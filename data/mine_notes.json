@@ -1,0 +1,46 @@
+{
+	"stollen": [
+		{
+			"speaker": "TOBIAS, VORARBEITER",
+			"text": "Die Stützen halten. Noch. Wer das hier liest: Zähl die Lampen auf dem Rückweg."
+		},
+		{
+			"speaker": "BERGMANN",
+			"text": "Das Licht wird dünner, je tiefer wir graben. Die Lampen am Seil brennen noch, aber nicht mehr lange."
+		},
+		{
+			"speaker": "NOTIZ",
+			"text": "Schicht 14. Etwas kratzt hinter der Wand. Der Alte sagt, es sind die Ratten. Es sind keine Ratten."
+		},
+		{
+			"speaker": "BERGMANN",
+			"text": "Die Winde klemmt wieder. Wenn du sie zum Laufen bringst, kommst du schneller nach Hause als wir."
+		},
+		{
+			"speaker": "TAGEBUCH",
+			"text": "Wir haben schwarze Spinnen im Nest gefunden. Wir haben sie in Ruhe gelassen. Sie uns nicht."
+		},
+		{
+			"speaker": "NOTIZ",
+			"text": "Wer tiefer geht, braucht Glück. Wer zurückkommt, braucht mehr."
+		}
+	],
+	"stein": [
+		{
+			"speaker": "STEINMETZ",
+			"text": "Die Wände hier sind gemauert, aber nicht von uns. Etwas war vor uns hier."
+		}
+	],
+	"kristall": [
+		{
+			"speaker": "NOTIZ",
+			"text": "Die Kristalle summen, wenn man schweigt. Ich schweige nicht mehr."
+		}
+	],
+	"zerfressen": [
+		{
+			"speaker": "NOTIZ",
+			"text": "Es ist nicht mehr Fels. Es atmet."
+		}
+	]
+}

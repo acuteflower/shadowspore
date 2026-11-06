@@ -1,0 +1,18 @@
+# Nacht-Atmosphäre: Mondlicht, kalte Düsternis, Nebel
+
+Rückmeldung des Users: die Nacht war nicht düster und mysteriös genug; es fehlten Mondlicht, violettes Ambiente und Nebel. Nach dem ersten Bau: „düsterer statt lilaner, Mondschein krasser“. Das Ergebnis steht unten, die Zahlen sind Startwerte.
+
+## Konzept
+- **Düster statt lila:** Der Tint (`TimeManager.NIGHT_COLOR` 0.30/0.29/0.50) ist dunkel und kalt, nur leicht violett. Das Violett kommt als schwacher additiver Hauch (`night_moon`) und aus einem leichten Farbgrad der Wiese (`ground_tone`, 16 %), nicht aus dem Tint. Ein fast schwarzer Rand (Vignette in `night_fog`) lässt die Nacht zusammenrücken.
+- **Mondlicht ist Licht, keine Farbe:** `night_moon` liest das fertige Bild (`hint_screen_texture`) und HELLT es auf (Bild × Verstärkung plus ein kühler Anteil, der mit der Helligkeit des Untergrunds wächst), statt eine blasse Farbe darüberzulegen. So werden Gras, Rinde und Büsche in den Pfützen heller und bläulich-grün statt grau. Jede Pfütze hat einen hellen Kern und fällt in geditherten Stufen ab, Blätterlicht bricht sie auf, schräge Strahlen und glimmende Pixel kommen dazu. Die Pfützen gehören der Welt, nicht der Kamera: sie ziehen von allein, wachsen, schrumpfen und trennen sich (zwei Felder bewegen sich gegeneinander, die Schwelle atmet). Die Kameraposition wird erst direkt vor dem Zeichnen (`RenderingServer.frame_pre_draw`) an die Shader gegeben, sonst hinkt sie ein Bild hinter dem Gehen her und das Licht rutscht gegen den Boden. Die alten Nacht-Flecken im Bodenshader (`ground_tone`: Mond- und Nebelflecken per Palettenverschiebung, grauer Farbmix) sind komplett entfernt, sie sahen wie graue Flecken aus und waren kein Mondlicht. Der violette Farbgrad der Wiese bleibt.
+- **Ellie:** Sie wird nur aufgehellt, wenn sie in eine Mondpfütze läuft (das Bild wird darunter aufgehellt, also auch sie). Keine eigene Aura.
+- **Mondphasen:** Acht-Tage-Zyklus (`TimeManager.moon_phase/moon_light`, 0 Neumond .. 4 Vollmond). Vollmond: helle Fenster, wenig Nebel. Neumond: dunkler, dichter Nebel. Das gibt jeder Nacht eine eigene Stimmung, ohne neue Regeln.
+- **Nebel:** zwei driftende, gestufte und geditherte Bänke in Weltkoordinaten (schiebt sich beim Gehen vorbei). Sie ziehen sich vor dem Licht der Stadt zurück (dieselben Kreise, die die Wesen draußen halten, bis zu acht pro Bild) und vor der Heldin (kleine Lichtung, damit man spielen kann). Dünner Frühnebel am Morgen (`dew_amount`), der verfliegt.
+- **Nebelnacht (Sondernacht `fog`):** ab Tag 4 neben Flut und Stille. Dichter Nebel, das Licht der Stadt reicht nur 80 % weit (`TownManager.light_scale`, gilt für KI, Spawnsperre und Nebel; Baurechte bleiben bei 100 %). Banner am Abend.
+- Innenräume und die Mine bleiben unberührt (eigenes Licht).
+
+## Bau
+`NightAtmosphere` (`src/world/night_atmosphere.gd`, Kind von `DayNight`, jeder Peer, rein kosmetisch) hängt zwei Bildschirmflächen unter das HUD: `assets/shaders/night_moon.gdshader` (additiv) und `night_fog.gdshader` (Alpha), gemeinsame Rauschfunktionen in `night_noise.gdshaderinc`. Welt-Ursprung und Bildgröße kommen aus der Canvas-Transformation. Die Sondernacht wird auf jedem Peer aus Weltseed und Tag berechnet (`NightRules.special_for`), also ohne Netzwerk. Daten der Sondernacht: `data/night.json` (`fog`, `light_scale`). Vorher/nachher-Bilder: `Godot --rendering-driver opengl3 --path . tools/preview_daylight.tscn -- --dir=/abs --times=0.0 --at=786,679 --day=4 --town` (`--day` = Mondphase, `--town` = Stadt mit Licht).
+
+## Nicht gebaut
+Mondschatten von Bäumen und Häusern, kalter Randlicht-Saum auf Figuren, Nebel nach Geländehöhe (Mulden dichter), Nebelton, Mond am Himmel (gibt es in der Draufsicht nicht).

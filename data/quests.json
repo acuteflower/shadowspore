@@ -1,0 +1,344 @@
+{
+ "find_help": {
+  "title": "HILFE FINDEN",
+  "steps": [
+   {
+    "id": "follow",
+    "text": "FOLGE DEM PFAD NACH SÜDEN",
+    "type": "reach",
+    "tile": [
+     461,
+     658
+    ],
+    "radius": 5
+   },
+   {
+    "id": "approach",
+    "text": "FOLGE DEM PFAD WEITER",
+    "type": "reach",
+    "tile": [
+     465,
+     661
+    ],
+    "radius": 3
+   },
+   {
+    "id": "sneak",
+    "text": "SCHLEICH AN DEN SPINNEN VORBEI",
+    "type": "reach",
+    "tile": [
+     478,
+     674
+    ],
+    "radius": 3,
+    "event": "dialogue:spiders_intro",
+    "hint": "sneak"
+   },
+   {
+    "id": "find_knight",
+    "text": "FOLGE DEM PFAD WEITER",
+    "type": "reach",
+    "tile": [
+     489,
+     685
+    ],
+    "radius": 5,
+    "flag": "knight_seen"
+   },
+   {
+    "id": "inspect_knight",
+    "text": "UNTERSUCHE DEN GEFALLENEN RITTER",
+    "type": "flag",
+    "flag": "knight_inspected",
+    "tile": [
+     493,
+     685
+    ]
+   },
+   {
+    "id": "take_sword",
+    "text": "NIMM DAS SCHWERT",
+    "type": "flag",
+    "flag": "knight_sword_taken",
+    "tile": [
+     493,
+     685
+    ],
+    "hint": "take_sword"
+   },
+   {
+    "id": "equip_sword",
+    "text": "RÜSTE DAS SCHWERT AUS",
+    "type": "flag",
+    "flag": "knight_sword_equipped",
+    "hint": "equip_sword"
+   },
+   {
+    "id": "sword_combo",
+    "text": "ÜBE DIE DREISTUFIGE ANGRIFFSKETTE",
+    "type": "flag",
+    "flag": "sword_combo_done",
+    "hint": "combo"
+   },
+   {
+    "id": "crossroad",
+    "text": "ERREICHE DIE ABZWEIGUNG",
+    "type": "reach",
+    "tile": [
+     498,
+     698
+    ],
+    "radius": 4
+   },
+   {
+    "id": "sign",
+    "text": "LIES DEN WEGWEISER",
+    "type": "flag",
+    "flag": "read_sign",
+    "tile": [
+     498,
+     698
+    ]
+   },
+   {
+    "id": "ambush",
+    "text": "ÜBERLEBE",
+    "type": "flag",
+    "flag": "ambush_done",
+    "event": "ambush:crossroad"
+   },
+   {
+    "id": "wake",
+    "text": "WACHE AUF",
+    "type": "flag",
+    "flag": "woke_up",
+    "event": "wake:hut"
+   },
+   {
+    "id": "leave_hut",
+    "text": "VERLASSE DIE HÜTTE",
+    "type": "flag",
+    "flag": "left_hut",
+    "anchor": "hut_exit"
+   },
+   {
+    "id": "find_knight",
+    "text": "SUCHE DEN UNBEKANNTEN RITTER",
+    "type": "flag",
+    "flag": "knight_seen",
+    "tile": [
+     786,
+     676
+    ],
+    "search": 50,
+    "event": "dialogue:where_knight",
+    "hint": "map"
+   },
+   {
+    "id": "talk_knight",
+    "text": "SPRICH MIT DEM RITTER",
+    "type": "reach",
+    "actor": "knight",
+    "radius": 7,
+    "event": "bark:knight_spotted"
+   },
+   {
+    "id": "meet",
+    "text": "SPRICH MIT DEM RITTER",
+    "type": "flag",
+    "flag": "knight_met",
+    "actor": "knight",
+    "event": "meet:knight"
+   },
+   {
+    "id": "follow_knight",
+    "text": "FOLGE DEM RITTER",
+    "type": "flag",
+    "flag": "knight_arrived",
+    "actor": "knight",
+    "event": "follow:knight"
+   },
+   {
+    "id": "sit_fire",
+    "text": "SETZ DICH ANS FEUER",
+    "type": "flag",
+    "flag": "fire_seated",
+    "tile": [
+     786,
+     676
+    ]
+   },
+   {
+    "id": "sleep",
+    "text": "GEH IN DIE HÜTTE UND SCHLAFE",
+    "type": "flag",
+    "flag": "slept",
+    "tile": [
+     786,
+     676
+    ]
+   }
+  ]
+ },
+ "lumberjack": {
+  "title": "DIE HOLZFÄLLERHÜTTE",
+  "steps": [
+   {
+    "id": "find_lumberjack",
+    "text": "SUCHE DIE HOLZFÄLLERHÜTTE",
+    "type": "flag",
+    "flag": "cabin_near",
+    "tile": [
+     748,
+     490
+    ],
+    "search": 40,
+    "event": "dialogue:day2_morning"
+   },
+   {
+    "id": "enter_cabin",
+    "text": "BETRITT DIE HÜTTE",
+    "type": "flag",
+    "flag": "entered_cabin",
+    "tile": [
+     755,
+     482
+    ]
+   },
+   {
+    "id": "kill_spider",
+    "text": "BESIEGE DIE SCHATTENSPINNE",
+    "type": "flag",
+    "flag": "spider_dead",
+    "tile": [
+     755,
+     482
+    ],
+    "event": "cabin:fight"
+   },
+   {
+    "id": "search_cabin",
+    "text": "DURCHSUCHE DIE HÜTTE",
+    "type": "flag",
+    "flag": "lumberjack_found",
+    "tile": [
+     755,
+     482
+    ]
+   },
+   {
+    "id": "report_back",
+    "text": "MELDE DICH BEI VALDRIC ZURÜCK",
+    "type": "reach",
+    "actor": "knight",
+    "radius": 5,
+    "hint": "chop"
+   },
+   {
+    "id": "report_talk",
+    "text": "SPRICH MIT VALDRIC",
+    "type": "flag",
+    "flag": "lumberjack_reported",
+    "event": "story:report_lumberjack"
+   }
+  ],
+  "next": "rebuild_hut"
+ },
+ "rebuild_hut": {
+  "title": "DIE HÜTTE ERNEUERN",
+  "steps": [
+   {
+    "id": "rebuild_tasks",
+    "text": "MACHE DIE HÜTTE SICHER",
+    "type": "tasks",
+    "tile": [
+     786,
+     676
+    ],
+    "tasks": [
+     {
+      "id": "wood",
+      "text": "TANNENHOLZ AN VALDRIC",
+      "kind": "deliver",
+      "item": "wood",
+      "count": 20,
+      "flag": "rebuild_wood_delivered"
+     },
+     {
+      "id": "mushrooms",
+      "text": "PILZE IM HAUS ENTFERNEN",
+      "kind": "flag",
+      "flag": "hut_mushrooms_removed"
+     },
+     {
+      "id": "tree",
+      "text": "BAUM IM HAUS FÄLLEN",
+      "kind": "flag",
+      "flag": "hut_tree_felled"
+     }
+    ]
+   },
+   {
+    "id": "rebuild_finale",
+    "text": "SPRICH MIT VALDRIC",
+    "type": "flag",
+    "flag": "rebuild_done",
+    "event": "finale:hut"
+   }
+  ],
+  "next": "town_start"
+ },
+ "town_start": {
+  "title": "DIE STADT",
+  "steps": [
+   {
+    "id": "town_night",
+    "text": "RUHE DICH AUS, BIS ES MORGEN WIRD",
+    "type": "flag",
+    "flag": "town_morning"
+   },
+   {
+    "id": "town_valdric",
+    "text": "SPRICH MIT VALDRIC",
+    "type": "reach",
+    "actor": "knight",
+    "radius": 6
+   },
+   {
+    "id": "town_intro",
+    "text": "SPRICH MIT VALDRIC",
+    "type": "flag",
+    "flag": "town_intro_done",
+    "event": "story:town_intro"
+   },
+   {
+    "id": "build_lamp",
+    "text": "BAUE EINEN LICHTPFOSTEN",
+    "type": "flag",
+    "flag": "built_lamp_post",
+    "hint": "build"
+   },
+   {
+    "id": "build_workshop",
+    "text": "BAUE EINE WERKSTATT",
+    "type": "flag",
+    "flag": "built_workshop",
+    "hint": "build"
+   },
+   {
+    "id": "meet_stranger",
+    "text": "EIN FREMDER KOMMT ZUM LICHT",
+    "type": "reach",
+    "actor": "gustav",
+    "radius": 4
+   },
+   {
+    "id": "gustav_hello",
+    "text": "SPRICH MIT DEM FREMDEN",
+    "type": "flag",
+    "flag": "gustav_joined",
+    "event": "story:gustav_hello"
+   }
+  ]
+ }
+}

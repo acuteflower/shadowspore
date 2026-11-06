@@ -1,0 +1,1107 @@
+{
+ "hut": {
+  "title": "Hütte",
+  "dir": "res://assets/interior/hut/",
+  "size": [
+   432,
+   312
+  ],
+  "floor": [
+   16,
+   72,
+   400,
+   224
+  ],
+  "front_y": 274,
+  "ambient": {
+   "day": "#e6d3bd",
+   "night": "#5a5478"
+  },
+  "entry": [
+   320,
+   262
+  ],
+  "exit_door": {
+   "id": "door",
+   "pos": [
+    320,
+    292
+   ],
+   "leaf": [
+    292,
+    256
+   ]
+  },
+  "bed_anchor": [
+   62,
+   94
+  ],
+  "shell": [
+   {
+    "tex": "floor.png",
+    "pos": [
+     16,
+     72
+    ],
+    "z": -6
+   },
+   {
+    "tex": "wall.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "side.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "side.png",
+    "pos": [
+     416,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   }
+  ],
+  "walls": [
+   [
+    16,
+    48,
+    400,
+    28
+   ],
+   [
+    0,
+    40,
+    24,
+    260
+   ],
+   [
+    408,
+    40,
+    24,
+    260
+   ],
+   [
+    0,
+    284,
+    296,
+    30
+   ],
+   [
+    344,
+    284,
+    88,
+    30
+   ],
+   [
+    296,
+    306,
+    48,
+    10
+   ]
+  ],
+  "props": [
+   {
+    "id": "bed",
+    "tex": "bed.png",
+    "frames": 2,
+    "frame": 0,
+    "pos": [
+     62,
+     94
+    ],
+    "feet": 66,
+    "glow": "bed_glow.png",
+    "solid": [
+     64,
+     20,
+     -34,
+     -12
+    ]
+   },
+   {
+    "id": "fireplace",
+    "tex": "fireplace.png",
+    "pos": [
+     272,
+     82
+    ],
+    "feet": 100,
+    "glow": "fireplace_glow.png",
+    "solid": [
+     64,
+     14,
+     -32,
+     -12
+    ]
+   },
+   {
+    "id": "cupboard",
+    "tex": "cupboard.png",
+    "pos": [
+     176,
+     84
+    ],
+    "feet": 82,
+    "glow": "cupboard_glow.png",
+    "solid": [
+     52,
+     12,
+     -26,
+     -10
+    ]
+   },
+   {
+    "id": "shelf",
+    "tex": "shelf.png",
+    "pos": [
+     354,
+     56
+    ],
+    "feet": 18,
+    "glow": "shelf_glow.png"
+   },
+   {
+    "id": "rack",
+    "tex": "rack.png",
+    "pos": [
+     224,
+     54
+    ],
+    "feet": 20
+   },
+   {
+    "id": "table",
+    "tex": "table.png",
+    "pos": [
+     204,
+     176
+    ],
+    "feet": 56,
+    "glow": "table_glow.png",
+    "solid": [
+     70,
+     14,
+     -35,
+     -14
+    ]
+   },
+   {
+    "id": "stool_a",
+    "tex": "stool.png",
+    "frames": 3,
+    "frame": 0,
+    "pos": [
+     158,
+     196
+    ],
+    "feet": 24,
+    "solid": [
+     14,
+     8,
+     -7,
+     -6
+    ]
+   },
+   {
+    "id": "stool_b",
+    "tex": "stool.png",
+    "frames": 3,
+    "frame": 1,
+    "pos": [
+     254,
+     170
+    ],
+    "feet": 24,
+    "solid": [
+     14,
+     8,
+     -7,
+     -6
+    ]
+   },
+   {
+    "id": "stool_c",
+    "tex": "stool.png",
+    "frames": 3,
+    "frame": 2,
+    "pos": [
+     236,
+     226
+    ],
+    "feet": 24
+   },
+   {
+    "id": "chair",
+    "tex": "chair.png",
+    "pos": [
+     124,
+     176
+    ],
+    "feet": 48,
+    "solid": [
+     18,
+     8,
+     -9,
+     -6
+    ]
+   },
+   {
+    "id": "chest",
+    "tex": "chest.png",
+    "pos": [
+     372,
+     150
+    ],
+    "feet": 44,
+    "solid": [
+     42,
+     12,
+     -21,
+     -10
+    ]
+   },
+   {
+    "id": "barrel",
+    "tex": "barrel.png",
+    "pos": [
+     394,
+     208
+    ],
+    "feet": 36,
+    "solid": [
+     22,
+     12,
+     -11,
+     -10
+    ]
+   },
+   {
+    "id": "crates",
+    "tex": "crates.png",
+    "pos": [
+     358,
+     262
+    ],
+    "feet": 52,
+    "solid": [
+     50,
+     14,
+     -25,
+     -12
+    ]
+   },
+   {
+    "id": "pots",
+    "tex": "pots.png",
+    "pos": [
+     58,
+     250
+    ],
+    "feet": 24
+   },
+   {
+    "id": "sapling",
+    "tex": "sapling.png",
+    "pos": [
+     278,
+     242
+    ],
+    "feet": 150,
+    "glow": "sapling_glow.png",
+    "solid": [
+     12,
+     6,
+     -6,
+     -5
+    ],
+    "crown": {
+     "tex": "sapling_crown.png",
+     "glow": "sapling_crown_glow.png",
+     "sway": 0.028
+    },
+    "fell": {
+     "hits": 6,
+     "drops": [
+      {
+       "id": "wood",
+       "chance": 1.0,
+       "min": 1,
+       "max": 1
+      },
+      {
+       "id": "stick",
+       "chance": 0.3,
+       "min": 1,
+       "max": 1
+      }
+     ],
+     "final_drops": [
+      {
+       "id": "wood",
+       "chance": 1.0,
+       "min": 2,
+       "max": 3
+      },
+      {
+       "id": "resin",
+       "chance": 0.5,
+       "min": 1,
+       "max": 1
+      }
+     ]
+    }
+   },
+   {
+    "id": "mushrooms_a",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 2,
+    "pos": [
+     92,
+     188
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#78f4e6",
+     "radius": 30,
+     "energy": 0.7
+    },
+    "pickup": {
+     "item": "glow_cap",
+     "amounts": [
+      1,
+      2,
+      3,
+      5
+     ],
+     "step": "rebuild_tasks",
+     "flag": "hut_mushrooms_a",
+     "all_flag": "hut_mushrooms_removed"
+    }
+   },
+   {
+    "id": "mushrooms_b",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 1,
+    "pos": [
+     192,
+     128
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#a97cff",
+     "radius": 28,
+     "energy": 0.6
+    },
+    "pickup": {
+     "item": "glow_cap",
+     "amounts": [
+      1,
+      2,
+      3,
+      5
+     ],
+     "step": "rebuild_tasks",
+     "flag": "hut_mushrooms_b",
+     "all_flag": "hut_mushrooms_removed"
+    }
+   },
+   {
+    "id": "mushrooms_c",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 3,
+    "pos": [
+     302,
+     232
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#78f4e6",
+     "radius": 26,
+     "energy": 0.55
+    },
+    "pickup": {
+     "item": "glow_cap",
+     "amounts": [
+      1,
+      2,
+      3,
+      5
+     ],
+     "step": "rebuild_tasks",
+     "flag": "hut_mushrooms_c",
+     "all_flag": "hut_mushrooms_removed"
+    }
+   },
+   {
+    "id": "mushrooms_d",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 0,
+    "pos": [
+     346,
+     178
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#78f4e6",
+     "radius": 22,
+     "energy": 0.5
+    },
+    "pickup": {
+     "item": "glow_cap",
+     "amounts": [
+      1,
+      2,
+      3,
+      5
+     ],
+     "step": "rebuild_tasks",
+     "flag": "hut_mushrooms_d",
+     "all_flag": "hut_mushrooms_removed"
+    }
+   },
+   {
+    "id": "mushrooms_e",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 2,
+    "pos": [
+     58,
+     270
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#a97cff",
+     "radius": 22,
+     "energy": 0.45
+    },
+    "pickup": {
+     "item": "glow_cap",
+     "amounts": [
+      1,
+      2,
+      3,
+      5
+     ],
+     "step": "rebuild_tasks",
+     "flag": "hut_mushrooms_e",
+     "all_flag": "hut_mushrooms_removed"
+    }
+   }
+  ],
+  "hanging": [
+   {
+    "id": "herbs",
+    "tex": "herbs.png",
+    "glow": "herbs_glow.png",
+    "pos": [
+     118,
+     20
+    ],
+    "sway": 0.06,
+    "speed": 0.9
+   },
+   {
+    "id": "lantern",
+    "tex": "lantern.png",
+    "glow": "lantern_glow.png",
+    "pos": [
+     206,
+     14
+    ],
+    "sway": 0.05,
+    "speed": 0.7,
+    "light": {
+     "color": "#78f4e6",
+     "radius": 64,
+     "energy": 0.9,
+     "drop": 40
+    }
+   }
+  ],
+  "anims": [
+   {
+    "id": "fire",
+    "tex": "fire.png",
+    "frames": 6,
+    "pos": [
+     272,
+     80
+    ],
+    "feet": 28,
+    "fps": 9.0,
+    "unlit": true
+   }
+  ],
+  "drips": [
+   {
+    "pos": [
+     250,
+     40
+    ],
+    "land": [
+     250,
+     128
+    ],
+    "every": 3.2
+   },
+   {
+    "pos": [
+     366,
+     40
+    ],
+    "land": [
+     372,
+     100
+    ],
+    "every": 4.6
+   }
+  ],
+  "decals": [
+   {
+    "tex": "rug.png",
+    "pos": [
+     132,
+     144
+    ],
+    "z": -4
+   },
+   {
+    "tex": "web.png",
+    "pos": [
+     16,
+     72
+    ],
+    "z": 2
+   },
+   {
+    "tex": "web.png",
+    "pos": [
+     388,
+     72
+    ],
+    "z": 2,
+    "flip": true
+   }
+  ],
+  "lights": [
+   {
+    "pos": [
+     272,
+     98
+    ],
+    "color": "#ff9a4a",
+    "radius": 130,
+    "squash": 0.75,
+    "energy": 1.3,
+    "flicker": 0.24
+   },
+   {
+    "pos": [
+     116,
+     110
+    ],
+    "color": "#cfe0ff",
+    "radius": 84,
+    "squash": 0.8,
+    "energy": 0.8,
+    "day": true
+   },
+   {
+    "pos": [
+     326,
+     110
+    ],
+    "color": "#cfe0ff",
+    "radius": 70,
+    "squash": 0.8,
+    "energy": 0.6,
+    "day": true
+   },
+   {
+    "pos": [
+     381,
+     110
+    ],
+    "color": "#d9ecff",
+    "radius": 56,
+    "squash": 0.8,
+    "energy": 0.5,
+    "day": true
+   },
+   {
+    "pos": [
+     270,
+     214
+    ],
+    "color": "#a8f0d0",
+    "radius": 56,
+    "squash": 0.8,
+    "energy": 0.5,
+    "day": true
+   }
+  ],
+  "rays": [
+   {
+    "pos": [
+     96,
+     72
+    ],
+    "scale": 1.0
+   },
+   {
+    "pos": [
+     306,
+     72
+    ],
+    "scale": 0.9
+   },
+   {
+    "pos": [
+     366,
+     72
+    ],
+    "scale": 1.1
+   },
+   {
+    "pos": [
+     244,
+     72
+    ],
+    "scale": 1.5
+   }
+  ]
+ },
+ "cabin": {
+  "title": "Holzfällerhütte",
+  "dir": "res://assets/interior/cabin/",
+  "size": [
+   256,
+   232
+  ],
+  "floor": [
+   16,
+   72,
+   224,
+   144
+  ],
+  "front_y": 194,
+  "ambient": {
+   "day": "#d4cdd0",
+   "night": "#4a4a6c"
+  },
+  "entry": [
+   128,
+   182
+  ],
+  "exit_door": {
+   "id": "door",
+   "pos": [
+    128,
+    212
+   ],
+   "leaf": [
+    104,
+    176
+   ]
+  },
+  "shell": [
+   {
+    "tex": "floor.png",
+    "pos": [
+     16,
+     72
+    ],
+    "z": -6
+   },
+   {
+    "tex": "wall.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "side.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "side.png",
+    "pos": [
+     240,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   }
+  ],
+  "walls": [
+   [
+    16,
+    48,
+    224,
+    28
+   ],
+   [
+    0,
+    40,
+    24,
+    180
+   ],
+   [
+    232,
+    40,
+    24,
+    180
+   ],
+   [
+    0,
+    204,
+    104,
+    30
+   ],
+   [
+    152,
+    204,
+    104,
+    30
+   ],
+   [
+    104,
+    226,
+    48,
+    10
+   ]
+  ],
+  "props": [
+   {
+    "id": "bed",
+    "tex": "bed.png",
+    "frames": 2,
+    "frame": 1,
+    "pos": [
+     58,
+     104
+    ],
+    "feet": 66,
+    "solid": [
+     64,
+     20,
+     -34,
+     -12
+    ]
+   },
+   {
+    "id": "rack",
+    "tex": "rack.png",
+    "pos": [
+     206,
+     60
+    ],
+    "feet": 20
+   },
+   {
+    "id": "shelf",
+    "tex": "shelf.png",
+    "pos": [
+     112,
+     52
+    ],
+    "feet": 18
+   },
+   {
+    "id": "table",
+    "tex": "table.png",
+    "pos": [
+     196,
+     152
+    ],
+    "feet": 56,
+    "solid": [
+     70,
+     14,
+     -35,
+     -14
+    ]
+   },
+   {
+    "id": "chair",
+    "tex": "chair.png",
+    "pos": [
+     148,
+     160
+    ],
+    "feet": 48,
+    "solid": [
+     18,
+     8,
+     -9,
+     -6
+    ]
+   },
+   {
+    "id": "stool_a",
+    "tex": "stool.png",
+    "frames": 3,
+    "frame": 2,
+    "pos": [
+     68,
+     172
+    ],
+    "feet": 24,
+    "solid": [
+     14,
+     8,
+     -7,
+     -6
+    ]
+   },
+   {
+    "id": "barrel",
+    "tex": "barrel.png",
+    "pos": [
+     222,
+     106
+    ],
+    "feet": 36,
+    "solid": [
+     22,
+     12,
+     -11,
+     -10
+    ]
+   },
+   {
+    "id": "crates",
+    "tex": "crates.png",
+    "pos": [
+     40,
+     198
+    ],
+    "feet": 52,
+    "solid": [
+     50,
+     14,
+     -25,
+     -12
+    ]
+   },
+   {
+    "id": "pots",
+    "tex": "pots.png",
+    "pos": [
+     214,
+     196
+    ],
+    "feet": 24
+   },
+   {
+    "id": "mushrooms_a",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 2,
+    "pos": [
+     96,
+     150
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#78f4e6",
+     "radius": 30,
+     "energy": 0.7
+    }
+   },
+   {
+    "id": "mushrooms_b",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 1,
+    "pos": [
+     34,
+     142
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#a97cff",
+     "radius": 26,
+     "energy": 0.55
+    }
+   },
+   {
+    "id": "mushrooms_c",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 3,
+    "pos": [
+     182,
+     116
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#78f4e6",
+     "radius": 26,
+     "energy": 0.5
+    }
+   },
+   {
+    "id": "mushrooms_d",
+    "tex": "res://assets/props/mushrooms.png",
+    "frames": 4,
+    "frame": 0,
+    "pos": [
+     122,
+     92
+    ],
+    "feet": 20,
+    "glow": "res://assets/props/mushrooms_glow.png",
+    "light": {
+     "color": "#78f4e6",
+     "radius": 22,
+     "energy": 0.45
+    }
+   }
+  ],
+  "body": {
+   "pos": [
+    152,
+    98
+   ],
+   "axe": [
+    176,
+    112
+   ]
+  },
+  "hanging": [
+   {
+    "id": "herbs",
+    "tex": "herbs.png",
+    "pos": [
+     196,
+     20
+    ],
+    "sway": 0.04,
+    "speed": 0.7
+   },
+   {
+    "id": "lantern",
+    "tex": "lantern.png",
+    "pos": [
+     92,
+     14
+    ],
+    "sway": 0.03,
+    "speed": 0.6
+   }
+  ],
+  "drips": [
+   {
+    "pos": [
+     70,
+     40
+    ],
+    "land": [
+     72,
+     132
+    ],
+    "every": 5.4
+   }
+  ],
+  "decals": [
+   {
+    "tex": "web.png",
+    "pos": [
+     16,
+     72
+    ],
+    "z": 2
+   },
+   {
+    "tex": "web.png",
+    "pos": [
+     212,
+     72
+    ],
+    "z": 2,
+    "flip": true
+   },
+   {
+    "tex": "web.png",
+    "pos": [
+     104,
+     72
+    ],
+    "z": 2
+   }
+  ],
+  "lights": [
+   {
+    "pos": [
+     150,
+     112
+    ],
+    "color": "#cfe0ff",
+    "radius": 78,
+    "squash": 0.8,
+    "energy": 0.7,
+    "day": true
+   },
+   {
+    "pos": [
+     60,
+     110
+    ],
+    "color": "#a8f0d0",
+    "radius": 50,
+    "squash": 0.8,
+    "energy": 0.4,
+    "day": true
+   }
+  ],
+  "rays": [
+   {
+    "pos": [
+     134,
+     72
+    ],
+    "scale": 1.1
+   },
+   {
+    "pos": [
+     190,
+     72
+    ],
+    "scale": 0.7
+   }
+  ]
+ }
+}

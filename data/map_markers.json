@@ -1,0 +1,19 @@
+{
+  "resident": {
+    "color": "a6ceae",
+    "rows": ["..X..", ".XXX.", "XXXXX", ".XXX.", "..X.."]
+  },
+  "valdric": {
+    "name": "VALDRIC",
+    "title": "RITTER",
+    "requires": "knows_adventurer",
+    "color": "c8b8ed",
+    "rows": ["XXXXX", "X.X.X", "X.X.X", ".XXX.", "..X.."]
+  },
+  "gustav": {
+    "name": "GUSTAV",
+    "title": "ZIMMERMANN",
+    "color": "e6c488",
+    "rows": ["XXXX.", ".XX.X", "..X..", "..X..", "..X.."]
+  }
+}

@@ -1,0 +1,92 @@
+{
+	"grass": {
+		"speed": 1.0,
+		"step": {
+			"kind": "puff",
+			"color": "#b7dc94",
+			"amount": 2
+		}
+	},
+	"path": {
+		"speed": 1.0,
+		"step": {
+			"kind": "puff",
+			"color": "#d6c9a8",
+			"amount": 3
+		}
+	},
+	"mud": {
+		"speed": 0.7,
+		"step": {
+			"kind": "puff",
+			"color": "#5a3d2e",
+			"amount": 4
+		},
+		"footprint": {
+			"color": "#2e1d15",
+			"seconds": 14
+		}
+	},
+	"shallow_water": {
+		"speed": 0.8,
+		"submerge": 3,
+		"ripples": true,
+		"step": {
+			"kind": "splash",
+			"color": "#bfe9ff",
+			"amount": 6
+		}
+	},
+	"deep_water": {
+		"speed": 0.5,
+		"submerge": 9,
+		"ripples": true,
+		"allow_sprint": false,
+		"allow_blink": false,
+		"step": {
+			"kind": "splash",
+			"color": "#bfe9ff",
+			"amount": 8
+		}
+	},
+	"slope": {
+		"speed": 0.92,
+		"step": {
+			"kind": "puff",
+			"color": "#a58a68",
+			"amount": 3
+		}
+	},
+	"stone": {
+		"speed": 1.0,
+		"step": {
+			"kind": "puff",
+			"color": "#b9b7d0",
+			"amount": 2
+		}
+	},
+	"wood": {
+		"speed": 1.0,
+		"step": {
+			"kind": "puff",
+			"color": "#8a7a6c",
+			"amount": 2
+		}
+	},
+	"bed": {
+		"speed": 0.8,
+		"step": {
+			"kind": "puff",
+			"color": "#6b4a36",
+			"amount": 3
+		}
+	},
+	"mine_stone": {
+		"speed": 1.0,
+		"step": {
+			"kind": "puff",
+			"color": "#6c6680",
+			"amount": 2
+		}
+	}
+}

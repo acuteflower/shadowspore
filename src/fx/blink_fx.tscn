@@ -1,0 +1,41 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/fx/blink_fx.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/fx/blink_rift.png" id="2_rift"]
+[ext_resource type="Texture2D" path="res://assets/fx/void_shard.png" id="3_shard"]
+
+[sub_resource type="Gradient" id="Gradient_void"]
+offsets = PackedFloat32Array(0, 0.4, 1)
+colors = PackedColorArray(0.91, 0.78, 1, 1, 0.61, 0.36, 1, 1, 0.16, 0.07, 0.31, 0)
+
+[sub_resource type="Curve" id="Curve_shrink"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0.3), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[node name="BlinkFx" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Rift" type="Sprite2D" parent="."]
+z_index = -1
+position = Vector2(0, -1)
+texture = ExtResource("2_rift")
+hframes = 6
+
+[node name="Shards" type="CPUParticles2D" parent="."]
+position = Vector2(0, -2)
+amount = 16
+lifetime = 0.6
+one_shot = true
+explosiveness = 0.95
+texture = ExtResource("3_shard")
+direction = Vector2(0, -1)
+spread = 75.0
+gravity = Vector2(0, -30)
+initial_velocity_min = 30.0
+initial_velocity_max = 90.0
+damping_min = 90.0
+damping_max = 130.0
+scale_amount_min = 1.0
+scale_amount_max = 1.8
+scale_amount_curve = SubResource("Curve_shrink")
+color_ramp = SubResource("Gradient_void")

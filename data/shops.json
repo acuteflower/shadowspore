@@ -1,0 +1,208 @@
+{
+ "gustav_bench": {
+  "title": "WERKBANK",
+  "npc": "gustav",
+  "role": "craft",
+  "reach": 140.0,
+  "tabs": [
+   {
+    "id": "make",
+    "name": "FERTIGEN",
+    "kind": "craft"
+   },
+   {
+    "id": "order",
+    "name": "BESTELLEN",
+    "kind": "order"
+   },
+   {
+    "id": "buy",
+    "name": "KAUFEN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "VERKAUFEN",
+    "kind": "sell"
+   }
+  ],
+  "buy": [
+   {
+    "item": "plank",
+    "price": 14,
+    "trust": 0
+   },
+   {
+    "item": "rope",
+    "price": 10,
+    "trust": 0
+   },
+   {
+    "item": "glow_cap",
+    "price": 18,
+    "trust": 30
+   }
+  ],
+  "sell": [
+   {
+    "item": "wood",
+    "price": 3
+   },
+   {
+    "item": "stone",
+    "price": 3
+   },
+   {
+    "item": "plant_fiber",
+    "price": 2
+   },
+   {
+    "item": "glow_cap",
+    "price": 6
+   },
+   {
+    "item": "moonbell",
+    "price": 5
+   },
+   {
+    "item": "wound_leaf",
+    "price": 4
+   },
+   {
+    "item": "seed_fluff",
+    "price": 2
+   },
+   {
+    "item": "fiddlehead",
+    "price": 4
+   },
+   {
+    "item": "fern_frond",
+    "price": 2
+   },
+   {
+    "item": "reed",
+    "price": 2
+   },
+   {
+    "item": "sun_seed",
+    "price": 7
+   },
+   {
+    "item": "void_bloom",
+    "price": 12
+   },
+   {
+    "item": "earth_tuber",
+    "price": 4
+   },
+   {
+    "item": "ember_carrot",
+    "price": 9
+   },
+   {
+    "item": "night_beet",
+    "price": 10
+   },
+   {
+    "item": "mist_lily",
+    "price": 10
+   },
+   {
+    "item": "spark_poppy",
+    "price": 5
+   },
+   {
+    "item": "birch_wood",
+    "price": 3
+   },
+   {
+    "item": "birch_bark",
+    "price": 3
+   },
+   {
+    "item": "birch_leaf",
+    "price": 3
+   },
+   {
+    "item": "ember_morel",
+    "price": 6
+   },
+   {
+    "item": "moon_parasol",
+    "price": 9
+   },
+   {
+    "item": "iris_bloom",
+    "price": 8
+   },
+   {
+    "item": "brook_mint",
+    "price": 5
+   },
+   {
+    "item": "marsh_gold",
+    "price": 4
+   },
+   {
+    "item": "fish_silverling",
+    "price": 4
+   },
+   {
+    "item": "fish_loach",
+    "price": 5
+   },
+   {
+    "item": "fish_trout",
+    "price": 9
+   },
+   {
+    "item": "fish_carp",
+    "price": 10
+   },
+   {
+    "item": "fish_glimmer",
+    "price": 8
+   },
+   {
+    "item": "fish_eel",
+    "price": 30
+   },
+   {
+    "item": "fish_pike",
+    "price": 45
+   }
+  ],
+  "lines": {
+   "open": [
+    "NA, WAS BRAUCHST DU?",
+    "DIE BANK IST FREI.",
+    "SAG, WAS ICH BAUEN SOLL."
+   ],
+   "craft": [
+    "DAS KANNST DU SELBST, ICH SCHAU ZU."
+   ],
+   "order": [
+    "DAS MACH ICH. ABER NICHT IM HANDUMDREHEN."
+   ],
+   "collect": [
+    "BITTE SEHR. ORDENTLICHE ARBEIT."
+   ],
+   "buy": [
+    "GUT, DASS DU ES NIMMST."
+   ],
+   "sell": [
+    "DAS KANN ICH GEBRAUCHEN."
+   ],
+   "no_trust": [
+    "DAS MACHE ICH NICHT FÜR JEDEN."
+   ],
+   "busy": [
+    "ERST DIESES HIER."
+   ],
+   "missing": [
+    "DA FEHLT NOCH WAS."
+   ]
+  }
+ }
+}

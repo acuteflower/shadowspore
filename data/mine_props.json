@@ -1,0 +1,407 @@
+{
+	"support_frame": {
+		"tex": "res://assets/mine/props/support_frame.png",
+		"feet": 64,
+		"size": [
+			78,
+			74
+		]
+	},
+	"support_lamp": {
+		"tex": "res://assets/mine/props/support_lamp.png",
+		"feet": 64,
+		"size": [
+			78,
+			74
+		],
+		"glow": "res://assets/mine/props/support_lamp_glow.png"
+	},
+	"post": {
+		"tex": "res://assets/mine/props/post.png",
+		"feet": 52,
+		"size": [
+			34,
+			62
+		]
+	},
+	"lamp": {
+		"tex": "res://assets/mine/props/lamp.png",
+		"feet": 56,
+		"size": [
+			28,
+			64
+		],
+		"glow": "res://assets/mine/props/lamp_glow.png"
+	},
+	"lamp_dead": {
+		"tex": "res://assets/mine/props/lamp_dead.png",
+		"feet": 56,
+		"size": [
+			28,
+			64
+		]
+	},
+	"cart": {
+		"tex": "res://assets/mine/props/cart.png",
+		"feet": 40,
+		"size": [
+			76,
+			52
+		]
+	},
+	"cart_loaded": {
+		"tex": "res://assets/mine/props/cart_loaded.png",
+		"feet": 40,
+		"size": [
+			76,
+			52
+		],
+		"glow": "res://assets/mine/props/cart_loaded_glow.png"
+	},
+	"crates": {
+		"tex": "res://assets/mine/props/crates.png",
+		"feet": 52,
+		"size": [
+			62,
+			60
+		]
+	},
+	"barrel": {
+		"tex": "res://assets/mine/props/barrel.png",
+		"feet": 36,
+		"size": [
+			34,
+			44
+		]
+	},
+	"sacks": {
+		"tex": "res://assets/mine/props/sacks.png",
+		"feet": 40,
+		"size": [
+			48,
+			50
+		]
+	},
+	"stairs_down": {
+		"tex": "res://assets/mine/props/stairs_down.png",
+		"feet": 40,
+		"size": [
+			66,
+			62
+		]
+	},
+	"stairs_up": {
+		"tex": "res://assets/mine/props/stairs_up.png",
+		"feet": 70,
+		"size": [
+			70,
+			80
+		],
+		"glow": "res://assets/mine/props/stairs_up_glow.png"
+	},
+	"winch": {
+		"tex": "res://assets/mine/props/winch.png",
+		"feet": 100,
+		"size": [
+			96,
+			112
+		],
+		"glow": "res://assets/mine/props/winch_glow.png"
+	},
+	"entrance": {
+		"tex": "res://assets/mine/props/entrance.png",
+		"feet": 156,
+		"size": [
+			216,
+			176
+		],
+		"glow": "res://assets/mine/props/entrance_glow.png"
+	},
+	"bunk": {
+		"tex": "res://assets/mine/props/bunk.png",
+		"feet": 60,
+		"size": [
+			70,
+			70
+		]
+	},
+	"bones": {
+		"tex": "res://assets/mine/props/bones.png",
+		"feet": 22,
+		"size": [
+			60,
+			34
+		]
+	},
+	"notes": {
+		"tex": "res://assets/mine/props/notes.png",
+		"feet": 14,
+		"size": [
+			34,
+			22
+		],
+		"glow": "res://assets/mine/props/notes_glow.png"
+	},
+	"nest": {
+		"tex": "res://assets/mine/props/nest.png",
+		"feet": 36,
+		"size": [
+			70,
+			50
+		],
+		"glow": "res://assets/mine/props/nest_glow.png"
+	},
+	"stalagmites": {
+		"tex": "res://assets/mine/props/stalagmites.png",
+		"feet": 42,
+		"size": [
+			48,
+			52
+		]
+	},
+	"waysign": {
+		"tex": "res://assets/mine/props/waysign.png",
+		"feet": 56,
+		"size": [
+			46,
+			66
+		],
+		"glow": "res://assets/mine/props/waysign_glow.png"
+	},
+	"web": {
+		"tex": "res://assets/mine/props/web.png",
+		"feet": 0,
+		"size": [
+			22,
+			22
+		]
+	},
+	"puddle_a": {
+		"tex": "res://assets/mine/props/puddle_a.png",
+		"feet": 10,
+		"size": [
+			44,
+			20
+		]
+	},
+	"puddle_b": {
+		"tex": "res://assets/mine/props/puddle_b.png",
+		"feet": 7,
+		"size": [
+			28,
+			14
+		]
+	},
+	"chest": {
+		"tex": "res://assets/mine/props/chest.png",
+		"feet": 44,
+		"size": [
+			56,
+			52
+		]
+	},
+	"table": {
+		"tex": "res://assets/mine/props/table.png",
+		"feet": 56,
+		"size": [
+			90,
+			66
+		],
+		"glow": "res://assets/mine/props/table_glow.png"
+	},
+	"stool": {
+		"tex": "res://assets/mine/props/stool.png",
+		"feet": 24,
+		"size": [
+			28,
+			30
+		]
+	},
+	"shelf": {
+		"tex": "res://assets/mine/props/shelf.png",
+		"feet": 18,
+		"size": [
+			70,
+			34
+		],
+		"glow": "res://assets/mine/props/shelf_glow.png"
+	},
+	"pots": {
+		"tex": "res://assets/mine/props/pots.png",
+		"feet": 24,
+		"size": [
+			44,
+			30
+		]
+	},
+	"anvil": {
+		"tex": "res://assets/mine/props/anvil.png",
+		"feet": 28,
+		"size": [
+			36,
+			34
+		],
+		"glow": "res://assets/mine/props/anvil_glow.png"
+	},
+	"forge": {
+		"tex": "res://assets/mine/props/forge.png",
+		"feet": 76,
+		"size": [
+			64,
+			90
+		],
+		"glow": "res://assets/mine/props/forge_glow.png"
+	},
+	"quench": {
+		"tex": "res://assets/mine/props/quench.png",
+		"feet": 22,
+		"size": [
+			44,
+			30
+		],
+		"glow": "res://assets/mine/props/quench_glow.png"
+	},
+	"crystal_a": {
+		"tex": "res://assets/mine/props/crystal_a.png",
+		"feet": 54,
+		"size": [
+			52,
+			66
+		],
+		"glow": "res://assets/mine/props/crystal_a_glow.png"
+	},
+	"crystal_b": {
+		"tex": "res://assets/mine/props/crystal_b.png",
+		"feet": 54,
+		"size": [
+			52,
+			66
+		],
+		"glow": "res://assets/mine/props/crystal_b_glow.png"
+	},
+	"crystal_big": {
+		"tex": "res://assets/mine/props/crystal_big.png",
+		"feet": 96,
+		"size": [
+			64,
+			110
+		],
+		"glow": "res://assets/mine/props/crystal_big_glow.png"
+	},
+	"void_crack": {
+		"tex": "res://assets/mine/props/void_crack.png",
+		"feet": 9,
+		"size": [
+			48,
+			18
+		],
+		"glow": "res://assets/mine/props/void_crack_glow.png"
+	},
+	"void_pod": {
+		"tex": "res://assets/mine/props/void_pod.png",
+		"feet": 32,
+		"size": [
+			34,
+			40
+		],
+		"glow": "res://assets/mine/props/void_pod_glow.png"
+	},
+	"void_eyes": {
+		"tex": "res://assets/mine/props/void_eyes.png",
+		"feet": 6,
+		"size": [
+			26,
+			12
+		],
+		"glow": "res://assets/mine/props/void_eyes_glow.png"
+	},
+	"rubble_a": {
+		"tex": "res://assets/mine/props/rubble_a.png",
+		"feet": 8,
+		"size": [
+			25,
+			12
+		]
+	},
+	"rubble_b": {
+		"tex": "res://assets/mine/props/rubble_b.png",
+		"feet": 9,
+		"size": [
+			46,
+			13
+		]
+	},
+	"rubble_c": {
+		"tex": "res://assets/mine/props/rubble_c.png",
+		"feet": 8,
+		"size": [
+			54,
+			12
+		]
+	},
+	"planks": {
+		"tex": "res://assets/mine/props/planks.png",
+		"feet": 15,
+		"size": [
+			38,
+			22
+		]
+	},
+	"mushrooms": {
+		"tex": "res://assets/mine/props/mushrooms.png",
+		"feet": 24,
+		"size": [
+			34,
+			30
+		],
+		"glow": "res://assets/mine/props/mushrooms_glow.png"
+	},
+	"lantern_floor": {
+		"tex": "res://assets/mine/props/lantern_floor.png",
+		"feet": 14,
+		"size": [
+			16,
+			18
+		]
+	},
+	"pickaxe": {
+		"tex": "res://assets/mine/props/pickaxe.png",
+		"feet": 9,
+		"size": [
+			34,
+			12
+		]
+	},
+	"bucket": {
+		"tex": "res://assets/mine/props/bucket.png",
+		"feet": 14,
+		"size": [
+			18,
+			18
+		]
+	},
+	"rope": {
+		"tex": "res://assets/mine/props/rope.png",
+		"feet": 10,
+		"size": [
+			20,
+			14
+		]
+	},
+	"ladder": {
+		"tex": "res://assets/mine/props/ladder.png",
+		"feet": 40,
+		"size": [
+			24,
+			46
+		]
+	},
+	"chain": {
+		"tex": "res://assets/mine/props/chain.png",
+		"feet": 36,
+		"size": [
+			12,
+			40
+		]
+	}
+}

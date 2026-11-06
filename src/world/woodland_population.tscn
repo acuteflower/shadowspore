@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/world/woodland_population.gd" id="1"]
+
+[node name="Woodland" type="Node2D"]
+y_sort_enabled = true
+script = ExtResource("1")
+
+[node name="Residents" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/entities/wildlife/woodland_mammal.tscn")
+spawn_path = NodePath("../Residents")
+
+[node name="Shelters" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="ShelterSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/entities/wildlife/wildlife_shelter.tscn")
+spawn_path = NodePath("../Shelters")

@@ -1,0 +1,506 @@
+{
+ "settings": {
+  "stand": {
+   "x_min": -6.0,
+   "x_max": 16.0
+  },
+  "cast": {
+   "min": 28.0,
+   "max": 130.0,
+   "flight": 0.45,
+   "target_x_max": -4.0,
+   "cooldown": 0.6,
+   "windup": 0.35
+  },
+  "drift": {
+   "speed": 9.0,
+   "give_speed": 20.0,
+   "stop_x": -3.0,
+   "sync": 0.1,
+   "give_hold": 0.3,
+   "max_line": 190.0
+  },
+  "twitch": {
+   "shift": 3.0,
+   "window": 3.0,
+   "scare_count": 3,
+   "lure_bonus": 0.7
+  },
+  "nibble": {
+   "min": 3.0,
+   "max": 10.0,
+   "taps": [
+    2,
+    3
+   ],
+   "tap_gap": 0.5,
+   "idle_giveup": 60.0
+  },
+  "strike": {
+   "min": 0.8,
+   "max": 1.4
+  },
+  "drill": {
+   "land_distance": 18.0,
+   "start_distance": [
+    50.0,
+    110.0
+   ],
+   "k": 3.0,
+   "reel_in_flee": 0.6,
+   "over_line": 0.8,
+   "run_base": 0.45,
+   "run_give": 0.55,
+   "burst": [
+    1.6,
+    0.6
+   ],
+   "turn": [
+    0.5,
+    1.0
+   ],
+   "splash_gap": 0.4,
+   "reel_stamina": 0.4,
+   "escape_factor": 1.25,
+   "snap_hold": 0.3,
+   "tell_time": 0.45,
+   "sync": 0.066
+  },
+  "tension": {
+   "warn": 0.6,
+   "danger": 0.82
+  },
+  "line_colors": {
+   "slack": "3cc0c6",
+   "good": "e6c468",
+   "danger": "ff4a63"
+  },
+  "light": {
+   "shy_depth": -32.0
+  },
+  "net": {
+   "reach": 40.0,
+   "range": 46.0,
+   "pull": 60.0,
+   "cap": 0.8,
+   "prime_count": 2
+  },
+  "turmoil": {
+   "after": 10.0,
+   "lure": 3.0
+  },
+  "book": {
+   "path": "user://fish_book.json"
+  },
+  "messages": {
+   "early": "ZU FRÜH",
+   "late": "ZU SPÄT",
+   "escaped": "ENTWISCHT",
+   "snapped": "SCHNUR GERISSEN",
+   "scared": "ERSCHRECKT",
+   "full": "BEUTEL VOLL",
+   "net": "IM KESCHER"
+  }
+ },
+ "rods": {
+  "rod_basic": {
+   "flex": 1.0,
+   "line": 190.0,
+   "reel": 80.0,
+   "cast": 130.0
+  }
+ },
+ "baits": {
+  "dusk_berry": {
+   "name": "DÄMMERBEERE"
+  },
+  "ember_berry": {
+   "name": "GLUTBEERE"
+  },
+  "brook_mint": {
+   "name": "BACHMINZE"
+  },
+  "marsh_gold": {
+   "name": "SUMPFDOTTER"
+  },
+  "glow_cap": {
+   "name": "GLIMMKAPPE"
+  },
+  "fish_glimmer": {
+   "name": "GLIMMER-SCHMERLE"
+  }
+ },
+ "poses": {
+  "cork": {
+   "name": "KORK",
+   "needs": "",
+   "glow": 0.0,
+   "mult": {}
+  },
+  "glimmer": {
+   "name": "GLIMM",
+   "needs": "glow_cap",
+   "glow": 1.0,
+   "mult": {
+    "glimmer_loach": 2.2
+   }
+  },
+  "obsidian": {
+   "name": "OBSIDIAN",
+   "needs": "void_splinter",
+   "glow": 0.0,
+   "dark": true,
+   "mult": {
+    "veil_eel": 1.5,
+    "abyss_pike": 1.5
+   }
+  }
+ },
+ "species": {
+  "silverling": {
+   "name": "SILBERSTRÖMER",
+   "item": "fish_silverling",
+   "rarity": "common",
+   "habitat": {
+    "x": [
+     -80.0,
+     -5.0
+    ],
+    "y": [
+     0.0,
+     0.4
+    ]
+   },
+   "night": [
+    0.0,
+    0.55
+   ],
+   "baits": {
+    "dusk_berry": 1.0,
+    "ember_berry": 0.6,
+    "": 0.35
+   },
+   "weight": 1.0,
+   "timid": true,
+   "shy": 0.0,
+   "pull": 0.35,
+   "speed": 26.0,
+   "flee": [
+    0.7,
+    1.2
+   ],
+   "tire": [
+    1.6,
+    2.8
+   ],
+   "stamina": 0.45,
+   "burst": 0.3,
+   "length": [
+    12,
+    24
+   ],
+   "strike": [
+    1.0,
+    1.4
+   ],
+   "turmoil": 0.1,
+   "info": "FLINKER SCHWARM AUS DEN KIESBÄNKEN",
+   "leap": true
+  },
+  "copper_loach": {
+   "name": "KUPFERKIES-GRÜNDLING",
+   "item": "fish_loach",
+   "rarity": "common",
+   "habitat": {
+    "x": [
+     -80.0,
+     -6.0
+    ],
+    "y": [
+     0.3,
+     0.85
+    ]
+   },
+   "night": [
+    0.0,
+    1.0
+   ],
+   "baits": {
+    "glow_cap": 1.0,
+    "": 0.2
+   },
+   "weight": 0.9,
+   "timid": false,
+   "shy": 0.0,
+   "pull": 0.5,
+   "speed": 18.0,
+   "flee": [
+    1.0,
+    1.6
+   ],
+   "tire": [
+    1.2,
+    2.0
+   ],
+   "stamina": 0.6,
+   "burst": 0.25,
+   "length": [
+    14,
+    28
+   ],
+   "strike": [
+    0.9,
+    1.4
+   ],
+   "turmoil": 0.2,
+   "info": "STEMMT SICH STUR AUF DEN GRUND"
+  },
+  "moon_trout": {
+   "name": "MONDFORELLE",
+   "item": "fish_trout",
+   "rarity": "uncommon",
+   "habitat": {
+    "x": [
+     -80.0,
+     -8.0
+    ],
+    "y": [
+     0.4,
+     0.9
+    ]
+   },
+   "night": [
+    0.0,
+    0.6
+   ],
+   "baits": {
+    "brook_mint": 0.8,
+    "": 0.5
+   },
+   "weight": 0.8,
+   "timid": false,
+   "shy": 0.0,
+   "lively": true,
+   "pull": 0.6,
+   "speed": 42.0,
+   "flee": [
+    0.8,
+    1.3
+   ],
+   "tire": [
+    1.4,
+    2.2
+   ],
+   "stamina": 0.7,
+   "burst": 0.3,
+   "length": [
+    24,
+    46
+   ],
+   "strike": [
+    0.8,
+    1.2
+   ],
+   "turmoil": 0.3,
+   "info": "SPRINGT IM SCHAUM UNTER DEN FÄLLEN",
+   "leap": true
+  },
+  "gold_carp": {
+   "name": "GOLDBAUCH-KARPFEN",
+   "item": "fish_carp",
+   "rarity": "uncommon",
+   "habitat": {
+    "x": [
+     -80.0,
+     -10.0
+    ],
+    "y": [
+     0.0,
+     0.6
+    ]
+   },
+   "night": [
+    0.0,
+    0.6
+   ],
+   "calm": 0.35,
+   "baits": {
+    "brook_mint": 1.0,
+    "marsh_gold": 1.0,
+    "": 0.15
+   },
+   "weight": 0.8,
+   "timid": false,
+   "shy": 0.0,
+   "pull": 0.78,
+   "speed": 26.0,
+   "flee": [
+    1.1,
+    1.8
+   ],
+   "tire": [
+    1.0,
+    1.6
+   ],
+   "stamina": 0.9,
+   "burst": 0.28,
+   "length": [
+    30,
+    62
+   ],
+   "strike": [
+    1.0,
+    1.4
+   ],
+   "turmoil": 0.4,
+   "info": "TRÄGES SCHWERGEWICHT RUHIGER BUCHTEN"
+  },
+  "glimmer_loach": {
+   "name": "GLIMMER-SCHMERLE",
+   "item": "fish_glimmer",
+   "rarity": "uncommon",
+   "habitat": {
+    "x": [
+     -80.0,
+     -5.0
+    ],
+    "y": [
+     0.0,
+     0.5
+    ]
+   },
+   "night": [
+    0.3,
+    1.0
+   ],
+   "baits": {
+    "glow_cap": 1.0,
+    "dusk_berry": 0.4,
+    "": 0.3
+   },
+   "weight": 1.0,
+   "timid": true,
+   "shy": 0.0,
+   "pull": 0.3,
+   "speed": 30.0,
+   "flee": [
+    0.6,
+    1.0
+   ],
+   "tire": [
+    1.4,
+    2.4
+   ],
+   "stamina": 0.4,
+   "burst": 0.3,
+   "length": [
+    10,
+    18
+   ],
+   "strike": [
+    0.9,
+    1.3
+   ],
+   "turmoil": 0.1,
+   "info": "GLIMMT TÜRKIS IM LATERNENLICHT"
+  },
+  "veil_eel": {
+   "name": "SCHLEIER-AAL",
+   "item": "fish_eel",
+   "rarity": "rare",
+   "habitat": {
+    "x": [
+     -80.0,
+     -8.0
+    ],
+    "y": [
+     0.64,
+     1.0
+    ]
+   },
+   "night": [
+    0.5,
+    1.0
+   ],
+   "baits": {
+    "glow_cap": 1.0,
+    "": 0.25
+   },
+   "weight": 0.6,
+   "timid": false,
+   "shy": 1.0,
+   "pull": 0.8,
+   "speed": 30.0,
+   "flee": [
+    0.9,
+    1.5
+   ],
+   "tire": [
+    1.0,
+    1.5
+   ],
+   "stamina": 1.0,
+   "burst": 0.22,
+   "length": [
+    60,
+    110
+   ],
+   "strike": [
+    0.8,
+    1.2
+   ],
+   "turmoil": 1.0,
+   "info": "BEISST NUR IN VÖLLIGER FINSTERNIS"
+  },
+  "abyss_pike": {
+   "name": "ABYSSISCHER ZANDER",
+   "item": "fish_pike",
+   "rarity": "epic",
+   "habitat": {
+    "x": [
+     -80.0,
+     -10.0
+    ],
+    "y": [
+     0.75,
+     1.0
+    ]
+   },
+   "night": [
+    0.5,
+    1.0
+   ],
+   "baits": {
+    "glow_cap": 0.6,
+    "fish_glimmer": 1.0,
+    "": 0.15
+   },
+   "weight": 0.4,
+   "timid": false,
+   "shy": 1.0,
+   "pull": 0.92,
+   "speed": 40.0,
+   "flee": [
+    0.8,
+    1.4
+   ],
+   "tire": [
+    1.1,
+    1.6
+   ],
+   "stamina": 0.9,
+   "burst": 0.24,
+   "length": [
+    70,
+    120
+   ],
+   "strike": [
+    0.8,
+    1.1
+   ],
+   "turmoil": 1.6,
+   "info": "BRUTALE STÖSSE AUS DER TIEFE",
+   "leap": true
+  }
+ }
+}

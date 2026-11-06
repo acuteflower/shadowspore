@@ -1,0 +1,32 @@
+{
+ "default": {
+  "equipment": {
+   "main_hand": "sword_basic"
+  },
+  "items": [
+   {
+    "id": "sword_iron",
+    "count": 1
+   },
+   {
+    "id": "sickle_basic",
+    "count": 1,
+    "slot": 1
+   },
+   {
+    "id": "pickaxe_basic",
+    "count": 1,
+    "slot": 2
+   },
+   {
+    "id": "axe_basic",
+    "count": 1,
+    "slot": 3
+   }
+  ]
+ },
+ "story_start": {
+  "equipment": {},
+  "items": []
+ }
+}

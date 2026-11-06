@@ -1,0 +1,194 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/ui/hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://src/ui/stamina_bar.gd" id="2_bar"]
+[ext_resource type="Script" path="res://src/ui/blink_icon.gd" id="3_icon"]
+[ext_resource type="Script" path="res://src/ui/sneak_vignette.gd" id="4_vig"]
+[ext_resource type="Shader" path="res://assets/shaders/sneak_vignette.gdshader" id="5_shader"]
+[ext_resource type="Script" path="res://src/ui/hotbar.gd" id="6_hotbar"]
+[ext_resource type="Script" path="res://src/ui/inventory_window.gd" id="7_inventory"]
+[ext_resource type="Script" path="res://src/ui/health_bar.gd" id="8_health"]
+[ext_resource type="Script" path="res://src/ui/damage_vignette.gd" id="9_dvig"]
+[ext_resource type="Script" path="res://src/ui/death_screen.gd" id="10_death"]
+[ext_resource type="Script" path="res://src/ui/purse_vine.gd" id="12_purse"]
+[ext_resource type="Script" path="res://src/ui/pause_menu.gd" id="13_pause"]
+[ext_resource type="Script" path="res://src/ui/clock_vine.gd" id="14_clock"]
+[ext_resource type="Script" path="res://src/ui/map_window.gd" id="15_map"]
+[ext_resource type="Script" path="res://src/ui/skill_tree_window.gd" id="16_skills"]
+[ext_resource type="Shader" path="res://assets/shaders/damage_vignette.gdshader" id="11_dshader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_dvig"]
+shader = ExtResource("11_dshader")
+shader_parameter/amount = 0.0
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_vig"]
+shader = ExtResource("5_shader")
+shader_parameter/amount = 0.0
+shader_parameter/desaturation = 0.25
+shader_parameter/darkness = 0.3
+
+[node name="Hud" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="SneakVignette" type="ColorRect" parent="."]
+visible = false
+material = SubResource("ShaderMaterial_vig")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("4_vig")
+
+[node name="DamageVignette" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_dvig")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("9_dvig")
+
+[node name="InventoryWindow" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("7_inventory")
+
+[node name="MapWindow" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("15_map")
+
+[node name="SkillTreeWindow" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("16_skills")
+
+[node name="PauseMenu" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("13_pause")
+
+[node name="Hotbar" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -112
+offset_top = -48
+offset_right = 112
+offset_bottom = -4
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("6_hotbar")
+
+[node name="HealthBar" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -198
+offset_top = -48
+offset_right = -112
+offset_bottom = -4
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("8_health")
+
+[node name="StaminaBar" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 112
+offset_top = -48
+offset_right = 188
+offset_bottom = -4
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("2_bar")
+
+[node name="BlinkIcon" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 86
+offset_top = -48
+offset_right = 114
+offset_bottom = -4
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+script = ExtResource("3_icon")
+
+
+[node name="DeathScreen" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("10_death")
+
+[node name="PurseVine" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -152.0
+offset_top = 8.0
+offset_right = 0.0
+offset_bottom = 76.0
+grow_horizontal = 0
+mouse_filter = 2
+script = ExtResource("12_purse")
+
+[node name="ClockVine" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 8.0
+offset_right = 172.0
+offset_bottom = 74.0
+mouse_filter = 2
+script = ExtResource("14_clock")

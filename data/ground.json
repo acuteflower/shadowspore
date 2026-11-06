@@ -1,0 +1,1453 @@
+{
+ "seed": 9,
+ "manhole": [
+  -146,
+  -120
+ ],
+ "stone_fields": [
+  {
+   "id": "start_ruins",
+   "rects": [
+    [
+     -204,
+     -194,
+     -118,
+     -151
+    ],
+    [
+     -223,
+     -169,
+     -56,
+     -55
+    ],
+    [
+     -96,
+     -141,
+     -11,
+     -99
+    ],
+    [
+     19,
+     -139,
+     105,
+     -61
+    ],
+    [
+     -133,
+     -117,
+     33,
+     -3
+    ],
+    [
+     -262,
+     -75,
+     -176,
+     3
+    ],
+    [
+     -126,
+     -18,
+     -40,
+     25
+    ],
+    [
+     -74,
+     -29,
+     94,
+     105
+    ],
+    [
+     70,
+     -5,
+     121,
+     65
+    ],
+    [
+     -61,
+     65,
+     25,
+     142
+    ],
+    [
+     -83,
+     125,
+     -33,
+     195
+    ],
+    [
+     -3,
+     117,
+     84,
+     195
+    ]
+   ]
+  }
+ ],
+ "paths": [
+  {
+   "id": "footpath_start",
+   "width": 30,
+   "taper_out": 90,
+   "points": [
+    [
+     -4,
+     40
+    ],
+    [
+     -12,
+     100
+    ],
+    [
+     -30,
+     150
+    ],
+    [
+     -55,
+     200
+    ],
+    [
+     -60,
+     260
+    ],
+    [
+     -45,
+     330
+    ],
+    [
+     -30,
+     400
+    ],
+    [
+     -35,
+     470
+    ],
+    [
+     -55,
+     540
+    ],
+    [
+     -70,
+     610
+    ],
+    [
+     -32,
+     672
+    ],
+    [
+     48,
+     752
+    ],
+    [
+     144,
+     832
+    ],
+    [
+     256,
+     928
+    ],
+    [
+     368,
+     1040
+    ],
+    [
+     448,
+     1152
+    ],
+    [
+     512,
+     1248
+    ],
+    [
+     560,
+     1312
+    ],
+    [
+     640,
+     1424
+    ],
+    [
+     752,
+     1568
+    ]
+   ]
+  },
+  {
+   "id": "footpath_branch",
+   "width": 26,
+   "taper_out": 70,
+   "taper_in": 30,
+   "points": [
+    [
+     560,
+     1312
+    ],
+    [
+     672,
+     1264
+    ],
+    [
+     816,
+     1232
+    ],
+    [
+     976,
+     1248
+    ],
+    [
+     1120,
+     1296
+    ]
+   ]
+  }
+ ],
+ "props": [
+  {
+   "kind": "tree",
+   "variant": 1,
+   "tile": [
+    -15,
+    -4
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 0,
+   "tile": [
+    -13,
+    0
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 1,
+   "tile": [
+    -16,
+    -7
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    -14,
+    -7
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 2,
+   "tile": [
+    -12,
+    -3
+   ]
+  },
+  {
+   "kind": "grass",
+   "variant": 1,
+   "tile": [
+    -16,
+    -2
+   ]
+  },
+  {
+   "kind": "blossom",
+   "variant": 0,
+   "tile": [
+    -17,
+    1
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    -11,
+    -9
+   ]
+  },
+  {
+   "kind": "grass",
+   "variant": 3,
+   "tile": [
+    -13,
+    -6
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 1,
+   "tile": [
+    -16,
+    -12
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 3,
+   "tile": [
+    -2,
+    -26
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 1,
+   "tile": [
+    -23,
+    -11
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 2,
+   "tile": [
+    12,
+    -20
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 3,
+   "tile": [
+    -22,
+    -25
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 2,
+   "tile": [
+    -17,
+    -17
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 3,
+   "tile": [
+    -17,
+    -25
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 2,
+   "tile": [
+    -7,
+    -19
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 2,
+   "tile": [
+    -26,
+    -20
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 3,
+   "tile": [
+    6,
+    -27
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 1,
+   "tile": [
+    16,
+    -5
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 3,
+   "tile": [
+    16,
+    -24
+   ]
+  },
+  {
+   "kind": "tree",
+   "variant": 3,
+   "tile": [
+    -7,
+    -24
+   ]
+  },
+  {
+   "kind": "blossom",
+   "variant": 0,
+   "tile": [
+    2,
+    -12
+   ]
+  },
+  {
+   "kind": "blossom",
+   "variant": 0,
+   "tile": [
+    -21,
+    -5
+   ]
+  },
+  {
+   "kind": "blossom",
+   "variant": 0,
+   "tile": [
+    16,
+    -13
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 2,
+   "tile": [
+    -12,
+    -23
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 2,
+   "tile": [
+    -26,
+    -15
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 1,
+   "tile": [
+    2,
+    -22
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    -12,
+    -18
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 2,
+   "tile": [
+    11,
+    -6
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    -2,
+    -18
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    6,
+    -22
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    -6,
+    -14
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 1,
+   "tile": [
+    -12,
+    -27
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    -21,
+    -20
+   ]
+  },
+  {
+   "kind": "bush",
+   "variant": 0,
+   "tile": [
+    11,
+    -26
+   ]
+  }
+ ],
+ "barrier": {
+  "id": "intro_corridor",
+  "paths": [
+   "footpath_start",
+   "footpath_branch"
+  ],
+  "half": 150,
+  "pad": 24,
+  "cell": 8
+ },
+ "quest_points": {
+  "crossroad": [
+   560,
+   1312
+  ]
+ },
+ "guards": [
+  {
+   "enemy": "guard_spider",
+   "at": [
+    36,
+    861
+   ],
+   "face": [
+    0.64,
+    -0.77
+   ]
+  },
+  {
+   "enemy": "guard_spider",
+   "at": [
+    164,
+    707
+   ],
+   "face": [
+    -0.64,
+    0.77
+   ]
+  }
+ ],
+ "story_start": {
+  "health_ratio": 0.1,
+  "hidden_hud": [
+   "Hotbar",
+   "ClockVine",
+   "PurseVine",
+   "BlinkIcon",
+   "HealthBar",
+   "StaminaBar"
+  ]
+ },
+ "fallen_knight": {
+  "tile": [
+   493,
+   685
+  ],
+  "approach": [
+   489,
+   685
+  ],
+  "clear_radius": 4
+ },
+ "signposts": [
+  {
+   "id": "crossroad",
+   "tile": [
+    501,
+    699
+   ],
+   "variant": 0,
+   "dialogue": "sign_crossroad",
+   "flag": "read_sign",
+   "clear_radius": 3
+  }
+ ],
+ "stumbles": [
+  {
+   "tile": [
+    460,
+    632
+   ],
+   "radius": 4.0
+  },
+  {
+   "tile": [
+    460,
+    648
+   ],
+   "radius": 4.0
+  },
+  {
+   "tile": [
+    493,
+    691
+   ],
+   "radius": 4.0
+  }
+ ],
+ "huts": [
+  {
+   "id": "hut",
+   "tile": [
+    786,
+    676
+   ],
+   "interior": "hut",
+   "clear_radius": 10,
+   "yard": {
+    "trample": [
+     [
+      0,
+      24,
+      66,
+      30,
+      1.0
+     ],
+     [
+      34,
+      68,
+      40,
+      24,
+      0.95
+     ],
+     [
+      94,
+      42,
+      28,
+      17,
+      0.9
+     ],
+     [
+      112,
+      22,
+      24,
+      12,
+      0.7
+     ],
+     [
+      0,
+      64,
+      30,
+      22,
+      0.55
+     ],
+     [
+      -30,
+      34,
+      26,
+      16,
+      0.7
+     ]
+    ],
+    "tracks": [
+     {
+      "w": 5,
+      "k": 0.9,
+      "pts": [
+       [
+        2,
+        10
+       ],
+       [
+        6,
+        34
+       ],
+       [
+        22,
+        54
+       ],
+       [
+        34,
+        64
+       ]
+      ]
+     },
+     {
+      "w": 5,
+      "k": 0.85,
+      "pts": [
+       [
+        10,
+        12
+       ],
+       [
+        50,
+        30
+       ],
+       [
+        90,
+        42
+       ]
+      ]
+     },
+     {
+      "w": 4,
+      "k": 0.55,
+      "pts": [
+       [
+        0,
+        44
+       ],
+       [
+        -6,
+        70
+       ],
+       [
+        -14,
+        108
+       ]
+      ]
+     },
+     {
+      "w": 5,
+      "k": 0.8,
+      "pts": [
+       [
+        -8,
+        12
+       ],
+       [
+        -26,
+        26
+       ],
+       [
+        -44,
+        34
+       ]
+      ]
+     }
+    ],
+    "slabs": [
+     [
+      0,
+      10,
+      20,
+      6.2,
+      0
+     ],
+     [
+      -3,
+      25,
+      10,
+      6,
+      -7
+     ],
+     [
+      6,
+      38,
+      9,
+      5.6,
+      9
+     ],
+     [
+      -3,
+      51,
+      8.6,
+      5.2,
+      -5
+     ],
+     [
+      12,
+      62,
+      7.4,
+      4.8,
+      12
+     ]
+    ],
+    "puddles": [],
+    "props": [
+     {
+      "id": "pit",
+      "tex": "yard_pit.png",
+      "pos": [
+       34,
+       64
+      ],
+      "feet": 46,
+      "glow": true,
+      "solid": [
+       34,
+       14,
+       -17,
+       -11
+      ],
+      "ash": 24,
+      "anim": {
+       "tex": "yard_fire.png",
+       "frames": 8,
+       "fps": 11,
+       "at": [
+        0,
+        0
+       ],
+       "feet": 27
+      },
+      "light": {
+       "color": "ff9448",
+       "radius": 96,
+       "squash": 0.7,
+       "energy": 1.4,
+       "at": [
+        0,
+        -6
+       ],
+       "flicker": 0.35
+      },
+      "sparks": true,
+      "smoke": true,
+      "sound": "fire.wav"
+     },
+     {
+      "id": "block",
+      "tex": "yard_block.png",
+      "pos": [
+       94,
+       40
+      ],
+      "feet": 50,
+      "solid": [
+       22,
+       10,
+       -11,
+       -8
+      ],
+      "chips": 22
+     },
+     {
+      "id": "barrel",
+      "tex": "yard_barrel.png",
+      "pos": [
+       -58,
+       26
+      ],
+      "feet": 46,
+      "glow": true,
+      "solid": [
+       20,
+       10,
+       -16,
+       -8
+      ]
+     },
+     {
+      "id": "line",
+      "tex": "yard_line.png",
+      "pos": [
+       78,
+       16
+      ],
+      "feet": 70,
+      "glow": true,
+      "solid": [
+       6,
+       4,
+       30,
+       -3
+      ],
+      "layers": [
+       {
+        "tex": "yard_rags.png",
+        "sway": {
+         "pivot": 24,
+         "dir": 1,
+         "amount": 5.5,
+         "flutter": 0.8,
+         "cell": 11
+        }
+       }
+      ]
+     },
+     {
+      "id": "seat_s",
+      "tex": "yard_seats.png",
+      "frames": 4,
+      "frame": 0,
+      "pos": [
+       34,
+       92
+      ],
+      "feet": 26,
+      "solid": [
+       32,
+       7,
+       -16,
+       -6
+      ]
+     },
+     {
+      "id": "seat_e",
+      "tex": "yard_seats.png",
+      "frames": 4,
+      "frame": 1,
+      "pos": [
+       84,
+       64
+      ],
+      "feet": 26,
+      "solid": [
+       12,
+       6,
+       -6,
+       -4
+      ]
+     },
+     {
+      "id": "bedroll",
+      "tex": "yard_bedroll.png",
+      "pos": [
+       -40,
+       82
+      ],
+      "feet": 28,
+      "solid": [
+       10,
+       6,
+       -5,
+       -4
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "cabin",
+   "tile": [
+    755,
+    482
+   ],
+   "interior": "cabin",
+   "art": "cabin",
+   "clear_radius": 8,
+   "yard": {
+    "trample": [
+     [
+      0,
+      22,
+      34,
+      17,
+      0.8
+     ],
+     [
+      -30,
+      36,
+      22,
+      12,
+      0.55
+     ],
+     [
+      36,
+      30,
+      20,
+      11,
+      0.5
+     ],
+     [
+      -6,
+      50,
+      16,
+      9,
+      0.4
+     ]
+    ],
+    "tracks": [
+     {
+      "w": 4,
+      "k": 0.7,
+      "pts": [
+       [
+        0,
+        8
+       ],
+       [
+        2,
+        26
+       ],
+       [
+        10,
+        50
+       ],
+       [
+        16,
+        80
+       ]
+      ]
+     },
+     {
+      "w": 3,
+      "k": 0.45,
+      "pts": [
+       [
+        -8,
+        26
+       ],
+       [
+        -34,
+        34
+       ],
+       [
+        -48,
+        28
+       ]
+      ]
+     }
+    ],
+    "slabs": [
+     [
+      0,
+      12,
+      13,
+      5.4,
+      0
+     ],
+     [
+      2,
+      26,
+      8,
+      4.8,
+      -6
+     ],
+     [
+      8,
+      40,
+      7,
+      4.6,
+      8
+     ]
+    ],
+    "puddles": [],
+    "props": [
+     {
+      "id": "stump",
+      "tex": "yard_stump.png",
+      "pos": [
+       -48,
+       30
+      ],
+      "feet": 34,
+      "glow": true,
+      "solid": [
+       22,
+       8,
+       -11,
+       -6
+      ],
+      "chips": 22
+     },
+     {
+      "id": "woodpile",
+      "tex": "yard_woodpile.png",
+      "pos": [
+       -66,
+       10
+      ],
+      "feet": 32,
+      "glow": true,
+      "solid": [
+       50,
+       10,
+       -25,
+       -8
+      ]
+     },
+     {
+      "id": "sawhorse",
+      "tex": "yard_sawhorse.png",
+      "pos": [
+       54,
+       34
+      ],
+      "feet": 36,
+      "solid": [
+       34,
+       8,
+       -17,
+       -6
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "quarries": [
+  {
+   "id": "quarry",
+   "tile": [
+    754,
+    700
+   ],
+   "clear_radius": 11,
+   "knight": {
+    "face": [
+     -1,
+     0
+    ]
+   },
+   "yard": {
+    "palette": "gravel",
+    "trample": [
+     [
+      -14,
+      6,
+      76,
+      24,
+      1.0
+     ],
+     [
+      -72,
+      8,
+      50,
+      16,
+      0.85
+     ],
+     [
+      64,
+      30,
+      48,
+      20,
+      0.85
+     ],
+     [
+      -56,
+      34,
+      30,
+      14,
+      0.8
+     ],
+     [
+      130,
+      6,
+      34,
+      12,
+      0.7
+     ]
+    ],
+    "tracks": [],
+    "slabs": [],
+    "puddles": [],
+    "props": [
+     {
+      "id": "r_moss",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 6,
+      "row": 0,
+      "pos": [
+       -108,
+       -14
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "r_big",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 2,
+      "row": 0,
+      "pos": [
+       -74,
+       -14
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "r_crystal",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 7,
+      "row": 0,
+      "pos": [
+       -42,
+       -20
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "r_spires",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 5,
+      "row": 0,
+      "pos": [
+       -6,
+       -18
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "r_target",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 1,
+      "row": 1,
+      "pos": [
+       -38,
+       -2
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "r_small",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 0,
+      "row": 0,
+      "pos": [
+       -90,
+       6
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "r_slab",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 4,
+      "row": 0,
+      "pos": [
+       -64,
+       8
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "d_a",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 1,
+      "row": 3,
+      "pos": [
+       -24,
+       8
+      ],
+      "feet": 52,
+      "glow": true
+     },
+     {
+      "id": "d_b",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 2,
+      "row": 3,
+      "pos": [
+       -104,
+       14
+      ],
+      "feet": 52,
+      "glow": true
+     },
+     {
+      "id": "d_c",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 4,
+      "row": 3,
+      "pos": [
+       106,
+       14
+      ],
+      "feet": 52,
+      "glow": true
+     },
+     {
+      "id": "e_slab",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 4,
+      "row": 0,
+      "pos": [
+       120,
+       -4
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "e_slab2",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 4,
+      "row": 1,
+      "pos": [
+       146,
+       2
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "e_small",
+      "tex": "res://assets/props/rock.png",
+      "frames": 8,
+      "rows": 4,
+      "frame": 0,
+      "row": 0,
+      "pos": [
+       168,
+       -6
+      ],
+      "feet": 52,
+      "glow": true,
+      "solid": [
+       40,
+       10,
+       -20,
+       -9
+      ]
+     },
+     {
+      "id": "cart",
+      "tex": "quarry_cart.png",
+      "pos": [
+       76,
+       36
+      ],
+      "feet": 56,
+      "glow": true,
+      "solid": [
+       38,
+       12,
+       -18,
+       -11
+      ]
+     },
+     {
+      "id": "crane",
+      "tex": "quarry_crane.png",
+      "pos": [
+       -132,
+       16
+      ],
+      "feet": 92,
+      "glow": true,
+      "solid": [
+       16,
+       8,
+       -8,
+       -6
+      ],
+      "layers": [
+       {
+        "tex": "quarry_hang.png",
+        "sway": {
+         "pivot": 39,
+         "dir": 1,
+         "amount": 2.4,
+         "flutter": 0.5,
+         "cell": 30
+        }
+       }
+      ]
+     },
+     {
+      "id": "tools",
+      "tex": "quarry_tools.png",
+      "pos": [
+       -22,
+       20
+      ],
+      "feet": 30,
+      "solid": [
+       16,
+       6,
+       -2,
+       -6
+      ]
+     },
+     {
+      "pos": [
+       -24,
+       6
+      ],
+      "chips": 34
+     }
+    ]
+   }
+  }
+ ],
+ "mines": [
+  {
+   "id": "old_mine",
+   "tile": [
+    736,
+    736
+   ],
+   "clear_radius": 10
+  }
+ ]
+}

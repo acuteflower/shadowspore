@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/preview_ellie_standby.gd" id="1"]
+
+[node name="EllieStandbyPreview" type="Node2D"]
+script = ExtResource("1")

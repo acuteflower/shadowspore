@@ -1,0 +1,87 @@
+{
+	"meadow": {
+		"name": "Die Lichtung",
+		"tier": 1,
+		"mood": "warm, mythisch, noch friedlich",
+		"color": "#5fb36b",
+		"relief": {
+			"gain": 1.15,
+			"bias": -0.04,
+			"styles": [
+				0.72,
+				0.28,
+				0,
+				0,
+				0
+			]
+		}
+	},
+	"mist_forest": {
+		"name": "Nebelwald",
+		"tier": 2,
+		"mood": "dicht, dämmrig, Nebel zwischen den Stämmen",
+		"color": "#3d8f86",
+		"relief": {
+			"gain": 1.25,
+			"bias": -0.02,
+			"styles": [
+				0.5,
+				0.5,
+				0,
+				0,
+				0
+			]
+		}
+	},
+	"glass_cliffs": {
+		"name": "Glasklippen",
+		"tier": 3,
+		"mood": "karg, kühl, violette Kristalle",
+		"color": "#8a6fd6",
+		"relief": {
+			"gain": 1.35,
+			"bias": 0.0,
+			"styles": [
+				0.1,
+				0.45,
+				0,
+				0.45,
+				0
+			]
+		}
+	},
+	"sunken_ruins": {
+		"name": "Versunkene Ruinen",
+		"tier": 4,
+		"mood": "still, nass, melancholisch",
+		"color": "#d98a4a",
+		"relief": {
+			"gain": 1.2,
+			"bias": -0.04,
+			"styles": [
+				0.05,
+				0.25,
+				0.7,
+				0,
+				0
+			]
+		}
+	},
+	"void_bloom": {
+		"name": "Das Leerenblühen",
+		"tier": 5,
+		"mood": "schwarz, violett, fremd",
+		"color": "#c9506f",
+		"relief": {
+			"gain": 1.35,
+			"bias": 0.0,
+			"styles": [
+				0,
+				0.35,
+				0,
+				0.1,
+				0.55
+			]
+		}
+	}
+}

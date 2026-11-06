@@ -1,0 +1,42 @@
+{
+	"main_hand": {
+		"name": "Waffe",
+		"accepts": "main_hand",
+		"short": "WAF"
+	},
+	"head": {
+		"name": "Kopf",
+		"accepts": "head",
+		"short": "KOP"
+	},
+	"chest": {
+		"name": "Brust",
+		"accepts": "chest",
+		"short": "BRU"
+	},
+	"legs": {
+		"name": "Beine",
+		"accepts": "legs",
+		"short": "BEI"
+	},
+	"feet": {
+		"name": "Füße",
+		"accepts": "feet",
+		"short": "FUE"
+	},
+	"talisman_1": {
+		"name": "Talisman",
+		"accepts": "talisman",
+		"short": "TAL"
+	},
+	"talisman_2": {
+		"name": "Talisman",
+		"accepts": "talisman",
+		"short": "TAL"
+	},
+	"talisman_3": {
+		"name": "Talisman",
+		"accepts": "talisman",
+		"short": "TAL"
+	}
+}

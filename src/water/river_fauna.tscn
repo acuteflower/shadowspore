@@ -1,0 +1,10 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://src/water/river_fauna.gd" id="1"]
+[node name="RiverFauna" type="Node2D"]
+y_sort_enabled = true
+script = ExtResource("1")
+[node name="Animals" type="Node2D" parent="."]
+y_sort_enabled = true
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/water/river_animal.tscn")
+spawn_path = NodePath("../Animals")

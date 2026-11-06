@@ -1,0 +1,9 @@
+{
+ "interval": [20, 45],
+ "actor_cooldown": [65, 115],
+ "view_range": [75, 340],
+ "maximum_duration": 8.0,
+ "fox_hunt_range": 125,
+ "rabbit_crow_range": 95,
+ "rabbit_play_range": 70
+}

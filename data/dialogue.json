@@ -1,0 +1,1094 @@
+{
+ "spiders_intro": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "hurt",
+    "title": "",
+    "text": "Argh... Spinnen. Natürlich Spinnen. Und alle größer als mein Kopf."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "hurt",
+    "title": "",
+    "text": "Also gut. Nicht rennen, nicht husten, nicht atmen. Schleichen. Wie die Katze am Vogelhaus, nur dass ich diesmal der Vogel bin."
+   }
+  ]
+ },
+ "knight_sword": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Was waren das nur für Dinger...?"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Du hast es auch nicht geschafft. Tut mir leid."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Dein Schwert brauchst du nicht mehr, ich schon. Ich pass drauf auf."
+   }
+  ]
+ },
+ "sign_crossroad": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "hurt",
+    "title": "",
+    "text": "Verwittert, aber lesbar. Nach Nordwesten: „Alter Zugang“. Da komm ich her."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "hurt",
+    "title": "",
+    "text": "Nach Osten: „Hirtenhütte“. Nach Süden: „Wachturm Ostwacht“."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "hurt",
+    "title": "",
+    "text": "Ein Turm heißt Männer mit Waffen und Fragen. Eine Hütte heißt Feuer, Wasser, Verbände. Das ist meine Richtung."
+   }
+  ]
+ },
+ "ambush_start": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "hurt",
+    "title": "",
+    "text": "Oh nein, nein, nein. Nicht schon wieder! Und gleich drei... das ist definitiv zu viel!"
+   }
+  ]
+ },
+ "rescue": {
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "RITTER",
+    "mood": "",
+    "title": "",
+    "text": "Halt durch. Ich hab dich."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "...Wer... bist du...?"
+   }
+  ]
+ },
+ "wake_inner": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "...Wo... bin ich...?"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Es riecht nach Rauch. Nach altem Holz. Und nach... Moos."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Der Schmerz ist dumpf. Jemand hat mich verbunden... Wer macht das für jemanden, den er gar nicht kennt?"
+   }
+  ]
+ },
+ "where_knight": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Hm... wo steckt er denn jetzt, mein Ritter von gestern?"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Er schleppt mich her, flickt mich zusammen und ist weg. Nicht mal einen Namen hat er dagelassen. Das ist unhöflich. Oder Absicht."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Weit kann er nicht sein. So viel Eisen läuft nicht unbemerkt davon. Vielleicht hilft mir die Karte."
+   }
+  ]
+ },
+ "bark_test": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Das ist die Sprechbox: Name, Text, kein Bild."
+   },
+   {
+    "speaker": "RITTER",
+    "text": "Sie wartet nicht auf dich und hält nichts an. Man läuft einfach weiter."
+   }
+  ]
+ },
+ "knight_spotted": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Da! Das muss er sein. Und er schlägt... Steine? Natürlich schlägt er Steine."
+   }
+  ]
+ },
+ "knight_meet_a": {
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Du stehst auf den Beinen. Gut. Ich hatte schon mit mir gewettet, wie lange du liegen bleibst."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Du bist der Ritter von gestern. Muss ich jetzt den Kopf senken? Ich frag nur, damit ich weiß, ob ich's gleich lassen kann."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Lass es. Wer dauernd nach unten schaut, stolpert. Ich bin Valdric. Und du?"
+   }
+  ]
+ },
+ "knight_meet_b": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Ellie. Und... danke. Für gestern."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Danke mir, wenn du wieder gerade gehst. Bis dahin: Ruhe, Wärme, etwas im Magen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Kannst du in dem Helm eigentlich was sehen?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Genug. Ich sehe zum Beispiel, dass du dir gerade die Rippen hältst."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Ich... ja. Hör auf zu gucken. Und wofür sind die Steine?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Für ein Dach, das nicht tropft. Aber das hat Zeit. Erst bist du dran."
+   }
+  ]
+ },
+ "knight_leave": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Komm. Du gehörst ins Warme. Der Stein läuft nicht weg.",
+    "hold": 0.6
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Bin dabei. Rennen ist nur gerade nicht drin."
+   }
+  ]
+ },
+ "walk_a": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Langsamer. Wer hier umkippt, den muss ich tragen. Mein Rücken hat dazu eine klare Meinung."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Sag deinem Rücken, ich geb mir Mühe. Es zieht bei jedem Schritt."
+   }
+  ]
+ },
+ "walk_b": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Sag mal, was macht ein Ritter hier draußen? Hier kommen sonst nur Rotwild und ein paar Krähen vorbei."
+   },
+   {
+    "speaker": "VALDRIC",
+    "text": "Dasselbe wie du: unterwegs gewesen und hängen geblieben. Den Rest gibt's am Feuer."
+   }
+  ]
+ },
+ "walk_c": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Der Rauch dort drüben. Das ist die Hütte."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Ich riech's schon. Zum ersten Mal seit Tagen riecht hier was nach Essen."
+   },
+   {
+    "speaker": "VALDRIC",
+    "text": "Keine falschen Hoffnungen. Mein Eintopf ist Überlebenskunst, keine Kochkunst."
+   }
+  ]
+ },
+ "walk_d": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Gleich geschafft. Noch ein paar Schritte."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Sag nicht „gleich“. Wenn jemand „gleich“ sagt, wird der Weg immer länger."
+   }
+  ]
+ },
+ "walk_wait_a": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Ich warte. Aber lass mich hier draußen nicht zu lange stehen."
+   }
+  ]
+ },
+ "walk_wait_b": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Kommst du? Sonst trag ich dich. Ich warne dich, das wird unwürdig."
+   }
+  ]
+ },
+ "walk_wait_c": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Ein Fuß vor den anderen, Ellie. Ich bin hier."
+   }
+  ]
+ },
+ "walk_end": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "So. Ans Feuer mit dir, näher ran. Ich hol was Warmes."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Ist das ein Befehl?"
+   },
+   {
+    "speaker": "VALDRIC",
+    "text": "Eine dringende Empfehlung."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "...Dann nehm ich sie an."
+   }
+  ]
+ },
+ "fire_a": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Es duftet nach Kräutern. Und nach Rauch. Und nach irgendwas, das ich lieber nicht kennen will."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Trink. Heiß, bitter, wirkt. Frag nicht, was drin ist."
+   }
+  ]
+ },
+ "fire_b": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Schmeckt wie die Rinde von einem beleidigten Baum. ...Aber es wird warm in mir. Wirklich."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Die Wunde war nicht tief, nur schmutzig. Der Schatten hatte schon angefangen, daran zu fressen. Ich hab ihn ausgebrannt, so gut es ging."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Du hast diese Spinnendinger angesehen, als kenntest du sie. Und als wär dir das gar nicht recht."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "...Ich hab sie schon gesehen. Verstanden hab ich sie nie. Mehr dazu, wenn du wieder fest auf den Beinen stehst. Erst Feuer, dann Fragen."
+   }
+  ]
+ },
+ "fire_end": {
+  "lines": [
+   {
+    "speaker": "VALDRIC",
+    "text": "Ab ins Bett, Ellie. Drinnen ist es warm. Ich halte draußen die Wache.",
+    "hold": 2.4
+   }
+  ]
+ },
+ "sleep_in": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Tür zu. Feuer draußen. Nur kurz die Augen zumachen...",
+    "hold": 2.4
+   }
+  ]
+ },
+ "wake_day2": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "...Kein Schmerz mehr. Nur Hunger."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Der Ritter ist noch da, ich rieche sein Feuer. Dann war das gestern kein Fiebertraum."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Los. Raus, bevor ich mir das wieder ausrede."
+   }
+  ]
+ },
+ "fire_c": {
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Dein Schwert. Ich hab die Klinge gesäubert. Du hältst sie übrigens, als wäre es ein Besen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Ich war Dienerin. Ich hab jahrelang Besen gehalten. Das ist fast dasselbe."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ha! Fast. Nur dass der Staub hier zurückbeißt."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ein Feuer ist mehr als Wärme, Ellie. Du kannst daran kochen. Beeren, Pilze, was der Wald hergibt. Ein warmes Mahl heilt besser als jeder Verband."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Kochen. Und das bringst du mir bei?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Überleben kann ich. Schmecken ist deine Abteilung. Du lernst es, indem du es tust, aber nicht mehr heute. Du schläfst in der Hütte, ich bleib am Feuer."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Du schläfst gar nicht?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Irgendwer muss auf das Feuer aufpassen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "...Und morgen?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Morgen beginnt es erst richtig."
+   }
+  ]
+ },
+ "day2_morning": {
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Guten Morgen, Ellie. Du siehst wieder aus wie ein Mensch. Das ist ein Fortschritt."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Morgen. Ich fühl mich auch fast wie einer. Nur mein Magen ist anderer Meinung."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Hunger ist ein gutes Zeichen. Hör zu: Etwa zweihundert Schritte nördlich soll eine alte Holzfällerhütte stehen. Verlassen, aber vielleicht liegen dort noch Vorräte."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ich würde selbst gehen, aber ich lass die Hütte ungern allein. Schaust du nach? Und wenn dir irgendwas komisch vorkommt, dreh um."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Mach ich. Bewegung tut mir eh gut, und die Karte hab ich ja. Sorgst du dich etwa?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ich sorge mich um die Hütte. Du stehst nur zufällig drin."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Natürlich. Zufällig."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Die Spinnen sind nicht weg, Ellie. Bleib wachsam."
+   }
+  ]
+ },
+ "lumberjack_found": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Oh nein... Du hast es nicht mehr bis zur Tür geschafft."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Schwarze Adern, wie bei dem Ritter am Baum. Der Schatten hat dich schon angefressen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Vorräte gibt es hier keine, nur dich. Es tut mir leid."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Deine Axt liegt noch neben dir. Der Griff ist glatt von deinen Händen. Ich nehm sie mit, wenn ich darf. Ich pass gut auf sie auf."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Mit der Axt kann ich Bäume fällen. Jede Art gibt anderes Holz, das probier ich aus."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Ruhe in Frieden. Ich sag Valdric Bescheid. Er sollte das wissen."
+   }
+  ]
+ },
+ "cabin_spider": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Es ist still hier drinnen. Zu still."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Da, in der Ecke. Etwas Schwarzes schiebt sich aus dem Boden."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Eine Schattenspinne. Und sie ist schon wach. Natürlich."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Aber nur eine. Und diesmal hab ich ein Schwert. ...Komm schon, du Vieh."
+   }
+  ]
+ },
+ "report_lumberjack": {
+  "flag": "lumberjack_reported",
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Valdric, ich war an der Holzfällerhütte."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Und? Gab's Vorräte?"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Nur den Holzfäller. Er saß tot an der Wand, der Schatten hatte ihn schon halb aufgefressen. Seine Axt hab ich mitgebracht."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "...Das tut mir leid für ihn. Die Axt hat Besseres verdient, als zu rosten. Gut gepflegt, der Griff ist glatt von Jahren."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Und drinnen saß eine Spinne. Mitten im Raum, als hätte sie auf mich gewartet."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Gewartet. Das gefällt mir nicht. Tiere folgen Regeln, Ellie. Die da folgen keinen."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Sieh dich um. Das Dach tropft, im Boden wächst ein Baum, der Wind pfeift durch jede Ritze. Ein Dach muss den Sturm aushalten, nicht schön aussehen. Das hier hält nicht mal eine Spinne aus."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Du willst die Hütte wieder aufbauen."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Fester, dichter, sicherer. Du hast jetzt eine Axt: Hol mir zwanzig Stück Tannenholz. Tannen geben hartes, gutes Holz."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Drinnen muss auch aufgeräumt werden. Die Pilze fressen das Holz von innen, und der Baum im Boden muss fallen. Dann können wir anfangen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Holz, Pilze raus, Baum fällen. Ein Dach, das nicht wackelt... da bin ich dabei."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Die Pilze sind übrigens nicht giftig. Sammel sie ruhig ein, vielleicht brauchen wir sie noch."
+   }
+  ]
+ },
+ "rebuild_wood": {
+  "flag": "rebuild_wood_delivered",
+  "take": {
+   "item": "wood",
+   "count": 20
+  },
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Zwanzig Stück. Sauber geschlagen, nichts Faules dabei. So schnell hab ich das nicht erwartet."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Die Tannen haben sich gewehrt. Ich hab gewonnen. Knapp."
+   }
+  ]
+ },
+ "finale_outside": {
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Holz liegt bereit, die Pilze sind raus, der Baum ist gefällt. Mehr Ausreden hab ich nicht."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ausreden? Du wolltest die ganze Zeit anfangen. Gib's zu."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ha! Erwischt. Komm, wir fangen an."
+   }
+  ]
+ },
+ "finale_inside": {
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Den Baum hab ich bis nach draußen krachen hören. Da hat jemand ordentlich zugelangt."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ich hab ihn nur... überzeugt."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Das Holz liegt bereit, drinnen ist frei. Mehr Ausreden hab ich nicht."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Du wolltest die ganze Zeit anfangen. Gib's zu."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ha! Erwischt. Komm mit raus, wir fangen an."
+   }
+  ]
+ },
+ "finale_work": {
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Gerade halten. Ja, so. Wackel nicht, ich hänge an meinen Fingern."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ich wackle nicht, das Holz wackelt! ...Sie hält. Sie hält wirklich."
+   }
+  ]
+ },
+ "finale_end": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Sieh dir das an. Ein Dach, das nicht wackelt."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Dicht ist es auch. Ein guter Anfang, Ellie."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Mehr morgen. Heute hast du dir den Abend am Feuer verdient."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Und die halbe Ration. Mindestens."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ha! Ein Drittel. Verhandlungsbasis."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "...Danke, Valdric. Wirklich."
+   }
+  ]
+ },
+ "town_intro": {
+  "flag": "town_intro_done",
+  "give": [
+   {
+    "item": "sickle_basic",
+    "count": 1
+   },
+   {
+    "item": "pickaxe_basic",
+    "count": 1
+   }
+  ],
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Guten Morgen. Das Dach hält sogar den Tau draußen. Ich hätte nie gedacht, dass ich mich mal über Trockenheit freue."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Morgen, Ellie. Setz dich kurz, ich will dir was zeigen."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ein Dach haben wir. Aber ein Dach allein macht noch keinen Ort."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Menschen gehen dorthin, wo Licht ist. Das ist keine Poesie. Die Schatten scheuen es, und wer Angst hat, sucht es."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Du willst, dass hier mehr entsteht als eine Hütte."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ich will, dass hier eine Stadt entsteht. Klein anfangen, Pfosten für Pfosten. Zu zweit überlebt man eine Nacht. Für mehr braucht man mehr Leute."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Drück B, dann siehst du, was du bauen kannst. Der erste Lichtpfosten braucht Holz und zwei Glimmkappen. Die wachsen im Schatten der Bäume."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Und nimm das hier: eine Sichel für Fasern, eine Spitzhacke für Stein. Die Axt hast du ja schon."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ein Licht anzünden und schauen, wer kommt. Wie Krümel für die Spatzen, nur im großen Stil."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Genau so. Und es ist deine Stadt, Ellie. Du entscheidest, wo sie wächst. Ich halte dir den Rücken frei."
+   }
+  ]
+ },
+ "gustav_hello": {
+  "flag": "gustav_joined",
+  "town_talk": "gustav",
+  "lines": [
+   {
+    "speaker": "FREMDER",
+    "mood": "",
+    "title": "",
+    "text": "Hoho! Ein Licht mitten im Nichts, und darunter ein Dach, das noch nach frischem Holz riecht! Wer hat das denn gebaut? Wo ist mein... Bleistift...",
+    "known_flag": "gustav_joined",
+    "known_name": "GUSTAV"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Hinter deinem Ohr. Ich bin Ellie, und das ist meine Werkstatt. Also: unsere."
+   },
+   {
+    "speaker": "FREMDER",
+    "mood": "",
+    "title": "",
+    "text": "Hinterm Ohr! Natürlich! Gustav, Kleines, Zimmermann, Stellmacher, was du willst. Ich habe Scheunen gebaut, die stehen noch, wenn die Welt schon längst umgefallen ist.",
+    "known_flag": "gustav_joined",
+    "known_name": "GUSTAV"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Und das hier? Die Fuge hier hat jemand mit Liebe gesetzt. Nicht mit Verstand, aber mit Liebe. Das lässt sich lernen. Ich zeig es dir."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Du bleibst?"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Mädel, ich bin seit Jahren von Dorf zu Dorf gezogen, und alle sind umgefallen. Ein Licht, ein Dach und jemand, der mich ansieht, als hätte ich eine Meinung: Ich bleibe!"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Such mich an der Werkbank, wenn du Bretter, Seil oder Werkzeug brauchst. Und setz dich ruhig kurz, du siehst aus wie drei Tage im Regen gestanden."
+   }
+  ]
+ },
+ "gustav_talk_a": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Morgen, Kleines! Wenn du Holz im Lager hast, säg ich dir Bretter draus. Ganz von allein, ich kann gar nicht anders!"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Du fragst gar nicht, was ich bauen will?"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Ein Haus erzählt einem schon, was es werden will. Man muss nur zuhören. Und die Späne vom Ohr pusten."
+   }
+  ]
+ },
+ "gustav_talk_b": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Weißt du, was ich an diesem Ort mag? Man hört, dass hier jemand bleiben will. Das Holz knarzt anders, wenn es nicht auf der Flucht ist."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Du hörst Holz knarzen?"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Jedes Holz! Die Fichte da drüben, herrliche Maserung, da nisten doch die Rotkehlchen drin! ... Äh. Wo war ich? Ach ja, Zäune! Ihr braucht Zäune!"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Und wenn du mir ein paar Leerensplitter bringst, schmiede ich dir was Besseres. Ich frag nicht, woher. Ich frag nur, ob du dabei heil geblieben bist."
+   }
+  ]
+ },
+ "gustav_talk_c": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Setz dich, Ellie. Nein, nicht auf den Balken, der ist noch nass. Hier, der Schemel. Ich hab ihn gestern gemacht."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Für mich?"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Lag da so rum, dachte, vielleicht gefällt er dir."
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Mauern schützen vor Wind, aber ein Zuhause wird es erst, wenn jemand am Tisch sitzt. Mach weiter so, Kleines. Ich bau dir den Rest."
+   }
+  ]
+ }
+}

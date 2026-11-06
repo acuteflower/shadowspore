@@ -1,0 +1,874 @@
+{
+  "rabbit": {
+    "name": "Wildkaninchen",
+    "scene": "res://src/entities/wildlife/wild_rabbit.tscn",
+    "texture": "res://assets/wildlife/rabbit.png",
+    "variants": [
+      "Wildbraun",
+      "Aschgrau",
+      "Honig",
+      "Dunkelbraun",
+      "Sand",
+      "Rotbraun"
+    ],
+    "variant_weights": [
+      5,
+      3,
+      2,
+      2,
+      1,
+      2
+    ],
+    "biomes": [
+      "meadow"
+    ],
+    "chunk_chance": 0.72,
+    "group_min": 1,
+    "group_max": 3,
+    "group_radius": 54,
+    "max_loaded": 36,
+    "spawn_attempts": 12,
+    "spawn_margin": 42,
+    "home_radius": 105,
+    "sense_interval": 0.12,
+    "alert_range": 115,
+    "flee_range": 57,
+    "safe_range": 165,
+    "sprint_alert_multiplier": 1.35,
+    "sprint_flee_multiplier": 1.5,
+    "sneak_multiplier": 0.6,
+    "swing_scare_range": 105,
+    "predator_multiplier": 1.5,
+    "alarm_range": 68,
+    "calm_seconds": 2.6,
+    "alert_seconds": 1.1,
+    "recover_seconds": 2.4,
+    "rest_seconds": [
+      1.6,
+      4.2
+    ],
+    "graze_seconds": [
+      2.0,
+      5.0
+    ],
+    "groom_seconds": [
+      1.7,
+      2.8
+    ],
+    "wander_hops": [
+      1,
+      3
+    ],
+    "wander_distance": [
+      15,
+      27
+    ],
+    "wander_duration": [
+      0.42,
+      0.56
+    ],
+    "wander_pause": [
+      0.2,
+      0.7
+    ],
+    "wander_height": 4.0,
+    "flee_distance": [
+      33,
+      47
+    ],
+    "flee_duration": [
+      0.27,
+      0.34
+    ],
+    "flee_pause": [
+      0.04,
+      0.12
+    ],
+    "flee_height": 7.0,
+    "blocked_pause": 0.3
+  },
+  "crow": {
+    "scene": "res://src/entities/wildlife/wild_corvid.tscn",
+    "texture": "res://assets/wildlife/corvid.png",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 8,
+    "spawn_attempts": 14,
+    "spawn_margin": 58,
+    "group_radius": 66,
+    "sense_interval": 0.16,
+    "alarm_range": 185,
+    "alert_range": 135,
+    "flee_range": 67,
+    "sneak_multiplier": 0.65,
+    "sprint_multiplier": 1.5,
+    "swing_range": 125,
+    "perch_fear_multiplier": 0.65,
+    "personal_space": 19,
+    "walk_distance": [
+      14,
+      34
+    ],
+    "walk_speed": 30,
+    "flight_distance": [
+      245,
+      390
+    ],
+    "flight_speed": 125,
+    "flight_height": 58,
+    "flight_seconds_min": 2.2,
+    "flight_clearance": 28,
+    "perch_chance": 0.36,
+    "safe_landing_range": 110,
+    "calm_seconds": 4.0,
+    "idle_seconds": [
+      1.7,
+      3.8
+    ],
+    "peck_seconds": [
+      2,
+      4.8
+    ],
+    "watch_seconds": [
+      3,
+      5.5
+    ],
+    "preen_seconds": [
+      2,
+      3.6
+    ],
+    "roost_seconds": [
+      8,
+      16
+    ],
+    "call_seconds": [
+      10,
+      24
+    ],
+    "call_volume_db": -23,
+    "flap_fps": 10,
+    "social_chance": 0.16,
+    "relocate_chance": 0.07,
+    "night_roost": true,
+    "name": "Rabenkr\u00e4he",
+    "group_min": 2,
+    "group_max": 3,
+    "chunk_chance": 0.22,
+    "build_offset": 0
+  },
+  "raven": {
+    "scene": "res://src/entities/wildlife/wild_corvid.tscn",
+    "texture": "res://assets/wildlife/corvid.png",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 8,
+    "spawn_attempts": 14,
+    "spawn_margin": 58,
+    "group_radius": 66,
+    "sense_interval": 0.16,
+    "alarm_range": 185,
+    "alert_range": 155,
+    "flee_range": 75,
+    "sneak_multiplier": 0.65,
+    "sprint_multiplier": 1.5,
+    "swing_range": 125,
+    "perch_fear_multiplier": 0.65,
+    "personal_space": 25,
+    "walk_distance": [
+      14,
+      34
+    ],
+    "walk_speed": 26,
+    "flight_distance": [
+      280,
+      440
+    ],
+    "flight_speed": 115,
+    "flight_height": 74,
+    "flight_seconds_min": 2.2,
+    "flight_clearance": 28,
+    "perch_chance": 0.55,
+    "safe_landing_range": 110,
+    "calm_seconds": 4.0,
+    "idle_seconds": [
+      1.7,
+      3.8
+    ],
+    "peck_seconds": [
+      2,
+      4.8
+    ],
+    "watch_seconds": [
+      3,
+      5.5
+    ],
+    "preen_seconds": [
+      2,
+      3.6
+    ],
+    "roost_seconds": [
+      8,
+      16
+    ],
+    "call_seconds": [
+      14,
+      30
+    ],
+    "call_volume_db": -22,
+    "flap_fps": 7.5,
+    "social_chance": 0.16,
+    "relocate_chance": 0.06,
+    "night_roost": true,
+    "name": "Kolkrabe",
+    "group_min": 1,
+    "group_max": 2,
+    "chunk_chance": 0.09,
+    "build_offset": 3
+  },
+  "owl": {
+    "scene": "res://src/entities/wildlife/wild_meadow_bird.tscn",
+    "texture": "res://assets/wildlife/meadow_birds.png",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 8,
+    "spawn_attempts": 14,
+    "spawn_margin": 58,
+    "group_radius": 45,
+    "sense_interval": 0.16,
+    "alarm_range": 185,
+    "alert_range": 125,
+    "flee_range": 52,
+    "sneak_multiplier": 0.65,
+    "sprint_multiplier": 1.5,
+    "swing_range": 125,
+    "perch_fear_multiplier": 0.65,
+    "personal_space": 19,
+    "walk_distance": [
+      9,
+      17
+    ],
+    "walk_speed": 18,
+    "flight_distance": [
+      210,
+      340
+    ],
+    "flight_speed": 108,
+    "flight_height": 38,
+    "flight_seconds_min": 2.2,
+    "flight_clearance": 16.0,
+    "perch_chance": 0.65,
+    "safe_landing_range": 130,
+    "calm_seconds": 4.0,
+    "idle_seconds": [
+      1.7,
+      3.8
+    ],
+    "peck_seconds": [
+      2,
+      4.8
+    ],
+    "watch_seconds": [
+      3,
+      5.5
+    ],
+    "preen_seconds": [
+      2,
+      3.6
+    ],
+    "roost_seconds": [
+      8,
+      16
+    ],
+    "call_seconds": [
+      28,
+      50
+    ],
+    "call_volume_db": -30,
+    "flap_fps": 6.0,
+    "social_chance": 0,
+    "relocate_chance": 0.07,
+    "night_roost": false,
+    "name": "Schleiereule",
+    "group_min": 1,
+    "group_max": 1,
+    "chunk_chance": 0.085,
+    "build_offset": 0,
+    "max_species_loaded": 1,
+    "requires_perch": true,
+    "flock_watch": false,
+    "night_flight_height": 24,
+    "curve_ratio": 0.17,
+    "glide_from": 0.28,
+    "glide_to": 0.85,
+    "takeoff_fraction": 0.14,
+    "landing_fraction": 0.86,
+    "sleep_seconds": [
+      12,
+      24
+    ],
+    "listen_seconds": [
+      2.8,
+      5.2
+    ],
+    "awake_threshold": 0.4
+  },
+  "hoopoe": {
+    "scene": "res://src/entities/wildlife/wild_meadow_bird.tscn",
+    "texture": "res://assets/wildlife/meadow_birds.png",
+    "biomes": [
+      "meadow"
+    ],
+    "max_loaded": 8,
+    "spawn_attempts": 14,
+    "spawn_margin": 58,
+    "group_radius": 65,
+    "sense_interval": 0.16,
+    "alarm_range": 185,
+    "alert_range": 105,
+    "flee_range": 55,
+    "sneak_multiplier": 0.65,
+    "sprint_multiplier": 1.5,
+    "swing_range": 125,
+    "perch_fear_multiplier": 0.65,
+    "personal_space": 19,
+    "walk_distance": [
+      12,
+      25
+    ],
+    "walk_speed": 22,
+    "flight_distance": [
+      150,
+      240
+    ],
+    "flight_speed": 95,
+    "flight_height": 43,
+    "flight_seconds_min": 2.2,
+    "flight_clearance": 28,
+    "perch_chance": 0.16,
+    "safe_landing_range": 100,
+    "calm_seconds": 4.0,
+    "idle_seconds": [
+      1.7,
+      3.8
+    ],
+    "peck_seconds": [
+      2.8,
+      5
+    ],
+    "watch_seconds": [
+      3,
+      5.5
+    ],
+    "preen_seconds": [
+      1.8,
+      3.2
+    ],
+    "roost_seconds": [
+      8,
+      16
+    ],
+    "call_seconds": [
+      18,
+      34
+    ],
+    "call_volume_db": -25,
+    "flap_fps": 12,
+    "social_chance": 0.16,
+    "relocate_chance": 0.07,
+    "night_roost": true,
+    "name": "Wiedehopf",
+    "group_min": 1,
+    "group_max": 2,
+    "chunk_chance": 0.12,
+    "build_offset": 3,
+    "max_species_loaded": 2,
+    "requires_perch": false,
+    "flock_watch": false,
+    "curve_ratio": 0.3,
+    "glide_from": 0.5,
+    "glide_to": 0.57,
+    "flight_bob": 2.8,
+    "flight_bob_hz": 2.3,
+    "alarm_reaction": [
+      0.28,
+      0.55
+    ]
+  },
+  "deer": {
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 8,
+    "spawn_margin": 62,
+    "spawn_attempts": 16,
+    "home_radius": 150,
+    "sense_interval": 0.15,
+    "alert_range": 165,
+    "flee_range": 95,
+    "safe_range": 230,
+    "sneak_multiplier": 0.6,
+    "sprint_multiplier": 1.45,
+    "swing_range": 105,
+    "safe_seconds": 3.5,
+    "body_radius": 6,
+    "walk_speed": 37,
+    "run_speed": 138,
+    "walk_distance": [
+      48,
+      82
+    ],
+    "run_distance": [
+      65,
+      100
+    ],
+    "walk_stride": 23,
+    "run_stride": 44,
+    "rest_seconds": [
+      1.7,
+      3.8
+    ],
+    "forage_seconds": [
+      2.2,
+      4.5
+    ],
+    "groom_seconds": [
+      1.6,
+      2.8
+    ],
+    "sleep_seconds": [
+      8,
+      16
+    ],
+    "nocturnal": false,
+    "texture": "res://assets/wildlife/deer.png",
+    "name": "Reh",
+    "chunk_chance": 0.12,
+    "max_species_loaded": 3,
+    "group_min": 2,
+    "group_max": 3,
+    "family_range": 48,
+    "alarm_range": 220,
+    "fawn_speed_factor": 0.91,
+    "motion_ramp": 0.18
+  },
+  "badger": {
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 8,
+    "spawn_margin": 62,
+    "spawn_attempts": 16,
+    "home_radius": 85,
+    "sense_interval": 0.15,
+    "alert_range": 95,
+    "flee_range": 43,
+    "safe_range": 140,
+    "sneak_multiplier": 0.6,
+    "sprint_multiplier": 1.45,
+    "swing_range": 105,
+    "safe_seconds": 3.5,
+    "body_radius": 5,
+    "walk_speed": 24,
+    "run_speed": 72,
+    "walk_distance": [
+      30,
+      52
+    ],
+    "run_distance": [
+      44,
+      72
+    ],
+    "walk_stride": 16,
+    "run_stride": 27,
+    "rest_seconds": [
+      1.7,
+      3.8
+    ],
+    "forage_seconds": [
+      2.2,
+      4.5
+    ],
+    "groom_seconds": [
+      1.6,
+      2.8
+    ],
+    "sleep_seconds": [
+      8,
+      16
+    ],
+    "nocturnal": true,
+    "texture": "res://assets/wildlife/badger.png",
+    "name": "Dachs",
+    "chunk_chance": 0.1,
+    "max_species_loaded": 2,
+    "group_min": 1,
+    "group_max": 2,
+    "dig_seconds": [
+      2.1,
+      3.3
+    ],
+    "emerge_seconds": 1.1,
+    "motion_ramp": 0.18
+  },
+  "fox": {
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 8,
+    "spawn_margin": 62,
+    "spawn_attempts": 16,
+    "home_radius": 145,
+    "sense_interval": 0.15,
+    "alert_range": 135,
+    "flee_range": 70,
+    "safe_range": 200,
+    "sneak_multiplier": 0.6,
+    "sprint_multiplier": 1.45,
+    "swing_range": 105,
+    "safe_seconds": 3.5,
+    "body_radius": 4,
+    "walk_speed": 34,
+    "run_speed": 125,
+    "walk_distance": [
+      50,
+      85
+    ],
+    "run_distance": [
+      44,
+      72
+    ],
+    "walk_stride": 22,
+    "run_stride": 42,
+    "rest_seconds": [
+      1.7,
+      3.8
+    ],
+    "forage_seconds": [
+      2.2,
+      4.5
+    ],
+    "groom_seconds": [
+      1.6,
+      2.8
+    ],
+    "sleep_seconds": [
+      8,
+      16
+    ],
+    "nocturnal": true,
+    "texture": "res://assets/wildlife/fox.png",
+    "name": "Fuchs",
+    "chunk_chance": 0.075,
+    "max_species_loaded": 1,
+    "group_min": 1,
+    "group_max": 1,
+    "listen_seconds": [
+      1.3,
+      2.3
+    ],
+    "pounce_seconds": 0.85,
+    "pounce_height": 7,
+    "pounce_distance": [
+      10,
+      19
+    ],
+    "motion_ramp": 0.18
+  },
+  "hedgehog": {
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 8,
+    "spawn_margin": 62,
+    "spawn_attempts": 16,
+    "home_radius": 65,
+    "sense_interval": 0.15,
+    "alert_range": 65,
+    "flee_range": 30,
+    "safe_range": 90,
+    "sneak_multiplier": 0.6,
+    "sprint_multiplier": 1.45,
+    "swing_range": 105,
+    "safe_seconds": 3.8,
+    "body_radius": 2.5,
+    "walk_speed": 13,
+    "run_speed": 20,
+    "walk_distance": [
+      18,
+      28
+    ],
+    "run_distance": [
+      44,
+      72
+    ],
+    "walk_stride": 10,
+    "run_stride": 13,
+    "rest_seconds": [
+      1.7,
+      3.8
+    ],
+    "forage_seconds": [
+      2.2,
+      4.5
+    ],
+    "groom_seconds": [
+      1.6,
+      2.8
+    ],
+    "sleep_seconds": [
+      8,
+      16
+    ],
+    "nocturnal": true,
+    "texture": "res://assets/wildlife/hedgehog.png",
+    "name": "Igel",
+    "chunk_chance": 0.13,
+    "max_species_loaded": 2,
+    "group_min": 1,
+    "group_max": 1,
+    "curl_seconds": 0.8,
+    "uncurl_seconds": 1.1,
+    "motion_ramp": 0.18
+  },
+  "butterfly": {
+    "name": "Schmetterling",
+    "scene": "res://src/entities/wildlife/meadow_butterfly.tscn",
+    "texture": "res://assets/wildlife/butterfly.png",
+    "biomes": [
+      "meadow"
+    ],
+    "chunk_chance": 0.32,
+    "group_min": 2,
+    "group_max": 4,
+    "max_loaded": 10,
+    "min_flowers": 6,
+    "flower_kinds": [
+      "flower",
+      "bloom",
+      "clover"
+    ],
+    "feed_seconds": [
+      2.0,
+      4.8
+    ],
+    "flight_seconds": [
+      1.1,
+      2.1
+    ],
+    "flight_height": [
+      5,
+      10
+    ],
+    "scatter_range": 34,
+    "swing_range": 75,
+    "patch_radius": 90,
+    "rest_seconds": [
+      5,
+      10
+    ]
+  },
+  "bee": {
+    "name": "Biene",
+    "biomes": [
+      "meadow"
+    ],
+    "body_radius": 1,
+    "max_loaded": 24,
+    "chunk_chance": 0.75,
+    "group_min": 3,
+    "group_max": 5,
+    "patch_radius": 90,
+    "feed_seconds": [
+      2,
+      5
+    ],
+    "rest_seconds": [
+      5,
+      10
+    ],
+    "flight_speed": 24,
+    "flight_height": 5,
+    "scatter_range": 20
+  },
+  "snail": {
+    "name": "Schnecke",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "body_radius": 1,
+    "max_loaded": 18,
+    "chunk_chance": 0.7,
+    "group_min": 2,
+    "group_max": 3,
+    "home_radius": 36,
+    "crawl_speed": 1.3,
+    "rest_seconds": [
+      4,
+      11
+    ],
+    "withdraw_seconds": [
+      2,
+      4
+    ],
+    "scatter_range": 18,
+    "tree_chance": 0.45
+  },
+  "ladybug": {
+    "name": "Marienk\u00e4fer",
+    "biomes": [
+      "meadow"
+    ],
+    "body_radius": 1,
+    "max_loaded": 12,
+    "chunk_chance": 0.5,
+    "group_min": 1,
+    "group_max": 2,
+    "home_radius": 40,
+    "crawl_speed": 2.2,
+    "rest_seconds": [
+      3,
+      7
+    ],
+    "feed_seconds": [
+      3,
+      6
+    ],
+    "patch_radius": 80,
+    "flight_speed": 18,
+    "flight_height": 4,
+    "scatter_range": 16,
+    "withdraw_seconds": [
+      2,
+      4
+    ]
+  },
+  "moth": {
+    "name": "Nachtfalter",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "body_radius": 1,
+    "max_loaded": 14,
+    "chunk_chance": 0.6,
+    "group_min": 2,
+    "group_max": 3,
+    "rest_seconds": [
+      2,
+      5
+    ],
+    "feed_seconds": [
+      1.5,
+      4
+    ],
+    "patch_radius": 100,
+    "flight_speed": 17,
+    "flight_height": 7,
+    "scatter_range": 22,
+    "night_only": true
+  },
+  "bear": {
+    "scene": "res://src/entities/wildlife/wild_bear.tscn",
+    "biomes": [
+      "meadow",
+      "mist_forest"
+    ],
+    "max_loaded": 6,
+    "spawn_margin": 90,
+    "spawn_attempts": 18,
+    "home_radius": 150,
+    "sense_interval": 0.15,
+    "alert_range": 140,
+    "flee_range": 95,
+    "safe_range": 185,
+    "sneak_multiplier": 0.6,
+    "sprint_multiplier": 1.2,
+    "safe_seconds": 3,
+    "body_radius": 11,
+    "walk_speed": 23,
+    "run_speed": 73,
+    "walk_distance": [
+      28,
+      55
+    ],
+    "run_distance": [
+      55,
+      85
+    ],
+    "walk_stride": 23,
+    "run_stride": 34,
+    "rest_seconds": [
+      2,
+      5
+    ],
+    "forage_seconds": [
+      3,
+      6
+    ],
+    "groom_seconds": [
+      2,
+      3.5
+    ],
+    "sleep_seconds": [
+      8,
+      14
+    ],
+    "nocturnal": false,
+    "texture": "res://assets/wildlife/bear.png",
+    "name": "Braunb\u00e4r",
+    "chunk_chance": 0.22,
+    "motion_ramp": 0.18,
+    "family_chance": 0.78,
+    "family_range": 43,
+    "cub_speed_factor": 0.85,
+    "pursuit_seconds": 6,
+    "pursuit_decay": 2,
+    "pursuit_range": 130,
+    "pressure_range": 48,
+    "warning_seconds": 2,
+    "lower_seconds": 0.65,
+    "disengage_range": 155,
+    "chase_seconds": 7,
+    "chase_leash": 220,
+    "attack_range": 34,
+    "attack_arc": 100,
+    "attack_damage": 18,
+    "attack_knockback": 120,
+    "attack_seconds": 1.15,
+    "attack_hit_start": 0.42,
+    "attack_hit_end": 0.64,
+    "attack_recover": 1.2,
+    "hunt_range": 100,
+    "hunt_seconds": 3,
+    "hunt_cooldown": [
+      40,
+      70
+    ],
+    "hunt_contact": 12,
+    "play_seconds": [
+      2,
+      4
+    ],
+    "chase_step": 32,
+    "warning_release_range": 100,
+    "maternal_pressure_range": 40,
+    "maternal_pursuit_seconds": 4,
+    "follow_stop": 17,
+    "follow_step": 42
+  }
+}

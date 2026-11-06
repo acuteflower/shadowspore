@@ -1,0 +1,57 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/entities/enemies/training_dummy.gd" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/props/training_dummy.png" id="2_tex"]
+[ext_resource type="Shader" path="res://assets/shaders/hit_flash.gdshader" id="3_flash"]
+[ext_resource type="Script" path="res://src/components/health_component.gd" id="4_health"]
+[ext_resource type="Script" path="res://src/components/hurtbox_component.gd" id="5_hurtbox"]
+[ext_resource type="Script" path="res://src/fx/world_health_bar.gd" id="6_bar"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flash"]
+resource_local_to_scene = true
+shader = ExtResource("3_flash")
+shader_parameter/flash = 0.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_base"]
+size = Vector2(12, 6)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(14, 24)
+
+[sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_health"]
+properties/0/path = NodePath("HealthComponent:current")
+properties/0/spawn = true
+properties/0/replication_mode = 1
+
+[node name="TrainingDummy" type="StaticBody2D"]
+y_sort_enabled = true
+script = ExtResource("1_script")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+material = SubResource("ShaderMaterial_flash")
+texture = ExtResource("2_tex")
+offset = Vector2(0, -16)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -3)
+shape = SubResource("RectangleShape2D_base")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 0
+script = ExtResource("5_hurtbox")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+position = Vector2(0, -16)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="HealthComponent" type="Node" parent="."]
+script = ExtResource("4_health")
+max_health = 100.0
+
+[node name="HealthBar" type="Node2D" parent="."]
+position = Vector2(0, -38)
+script = ExtResource("6_bar")
+
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+replication_config = SubResource("SceneReplicationConfig_health")

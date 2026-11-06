@@ -1,0 +1,22 @@
+{
+	"common": {
+		"name": "Gewöhnlich",
+		"color": "#b8b8c8"
+	},
+	"uncommon": {
+		"name": "Ungewöhnlich",
+		"color": "#6fd08c"
+	},
+	"rare": {
+		"name": "Selten",
+		"color": "#5aa8ff"
+	},
+	"epic": {
+		"name": "Episch",
+		"color": "#b47aff"
+	},
+	"legendary": {
+		"name": "Legendär",
+		"color": "#ffb347"
+	}
+}

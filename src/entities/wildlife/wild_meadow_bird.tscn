@@ -1,0 +1,11 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://src/entities/wildlife/wild_corvid.tscn" id="1"]
+[ext_resource type="Script" path="res://src/entities/wildlife/wild_meadow_bird.gd" id="2"]
+[ext_resource type="Texture2D" path="res://assets/wildlife/meadow_birds.png" id="3"]
+
+[node name="WildMeadowBird" instance=ExtResource("1")]
+script = ExtResource("2")
+
+[node name="Sprite2D" parent="." index="0"]
+texture = ExtResource("3")

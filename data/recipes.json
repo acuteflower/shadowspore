@@ -1,0 +1,128 @@
+{
+ "plank": {
+  "name": "BRETTER",
+  "station": "workshop",
+  "in": {
+   "wood": 2
+  },
+  "out": {
+   "plank": 2
+  },
+  "seconds": 1.2,
+  "trust": 0,
+  "info": "GESÄGT UND GLATT",
+  "by": "self"
+ },
+ "rope": {
+  "name": "SEIL",
+  "station": "workshop",
+  "in": {
+   "plant_fiber": 3
+  },
+  "out": {
+   "rope": 1
+  },
+  "seconds": 1.2,
+  "trust": 0,
+  "info": "GEDREHTE FASERN",
+  "by": "self"
+ },
+ "axe_basic": {
+  "name": "AXT",
+  "station": "workshop",
+  "in": {
+   "wood": 2,
+   "stone": 2
+  },
+  "out": {
+   "axe_basic": 1
+  },
+  "seconds": 2.0,
+  "trust": 0,
+  "info": "ERSATZ FÜR DIE FÄLLAXT",
+  "once": true,
+  "by": "self"
+ },
+ "pickaxe_basic": {
+  "name": "SPITZHACKE",
+  "station": "workshop",
+  "in": {
+   "wood": 2,
+   "stone": 3
+  },
+  "out": {
+   "pickaxe_basic": 1
+  },
+  "seconds": 2.0,
+  "trust": 0,
+  "info": "BRICHT FELSEN",
+  "once": true,
+  "by": "self"
+ },
+ "sickle_basic": {
+  "name": "SICHEL",
+  "station": "workshop",
+  "in": {
+   "wood": 1,
+   "stone": 1,
+   "plant_fiber": 1
+  },
+  "out": {
+   "sickle_basic": 1
+  },
+  "seconds": 2.0,
+  "trust": 0,
+  "info": "FÜR GRAS UND FASERN",
+  "once": true,
+  "by": "self"
+ },
+ "sword_iron": {
+  "name": "GESCHMIEDETES SCHWERT",
+  "station": "workshop",
+  "in": {
+   "sword_basic": 1,
+   "plank": 2,
+   "stone": 4,
+   "void_splinter": 2
+  },
+  "out": {
+   "sword_iron": 1
+  },
+  "seconds": 3.5,
+  "trust": 20,
+  "info": "GUSTAV SCHMIEDET, DAS DAUERT",
+  "by": "npc",
+  "npc": "gustav",
+  "work": 100.0
+ },
+ "rope_reed": {
+  "name": "SCHILFSEIL",
+  "station": "workshop",
+  "in": {
+   "reed": 4
+  },
+  "out": {
+   "rope": 1
+  },
+  "seconds": 1.2,
+  "trust": 0,
+  "info": "GEFLOCHTENES SCHILF",
+  "by": "self"
+ },
+ "rod_basic": {
+  "name": "ANGELRUTE",
+  "station": "workshop",
+  "in": {
+   "wood": 2,
+   "plant_fiber": 4
+  },
+  "out": {
+   "rod_basic": 1
+  },
+  "seconds": 2.0,
+  "trust": 0,
+  "info": "ESCHE UND FLACHS",
+  "once": true,
+  "by": "self"
+ }
+}

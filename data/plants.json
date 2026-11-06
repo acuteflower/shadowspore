@@ -1,0 +1,1938 @@
+{
+ "bush": {
+  "name": "Lichtungsbusch",
+  "texture": "res://assets/props/bush.png",
+  "glow": "res://assets/props/bush_glow.png",
+  "stripped": "res://assets/props/bush_stripped.png",
+  "columns": 6,
+  "rows": 1,
+  "weights": [
+   3,
+   4,
+   2,
+   3,
+   2,
+   1
+  ],
+  "radius": [
+   9,
+   12,
+   15,
+   16,
+   10,
+   12
+  ],
+  "height": [
+   16,
+   22,
+   28,
+   15,
+   28,
+   22
+  ],
+  "density": {
+   "base": 0.0035,
+   "wild": 0.011
+  },
+  "slow": 0.72,
+  "harvest": {
+   "tool": "sickle",
+   "hits": 3,
+   "drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "leaf",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.05,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.6,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "leaf",
+     "chance": 0.4,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "scene": "res://src/entities/props/bush.tscn",
+  "edge_margin": 4
+ },
+ "berry_bush": {
+  "name": "Dämmerbeerenbusch",
+  "texture": "res://assets/props/bush_berry.png",
+  "glow": "res://assets/props/bush_berry_glow.png",
+  "light": {
+   "color": "#9a7cff",
+   "radius": 15,
+   "energy": 0.3
+  },
+  "stripped": "res://assets/props/bush_berry_stripped.png",
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   2,
+   2,
+   1
+  ],
+  "radius": [
+   12,
+   15,
+   16
+  ],
+  "height": [
+   22,
+   28,
+   15
+  ],
+  "density": {
+   "base": 0.001,
+   "wild": 0.0035
+  },
+  "slow": 0.72,
+  "harvest": {
+   "tool": "sickle",
+   "hits": 3,
+   "drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "leaf",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.05,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.6,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "leaf",
+     "chance": 0.4,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "pickup": {
+   "item": "dusk_berry",
+   "min": 2,
+   "max": 4,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3
+  },
+  "scene": "res://src/entities/props/bush.tscn",
+  "edge_margin": 4
+ },
+ "grass": {
+  "name": "Flüstergras",
+  "texture": "res://assets/props/grass.png",
+  "glow": "res://assets/props/grass_glow.png",
+  "stripped": "res://assets/props/grass_stripped.png",
+  "fireflies": true,
+  "sway": 0.05,
+  "leaf_colors": [
+   "#62b868",
+   "#a4e890",
+   "#3a8a58"
+  ],
+  "columns": 5,
+  "rows": 1,
+  "weights": [
+   4,
+   4,
+   2,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   11,
+   10,
+   16,
+   9
+  ],
+  "height": [
+   15,
+   21,
+   30,
+   11,
+   30
+  ],
+  "slow": 0.9,
+  "harvest": {
+   "tool": "sickle",
+   "hits": 2,
+   "drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.45,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "leaf",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "scene": "res://src/entities/props/bush.tscn",
+  "edge_margin": 3
+ },
+ "ember_bush": {
+  "name": "Glutbeerenranke",
+  "texture": "res://assets/props/bramble.png",
+  "glow": "res://assets/props/bramble_glow.png",
+  "light": {
+   "color": "#ffb25a",
+   "radius": 15,
+   "energy": 0.34
+  },
+  "stripped": "res://assets/props/bramble_stripped.png",
+  "fireflies": true,
+  "leaf_colors": [
+   "#3e8a6c",
+   "#6cb890",
+   "#2c6460"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   2,
+   2,
+   1
+  ],
+  "radius": [
+   11,
+   15,
+   16
+  ],
+  "height": [
+   18,
+   24,
+   20
+  ],
+  "slow": 0.68,
+  "harvest": {
+   "tool": "sickle",
+   "hits": 3,
+   "drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.15,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.5,
+     "min": 1,
+     "max": 2
+    }
+   ],
+   "regrow_days": 1
+  },
+  "pickup": {
+   "item": "ember_berry",
+   "min": 2,
+   "max": 3,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#ffb25a",
+    "#fff0b0",
+    "#ee7a2a"
+   ]
+  },
+  "scene": "res://src/entities/props/bush.tscn",
+  "edge_margin": 4
+ },
+ "pebble": {
+  "name": "Kiesel",
+  "texture": "res://assets/props/pebbles.png",
+  "columns": 5,
+  "rows": 1,
+  "weights": [
+   3,
+   2,
+   1,
+   2,
+   1
+  ],
+  "radius": [
+   6,
+   8,
+   9,
+   8,
+   6
+  ],
+  "height": [
+   6,
+   6,
+   7,
+   5,
+   6
+  ],
+  "density": {
+   "base": 0.006,
+   "wild": 0.004,
+   "shore": 0.018
+  },
+  "pickup": {
+   "item": "stone",
+   "min": 1,
+   "max": 1,
+   "regrow_days": 3,
+   "prompt": "AUFHEBEN"
+  },
+  "scene": "res://src/entities/props/pebble.tscn",
+  "edge_margin": 2
+ },
+ "willow": {
+  "name": "Schleierweide",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/willow.png",
+  "growth": "res://assets/props/willow_growth.png",
+  "columns": 4,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   1
+  ],
+  "radius": [
+   12,
+   16,
+   19,
+   19
+  ],
+  "height": [
+   92,
+   130,
+   164,
+   190
+  ],
+  "hits": [
+   4,
+   6,
+   8,
+   8
+  ],
+  "crown_fade": [
+   true,
+   true,
+   true,
+   true
+  ],
+  "crown_half_width": [
+   27,
+   39,
+   49,
+   53
+  ],
+  "trunk_half_width": [
+   4,
+   6,
+   8,
+   8
+  ],
+  "clear": [
+   10,
+   14,
+   18,
+   22
+  ],
+  "crown_shape": "curtain",
+  "dome_height": [
+   26,
+   34,
+   42,
+   48
+  ],
+  "sway": 0.02,
+  "fireflies": true,
+  "light_color": "#6fe6d6",
+  "light_energy": 0.3,
+  "rain_colors": [
+   "#3a9a70",
+   "#7cd28c",
+   "#20665a"
+  ],
+  "density": {
+   "base": 0.0008,
+   "wild": 0.004
+  },
+  "edge_margin": 6,
+  "min_gap": 4,
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "willow_wood",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "willow_thread",
+     "chance": 0.3,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "willow_wood",
+     "chance": 1.0,
+     "min": 2,
+     "max": 3
+    },
+    {
+     "id": "willow_thread",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  }
+ },
+ "blossom": {
+  "name": "Dämmerblüte",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/blossom.png",
+  "growth": "res://assets/props/blossom_growth.png",
+  "columns": 4,
+  "rows": 6,
+  "weights": [
+   3,
+   3,
+   2,
+   1
+  ],
+  "radius": [
+   11,
+   14,
+   17,
+   20
+  ],
+  "height": [
+   70,
+   98,
+   126,
+   152
+  ],
+  "hits": [
+   3,
+   5,
+   7,
+   8
+  ],
+  "crown_fade": [
+   true,
+   true,
+   true,
+   true
+  ],
+  "crown_half_width": [
+   25,
+   35,
+   45,
+   53
+  ],
+  "trunk_half_width": [
+   4,
+   5,
+   7,
+   8
+  ],
+  "clear": [
+   12,
+   18,
+   26,
+   34
+  ],
+  "crown_shape": "dome",
+  "sway": 0.012,
+  "fireflies": true,
+  "light_color": "#ff9ad8",
+  "light_from": 1,
+  "light_energy": 0.34,
+  "rain_colors": [
+   "#c25cc8",
+   "#ea92dc",
+   "#54287e"
+  ],
+  "petals": [
+   "#ea92dc",
+   "#fcd0f2"
+  ],
+  "density": {
+   "base": 0.002,
+   "wild": 0.0005
+  },
+  "edge_margin": 6,
+  "min_gap": 4,
+  "pickup": {
+   "item": "dusk_blossom",
+   "amount": [
+    2,
+    3,
+    4,
+    5
+   ],
+   "regrow_days": 3,
+   "prompt": "PFLÜCKEN",
+   "burst": [
+    "#fcd0f2",
+    "#ea92dc",
+    "#ffe8a0"
+   ]
+  },
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "blossom_wood",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "blossom_wood",
+     "chance": 1.0,
+     "min": 2,
+     "max": 3
+    },
+    {
+     "id": "dusk_blossom",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  }
+ },
+ "mushroom": {
+  "name": "Glimmkappe",
+  "texture": "res://assets/props/mushrooms.png",
+  "glow": "res://assets/props/mushrooms_glow.png",
+  "light": {
+   "color": "#6fe6d6",
+   "radius": 12,
+   "energy": 0.2
+  },
+  "columns": 4,
+  "rows": 1,
+  "weights": [
+   4,
+   3,
+   2,
+   1
+  ],
+  "radius": [
+   6,
+   9,
+   10,
+   12
+  ],
+  "height": [
+   14,
+   15,
+   15,
+   17
+  ],
+  "pickup": {
+   "item": "glow_cap",
+   "amount": [
+    1,
+    2,
+    3,
+    5
+   ],
+   "regrow_days": 3,
+   "prompt": "SAMMELN",
+   "burst": [
+    "#a082ff",
+    "#78f4e6"
+   ]
+  },
+  "scene": "res://src/entities/props/mushroom.tscn",
+  "edge_margin": 3
+ },
+ "rock": {
+  "name": "Felsen",
+  "texture": "res://assets/props/rock.png",
+  "glow": "res://assets/props/rock_glow.png",
+  "light": [
+   0.0,
+   0.2,
+   0.3,
+   0.25,
+   0.0,
+   0.28,
+   0.2,
+   0.45
+  ],
+  "columns": 8,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   1,
+   2,
+   2,
+   2,
+   1
+  ],
+  "radius": [
+   10,
+   14,
+   20,
+   8,
+   18,
+   14,
+   18,
+   15
+  ],
+  "height": [
+   20,
+   28,
+   42,
+   48,
+   18,
+   46,
+   34,
+   38
+  ],
+  "hits": [
+   3,
+   4,
+   6,
+   5,
+   3,
+   5,
+   5,
+   6
+  ],
+  "density": {
+   "base": 0.0012,
+   "wild": 0.004,
+   "shore": 0.01
+  },
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "stone",
+     "chance": 0.8,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "stone",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  },
+  "scene": "res://src/entities/props/rock.tscn",
+  "edge_margin": 4
+ },
+ "tree": {
+  "name": "Tanne",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/tree.png",
+  "growth": "res://assets/props/tree_growth.png",
+  "columns": 4,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   1
+  ],
+  "radius": [
+   12,
+   16,
+   20,
+   18
+  ],
+  "height": [
+   84,
+   124,
+   164,
+   192
+  ],
+  "hits": [
+   4,
+   6,
+   8,
+   8
+  ],
+  "crown_fade": [
+   true,
+   true,
+   true,
+   true
+  ],
+  "crown_half_width": [
+   22,
+   31,
+   40,
+   34
+  ],
+  "trunk_half_width": [
+   4,
+   6,
+   8,
+   7
+  ],
+  "density": {
+   "base": 0.0012,
+   "wild": 0.016
+  },
+  "edge_margin": 6,
+  "min_gap": 4,
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "wood",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "wood",
+     "chance": 1.0,
+     "min": 2,
+     "max": 3
+    },
+    {
+     "id": "resin",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "clear": [
+   14,
+   38,
+   62,
+   72
+  ]
+ },
+ "mine_rock": {
+  "name": "Felsen (Mine)",
+  "texture": "res://assets/mine/props/mine_rocks.png",
+  "columns": 8,
+  "rows": 4,
+  "radius": [
+   10,
+   14,
+   20,
+   8,
+   18,
+   14,
+   18,
+   15
+  ],
+  "height": [
+   20,
+   28,
+   42,
+   48,
+   18,
+   46,
+   34,
+   38
+  ],
+  "hits": [
+   3,
+   4,
+   6,
+   5,
+   3,
+   5,
+   5,
+   6
+  ],
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "stone",
+     "chance": 0.8,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "stone",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  },
+  "scene": "res://src/entities/props/mine_rock.tscn"
+ },
+ "mine_collapse": {
+  "name": "Geröll (Einsturz)",
+  "texture": "res://assets/mine/props/mine_rocks.png",
+  "columns": 8,
+  "rows": 4,
+  "radius": [
+   10,
+   14,
+   20,
+   8,
+   18,
+   14,
+   18,
+   15
+  ],
+  "height": [
+   20,
+   28,
+   42,
+   48,
+   18,
+   46,
+   34,
+   38
+  ],
+  "hits": [
+   3,
+   4,
+   6,
+   5,
+   3,
+   5,
+   5,
+   6
+  ],
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 100000,
+   "drops": [
+    {
+     "id": "stone",
+     "chance": 0.8,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "stone",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  },
+  "scene": "res://src/entities/props/mine_rock.tscn"
+ },
+ "moonbell": {
+  "name": "Mondglöckchen",
+  "texture": "res://assets/props/moonbell.png",
+  "glow": "res://assets/props/moonbell_glow.png",
+  "light": {
+   "color": "#8fe8f0",
+   "radius": 13,
+   "energy": 0.22
+  },
+  "fireflies": true,
+  "sway": 0.045,
+  "leaf_colors": [
+   "#8ab8e0",
+   "#d6f2f4",
+   "#3a8a58"
+  ],
+  "pickup": {
+   "item": "moonbell",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#8ab8e0",
+    "#d6f2f4",
+    "#78f4e6"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   7,
+   10,
+   13
+  ],
+  "height": [
+   20,
+   24,
+   26
+  ],
+  "slow": 0.9,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "wound_leaf": {
+  "name": "Wundblatt",
+  "texture": "res://assets/props/wound_leaf.png",
+  "glow": "res://assets/props/wound_leaf_glow.png",
+  "sway": 0.03,
+  "leaf_colors": [
+   "#449a62",
+   "#6cc47a",
+   "#a4eca0"
+  ],
+  "pickup": {
+   "item": "wound_leaf",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 2,
+   "burst": [
+    "#6cc47a",
+    "#a4eca0",
+    "#f0c8f0"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   11,
+   13
+  ],
+  "height": [
+   10,
+   20,
+   20
+  ],
+  "slow": 0.88,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "puffseed": {
+  "name": "Wispersaat",
+  "texture": "res://assets/props/puffseed.png",
+  "glow": "res://assets/props/puffseed_glow.png",
+  "fireflies": true,
+  "sway": 0.06,
+  "puff": [
+   "#d0d0f0",
+   "#f6f4ff"
+  ],
+  "leaf_colors": [
+   "#d0d0f0",
+   "#f6f4ff",
+   "#449a62"
+  ],
+  "pickup": {
+   "item": "seed_fluff",
+   "min": 1,
+   "max": 2,
+   "prompt": "SAMMELN",
+   "regrow_days": 3,
+   "burst": [
+    "#d0d0f0",
+    "#f6f4ff"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   6,
+   10,
+   13
+  ],
+  "height": [
+   22,
+   22,
+   22
+  ],
+  "slow": 0.92,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "glowfern": {
+  "name": "Leuchtfern",
+  "texture": "res://assets/props/glowfern.png",
+  "glow": "res://assets/props/glowfern_glow.png",
+  "stripped": "res://assets/props/glowfern_stripped.png",
+  "light": {
+   "color": "#66f0d8",
+   "radius": 14,
+   "energy": 0.2
+  },
+  "fireflies": true,
+  "sway": 0.04,
+  "leaf_colors": [
+   "#42a05e",
+   "#70cc78",
+   "#aef09a"
+  ],
+  "harvest": {
+   "tool": "sickle",
+   "hits": 2,
+   "drops": [
+    {
+     "id": "fern_frond",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "fern_frond",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "plant_fiber",
+     "chance": 0.3,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "pickup": {
+   "item": "fiddlehead",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#9ccc44",
+    "#e4f88e",
+    "#d8ff80"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   3,
+   3,
+   2
+  ],
+  "radius": [
+   10,
+   14,
+   17
+  ],
+  "height": [
+   12,
+   14,
+   16
+  ],
+  "slow": 0.7,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "cattail": {
+  "name": "Rohrkolben",
+  "texture": "res://assets/props/cattail.png",
+  "sway": 0.07,
+  "stripped": "res://assets/props/cattail_stripped.png",
+  "leaf_colors": [
+   "#449a62",
+   "#6cc47a",
+   "#7a4a52"
+  ],
+  "harvest": {
+   "tool": "sickle",
+   "hits": 2,
+   "drops": [
+    {
+     "id": "reed",
+     "chance": 0.6,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "reed",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "plant_fiber",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "columns": 3,
+  "rows": 1,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   9,
+   13,
+   17
+  ],
+  "height": [
+   20,
+   21,
+   21
+  ],
+  "slow": 0.85,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 4
+ },
+ "sunbloom": {
+  "name": "Sonnenwende",
+  "texture": "res://assets/props/sunbloom.png",
+  "glow": "res://assets/props/sunbloom_glow.png",
+  "sun": true,
+  "sway": 0.025,
+  "leaf_colors": [
+   "#f0a020",
+   "#ffd860",
+   "#449a62"
+  ],
+  "pickup": {
+   "item": "sun_seed",
+   "min": 1,
+   "max": 2,
+   "prompt": "ERNTEN",
+   "regrow_days": 4,
+   "burst": [
+    "#f0a020",
+    "#ffd860",
+    "#fff0a0"
+   ]
+  },
+  "columns": 3,
+  "rows": 5,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   9,
+   12
+  ],
+  "height": [
+   22,
+   24,
+   26
+  ],
+  "slow": 0.9,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "voidbloom": {
+  "name": "Leerenblüte",
+  "texture": "res://assets/props/voidbloom.png",
+  "glow": "res://assets/props/voidbloom_glow.png",
+  "light": {
+   "color": "#ff4ad0",
+   "radius": 14,
+   "energy": 0.3
+  },
+  "sway": 0.03,
+  "leaf_colors": [
+   "#40146e",
+   "#6a2aa0",
+   "#ff4ad0"
+  ],
+  "pickup": {
+   "item": "void_bloom",
+   "min": 1,
+   "max": 1,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 5,
+   "burst": [
+    "#6a2aa0",
+    "#ff4ad0",
+    "#ffa0ee"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   7,
+   11,
+   14
+  ],
+  "height": [
+   26,
+   28,
+   30
+  ],
+  "slow": 0.85,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 5
+ },
+ "earth_tuber": {
+  "name": "Erdknolle",
+  "texture": "res://assets/props/earth_tuber.png",
+  "sway": 0.02,
+  "leaf_colors": [
+   "#449a62",
+   "#6cc47a",
+   "#5a4048"
+  ],
+  "pickup": {
+   "item": "earth_tuber",
+   "min": 1,
+   "max": 2,
+   "prompt": "AUSGRABEN",
+   "regrow_days": 4,
+   "burst": [
+    "#5a4048",
+    "#7a6068",
+    "#a082a8"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   12,
+   15
+  ],
+  "height": [
+   14,
+   14,
+   14
+  ],
+  "slow": 0.9,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "ember_carrot": {
+  "name": "Glutmöhre",
+  "texture": "res://assets/props/ember_carrot.png",
+  "glow": "res://assets/props/ember_carrot_glow.png",
+  "light": {
+   "color": "#ffb25a",
+   "radius": 13,
+   "energy": 0.24
+  },
+  "sway": 0.03,
+  "leaf_colors": [
+   "#4aa87a",
+   "#7ad89a",
+   "#e0701c"
+  ],
+  "scene": "res://src/entities/props/flora.tscn",
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "pull": true,
+  "fireflies": true,
+  "radius": [
+   8,
+   10,
+   13
+  ],
+  "height": [
+   18,
+   20,
+   20
+  ],
+  "slow": 0.9,
+  "pickup": {
+   "item": "ember_carrot",
+   "min": 1,
+   "max": 1,
+   "prompt": "AUSZIEHEN",
+   "regrow_days": 5,
+   "burst": [
+    "#e0701c",
+    "#ffa83a",
+    "#ffe08a"
+   ]
+  },
+  "edge_margin": 4
+ },
+ "night_beet": {
+  "name": "Nachtrübe",
+  "texture": "res://assets/props/night_beet.png",
+  "glow": "res://assets/props/night_beet_glow.png",
+  "light": {
+   "color": "#4cc8c8",
+   "radius": 13,
+   "energy": 0.2
+  },
+  "sway": 0.02,
+  "leaf_colors": [
+   "#7a4a98",
+   "#a070c0",
+   "#4cc8c8"
+  ],
+  "scene": "res://src/entities/props/flora.tscn",
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "pull": true,
+  "fireflies": true,
+  "radius": [
+   9,
+   11,
+   14
+  ],
+  "height": [
+   20,
+   22,
+   22
+  ],
+  "slow": 0.88,
+  "pickup": {
+   "item": "night_beet",
+   "min": 1,
+   "max": 1,
+   "prompt": "AUSZIEHEN",
+   "regrow_days": 6,
+   "burst": [
+    "#4a2478",
+    "#a870d0",
+    "#4cc8c8"
+   ]
+  },
+  "edge_margin": 4
+ },
+ "mist_lily": {
+  "name": "Nebellilie",
+  "texture": "res://assets/props/mist_lily.png",
+  "glow": "res://assets/props/mist_lily_glow.png",
+  "light": {
+   "color": "#c8b8ff",
+   "radius": 15,
+   "energy": 0.26
+  },
+  "fireflies": true,
+  "sway": 0.03,
+  "bloom": "night",
+  "leaf_colors": [
+   "#9a8cd4",
+   "#d4cdf2",
+   "#ffe28a"
+  ],
+  "columns": 3,
+  "rows": 3,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   7,
+   11,
+   14
+  ],
+  "height": [
+   26,
+   28,
+   28
+  ],
+  "slow": 0.9,
+  "pickup": {
+   "item": "mist_lily",
+   "min": 1,
+   "max": 1,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 4,
+   "burst": [
+    "#9a8cd4",
+    "#d4cdf2",
+    "#ffe28a"
+   ]
+  },
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "spark_poppy": {
+  "name": "Funkenmohn",
+  "texture": "res://assets/props/spark_poppy.png",
+  "glow": "res://assets/props/spark_poppy_glow.png",
+  "light": {
+   "color": "#ff8a3a",
+   "radius": 13,
+   "energy": 0.2
+  },
+  "sway": 0.05,
+  "puff": [
+   "#ff8a3a",
+   "#ffe8a0"
+  ],
+  "puff_rise": true,
+  "leaf_colors": [
+   "#e03a22",
+   "#ff7a2a",
+   "#ffc060"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   12,
+   15
+  ],
+  "height": [
+   24,
+   26,
+   26
+  ],
+  "slow": 0.92,
+  "pickup": {
+   "item": "spark_poppy",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#e03a22",
+    "#ff7a2a",
+    "#ffc060"
+   ]
+  },
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "birch": {
+  "name": "Mondbirke",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/birch.png",
+  "growth": "res://assets/props/birch_growth.png",
+  "columns": 6,
+  "rows": 6,
+  "weights": [
+   3,
+   4,
+   3,
+   2,
+   2,
+   1
+  ],
+  "radius": [
+   9,
+   11,
+   12,
+   14,
+   15,
+   17
+  ],
+  "height": [
+   88,
+   116,
+   134,
+   158,
+   178,
+   194
+  ],
+  "hits": [
+   3,
+   4,
+   5,
+   6,
+   7,
+   8
+  ],
+  "crown_fade": [
+   true,
+   true,
+   true,
+   true,
+   true,
+   true
+  ],
+  "crown_half_width": [
+   22,
+   31,
+   36,
+   45,
+   49,
+   53
+  ],
+  "trunk_half_width": [
+   3,
+   4,
+   4,
+   6,
+   6,
+   8
+  ],
+  "clear": [
+   30,
+   42,
+   46,
+   56,
+   64,
+   70
+  ],
+  "crown_shape": "dome",
+  "sway": 0.016,
+  "fireflies": true,
+  "light_color": "#ffe9a0",
+  "light_from": 3,
+  "light_energy": 0.24,
+  "rain_colors": [
+   "#88c868",
+   "#f0c458",
+   "#96d2c2"
+  ],
+  "petals": [
+   "#f0c458",
+   "#c8f29c",
+   "#fff2a8"
+  ],
+  "density": {
+   "base": 0.001,
+   "wild": 0.0004
+  },
+  "edge_margin": 6,
+  "min_gap": 4,
+  "pickup": {
+   "item": "birch_leaf",
+   "amount": [
+    1,
+    2,
+    2,
+    3,
+    3,
+    4
+   ],
+   "regrow_days": 3,
+   "prompt": "PFLÜCKEN",
+   "burst": [
+    "#f0c458",
+    "#c8f29c",
+    "#fff2a8"
+   ]
+  },
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "birch_wood",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "birch_bark",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "birch_wood",
+     "chance": 1.0,
+     "min": 2,
+     "max": 3
+    },
+    {
+     "id": "birch_bark",
+     "chance": 0.8,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "birch_leaf",
+     "chance": 0.5,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  }
+ },
+ "ember_morel": {
+  "name": "Glutmorchel",
+  "texture": "res://assets/props/ember_morel.png",
+  "glow": "res://assets/props/ember_morel_glow.png",
+  "light": {
+   "color": "#ff9a40",
+   "radius": 12,
+   "energy": 0.2
+  },
+  "fireflies": true,
+  "sway": 0.012,
+  "leaf_colors": [
+   "#c07a34",
+   "#e8aa58",
+   "#5a2a18"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   12,
+   15
+  ],
+  "height": [
+   22,
+   24,
+   26
+  ],
+  "slow": 0.92,
+  "pickup": {
+   "item": "ember_morel",
+   "min": 1,
+   "max": 2,
+   "prompt": "SAMMELN",
+   "regrow_days": 4,
+   "burst": [
+    "#e8aa58",
+    "#ffd68a",
+    "#ff8a38"
+   ]
+  },
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "moon_parasol": {
+  "name": "Mondschirm",
+  "texture": "res://assets/props/moon_parasol.png",
+  "glow": "res://assets/props/moon_parasol_glow.png",
+  "light": {
+   "color": "#c8b8ff",
+   "radius": 13,
+   "energy": 0.2
+  },
+  "fireflies": true,
+  "sway": 0.014,
+  "puff": [
+   "#9af0e4",
+   "#d8ccff"
+  ],
+  "leaf_colors": [
+   "#9c96cc",
+   "#cdc8ea",
+   "#9af0e4"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   3,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   12,
+   15
+  ],
+  "height": [
+   28,
+   28,
+   30
+  ],
+  "slow": 0.92,
+  "pickup": {
+   "item": "moon_parasol",
+   "min": 1,
+   "max": 1,
+   "prompt": "SAMMELN",
+   "regrow_days": 5,
+   "burst": [
+    "#cdc8ea",
+    "#f2f0fc",
+    "#9af0e4"
+   ]
+  },
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "moon_iris": {
+  "name": "Mondiris",
+  "texture": "res://assets/props/moon_iris.png",
+  "glow": "res://assets/props/moon_iris_glow.png",
+  "light": {
+   "color": "#a494f0",
+   "radius": 14,
+   "energy": 0.22
+  },
+  "fireflies": true,
+  "sway": 0.03,
+  "leaf_colors": [
+   "#429a82",
+   "#6cc4a0",
+   "#7260d4"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   9,
+   13,
+   16
+  ],
+  "height": [
+   26,
+   28,
+   28
+  ],
+  "slow": 0.8,
+  "pickup": {
+   "item": "iris_bloom",
+   "min": 1,
+   "max": 1,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 4,
+   "burst": [
+    "#7260d4",
+    "#d8d0ff",
+    "#ffe8a0"
+   ]
+  },
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 4
+ },
+ "brook_mint": {
+  "name": "Bachminze",
+  "texture": "res://assets/props/brook_mint.png",
+  "glow": "res://assets/props/brook_mint_glow.png",
+  "fireflies": true,
+  "sway": 0.025,
+  "leaf_colors": [
+   "#4ea072",
+   "#7cc890",
+   "#a898dc"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   12,
+   15
+  ],
+  "height": [
+   18,
+   20,
+   22
+  ],
+  "slow": 0.85,
+  "pickup": {
+   "item": "brook_mint",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#7cc890",
+    "#b4ecb4",
+    "#d0c4f4"
+   ]
+  },
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 4
+ },
+ "marsh_gold": {
+  "name": "Sumpfdotter",
+  "texture": "res://assets/props/marsh_gold.png",
+  "glow": "res://assets/props/marsh_gold_glow.png",
+  "light": {
+   "color": "#ffb838",
+   "radius": 12,
+   "energy": 0.2
+  },
+  "fireflies": true,
+  "sway": 0.02,
+  "leaf_colors": [
+   "#3e8a54",
+   "#98d484",
+   "#f0b830"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   12,
+   15
+  ],
+  "height": [
+   22,
+   24,
+   26
+  ],
+  "slow": 0.8,
+  "pickup": {
+   "item": "marsh_gold",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#f0b830",
+    "#ffd860",
+    "#fff4b0"
+   ]
+  },
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 4
+ }
+}

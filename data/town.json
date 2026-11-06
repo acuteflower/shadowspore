@@ -1,0 +1,539 @@
+{
+ "name": {
+  "default": 0,
+  "choices": [
+   "GLIMMRAST",
+   "LICHTHORST",
+   "DÄMMERHAIN",
+   "ASCHENLICHT",
+   "WISPERFURT",
+   "KERZENRAND",
+   "NEBELHERD",
+   "VIOLETTHAIN"
+  ]
+ },
+ "limits": {
+  "max_pieces": 400,
+  "build_reach": 240.0,
+  "helper_radius": 100.0,
+  "view_radius": 700.0,
+  "unview_radius": 900.0,
+  "refund_done": 0.6
+ },
+ "soft_kinds": [
+  "bush",
+  "berry_bush",
+  "ember_bush",
+  "grass",
+  "pebble",
+  "mushroom"
+ ],
+ "levels": [
+  {
+   "id": "camp",
+   "name": "RASTPLATZ",
+   "worth": 0
+  },
+  {
+   "id": "hamlet",
+   "name": "WEILER",
+   "worth": 25
+  },
+  {
+   "id": "village",
+   "name": "DORF",
+   "worth": 70
+  },
+  {
+   "id": "borough",
+   "name": "FLECKEN",
+   "worth": 150
+  },
+  {
+   "id": "town",
+   "name": "STADT",
+   "worth": 300
+  }
+ ],
+ "resident_worth": 8,
+ "categories": [
+  {
+   "id": "light",
+   "name": "LICHT"
+  },
+  {
+   "id": "craft",
+   "name": "HANDWERK"
+  },
+  {
+   "id": "living",
+   "name": "WOHNEN"
+  },
+  {
+   "id": "ground",
+   "name": "WEGE"
+  }
+ ],
+ "pieces": {
+  "house": {
+   "name": "HAUS",
+   "category": "hidden",
+   "builtin": true,
+   "reach": 176.0,
+   "worth": 10,
+   "foot": [
+    120,
+    28
+   ],
+   "role": "home",
+   "front": [
+    48,
+    34
+   ]
+  },
+  "lamp_post": {
+   "name": "LICHTPFOSTEN",
+   "category": "light",
+   "texture": "lamp_post",
+   "frame": [
+    48,
+    72
+   ],
+   "feet": 66,
+   "foot": [
+    12,
+    8
+   ],
+   "snap": 8,
+   "cost": {
+    "wood": 3,
+    "glow_cap": 2
+   },
+   "build_seconds": 4.0,
+   "reach": 112.0,
+   "worth": 2,
+   "glow": true,
+   "light": {
+    "color": "78f4e6",
+    "radius": 104,
+    "energy": 1.15,
+    "at": [
+     12,
+     -34
+    ],
+    "flicker": 0.1
+   },
+   "info": "TRÄGT DAS LICHT WEITER",
+   "preview": "lamp_post_preview",
+   "window": [
+    0.0,
+    0.86
+   ],
+   "anim": {
+    "frames": 8,
+    "fps": 6
+   },
+   "parts": [
+    {
+     "texture": "lamp_post_lantern",
+     "frame": [
+      24,
+      32
+     ],
+     "at": [
+      24,
+      16
+     ],
+     "window": [
+      0.78,
+      1.0
+     ],
+     "sway": {
+      "pivot": 5,
+      "amount": 3.0,
+      "flutter": 0.45
+     },
+     "glow": {
+      "frames": 8,
+      "fps": 8
+     },
+     "fireflies": true
+    }
+   ],
+   "motes": {
+    "at": [
+     12,
+     -42
+    ],
+    "color": "78f4e6"
+   },
+   "perches": [
+    [
+     9,
+     3,
+     62
+    ]
+   ]
+  },
+  "fence": {
+   "name": "ZAUNSTÜCK",
+   "category": "living",
+   "texture": "fence",
+   "frame": [
+    32,
+    28
+   ],
+   "feet": 24,
+   "foot": [
+    24,
+    6
+   ],
+   "snap": 8,
+   "cost": {
+    "wood": 1
+   },
+   "build_seconds": 1.5,
+   "worth": 0.2,
+   "info": "GRENZEN UND GEHEGE",
+   "glow": true,
+   "perches": [
+    [
+     -11,
+     3,
+     22
+    ]
+   ]
+  },
+  "bench": {
+   "name": "BANK",
+   "category": "living",
+   "texture": "bench",
+   "frame": [
+    40,
+    32
+   ],
+   "feet": 26,
+   "foot": [
+    32,
+    10
+   ],
+   "snap": 8,
+   "cost": {
+    "wood": 3
+   },
+   "build_seconds": 3.0,
+   "worth": 1,
+   "info": "EIN PLATZ ZUM SITZEN",
+   "glow": true,
+   "perches": [
+    [
+     0,
+     3,
+     20
+    ]
+   ]
+  },
+  "path_stone": {
+   "name": "TRITTPLATTE",
+   "category": "ground",
+   "texture": "path_stone",
+   "frame": [
+    16,
+    16
+   ],
+   "feet": 16,
+   "foot": [
+    16,
+    16
+   ],
+   "snap": 16,
+   "walk": true,
+   "surface": "stone",
+   "cost": {
+    "stone": 1
+   },
+   "build_seconds": 1.0,
+   "worth": 0.1,
+   "info": "FESTER WEG"
+  },
+  "stockpile": {
+   "name": "VORRATSLAGER",
+   "category": "craft",
+   "texture": "stockpile",
+   "frame": [
+    120,
+    80
+   ],
+   "feet": 68,
+   "foot": [
+    64,
+    28
+   ],
+   "snap": 8,
+   "pad": true,
+   "cost": {
+    "wood": 14,
+    "stone": 4
+   },
+   "build_seconds": 12.0,
+   "reach": 40.0,
+   "worth": 6,
+   "role": "stock",
+   "glow": true,
+   "light": {
+    "color": "ffb25a",
+    "radius": 44,
+    "energy": 0.6,
+    "at": [
+     -24,
+     -34
+    ],
+    "flicker": 0.25
+   },
+   "info": "GEMEINSAMER VORRAT",
+   "paths": true,
+   "front": [
+    64,
+    22
+   ],
+   "parts": [
+    {
+     "texture": "stockpile_lantern",
+     "frame": [
+      6,
+      8
+     ],
+     "at": [
+      38,
+      29
+     ],
+     "window": [
+      0.7,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 1,
+      "fps": 1
+     }
+    },
+    {
+     "texture": "stockpile_sign",
+     "frame": [
+      19,
+      10
+     ],
+     "at": [
+      60,
+      31
+     ],
+     "window": [
+      0.7,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.8,
+      "flutter": 0.5
+     }
+    },
+    {
+     "texture": "stockpile_pennant",
+     "frame": [
+      6,
+      9
+     ],
+     "at": [
+      90,
+      0
+     ],
+     "window": [
+      0.8,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 3.0,
+      "flutter": 0.9
+     }
+    }
+   ],
+   "spill": {
+    "texture": "stockpile_spill",
+    "base": 0.9
+   },
+   "wear": [
+    {
+     "texture": "stockpile_wear_a",
+     "days": 0
+    },
+    {
+     "texture": "stockpile_wear_b",
+     "days": 2
+    },
+    {
+     "texture": "stockpile_wear_c",
+     "days": 4
+    }
+   ],
+   "perches": [
+    [
+     -26,
+     3,
+     67
+    ],
+    [
+     -6,
+     3,
+     68
+    ],
+    [
+     14,
+     3,
+     68
+    ]
+   ]
+  },
+  "workshop": {
+   "name": "WERKSTATT",
+   "category": "craft",
+   "texture": "workshop",
+   "frame": [
+    144,
+    112
+   ],
+   "feet": 98,
+   "foot": [
+    96,
+    40
+   ],
+   "snap": 8,
+   "pad": true,
+   "cost": {
+    "wood": 24,
+    "stone": 10,
+    "plant_fiber": 4
+   },
+   "build_seconds": 24.0,
+   "reach": 56.0,
+   "worth": 12,
+   "role": "craft",
+   "glow": true,
+   "light": {
+    "color": "ff9a3a",
+    "radius": 60,
+    "energy": 0.8,
+    "at": [
+     22,
+     -30
+    ],
+    "flicker": 0.3
+   },
+   "info": "WERKBANK UND SCHMIEDE",
+   "paths": true,
+   "front": [
+    96,
+    30
+   ],
+   "smoke": {
+    "at": [
+     34,
+     -62
+    ]
+   },
+   "parts": [
+    {
+     "texture": "workshop_lantern",
+     "frame": [
+      6,
+      8
+     ],
+     "at": [
+      36,
+      44
+     ],
+     "window": [
+      0.7,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 1,
+      "fps": 1
+     }
+    },
+    {
+     "texture": "workshop_pennant",
+     "frame": [
+      7,
+      13
+     ],
+     "at": [
+      18,
+      4
+     ],
+     "window": [
+      0.8,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 3.2,
+      "flutter": 0.9
+     }
+    }
+   ],
+   "spill": {
+    "texture": "workshop_spill",
+    "forge": true,
+    "base": 0.9
+   },
+   "sparks": {
+    "at": [
+     34.5,
+     -9.5
+    ],
+    "color": "ffb25a"
+   },
+   "wear": [
+    {
+     "texture": "workshop_wear_a",
+     "days": 1
+    },
+    {
+     "texture": "workshop_wear_b",
+     "days": 3
+    },
+    {
+     "texture": "workshop_wear_c",
+     "days": 6
+    }
+   ],
+   "perches": [
+    [
+     -34,
+     3,
+     91
+    ],
+    [
+     -14,
+     3,
+     91
+    ],
+    [
+     8,
+     3,
+     91
+    ]
+   ]
+  }
+ }
+}

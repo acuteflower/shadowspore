@@ -1,0 +1,451 @@
+{
+ "shadow_spider": {
+  "name": "Schattenspinne",
+  "max_health": 48,
+  "chase_speed": 100,
+  "wander_speed": 12,
+  "turn_speed": 7,
+  "sight_range": 170,
+  "lose_range": 260,
+  "attack_range": 34,
+  "windup": 0.58,
+  "strike": 0.24,
+  "recover": 0.72,
+  "damage": 14,
+  "reach": 40,
+  "arc": 100,
+  "knockback": 95,
+  "hurt_stun": 0.24,
+  "loot": {
+   "award": "killer",
+   "xp": 12,
+   "copper": {
+    "min": 4,
+    "max": 10
+   },
+   "items": [
+    {
+     "id": "void_splinter",
+     "chance": 0.7,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "shadow_core",
+     "chance": 0.1,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "grapple": {
+   "min_range": 66,
+   "max_range": 150,
+   "hit_range": 130,
+   "cooldown": 4.6,
+   "windup": 0.7,
+   "throw": 0.2,
+   "pull_speed": 310,
+   "stop": 20,
+   "radius": 13,
+   "damage": 17,
+   "pull": 150,
+   "recover": 0.82
+  },
+  "notice_seconds": 0.38,
+  "stalk_seconds": 0.42,
+  "stalk_speed": 28,
+  "surge_seconds": 0.38,
+  "settle_seconds": 0.22,
+  "settle_speed": 12,
+  "orbit_distance": 100,
+  "orbit_weight": 0.32,
+  "aim_lock_seconds": 0.3,
+  "strike_hit_time": 0.14,
+  "heavy_knockback": 70,
+  "knockback_resistance": 0.45,
+  "flinch_cooldown": 0.85,
+  "navigation": {
+   "cell_size": 12,
+   "nodes_per_frame": 72,
+   "usec_per_frame": 1600,
+   "max_nodes": 5200,
+   "search_margin": 272,
+   "target_repath_distance": 24,
+   "refresh_seconds": 1.8,
+   "retry_seconds": 0.65,
+   "climb_penalty": 135
+  },
+  "climb": {
+   "windup": 0.52,
+   "speed": 55,
+   "min_duration": 0.65,
+   "recover": 0.52,
+   "cooldown": 3.5,
+   "max_span": 88,
+   "max_levels": 1
+  }
+ },
+ "void_listener": {
+  "name": "Leerenhorcher",
+  "max_health": 38,
+  "wander_speed": 11,
+  "move_speed": 48,
+  "retreat_speed": 42,
+  "strafe_speed": 29,
+  "turn_speed": 6,
+  "preferred_min": 95,
+  "preferred_max": 133,
+  "personal_range": 34,
+  "sight_range": 175,
+  "hearing_walk": 180,
+  "hearing_sprint": 255,
+  "hearing_sneak": 48,
+  "hearing_attack": 240,
+  "sound_occlusion": 0.7,
+  "sense_interval": 0.12,
+  "memory_seconds": 8,
+  "search_seconds": 2.8,
+  "notice_seconds": 0.42,
+  "hurt_stun": 0.26,
+  "heavy_knockback": 70,
+  "knockback_resistance": 0.6,
+  "flinch_cooldown": 0.8,
+  "wave": {
+   "windup": 0.8,
+   "aim_lock": 0.25,
+   "release": 0.22,
+   "recover": 0.85,
+   "cooldown": 1.6,
+   "range": 152,
+   "speed": 210,
+   "radius": 6,
+   "damage": 14,
+   "knockback": 65,
+   "fade_seconds": 0.2
+  },
+  "scream": {
+   "windup": 0.6,
+   "aim_lock": 0.25,
+   "strike": 0.22,
+   "hit_time": 0.13,
+   "recover": 1.05,
+   "cooldown": 2.8,
+   "trigger_range": 43,
+   "reach": 46,
+   "arc": 115,
+   "damage": 9,
+   "knockback": 115
+  },
+  "navigation": {
+   "cell_size": 12,
+   "nodes_per_frame": 72,
+   "usec_per_frame": 1600,
+   "max_nodes": 5200,
+   "search_margin": 272,
+   "target_repath_distance": 24,
+   "refresh_seconds": 1.8,
+   "retry_seconds": 0.65,
+   "climb_penalty": 135
+  },
+  "loot": {
+   "award": "killer",
+   "xp": 12,
+   "copper": {
+    "min": 4,
+    "max": 9
+   },
+   "items": [
+    {
+     "id": "void_splinter",
+     "chance": 0.65,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "shadow_core",
+     "chance": 0.08,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "audio": {
+   "charge": "res://assets/audio/listener_charge.wav",
+   "wave": "res://assets/audio/listener_wave.wav",
+   "scream": "res://assets/audio/listener_scream.wav",
+   "death": "res://assets/audio/listener_death.wav",
+   "volume_db": -8
+  }
+ },
+ "guard_spider": {
+  "name": "Wächterspinne",
+  "max_health": 48,
+  "chase_speed": 100,
+  "wander_speed": 12,
+  "turn_speed": 7,
+  "sight_range": 125,
+  "lose_range": 230,
+  "attack_range": 34,
+  "windup": 0.58,
+  "strike": 0.24,
+  "recover": 0.72,
+  "damage": 400,
+  "reach": 40,
+  "arc": 100,
+  "knockback": 95,
+  "hurt_stun": 0.24,
+  "loot": {
+   "award": "killer",
+   "xp": 0,
+   "copper": {
+    "min": 0,
+    "max": 0
+   },
+   "items": []
+  },
+  "grapple": {
+   "min_range": 66,
+   "max_range": 150,
+   "hit_range": 130,
+   "cooldown": 4.6,
+   "windup": 0.7,
+   "throw": 0.2,
+   "pull_speed": 310,
+   "stop": 20,
+   "radius": 13,
+   "damage": 400,
+   "pull": 150,
+   "recover": 0.82
+  },
+  "notice_seconds": 0.38,
+  "stalk_seconds": 0.42,
+  "stalk_speed": 28,
+  "surge_seconds": 0.38,
+  "settle_seconds": 0.22,
+  "settle_speed": 12,
+  "orbit_distance": 100,
+  "orbit_weight": 0.32,
+  "aim_lock_seconds": 0.3,
+  "strike_hit_time": 0.14,
+  "heavy_knockback": 70,
+  "knockback_resistance": 0.45,
+  "flinch_cooldown": 0.85,
+  "navigation": {
+   "cell_size": 12,
+   "nodes_per_frame": 72,
+   "usec_per_frame": 1600,
+   "max_nodes": 5200,
+   "search_margin": 272,
+   "target_repath_distance": 24,
+   "refresh_seconds": 1.8,
+   "retry_seconds": 0.65,
+   "climb_penalty": 135
+  },
+  "climb": {
+   "windup": 0.52,
+   "speed": 55,
+   "min_duration": 0.65,
+   "recover": 0.52,
+   "cooldown": 3.5,
+   "max_span": 88,
+   "max_levels": 1
+  },
+  "post": true
+ },
+ "ambush_spider": {
+  "name": "Schattenspinne",
+  "max_health": 150,
+  "chase_speed": 100,
+  "wander_speed": 12,
+  "turn_speed": 7,
+  "sight_range": 700,
+  "lose_range": 1200,
+  "attack_range": 34,
+  "windup": 0.58,
+  "strike": 0.24,
+  "recover": 0.72,
+  "damage": 14,
+  "reach": 40,
+  "arc": 100,
+  "knockback": 95,
+  "hurt_stun": 0.24,
+  "loot": {
+   "award": "killer",
+   "xp": 0,
+   "copper": {
+    "min": 0,
+    "max": 0
+   },
+   "items": []
+  },
+  "grapple": {
+   "min_range": 66,
+   "max_range": 150,
+   "hit_range": 130,
+   "cooldown": 4.6,
+   "windup": 0.7,
+   "throw": 0.2,
+   "pull_speed": 310,
+   "stop": 20,
+   "radius": 13,
+   "damage": 17,
+   "pull": 150,
+   "recover": 0.82
+  },
+  "notice_seconds": 0.38,
+  "stalk_seconds": 0.42,
+  "stalk_speed": 28,
+  "surge_seconds": 0.38,
+  "settle_seconds": 0.22,
+  "settle_speed": 12,
+  "orbit_distance": 100,
+  "orbit_weight": 0.32,
+  "aim_lock_seconds": 0.3,
+  "strike_hit_time": 0.14,
+  "heavy_knockback": 70,
+  "knockback_resistance": 0.45,
+  "flinch_cooldown": 0.85,
+  "navigation": {
+   "cell_size": 12,
+   "nodes_per_frame": 72,
+   "usec_per_frame": 1600,
+   "max_nodes": 5200,
+   "search_margin": 272,
+   "target_repath_distance": 24,
+   "refresh_seconds": 1.8,
+   "retry_seconds": 0.65,
+   "climb_penalty": 135
+  },
+  "climb": {
+   "windup": 0.52,
+   "speed": 55,
+   "min_duration": 0.65,
+   "recover": 0.52,
+   "cooldown": 3.5,
+   "max_span": 88,
+   "max_levels": 1
+  }
+ },
+ "void_crusher": {
+  "name": "Leerenbrecher",
+  "max_health": 80,
+  "wander_speed": 10,
+  "chase_speed": 40,
+  "turn_speed": 3.5,
+  "max_turn": 2.4,
+  "stop_distance": 24,
+  "sight_range": 150,
+  "personal_range": 30,
+  "hearing_walk": 95,
+  "hearing_sprint": 150,
+  "hearing_sneak": 26,
+  "hearing_attack": 135,
+  "sound_occlusion": 0.7,
+  "sense_interval": 0.15,
+  "memory_seconds": 8,
+  "search_seconds": 3.0,
+  "notice_seconds": 0.5,
+  "hurt_stun": 0.65,
+  "front_damage": 0.25,
+  "rear_damage": 3.0,
+  "knockback_resistance": 0.85,
+  "flinch_cooldown": 1.0,
+  "slam": {
+   "trigger_range": 42,
+   "reach": 54,
+   "arc": 120,
+   "windup": 0.95,
+   "aim_lock": 0.35,
+   "strike": 0.18,
+   "hit_time": 0.12,
+   "recover": 0.95,
+   "cooldown": 2.2,
+   "damage": 18,
+   "knockback": 120,
+   "cracks": 3
+  },
+  "rush": {
+   "min_range": 50,
+   "max_range": 130,
+   "windup": 0.7,
+   "aim_lock": 0.35,
+   "speed": 190,
+   "distance": 64,
+   "max_time": 0.45,
+   "width": 20,
+   "recover": 0.8,
+   "stun": 1.4,
+   "cooldown": 5.0,
+   "damage": 16,
+   "knockback": 140
+  },
+  "sweep": {
+   "behind_range": 56,
+   "behind_seconds": 1.2,
+   "windup": 0.45,
+   "aim_lock": 0.15,
+   "strike": 0.16,
+   "hit_time": 0.07,
+   "recover": 0.65,
+   "cooldown": 3.0,
+   "reach": 40,
+   "arc": 210,
+   "damage": 11,
+   "knockback": 90
+  },
+  "shake_radius": 220,
+  "navigation": {
+   "cell_size": 12,
+   "nodes_per_frame": 72,
+   "usec_per_frame": 1600,
+   "max_nodes": 5200,
+   "search_margin": 272,
+   "target_repath_distance": 24,
+   "refresh_seconds": 1.8,
+   "retry_seconds": 0.65,
+   "climb_penalty": 135
+  },
+  "loot": {
+   "award": "killer",
+   "xp": 22,
+   "copper": {
+    "min": 8,
+    "max": 18
+   },
+   "items": [
+    {
+     "id": "void_splinter",
+     "chance": 0.85,
+     "min": 2,
+     "max": 4
+    },
+    {
+     "id": "shadow_core",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "void_slag",
+     "chance": 0.1,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "audio": {
+   "notice": "res://assets/audio/crusher_notice.wav",
+   "charge": "res://assets/audio/crusher_charge.wav",
+   "slam": "res://assets/audio/crusher_slam.wav",
+   "rush": "res://assets/audio/crusher_rush.wav",
+   "sweep": "res://assets/audio/crusher_sweep.wav",
+   "core_hit": "res://assets/audio/crusher_core_hit.wav",
+   "front_hit": "res://assets/audio/crusher_front_hit.wav",
+   "stun": "res://assets/audio/crusher_stun.wav",
+   "death": "res://assets/audio/crusher_death.wav",
+   "step": "res://assets/audio/crusher_step.wav",
+   "volume_db": -6
+  }
+ }
+}

@@ -1,0 +1,6 @@
+{
+	"max_level": 30,
+	"base": 30,
+	"exponent": 1.7,
+	"step": 5
+}

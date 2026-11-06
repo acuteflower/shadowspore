@@ -1,0 +1,21 @@
+{
+  "branches": {
+    "combat": {"name": "KAMPF", "color": "e6c468"},
+    "movement": {"name": "BEWEGUNG", "color": "78f4e6"},
+    "shadow": {"name": "SCHATTEN", "color": "b06bff"}
+  },
+  "nodes": {
+    "sword_combo": {"name": "DREIKLANG", "branch": "combat", "pos": [-150, 28], "root": true, "icon": "sword", "description": "Deine dreiteilige Schwertkombo.", "detail": "VORHAND / RÜCKHAND / STOSS"},
+    "sprint": {"name": "ANTRITT", "branch": "movement", "pos": [0, 76], "root": true, "icon": "stride", "description": "Sprinten mit einem Dash beim Loslaufen.", "detail": "BEWEGEN + SPRINT GEDRÜCKT HALTEN"},
+    "shadow_blink": {"name": "SCHATTENBLINK", "branch": "shadow", "pos": [150, 28], "root": true, "icon": "rift", "description": "Springe durch den Schatten in Blickrichtung.", "detail": "BESTEHENDE FÄHIGKEIT"},
+    "combat_echo_a": {"name": "UNGEFORMTES ECHO I", "branch": "combat", "pos": [-230, -48], "parent": "sword_combo", "placeholder": true},
+    "combat_echo_b": {"name": "UNGEFORMTES ECHO II", "branch": "combat", "pos": [-112, -76], "parent": "sword_combo", "placeholder": true},
+    "combat_echo_c": {"name": "UNGEFORMTES ECHO III", "branch": "combat", "pos": [-240, -116], "parent": "combat_echo_a", "placeholder": true},
+    "movement_echo_a": {"name": "UNGEFORMTES ECHO I", "branch": "movement", "pos": [-48, -8], "parent": "sprint", "placeholder": true},
+    "movement_echo_b": {"name": "UNGEFORMTES ECHO II", "branch": "movement", "pos": [48, -8], "parent": "sprint", "placeholder": true},
+    "movement_echo_c": {"name": "UNGEFORMTES ECHO III", "branch": "movement", "pos": [0, -124], "parent": "movement_echo_a", "placeholder": true},
+    "shadow_echo_a": {"name": "UNGEFORMTES ECHO I", "branch": "shadow", "pos": [112, -76], "parent": "shadow_blink", "placeholder": true},
+    "shadow_echo_b": {"name": "UNGEFORMTES ECHO II", "branch": "shadow", "pos": [230, -48], "parent": "shadow_blink", "placeholder": true},
+    "shadow_echo_c": {"name": "UNGEFORMTES ECHO III", "branch": "shadow", "pos": [240, -116], "parent": "shadow_echo_b", "placeholder": true}
+  }
+}

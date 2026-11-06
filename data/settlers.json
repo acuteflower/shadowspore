@@ -1,0 +1,375 @@
+{
+ "maren": {
+  "name": "MAREN",
+  "title": "STROMHÜTERIN",
+  "art": "maren",
+  "enabled": false,
+  "role": "fisher",
+  "home": "pier_wood",
+  "arrive": {"needs": "pier_wood", "delay": 10.0, "angle": 180.0, "distance": 300.0},
+  "spots": {
+   "work": {"of": "home", "at": [0, 8], "face": [0, 1], "clip": "work", "sound": "none"},
+   "fire": {"of": "center", "at": [-12, 80], "face": [1, 0], "clip": "idle"},
+   "rest": {"of": "home", "at": [0, 0]}
+  },
+  "schedule": [[0.21, 0.55, "work"], [0.55, 0.62, "fire"], [0.62, 0.82, "work"], [0.82, 0.88, "fire"], [0.88, 0.21, "rest"]],
+  "chat": {"any": ["Das Wasser schläft nie. Hör genau hin.", "Lass der Schnur ihren Lauf. Der Strom zeigt dir, wann du ziehen musst.", "Solange die Wasseramsel taucht, ist das Ufer ruhig."]}
+ },
+ "gustav": {
+  "name": "GUSTAV",
+  "title": "ZIMMERMANN",
+  "art": "gustav",
+  "role": "craft",
+  "home": "workshop",
+  "arrive": {
+   "needs": "workshop",
+   "delay": 6.0,
+   "angle": 38.0,
+   "distance": 240.0
+  },
+  "spots": {
+   "work": {
+    "of": "home",
+    "at": [
+     -22,
+     8
+    ]
+   },
+   "fire": {
+    "of": "center",
+    "at": [
+     6,
+     80
+    ]
+   },
+   "rest": {
+    "of": "home",
+    "at": [
+     38,
+     -4
+    ]
+   },
+   "split": {
+    "of": "stockpile",
+    "at": [
+     37,
+     2
+    ],
+    "face": [
+     1,
+     0
+    ],
+    "clip": "work",
+    "sound": "hammer",
+    "chips": true,
+    "pitch": 0.8,
+    "reach": 9,
+    "fallback": "work"
+   },
+   "bench": {
+    "of": "bench",
+    "at": [
+     0,
+     12
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "sit",
+    "fallback": "fire"
+   }
+  },
+  "schedule": [
+   [
+    0.29,
+    0.33,
+    "work"
+   ],
+   [
+    0.33,
+    0.38,
+    "split"
+   ],
+   [
+    0.38,
+    0.56,
+    "work"
+   ],
+   [
+    0.56,
+    0.6,
+    "fire"
+   ],
+   [
+    0.6,
+    0.76,
+    "work"
+   ],
+   [
+    0.76,
+    0.8,
+    "fire"
+   ],
+   [
+    0.8,
+    0.84,
+    "bench"
+   ],
+   [
+    0.84,
+    0.88,
+    "fire"
+   ],
+   [
+    0.88,
+    0.29,
+    "rest"
+   ]
+  ],
+  "face_work": [
+   0,
+   -1
+  ],
+  "face_fire": [
+   1,
+   0
+  ],
+  "produces": {
+   "in": {
+    "wood": 2
+   },
+   "out": {
+    "plank": 2
+   }
+  },
+  "talk": [
+   {
+    "trust": 0,
+    "dialogue": "gustav_talk_a"
+   },
+   {
+    "trust": 30,
+    "dialogue": "gustav_talk_b"
+   },
+   {
+    "trust": 60,
+    "dialogue": "gustav_talk_c"
+   }
+  ],
+  "barks": [
+   "Wo ist mein Bleistift? ... Hinterm Ohr. Natürlich.",
+   "Hörst du das? Das Holz arbeitet noch. Herrlich!",
+   "Pass auf die Späne auf, Kleines!",
+   "Gib mir Holz, und ich gebe dir Bretter. So einfach ist das."
+  ],
+  "shop": "gustav_bench",
+  "barks_spot": {
+   "split": [
+    "Kleinholz für die Esse. Gut gespalten ist halb gewärmt.",
+    "Der Keil sitzt. Jetzt nur noch den Schlegel mögen lassen."
+   ],
+   "bench": [
+    "Fünf Minuten sitzen. Die Bank hast du gut gebaut.",
+    "Siehst du das Licht an den Dächern? So soll es aussehen."
+   ]
+  }
+ },
+ "valdric": {
+  "name": "VALDRIC",
+  "title": "RITTER",
+  "art": "adventurer",
+  "role": "guard",
+  "home": "house",
+  "founder": true,
+  "takes_over": "knight",
+  "actor": "knight",
+  "counts": false,
+  "spots": {
+   "door": {
+    "of": "home",
+    "at": [
+     -26,
+     40
+    ],
+    "clip": "stand",
+    "face": [
+     0.4,
+     1
+    ]
+   },
+   "repair": {
+    "of": "home",
+    "at": [
+     -34,
+     8
+    ],
+    "clip": "hammer",
+    "sound": "hammer",
+    "strike": 3,
+    "face": [
+     0,
+     -1
+    ]
+   },
+   "fire": {
+    "of": "home",
+    "at": [
+     38,
+     95
+    ],
+    "clip": "sit",
+    "enter": "sit_down",
+    "face": [
+     0,
+     -1
+    ]
+   },
+   "practice": {
+    "of": "home",
+    "at": [
+     -8,
+     122
+    ],
+    "clips": [
+     "slash_a",
+     "slash_b",
+     "flick",
+     "slash_c"
+    ],
+    "pause": 1.4,
+    "face": [
+     1,
+     0.3
+    ]
+   },
+   "guard": {
+    "of": "home",
+    "at": [
+     22,
+     140
+    ],
+    "clip": "stand",
+    "face": [
+     0,
+     1
+    ]
+   },
+   "night": {
+    "of": "home",
+    "at": [
+     84,
+     67
+    ],
+    "clip": "sit",
+    "enter": "sit_down",
+    "face": [
+     -1,
+     -0.3
+    ]
+   }
+  },
+  "schedule": [
+   [
+    0.22,
+    0.4,
+    "door"
+   ],
+   [
+    0.4,
+    0.52,
+    "repair"
+   ],
+   [
+    0.52,
+    0.57,
+    "fire"
+   ],
+   [
+    0.57,
+    0.7,
+    "practice"
+   ],
+   [
+    0.7,
+    0.78,
+    "guard"
+   ],
+   [
+    0.78,
+    0.88,
+    "fire"
+   ],
+   [
+    0.88,
+    0.22,
+    "night"
+   ]
+  ],
+  "chat": {
+   "_note": "PLACEHOLDER lines for the dialogue writer (docs/prompts/dialogue_writer.md): pools by quest step, by place, by night, of anything",
+   "quest": {
+    "town_night": [
+     "Schlaf. Das Licht hält Wache, ich auch.",
+     "Der Morgen kommt immer. Auch hier."
+    ],
+    "town_valdric": [
+     "Gut, dass du da bist. Ich hab etwas für dich."
+    ],
+    "town_intro": [
+     "Nimm die Sachen. Sie sind für die Arbeit, nicht für den Kampf."
+    ],
+    "build_lamp": [
+     "Ein Lichtpfosten. Das Licht trägt weiter, als man denkt.",
+     "Stell ihn dahin, wo du abends gern stehst."
+    ],
+    "build_workshop": [
+     "Eine Werkstatt ruft Handwerker. Man hört das Hämmern weit.",
+     "Bau sie gut, dann kommt jemand."
+    ],
+    "meet_stranger": [
+     "Siehst du den Fremden am Licht? Geh hin, er beißt nicht."
+    ],
+    "gustav_hello": [
+     "Sprich mit ihm. Handwerker sind ehrliche Leute."
+    ]
+   },
+   "spot": {
+    "door": [
+     "Ich halte die Tür im Blick.",
+     "Morgens ist es am stillsten."
+    ],
+    "repair": [
+     "Das Dach hält noch. Nicht ewig.",
+     "Jedes Brett, das ich festnagele, ist eins weniger im Wind."
+    ],
+    "fire": [
+     "Setz dich, wenn du magst. Das Feuer kostet nichts.",
+     "Warm ist gut. Warm bedeutet, dass wir noch hier sind."
+    ],
+    "practice": [
+     "Die Klinge vergisst, wenn man sie nicht führt.",
+     "Nicht stehen bleiben. Das lernt dein Körper schneller als dein Kopf."
+    ],
+    "guard": [
+     "Von hier sieht man den Weg. Und alles, was ihm folgt."
+    ]
+   },
+   "night": [
+    "Nachts hören die Schatten zu. Sprich leise.",
+    "Bleib im Licht. Dafür baut man es.",
+    "Ich schlafe nicht viel. Geh ruhig."
+   ],
+   "any": [
+    "Wir haben nicht viel. Aber wir haben das hier.",
+    "Du hast dich gut gehalten, für den Anfang.",
+    "Das Land erinnert sich an jeden, der es pflegt.",
+    "Frag, wenn du etwas brauchst. Ich bin selten weit.",
+    "Irgendwann fragst du mich, woher ich komme. Heute nicht.",
+    "Der Wald ist ruhig. Das ist nie ein gutes Zeichen, aber heute nehme ich es.",
+    "Bau, was du brauchst. Nicht mehr.",
+    "Eine Stadt beginnt mit einem Licht und einem, der es hütet."
+   ]
+  }
+ }
+}

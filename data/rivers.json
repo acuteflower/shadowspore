@@ -1,0 +1,21 @@
+{
+  "seed": 41729,
+  "basins": 2,
+  "sources_per_basin": 2,
+  "grid_tiles": 4,
+  "minimum_basin_nodes": 110,
+  "minimum_run": 500,
+  "source_separation": 600,
+  "safe_margin_tiles": 7,
+  "story_margin": 180,
+  "start_margin": 440,
+  "bank_width": 20,
+  "base_radius": 6,
+  "flow_radius": 12,
+  "max_radius": 36,
+  "ford_spacing": 160,
+  "ford_half_length": 16,
+  "ford_depth": 0.22,
+  "deep_threshold": 0.64,
+  "prop_margin": 12
+}

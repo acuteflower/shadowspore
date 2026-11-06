@@ -1,0 +1,1681 @@
+class_name WorldLevel
+extends TestLevel
+## The real world: the frozen RegionMap (data/world_map.json) painted in chunks around the players.
+## Every peer paints its own ground from the same data, so only gameplay state is networked.
+## Named areas share the world's selected biome; ground, foliage and wildlife follow that biome.
+## Land ends where the baked coast ends
+## (assets/world/land_sdf.png, see tools/bake_land_sdf.gd): the void beyond is blocked by collision
+## and drawn by `VoidEdge`; a violet light shines along the edge at night.
+
+const CHUNK: int = 32 ## tiles per chunk side
+const STREAM_BUDGET_USEC: int = 2000 ## cooperative CPU preparation per frame
+const DETAIL_BUCKET: float = 64.0
+const LOAD_RADIUS: int = 1 ## chunks around every player that are kept painted
+const UNLOAD_RADIUS: int = 2 ## farther chunks are dropped (the gap stops flicker at the border)
+const BORDER_WARP: float = 5.0 ## tiles; jitter that roughens the 4-tile lookup grid of the map
+const PICK_SLACK: float = 14.0 ## px the host forgives on top of the interaction range
+const STONE_BED: Texture2D = preload("res://assets/props/stonebed.png")
+const FOREST_BED: Texture2D = preload("res://assets/props/forestbed.png")
+const FOREST_BED_FRAME: Vector2i = Vector2i(192, 128)
+const FOREST_BED_FLATTEN: float = 0.64 ## the litter patches are drawn as flattened ellipses (tools/art_forestbed.py)
+const SDF_TEXTURE: Texture2D = preload("res://assets/world/land_sdf.png")
+const OUTER_SDF: Texture2D = preload("res://assets/world/outer_sdf.png")
+const VOID_MARGIN: float = 6.0 ## px the void's collision reaches into the land (the edge shader eats that far)
+const EDGE_LIGHT_CELL: int = 8 ## tiles; one edge light per cell that touches the coast
+const EDGE_LIGHT_COLOR: Color = Color("8a4dff")
+const DIRECTIONS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]
+const INTRO_SPAWN: Vector2 = Vector2(36.0, 12.0) ## px from the cover's middle where she stands up (after the crawl) and where players start
+const PLACEHOLDER_CHANCE: float = 0.08 ## share of placeholder tiles that carry a decoration
+
+var fallen_knight: FallenKnight
+
+var edits: WorldEdits = WorldEdits.new()
+var editor_camera: Camera2D
+var _cliffs: ReliefLayer
+
+var _map: RegionMap
+var _layers: Dictionary = {} ## biome id -> TileMapLayer
+var _chunks: Dictionary = {} ## Vector2i -> Chunk
+var _zone: FastNoiseLite
+var _warp_x: FastNoiseLite
+var _warp_y: FastNoiseLite
+var _props: Node2D ## y-sorted: bushes
+var _generator: PropGenerator
+var _things: Dictionary = {} ## Vector2i cell -> WorldProp (loaded ones)
+var _young: Dictionary = {} ## cell -> {"age", "variant"}: saplings the generator planted; their stage follows the day (see `_young_state`), nothing is stored
+var _thing_states: Dictionary = {} ## cell -> state dict, only for props that are not untouched (every peer)
+var _sdf: PackedByteArray ## baked coast: one byte per tile, 128 = coast, above = land
+var _outer_sdf: PackedByteArray ## exterior coast only: inland lakes carry no void rim/light
+var _rivers: WorldRivers
+var _relief: Relief ## baked height levels (walls, ramps, stairs)
+var _start: Vector2i
+var cover_node: ManholeCover ## the manhole cover (the intro animates its lid)
+var _berry_free: Dictionary = {} ## tiles of the story's first stretch: no berries (nothing heals her)
+var _barriers: Dictionary = {} ## id -> StaticBody2D: the invisible walls that keep her near the footpath
+var _stone_cells: Dictionary = {} ## tiles lying on the old flagstones: no trees there
+var opening_over: bool = false
+var _cover_at: Vector2 = Vector2.ZERO ## the manhole cover (world px), where the story starts; zero = none baked
+var _building: ChunkBuild
+var night: NightDirector ## host: spawns and steers the creatures of the night
+var knight_taken: bool = false ## Valdric is a settler (`take_knight`): the story actor stays hidden
+var _town_node: TownManager ## the player's town (docs/town.md): what it has cleared stays cleared
+var _tiles: Dictionary
+
+@onready var _wildlife: WildlifePopulation = $Wildlife
+
+
+## What a loaded chunk owns, so it can be taken down again.
+class Chunk:
+	var node: Node2D ## lights and collision
+	var cells: Dictionary = {} ## biome id -> Array[Vector2i] painted on that layer
+	var atlas: Dictionary = {} ## cell -> atlas coordinates, applied only at commit
+	var glow_cells: Array[Vector2i] = []
+	var things: Array[WorldProp] = []
+	var fallen_logs: Array[FallenLog] = []
+	var clover: Array[CloverField] = [] ## standing clover fields, y-sorted in the Props chain
+
+
+## Detached preparation: no partial terrain, collision, interaction or wildlife enters
+## the live world. Each work unit is a row, cluster, prop or detail candidate.
+class ChunkBuild:
+	var cell: Vector2i
+	var chunk: Chunk
+	var query: PropGenerator.Query
+	var phase: int = 0
+	var index: int = 0
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	var body: StaticBody2D
+	var open_runs: Dictionary = {}
+	var lit_cells: Dictionary = {}
+	var reserved: Dictionary = {}
+	var custom_keys: Array = []
+	var custom: Dictionary = {}
+	var obstacles: Array[Dictionary] = []
+	var obstacle_grid: Dictionary = {}
+	var beds: Array[Dictionary] = [] ## the forest floors of this chunk and its neighbours {pos, rx}: what grows between the trees changes there
+	var points: Array[Dictionary] = []
+
+
+func _fill_ground() -> void:
+	RenderingServer.set_default_clear_color(Color("120e1f")) ## the void behind the land
+	_map = RegionMap.new(0, DataRegistry.table("world_map"))
+	_tiles = DataRegistry.table("grass_tiles")
+	_props = Node2D.new()
+	_props.name = "Props"
+	_props.y_sort_enabled = true
+	add_child(_props)
+	_zone = _noise(11, 0.035, 2)
+	_warp_x = _noise(21, 1.0 / 14.0, 1)
+	_warp_y = _noise(22, 1.0 / 14.0, 1)
+	var image: Image = SDF_TEXTURE.get_image()
+	image.convert(Image.FORMAT_L8)
+	_sdf = image.get_data()
+	var outer_image: Image = OUTER_SDF.get_image()
+	outer_image.convert(Image.FORMAT_L8)
+	_outer_sdf = outer_image.get_data()
+	var interiors: Interiors = Interiors.new() ## the pocket spaces behind the doors (huts, houses)
+	add_child(interiors)
+	var mines: MineManager = MineManager.new() ## the mine: fixed levels far outside the world (docs/mine.md)
+	mines.setup(_map.world_seed)
+	add_child(mines)
+	_town_node = TownManager.new() ## the town the group builds on the meadow (docs/town.md)
+	_town_node.setup(self)
+	add_child(_town_node)
+	var discovery: MapDiscovery = MapDiscovery.new() ## the fog of the map (M)
+	discovery.name = "MapDiscovery"
+	add_child(discovery)
+	_relief = Relief.new()
+	Terrain.relief = _relief
+	if multiplayer.is_server():
+		edits.read()
+	_relief.editor_apply(edits.terrain)
+	_cliffs = ReliefLayer.new()
+	_cliffs.setup(_relief.editor_texture, _relief.editor_field, _relief)
+	add_child(_cliffs)
+	var edge: VoidEdge = VoidEdge.new()
+	edge.setup(OUTER_SDF)
+	add_child(edge)
+	var biomes: Dictionary = DataRegistry.table("biomes")
+	for id: String in biomes:
+		var active: String = RegionMap.active_biome(id)
+		if not _layers.has(active):
+			_layers[active] = _ground if active == "meadow" else _make_layer(active, Color((biomes[active] as Dictionary).color as String))
+		_layers[id] = _layers[active]
+	_start = _map.start if _map.start.x >= 0 else _map.anchor(_map.start_region)
+	var cleared: Rect2i = Rect2i() ## nothing is cleared by area any more: the generator fills the start like everywhere else (only the footpath and the cover stay free)
+	_generator = PropGenerator.new(_zone, _sdf, _relief, cleared, _map.world_seed)
+	_generator.blocked_cells = _add_ground_decals()
+	_generator.extra_props = _extra_props()
+	_rivers = WorldRivers.new()
+	_rivers.name = "Rivers"
+	add_child(_rivers)
+	_generator.water_clear = _rivers.clear_for_prop
+	_generator.water_dist = func(at: Vector2) -> float: return _rivers.field_at(at).x
+	_generator.tree_free_cells = _stone_cells
+	_generator.berry_free_cells = _berry_free
+	var wind: WorldWind = WorldWind.new()
+	wind.name = "WorldWind"
+	wind.setup(self)
+	add_child(wind)
+	_wildlife.setup(_map.world_seed, _rabbit_habitat, _bird_habitat, _fauna_habitat, _flower_targets)
+	var encounters: WildlifeEvents = WildlifeEvents.new()
+	encounters.name = "WildlifeEvents"
+	encounters.setup(self)
+	add_child(encounters)
+	night = NightDirector.new() ## the night (docs/nacht_monster_konzept.md): the host's director
+	night.setup(self)
+	add_child(night)
+	_stream(true)
+	fallen_knight = FallenKnight.new()
+	fallen_knight.name = "FallenKnight"
+	var knight_tile: Array = DataRegistry.get_entry("ground", "fallen_knight").get("tile", [501,685])
+	fallen_knight.position = Vector2(float(knight_tile[0]), float(knight_tile[1])) * 16 + Vector2(8,8)
+	add_child(fallen_knight)
+	_spawn_guards.call_deferred()
+	if multiplayer.is_server() and not opening_over:
+		TimeManager.lock_at(0.0) ## day 1, 00:00: the opening is at night, the clock stands still until she reaches the town
+	TimeManager.day_started.connect(_age_young) ## every peer counts the days itself
+	if multiplayer.is_server():
+		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_thing_snapshot.rpc_id(id, _thing_states))
+		TimeManager.day_started.connect(_grow_things)
+		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_editor_snapshot.rpc_id(id, edits.data()))
+
+
+## The hand-authored ground (tools/bake_ground.py): old flagstone fields, the footpath and the manhole cover. Returns the tiles
+## the props must keep clear (along the footpath and around the cover).
+func _add_ground_decals() -> Dictionary:
+	var baked: Dictionary = DataRegistry.table("ground_baked")
+	var decals: Array = baked.get("decals", []) as Array
+	for i: int in range(decals.size() - 1, -1, -1): ## the footpath first, the stones lie over its start
+		var spec: Dictionary = decals[i] as Dictionary
+		var decal: GroundDecal = GroundDecal.new()
+		decal.setup(String(spec.texture), String(spec.mask), Vector2(float(spec.x), float(spec.y)))
+		add_child(decal)
+		var size: Vector2 = decal.texture.get_size()
+		for ty: int in range(int(spec.y) / 16, int((float(spec.y) + size.y) / 16.0) + 1):
+			for tx: int in range(int(spec.x) / 16, int((float(spec.x) + size.x) / 16.0) + 1):
+				if decal.surface_at(Vector2(tx, ty) * 16.0 + Vector2(8, 8)) == "stone":
+					_stone_cells[Vector2i(tx, ty)] = true
+	for barrier: Dictionary in baked.get("barriers", []) as Array:
+		var body: StaticBody2D = StaticBody2D.new()
+		body.name = "Barrier_" + String(barrier.id)
+		for rect: Array in barrier.rects as Array:
+			var shape: CollisionShape2D = CollisionShape2D.new()
+			var box: RectangleShape2D = RectangleShape2D.new()
+			box.size = Vector2(float(rect[2]), float(rect[3]))
+			shape.shape = box
+			shape.position = Vector2(float(rect[0]), float(rect[1])) + box.size / 2.0
+			body.add_child(shape)
+		add_child(body)
+		_barriers[String(barrier.id)] = body
+	for run: Array in baked.get("berry_free", []) as Array:
+		for tx: int in range(int(run[0]), int(run[2]) + 1):
+			_berry_free[Vector2i(tx, int(run[1]))] = true
+	var clear: Dictionary = {}
+	var knight: Dictionary = DataRegistry.get_entry("ground", "fallen_knight")
+	var tile: Array = knight.get("tile", [501,685])
+	_clear_around(clear, Vector2(float(tile[0]), float(tile[1])) * 16 + Vector2(8,8), int(knight.get("clear_radius", 4)))
+	for sign_spec: Dictionary in DataRegistry.table("ground").get("signposts", []) as Array: ## standard signposts (Signpost)
+		var post: Signpost = Signpost.new()
+		var stile: Array = sign_spec.tile as Array
+		post.name = "Signpost_" + String(sign_spec.id)
+		post.position = Vector2(float(stile[0]), float(stile[1])) * 16.0 + Vector2(8, 8)
+		post.variant = int(sign_spec.get("variant", 0))
+		post.dialogue_id = String(sign_spec.get("dialogue", ""))
+		post.flag = String(sign_spec.get("flag", ""))
+		add_child(post)
+		_clear_around(clear, post.position, int(sign_spec.get("clear_radius", 3)))
+	for hut_spec: Dictionary in DataRegistry.table("ground").get("huts", []) as Array: ## buildings with an interior behind their door
+		var hut: Hut = Hut.new()
+		var htile: Array = hut_spec.tile as Array
+		hut.name = "Hut_" + String(hut_spec.id)
+		hut.interior_id = String(hut_spec.interior)
+		hut.art = String(hut_spec.get("art", "hut"))
+		hut.yard_props = (hut_spec.get("yard", {}) as Dictionary).get("props", []) as Array
+		hut.position = Vector2(float(htile[0]), float(htile[1])) * 16.0 + Vector2(8, 8)
+		add_child(hut)
+		(get_node("Interiors") as Interiors).register_entrance(hut.interior_id, hut)
+		_clear_around(clear, hut.position + Vector2(0, -10), int(hut_spec.get("clear_radius", 8)))
+	for quarry_spec: Dictionary in DataRegistry.table("ground").get("quarries", []) as Array: ## the quarry where the knight is mining
+		var quarry: Quarry = Quarry.new()
+		var qtile: Array = quarry_spec.tile as Array
+		quarry.name = "Quarry_" + String(quarry_spec.id)
+		quarry.spec = quarry_spec
+		quarry.position = Vector2(float(qtile[0]), float(qtile[1])) * 16.0 + Vector2(8, 8)
+		add_child(quarry)
+		_clear_around(clear, quarry.position + Vector2(-50, -14), int(quarry_spec.get("clear_radius", 9)))
+	for mine_spec: Dictionary in DataRegistry.table("ground").get("mines", []) as Array: ## the old mine's gate (docs/mine.md)
+		var gate: MineEntrance = MineEntrance.new()
+		var mtile: Array = mine_spec.tile as Array
+		gate.name = "MineEntrance_" + String(mine_spec.id)
+		gate.position = Vector2(float(mtile[0]), float(mtile[1])) * 16.0 + Vector2(8, 8)
+		add_child(gate)
+		(get_node("Mines") as MineManager).entrance = gate.exit_position
+		_clear_around(clear, gate.position + Vector2(0, -20), int(mine_spec.get("clear_radius", 10)))
+	if baked.has("manhole"):
+		var at: Vector2 = Vector2(float((baked.manhole as Array)[0]), float((baked.manhole as Array)[1]))
+		var cover: ManholeCover = ManholeCover.new()
+		cover.position = at
+		add_child(cover)
+		_cover_at = at
+		cover_node = cover
+		_clear_around(clear, at, 4) ## room for the crawl
+	var centre: Vector2 = Vector2(_start) * 16.0 + Vector2(8.0, 8.0)
+	for guard: Dictionary in DataRegistry.table("ground").get("guards", []) as Array:
+		var gat: Array = guard.at as Array
+		_clear_around(clear, centre + Vector2(float(gat[0]), float(gat[1])), 3) ## no bush or tree beside a guard
+	for path: Dictionary in DataRegistry.table("ground").get("paths", []) as Array:
+		var points: Array = path.points as Array
+		var reach: int = ceili((float(path.get("width", 24.0)) * 0.5 + 14.0) / 16.0)
+		for i: int in range(points.size() - 1):
+			var a: Vector2 = centre + Vector2(float((points[i] as Array)[0]), float((points[i] as Array)[1]))
+			var b: Vector2 = centre + Vector2(float((points[i + 1] as Array)[0]), float((points[i + 1] as Array)[1]))
+			for step: int in range(int(a.distance_to(b) / 8.0) + 1):
+				_clear_around(clear, a.lerp(b, step * 8.0 / maxf(a.distance_to(b), 1.0)), reach)
+	return clear
+
+
+## The opening (intro, spider gate, knight, crossroads, rescue) ends when she wakes up in the hut and the town begins: the story calls
+## this then (nothing does yet). Until then the clock is locked, and a death brings her back wounded.
+func finish_opening() -> void:
+	opening_over = true
+	TimeManager.unlock()
+
+
+## Opens a story barrier (the invisible walls along the footpath): `id` as in data/ground.json "barrier".
+func open_barrier(id: String) -> void:
+	if _barriers.has(id):
+		(_barriers[id] as Node).queue_free()
+		_barriers.erase(id)
+
+
+## A new game without the intro: the first quest starts at once.
+func begin_story() -> void:
+	var player: Player = _players.get_child(0) as Player if _players.get_child_count() > 0 else null
+	if player != null and player.quests != null:
+		player.quests.start("find_help")
+
+
+## The story's intro (new game, singleplayer): she crawls out of the manhole. Called by main.gd.
+func start_intro() -> void:
+	var player: Player = _players.get_child(0) as Player if _players.get_child_count() > 0 else null
+	if player == null or cover_node == null or not player.is_multiplayer_authority():
+		return
+	var scene: IntroScene = IntroScene.new()
+	player.add_child(scene)
+	scene.start(player, cover_node)
+
+
+## The rescue is over: she wakes up in the hut's bed (WakeScene) and, once she stands, the opening is over. Solo / host only for now.
+func start_wake(player: Player) -> void:
+	if not player.is_multiplayer_authority() or player.get_node_or_null("WakeScene") != null:
+		return
+	var scene: WakeScene = WakeScene.new()
+	scene.name = "WakeScene"
+	player.add_child(scene)
+	scene.start(player, self)
+
+
+## She has reached the knight at the quarry: the meeting cutscene (KnightMeetScene). Solo / host only for now.
+func start_knight_meet(player: Player) -> void:
+	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
+	if quarry == null or not player.is_multiplayer_authority() or player.get_node_or_null("KnightMeetScene") != null:
+		return
+	var scene: KnightMeetScene = KnightMeetScene.new()
+	scene.name = "KnightMeetScene"
+	player.add_child(scene)
+	scene.start(player, quarry)
+
+
+## The meeting is over: the knight walks back to the hut and she follows (KnightWalkScene). A save that stopped there starts it again.
+func start_knight_walk(player: Player) -> void:
+	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
+	var hut: Hut = _hut() ## the knight's hut, not the lumberjack's cabin
+	if quarry == null or hut == null or not player.is_multiplayer_authority() or player.get_node_or_null("KnightWalkScene") != null or quarry.knight_left:
+		return
+	var scene: KnightWalkScene = KnightWalkScene.new()
+	scene.name = "KnightWalkScene"
+	player.add_child(scene)
+	scene.start(player, quarry, hut)
+
+
+func _hut(interior: String = "hut") -> Hut:
+	for child: Node in get_children():
+		if child is Hut and (child as Hut).interior_id == interior:
+			return child as Hut
+	return null
+
+
+## She sat down at one of the two places at the fire (`seat` "east" = the stump, "south" = the log): the fire scene (KnightFireScene), the evening and the talk.
+func start_fire_scene(player: Player, seat: String) -> void:
+	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
+	var hut: Hut = _hut()
+	if quarry == null or hut == null or not player.is_multiplayer_authority() or player.get_node_or_null("KnightFireScene") != null:
+		return
+	var scene: KnightFireScene = KnightFireScene.new()
+	scene.name = "KnightFireScene"
+	player.add_child(scene)
+	scene.start(player, quarry, hut, seat)
+
+
+## She has stepped into the lumberjack's cabin: one shadow spider rises in the room and she has to beat it (CabinSpiderScene). `talked`: the dialogue was already played.
+func start_cabin_spider(player: Player, talked: bool = false) -> void:
+	var cabin: Hut = _hut("cabin")
+	if cabin == null or not player.is_multiplayer_authority() or player.get_node_or_null("CabinSpiderScene") != null:
+		return
+	var scene: CabinSpiderScene = CabinSpiderScene.new()
+	scene.name = "CabinSpiderScene"
+	player.add_child(scene)
+	scene.start(player, self, cabin, talked)
+
+
+## She goes to bed (the bed's E): black, the night, the second morning (WakeScene as a second wake-up).
+func start_sleep(player: Player, rest: bool = false) -> void:
+	if not player.is_multiplayer_authority() or player.get_node_or_null("SleepScene") != null:
+		return
+	var scene: SleepScene = SleepScene.new()
+	scene.name = "SleepScene"
+	player.add_child(scene)
+	scene.start(player, self, rest)
+
+
+## Valdric joins the town's daily life (data/settlers.json `takes_over`): the story's actor is put away for good and a settler is him from now on. Returns where the actor stood
+## (the settler walks on from there), INF when he was not on the map.
+func take_knight() -> Vector2:
+	knight_taken = true
+	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
+	if quarry == null or quarry.knight == null:
+		return Vector2.INF
+	var at: Vector2 = quarry.knight.global_position if quarry.knight.visible else Vector2.INF
+	quarry.knight.visible = false
+	quarry.set_knight_solid(false)
+	return at
+
+
+## Puts the knight where the story wants him: "fire" = sitting on the log by the fire, "door" = resting in front of the hut's door (the second morning on).
+func place_knight(where: String) -> void:
+	if knight_taken:
+		return ## he lives in the town now (a settler, see `take_knight`)
+	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
+	var hut: Hut = _hut()
+	if quarry == null or hut == null:
+		return
+	if not quarry.knight_left:
+		quarry.hand_over_knight(self)
+	quarry.show_pick(true)
+	var knight: Adventurer = quarry.knight
+	if where == "fire":
+		knight.global_position = hut.global_position + KnightFireScene.LOG + Vector2(4, 3)
+		knight.play("sit", Vector2(1, -1))
+	else:
+		knight.global_position = hut.exit_position + Vector2(-26, 12)
+		knight.play("stand", Vector2(0.4, 1.0))
+	quarry.set_knight_solid(true)
+
+
+## The hut is mended: the new boards on the roof and over the hole in the floor.
+func _apply_renewed(on: bool) -> void:
+	var hut: Hut = _hut()
+	if hut != null:
+		hut.set_renewed(on)
+	var room: Interior = (get_node("Interiors") as Interiors).interior("hut")
+	if room != null:
+		room.set_renewed(on)
+
+
+func apply_renewed() -> void:
+	_apply_renewed(true)
+
+
+## A story conversation started by a quest step (event `story:<id>`): the full dialogue `id` of data/dialogue.json; when it is closed its `take` {item, count} is taken out of her bag
+## and its `flag` is set (this is what ends the step).
+func play_story_dialogue(player: Player, id: String) -> void:
+	if not player.is_multiplayer_authority():
+		return
+	var entry: Dictionary = DataRegistry.get_entry("dialogue", id)
+	for child: Node in player.get_children():
+		var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
+		if box != null:
+			box.start(id)
+			await box.finished
+			break
+	var take: Dictionary = entry.get("take", {}) as Dictionary
+	if not take.is_empty():
+		player.inventory.remove_item(String(take.item), int(take.count))
+	for gift: Variant in entry.get("give", []) as Array: ## what the speaker hands over ({item, count}); a full bag keeps nothing of it
+		player.inventory.give(String((gift as Dictionary).item), int((gift as Dictionary).count))
+	if String(entry.get("town_talk", "")) != "" and _town_node != null:
+		_town_node.request_talk(String(entry.town_talk)) ## the first talk with a settler counts as the day's talk
+	if player.quests != null and String(entry.get("flag", "")) != "":
+		player.quests.set_flag(String(entry.flag))
+
+
+## The developer checkpoint is offered only in a free, living solo session.
+func debug_can_return_home() -> bool:
+	if not multiplayer.is_server() or not multiplayer.get_peers().is_empty() or _players.get_child_count() == 0:
+		return false
+	var player: Player = _players.get_child(0) as Player
+	return player != null and player.is_multiplayer_authority() and player.intro == null and not player.story_lock and not player.fainting and player.health.current > 0.0
+
+
+## Developer checkpoint: back home after the lumberjack's cabin, with the story gear.
+## No automatic save write; use the normal menu to keep this checkpoint if desired.
+func debug_return_home() -> void:
+	if not debug_can_return_home(): return
+	var player: Player = _players.get_child(0) as Player
+	var hut: Hut = _hut()
+	if hut == null: return
+	var saved: Dictionary = player.quests.export_data()
+	var flags: Dictionary = saved.flags as Dictionary
+	for quest_id: String in ["find_help", "lumberjack"]:
+		(saved.active as Dictionary).erase(quest_id)
+		(saved.active_steps as Dictionary).erase(quest_id)
+		if not (saved.done as Array).has(quest_id):
+			(saved.done as Array).append(quest_id)
+		for step: Dictionary in DataRegistry.get_entry("quests", quest_id).steps as Array:
+			if step.has("flag"): flags[String(step.flag)] = true
+	for flag: String in ["rescued", "knight_dialogue_done", "hud_unlocked", "map_opened", "knows_adventurer", "knows_cooking", "day2_started", "cabin_board_moved", "left_cabin"]:
+		flags[flag] = true
+	player.quests.import_data(saved)
+	if not player.inventory.has_item("sword_basic"):
+		if (player.inventory.equipment.get("main_hand", {}) as Dictionary).is_empty():
+			player.inventory.equipment["main_hand"] = {"id": "sword_basic", "count": 1}
+			player.inventory._commit()
+		else:
+			player.inventory.give("sword_basic", 1)
+	if not player.inventory.has_item("axe_basic"):
+		player.inventory.give("axe_basic", 1)
+	player.health.floor_value = 0.0
+	player.health.heal_full()
+	player.stamina.refill()
+	player.set_bandaged(false)
+	player.sync_wound_visuals()
+	player.auto_walk = Vector2.INF
+	player.request_teleport(hut.exit_position + Vector2(24, 24))
+	player.facing = Vector2.DOWN
+	player._camera.zoom = Vector2.ONE
+	var interiors: Interiors = get_node("Interiors") as Interiors
+	interiors.interior("hut").set_bed_frame(1)
+	interiors.apply_view(player)
+	TimeManager.set_time(10.0 / 24.0)
+	finish_opening()
+	resume_story(player) ## knight at home, cabin board moved aside
+
+
+## Developer checkpoint: the finished town. Everything before it counts as done (the hut renewed, the first lessons), every piece of the catalogue stands finished, the craftsman is at his
+## bench and the town quest stands at "a stranger comes to the light". Solo only, no auto-save.
+func debug_jump_town() -> void:
+	if not debug_can_return_home() or _town_node == null:
+		return
+	debug_return_home()
+	var player: Player = _players.get_child(0) as Player
+	var saved: Dictionary = player.quests.export_data()
+	var flags: Dictionary = saved.flags as Dictionary
+	for quest_id: String in ["rebuild_hut", "town_start"]:
+		var until: String = "meet_stranger" if quest_id == "town_start" else ""
+		(saved.active as Dictionary).erase(quest_id)
+		(saved.active_steps as Dictionary).erase(quest_id)
+		var steps: Array = DataRegistry.get_entry("quests", quest_id).steps as Array
+		for i: int in steps.size():
+			var step: Dictionary = steps[i] as Dictionary
+			if until != "" and String(step.get("id", "")) == until:
+				(saved.active as Dictionary)[quest_id] = i
+				(saved.active_steps as Dictionary)[quest_id] = until
+				break
+			if step.has("flag"):
+				flags[String(step.flag)] = true
+			for task: Variant in step.get("tasks", []) as Array:
+				if (task as Dictionary).has("flag"):
+					flags[String((task as Dictionary).flag)] = true
+		if until == "" and not (saved.done as Array).has(quest_id):
+			(saved.done as Array).append(quest_id)
+	for flag: String in ["rebuild_done", "lumberjack_reported", "rebuild_delivered", "rebuild_wood_delivered", "hut_mushrooms_removed", "hut_tree_felled"]:
+		flags[flag] = true
+	player.quests.import_data(saved)
+	for item: String in ["sickle_basic", "pickaxe_basic"]:
+		if not player.inventory.has_item(item):
+			player.inventory.give(item, 1)
+	resume_story(player) ## the hut mended, the knight at the door
+	_town_node.debug_build_all() ## she stands at the hut's door: the workshop and its craftsman are a short walk away
+
+
+## A loaded save that stopped in the middle of the wake-up starts it again.
+func resume_story(player: Player) -> void:
+	if player.quests != null and String(player.quests.current().get("step_id", "")) == "wake":
+		start_wake(player)
+	elif player.quests != null and String(player.quests.current().get("step_id", "")) == "meet":
+		start_knight_meet(player) ## a save that stopped in the middle of the meeting plays it again
+	elif player.quests != null and String(player.quests.current().get("step_id", "")) == "follow_knight":
+		start_knight_walk(player)
+	elif player.quests != null and String(player.quests.current().get("step_id", "")) in ["sit_fire", "sleep"]:
+		place_knight("fire") ## a save from the evening: he sits by the fire
+	elif player.quests != null and player.quests.has_flag("day2_started"):
+		place_knight("door")
+	if player.quests != null and String(player.quests.current().get("step_id", "")) == "kill_spider":
+		start_cabin_spider(player, true) ## a save from in the fight: a spider rises again when she is inside
+	if player.quests != null and String(player.quests.current().get("step_id", "")) == "report_back" and not player.inventory.has_item("axe_basic"):
+		player.inventory.give("axe_basic", 1) ## a save from between dropping and picking up the axe: never soft-locked without it
+	var hut_room: Interior = (get_node("Interiors") as Interiors).interior("hut")
+	if hut_room != null and player.quests != null: ## a save from while the hut was being renewed: what is gone stays gone
+		for node: Interactable in hut_room.pickups:
+			var spot: InteriorPickup = node as InteriorPickup
+			if player.quests.has_flag(String(spot.spec.flag)):
+				spot.apply_gone()
+		if hut_room.tree != null and player.quests.has_flag("hut_tree_felled"):
+			(hut_room.tree as HutTree).set_felled(true)
+	if player.quests != null and String(player.quests.current().get("step_id", "")) == "rebuild_finale":
+		start_hut_finale(player) ## a save from just before the building: it starts again
+	if player.quests != null and player.quests.has_flag("rebuild_done"):
+		_apply_renewed(true) ## the hut stays mended
+		if player.quests.is_finished("rebuild_hut"):
+			player.quests.start("town_start") ## a save from before the town quest existed: it begins now (start() keeps existing progress)
+	var cabin: Hut = _hut("cabin")
+	if cabin != null and cabin.board != null and player.quests != null and player.quests.has_flag("cabin_board_moved"):
+		cabin.board.set_moved(true) ## a save from after the board was carried aside
+	# Checkpoints and older saves can mark the cabin quest done without its normal
+	# completion event. Restore its follow-up; start() preserves existing progress.
+	if player.quests != null and player.quests.is_finished("lumberjack"):
+		var next: String = String(DataRegistry.get_entry("quests", "lumberjack").get("next", ""))
+		if next != "":
+			player.quests.start(next)
+
+
+## Hand-placed props around the start (data/ground.json "props": kind, variant, tile offset from the start tile).
+func _extra_props() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for spec: Dictionary in DataRegistry.table("ground").get("props", []) as Array:
+		var tile: Array = spec.tile as Array
+		out.append({"cell": _start + Vector2i(int(tile[0]), int(tile[1])), "kind": String(spec.kind), "variant": int(spec.variant)})
+	return out
+
+
+func _clear_around(cells: Dictionary, at: Vector2, radius: int) -> void:
+	var tile: Vector2i = Vector2i(at / 16.0)
+	for y: int in range(-radius, radius + 1):
+		for x: int in range(-radius, radius + 1):
+			if x * x + y * y <= radius * radius:
+				cells[tile + Vector2i(x, y)] = true
+
+
+## Players start beside the manhole cover, where she crawls out (see IntroSequence); without a baked cover at the map's start tile.
+## The story's guard spiders beside the footpath (data/ground.json "guards", px relative to the start tile): they stand still, sway a little and
+## kill whoever they notice; only sneaking gets her past.
+func _spawn_guards() -> void:
+	if not multiplayer.is_server():
+		return
+	var centre: Vector2 = Vector2(_start) * 16.0 + Vector2(8.0, 8.0)
+	for guard: Dictionary in DataRegistry.table("ground").get("guards", []) as Array:
+		var at: Array = guard.at as Array
+		var face: Array = guard.face as Array
+		var spider: ShadowSpider = SPIDER_SCENE.instantiate() as ShadowSpider
+		_enemy_count += 1
+		spider.name = "Guard%d" % _enemy_count
+		spider.enemy_id = String(guard.enemy)
+		spider.position = centre + Vector2(float(at[0]), float(at[1]))
+		spider.heading = Vector2(float(face[0]), float(face[1])).angle()
+		_enemies.add_child(spider)
+
+
+## A story spider (`enemy_id` from data/enemies.json) for a cutscene; host only.
+func spawn_story_spider(enemy_id: String, at: Vector2, heading: float) -> ShadowSpider:
+	if not multiplayer.is_server():
+		return null
+	var spider: ShadowSpider = SPIDER_SCENE.instantiate() as ShadowSpider
+	_enemy_count += 1
+	spider.name = "Story%d" % _enemy_count
+	spider.enemy_id = enemy_id
+	spider.emerge_on_spawn = true
+	spider.position = at
+	spider.heading = heading
+	_enemies.add_child(spider)
+	return spider
+
+
+## The crossroad ambush (story step "ambush"): three shadow spiders, a fight she cannot win. Solo / host only for now.
+func start_ambush(player: Player) -> void:
+	if not multiplayer.is_server() or not player.is_multiplayer_authority() or player.get_node_or_null("AmbushScene") != null:
+		return
+	var scene: AmbushScene = AmbushScene.new()
+	scene.name = "AmbushScene"
+	player.add_child(scene)
+	scene.start(player, self)
+
+
+## Scene initialization uses the same starting health on host and all peers.
+func starting_health_ratio() -> float:
+	return float(DataRegistry.get_entry("ground", "story_start").get("health_ratio", 0.1))
+
+
+func _spawn_position(index: int) -> Vector2:
+	if _cover_at != Vector2.ZERO:
+		return _cover_at + Vector2(INTRO_SPAWN.x + 16.0 * (index % 2), INTRO_SPAWN.y + 16.0 * (index / 2))
+	return Vector2(_start) * 16.0 + Vector2(8.0 + 16.0 * index, 8.0)
+
+
+func _clamp_spawn(pos: Vector2) -> Vector2:
+	return pos
+
+
+var _wood_clock: float = 0.0
+var _wood_busy: bool = false
+
+
+func _process(delta: float) -> void:
+	super(delta)
+	_stream(false)
+	_wood_clock -= delta
+	if _wood_clock <= 0.0:
+		_wood_clock = 0.4
+		_watch_wood_handover()
+
+
+## Quest "renew the hut": with 20 pieces of wood in the bag, standing near Valdric, the wood is handed over (a short dialogue takes it and ends that task).
+func _watch_wood_handover() -> void:
+	if _wood_busy or _players.get_child_count() == 0:
+		return
+	var player: Player = _players.get_child(0) as Player
+	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
+	if player == null or quarry == null or not player.is_multiplayer_authority() or player.quests == null or player.story_lock or InputManager.ui_blocking:
+		return
+	if String(player.quests.current().get("step_id", "")) != "rebuild_tasks" or player.quests.has_flag("rebuild_wood_delivered") or player.inventory.count_item("wood") < 20:
+		return
+	if player.global_position.distance_to(quarry.knight.global_position) < 90.0:
+		_wood_busy = true
+		await play_story_dialogue(player, "rebuild_wood")
+		_wood_busy = false
+
+
+## All three jobs of the renewal are done (quest step `rebuild_finale`): Valdric says it is time, they begin to build (HutFinaleScene). Inside the hut he comes in to her first.
+func start_hut_finale(player: Player) -> void:
+	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
+	var hut: Hut = _hut()
+	if quarry == null or hut == null or not player.is_multiplayer_authority() or player.get_node_or_null("HutFinaleScene") != null:
+		return
+	var scene: HutFinaleScene = HutFinaleScene.new()
+	scene.name = "HutFinaleScene"
+	player.add_child(scene)
+	scene.start(player, self, quarry, hut)
+
+
+func _noise(noise_seed: int, frequency: float, octaves: int) -> FastNoiseLite:
+	var n: FastNoiseLite = FastNoiseLite.new()
+	n.seed = noise_seed
+	n.frequency = frequency
+	n.fractal_octaves = octaves
+	return n
+
+
+func _make_layer(biome: String, tint: Color) -> TileMapLayer:
+	var layer: TileMapLayer = TileMapLayer.new()
+	layer.name = biome
+	layer.tile_set = _ground.tile_set
+	layer.material = _ground.material
+	layer.z_index = _ground.z_index
+	layer.modulate = Color.WHITE.lerp(tint, 0.6)
+	add_child(layer)
+	Terrain.register_layer(layer)
+	return layer
+
+
+## Keeps the chunks around the players painted: `all` loads the whole ring now (start), otherwise
+## nearest first. Runtime preparation is budgeted; activation is atomic.
+func _stream(all: bool) -> void:
+	var centers: Array[Vector2i] = []
+	if all:
+		centers.append(_start / CHUNK)
+		centers.append(Vector2i(_spawn_position(0) / (16.0 * CHUNK)))
+	else:
+		for player: Node in _players.get_children():
+			centers.append(Vector2i(Interiors.outer(get_tree(), (player as Node2D).position) / (16.0 * CHUNK)))
+	if is_instance_valid(editor_camera):
+		centers.append(Vector2i(editor_camera.position / (16.0 * CHUNK)))
+	var best: Vector2i = Vector2i(-1, -1)
+	var best_d: int = 1 << 30
+	for center: Vector2i in centers:
+		var radius: int = LOAD_RADIUS
+		if is_instance_valid(editor_camera) and center == Vector2i(editor_camera.position / (16.0 * CHUNK)):
+			radius = clampi(ceili(get_viewport_rect().size.x / editor_camera.zoom.x / (16.0 * CHUNK) * 0.5 + 0.5), 1, 4)
+		for dy: int in range(-radius, radius + 1):
+			for dx: int in range(-radius, radius + 1):
+				var c: Vector2i = center + Vector2i(dx, dy)
+				if _chunks.has(c) or c.x < 0 or c.y < 0 or c.x * CHUNK >= RegionMap.WORLD_TILES or c.y * CHUNK >= RegionMap.WORLD_TILES:
+					continue
+				if all:
+					_load_chunk(c)
+				elif dx * dx + dy * dy < best_d:
+					best_d = dx * dx + dy * dy
+					best = c
+	if not all:
+		if best.x < 0 or (_building != null and _building.cell != best):
+			_discard_chunk_build()
+		if best.x >= 0:
+			if _building == null: _building = _begin_chunk(best)
+			# Teleports, large windows and the editor must never expose unfinished land.
+			var deadline: int = 0 if best_d == 0 or _chunk_in_view(best) else Time.get_ticks_usec() + STREAM_BUDGET_USEC
+			if _advance_chunk(_building, deadline):
+				_commit_chunk(_building)
+				_building = null
+	if all or centers.is_empty():
+		return
+	for c: Vector2i in _chunks.keys():
+		var near: bool = false
+		for center: Vector2i in centers:
+			var radius: int = UNLOAD_RADIUS
+			if is_instance_valid(editor_camera) and center == Vector2i(editor_camera.position / (16.0 * CHUNK)):
+				radius = clampi(ceili(get_viewport_rect().size.x / editor_camera.zoom.x / (16.0 * CHUNK) * 0.5 + 0.5), 1, 4) + 1
+			if maxi(absi(c.x - center.x), absi(c.y - center.y)) <= radius:
+				near = true
+				break
+		if not near:
+			_unload_chunk(c)
+
+
+func _land_at(x: int, y: int) -> bool:
+	if x < 0 or y < 0 or x >= RegionMap.WORLD_TILES or y >= RegionMap.WORLD_TILES:
+		return false
+	return _sdf[y * RegionMap.WORLD_TILES + x] >= 128
+
+
+## The biome of a land tile. The lookup is bent by a little noise so borders are ragged at tile
+## size; where the bent lookup falls in the sea the nearest land decides.
+func _land_biome(cell: Vector2i) -> String:
+	if not _map.world_biome.is_empty():
+		return _map.world_biome
+	var authored: Dictionary = edits.terrain.get(WorldEdits.key(cell), {})
+	if authored.has("biome"):
+		return String(authored.biome)
+	var bend: Vector2i = Vector2i(roundi(_warp_x.get_noise_2d(cell.x, cell.y) * BORDER_WARP), roundi(_warp_y.get_noise_2d(cell.x, cell.y) * BORDER_WARP))
+	var biome: String = _map.biome_at(cell + bend)
+	for radius: int in [4, 8, 12]:
+		if biome != "":
+			break
+		for dir: Vector2i in DIRECTIONS:
+			biome = _map.biome_at(cell + dir * radius)
+			if biome != "":
+				break
+	return biome if biome != "" else "meadow"
+
+
+## Biome at one tile ("" = void).
+func _biome_at(cell: Vector2i) -> String:
+	return _land_biome(cell) if _land_at(cell.x, cell.y) else ""
+
+
+func _load_chunk(c: Vector2i) -> void:
+	if _chunks.has(c): return
+	var build: ChunkBuild
+	if _building != null and _building.cell == c:
+		build = _building
+		_building = null
+	else:
+		build = _begin_chunk(c)
+	_advance_chunk(build)
+	_commit_chunk(build)
+
+
+func _begin_chunk(c: Vector2i) -> ChunkBuild:
+	var build: ChunkBuild = ChunkBuild.new()
+	build.cell = c
+	build.chunk = Chunk.new()
+	build.chunk.node = Node2D.new()
+	build.chunk.node.name = "Chunk%d_%d" % [c.x, c.y]
+	build.body = StaticBody2D.new()
+	build.chunk.node.add_child(build.body)
+	build.rng.seed = hash(Vector3i(c.x, c.y, _map.world_seed))
+	build.query = _generator.begin_chunk(Rect2i(c * CHUNK, Vector2i(CHUNK, CHUNK)))
+	build.custom_keys = edits.props.keys()
+	return build
+
+
+func _advance_chunk(build: ChunkBuild, deadline: int = 0) -> bool:
+	while build.phase < 9:
+		if deadline > 0 and Time.get_ticks_usec() >= deadline: return false
+		match build.phase:
+			0:
+				if not build.query.advance(deadline): return false
+				build.obstacles = build.query.outer.duplicate()
+				build.phase = 1
+			1:
+				_build_ground_row(build)
+				build.index += 1
+				if build.index == CHUNK:
+					_update_void_rects(build.body, build.cell, build.open_runs, [] as Array[Vector2i], CHUNK)
+					build.phase = 2
+					build.index = 0
+			2:
+				var cliffs: StaticBody2D = StaticBody2D.new()
+				cliffs.add_to_group("relief_walls")
+				build.chunk.node.add_child(cliffs)
+				for wall: Rect2 in _relief.blockers(Rect2i(build.cell * CHUNK, Vector2i(CHUNK, CHUNK))):
+					var shape: CollisionShape2D = CollisionShape2D.new()
+					var box: RectangleShape2D = RectangleShape2D.new()
+					box.size = wall.size
+					shape.shape = box
+					shape.position = wall.get_center()
+					cliffs.add_child(shape)
+				build.phase = 3
+			3:
+				if build.index >= build.query.inner.size():
+					build.phase = 4
+					build.index = 0
+					continue
+				var spec: Dictionary = build.query.inner[build.index]
+				build.index += 1
+				if String(spec.kind) == "stonebed":
+					_add_stone_bed(build.chunk.node, spec.pos as Vector2, int(spec.variant))
+				elif String(spec.kind) == "forestbed":
+					_add_forest_bed(build.chunk.node, spec.pos as Vector2, int(spec.variant))
+				elif not edits.props.has(WorldEdits.key(spec.cell as Vector2i)):
+					_prepare_thing(build, spec.cell, String(spec.kind), int(spec.variant), spec)
+			4:
+				if build.index >= build.custom_keys.size():
+					build.phase = 5
+					build.index = 0
+					continue
+				var key_string: String = build.custom_keys[build.index]
+				build.index += 1
+				var cell: Vector2i = WorldEdits.cell(key_string)
+				var spec: Dictionary = edits.props[key_string]
+				if bool(spec.get("removed", false)): continue
+				var at: Vector2 = PropGenerator.position_of(cell)
+				var pos: Array = spec.get("pos", [at.x, at.y])
+				build.obstacles.append({"pos": Vector2(float(pos[0]), float(pos[1])), "kind": spec.kind, "variant": int(spec.variant), "custom": true, "scale": float(spec.get("scale", 1.0))})
+				if cell / CHUNK == build.cell:
+					_prepare_thing(build, cell, String(spec.kind), int(spec.variant))
+					build.custom[cell] = spec
+			5:
+				if build.index >= build.obstacles.size():
+					build.phase = 6
+					build.index = 0
+					build.rng.seed = hash(Vector4i(build.cell.x, build.cell.y, _map.world_seed, 7919))
+					continue
+				_index_detail_obstacle(build, build.obstacles[build.index])
+				build.index += 1
+			6:
+				_detail_candidate(build)
+				build.index += 1
+				if build.index == (CHUNK / 2) * (CHUNK / 2):
+					build.phase = 7
+					build.index = 0
+			7:
+				var log_spec: Dictionary = FallenLogScatter.candidate(self,build.cell,build.index,build.obstacles)
+				if not log_spec.is_empty():
+					var log_node: FallenLog = FallenLog.new()
+					log_node.name = "FallenLog_%d_%d_%d" % [build.cell.x,build.cell.y,build.index]
+					log_node.setup(log_spec.pos as Vector2,int(log_spec.frame))
+					build.chunk.fallen_logs.append(log_node)
+				build.index += 1
+				if build.index == 16: build.phase = 8
+			8:
+				_build_clover_fields(build)
+				if not build.points.is_empty():
+					var details: MeadowDetails = MeadowDetails.new()
+					details.name = "MeadowDetails"
+					details.setup(build.points, Vector2(build.cell * CHUNK) * 16.0)
+					build.chunk.node.add_child(details)
+				build.phase = 9
+	return true
+
+
+func _build_ground_row(build: ChunkBuild) -> void:
+	var y: int = build.index
+	var runs: Array[Vector2i] = []
+	var run_start: int = -1
+	for x: int in CHUNK + 1:
+		var cell: Vector2i = build.cell * CHUNK + Vector2i(x, y)
+		var biome: String = "-" if x == CHUNK else _biome_at(cell)
+		var lake: bool = x < CHUNK and _rivers.lake_at(Vector2(cell) * 16.0 + Vector2(8, 8))
+		if biome == "" and not lake:
+			if run_start < 0: run_start = x
+			continue
+		if run_start >= 0:
+			runs.append(Vector2i(run_start, x))
+			run_start = -1
+		if x < CHUNK and biome != "":
+			_paint(build.chunk, cell, biome, build.rng)
+			if _outer_sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 136:
+				_add_edge_light(build.chunk.node, cell, build.lit_cells)
+	_update_void_rects(build.body, build.cell, build.open_runs, runs, y)
+
+
+func _prepare_thing(build: ChunkBuild, cell: Vector2i, kind: String, variant: int, extra: Dictionary = {}) -> void:
+	if _things.has(cell) or build.reserved.has(cell): return
+	if _town_node != null and _town_node.cleared.has(cell): return ## a foundation of the town removed it
+	var plant: Dictionary = DataRegistry.get_entry("plants", kind)
+	var radius: float = _generator._foot(plant, kind, variant) * float(extra.get("scale", 1.0))
+	var authored: Dictionary = edits.props.get(WorldEdits.key(cell), {})
+	var at: Vector2 = PropGenerator.position_of(cell)
+	var offset: Array = authored.get("pos", [at.x, at.y])
+	if not _rivers.clear_for_prop(Vector2(float(offset[0]), float(offset[1])), radius * float(authored.get("scale", 1.0))): return
+	build.reserved[cell] = true
+	if extra.has("young"):
+		_young[cell] = {"age": int(extra.young), "variant": variant}
+	build.chunk.things.append(_create_thing(cell, kind, variant, extra))
+
+
+func _commit_chunk(build: ChunkBuild) -> void:
+	var chunk: Chunk = build.chunk
+	for biome: String in chunk.cells:
+		for cell: Vector2i in chunk.cells[biome]:
+			(_layers[biome] as TileMapLayer).set_cell(cell, 0, chunk.atlas[cell])
+	for cell: Vector2i in chunk.glow_cells:
+		_glow.set_cell(cell, 0, chunk.atlas[cell])
+	chunk.atlas.clear()
+	if _town_node != null and not _town_node.cleared.is_empty(): ## a chunk that was in preparation while the town cleared a foundation
+		var kept: Array[WorldProp] = []
+		for prepared: WorldProp in chunk.things:
+			if _town_node.cleared.has(prepared.cell):
+				prepared.free()
+			else:
+				kept.append(prepared)
+		chunk.things = kept
+	for thing: WorldProp in chunk.things:
+		_props.add_child(thing)
+		_things[thing.cell] = thing
+		if build.custom.has(thing.cell):
+			var spec: Dictionary = build.custom[thing.cell]
+			var pos: Array = spec.get("pos", [thing.position.x, thing.position.y])
+			thing.position = Vector2(float(pos[0]), float(pos[1]))
+			thing.scale = Vector2(float(spec.get("scale", 1.0)) * (-1.0 if bool(spec.get("flip", false)) else 1.0), float(spec.get("scale", 1.0)))
+	for log_node: FallenLog in chunk.fallen_logs: _props.add_child(log_node)
+	for field: CloverField in chunk.clover: _props.add_child(field)
+	_rivers.attach_chunk(chunk.node, build.cell)
+	add_child(chunk.node)
+	_chunks[build.cell] = chunk
+	_wildlife.chunk_loaded(build.cell)
+
+
+func _chunk_in_view(c: Vector2i) -> bool:
+	var inverse: Transform2D = get_viewport().get_canvas_transform().affine_inverse()
+	var view: Rect2 = Rect2(inverse * Vector2.ZERO, Vector2.ZERO).expand(inverse * get_viewport_rect().size).grow(64.0)
+	return view.intersects(Rect2(Vector2(c * CHUNK) * 16.0, Vector2.ONE * CHUNK * 16.0))
+
+
+func _discard_chunk_build() -> void:
+	if _building == null: return
+	for thing: WorldProp in _building.chunk.things: thing.free()
+	for log_node: FallenLog in _building.chunk.fallen_logs: log_node.free()
+	for field: CloverField in _building.chunk.clover: field.free()
+	_building.chunk.node.free()
+	_building = null
+
+
+func _exit_tree() -> void:
+	_discard_chunk_build()
+
+
+## Tiles inland from the coast (0 at the shore; the baked field has 8 steps per tile). Negative outside the land.
+func coast_tiles(point: Vector2) -> float:
+	var x: int = floori(point.x / 16.0)
+	var y: int = floori(point.y / 16.0)
+	if x < 0 or y < 0 or x >= RegionMap.WORLD_TILES or y >= RegionMap.WORLD_TILES:
+		return -1.0
+	return (float(_sdf[y * RegionMap.WORLD_TILES + x]) - 128.0) / 8.0
+
+
+## Where somebody who fell comes back: at the door of the hut / the town's house once the opening is over (the manhole before that).
+func spawn_point() -> Vector2:
+	if _town_node != null and _town_node.founded: ## (not `opening_over`: clients never play the opening, the founded town is synced)
+		return _town_node.respawn_point()
+	var hut: Hut = _hut() if opening_over else null
+	if hut != null:
+		return hut.exit_position
+	return super()
+
+
+## Enemy navigation stays inside loaded land, including wall faces used by climb links.
+func navigation_floor(point: Vector2) -> bool:
+	if MineManager.in_mine(point):
+		return (get_node("Mines") as MineManager).navigation_floor(point)
+	if Interiors.slot_at(point) >= 0:
+		return true ## inside a building the floor is the room (its colliders do the rest): the story fights there
+	var tile: Vector2i = Vector2i(floori(point.x / 16.0), floori(point.y / 16.0))
+	var chunk: Vector2i = Vector2i(floori(point.x / (CHUNK * 16.0)), floori(point.y / (CHUNK * 16.0)))
+	var floor: bool = (_land_at(tile.x, tile.y) and _relief.is_land(tile.x, tile.y)) or _rivers.lake_at(point)
+	return _chunks.has(chunk) and floor and not _rivers.is_deep(point)
+
+
+## Grows void rectangles over equal runs of consecutive rows and emits finished ones.
+func _update_void_rects(body: StaticBody2D, c: Vector2i, open_runs: Dictionary, runs: Array[Vector2i], row: int) -> void:
+	var keys: Array[String] = []
+	for run: Vector2i in runs:
+		keys.append("%d:%d" % [run.x, run.y])
+		if not open_runs.has(keys[-1]):
+			open_runs[keys[-1]] = row
+	for key: String in open_runs.keys():
+		if keys.has(key):
+			continue
+		var x0: int = key.get_slice(":", 0).to_int()
+		var x1: int = key.get_slice(":", 1).to_int()
+		var y0: int = open_runs[key]
+		open_runs.erase(key)
+		var shape: CollisionShape2D = CollisionShape2D.new()
+		var rect: RectangleShape2D = RectangleShape2D.new()
+		rect.size = Vector2(x1 - x0, row - y0) * 16.0 + Vector2.ONE * 2.0 * VOID_MARGIN
+		shape.shape = rect
+		shape.position = (Vector2(c * CHUNK) + Vector2(x0 + x1, y0 + row) * 0.5) * 16.0
+		body.add_child(shape)
+
+
+## One violet light per few tiles of coast, so the edge also shines on the grass at night.
+func _add_edge_light(parent: Node2D, cell: Vector2i, taken: Dictionary) -> void:
+	var key: Vector2i = cell / EDGE_LIGHT_CELL
+	if taken.has(key):
+		return
+	taken[key] = true
+	var light: NightLight = NightLight.new()
+	light.glow_color = EDGE_LIGHT_COLOR
+	light.radius = 46
+	light.base_energy = 0.55
+	light.pulse = 0.25
+	light.position = Vector2(cell) * 16.0 + Vector2(8.0, 8.0)
+	parent.add_child(light)
+
+
+func _paint(chunk: Chunk, cell: Vector2i, biome: String, rng: RandomNumberGenerator) -> void:
+	var authored: Dictionary = edits.terrain.get(WorldEdits.key(cell), {})
+	biome = RegionMap.active_biome(String(authored.get("biome", biome)))
+	var kind: String = "plain"
+	if biome == "meadow":
+		kind = _pick_tile_kind(_zone.get_noise_2d(cell.x, cell.y) * 0.5 + 0.5, rng)
+	elif rng.randf() < PLACEHOLDER_CHANCE:
+		kind = COMMON_KINDS[rng.rand_weighted(COMMON_WEIGHTS)]
+	if _relief.kind(cell.x, cell.y) != Relief.FLOOR: ## walls, ramps and stairs are drawn over plain ground
+		kind = "plain"
+	kind = String(authored.get("ground", kind))
+	if not _rivers.clear_for_prop(Vector2(cell) * 16.0 + Vector2(8, 8), 0.0): kind = "plain"
+	var options: Array = _tiles.get(kind, _tiles["plain"])
+	var atlas: Array = options[rng.randi() % options.size()]
+	var coords: Vector2i = Vector2i(int(atlas[0]), int(atlas[1]))
+	chunk.atlas[cell] = coords
+	if not chunk.cells.has(biome):
+		chunk.cells[biome] = [] as Array[Vector2i]
+	(chunk.cells[biome] as Array[Vector2i]).append(cell)
+	if biome == "meadow" and GLOW_KINDS.has(kind):
+		chunk.glow_cells.append(cell)
+		_add_glow(cell, kind, options.find(atlas), chunk.node)
+
+
+func _unload_chunk(c: Vector2i) -> void:
+	_wildlife.chunk_unloaded(c)
+	var chunk: Chunk = _chunks[c]
+	for biome: String in chunk.cells:
+		for cell: Vector2i in chunk.cells[biome]:
+			(_layers[biome] as TileMapLayer).erase_cell(cell)
+	for cell: Vector2i in chunk.glow_cells:
+		_glow.erase_cell(cell)
+	for thing: WorldProp in chunk.things:
+		_things.erase(thing.cell)
+		_young.erase(thing.cell)
+		_props.remove_child(thing)
+		thing.queue_free()
+	for log_node: FallenLog in chunk.fallen_logs:
+		_props.remove_child(log_node)
+		log_node.queue_free()
+	for field: CloverField in chunk.clover:
+		_props.remove_child(field)
+		field.queue_free()
+	remove_child(chunk.node)
+	chunk.node.queue_free()
+	_chunks.erase(c)
+
+
+# ---------------------------------------------------------------------------------- props
+## Insert obstacle discs into every covered bucket, including moved/scaled authored props.
+func _index_detail_obstacle(build: ChunkBuild, obstacle: Dictionary) -> void:
+	if String(obstacle.kind) == "forestbed": ## the forest floor does not block small plants, it changes which ones grow
+		if _forest_bed_ok(obstacle.pos as Vector2, int(obstacle.variant)):
+			build.beds.append({"pos": obstacle.pos, "rx": PropGenerator.FOREST_BED_RX[int(obstacle.variant)]})
+		return
+	if not bool(obstacle.get("custom", false)) and obstacle.has("cell") and edits.props.has(WorldEdits.key(obstacle.cell as Vector2i)): return
+	var radius: float = 60.0
+	if String(obstacle.kind) != "stonebed":
+		var plant: Dictionary = DataRegistry.get_entry("plants", String(obstacle.kind))
+		radius = float((plant.radius as Array)[int(obstacle.variant)]) * float(obstacle.get("scale", 1.0))
+	radius += 8.0
+	var pos: Vector2 = obstacle.pos
+	var lo: Vector2i = Vector2i(((pos - Vector2.ONE * radius) / DETAIL_BUCKET).floor())
+	var hi: Vector2i = Vector2i(((pos + Vector2.ONE * radius) / DETAIL_BUCKET).floor())
+	var disc: Dictionary = {"pos": pos, "reach": radius}
+	for y: int in range(lo.y, hi.y + 1):
+		for x: int in range(lo.x, hi.x + 1):
+			(build.obstacle_grid.get_or_add(Vector2i(x, y), []) as Array).append(disc)
+
+
+func _detail_candidate(build: ChunkBuild) -> void:
+	var x: int = (build.index % (CHUNK / 2)) * 2
+	var y: int = (build.index / (CHUNK / 2)) * 2
+	var cell: Vector2i = build.cell * CHUNK + Vector2i(x + build.rng.randi_range(0, 1), y + build.rng.randi_range(0, 1))
+	if not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
+		return
+	var biome: String = _land_biome(cell)
+	var density: float = float(DataRegistry.get_entry("wind","detail_density").get(biome,0.3))
+	var patch: float = _zone.get_noise_2d(cell.x * 2.3, cell.y * 2.3)
+	if build.rng.randf() > density * (0.8 + patch):
+		return
+	var pos: Vector2 = Vector2(cell) * 16.0 + Vector2(build.rng.randf_range(3,13),build.rng.randf_range(5,14)).round()
+	if not _rivers.clear_for_prop(pos, 10.0): return
+	if not _relief.flat_around(pos, 10.0):
+		return
+	var obstructed: bool = false
+	for patch_node: Node in Terrain.patches:
+		if String(patch_node.call("surface_at", pos)) != "":
+			obstructed = true
+			break
+	if obstructed:
+		return
+	# Every bucket includes all obstacle discs covering it; keep the exact old test.
+	var bucket: Vector2i = Vector2i(floori(pos.x / DETAIL_BUCKET), floori(pos.y / DETAIL_BUCKET))
+	for obstacle: Dictionary in build.obstacle_grid.get(bucket, []):
+		if (obstacle.pos as Vector2).distance_to(pos) < float(obstacle.reach):
+			obstructed = true
+			break
+	if obstructed:
+		return
+	var in_bed: bool = false
+	for bed: Dictionary in build.beds: ## on a forest floor only shade plants grow, and fewer of them
+		var offset: Vector2 = pos - (bed.pos as Vector2)
+		var rx: float = float(bed.rx)
+		if pow(offset.x / rx, 2.0) + pow(offset.y / (rx * FOREST_BED_FLATTEN), 2.0) < 0.8:
+			in_bed = true
+			break
+	var kind: int = build.rng.randi_range(0,MeadowDetails.COUNT-3)
+	# Most new ground cover stays green; blossoms accent the open patches.
+	if build.rng.randf() < 0.35: kind = [0,1,2,3,9,10,11,12,13,14,18,19,20,21][build.rng.randi_range(0,13)]
+	if biome == "mist_forest" and build.rng.randf() < 0.55:
+		kind = [9,10,11,18,19,20,21][build.rng.randi_range(0,6)]
+	elif biome == "glass_cliffs":
+		kind = [0,2,5,7][build.rng.randi_range(0,3)]
+	if in_bed:
+		if build.rng.randf() < 0.45: return
+		kind = [9,10,11,18,19,24,24,25,25,25][build.rng.randi_range(0,9)] ## ferns and shade moss
+	else:
+		var slope: float = _generator.aspect(pos / 16.0)
+		if slope < -0.35 and build.rng.randf() < 0.65:
+			kind = [9,10,11,18,19,24,25][build.rng.randi_range(0,6)] ## north slopes and cliff feet: damp, ferns and moss
+		elif slope > 0.35 and build.rng.randf() < 0.55:
+			kind = [22,23,0,2,22,23][build.rng.randi_range(0,5)] ## sunny slopes: dry straw and thin grass
+	var tint: Color = Color.WHITE
+	match biome:
+		"mist_forest": tint = Color(0.79,0.95,0.94)
+		"glass_cliffs": tint = Color(0.88,0.85,1.0)
+		"sunken_ruins": tint = Color(0.94,0.88,0.73)
+		"void_bloom": tint = Color(0.85,0.70,0.92)
+	build.points.append({"pos":pos,"kind":kind,"phase":build.rng.randf(),"sway":build.rng.randf_range(0.8,1.5),"tint":tint,"exposure":float(DataRegistry.get_entry("wind","exposure").get(biome,1.0))})
+
+
+## Small clover fields: each one is a crowd of standing clumps drawn from its own seed (CloverField), y-sorted so you stand in it. A field only
+## lies on open, flat, dry meadow, off the footpath and stone floors; it may lie under trees and bushes (they stand over it).
+func _build_clover_fields(build: ChunkBuild) -> void:
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = hash(Vector4i(build.cell.x, build.cell.y, _map.world_seed, 6151))
+	var count: int = 2 + (1 if rng.randf() < 0.6 else 0) + (1 if rng.randf() < 0.3 else 0)
+	for _i: int in count:
+		for _attempt: int in 5: ## a spot that is not open ground is given up on, the next try is somewhere else
+			if _try_clover_field(build, rng):
+				break
+
+
+func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
+	var field: Dictionary = CloverField.plan(rng)
+	var tile: Vector2i = build.cell * CHUNK + Vector2i(rng.randi_range(5, CHUNK - 6), rng.randi_range(5, CHUNK - 6))
+	var open: float = 1.0 - smoothstep(0.5, 0.78, 1.0 - (_zone.get_noise_2d(tile.x, tile.y) * 0.5 + 0.5)) ## clover likes the open ground
+	if rng.randf() > 0.6 + 0.4 * open:
+		return false
+	var center: Vector2 = Vector2(tile) * 16.0 + Vector2(8, 8)
+	var rx: float = float(field.rx)
+	var ry: float = float(field.ry)
+	for other: CloverField in build.chunk.clover: ## two fields never lie in each other
+		if other.position.distance_to(center) < other.radius.x + rx + 8.0:
+			return false
+	var ok: bool = _relief.flat_around(center, ry * 0.7) and _rivers.clear_for_prop(center, rx * 0.9)
+	for a: int in 8:
+		var edge: Vector2 = center + Vector2.from_angle(float(a) * TAU / 8.0) * Vector2(rx, ry) * 0.9
+		var cell: Vector2i = Vector2i((edge / 16.0).floor())
+		if not ok or not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
+			ok = false
+			break
+	if ok:
+		for patch_node: Node in Terrain.patches:
+			if String(patch_node.call("surface_at", center)) != "":
+				ok = false
+				break
+	if ok: ## only on open ground: most of the field must be free of trees, bushes and rocks
+		var free: int = 0
+		for k: int in 14:
+			var sample: Vector2 = center + Vector2.from_angle(float(k) * 2.4) * Vector2(rx, ry) * (0.2 + 0.6 * float(k % 5) / 4.0)
+			if _detail_spot_free(build, sample):
+				free += 1
+		ok = free >= 10
+	if not ok:
+		return false
+	var node: CloverField = CloverField.new()
+	node.setup(field, center)
+	build.chunk.clover.append(node)
+	return true
+
+
+## True when no prop of the chunk (and no solid ground decal) stands where a small plant would.
+func _detail_spot_free(build: ChunkBuild, pos: Vector2) -> bool:
+	var cell: Vector2i = Vector2i((pos / 16.0).floor())
+	if not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell) or not _rivers.clear_for_prop(pos, 6.0):
+		return false
+	var bucket: Vector2i = Vector2i(floori(pos.x / DETAIL_BUCKET), floori(pos.y / DETAIL_BUCKET))
+	for obstacle: Dictionary in build.obstacle_grid.get(bucket, []):
+		if (obstacle.pos as Vector2).distance_to(pos) < float(obstacle.reach):
+			return false
+	return true
+
+
+## The gravel under a rock formation: a decal on the ground, below everything that stands on it.
+func _add_stone_bed(parent: Node2D, at: Vector2, variant: int) -> void:
+	if not _rivers.clear_for_prop(at, PropGenerator.BED_RX[variant]): return
+	var bed: Sprite2D = Sprite2D.new()
+	bed.texture = STONE_BED
+	bed.region_enabled = true
+	bed.region_rect = Rect2(variant * 176, 0, 176, 120)
+	bed.position = at
+	bed.z_index = -9
+	parent.add_child(bed)
+
+
+## True where a litter patch of this size may lie: on land, dry, level, off the old stones and the footpath.
+func _forest_bed_ok(at: Vector2, variant: int) -> bool:
+	var rx: float = PropGenerator.FOREST_BED_RX[variant]
+	if not _rivers.clear_for_prop(at, rx * 0.8) or not _relief.flat_around(at, rx * 0.55):
+		return false
+	for angle: float in [0.0, PI * 0.5, PI, PI * 1.5]:
+		var edge: Vector2 = at + Vector2.from_angle(angle) * Vector2(rx, rx * FOREST_BED_FLATTEN) * 0.75
+		var cell: Vector2i = Vector2i((edge / 16.0).floor())
+		if not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
+			return false
+	for patch_node: Node in Terrain.patches:
+		if String(patch_node.call("surface_at", at)) != "":
+			return false
+	return true
+
+
+## The forest floor under a tree of a wood: litter, humus and moss, a decal on the ground below everything that stands on it.
+func _add_forest_bed(parent: Node2D, at: Vector2, variant: int) -> void:
+	if not _forest_bed_ok(at, variant): return
+	var bed: Sprite2D = Sprite2D.new()
+	bed.texture = FOREST_BED
+	bed.region_enabled = true
+	bed.region_rect = Rect2(variant * FOREST_BED_FRAME.x, 0, FOREST_BED_FRAME.x, FOREST_BED_FRAME.y)
+	bed.position = at
+	bed.z_index = -9
+	parent.add_child(bed)
+
+
+func _create_thing(cell: Vector2i, prop_kind: String, variant: int, extra: Dictionary = {}) -> WorldProp:
+	var scene: PackedScene = load(String(DataRegistry.get_entry("plants", prop_kind).scene)) as PackedScene
+	var thing: WorldProp = scene.instantiate() as WorldProp
+	thing.setup(self, cell, prop_kind, variant)
+	thing.position = PropGenerator.position_of(cell)
+	if extra.has("scale"): ## Krummholz on the high levels: smaller and more swept by the wind
+		thing.scale = Vector2.ONE * float(extra.scale)
+		thing.wind_boost = 1.0 + 3.0 * (1.0 - float(extra.scale))
+	return thing
+
+
+func _spawn_thing(cell: Vector2i, prop_kind: String, variant: int) -> WorldProp:
+	var thing: WorldProp = _create_thing(cell, prop_kind, variant)
+	_props.add_child(thing)
+	_things[cell] = thing
+	return thing
+
+
+## The props that are not untouched, for the save file ("x,y" -> state).
+func export_things() -> Dictionary:
+	var out: Dictionary = {}
+	for cell: Vector2i in _thing_states:
+		out["%d,%d" % [cell.x, cell.y]] = _thing_states[cell]
+	return out
+
+
+## Host, after loading a save: every prop takes the saved state (the others become untouched).
+func import_things(saved: Dictionary) -> void:
+	_thing_states.clear()
+	for key: String in saved:
+		var parts: PackedStringArray = key.split(",")
+		var state: Dictionary = {}
+		for field: String in (saved[key] as Dictionary):
+			var value: Variant = (saved[key] as Dictionary)[field]
+			state[field] = int(value) if value is float else value ## JSON has only floats
+		_thing_states[Vector2i(int(parts[0]), int(parts[1]))] = state
+	for cell: Vector2i in _things:
+		(_things[cell] as WorldProp).apply_state(thing_state(cell), "")
+
+
+func thing_state(cell: Vector2i) -> Dictionary:
+	if not _thing_states.has(cell) and _young.has(cell):
+		return _young_state(cell)
+	return _thing_states.get(cell, {})
+
+
+## A sapling the generator planted: it grows with the days (`YOUNG_GROW_DAYS`), shown through the same felled -> stump / sapling / young
+## tree states as a regrowing tree (state `f` and `h`), so it cannot be chopped until it is a fir. Mature = {} and forgotten.
+func _young_state(cell: Vector2i) -> Dictionary:
+	var info: Dictionary = _young[cell]
+	var progress: float = (float(info.age) + float(TimeManager.day) - 1.0) / PropGenerator.YOUNG_GROW_DAYS
+	if progress >= 1.0:
+		_young.erase(cell)
+		return {}
+	var hits: Array = DataRegistry.get_entry("plants", "tree").get("hits", [4, 6, 8, 8]) as Array
+	var slots: int = int(hits[int(info.variant)])
+	return {"k": "tree", "f": 1, "h": clampi(slots - maxi(1, int(progress * float(slots))), 1, slots - 1)} ## never the bare stump (h = slots): a planted sapling is at least a sapling
+
+
+## Sunrise: the saplings in view grow a step (every peer counts the days itself).
+func _age_young(_day: int) -> void:
+	for cell: Vector2i in _young.keys():
+		var thing: WorldProp = _things.get(cell) as WorldProp
+		if thing != null:
+			thing.apply_state(thing_state(cell), "regrow")
+
+
+## Local player pressed E at something that can be picked up (berries, a little stone).
+func request_pick(cell: Vector2i) -> void:
+	if multiplayer.is_server():
+		_host_pick(cell, multiplayer.get_unique_id())
+	else:
+		_rpc_pick.rpc_id(1, cell)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_pick(cell: Vector2i) -> void:
+	if multiplayer.is_server():
+		_host_pick(cell, multiplayer.get_remote_sender_id())
+
+
+func _host_pick(cell: Vector2i, peer: int) -> void:
+	var thing: WorldProp = _things.get(cell) as WorldProp
+	var player: Player = _players.get_node_or_null(str(peer)) as Player
+	if thing == null or player == null or player.health.current <= 0.0 or thing.prompt() == "":
+		return
+	if thing.reach_distance(player.global_position) > Interactable.INTERACT_RANGE + PICK_SLACK:
+		return
+	var pickup: Dictionary = thing.spec().get("pickup", {}) as Dictionary
+	if pickup.is_empty():
+		return
+	var amount_min: int = int(pickup.min) if pickup.has("min") else 1
+	var amount_max: int = int(pickup.max) if pickup.has("max") else amount_min
+	if pickup.has("amount"): ## the variant decides: a cluster of three gives three
+		amount_min = int((pickup.amount as Array)[thing.variant])
+		amount_max = amount_min
+	DropComponent.spawn_drops(get_tree(), [{"id": pickup.item, "chance": 1.0, "min": amount_min, "max": amount_max}], thing.global_position + Vector2(0, -8))
+	var next: Dictionary = thing.state.duplicate()
+	next["p"] = TimeManager.day + 1 ## the day it was picked (+ 1, so day 0 still counts as set)
+	next["k"] = thing.kind
+	_rpc_thing_state.rpc(cell, next, "pick")
+
+
+## Host: a weapon's hit scan found `thing`. Only the prop's tool (sickle, pickaxe) harvests it, any
+## other weapon just makes it rustle.
+func harvest_hit(thing: WorldProp, source: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var harvest: Dictionary = thing.spec().get("harvest", {})
+	if harvest.is_empty() or thing.is_depleted():
+		return
+	var player: Player = _players.get_node_or_null(str(source)) as Player
+	var tool_id: String = ""
+	if player != null:
+		tool_id = String(Items.definition(player.inventory.active_stack()).get("tool", ""))
+	if tool_id != String(harvest.tool):
+		_rpc_thing_state.rpc(thing.cell, thing.state, "rustle")
+		return
+	var hits: int = int(thing.state.get("h", 0)) + 1
+	var next: Dictionary = thing.state.duplicate()
+	var entries: Array = (harvest.drops as Array).duplicate()
+	var strip: bool = hits >= thing.slots()
+	next["h"] = hits
+	next["k"] = thing.kind
+	if strip:
+		entries.append_array(harvest.final_drops as Array)
+		if thing.spec().get("crown_fade") != null: ## trees: felled, then they regrow stage by stage
+			next["f"] = 1
+	DropComponent.spawn_drops(get_tree(), entries, thing.global_position + Vector2(0, -10))
+	_rpc_thing_state.rpc(thing.cell, next, "strip" if strip else "hit")
+
+
+## Host, every sunrise: each harvested prop gets one slot back per `regrow_days` of its kind, picked
+## berries and stones come back after the kind's pickup `regrow_days`. Nothing ever disappears.
+func _grow_things(day: int) -> void:
+	for cell: Vector2i in _thing_states.keys():
+		var before: Dictionary = _thing_states[cell]
+		var plant: Dictionary = DataRegistry.get_entry("plants", String(before.get("k", "bush")))
+		var next: Dictionary = before.duplicate()
+		var slot_days: int = maxi(1, int((plant.get("harvest", {}) as Dictionary).get("regrow_days", 1)))
+		if int(next.get("h", 0)) > 0 and day % slot_days == 0:
+			next["h"] = int(next.h) - 1
+			if int(next.h) <= 0:
+				next.erase("h")
+		var pick_days: int = int((plant.get("pickup", {}) as Dictionary).get("regrow_days", 3))
+		if next.has("p") and day + 1 - int(next.p) >= pick_days:
+			next.erase("p")
+		if not next.has("h"):
+			next.erase("f") ## fully regrown
+		if next.keys() == ["k"]:
+			next.clear()
+		if next != before:
+			_rpc_thing_state.rpc(cell, next, "regrow")
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_thing_state(cell: Vector2i, state: Dictionary, fx: String) -> void:
+	if state.is_empty():
+		_thing_states.erase(cell)
+	else:
+		_thing_states[cell] = state
+	var thing: WorldProp = _things.get(cell) as WorldProp
+	if thing != null:
+		thing.apply_state(state, fx)
+		if multiplayer.is_server() and fx in ["strip", "hit", "pick"] and _spent(thing):
+			_sweep_spent(thing)
+
+
+## A prop that has given everything it had: a stripped bush, a felled tree, a mined-out rock, a picked pebble or mushroom (berries and blossoms grow back, the plant stays).
+func _spent(thing: WorldProp) -> bool:
+	return bool(thing.state.get("p", 0)) if thing is Pebble else thing.is_depleted()
+
+
+## Host: inside the town's light a spent prop does not stay as a stump, rubble or a regrowing sapling: after its effect it is gone for good.
+func _sweep_spent(thing: WorldProp) -> void:
+	if _town_node == null or not _town_node.founded or not _town_node.in_territory(thing.position):
+		return
+	var cell: Vector2i = thing.cell
+	await get_tree().create_timer(5.0 if thing.kind in PropGenerator.TREE_KINDS else 0.9).timeout ## the fall / the burst plays out first
+	if _town_node != null and _things.has(cell):
+		_town_node.clear_spent([cell])
+
+
+## A peer that joins gets every prop that is not untouched.
+@rpc("authority", "call_remote", "reliable")
+func _rpc_thing_snapshot(snapshot: Dictionary) -> void:
+	_thing_states = snapshot
+	for cell: Vector2i in _things:
+		(_things[cell] as WorldProp).apply_state(thing_state(cell), "")
+
+
+## Wildlife is native to green meadow floors, away from the void and steep relief edges.
+func _rabbit_habitat(at: Vector2) -> bool:
+	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
+	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
+		return false
+	var biomes: Array = DataRegistry.get_entry("wildlife", "rabbit").get("biomes", ["meadow"])
+	return biomes.has(_land_biome(cell)) and _relief.flat_around(at, 5.0) and _rivers.clear_for_prop(at, 5.0)
+
+
+func _bird_habitat(at: Vector2, species: String) -> bool:
+	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
+	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
+		return false
+	var biomes: Array = DataRegistry.get_entry("wildlife", species).get("biomes", ["meadow"])
+	return biomes.has(_land_biome(cell)) and _relief.flat_around(at, 4.0) and _rivers.clear_for_prop(at, 4.0)
+
+
+func _fauna_habitat(at: Vector2, species: String) -> bool:
+	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
+	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
+		return false
+	var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
+	var biomes: Array = spec.get("biomes", ["meadow"])
+	return biomes.has(_land_biome(cell)) and _relief.flat_around(at, float(spec.get("body_radius", 3.0)) + 2.0) and _rivers.clear_for_prop(at, float(spec.get("body_radius", 3.0)))
+
+
+## Real painted meadow blossoms, not arbitrary air positions. Called after a chunk is painted.
+func _flower_targets(chunk: Vector2i) -> Array[Vector2]:
+	var result: Array[Vector2] = []
+	var atlases: Array[Vector2i] = []
+	for kind: String in DataRegistry.get_entry("wildlife", "butterfly").get("flower_kinds", []):
+		for xy: Array in _tiles.get(kind, []):
+			atlases.append(Vector2i(int(xy[0]), int(xy[1])))
+	for y: int in CHUNK:
+		for x: int in CHUNK:
+			var cell: Vector2i = chunk * CHUNK + Vector2i(x, y)
+			if atlases.has(_ground.get_cell_atlas_coords(cell)):
+				result.append(Vector2(cell) * 16.0 + Vector2(8, 8))
+	return result
+
+
+## Host-owned authoring snapshot; late joiners receive this same layer.
+@rpc("authority", "call_remote", "reliable")
+func _rpc_editor_snapshot(data: Dictionary) -> void:
+	editor_apply(data, false)
+
+func editor_apply(data: Dictionary, broadcast: bool = true) -> void:
+	_discard_chunk_build()
+	var terrain_changed: bool = edits.terrain != data.get("terrain", {})
+	edits.assign(data)
+	if terrain_changed:
+		_relief.editor_apply(edits.terrain)
+		_generator._cache.clear()
+	var loaded: Array = _chunks.keys()
+	for c: Vector2i in _chunks.keys():
+		_unload_chunk(c)
+	for c: Vector2i in loaded:
+		_load_chunk(c)
+	_stream(true)
+	if broadcast and multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+		_rpc_editor_snapshot.rpc(edits.data())
+
+func editor_prop(cell: Vector2i) -> Dictionary:
+	if not _things.has(cell):
+		return {}
+	var thing: WorldProp = _things[cell]
+	return {"kind": thing.kind, "variant": thing.variant, "pos": [thing.position.x, thing.position.y], "scale": absf(thing.scale.y), "flip": thing.scale.x < 0.0}
+
+func editor_pick(pos: Vector2) -> WorldProp:
+	var best: WorldProp
+	var distance: float = 48.0
+	for thing: WorldProp in _things.values():
+		var d: float = pos.distance_to(thing.position + Vector2(0, -minf(thing._height * 0.4, 28.0)))
+		if d < distance:
+			distance = d
+			best = thing
+	return best
+
+func editor_land(cell: Vector2i) -> bool:
+	return _land_at(cell.x, cell.y)
+
+func editor_height(cell: Vector2i) -> int:
+	return _relief.level(cell.x, cell.y)
+
+func editor_refresh() -> void:
+	_stream(false)
+
+
+# ---------------------------------------------------------------------------------- the town (docs/town.md)
+func hut_node() -> Hut:
+	return _hut()
+
+
+func town() -> TownManager:
+	return _town_node
+
+
+## What the ground says against a piece standing on `rect` (px, its footprint): "" = nothing. Land, one flat level, no water, nothing solid in the way.
+func town_probe(rect: Rect2) -> String:
+	var wide: Rect2 = rect.grow(8.0)
+	var middle: Vector2i = Vector2i(floori(rect.get_center().x / 16.0), floori(rect.get_center().y / 16.0))
+	var home: int = _relief.level(middle.x, middle.y)
+	for y: int in range(floori(wide.position.y / 16.0), floori(wide.end.y / 16.0) + 1):
+		for x: int in range(floori(wide.position.x / 16.0), floori(wide.end.x / 16.0) + 1):
+			if not _land_at(x, y) or not _relief.is_land(x, y):
+				return "KEIN LAND"
+			if _relief.kind(x, y) != Relief.FLOOR or _relief.level(x, y) != home:
+				return "ZU UNEBEN"
+	if not _rivers.clear_for_prop(rect.get_center(), maxf(rect.size.x, rect.size.y) * 0.5):
+		return "ZU NAH AM WASSER"
+	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+	var box: RectangleShape2D = RectangleShape2D.new()
+	box.size = rect.size - Vector2(2.0, 2.0)
+	query.shape = box
+	query.transform = Transform2D(0.0, rect.get_center())
+	query.collision_mask = 1
+	if not get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty():
+		return "IM WEG"
+	return ""
+
+
+## The height level a point stands on (for the town's ways, which stay on one level).
+func town_level_at(point: Vector2) -> int:
+	return _relief.level(floori(point.x / 16.0), floori(point.y / 16.0))
+
+
+## Can a trampled way run over this point? Land, flat floor of `level`, no water, nothing solid within 5 px.
+func town_walkable(point: Vector2, level: int) -> bool:
+	var x: int = floori(point.x / 16.0)
+	var y: int = floori(point.y / 16.0)
+	if not _land_at(x, y) or not _relief.is_land(x, y) or _relief.kind(x, y) != Relief.FLOOR or _relief.level(x, y) != level:
+		return false
+	if not _rivers.clear_for_prop(point, 4.0):
+		return false
+	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+	var circle: CircleShape2D = CircleShape2D.new()
+	circle.radius = 5.0
+	query.shape = circle
+	query.transform = Transform2D(0.0, point)
+	query.collision_mask = 1
+	return get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty()
+
+
+func _town_soft(thing: WorldProp) -> bool:
+	if thing.kind in ((TownRules.config().get("soft_kinds", []) as Array)):
+		return true
+	if thing.kind in PropGenerator.TREE_KINDS:
+		return thing.state.has("f") ## felled: stump and sapling have no collision (a young tree grows back by itself otherwise)
+	return thing.kind == "rock" and thing.is_depleted()
+
+
+## The loaded props a foundation on `rect` sweeps away (cells): bushes, grass, pebbles, mushrooms, stumps and spent rocks.
+func town_soft_cells(rect: Rect2) -> Array:
+	var out: Array = []
+	for cell: Vector2i in _things:
+		var thing: WorldProp = _things[cell] as WorldProp
+		if _town_soft(thing) and rect.grow(thing._radius * 0.8).has_point(thing.position):
+			out.append(cell)
+	return out
+
+
+## Everyone: these props are gone (the town cleared them).
+func town_clear_cells(cells: Array) -> void:
+	for raw: Variant in cells:
+		var cell: Vector2i = raw as Vector2i
+		_thing_states.erase(cell) ## nothing grows back there
+		if not _things.has(cell):
+			continue
+		var thing: WorldProp = _things[cell] as WorldProp
+		_things.erase(cell)
+		for chunk: Chunk in _chunks.values():
+			chunk.things.erase(thing)
+		if thing.get_parent() != null:
+			thing.get_parent().remove_child(thing)
+		thing.queue_free()
+
+
+func export_story() -> Dictionary:
+	return fallen_knight.export_data() if fallen_knight != null else {}
+func import_story(data: Dictionary) -> void:
+	if fallen_knight != null: fallen_knight.import_data(data)

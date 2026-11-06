@@ -1,0 +1,615 @@
+{
+ "sword_basic": {
+  "name": "Einfaches Schwert",
+  "kind": "weapon",
+  "slot": "main_hand",
+  "weapon_class": "sword_1h",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/sword_basic.png",
+  "held": "res://assets/items/sword_basic_held.png",
+  "stats": {
+   "damage": 5,
+   "speed": 0.9,
+   "reach": 28,
+   "knockback": 40
+  },
+  "description": "Ein schlichtes Eisenschwert. Hat schon bessere Tage gesehen."
+ },
+ "sword_iron": {
+  "name": "Geschmiedetes Schwert",
+  "kind": "weapon",
+  "slot": "main_hand",
+  "weapon_class": "sword_1h",
+  "rarity": "uncommon",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/sword_iron.png",
+  "held": "res://assets/items/sword_iron_held.png",
+  "stats": {
+   "damage": 8,
+   "speed": 1.0,
+   "reach": 30,
+   "knockback": 50
+  },
+  "description": "Testgegenstand: besser als das Standardschwert."
+ },
+ "shadow_core": {
+  "name": "Schattenkern",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 20,
+  "hotbar": false,
+  "icon": "res://assets/items/shadow_core.png",
+  "description": "Ein pulsierender Kern aus verdichteter Leere."
+ },
+ "void_splinter": {
+  "name": "Leerensplitter",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/void_splinter.png",
+  "description": "Ein Splitter aus kristallisierter Leere. Lässt das Licht in sich verschwinden."
+ },
+ "void_slag": {
+  "name": "Versteinertes Leerenfragment",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 20,
+  "hotbar": false,
+  "icon": "res://assets/items/void_slag.png",
+  "description": "Ein Brocken Leerenbasalt, hart wie Wehrmauerwerk. Taugt für Schildverstärkungen und schwere Rüstung."
+ },
+ "plant_fiber": {
+  "name": "Pflanzenfaser",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/plant_fiber.png",
+  "description": "Zähe, helle Fasern vom Lichtungsbusch. Mit etwas Violett zusammengebunden."
+ },
+ "stick": {
+  "name": "Zweig",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/stick.png",
+  "description": "Ein gegabelter Zweig. Dunkel wie Gewitterholz."
+ },
+ "leaf": {
+  "name": "Lichtungsblatt",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/leaf.png",
+  "description": "Ein Blatt mit feinen Adern. Riecht nach Tau und kühler Luft."
+ },
+ "dusk_berry": {
+  "name": "Dämmerbeere",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/dusk_berry.png",
+  "stats": {
+   "heal": 5,
+   "regen": 5,
+   "regen_seconds": 5
+  },
+  "description": "Kühl und süß, mit einem Glimmen im Fruchtfleisch. Stellt sofort 5 Leben wieder her und 5 weitere über 5 Sekunden."
+ },
+ "ember_berry": {
+  "name": "Glutbeere",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/ember_berry.png",
+  "stats": {
+   "regen": 18,
+   "regen_seconds": 12
+  },
+  "description": "Wärmt von innen, das Fruchtfleisch glimmt wie Glut. Stellt über 12 Sekunden 18 Leben wieder her."
+ },
+ "sickle_basic": {
+  "name": "Einfache Sichel",
+  "kind": "tool",
+  "tool": "sickle",
+  "weapon_class": "sickle_1h",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/sickle_basic.png",
+  "held": "res://assets/items/sickle_basic_held.png",
+  "stats": {
+   "damage": 2,
+   "speed": 1.1,
+   "reach": 22,
+   "knockback": 8
+  },
+  "description": "Zum Zerrupfen von Büschen. Als Waffe nur ein Notbehelf. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
+ },
+ "pickaxe_basic": {
+  "name": "Einfache Spitzhacke",
+  "kind": "tool",
+  "tool": "pickaxe",
+  "weapon_class": "pickaxe_1h",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/pickaxe_basic.png",
+  "held": "res://assets/items/pickaxe_basic_held.png",
+  "stats": {
+   "damage": 3,
+   "speed": 0.9,
+   "reach": 24,
+   "knockback": 14
+  },
+  "description": "Bricht Felsen auf. Schwer, aber ehrlich. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
+ },
+ "stone": {
+  "name": "Stein",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/stone.png",
+  "description": "Grau mit einem Hauch Violett. Liegt überall herum, am meisten am Ufer."
+ },
+ "glow_cap": {
+  "name": "Glimmkappe",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/glow_cap.png",
+  "description": "Die Kappe schimmert im Dunkeln schwach türkis. Wächst im Schatten der Bäume, am liebsten in Gruppen."
+ },
+ "willow_wood": {
+  "name": "Weidenholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/willow_wood.png",
+  "description": "Hell, zäh und erstaunlich leicht. Es fühlt sich an, als hätte es den Wind noch nicht vergessen."
+ },
+ "willow_thread": {
+  "name": "Schleierfaden",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/willow_thread.png",
+  "description": "Ein langer Strang der Schleierweide. Im Dunkeln glimmt er schwach türkis."
+ },
+ "blossom_wood": {
+  "name": "Blütenholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/blossom_wood.png",
+  "description": "Rosiges Holz mit feiner Maserung. Riecht nach Frühling, auch mitten in der Nacht."
+ },
+ "dusk_blossom": {
+  "name": "Dämmerblüte",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/dusk_blossom.png",
+  "description": "Zarte Blüte mit warmem Herz. Ihre Blätter fallen lautlos, ohne je den Boden zu erreichen."
+ },
+ "axe_basic": {
+  "name": "Einfache Axt",
+  "kind": "tool",
+  "tool": "axe",
+  "weapon_class": "axe_1h",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/axe_basic.png",
+  "held": "res://assets/items/axe_basic_held.png",
+  "stats": {
+   "damage": 4,
+   "speed": 0.9,
+   "reach": 24,
+   "knockback": 16
+  },
+  "description": "Fällt Bäume. Der Stiel ist violett umwickelt, damit er nicht aus der Hand rutscht. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
+ },
+ "wood": {
+  "name": "Tannenholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/wood.png",
+  "description": "Dunkles, harziges Holz. Riecht nach Nadeln und Regen."
+ },
+ "resin": {
+  "name": "Baumharz",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/resin.png",
+  "description": "Bernsteinfarbenes Harz mit einem violetten Schimmer tief im Inneren."
+ },
+ "plank": {
+  "name": "Brett",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/plank.png",
+  "description": "Glatt gesägt, an den Kanten leicht violett. Hält, was Gustav verspricht."
+ },
+ "rope": {
+  "name": "Seil",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/rope.png",
+  "description": "Aus Lichtungsfasern gedreht. Straff und überraschend zäh."
+ },
+ "moonbell": {
+  "name": "Mondglocke",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/moonbell.png",
+  "description": "Klingt nicht, aber leuchtet leise türkis, wenn es dunkel wird. Ihr Saft kühlt Wunden."
+ },
+ "wound_leaf": {
+  "name": "Wundblatt",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/wound_leaf.png",
+  "stats": {
+   "heal": 8
+  },
+  "description": "Breit, zäh und bitter. Aufgelegt oder gekaut schließt es kleine Wunden. Stellt sofort 8 Leben wieder her."
+ },
+ "seed_fluff": {
+  "name": "Flugsamen",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/seed_fluff.png",
+  "description": "Federleicht. Der kleinste Atem trägt ihn davon. Gut zum Polstern."
+ },
+ "fiddlehead": {
+  "name": "Farnspross",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/fiddlehead.png",
+  "stats": {
+   "heal": 3,
+   "regen": 12,
+   "regen_seconds": 10
+  },
+  "description": "Der eingerollte Spross des Leuchtfarns, nussig und kühl. Stellt sofort 3 Leben wieder her und 12 weitere über 10 Sekunden."
+ },
+ "fern_frond": {
+  "name": "Farnwedel",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/fern_frond.png",
+  "description": "Ein langer, biegsamer Wedel. Feine Sporen schimmern auf der Unterseite."
+ },
+ "reed": {
+  "name": "Schilfrohr",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/reed.png",
+  "description": "Hohl, gerade und erstaunlich fest. Wächst, wo der Boden feucht ist."
+ },
+ "sun_seed": {
+  "name": "Sonnenkern",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/sun_seed.png",
+  "stats": {
+   "heal": 10
+  },
+  "description": "Der Kern der Sonnenwende speichert den Tag. Stellt sofort 10 Leben wieder her."
+ },
+ "void_bloom": {
+  "name": "Leerenblüte",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/void_bloom.png",
+  "description": "Schwarz wie ein Loch im Abend, und die Adern pulsieren. Sie wächst dort, wo die Leere am Rand frisst."
+ },
+ "earth_tuber": {
+  "name": "Erdknolle",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/earth_tuber.png",
+  "stats": {
+   "heal": 6,
+   "regen": 10,
+   "regen_seconds": 8
+  },
+  "description": "Dick, schwer und erdig. Sättigt langsam. Stellt sofort 6 Leben wieder her und 10 weitere über 8 Sekunden."
+ },
+ "ember_carrot": {
+  "name": "Glutmöhre",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/ember_carrot.png",
+  "stats": {
+   "heal": 4,
+   "regen": 22,
+   "regen_seconds": 14
+  },
+  "description": "Die Wurzel glimmt wie Kohle unter Asche und wärmt von innen. Stellt sofort 4 Leben wieder her und 22 weitere über 14 Sekunden."
+ },
+ "night_beet": {
+  "name": "Nachtrübe",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/night_beet.png",
+  "stats": {
+   "heal": 16
+  },
+  "description": "Schwer, dunkel und kühl, mit einem türkisen Schimmer in den Ringen. Wächst nur in tiefem Schatten. Stellt sofort 16 Leben wieder her."
+ },
+ "mist_lily": {
+  "name": "Nebelblüte",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/mist_lily.png",
+  "description": "Blüht nur, wenn es dunkel wird, und streut dabei feinen Schimmer. Gepflückt hält sie sich lange. Schmeckt nach nichts, riecht nach Mondlicht."
+ },
+ "spark_poppy": {
+  "name": "Mohnfunke",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/spark_poppy.png",
+  "description": "Die Blütenblätter sind warm wie Glut. Wer daran reibt, sieht einen Funken springen."
+ },
+ "birch_wood": {
+  "name": "Birkenholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/birch_wood.png",
+  "description": "Hell, leicht und fein gemasert. Brennt schnell, riecht nach Harz und nach dem Anfang des Herbstes."
+ },
+ "birch_bark": {
+  "name": "Birkenrinde",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/birch_bark.png",
+  "description": "Weiß wie Papier, mit dunklen Strichen darauf. Lässt sich in Streifen schälen und brennt auch nass."
+ },
+ "birch_leaf": {
+  "name": "Birkenblatt",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/birch_leaf.png",
+  "description": "Klein, gezähnt und in der Dämmerung leicht golden. Wer sie aufbrüht, schläft tief."
+ },
+ "ember_morel": {
+  "name": "Glutmorchel",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/ember_morel.png",
+  "stats": {
+   "heal": 2,
+   "regen": 14,
+   "regen_seconds": 7
+  },
+  "description": "Die Waben der Kappe glimmen wie Glut in der Asche. Schmeckt rauchig und nussig. Stellt sofort 2 Leben wieder her und 14 weitere über 7 Sekunden."
+ },
+ "moon_parasol": {
+  "name": "Mondschirm",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/moon_parasol.png",
+  "description": "Ein Schirm aus hellem Lilaschein, so dünn, dass man das Licht dahinter sieht. Wer ihn berührt, lässt eine Wolke feiner Sporen frei."
+ },
+ "iris_bloom": {
+  "name": "Irisblüte",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/iris_bloom.png",
+  "description": "Drei hohe Blätter, drei hängende, und mitten darin ein Bart aus Licht. Die Mondiris blüht nur dort, wo der Boden nass bleibt."
+ },
+ "brook_mint": {
+  "name": "Bachminze",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/brook_mint.png",
+  "stats": {
+   "heal": 3,
+   "regen": 8,
+   "regen_seconds": 6
+  },
+  "description": "Kühl und scharf, riecht nach Wasser und Morgen. Als Tee oder gekaut gut gegen Müdigkeit. Stellt sofort 3 Leben wieder her und 8 weitere über 6 Sekunden."
+ },
+ "marsh_gold": {
+  "name": "Sumpfdotter",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/marsh_gold.png",
+  "description": "Eine goldene Blüte aus dem nassen Uferland. Wo sie wächst, steht das Wasser nie weit."
+ },
+ "fish_silverling": {
+  "name": "Silberströmer",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "description": "Flink und schmal, silbern wie der Kies, über den er huscht. Zart im Kessel.",
+  "icon": "res://assets/items/fish_silverling.png"
+ },
+ "fish_loach": {
+  "name": "Kupferkies-Gründling",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "description": "Dunkel und kupfern gefleckt. Wer ihn hochzieht, spürt, wie er sich am Grund festhält.",
+  "icon": "res://assets/items/fish_loach.png"
+ },
+ "fish_trout": {
+  "name": "Mondforelle",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "description": "Blasse Flanken, violette Tupfen. Sie springt im Schaum, wo das Wasser fällt.",
+  "icon": "res://assets/items/fish_trout.png"
+ },
+ "fish_carp": {
+  "name": "Goldbauch-Karpfen",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "description": "Schwer und träge, mit einem Bauch wie flüssiges Gold.",
+  "icon": "res://assets/items/fish_carp.png"
+ },
+ "fish_glimmer": {
+  "name": "Glimmer-Schmerle",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "description": "Ein kleiner Fisch, der türkis glimmt, wenn es dunkel wird.",
+  "icon": "res://assets/items/fish_glimmer.png"
+ },
+ "fish_eel": {
+  "name": "Schleier-Aal",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "description": "Lang wie ein Schatten, glatt wie Öl. Beißt nur, wo kein Licht das Wasser berührt.",
+  "icon": "res://assets/items/fish_eel.png"
+ },
+ "fish_pike": {
+  "name": "Abyssischer Zander",
+  "kind": "material",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "description": "Aus den tiefsten Kolken. Sein Kamm ist hart wie Horn, seine Augen glühen schwach.",
+  "icon": "res://assets/items/fish_pike.png"
+ },
+ "rod_basic": {
+  "name": "Eschenrute",
+  "kind": "tool",
+  "tool": "rod",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/rod_basic.png",
+  "held": "res://assets/items/rod_basic_held.png",
+  "stats": {
+   "reach": 130
+  },
+  "description": "Geschälte Esche und Flachsfaser, biegsam wie Weide. In der Schnellleiste gewählt: Maus zielt aufs Wasser, Linksklick wirft. Z wechselt den Köder, H die Pose."
+ }
+}

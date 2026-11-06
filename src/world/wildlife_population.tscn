@@ -1,0 +1,32 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/world/wildlife_population.gd" id="1"]
+
+[ext_resource type="PackedScene" path="res://src/world/corvid_population.tscn" id="2"]
+
+[ext_resource type="PackedScene" path="res://src/world/woodland_population.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://src/world/butterfly_population.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://src/world/tiny_population.tscn" id="5"]
+
+[ext_resource type="PackedScene" path="res://src/world/bear_population.tscn" id="6"]
+
+[node name="Wildlife" type="Node2D"]
+y_sort_enabled = true
+script = ExtResource("1")
+
+[node name="Animals" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="Spawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/entities/wildlife/wild_rabbit.tscn")
+spawn_path = NodePath("../Animals")
+
+[node name="Corvids" parent="." instance=ExtResource("2")]
+
+[node name="Woodland" parent="." instance=ExtResource("3")]
+
+[node name="MeadowInsects" parent="." instance=ExtResource("4")]
+
+[node name="SmallResidents" parent="." instance=ExtResource("5")]
+
+[node name="Bears" parent="." instance=ExtResource("6")]

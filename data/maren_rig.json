@@ -1,0 +1,34 @@
+{
+  "frame": [
+    72,
+    76
+  ],
+  "feet": [
+    36,
+    62
+  ],
+  "frames": 36,
+  "rows": 8,
+  "clips": {
+    "idle": {
+      "start": 0,
+      "count": 8,
+      "fps": 5
+    },
+    "walk": {
+      "start": 8,
+      "count": 8,
+      "fps": 8
+    },
+    "run": {
+      "start": 16,
+      "count": 8,
+      "fps": 10
+    },
+    "work": {
+      "start": 24,
+      "count": 12,
+      "fps": 8
+    }
+  }
+}

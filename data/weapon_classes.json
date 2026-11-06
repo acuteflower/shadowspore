@@ -1,0 +1,142 @@
+{
+	"sword_1h": {
+		"name": "Einhandschwert",
+		"combo_window": 0.55,
+		"combo": [
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 120,
+				"windup": 0.07,
+				"active": 0.09,
+				"recovery": 0.18,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 1.0,
+				"lunge": 0,
+				"shake": 1.2
+			},
+			{
+				"style": "slash",
+				"sweep": 1,
+				"arc": 120,
+				"windup": 0.05,
+				"active": 0.09,
+				"recovery": 0.18,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 1.0,
+				"lunge": 0,
+				"shake": 1.2
+			},
+			{
+				"style": "thrust",
+				"arc": 40,
+				"windup": 0.14,
+				"active": 0.08,
+				"recovery": 0.3,
+				"damage": 1.6,
+				"reach": 1.2,
+				"knock": 2.0,
+				"lunge": 0,
+				"shake": 2.5
+			}
+		]
+	},
+	"sickle_1h": {
+		"name": "Sichel",
+		"combo_window": 0.5,
+		"combo": [
+			{
+				"style": "slash",
+				"sweep": 1,
+				"arc": 140,
+				"windup": 0.07,
+				"active": 0.1,
+				"recovery": 0.2,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.5,
+				"lunge": 0,
+				"shake": 0.6
+			},
+			{
+				"style": "slash",
+				"sweep": 1,
+				"arc": 140,
+				"windup": 0.06,
+				"active": 0.1,
+				"recovery": 0.22,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.5,
+				"lunge": 0,
+				"shake": 0.6
+			}
+		]
+	},
+	"pickaxe_1h": {
+		"name": "Spitzhacke",
+		"combo_window": 0.6,
+		"combo": [
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 80,
+				"windup": 0.16,
+				"active": 0.09,
+				"recovery": 0.3,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.6,
+				"lunge": 0,
+				"shake": 1.6
+			},
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 80,
+				"windup": 0.14,
+				"active": 0.09,
+				"recovery": 0.32,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.6,
+				"lunge": 0,
+				"shake": 1.6
+			}
+		]
+	},
+	"axe_1h": {
+		"name": "Axt",
+		"combo_window": 0.6,
+		"combo": [
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 85,
+				"windup": 0.17,
+				"active": 0.09,
+				"recovery": 0.32,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.8,
+				"lunge": 0,
+				"shake": 2.0
+			},
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 85,
+				"windup": 0.15,
+				"active": 0.09,
+				"recovery": 0.34,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.8,
+				"lunge": 0,
+				"shake": 2.0
+			}
+		]
+	}
+}

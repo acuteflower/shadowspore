@@ -1,0 +1,104 @@
+{
+	"window": {
+		"start": 0.80,
+		"end": 0.20,
+		"spawn_end_progress": 0.85,
+		"waves": [[0.0, 0.3], [0.3, 0.7], [0.6, 1.0]]
+	},
+	"budget": {
+		"base": 6.0,
+		"per_level": 0.10,
+		"per_day": 0.02,
+		"day_cap": 1.5,
+		"player_exp": 0.8,
+		"after_death": 0.6,
+		"refund_on_kill": 0.5
+	},
+	"strength": {
+		"per_level": 0.06,
+		"power_weight": 0.15,
+		"damage_share": 0.6,
+		"gear_damage_full": 20.0
+	},
+	"groups": {
+		"radius_tiles": 80,
+		"alive_cap": 24,
+		"global_cap": 48,
+		"despawn_tiles": 75
+	},
+	"spawn": {
+		"interval": 1.0,
+		"ring_tiles": [28, 46],
+		"keep_clear_tiles": 22,
+		"sources": {"dark": 0.65, "edge": 0.35},
+		"edge_tiles": 9
+	},
+	"protection": {
+		"light_margin": 24.0,
+		"building_tiles": 6
+	},
+	"species": [
+		{"id": "shadow_spider", "cost": 1.0, "weight": 1.0, "min_budget": 0.0, "min_level": 1, "min_day": 0},
+		{"id": "void_listener", "cost": 1.5, "weight": 0.5, "min_budget": 9.0, "min_level": 3, "min_day": 1},
+		{"id": "void_crusher", "cost": 3.0, "weight": 0.3, "min_budget": 14.0, "min_level": 5, "min_day": 2}
+	],
+	"behavior": {
+		"patrol_speed": 2.0,
+		"raid_speed": 2.6,
+		"light_push": 70.0,
+		"light_slow": 0.6,
+		"goal_tiles": [18, 44],
+		"dark_margin": 30.0,
+		"arrive_px": 28.0,
+		"stuck_seconds": 3.0,
+		"trace_chance": 0.35,
+		"home_chance": 0.25
+	},
+	"lure": {
+		"zone_px": 150.0,
+		"decay": 1.2,
+		"sprint": 1.2,
+		"swing": 2.0,
+		"building": 1.5,
+		"extra_player": 0.3,
+		"threshold": 45.0,
+		"reset_to": 15.0,
+		"warning_seconds": 15.0,
+		"raid_seconds": 22.0,
+		"cooldown": 80.0,
+		"members_min": 2,
+		"members_max": 6,
+		"gap_tries": 24
+	},
+	"remnants": {
+		"interval": [90, 170],
+		"chance": 0.4,
+		"cap_per_group": 1,
+		"min_sun": 0.3,
+		"ring_tiles": [26, 42],
+		"health": 0.4,
+		"damage": 0.6,
+		"speed": 0.7,
+		"sun_wound": 0.03,
+		"shade_px": 64.0,
+		"tree_search_px": 520.0
+	},
+	"dawn": {
+		"wound": 0.05,
+		"wound_sun": 0.25,
+		"start_night_amount": 0.5
+	},
+	"special": {
+		"from_day": 4,
+		"chance": 0.2,
+		"kinds": {
+			"flood": {"weight": 1.0, "budget": 1.6, "health": 0.7, "damage": 0.8, "notice": "DIE LEERE DRÄNGT HEUTE NACHT", "hunters": 0},
+			"fog": {"weight": 1.0, "budget": 1.0, "health": 1.0, "damage": 1.0, "notice": "EIN SCHWERER NEBEL ZIEHT AUF", "hunters": 0, "fog": 0.55, "light_scale": 0.8},
+			"silent": {"weight": 1.0, "budget": 0.4, "health": 1.0, "damage": 1.0, "notice": "EINE UNHEIMLICHE STILLE LIEGT ÜBER DEM LAND", "hunters": 1, "hunter_health": 1.8}
+		}
+	},
+	"survive": {
+		"xp_base": 8,
+		"xp_per_level": 1.5
+	}
+}

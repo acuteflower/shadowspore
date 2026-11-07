@@ -40,7 +40,7 @@ script = ExtResource("8_fireflies")
 y_sort_enabled = true
 
 [node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://src/entities/enemies/shadow_spider.tscn", "res://src/entities/enemies/void_listener.tscn", "res://src/entities/enemies/void_crusher.tscn")
+_spawnable_scenes = PackedStringArray("res://src/entities/enemies/shadow_spider.tscn", "res://src/entities/enemies/void_listener.tscn", "res://src/entities/enemies/void_crusher.tscn", "res://src/entities/enemies/sky_cleaver.tscn")
 spawn_path = NodePath("../Enemies")
 
 [node name="EnemyProjectiles" type="Node2D" parent="."]

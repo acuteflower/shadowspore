@@ -403,8 +403,18 @@ func _draw_moths() -> void:
 			_moths.draw_rect(Rect2((at + Vector2(1.0 if flap else -1.0, -1.0 if flap else 0.0)).round(), Vector2(1, 1)), Color(tone, tone.a * 0.7))
 
 
+const ANIMATE_RANGE: float = 900.0 ## px; rooms are up to ~260 px across
+
+func _near_player(radius: float) -> bool:
+	for player: Player in Player.all:
+		if is_instance_valid(player) and player.global_position.distance_squared_to(global_position) <= radius * radius: return true
+	return false
+
+## Rooms far from every player are not animated. `_time` keeps running, so anything read from it is right
+## again on the first frame back; delta-driven states simply pause. No players at all: animate as before.
 func _process(delta: float) -> void:
 	_time += delta
+	if not Player.all.is_empty() and not _near_player(ANIMATE_RANGE): return
 	var day: float = 1.0 - TimeManager.night_amount()
 	for ray: Sprite2D in _rays:
 		var seed_value: float = float(ray.get_meta("seed"))

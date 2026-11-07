@@ -93,7 +93,7 @@ func _run() -> void:
 	editor.redo()
 	var edits: WorldEdits = WorldEdits.new()
 	edits.assign(world.edits.data())
-	var path: String = OS.get_temp_dir().path_join("voidbloom-world-editor-test.json")
+	var path: String = OS.get_temp_dir().path_join("shadowspore-world-editor-test.json")
 	check(edits.save(path), "atomic map save")
 	var loaded: WorldEdits = WorldEdits.new()
 	loaded.read(path)

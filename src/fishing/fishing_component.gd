@@ -57,6 +57,9 @@ var _bite_t: float = -1.0
 var _bite_species: String = ""
 var _approaching: bool = false
 var _scared: Array = []
+var _refused: Dictionary = {} ## species id -> seconds it stays away after turning from this bait
+var _lured: bool = false ## a twitch caught the eye of the approaching hunter
+var _length: int = 0 ## the hooked fish's length (rolled at the strike: a big one fights harder)
 var _twitches: Array[float] = []
 var _taps_left: int = 0
 var _tap_t: float = 0.0
@@ -88,6 +91,10 @@ var _bait_i: int = 0
 var _pose_i: int = 0
 var _view: FishingView
 var _creak: AudioStreamPlayer2D
+## Host: where fish were caught, lost or scared lately ({p, a, age}); shared by every angler on this machine, so a
+## fished-out stretch of river goes quiet for everyone and recovers over a few minutes.
+static var _pressure: Array[Dictionary] = []
+static var _pressure_frame: int = -1
 
 
 func _ready() -> void:
@@ -160,8 +167,26 @@ func _field(point: Vector2) -> Vector2:
 
 
 func _flow(point: Vector2) -> Vector2:
+	return current_at(point)
+
+
+## The current at a point: the river's direction times its strength (slack by the banks, full in the channel, still in
+## lakes and pools). The baked flow field alone only holds the direction.
+func current_at(point: Vector2) -> Vector2:
 	var rivers: WorldRivers = _rivers()
-	return rivers.fauna.flow_at(point) if rivers != null and rivers.fauna != null else Vector2.ZERO
+	if rivers == null or rivers.fauna == null:
+		return Vector2.ZERO
+	var x: float = rivers.field_at(point).x
+	var strength: float = FishingRules.current_strength(x, rivers.lake_at(point), _in_pool(point))
+	return rivers.fauna.flow_at(point).normalized() * strength if strength > 0.0 else Vector2.ZERO
+
+
+static func _in_pool(point: Vector2) -> bool:
+	for basin: Dictionary in DataRegistry.table("rivers_baked").get("basins", []):
+		var outlet: Array = basin["outlet"] as Array
+		if point.distance_to(Vector2(float(outlet[0]), float(outlet[1]))) < float(basin["radius"]) * 1.4:
+			return true
+	return false
 
 
 func stand_ok() -> bool:
@@ -246,7 +271,7 @@ func _oneshot_for(kind: String, data: Dictionary) -> String:
 	match kind:
 		"hook": return "strike"
 		"landed": return "land"
-		"lost": return "snap" if String(data.get("reason", "")) == "snapped" else "sag"
+		"lost": return "snap" if String(data.get("reason", "")) in ["snapped", "torn"] else "sag"
 	return ""
 
 
@@ -529,6 +554,47 @@ func _host_net(helper: Player) -> bool:
 	return true
 
 
+# ---------------------------------------------------------------------------------------------- fishing pressure
+
+static func add_pressure(at: Vector2, amount: float) -> void:
+	_pressure.append({"p": at, "a": amount, "age": 0.0})
+	if _pressure.size() > 64:
+		_pressure.pop_front()
+
+
+## 0..1: how stirred up / fished out the water around `at` is.
+static func pressure_at(at: Vector2) -> float:
+	var cfg: Dictionary = FishingRules.settings()["pressure"] as Dictionary
+	var radius: float = float(cfg["radius"])
+	var sum: float = 0.0
+	for entry: Dictionary in _pressure:
+		var d: float = at.distance_to(entry["p"] as Vector2)
+		if d < radius:
+			sum += float(entry["a"]) * exp(-float(entry["age"]) / float(cfg["tau"])) * (1.0 - d / radius)
+	return clampf(sum, 0.0, 1.0)
+
+
+static func clear_pressure() -> void:
+	_pressure.clear()
+
+
+## Ages the entries once per physics frame (several anglers tick in one frame).
+static func _age_pressure(delta: float) -> void:
+	var frame: int = Engine.get_physics_frames()
+	if frame == _pressure_frame:
+		return
+	_pressure_frame = frame
+	var tau: float = float((FishingRules.settings()["pressure"] as Dictionary)["tau"])
+	for i: int in range(_pressure.size() - 1, -1, -1):
+		_pressure[i]["age"] = float(_pressure[i]["age"]) + delta
+		if float(_pressure[i]["age"]) > tau * 5.0:
+			_pressure.remove_at(i)
+
+
+func _pressure_cfg(key: String) -> float:
+	return float((_cfg()["pressure"] as Dictionary)[key])
+
+
 # ---------------------------------------------------------------------------------------------- host
 
 func _host_rod() -> String:
@@ -587,6 +653,8 @@ func _host_cast(at: Vector2, bait_id: String, pose_id: String) -> void:
 	_bait_used = used
 	species = ""
 	_scared = []
+	_refused = {}
+	_lured = false
 	_twitches = []
 	_bite_t = -1.0
 	_bite_species = ""
@@ -604,6 +672,7 @@ var _bait_used: String = ""
 
 
 func _host_tick(delta: float) -> void:
+	_age_pressure(delta)
 	if state == S.IDLE:
 		return
 	if _host_rod() != rod_id or _player.health.current <= 0.0:
@@ -639,22 +708,29 @@ func _host_land_cast() -> void:
 	_set_state(S.DRIFTING)
 	_fx_all("splash", bobber, {"strength": 0.45})
 	_scare_near(bobber, 18.0)
+	add_pressure(bobber, _pressure_cfg("cast")) ## whipping the same spot again and again slowly spoils it
 	_broadcast()
 	_idle_time = 0.0
 	_drift_check = 0.0
-	_pick_bite(true)
+	_pick_bite(true, true)
 
 
 func _ctx() -> Dictionary:
 	var field: Vector2 = _field(bobber)
 	var town: Node = get_tree().get_first_node_in_group("town")
 	var light: float = (town as TownManager).light_depth(bobber) if town is TownManager else -9999.0
-	return {"x": field.x, "y": field.y, "flow": _flow(bobber).length(), "night": TimeManager.night_amount(),
-		"light_depth": light, "bait": _bait_used, "pose": cast_pose, "scared": _scared}
+	var away: Array = _scared.duplicate()
+	away.append_array(_refused.keys())
+	return {"x": field.x, "y": field.y, "flow": current_at(bobber).length(), "night": TimeManager.night_amount(),
+		"light_depth": light, "bait": _bait_used, "pose": cast_pose, "scared": away,
+		"reach": feet().distance_to(bobber), "sun": TimeManager.sun_amount(), "golden": TimeManager.golden_amount(),
+		"pressure": pressure_at(bobber)}
 
 
-func _pick_bite(fresh: bool) -> void:
-	var weights: Dictionary = FishingRules.weights(_ctx())
+## Which fish comes next and when. `settle`: the float just splashed down, the fish first have to come back.
+func _pick_bite(fresh: bool, settle: bool = false) -> void:
+	var ctx: Dictionary = _ctx()
+	var weights: Dictionary = FishingRules.weights(ctx)
 	if not fresh and _bite_species != "" and weights.has(_bite_species):
 		return ## still interested
 	if _approaching: ## the shadow that was swimming in loses interest
@@ -666,19 +742,27 @@ func _pick_bite(fresh: bool) -> void:
 		_bite_t = -1.0
 		return
 	_bite_species = FishingRules.pick(weights, _rng)
-	_bite_t = FishingRules.bite_delay(FishingRules.total(weights), _rng)
+	_bite_t = FishingRules.bite_delay(FishingRules.total(weights) * FishingRules.activity(ctx), _rng, settle)
+	_lured = false
 
 
 func _host_drift(delta: float) -> void:
 	var drift: Dictionary = _cfg()["drift"] as Dictionary
 	var field: Vector2 = _field(bobber)
 	var speed: float = float(drift["give_speed"]) if _give > 0.5 else float(drift["speed"])
-	var flow: Vector2 = _flow(bobber)
+	var flow: Vector2 = current_at(bobber) ## slow in the slack water by the bank, quick in the channel
 	var next: Vector2 = bobber + flow * speed * delta
+	var reach: float = float(drift["max_line"]) - 10.0
+	if feet().distance_to(next) > reach: ## all the line is out: it holds the float, which swings round on it in the current
+		next = feet() + (next - feet()).normalized() * maxf(reach, feet().distance_to(bobber) - 0.01)
 	if _field(next).x <= float(drift["stop_x"]) and field.x <= float(drift["stop_x"]):
 		bobber = next
 	_idle_time += delta
 	_drift_check += delta
+	for id: String in _refused.keys():
+		_refused[id] = float(_refused[id]) - delta
+		if float(_refused[id]) <= 0.0:
+			_refused.erase(id)
 	if _drift_check >= 1.5:
 		_drift_check = 0.0
 		_pick_bite(false)
@@ -687,18 +771,24 @@ func _host_drift(delta: float) -> void:
 			_host_end("", "")
 		return
 	_bite_t -= delta
-	var approach: float = 2.4
-	if not _approaching and _bite_t <= approach:
+	var bite_cfg: Dictionary = _cfg()["bite"] as Dictionary
+	var span: Array = bite_cfg["approach"] as Array
+	if not _approaching and _bite_t <= float(span[1]):
 		_approaching = true
 		species = _bite_species
 		approach_from = _deep_offset(bobber)
-		approach_total = maxf(_bite_t, 0.8)
+		approach_total = maxf(minf(_bite_t, _rng.randf_range(float(span[0]), float(span[1]))), 0.8)
+		_bite_t = approach_total
 		approach_time = approach_total
 		_broadcast()
 		_fx_all("approach", bobber, {})
 	if _approaching:
 		approach_time = maxf(0.0, _bite_t)
 	if _bite_t <= 0.0:
+		## the fish looks at the bait: a cautious one may turn away from a bait it does not care for, or from a busy spot
+		if _rng.randf() < FishingRules.refuse_chance(species, _bait_used, pressure_at(bobber), _lured):
+			_refuse(bobber + (bobber - approach_from).normalized() * 6.0)
+			return
 		_set_state(S.NIBBLE)
 		var taps: Array = (_cfg()["nibble"] as Dictionary)["taps"] as Array
 		_taps_left = _rng.randi_range(int(taps[0]), int(taps[1]))
@@ -715,11 +805,37 @@ func _host_nibble(delta: float) -> void:
 		_tap_t = float((_cfg()["nibble"] as Dictionary)["tap_gap"]) * _rng.randf_range(0.8, 1.3)
 		_fx_all("tap", bobber, {"side": _rng.randi_range(0, 1)})
 		return
+	var caution: float = float((FishingRules.species_table()[species] as Dictionary).get("caution", 0.0))
+	if _rng.randf() < caution * float((_cfg()["refuse"] as Dictionary)["let_go"]) * (1.0 - 0.6 * FishingRules.bait_appeal(species, _bait_used)):
+		_set_state(S.DRIFTING) ## it mouthed the bait and let go
+		_refuse(bobber)
+		return
 	_window = FishingRules.strike_window(species, _rng)
 	_t = 0.0
 	_set_state(S.BITE)
 	_broadcast()
 	_fx_all("bite", bobber, {})
+
+
+## The fish that was coming turns away and swims off (every peer sees the shadow leave); it keeps away for a while.
+func _refuse(at: Vector2) -> void:
+	var gone: String = species
+	_refused[gone] = float((_cfg()["refuse"] as Dictionary)["memory"])
+	add_pressure(bobber, _pressure_cfg("refuse"))
+	_approaching = false
+	species = ""
+	_bite_species = ""
+	_broadcast()
+	_fx_all("refuse", at, {"species": gone, "dir": _leave_dir(at)})
+	_pick_bite(true, true) ## the next one takes its time
+
+
+## Which way a frightened or unwilling fish swims off: away from her, towards deeper water.
+func _leave_dir(at: Vector2) -> Vector2:
+	var away: Vector2 = (at - feet()).normalized()
+	var bank: Vector2 = _bank_dir(at)
+	var dir: Vector2 = away - bank * 0.8
+	return dir.normalized() if dir.length() > 0.01 else away
 
 
 func _host_twitch() -> void:
@@ -739,16 +855,20 @@ func _host_twitch() -> void:
 	if _bite_species != "":
 		var spec: Dictionary = FishingRules.species_table()[_bite_species] as Dictionary
 		if bool(spec.get("timid", false)) and _twitches.size() >= int(tw["scare_count"]):
+			var fled: String = _bite_species
 			_scared.append(_bite_species)
 			_bite_species = ""
+			add_pressure(bobber, _pressure_cfg("scare"))
 			if _approaching:
 				_approaching = false
 				species = ""
 				_broadcast()
-				_fx_all("scared", bobber, {})
+				_fx_all("scared", bobber, {"species": fled, "dir": _leave_dir(bobber)})
 			_pick_bite(true)
 		elif not bool(spec.get("timid", false)):
-			_bite_t -= float(tw["lure_bonus"])
+			_bite_t = maxf(0.2, _bite_t - float(tw["lure_bonus"]))
+			if _approaching:
+				_lured = true ## the moving bait triggers the hunter
 
 
 func _host_hook() -> void:
@@ -761,7 +881,8 @@ func _host_hook() -> void:
 	var to: Vector2 = bobber - feet()
 	heading = to.normalized() if to.length() > 1.0 else Vector2.RIGHT
 	dist = maxf(0.0, to.length() - _shore_gap)
-	_drill = FishingRules.new_drill(species, rod, dist, _rng)
+	_length = int(FishingRules.roll_length(species, _rng, _field(bobber).y)) ## known from the strike on: a big one fights harder
+	_drill = FishingRules.new_drill(species, rod, dist, _rng, FishingRules.size_of(species, float(_length)))
 	_fled_seen = 1
 	_fvel = Vector2.ZERO
 	_leaps_done = 0
@@ -792,7 +913,8 @@ func _host_drill(delta: float) -> void:
 	if netted:
 		_drill["tension"] = minf(float(_drill["tension"]), float(net["cap"]))
 		_drill["snap"] = 0.0
-		if result == "snapped" or result == "escaped":
+		_drill["slack"] = 0.0
+		if result in ["snapped", "torn", "escaped", "unhooked"]:
 			result = ""
 	tension = float(_drill["tension"])
 	phase = String(_drill["phase"])
@@ -823,10 +945,8 @@ func _host_drill(delta: float) -> void:
 	match result:
 		"landed":
 			_host_landed()
-		"snapped":
-			_host_end("snapped", species)
-		"escaped":
-			_host_end("escaped", species)
+		"snapped", "torn", "escaped", "unhooked":
+			_host_end(result, species)
 
 
 ## The line that is out: from her feet to the fish, minus the stretch of bank before the water starts.
@@ -972,9 +1092,12 @@ func _swim(delta: float, spec: Dictionary, net: Dictionary) -> void:
 			wish = _shore - bobber
 		speed = float(_drill["pull_in"])
 		margin = 4.0
+	elif float(_drill["run"]) > 0.0: ## not held hard: it gets its breath back and edges away from her
+		wish = _flee_dir(bobber).lerp(heading, 0.5)
+		speed = float(_drill["run"])
 	else: ## exhausted: it hangs in the water and drifts a little
 		wish = heading.rotated(0.6 * sin(float(_drill["time"]) * 1.7 + _wander))
-		speed = float(spec["speed"]) * 0.1
+		speed = float(spec["speed"]) * 0.06
 	var aim: Vector2 = wish.normalized() if wish != Vector2.ZERO else heading
 	var hauled: bool = netted or (_reel and phase != "flee")
 	var dir: Vector2 = aim if hauled else _swim_dir(bobber, aim, margin) ## being hauled in, it follows the flood fill, not the feelers
@@ -1009,9 +1132,18 @@ func _flee_dir(point: Vector2) -> Vector2:
 		var x: float = _field(point).x
 		if x > -18.0: ## the bank is near: back to the middle
 			dir -= bank * clampf((x + 18.0) / 12.0, 0.0, 1.0) * 1.2
+		dir += _depth_dir(point) * 0.5 ## a hooked fish heads for deep water
 	if dir.length() < 0.01:
 		dir = away
 	return dir.normalized().rotated(0.45 * sin(float(_drill["t"]) * 2.2 + _wander))
+
+
+## Which way the water gets deeper (unit vector, zero when flat or unknown).
+func _depth_dir(point: Vector2) -> Vector2:
+	var gx: float = _field(point + Vector2(8, 0)).y - _field(point - Vector2(8, 0)).y
+	var gy: float = _field(point + Vector2(0, 8)).y - _field(point - Vector2(0, 8)).y
+	var g: Vector2 = Vector2(gx, gy)
+	return g.normalized() if is_finite(g.x) and is_finite(g.y) and g.length() > 0.02 else Vector2.ZERO
 
 
 ## The shoals and brook fish of RiverFauna scatter from a landing float and from a fight (host).
@@ -1023,14 +1155,20 @@ func _scare_near(at: Vector2, radius: float) -> void:
 
 ## Where a fish rises from: of eight directions the one over the deepest water, so shadows come up out of the depth.
 func _deep_offset(centre: Vector2) -> Vector2:
+	var span: Array = (_cfg()["bite"] as Dictionary)["from"] as Array
+	var reach: float = _rng.randf_range(float(span[0]), float(span[1]))
+	var down: Vector2 = current_at(centre).normalized()
 	var best: Vector2 = centre + Vector2.from_angle(_rng.randf() * TAU) * 30.0
-	var best_depth: float = -1.0
+	var best_score: float = -INF
 	var start: float = _rng.randf() * TAU
 	for i: int in 8:
-		var candidate: Vector2 = centre + Vector2.from_angle(start + float(i) * TAU / 8.0) * 32.0
+		var dir: Vector2 = Vector2.from_angle(start + float(i) * TAU / 8.0)
+		var candidate: Vector2 = centre + dir * reach
 		var field: Vector2 = _field(candidate)
-		if field.x <= -4.0 and field.y > best_depth:
-			best_depth = field.y
+		## fish stand head into the current and the bait drifts down to them: they rise from the deep water below the float
+		var score: float = field.y + 0.35 * dir.dot(down) + _rng.randf() * 0.15
+		if field.x <= -4.0 and _field(centre.lerp(candidate, 0.5)).x <= -2.0 and score > best_score:
+			best_score = score
 			best = candidate
 	return best
 
@@ -1060,12 +1198,13 @@ func _turn_fish() -> void:
 
 func _host_landed() -> void:
 	var spec: Dictionary = FishingRules.species_table()[species] as Dictionary
-	var length: int = int(FishingRules.roll_length(species, _rng))
+	var length: int = _length if _length > 0 else int(FishingRules.roll_length(species, _rng, _field(bobber).y))
 	var prime: bool = netted
 	var count: int = int((_cfg()["net"] as Dictionary)["prime_count"]) if prime else 1
 	var left: int = _player.inventory.give(String(spec["item"]), count)
 	var landed_species: String = species
 	_fx_all("landed", bobber, {"species": landed_species})
+	add_pressure(bobber, _pressure_cfg("catch"))
 	if left < count:
 		_notify_owner("caught", {"species": landed_species, "length": length, "day": TimeManager.day, "prime": prime})
 	_host_end("", "")
@@ -1097,9 +1236,13 @@ func _host_end(reason: String, lost_species: String) -> void:
 	if state == S.IDLE:
 		return
 	var where: Vector2 = bobber
+	var fled: String = lost_species if lost_species != "" else (species if reason in ["early", "late"] else "")
+	if fled != "" and reason != "": ## a fish that got away warns the others (a hooked one far more than a missed nibble)
+		add_pressure(where, _pressure_cfg("scare") if reason in ["early", "late"] else _pressure_cfg("lost"))
 	if reason != "":
-		_fx_all("lost", where, {"reason": reason, "species": lost_species})
+		_fx_all("lost", where, {"reason": reason, "species": fled, "dir": _leave_dir(where) if fled != "" else Vector2.ZERO})
 	_drill = {}
+	_length = 0
 	species = ""
 	netted = false
 	_approaching = false

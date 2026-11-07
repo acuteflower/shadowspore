@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://src/entities/enemies/crusher_rig.gd" id="2"]
 [ext_resource type="Script" path="res://src/components/health_component.gd" id="3"]
 [ext_resource type="Script" path="res://src/entities/enemies/crusher_hurtbox.gd" id="4"]
-[ext_resource type="Script" path="res://src/fx/world_health_bar.gd" id="5"]
+[ext_resource type="Script" path="res://src/fx/void_health_bar.gd" id="5"]
 [ext_resource type="Script" path="res://src/components/shadow_trail_component.gd" id="6"]
 [ext_resource type="Script" path="res://src/components/enemy_navigation.gd" id="7"]
 [ext_resource type="Script" path="res://src/components/drop_component.gd" id="8"]
@@ -200,3 +200,4 @@ color_ramp = SubResource("Void")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("Sync")
+replication_interval = 0.05

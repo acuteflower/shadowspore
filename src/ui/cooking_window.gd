@@ -231,6 +231,7 @@ func _input(event: InputEvent) -> void:
 			if _choice_rect(i).has_point(point):
 				_hover = i
 				_focus = i
+		GameCursor.set_hint(self, &"click" if _hover >= 0 else &"")
 	var mouse: InputEventMouseButton = event as InputEventMouseButton
 	if mouse != null and mouse.button_index==MOUSE_BUTTON_LEFT and mouse.pressed:
 		_click(get_local_mouse_position()-_origin())

@@ -40,16 +40,26 @@ func _process(delta: float) -> void:
 		_rpc_reveal.rpc(fresh)
 
 
-func _scan(at: Vector2, fresh: PackedInt32Array) -> void:
-	var reach: int = ceili(RADIUS + RAGGED)
+func _scan(at: Vector2, fresh: PackedInt32Array, radius: float = RADIUS) -> void:
+	var reach: int = ceili(radius + RAGGED)
 	for y: int in range(maxi(floori(at.y) - reach, 0), mini(floori(at.y) + reach + 1, GRID)):
 		for x: int in range(maxi(floori(at.x) - reach, 0), mini(floori(at.x) + reach + 1, GRID)):
 			var index: int = y * GRID + x
 			if _seen[index] != 0:
 				continue
 			var wander: float = (fposmod(sin(float(index) * 12.9898) * 43758.5453, 1.0) - 0.5) * RAGGED
-			if Vector2(x + 0.5, y + 0.5).distance_to(at) <= RADIUS + wander:
+			if Vector2(x + 0.5, y + 0.5).distance_to(at) <= radius + wander:
 				fresh.append(index)
+
+
+## Host: lifts the fog round a tile (a waystone waking up): a ragged disc of `radius_cells` cells, told to everybody (the open map shows the cells clearing).
+func reveal_disc(tile: Vector2, radius_cells: float) -> void:
+	if not multiplayer.is_server():
+		return
+	var fresh: PackedInt32Array = PackedInt32Array()
+	_scan(tile / float(RegionMap.CELL), fresh, radius_cells)
+	if not fresh.is_empty():
+		_rpc_reveal.rpc(fresh)
 
 
 @rpc("authority", "call_local", "reliable")

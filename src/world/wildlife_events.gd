@@ -70,15 +70,17 @@ func _choose_event() -> void:
 	var rabbits: Array[Node] = get_tree().get_nodes_in_group("wildlife")
 	rabbits.shuffle()
 	var prefer_hunt: bool = _rng.randf()<0.5
+	var hunters: Array[Node] = get_tree().get_nodes_in_group("wildlife_hunters") ## fetched once, not per rabbit
+	var birds: Array[Node] = get_tree().get_nodes_in_group("corvids")
 	for node: Node in rabbits:
 		var rabbit: WildRabbit = node as WildRabbit
 		if rabbit == null or rabbit.captured or not _eligible(rabbit): continue
 		if prefer_hunt:
-			for hunter: WoodlandMammal in get_tree().get_nodes_in_group("wildlife_hunters"):
+			for hunter: WoodlandMammal in hunters:
 				if not hunter._rest_hours() and not hunter._danger and not hunter._moving and _eligible(hunter) and hunter.global_position.distance_to(rabbit.global_position)<float(_spec["fox_hunt_range"]):
 					if begin_event("fox_hunt",hunter,rabbit): return
 		if rabbit._has_threat or rabbit._hopping or rabbit.state==WildRabbit.State.FLEE: continue
-		for bird: WildCorvid in get_tree().get_nodes_in_group("corvids"):
+		for bird: WildCorvid in birds:
 			if bird.species=="crow" and not bird._danger and not bird._rest_time() and bird._height<1.0 and not bird._moving and _eligible(bird) and bird.global_position.distance_to(rabbit.global_position)<float(_spec["rabbit_crow_range"]):
 				if begin_event("rabbit_crow",rabbit,bird): return
 		for other: Node in rabbits:

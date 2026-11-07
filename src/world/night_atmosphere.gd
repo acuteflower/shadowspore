@@ -17,6 +17,20 @@ var _moon_material: ShaderMaterial
 var _special_day: int = -999999
 var _origin: Vector2 = Vector2.ZERO
 var _view: Vector2 = Vector2(640, 360)
+var _alert_k: float = 0.0 ## the alarm glow of the light's edge, eased
+var _town: TownManager = null ## cached: the group lookup runs every frame otherwise
+var _town_look_at: int = 0 ## ticks (ms) before which a missing town is not looked up again
+
+
+## The town node, cached. While there is none it is looked up at most twice a second.
+func _find_town() -> TownManager:
+	if not is_instance_valid(_town):
+		_town = null
+		var now: int = Time.get_ticks_msec()
+		if now >= _town_look_at:
+			_town_look_at = now + 500
+			_town = get_tree().get_first_node_in_group("town") as TownManager
+	return _town
 
 
 func _ready() -> void:
@@ -48,7 +62,7 @@ func update(indoors: bool) -> void:
 		_special_day = TimeManager.day
 		special = NightRules.special_for(_world_seed(), _special_day)
 	var window: bool = NightRules.progress(TimeManager.time_of_day) >= 0.0
-	var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
+	var town: TownManager = _find_town()
 	if town != null:
 		town.light_scale = NightRules.light_scale(special) if window else 1.0
 	var mist: float = 0.0 if indoors else 0.4 * TimeManager.dew_amount() ## the dawn: a thin mist that burns off
@@ -62,6 +76,10 @@ func update(indoors: bool) -> void:
 	_moon_material.set_shader_parameter("night", night)
 	_moon_material.set_shader_parameter("moon", moon)
 	_fog_material.set_shader_parameter("night", night)
+	var glow: float = night if town != null and town.founded else 0.0 ## the edge of the town's light shows at night
+	_fog_material.set_shader_parameter("edge_glow", glow)
+	_alert_k = move_toward(_alert_k, 1.0 if town != null and town.alert_on else 0.0, get_process_delta_time() * 0.8)
+	_fog_material.set_shader_parameter("alert", _alert_k)
 	_fog_material.set_shader_parameter("lights", _lights(town, _origin + _view * 0.5, _view.length() * 0.5))
 
 

@@ -1,0 +1,231 @@
+{
+ "range": 190.0,
+ "gap": 2.6,
+ "hold": 3.2,
+ "reaction_cooldown": 25.0,
+ "topics": [
+  {
+   "id": "fire_talk_a",
+   "kind": "meet",
+   "spot": "fire",
+   "who": [
+    "gustav",
+    "valdric"
+   ],
+   "window": [
+    0.846,
+    0.866
+   ],
+   "lines": [
+    [
+     "gustav",
+     "Wieder ein langer Tag. Mein Rücken weiß es."
+    ],
+    [
+     "valdric",
+     "Dein Rücken weiß alles besser als du."
+    ],
+    [
+     "gustav",
+     "Das sagt der Richtige."
+    ]
+   ]
+  },
+  {
+   "id": "fire_talk_b",
+   "kind": "meet",
+   "spot": "fire",
+   "who": [
+    "valdric",
+    "gustav"
+   ],
+   "window": [
+    0.846,
+    0.866
+   ],
+   "lines": [
+    [
+     "valdric",
+     "Das Feuer ist heute ruhig."
+    ],
+    [
+     "gustav",
+     "Ruhig ist doch gut, oder?"
+    ],
+    [
+     "valdric",
+     "Ruhig heißt: die Dunkelheit wartet."
+    ]
+   ]
+  },
+  {
+   "id": "fire_talk_c",
+   "kind": "meet",
+   "spot": "fire",
+   "who": [
+    "gustav",
+    "valdric"
+   ],
+   "window": [
+    0.846,
+    0.866
+   ],
+   "lines": [
+    [
+     "gustav",
+     "Wie viele Bretter fehlen noch bis zum nächsten Haus?"
+    ],
+    [
+     "valdric",
+     "Frag sie. Sie hat das Holz."
+    ]
+   ]
+  },
+  {
+   "id": "fire_story_a",
+   "kind": "fire_story",
+   "spot": "fire",
+   "who": [
+    "valdric",
+    "gustav"
+   ],
+   "window": [
+    0.868,
+    0.878
+   ],
+   "lines": [
+    [
+     "valdric",
+     "In meinem Orden zündete man jeden Abend ein Licht für die, die nicht heimkamen."
+    ],
+    [
+     "gustav",
+     "Und wie viele Lichter waren das?"
+    ],
+    [
+     "valdric",
+     "Mehr, als ich zählen wollte."
+    ]
+   ]
+  },
+  {
+   "id": "fire_story_b",
+   "kind": "fire_story",
+   "spot": "fire",
+   "who": [
+    "gustav",
+    "valdric"
+   ],
+   "window": [
+    0.868,
+    0.878
+   ],
+   "lines": [
+    [
+     "gustav",
+     "Ich baute mal eine Brücke, die zu kurz war. Einen ganzen Fluss zu kurz."
+    ],
+    [
+     "valdric",
+     "Und?"
+    ],
+    [
+     "gustav",
+     "Jetzt ist es eben ein Steg."
+    ]
+   ]
+  }
+ ],
+ "reactions": [
+  {
+   "event": "built:lamp_post",
+   "lines": [
+    [
+     "any",
+     "Noch ein Licht. Das tut dem Weg gut."
+    ]
+   ]
+  },
+  {
+   "event": "built:bench",
+   "lines": [
+    [
+     "any",
+     "Eine Bank. Endlich muss ich nicht mehr im Stehen essen."
+    ]
+   ]
+  },
+  {
+   "event": "built:banner_post",
+   "lines": [
+    [
+     "any",
+     "Unsere Farben. Man sieht sie von weit."
+    ]
+   ]
+  },
+  {
+   "event": "built:workshop",
+   "lines": [
+    [
+     "valdric",
+     "Eine Werkstatt. Jetzt wird es ein Ort."
+    ]
+   ]
+  },
+  {
+   "event": "built:stockpile",
+   "lines": [
+    [
+     "any",
+     "Ein Lager. Ordnung macht ruhig."
+    ]
+   ]
+  },
+  {
+   "event": "joined:gustav",
+   "lines": [
+    [
+     "valdric",
+     "Gustav. Gut, dass du bleibst."
+    ]
+   ]
+  },
+  {
+   "event": "level_up",
+   "lines": [
+    [
+     "any",
+     "Wir sind mehr geworden. Spürst du das?"
+    ]
+   ]
+  },
+  {
+   "event": "lamp_out",
+   "lines": [
+    [
+     "any",
+     "Ein Licht ist erloschen! Wer füllt nach?"
+    ]
+   ]
+  },
+  {
+   "event": "alert",
+   "lines": [
+    [
+     "valdric",
+     "Sie sammeln sich. Bleibt im Licht."
+    ]
+   ]
+  },
+  {
+   "event": "night_survived",
+   "lines": [
+    [
+     "any",
+     "Wir haben die Nacht gehalten."
+    ]
+   ]
+  }
+ ]
+}

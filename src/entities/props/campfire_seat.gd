@@ -1,5 +1,5 @@
 class_name CampfireSeat
-extends StorySpot
+extends SeatSpot
 ## The first use belongs to the story; afterwards this is an ordinary resting place.
 
 var hut: Hut
@@ -38,6 +38,15 @@ func occupied() -> bool:
 		if rest != null and rest.seat == self:
 			return true
 	return false
+
+
+## The evening circle: a sitter with company at the fire gets warm after a few quiet seconds (`FireCircle`).
+func rest_tick(player: Player, seated: float) -> void:
+	FireCircle.tick(get_tree().get_first_node_in_group("town") as TownManager, player, seat_position(), seated)
+
+
+func usable_by(player: Player) -> bool:
+	return player != null and player.quests != null and player.quests.has_flag("fire_seated")
 
 
 func prompt() -> String:

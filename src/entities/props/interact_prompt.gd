@@ -1,15 +1,14 @@
 class_name InteractPrompt
 extends Node2D
 ## The tag that floats above something the player can use, in the vine style: a leaf of dark bark paper with a
-## ragged edge (like the item cards) that rises into place, a glowing flower bud holding the key (its petals open
-## as the tag appears, then breathe), the verb beside it, a leaf on one corner and a short thread with a bud
+## ragged edge (like the item cards) that rises into place, the shared key cap (`VineStyle.key_cap`, breathing teal,
+## two petals open on its shoulders), the verb beside it, a leaf on one corner and a short thread with a bud
 ## hanging down towards the object. By night the void tints it and creeps over a corner. Unlit, always on top.
 
 const PAPER: Color = Color("120d22")
 const PAPER_VOID: Color = Color("07030f")
 const HEIGHT: int = 13
 const RISE_SECONDS: float = 0.22
-const BUD_RADIUS: int = 4
 const THREAD: int = 5
 const GAMEPAD_KEY: String = "Y"
 
@@ -45,12 +44,7 @@ func _process(delta: float) -> void:
 func _key_label() -> String:
 	if not InputManager.using_mouse:
 		return GAMEPAD_KEY
-	for event: InputEvent in InputMap.action_get_events("interact"):
-		var key: InputEventKey = event as InputEventKey
-		if key != null:
-			var code: Key = key.keycode if key.keycode != KEY_NONE else DisplayServer.keyboard_get_keycode_from_physical(key.physical_keycode)
-			return OS.get_keycode_string(code).to_upper().left(1)
-	return "E"
+	return VineStyle.key_name("interact", "E")
 
 
 func _inset(x: int, bottom: bool, width: int) -> int:
@@ -63,7 +57,7 @@ func _draw() -> void:
 		return
 	var rise: float = 1.0 - pow(1.0 - clampf(_age / RISE_SECONDS, 0.0, 1.0), 3.0)
 	var void_level: float = VineStyle.void_amount()
-	var width: int = PixelText.width(_text) + 2 * BUD_RADIUS + 15
+	var width: int = PixelText.width(_text) + VineStyle.cap_width(_key) + 10
 	var bob: float = roundf(sin(_time * 2.2))
 	var left: int = -width / 2
 	var top: int = -HEIGHT - 3 - THREAD + int(roundf((1.0 - rise) * 5.0 + bob))
@@ -71,8 +65,8 @@ func _draw() -> void:
 	var alpha: float = rise
 	_draw_thread(top, alpha, void_level)
 	_draw_paper(left, top, width, alpha, void_level)
-	_draw_bud(Vector2(left + BUD_RADIUS + 3, top + HEIGHT / 2.0), rise, alpha)
-	PixelText.draw(self, _text, Vector2i(left + 2 * BUD_RADIUS + 10, top + 3), Color(UiStyle.TEXT, alpha), Color(VineStyle.OUTLINE, alpha))
+	_draw_key(Vector2(left + 3, top + 1), alpha, void_level)
+	PixelText.draw(self, _text, Vector2i(left + VineStyle.cap_width(_key) + 6, top + 3), Color(UiStyle.TEXT, alpha), Color(VineStyle.OUTLINE, alpha))
 	VineStyle.leaf(self, Vector2(left + width - 2, top + 2), 1, -1, 3, Color(VineStyle.LEAF.lerp(VineStyle.LEAF_VOID, void_level), alpha), Color(VineStyle.LEAF_LIGHT.lerp(VineStyle.LEAF_VOID_LIGHT, void_level), alpha))
 	if void_level > 0.3:
 		VineStyle.tendril(self, Vector2(left + 1, top + HEIGHT - 2), Vector2(-0.8, 0.6).normalized(), int(2 + 4 * void_level), _time, _text.length())
@@ -98,21 +92,13 @@ func _draw_paper(left: int, top: int, width: int, alpha: float, void_level: floa
 		last_bottom = lower
 
 
-## The key's flower bud: a teal disc with the letter, four petals that open out and then breathe.
-func _draw_bud(center: Vector2, rise: float, alpha: float) -> void:
+## The key cap (the same as everywhere in the HUD), breathing with a soft teal light; a few petals open around it.
+func _draw_key(at: Vector2, alpha: float, void_level: float) -> void:
 	var open: float = clampf((_age - 0.05) / 0.25, 0.0, 1.0)
 	var breathe: float = 0.5 + 0.5 * sin(_time * 3.0)
-	VineStyle.glow(self, center, 8.0, UiStyle.ACCENT, (0.55 + 0.3 * breathe) * alpha)
-	var reach: float = (BUD_RADIUS + 1.0 + open * 1.0 + breathe * 0.6)
-	for offset: Vector2 in [Vector2(0, -1), Vector2(1, 0), Vector2(0, 1), Vector2(-1, 0)]: ## petals
-		draw_rect(Rect2(center + offset * reach - Vector2(0.5, 0.5) + Vector2(0.5, 0.5), Vector2.ONE), Color(VineStyle.PETAL, alpha * open))
-	for y: int in range(-BUD_RADIUS, BUD_RADIUS + 1):
-		for x: int in range(-BUD_RADIUS, BUD_RADIUS + 1):
-			var d: float = x * x + y * y
-			if d <= BUD_RADIUS * BUD_RADIUS + 1:
-				var lit: float = -(x + y) / float(BUD_RADIUS * 2)
-				draw_rect(Rect2(roundf(center.x) + x - 1, roundf(center.y) + y - 1, 1, 1), Color(UiStyle.ACCENT.lightened(0.25 * lit) if d < BUD_RADIUS * BUD_RADIUS - 2 else UiStyle.ACCENT.darkened(0.35), alpha))
-	PixelText.draw(self, _key, Vector2i(roundi(center.x) - PixelText.width(_key) / 2 - 1, roundi(center.y) - 4), Color(VineStyle.OUTLINE, alpha))
+	var w: int = VineStyle.key_cap(self, at, _key, alpha, 0.2 + 0.25 * breathe, void_level)
+	for corner: Vector2 in [Vector2(-1, -1), Vector2(w, -1)]: ## two petals on its shoulders
+		draw_rect(Rect2(at + corner, Vector2.ONE), Color(VineStyle.PETAL, alpha * open * (0.5 + 0.5 * breathe)))
 
 
 ## A thread with a bud hangs from the tag towards the object, swaying a little.

@@ -44,6 +44,15 @@ func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0
 	_notify.rpc(amount, from, knockback, maxf(current - amount, floor_value))
 
 
+## Host only: the end, whatever the invulnerability or the floor say (a judgement that falls on everybody).
+func kill(from: Vector2 = Vector2.ZERO, source: int = 0) -> void:
+	if not multiplayer.is_server() or current <= 0.0:
+		return
+	if source != 0:
+		last_attacker = source
+	_notify.rpc(current, from, 0.0, 0.0)
+
+
 ## The most health can be raised to: the maximum plus the overheal allowance.
 func ceiling() -> float:
 	return max_health * (1.0 + overheal_ratio)

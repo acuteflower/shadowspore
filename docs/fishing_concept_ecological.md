@@ -1,9 +1,9 @@
-# Lies das Wasser – Ökologisches & Sensorisches Angeln in Voidbloom
+# Lies das Wasser – Ökologisches & Sensorisches Angeln in Shadowspore
 
 > **Konzept:** Ökologisches & Sensorisches Angeln (Ökosystem, Strömung & achtsamer Rhythmus)  
 > **Konzepter:** Konzepter 1 – Systemdesign, Ökologie & Kesselsynergie  
 > **Bezug:** Ergänzung zu `docs/water_design.md`, `docs/water_life.md`, `docs/cooking.md` und `src/water/`  
-> **Status:** Vollständiger Konzeptentwurf für Voidbloom (Godot 4.7, 640×360, Host-Authoritative Co-op)
+> **Status:** Vollständiger Konzeptentwurf für Shadowspore (Godot 4.7, 640×360, Host-Authoritative Co-op)
 
 ---
 
@@ -12,13 +12,13 @@
 ### 1.1 Name des Systems: *Lies das Wasser*
 In direkter Verwandtschaft zu unserem Kochsystem **„Lies den Kessel“** folgt die Fischerei keinem nervösen Reaktionsmuster oder isolierten Balken-Minispiel, sondern der aufmerksamen Wahrnehmung der Welt: **„Lies das Wasser“**.
 
-Das Gewässer in Voidbloom ist keine statische Kulisse mit aufgesetztem Zufallsgenerator. Es ist ein physikalisch fundiertes, strömendes und atmendes Ökosystem. Wer die Wasseroberfläche beobachtet – die feinen Doppelringe scheuer Fische, den Schattenwurf unter treibendem Federkraut, das Aufwirbeln von Grundschlamm durch gründelnde Enten oder das plötzliche Schweigen der Reiher –, begreift das Gewässer intuitiv und weiß, wo die Sehne ins Wasser gleiten muss.
+Das Gewässer in Shadowspore ist keine statische Kulisse mit aufgesetztem Zufallsgenerator. Es ist ein physikalisch fundiertes, strömendes und atmendes Ökosystem. Wer die Wasseroberfläche beobachtet – die feinen Doppelringe scheuer Fische, den Schattenwurf unter treibendem Federkraut, das Aufwirbeln von Grundschlamm durch gründelnde Enten oder das plötzliche Schweigen der Reiher –, begreift das Gewässer intuitiv und weiß, wo die Sehne ins Wasser gleiten muss.
 
-### 1.2 Warum es sich 100% nach Voidbloom anfühlt
+### 1.2 Warum es sich 100% nach Shadowspore anfühlt
 1. **Achtsamkeit statt Quick-Time-Event**: Kein hektisches Button-Mashing, kein künstlicher Stardew-Grünbalken. Das Einholen ist ein haptischer, rhythmischer Dialog zwischen der Strömung des Flusses, den Fluchtstößen des Fisches und der Biegung einer Eschenrute.
 2. **In-World-Immersion auf 640×360**: Das Angeln findet direkt in der Top-Down-Spielwelt statt. Keine Unterbrechung durch bildschirmfüllende Overlays; die Heldin steht am sandigen Ufersaum, die Seidenschnur wirft feine Glanzlichter im kühlen Petrol des Wassers, und der Fisch kämpft sichtbar zwischen Unterwassersteinen und Wasserpflanzen.
 3. **Farbharmonie & Mystik**: Gedämpftes Fluss-Petrol, glimmende Türkisflossen im tiefen Kolk, goldene Lichtkegel auf Kiesbänken und das bedrohliche, tiefe Violett der Flussufer in der Nacht.
-4. **Resonanz mit den Grundwerten von Voidbloom**: 
+4. **Resonanz mit den Grundwerten von Shadowspore**: 
    - *„Licht ist Land – und Ruhe ist Kraft“*: Nach gefahrvollen Erkundungen der Leere und feuchtkalten Tiefen der Mine bietet das Flussufer einen Ort der Regeneration, der Naturbeobachtung und des kooperativen Beisammenseins.
 
 ---
@@ -119,7 +119,7 @@ Erreicht der Fisch das seichte Ufer (`distance < 18 px`), stemmt sich die Heldin
 
 ### 2.5 Multiplayer & Host-Autorität
 
-Voidbloom setzt auf strikte Server-Autorität (`multiplayer.is_server()`). Das Angelsystem integriert sich nahtlos in diese Architektur:
+Shadowspore setzt auf strikte Server-Autorität (`multiplayer.is_server()`). Das Angelsystem integriert sich nahtlos in diese Architektur:
 
 | Element | Host (Server) | Client (Peer) |
 |---|---|---|
@@ -194,7 +194,7 @@ Das Angelsystem dockt direkt an die vorhandene Flussarchitektur (`WorldRivers`, 
 
 ### 4.2 Direkte Synergie mit „Lies den Kessel“ (`docs/cooking.md`)
 
-In Voidbloom besitzt das Kochen ein dreistufiges System mit sensorischen Nuancen (Ansehen, Riechen, Schmecken) und sechs Geschmackscharakteren (*frisch, samtig, fruchtig, leicht, wärmend, rauchig/herb*).
+In Shadowspore besitzt das Kochen ein dreistufiges System mit sensorischen Nuancen (Ansehen, Riechen, Schmecken) und sechs Geschmackscharakteren (*frisch, samtig, fruchtig, leicht, wärmend, rauchig/herb*).
 
 Fische fügen sich perfekt in diese Dreiteilung ein:
 
@@ -230,10 +230,10 @@ Fische fügen sich perfekt in diese Dreiteilung ein:
 
 ## 5. Mehrwert & Spielerlebnis
 
-Warum bereichert dieses Angelsystem Voidbloom nachhaltig?
+Warum bereichert dieses Angelsystem Shadowspore nachhaltig?
 
 1. **Erdung im Spiel-Pacing (Atmosphärische Balance)**:
-   Voidbloom bietet nervenaufreibende Scharmützel gegen die Brut der Leere, klaustrophobische Abenteuer in den Tiefen der Mine und rasante Bosskämpfe. Ein Spiel braucht jedoch Täler der Ruhe, um Höhen der Spannung wirken zu lassen. *„Lies das Wasser“* gibt dem Spieler einen triftigen, lohnenden Grund, am Flussufer innezuhalten, den Geräuschen der Natur zu lauschen und den Flusslauf zu studieren.
+   Shadowspore bietet nervenaufreibende Scharmützel gegen die Brut der Leere, klaustrophobische Abenteuer in den Tiefen der Mine und rasante Bosskämpfe. Ein Spiel braucht jedoch Täler der Ruhe, um Höhen der Spannung wirken zu lassen. *„Lies das Wasser“* gibt dem Spieler einen triftigen, lohnenden Grund, am Flussufer innezuhalten, den Geräuschen der Natur zu lauschen und den Flusslauf zu studieren.
 2. **Die Natur als echtes System, nicht als Dekoration**:
    Bäume, Sträucher, Wasserpflanzen und Tiere sind nicht bloß Kulisse. Wenn der Spieler versteht, dass die Libelle der beste Köder für die Forelle ist, dass die Ente die Fische füttert und dass der Schatten des Reihers Gefahr bedeutet, wird die Spielwelt zu einem konsistenten, lebendigen Kosmos.
 3. **Gemeinschaftsgefühl im Co-op**:
@@ -351,6 +351,6 @@ FishingController (Node2D, am Player angehängt)
 
 ## 7. Fazit
 
-*„Lies das Wasser“* ist kein Fremdkörper in Voidbloom, sondern die konsequente Vollendung unserer bestehenden Natur- und Flusssysteme. Es belohnt Geduld, Beobachtungsgabe und Rhythmusgefühl, bindet die reiche Tierwelt organisch ein und beliefert das Kochsystem *„Lies den Kessel“* mit edlen, differenzierten Zutaten. 
+*„Lies das Wasser“* ist kein Fremdkörper in Shadowspore, sondern die konsequente Vollendung unserer bestehenden Natur- und Flusssysteme. Es belohnt Geduld, Beobachtungsgabe und Rhythmusgefühl, bindet die reiche Tierwelt organisch ein und beliefert das Kochsystem *„Lies den Kessel“* mit edlen, differenzierten Zutaten. 
 
-Damit erhält Voidbloom ein hochgradig atmosphärisches, mechanisch tiefes Feature, das sowohl Solo als auch im Co-op das Markenzeichen des Spiels unterstreicht: **Eine Welt, die lebt, atmet und aufmerksam erforscht werden will.**
+Damit erhält Shadowspore ein hochgradig atmosphärisches, mechanisch tiefes Feature, das sowohl Solo als auch im Co-op das Markenzeichen des Spiels unterstreicht: **Eine Welt, die lebt, atmet und aufmerksam erforscht werden will.**

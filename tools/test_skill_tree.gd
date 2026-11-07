@@ -1,7 +1,7 @@
 extends Node
 ## Isolated real-player/UI regression. Never opens the world or reads the user's save.
 const PLAYER: PackedScene = preload("res://src/entities/player/player.tscn")
-const SAVE: String = "/tmp/voidbloom-skill-tree-test.json"
+const SAVE: String = "/tmp/shadowspore-skill-tree-test.json"
 var failures: int = 0
 var checks: int = 0
 
@@ -23,7 +23,7 @@ func capture(label: String) -> void:
 		return
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png("/tmp/voidbloom-skills-" + label + ".png")
+	get_viewport().get_texture().get_image().save_png("/tmp/shadowspore-skills-" + label + ".png")
 
 
 func key(code: Key, pressed: bool) -> void:

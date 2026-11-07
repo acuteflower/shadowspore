@@ -58,6 +58,7 @@ func _run() -> void:
 				world._advance_chunk(build)
 				_check(not world._chunks.has(cell), id + " remains hidden during preparation")
 				world._commit_chunk(build)
+				world._finish_commit()
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		_check(world.navigation_floor(shore) and not world.navigation_floor(deep), id + " navigation matches shallow/deep water")

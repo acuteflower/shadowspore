@@ -50,15 +50,15 @@ func _process(delta: float) -> void:
 	RenderingServer.global_shader_parameter_set("g_wind_dir",direction) ## the same wind for the shaders of the small plants (flora_wind)
 	RenderingServer.global_shader_parameter_set("g_wind_gust",gust)
 	RenderingServer.global_shader_parameter_set("g_wind_clock",clock)
-	for detail: MeadowDetails in get_tree().get_nodes_in_group("meadow_details"):
-		detail.set_wind(clock,direction,gust)
 	_tick += delta
 	_rustle_wait = maxf(0.0,_rustle_wait-delta)
 	if _tick >= float(_config.get("contact_tick",0.08)):
 		_contacts(_tick)
 		_tick = 0.0
+	var had_air: bool = not _air.is_empty()
 	_advance_air(delta)
-	queue_redraw()
+	# Only redraw while air particles exist (one more time when the last one goes, to clear it).
+	if had_air or not _air.is_empty(): queue_redraw()
 
 func _contacts(delta: float) -> void:
 	var seen: Dictionary = {}

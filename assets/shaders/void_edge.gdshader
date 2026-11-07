@@ -133,6 +133,8 @@ void fragment() {
 				col = vec4(VOID2, 0.95);
 			}
 			// cracks: cell edges of a warped cellular pattern, pulsing towards the edge
+			// the cracks only reach r < width * 1.725 (vein_zone <= 1, dark * crawl <= 1), so the cellular pattern is only worked out near the edge
+			if (r < width * 1.75) {
 			float vein_zone = smoothstep(0.35, 0.65, fbm(wp * 0.015 + 40.0)); // variable: some stretches have none
 			vec2 wq = wp / 11.0 + vec2(vnoise(wp * 0.07), vnoise(wp * 0.07 + 8.0)) * 0.9;
 			vec3 w = worley(wq);
@@ -146,6 +148,7 @@ void fragment() {
 				crack = mix(crack, vec3(0.78, 0.74, 0.96), calm * 0.3); // by day: pale lavender
 				crack = mix(crack, MAGENTA, dark * pulse * pulse * near * 0.75); // by night: hot flashes
 				col = vec4(mix(VOID3, crack * glow, 0.35 + 0.65 * pulse), 1.0);
+			}
 			}
 			// void blooms: small flickering crosses of light in the scorched ground
 			vec2 bc = floor(wp / 13.0);

@@ -52,6 +52,7 @@ def main():
     ext, feet = outside.hut_arr()
     put("hut", ext)
     put("vane", outside.vane_arr(), glow=False)
+    put("banner", outside.banner_arr(), glow=False)  # the town's big banner at the roof's right end (Hut hangs it at frame px (171, 88))
     if outside.WINDOW_BOX:  # the lamp light that leaves the window (Hut draws it additive at night)
         hut_lib.save(OUT / "hut_window_light.png", hut_lib.window_spill(ext.shape[1], ext.shape[0], feet, outside.WINDOW_BOX))
     print(json.dumps(art_hut.SIZES))

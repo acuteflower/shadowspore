@@ -114,6 +114,21 @@ float up_dist(vec2 p) {
 	return found;
 }
 
+// up_dist for the glow pass, which only ever asks whether a wall is within WALL px: the same answer
+// for those pixels, 99 otherwise, with half the texture reads
+float up_dist_wall(vec2 p) {
+	int home = lev(p);
+	float found = 99.0;
+	for (int i = 1; i <= 16; i++) {
+		float d = float(i) * 2.0;
+		if (lev(p - vec2(0.0, d)) > home) {
+			found = lev(p - vec2(0.0, d - 1.0)) > home ? d - 1.0 : d;
+			break;
+		}
+	}
+	return found;
+}
+
 // palette step i (0 dark .. 5 light) of a style's rock
 vec3 rock(int style, int i) {
 	i = clamp(i, 0, 5);
@@ -334,7 +349,7 @@ vec4 ramp(vec2 p, vec2 l, Tile c, vec3 tint, bool side) {
 		if (cover > 0.1) {
 			float dy = l.y + 16.0 * float(row);
 			vec3 w = wall_life(p, dy, c.style, wall_color(p, dy, c.style, tint), tint);
-			w *= 0.75 + 0.25 * smoothstep(half_w, half_w + 5.0, dist); // dark next to the path
+			w *= 0.92 + 0.08 * smoothstep(half_w, half_w + 4.0, dist); // only a whisper of shade beside the slope
 			if (cover < 0.3) w = mix(grass(2 + int(floor(hash21(p) * 2.0)), tint), w, smoothstep(0.1, 0.3, cover));
 			col = vec4(w, 1.0);
 		}
@@ -342,13 +357,21 @@ vec4 ramp(vec2 p, vec2 l, Tile c, vec3 tint, bool side) {
 		float centre = 1.0 - dist / half_w; // 1 on the worn middle
 		float n = vnoise(p * vec2(0.5, 0.4));
 		float tone = 2.2 + (n - 0.5) * 2.6 + vnoise(p * 0.18 + 9.0) * 0.8 + centre * 0.9 + (hash21(p) - 0.5) * 0.9 + (prog - 0.5) * 0.4;
-		vec3 base = c.style == 0 ? EARTH[clamp(int(floor(tone)), 1, 5)] : rock(c.style, int(floor(tone - 0.4)));
-		float rut = abs(sin((cx - 24.0 - meander) * 0.55));
-		if (centre > 0.25 && rut > 0.97) base *= 0.82;
-		float pb = hash21(floor(p * 0.5) + 31.0);
-		if (pb > 0.975) base = STONE[2 + int(floor(hash21(p) * 2.0))]; // pebbles
+		vec3 base;
+		if (c.style == 0) {
+			// a grassy slope that carries the wall's own greens: lighter towards the top, only a faint worn strip of earth
+			float g = 2.0 + prog * 0.9 + (n - 0.5) * 1.6 + (hash21(p) - 0.5) * 0.8;
+			base = grass(int(floor(g)), tint);
+			float worn = centre * (vnoise(p * vec2(0.35, 0.6) + 4.0) - 0.35);
+			if (worn > 0.3 && hash21(p + 9.0) < 0.5) base = mix(base, EARTH[3], 0.45);
+		} else {
+			base = rock(c.style, int(floor(tone - 0.4)));
+			float rut = abs(sin((cx - 24.0 - meander) * 0.55));
+			if (centre > 0.25 && rut > 0.97) base *= 0.82;
+			if (hash21(floor(p * 0.5) + 31.0) > 0.975) base = STONE[2 + int(floor(hash21(p) * 2.0))]; // pebbles
+		}
 		float rim = (half_w - dist);
-		if (rim < 3.0 && hash21(p + 5.0) > 0.35 + rim * 0.2) base = grass(2 + int(floor(hash21(p + 1.0) * 3.0)), tint); // grass creeping onto the path
+		if (c.style != 0 && rim < 3.0 && hash21(p + 5.0) > 0.35 + rim * 0.2) base = grass(2 + int(floor(hash21(p + 1.0) * 3.0)), tint); // grass creeping onto the path
 		float fade = prog < 0.3 ? (prog / 0.3) : 1.0; // the foot melts into the ground
 		if (side && prog > 0.7) fade = min(fade, (1.0 - prog) / 0.3 + 0.1); // and a path over a plain edge melts into the high ground too
 		col = vec4(base, fade * 1.15 > hash21(p + 17.0) ? 1.0 : 0.0);
@@ -375,31 +398,23 @@ vec4 forest_steps(vec2 p, vec2 l, Tile c, vec3 tint) {
 	float yy = l.y - sy * 4.0;
 	float edge = min(cx, 48.0 - cx); // distance to the nearest side of the stairs
 	float ragged = 2.0 + floor(hash21(vec2(p.y, 3.0)) * 3.0) + (vnoise(vec2(p.y * 0.2, 4.0)) - 0.5) * 3.0;
-	if (edge < ragged - 2.0 && hash21(p + 8.0) < 0.5) return vec4(0.0); // melts into the meadow
+	if (edge < ragged - 1.0 && hash21(p + 8.0) < 0.6) return vec4(0.0); // melts into the meadow
 	vec3 col;
 	if (edge < ragged) {
-		// the bank beside the steps: grass, ferns, a root
-		col = grass(1 + int(floor(hash21(p) * 3.0)), tint);
-		if (hash21(floor(p * 0.5) + 6.0) > 0.86) col = grass(4, tint);
-		if (edge < 1.0) col = hash21(p) < 0.6 ? LINE : grass(0, tint);
+		// the bank beside the steps: the same greens as the slope, no outline
+		col = grass(2 + int(floor(hash21(p) * 3.0)), tint);
+		if (hash21(floor(p * 0.5) + 6.0) > 0.88) col = grass(4, tint);
 	} else if (yy < 2.0) {
-		// the tread: packed earth, moss, a few pebbles
-		float n = vnoise(p * vec2(0.4, 0.8) + sy);
-		col = EARTH[clamp(int(floor(2.4 + n * 1.8 + (hash21(p) - 0.5) * 0.9 - yy * 0.5)), 1, 4)];
-		if (vnoise(p * 0.22 + sy * 7.0) > 0.58 && hash21(p + 2.0) > 0.3) col = grass(2 + int(floor(hash21(p + 1.0) * 3.0)), tint);
-		if (hash21(floor(p * 0.5) + sy * 13.0) > 0.96) col = STONE[2 + int(floor(hash21(p) * 2.0))];
+		// the tread: a flat stone slab, moss-grown, lit from above
+		col = STONE[yy < 1.0 ? 3 : 2] * vec3(0.78, 0.92, 0.82);
+		col *= 0.93 + 0.14 * hash21(vec2(floor((p.x + sy * 7.0) / 6.0), sy));
+		if (vnoise(p * 0.25 + sy * 7.0) > 0.52 && hash21(p + 2.0) > 0.35) col = grass(2 + int(floor(hash21(p + 1.0) * 3.0)), tint);
 	} else {
-		// the riser: a round log, lit on top, bark grooves, dark underneath
-		float groove = hash21(vec2(floor((p.x + sy * 5.0) / 3.0), sy));
-		col = EARTH[yy < 3.0 ? 3 : 2];
-		if (groove > 0.62) col = EARTH[yy < 3.0 ? 2 : 1];
-		if (yy >= 3.0 && hash21(p + 4.0) < 0.35) col = EARTH[0];
-		if (hash21(vec2(floor(p.x / 7.0), sy + 20.0)) > 0.8 && yy < 3.0 && mod(p.x, 7.0) < 3.0) col = grass(2, tint); // moss on the bark
-		float cut = mod(p.x + sy * 11.0, 24.0); // log ends where the rings show
-		if (cut < 1.0) col = EARTH[0];
-		else if (cut < 2.0 && yy < 3.0) col = EARTH[5];
+		// the riser: the shaded face of the slab, a dark joint underneath
+		col = STONE[yy < 3.0 ? 1 : 0] * vec3(0.8, 0.9, 0.85);
+		if (mod(p.x + sy * 5.0, 14.0) < 1.0) col = STONE[0];
+		if (yy >= 3.0 && vnoise(p * 0.3 + sy) > 0.6) col = grass(1, tint); // moss in the joint
 	}
-	if (l.y >= 15.0 && c.geom % 4 == ((c.geom >> 2) & 3) && hash21(vec2(p.x, 6.0)) < 0.9) col = LINE;
 	return vec4(col, 1.0);
 }
 
@@ -500,7 +515,7 @@ void fragment() {
 				}
 			}
 			if (!glow_pass || may_glow) {
-				float up = up_dist(p);
+				float up = glow_pass ? up_dist_wall(p) : up_dist(p);
 				if (up <= WALL) {
 					vec2 top_p = p - vec2(0.0, up);
 					Tile top = tile_at(top_p);
@@ -511,15 +526,6 @@ void fragment() {
 					COLOR = glow_pass ? wall_glow_pixel(p, up, style) : wall_pixel(p, up, style, tints[top.biome]);
 				} else if (!glow_pass) {
 					COLOR = floor_pixel(p, tint);
-					Tile above = tile_at(p - vec2(0.0, 16.0));
-					Tile below = tile_at(p + vec2(0.0, 16.0));
-					if (above.kind == 2 && (above.geom >> 6) == 0 && (above.geom & 3) == ((above.geom >> 2) & 3)) {
-						vec4 s = path_scatter(p, l, above, false);
-						if (s.a > 0.0) COLOR = s;
-					} else if (below.kind == 2 && (below.geom >> 6) == 0 && (below.geom & 3) == 0) {
-						vec4 s = path_scatter(p, l, below, true);
-						if (s.a > 0.0) COLOR = s;
-					}
 				}
 			}
 		}

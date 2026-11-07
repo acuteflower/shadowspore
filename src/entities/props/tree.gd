@@ -28,6 +28,7 @@ const LIGHT_COLOR: Color = Color("6fe6d6")
 const PETAL_PICKED_ROW: int = 4 ## blossom sheet: the crown with the blossoms picked (glow: row 5)
 
 var _covering: bool = false ## the tree currently hides a player
+var _cover_wait: float = 0.0 ## seconds until the next covering test
 var _fade: Tween
 var _wobble: float = 0.0 ## sway amplitude, dies out
 var _wobble_dir: float = 1.0
@@ -203,6 +204,10 @@ func _process(delta: float) -> void:
 	_sway(delta)
 	if not _crown.visible or not _fades():
 		return
+	# The covering test runs at about 10 Hz; the result (and the fade tween) is kept between checks.
+	_cover_wait -= delta
+	if _cover_wait > 0.0: return
+	_cover_wait = 0.1
 	var covering: bool = false
 	for player: Player in Player.all:
 		if player.global_position.distance_to(global_position) < WATCH_DISTANCE and _covers((player.global_position - global_position) / scale.x):

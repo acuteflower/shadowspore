@@ -24,6 +24,7 @@ var _facing: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_spec = DataRegistry.get_entry("wildlife", "butterfly")
 	_rng.seed = hash(name) + int(home.x) * 13 + int(home.y) * 7
 	_start = global_position

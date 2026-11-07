@@ -4,6 +4,7 @@ extends Node
 ## Player B belongs to the client: it casts, strikes and fights over RPC, the host decides and the fish lands in B's bag.
 const PORT: int = 17898
 const DT: float = 1.0 / 60.0
+const RULES_TEST: GDScript = preload("res://tools/test_fishing.gd") ## its `reader` plays like a person who reads the line
 var server: bool = false
 var rivers: WorldRivers
 var fa: FishingComponent
@@ -19,6 +20,8 @@ var fx_a: Array[String] = []
 var b_caught: Array[String] = []
 var joined: bool = false ## members, not locals: a lambda captures locals by value
 var connected: bool = false
+var lag_a: Dictionary = {}
+var lag_b: Dictionary = {}
 
 
 func check(ok: bool, label: String) -> void:
@@ -145,8 +148,9 @@ func run_server() -> void:
 			fa._host_request("strike", [])
 		if fa.state == FishingComponent.S.DRILL:
 			Engine.time_scale = 1.0 ## real time, so the client can come to the bank and hold the net
-			fa._give = 1.0 if fa.phase == "flee" else 0.0
-			fa._reel = fa.phase == "tire" and not fa.tell
+			var input_a: Array = RULES_TEST.reader({"phase": fa.phase, "tension": fa.tension, "tell": fa.tell}, lag_a, 0.2, DT)
+			fa._give = float(input_a[0])
+			fa._reel = bool(input_a[1])
 		if fa.state == FishingComponent.S.IDLE and guard > 2.0 and log_a.has(FishingComponent.S.DRILL):
 			break
 	Engine.time_scale = 3.0
@@ -163,6 +167,8 @@ func run_server() -> void:
 		guard += DT * 3.0
 		if fb.state == FishingComponent.S.DRIFTING and fb._bite_t > 0.5:
 			fb._bite_t = 0.5
+		if fb.state == FishingComponent.S.BITE:
+			fb._window = maxf(fb._window, 3.0) ## the host runs at triple speed here: leave the client time to answer over the wire
 		if fb.state == FishingComponent.S.DRILL:
 			seen_drill = true
 		if seen_drill and fb.state == FishingComponent.S.IDLE:
@@ -241,12 +247,17 @@ func run_client() -> void:
 		if fb.state == FishingComponent.S.BITE and not struck:
 			struck = true
 			fb._send("strike", [])
+		if fb.state == FishingComponent.S.IDLE and struck and not fought: ## missed or refused: cast again
+			struck = false
+			await get_tree().create_timer(0.8).timeout
+			fb._send("cast", [spot["target"], "", "cork"])
 		if fb.state == FishingComponent.S.DRILL:
 			fought = true
+			var input_b: Array = RULES_TEST.reader({"phase": fb.phase, "tension": fb.tension, "tell": fb.tell}, lag_b, 0.2, DT)
 			input_t -= DT
 			if input_t <= 0.0:
 				input_t = 0.05
-				fb._rpc_input.rpc_id(1, 1.0 if fb.phase == "flee" else 0.0, fb.phase == "tire" and not fb.tell)
+				fb._rpc_input.rpc_id(1, float(input_b[0]), bool(input_b[1]))
 		if fought and fb.state == FishingComponent.S.IDLE:
 			break
 	check(struck and fought, "client: B struck and fought through RPC")

@@ -186,6 +186,137 @@ def bake_stone_field(spec, seed, centre):
     return img, mask, (x0, y0)
 
 
+# ------------------------------------------------------------------ arenas (stone floor on a plateau, drawn as a polygon)
+_FIELDS = {}
+
+
+def relief_field(channel, px, py):
+    """Smooth relief field (0..1, channel 0/1/2 = level >= 1/2/3) at world px arrays (bilinear, the way the game reads it)."""
+    if "f" not in _FIELDS:
+        from PIL import Image
+        _FIELDS["f"] = np.array(Image.open(ROOT / "assets" / "world" / "relief_field.png").convert("RGB"))
+    f = _FIELDS["f"][:, :, channel] / 255.0
+    u, v = px / 16.0 - 0.5, py / 16.0 - 0.5
+    x0, y0 = np.floor(u).astype(int), np.floor(v).astype(int)
+    fx, fy = u - x0, v - y0
+    def g(x, y):
+        return f[np.clip(y, 0, f.shape[0] - 1), np.clip(x, 0, f.shape[1] - 1)]
+    return (g(x0, y0) * (1 - fx) + g(x0 + 1, y0) * fx) * (1 - fy) + (g(x0, y0 + 1) * (1 - fx) + g(x0 + 1, y0 + 1) * fx) * fy
+
+
+def _grow(mask, n):
+    out = mask.copy()
+    for i in range(n):
+        nxt = out.copy()
+        nxt[1:, :] |= out[:-1, :]
+        nxt[:-1, :] |= out[1:, :]
+        nxt[:, 1:] |= out[:, :-1]
+        nxt[:, :-1] |= out[:, 1:]
+        if i % 2:
+            nxt[1:, 1:] |= out[:-1, :-1]
+            nxt[:-1, :-1] |= out[1:, 1:]
+            nxt[1:, :-1] |= out[:-1, 1:]
+            nxt[:-1, 1:] |= out[1:, :-1]
+        out = nxt
+    return out
+
+
+def _signed_distance(inside, reach):
+    """Roughly the distance (px) to the border of `inside`: negative inside, positive outside, clipped to +-reach."""
+    sd = np.zeros(inside.shape)
+    cur = inside.copy()
+    for k in range(reach):  # outside: how many growth steps until a pixel is reached
+        nxt = _grow(cur, 1)
+        sd[nxt & ~cur] = k + 1
+        cur = nxt
+    sd[~cur] = reach
+    cur = ~inside
+    for k in range(reach):
+        nxt = _grow(cur, 1)
+        sd[nxt & ~cur & inside] = -(k + 1)
+        cur = nxt
+    sd[inside & ~cur] = -reach
+    return sd
+
+
+def bake_arena(spec, seed):
+    """An old flagstone floor in the shape of a hand-drawn polygon (px relative to the arena tile's centre), laid on a plateau:
+    like the field around the manhole (broken plates, grass and moss breaking through, ragged edges) but only where the smooth
+    relief field says the plateau top is (`level` = 3 reads channel 2), a few px away from its lip. Returns (img, mask, (ox, oy))
+    with the offset relative to the tile's centre."""
+    from PIL import Image, ImageDraw
+    poly = spec["poly"]
+    pad = 22
+    x0, y0 = int(min(p[0] for p in poly)) - pad, int(min(p[1] for p in poly)) - pad
+    x1, y1 = int(max(p[0] for p in poly)) + pad, int(max(p[1] for p in poly)) + pad
+    w, h = x1 - x0, y1 - y0
+    centre = (spec["tile"][0] * 16 + 8, spec["tile"][1] * 16 + 8)
+    X = np.arange(w)[None, :] + x0 + 0.5
+    Y = np.arange(h)[:, None] + y0 + 0.5
+    warp_x = (vnoise(w, h, 16, seed + 1) - 0.5) * 16 + (vnoise(w, h, 6, seed + 2) - 0.5) * 6
+    warp_y = (vnoise(w, h, 16, seed + 3) - 0.5) * 16 + (vnoise(w, h, 6, seed + 4) - 0.5) * 6
+    shape = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(shape).polygon([(p[0] - x0, p[1] - y0) for p in poly], fill=255)
+    inside = np.array(shape) > 0
+    sd = _signed_distance(inside, 24)
+    # warp the edge a little: sample the distance field at a noisy position
+    wy_i = np.clip((np.arange(h)[:, None] + warp_y).astype(int), 0, h - 1)
+    wx_i = np.clip((np.arange(w)[None, :] + warp_x).astype(int), 0, w - 1)
+    sd = sd[wy_i, wx_i]
+    density = 0.62 + 0.5 * vnoise(w, h, 44, seed + 5)
+    holes = 0.62 * vnoise(w, h, 26, seed + 6) + 0.38 * vnoise(w, h, 9, seed + 9)
+    pits = vnoise(w, h, 6, seed + 7)
+    jitter = (vnoise(w, h, 3, seed + 8) - 0.5) * 0.3
+    bayer = np.tile(BAYER, (h // 4 + 1, w // 4 + 1))[:h, :w]
+    edge = np.clip((10.0 - sd) / 14.0, 0.0, 1.0)
+    keep = (edge * density + jitter) > (bayer * 0.9 + 0.05)
+    keep &= ~(holes > 0.70 + (bayer - 0.5) * 0.1)  # grass takes whole patches back
+    keep &= ~((pits > 0.86) & (bayer > 0.2))
+    PX, PY = np.broadcast_arrays(X + centre[0], Y + centre[1])
+    field = relief_field(int(spec.get("level", 3)) - 1, PX, PY)
+    lip = field <= 0.58
+    top = ~_grow(lip, 1)  # the plateau top
+    depth = np.maximum(-_signed_distance(~lip, 14), 0.0)  # px inside the lip (0 at the lip)
+    fade = np.clip((depth - 0.5) / 12.0, 0.0, 1.0)  # the stones thin out towards the lip instead of ending in a clean edge
+    keep &= top & ((fade * 1.1 + jitter) > (bayer * 0.9 + 0.05))
+    for pillar in spec.get("pillars", []):  # every pillar stands on paving, whatever the lip does
+        near = np.hypot((X - pillar["pos"][0]) / 1.0, (Y - pillar["pos"][1]) * 1.6) < 26
+        keep |= near & top & (holes < 0.8)
+    img = np.zeros((h, w, 4), dtype=np.uint8)
+    mask = np.zeros((h, w, 4), dtype=np.uint8)
+    ys, xs = np.nonzero(keep)
+    grown = vnoise(w, h, 5, seed + 11) + (vnoise(w, h, 2, seed + 12) - 0.5) * 0.3
+    for y, x in zip(ys, xs):
+        img[y, x] = flagstone(int(x + x0), int(y + y0), seed)
+        mask[y, x] = (STONE_CODE, 0, 0, 255)
+        if depth[y, x] < 16 and grown[y, x] > 0.30 + depth[y, x] / 24.0:  # moss and grass grow over the stones near the lip
+            img[y, x] = MOSS[(x + y) % 3] if grown[y, x] < 0.62 else (BUSH[3] if (x * 7 + y * 3) % 5 else MEADOW[3])
+    rng = random.Random(seed)
+    for _ in range(int(w * h / 38)):  # grass blades and tufts creeping over the lip
+        x, y = rng.randrange(4, w - 4), rng.randrange(8, h - 2)
+        if top[y, x] and 0.5 < depth[y, x] < 13 and keep[y, x] and rng.random() < 1.0 - depth[y, x] / 14.0:
+            tuft(img, x, y, rng.randrange(2, 5), rng, MEADOW)
+    for _ in range(int(w * h / 80)):  # grass and moss creep in through the joints
+        x, y = rng.randrange(0, w), rng.randrange(1, h)
+        if keep[y, x]:
+            c = MOSS[1 + rng.randrange(3)] if rng.random() < 0.7 else BUSH[3]
+            img[y, x] = c
+            if rng.random() < 0.5:
+                img[y - 1, x] = c
+    for _ in range(int(w * h / 1400)):  # tufts at the ragged edges
+        x, y = rng.randrange(4, w - 4), rng.randrange(8, h - 2)
+        if keep[y, x] and sd[y, x] > -12:
+            tuft(img, x, y, rng.randrange(3, 6), rng, MEADOW)
+    for _ in range(int(w * h / 650)):  # loose pebbles and chips just outside
+        x, y = rng.randrange(2, w - 2), rng.randrange(2, h - 2)
+        if not keep[y, x] and top[y, x] and -6 < sd[y, x] < 12 and img[y, x, 3] == 0:
+            img[y, x] = STONE[2 + rng.randrange(2)]
+            mask[y, x] = (STONE_CODE, 0, 0, 255)
+            if rng.random() < 0.4:
+                img[y, x + 1] = STONE[1]
+    return img, mask, (x0, y0)
+
+
 # ------------------------------------------------------------------ the footpath
 def catmull(points, step=2.0):
     """A smooth curve through the points, sampled about every `step` px."""
@@ -594,9 +725,18 @@ def main():
         baked.append({"id": name, "texture": "res://assets/world/ground/%s.png" % name, "mask": "res://assets/world/ground/%s_mask.png" % name, "x": feet[0] + ox, "y": feet[1] + oy})
         yards.append((img, mask, (ox, oy)))
         print("baked", name, img.shape[1], "x", img.shape[0])
+    for i, arena in enumerate(data.get("arenas", [])):  # stone floors of the boss arenas (polygon in px relative to the arena tile's centre)
+        img, mask, (ox, oy) = bake_arena(arena, seed + 1300 + i * 17)
+        name = arena["id"] + "_arena"
+        save(ROOT / "assets" / "world" / "ground" / (name + ".png"), img)
+        save(ROOT / "assets" / "world" / "ground" / (name + "_mask.png"), mask)
+        feet = (arena["tile"][0] * 16 + 8, arena["tile"][1] * 16 + 8)
+        baked.append({"id": name, "texture": "res://assets/world/ground/%s.png" % name, "mask": "res://assets/world/ground/%s_mask.png" % name, "x": feet[0] + ox, "y": feet[1] + oy})
+        yards.append((img, mask, (ox, oy)))
+        print("baked", name, img.shape[1], "x", img.shape[0])
     if only_yards:
         out = json.load(open(ROOT / "data" / "ground_baked.json"))
-        out["decals"] = [d for d in out["decals"] if not d["id"].endswith("_yard")] + baked
+        out["decals"] = [d for d in out["decals"] if not (d["id"].endswith("_yard") or d["id"].endswith("_arena"))] + baked
         json.dump(out, open(ROOT / "data" / "ground_baked.json", "w"), separators=(",", ":"))
         if args and yards:
             preview(yards, pathlib.Path(args[0]))

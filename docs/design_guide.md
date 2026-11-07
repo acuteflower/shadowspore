@@ -1,4 +1,4 @@
-# Voidbloom – Gestaltungs-Grundlagen
+# Shadowspore – Gestaltungs-Grundlagen
 
 Diese Anleitung sagt, wie Charaktere, Items und Map-Objekte aussehen sollen, wie sie funktionieren und
 wie sie eingesammelt werden – damit alles Neue zum Bestehenden passt. Was hier steht, ist **im Spiel

@@ -156,6 +156,7 @@ func _end_night() -> void:
 					rewarded = true
 		if rewarded:
 			(_world.town() as TownManager).banner("NACHT ÜBERSTANDEN", "TAG %d" % (TimeManager.day + 1))
+			(_world.town() as TownManager).emit_event("night_survived", {})
 	_end_raid(false)
 
 
@@ -622,6 +623,12 @@ func _begin_warning(target: Player, players: Array[Player]) -> void:
 		behavior.goal = town.dark_edge((entry.node as Node2D).global_position, target.global_position, float((NightRules.config().behavior as Dictionary).dark_margin) + 10.0)
 	_raid = {"state": "warning", "time": float(cfg.warning_seconds), "target": target, "members": members}
 	town.banner("ETWAS REGT SICH IM DUNKELN", "")
+	var gather: Vector2 = Vector2.ZERO
+	for entry: Dictionary in members:
+		gather += (entry.node as Node2D).global_position
+	if not members.is_empty():
+		town.set_alert(true, (gather / float(members.size()) - town.center).angle()) ## Valdric goes to the edge where they gather
+		town.emit_event("alert", {})
 
 
 func _begin_attack() -> void:
@@ -694,6 +701,9 @@ func _end_raid(spent: bool) -> void:
 		behavior.queue.clear()
 		behavior.goal = Vector2.INF
 	_raid = {"state": "idle", "time": 0.0, "target": null, "members": []}
+	var home: TownManager = _world.town() as TownManager
+	if home != null:
+		home.set_alert(false, 0.0)
 	if spent:
 		var cfg: Dictionary = NightRules.config().lure as Dictionary
 		lure = float(cfg.reset_to)

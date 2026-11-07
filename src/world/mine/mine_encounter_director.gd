@@ -57,8 +57,10 @@ func awake_count(level: int) -> int:
 
 
 static func _alive(member: Variant) -> bool:
+	if member == null or not is_instance_valid(member): ## (check before casting: casting a freed object is itself an error)
+		return false
 	var node: Node2D = member as Node2D
-	if node == null or not is_instance_valid(node) or node.is_queued_for_deletion():
+	if node == null or node.is_queued_for_deletion():
 		return false
 	return (node.get_node("HealthComponent") as HealthComponent).current > 0.0
 

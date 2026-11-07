@@ -29,9 +29,10 @@ RAMPS = {  # dark .. light; bevel: lit rim = last, shaded rim = first, inside = 
     "leather": [hexc(c) for c in ("2a1a4a", "46308a", "6a4bd0", "9a82f0")],
     "gold": [hexc(c) for c in ("6a4a2a", "a07a3a", "d8b45a", "f6e0a0")],
     "mint": [hexc(c) for c in ("2e4a46", "4f7f74", "8fc4b0", "dff6ec")],  # the forged sword
+    "void": [hexc(c) for c in ("14092e", "35227a", "7d57e0", "e8dcff")],  # the void-forged blade of the boss fight
     "dark": [hexc(c) for c in ("1f1d38", "343b58", "4a5472", "77839f")],
 }
-GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6")}
+GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8")}
 
 
 # ------------------------------------------------------------------ geometry (item frame: pointing right, y down)
@@ -173,6 +174,7 @@ def rod(w, h, tf):
 ITEMS = {  # id: (size, pivot in the item frame, builder, steel ramp, icon fit: (rotation, scale, offset))
     "sword_basic": ((34, 12), (4.5, 6.0), sword(21, "sword_basic", "steel"), "steel", (-45.0, 0.46, (1.6, 14.4))),
     "sword_iron": ((36, 12), (4.5, 6.0), sword(23, "sword_iron", "mint"), "mint", (-45.0, 0.44, (1.6, 14.4))),
+    "sword_void": ((42, 12), (4.5, 6.0), sword(29, "sword_void", "void"), "void", (-45.0, 0.4, (1.6, 14.4))),
     "axe_basic": ((34, 18), (5.0, 12.0), axe, "steel", (-45.0, 0.5, (1.0, 15.2))),
     "pickaxe_basic": ((34, 22), (5.0, 11.0), pickaxe, "steel", (-45.0, 0.5, (1.0, 12.4))),
     "sickle_basic": ((26, 20), (5.0, 5.0), sickle, "steel", (-45.0, 0.6, (1.0, 12.6))),

@@ -14,6 +14,7 @@ var _occupied: Dictionary = {}
 var sources: Array[Vector2] = []
 var source_kinds: Array[int] = []
 var _origin: Vector2
+var _hidden: Dictionary = {} ## instance index -> true: plants the town's ground has no room for
 
 func setup(points: Array[Dictionary], origin: Vector2 = Vector2.ZERO) -> void:
 	_origin = origin
@@ -51,11 +52,30 @@ func setup(points: Array[Dictionary], origin: Vector2 = Vector2.ZERO) -> void:
 
 func _ready() -> void:
 	add_to_group("meadow_details")
+	apply_wear(get_tree().get_first_node_in_group("town") as TownManager)
 
-func set_wind(clock: float, direction: Vector2, gust: float) -> void:
-	_wind.set_shader_parameter("wind_clock",clock)
-	_wind.set_shader_parameter("wind_direction",direction)
-	_wind.set_shader_parameter("wind_gust",gust)
+## The town's trodden ground grows no small plants (docs/town_ausbau.md A5): a plant whose cell is worn enough is not drawn (which ones: a fixed hash of its place, so the edge
+## frays). Called for every chunk as it appears and whenever the town's ground changes.
+func apply_wear(town: TownManager) -> void:
+	if multimesh == null or town == null:
+		return
+	for i: int in sources.size():
+		var at: Vector2 = sources[i]
+		var value: float = town.wear_at(at)
+		var hide: bool = value > 0.30 + 0.5 * fposmod(sin(at.x * 12.9898 + at.y * 78.233) * 43758.5453, 1.0)
+		if hide == _hidden.has(i):
+			continue
+		var feet: Vector2 = at - _origin - Vector2(0, 9)
+		if hide:
+			_hidden[i] = true
+			multimesh.set_instance_transform_2d(i, Transform2D(Vector2.ZERO, Vector2.ZERO, feet))
+		else:
+			_hidden.erase(i)
+			multimesh.set_instance_transform_2d(i, Transform2D(0.0, feet))
+
+## Wind now comes from the shader globals that WorldWind publishes every frame. Kept as a no-op for old callers.
+func set_wind(_clock: float, _direction: Vector2, _gust: float) -> void:
+	pass
 
 func stamp_segment(from: Vector2, to: Vector2, force: float) -> bool:
 	if not Rect2(_origin-Vector2(20,20),Vector2(552,552)).intersects(Rect2(from,Vector2.ZERO).expand(to).grow(16)):

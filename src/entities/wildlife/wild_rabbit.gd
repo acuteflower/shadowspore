@@ -39,6 +39,7 @@ var _shadow: Node2D
 
 
 func _ready() -> void:
+	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_spec = DataRegistry.get_entry("wildlife", "rabbit")
 	_rng.seed = hash(name) + int(home.x) * 31 + int(home.y) * 7
 	add_to_group("wildlife")
@@ -246,6 +247,7 @@ func _try_hop(direction: Vector2, fleeing: bool) -> void:
 	var distance: float = _range("flee_distance" if fleeing else "wander_distance")
 	var best: Vector2 = Vector2.ZERO
 	var best_score: float = -INF
+	var herd: Array[Node] = get_tree().get_nodes_in_group("wildlife") ## once per decision, not once per angle
 	for angle: float in [0.0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.65, -1.65, 2.2, -2.2, PI]:
 		var step: Vector2 = direction.rotated(angle) * distance
 		var end: Vector2 = global_position + step
@@ -254,7 +256,7 @@ func _try_hop(direction: Vector2, fleeing: bool) -> void:
 		var score: float = -absf(angle) * 8.0
 		if fleeing:
 			score += end.distance_to(_threat)
-		for neighbour: Node in get_tree().get_nodes_in_group("wildlife"):
+		for neighbour: Node in herd:
 			if neighbour != self:
 				var gap: float = end.distance_to((neighbour as Node2D).global_position)
 				score -= maxf(0.0, 15.0 - gap) * 2.0

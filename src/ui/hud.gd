@@ -28,6 +28,9 @@ func _process(delta: float) -> void:
 	var skills: SkillTreeWindow = get_node_or_null("SkillTreeWindow") as SkillTreeWindow
 	var pause: CanvasItem = get_node_or_null("PauseMenu") as CanvasItem
 	var covered: bool = $InventoryWindow.visible or $MapWindow.visible or (skills != null and skills.visible) or (pause != null and pause.visible) ## the Escape menu too
+	var boss: BossBar = get_node_or_null("BossBar") as BossBar
+	if boss != null:
+		boss.set_covered(covered)
 	for part: String in ["QuestVine", "HintCard"]:
 		var node: CanvasItem = get_node_or_null(part) as CanvasItem
 		if node != null:
@@ -60,6 +63,9 @@ func bind(player: Node) -> void:
 	$InventoryWindow.bind(player.inventory, $Hotbar)
 	$MapWindow.bind(player)
 	$SkillTreeWindow.bind(player)
+	var boss_bar: BossBar = BossBar.new() ## the boss's health: `get_tree().call_group("boss_bar", "track", name, health)`
+	boss_bar.name = "BossBar"
+	add_child(boss_bar)
 	var fishing_hud: FishingHud = FishingHud.new() ## the rod's bait tags (docs/fishing.md)
 	fishing_hud.name = "FishingHud"
 	add_child(fishing_hud)

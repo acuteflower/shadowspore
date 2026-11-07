@@ -1,7 +1,7 @@
 class_name SleepScene
 extends Node
 ## She goes to bed after the talk at the fire (the bed's E, quest step `sleep`): a short line, the screen closes to black, the night passes (she is healed), the flag `slept`, and
-## the second morning begins as a WakeScene (`second_morning`): from there the game really starts. A child of the player; solo / host only for now.
+## the title card is shown once in the black (TitleCard), the second morning begins as a WakeScene (`second_morning`): from there the game really starts. A child of the player; solo / host only for now.
 
 const SHUT: AudioStream = preload("res://assets/audio/hut/creak_b.wav")
 
@@ -32,6 +32,10 @@ func start(player: Player, world: WorldLevel, rest: bool = false) -> void:
 	player.health.heal_full() ## the night mends her
 	if not rest:
 		player.quests.set_flag("slept")
+		if not player.quests.has_flag("title_shown"):
+			player.quests.set_flag("title_shown") ## the title card, once, in the black between the evening and the second morning
+			var card: TitleCard = TitleCard.show_card(self)
+			await card.finished
 	player.story_lock = false
 	InputManager.ui_blocking = false
 	var wake: WakeScene = WakeScene.new()

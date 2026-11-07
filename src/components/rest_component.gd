@@ -10,7 +10,7 @@ enum State { FREE, APPROACH, DOWN, IDLE, WARM, STRETCH, UP, HAIR, LOOK, SETTLE }
 const GESTURE_STATES: Array[int] = [State.WARM, State.STRETCH, State.HAIR, State.LOOK, State.SETTLE]
 const GESTURE_NAMES: PackedStringArray = ["warm", "stretch", "hair", "look", "settle"]
 
-var seat: CampfireSeat
+var seat: SeatSpot
 var state: State = State.FREE
 var _player: Player
 var _rig: Dictionary
@@ -22,6 +22,8 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _prompt: InteractPrompt
 var _requested_up: bool = false
 var _input_guard: float = 0.0
+var _tick: float = 0.0 ## host: seconds towards the next `rest_tick` of the seat
+var _seated: float = 0.0 ## host: seconds she has sat (after the sitting-down)
 
 
 func _ready() -> void:
@@ -59,8 +61,8 @@ func _restore(path: NodePath, next: State, elapsed: float, rested: float, gestur
 			_show_prompt()
 
 
-func request_sit(spot: CampfireSeat) -> void:
-	if not _player.is_multiplayer_authority() or _player.quests == null or not _player.quests.has_flag("fire_seated"):
+func request_sit(spot: SeatSpot) -> void:
+	if not _player.is_multiplayer_authority() or not spot.usable_by(_player):
 		return
 	if multiplayer.is_server():
 		_request_sit(spot.get_path())
@@ -76,7 +78,7 @@ func _owner_request() -> bool:
 func _request_sit(path: NodePath) -> void:
 	if not _owner_request() or state != State.FREE or _player.health.current <= 0.0 or _player.story_lock or _player.intro != null or _player.fainting or _player.stumbling or _player.attack.is_swinging():
 		return
-	var spot: CampfireSeat = get_node_or_null(path) as CampfireSeat
+	var spot: SeatSpot = get_node_or_null(path) as SeatSpot
 	if spot == null or spot.occupied() or spot.reach_distance(_player.global_position) > Interactable.INTERACT_RANGE + 4.0:
 		return
 	_begin.rpc(path)
@@ -89,7 +91,7 @@ func _from_host() -> bool:
 @rpc("any_peer", "call_local", "reliable")
 func _begin(path: NodePath) -> void:
 	if not _from_host(): return
-	seat = get_node_or_null(path) as CampfireSeat
+	seat = get_node_or_null(path) as SeatSpot
 	if seat == null: return
 	_player.story_lock = true
 	_player.sprinting = false
@@ -187,6 +189,15 @@ func _physics_process(delta: float) -> void:
 	if _player.global_position.distance_to(seat.seat_position()) > 48.0:
 		if multiplayer.is_server(): _finish.rpc()
 		return
+	if multiplayer.is_server() and state != State.UP and state != State.DOWN: ## the seat's worth (a bench heals a little, the fire's circle warms)
+		_seated += delta
+		_tick += delta
+		if _tick >= 1.0:
+			_tick = 0.0
+			var rate: float = seat.regen_rate()
+			if rate > 0.0 and _player.health.current < _player.health.max_health * float((TownRules.config().get("rest", {}) as Dictionary).get("cap", 0.7)):
+				_player.health.heal(rate)
+			seat.rest_tick(_player, _seated)
 	var clip: Array = _rig.idle as Array
 	var fps: float = float(_rig.idle_fps)
 	var frame: int
@@ -218,6 +229,40 @@ func _physics_process(delta: float) -> void:
 	_player.show_rest_frame(frame, seat.sit_sector())
 
 
+## The look of the fire's warmth on everyone's screen: warm motes rise round her, a soft chord.
+@rpc("any_peer", "call_local", "reliable")
+func warm_fx() -> void:
+	if not _from_host():
+		return
+	var motes: CPUParticles2D = CPUParticles2D.new()
+	motes.one_shot = true
+	motes.emitting = true
+	motes.amount = 18
+	motes.lifetime = 1.8
+	motes.explosiveness = 0.35
+	motes.direction = Vector2.UP
+	motes.spread = 35.0
+	motes.gravity = Vector2(0.0, -14.0)
+	motes.initial_velocity_min = 8.0
+	motes.initial_velocity_max = 22.0
+	motes.scale_amount_min = 1.0
+	motes.scale_amount_max = 1.6
+	motes.color = Color(1.0, 0.82, 0.5, 0.85)
+	motes.material = Unlit.material()
+	motes.position = Vector2(0.0, -14.0)
+	motes.z_index = 6
+	_player.add_child(motes)
+	get_tree().create_timer(2.4).timeout.connect(motes.queue_free)
+	if ResourceLoader.exists("res://assets/audio/town/warmth.wav"):
+		var sound: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+		sound.stream = load("res://assets/audio/town/warmth.wav") as AudioStream
+		sound.volume_db = -10.0
+		sound.max_distance = 260.0
+		_player.add_child(sound)
+		sound.finished.connect(sound.queue_free)
+		sound.play()
+
+
 func _show_prompt() -> void:
 	if _prompt == null:
 		_prompt = InteractPrompt.new()
@@ -244,6 +289,8 @@ func _clear(move_to_front: bool) -> void:
 		_prompt.queue_free()
 		_prompt = null
 	seat = null
+	_seated = 0.0
+	_tick = 0.0
 	state = State.FREE
 
 

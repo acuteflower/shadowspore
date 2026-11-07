@@ -9,7 +9,7 @@ uniform sampler2D bank_map : filter_nearest, repeat_disable;
 uniform sampler2D water_detail : filter_nearest, repeat_enable;
 uniform sampler2D bank_material : source_color, filter_nearest, repeat_enable;
 uniform vec2 world_origin = vec2(0.0);
-uniform float water_time = 0.0;
+global uniform float g_water_time; // seconds of the river clock (WorldRivers / river_design_patch), shared by all water
 uniform float bank_width = 12.0;
 // World bake only: bank_map.g holds the depth under the surface (0..8 px) for shore shading.
 uniform bool bank_inner = false;
@@ -44,14 +44,14 @@ void fragment() {
         if (depth < 0.48) { color = vec3(0.22, 0.41, 0.40); }
         if (depth < 0.27) { color = vec3(0.29, 0.46, 0.43); }
         // Slow one-pixel refraction shifts submerged stones together in small patches.
-        float refract_shift = step(0.72, sin(floor(pixel.y / 8.0) * 0.8 + water_time * 0.45));
+        float refract_shift = step(0.72, sin(floor(pixel.y / 8.0) * 0.8 + g_water_time * 0.45));
         vec4 fixed_detail = texture(water_detail, (pixel + vec2(refract_shift, 0.0) + vec2(0.5)) / 128.0);
         if (mask.g < 0.48 && fixed_detail.r > 0.3) {
             color = mix(color, vec3(0.54, 0.54, 0.43), (1.0 - mask.g / 0.48) * 0.72);
         }
         // Broken, multi-pixel painted reflection clusters flowing downstream.
         vec2 q = floor(vec2(dot(pixel, flow), dot(pixel, across)));
-        q.x -= floor(water_time * mix(1.5, 0.24, calm));
+        q.x -= floor(g_water_time * mix(1.5, 0.24, calm));
         vec2 cell = floor(q / vec2(22.0, 12.0));
         vec2 local = mod(q, vec2(22.0, 12.0));
         float seed = fract(sin(dot(cell, vec2(127.1, 311.7))) * 43758.5453);
@@ -67,7 +67,7 @@ void fragment() {
         if (g_night > 0.5) { // a few cold glints of moonlight
             vec2 mc = floor(pixel / vec2(7.0, 4.0));
             float mh = hash21(mc + 77.0);
-            if (mh > 0.96 && fract(water_time * 0.15 + mh * 5.0) < 0.2 && mod(pixel.x, 7.0) == 3.0 && mod(pixel.y, 4.0) == 2.0) {
+            if (mh > 0.96 && fract(g_water_time * 0.15 + mh * 5.0) < 0.2 && mod(pixel.x, 7.0) == 3.0 && mod(pixel.y, 4.0) == 2.0) {
                 color = mix(color, vec3(0.78, 0.88, 1.0), 0.8 * g_night);
             }
         }
@@ -75,12 +75,12 @@ void fragment() {
         if (g_sun > 0.3) {
             vec2 gc = floor(pixel / vec2(5.0, 3.0));
             float gh = hash21(gc + 51.0);
-            if (gh > 0.86 && fract(water_time * 0.22 + gh * 7.0) < 0.22 && mod(pixel.x, 5.0) >= 2.0 && mod(pixel.x, 5.0) < 4.0 && mod(pixel.y, 3.0) == 1.0) {
+            if (gh > 0.86 && fract(g_water_time * 0.22 + gh * 7.0) < 0.22 && mod(pixel.x, 5.0) >= 2.0 && mod(pixel.x, 5.0) < 4.0 && mod(pixel.y, 3.0) == 1.0) {
                 color = mix(color, vec3(1.0, 0.98, 0.88), g_sun);
             }
             if (mask.g < 0.34) {
-                float c1 = sin(pixel.x * 0.45 + water_time * 0.8 + sin(pixel.y * 0.37 + water_time * 0.6) * 1.7);
-                float c2 = sin(pixel.y * 0.52 - water_time * 0.7 + sin(pixel.x * 0.33) * 1.5);
+                float c1 = sin(pixel.x * 0.45 + g_water_time * 0.8 + sin(pixel.y * 0.37 + g_water_time * 0.6) * 1.7);
+                float c2 = sin(pixel.y * 0.52 - g_water_time * 0.7 + sin(pixel.x * 0.33) * 1.5);
                 if (c1 + c2 > 1.4) { color = mix(color, vec3(0.70, 0.86, 0.66), 0.5 * g_sun); }
             }
         }
@@ -92,15 +92,15 @@ void fragment() {
             vec2 ellipse = vec2(delta.x, delta.y * 1.5);
             float r = length(ellipse);
             float radius = max(d.z, 1.0);
-            float phase = mod(r - water_time * 2.0 + radius * 8.0, 9.0);
-            float angular = sin(atan(ellipse.y, ellipse.x) * 4.0 + r * 0.12 - water_time * 0.5);
+            float phase = mod(r - g_water_time * 2.0 + radius * 8.0, 9.0);
+            float angular = sin(atan(ellipse.y, ellipse.x) * 4.0 + r * 0.12 - g_water_time * 0.5);
             float fade = clamp(1.0 - r / radius, 0.0, 1.0) * d.w;
             if (phase < 2.0 && angular > 0.05 && fade > 0.0) {
                 color = mix(color, vec3(0.67, 0.78, 0.70), fade * 0.82);
             }
             float downstream = dot(delta, flow);
             float side = dot(delta, across);
-            float trail_wave = sin(downstream * 0.35 - water_time * 1.3 + side * 0.26);
+            float trail_wave = sin(downstream * 0.35 - g_water_time * 1.3 + side * 0.26);
             float trail = clamp(1.0 - downstream / radius, 0.0, 1.0) * d.w;
             if (downstream > 2.0 && downstream < radius && abs(side) < radius * 0.34 && trail_wave > 0.76) {
                 color = mix(color, vec3(0.61, 0.75, 0.68), trail * 0.65);
@@ -114,17 +114,17 @@ void fragment() {
             float half_width = max(fall.w * 0.5, 1.0);
             if (rel.y >= -12.0 && rel.y < 2.0 && abs(rel.x) < half_width) {
                 float inlet = clamp((rel.y + 12.0) / 12.0, 0.0, 1.0);
-                float rivulet = sin(rel.x * 0.65 + sin(rel.y * 0.3) - water_time * 1.1);
+                float rivulet = sin(rel.x * 0.65 + sin(rel.y * 0.3) - g_water_time * 1.1);
                 color = mix(color, vec3(0.29, 0.52, 0.50), inlet * 0.34);
-                if (rivulet > 0.65 && mod(rel.y - water_time * 2.0 + 64.0, 9.0) < 4.0) {
+                if (rivulet > 0.65 && mod(rel.y - g_water_time * 2.0 + 64.0, 9.0) < 4.0) {
                     color = mix(color, vec3(0.43, 0.65, 0.60), inlet * 0.52);
                 }
             }
             float landing_y = rel.y - fall.z;
             if (landing_y >= 0.0 && landing_y < 25.0 && abs(rel.x) < half_width * 1.25) {
                 float fade = (1.0 - landing_y / 25.0) * (1.0 - abs(rel.x) / (half_width * 1.25));
-                float wisps = sin(rel.x * 0.50 + landing_y * 0.37 - water_time * 1.2)
-                            + sin(rel.x * 0.22 - landing_y * 0.57 + water_time * 0.7);
+                float wisps = sin(rel.x * 0.50 + landing_y * 0.37 - g_water_time * 1.2)
+                            + sin(rel.x * 0.22 - landing_y * 0.57 + g_water_time * 0.7);
                 if (wisps > 0.65) { color = mix(color, vec3(0.59, 0.73, 0.67), fade * 0.72); }
             }
         }
@@ -143,10 +143,10 @@ void fragment() {
             if (north_land > 0.0 && inside < 2.5 && bayer4(pixel + vec2(1.0, 2.0)) < 0.6 * (1.0 - inside / 2.5)) {
                 color = mix(color, vec3(0.07, 0.17, 0.22), 0.6);
             }
-            float foam_line = 0.7 + 0.3 * sin(water_time * 1.2 + pixel.x * 0.11);
+            float foam_line = 0.7 + 0.3 * sin(g_water_time * 1.2 + pixel.x * 0.11);
             if (inside < 1.1 && shore > 0.34 - 0.1 * foam_line) {
                 color = mix(color, vec3(0.78, 0.90, 0.84), 0.55 * foam_line);
-            } else if (inside < 2.1 && shore > 0.80 && mod(pixel.x + floor(water_time * 2.0), 3.0) < 2.0) {
+            } else if (inside < 2.1 && shore > 0.80 && mod(pixel.x + floor(g_water_time * 2.0), 3.0) < 2.0) {
                 color = mix(color, vec3(0.66, 0.82, 0.76), 0.32);
             }
         }

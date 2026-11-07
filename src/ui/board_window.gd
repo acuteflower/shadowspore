@@ -476,6 +476,7 @@ func _draw_list(card: Rect2) -> void:
 
 func _draw_buttons(card: Rect2) -> void:
 	_button_rects.clear()
+	var over_button: bool = false ## for the cursor: it sparkles over a button that can be pressed
 	var list: Array[Dictionary] = _buttons()
 	var x: float = card.end.x - 14.0
 	for i: int in list.size():
@@ -488,6 +489,7 @@ func _draw_buttons(card: Rect2) -> void:
 		var ready: bool = bool(button.get("ready", true))
 		var main: bool = i == 0
 		var hover: bool = rect.has_point(_canvas.get_local_mouse_position()) and InputManager.using_mouse
+		over_button = over_button or (hover and ready)
 		_canvas.draw_rect(rect, UiStyle.OUTLINE)
 		_canvas.draw_rect(rect.grow(-1.0), VineStyle.BARK if ready else Color(VineStyle.BARK, 0.5))
 		_canvas.draw_rect(Rect2(rect.position + Vector2(1, 1), Vector2(rect.size.x - 2.0, 1)), VineStyle.BARK_LIGHT)
@@ -499,6 +501,7 @@ func _draw_buttons(card: Rect2) -> void:
 		if ready and main:
 			VineStyle.glow(_canvas, Vector2(rect.position.x + 6.0, rect.get_center().y), 6.0, LIT, 0.7)
 		_text(rect.position + Vector2(11, 8), label, TEXT if ready else DIM)
+	GameCursor.set_hint(_canvas, &"click" if over_button else &"")
 
 
 func _draw_bubble() -> void:

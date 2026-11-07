@@ -112,12 +112,7 @@ func start(id: String) -> void:
 	_time = 0.0
 	_menu_before = InputManager.menu_open
 	InputManager.menu_open = true
-	_continue_key = "E"
-	for action_event: InputEvent in InputMap.action_get_events("interact"):
-		if action_event is InputEventKey:
-			var key: InputEventKey = action_event as InputEventKey
-			_continue_key = OS.get_keycode_string(key.physical_keycode if key.physical_keycode != 0 else key.keycode).to_upper()
-			break
+	_continue_key = VineStyle.key_name("interact", "E")
 	# Quiet the surrounding HUD while this conversation has focus.
 	_hidden_parts.clear()
 	if get_parent() is CanvasLayer:
@@ -291,10 +286,9 @@ func _draw_panel(line: Dictionary, e: float) -> void:
 			break
 		draw_rect(Rect2(left + 22 + i * 7, rect.end.y - 13, 3, 2), UiStyle.ACCENT if i == _page else Color("514561"))
 	if shown >= String(line.text).length() and not _closing:
-		var key_width: int = maxi(11, PixelText.width(_continue_key) + 6)
-		var key_rect: Rect2 = Rect2(right - key_width - 15, rect.end.y - 21, key_width, 12)
-		_wood_plate(key_rect, VineStyle.BARK.lerp(VineStyle.BARK_VOID, void_level))
-		_text(_continue_key, key_rect.position + Vector2(3, 2), UiStyle.ACCENT)
+		var key_width: int = VineStyle.cap_width(_continue_key)
+		var key_rect: Rect2 = Rect2(right - key_width - 15, rect.end.y - 22, key_width, VineStyle.CAP_HEIGHT)
+		VineStyle.key_cap(self, key_rect.position, _continue_key, 1.0, 0.35 + 0.25 * sin(_time * 3.0), void_level)
 		var label: String = "WEITER" if _page + 1 < _lines.size() else "ZURÜCK"
 		_text(label, Vector2(key_rect.position.x - PixelText.width(label) - 10, key_rect.position.y + 2), Color(UiStyle.TEXT, 0.75 + sin(_time * 3) * 0.2))
 

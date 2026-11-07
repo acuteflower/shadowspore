@@ -36,6 +36,20 @@ var _materials: Array[ShaderMaterial] = []
 var _energy: Dictionary = {} ## per player: how hard he is moving through the field (the clumps lean away more, then settle slowly)
 var _notifier: VisibleOnScreenNotifier2D
 var _on_screen: bool = false
+var _actors: PackedVector4Array = PackedVector4Array() ## reused every frame (the slots the shaders read)
+var _sent_actors: PackedVector4Array = PackedVector4Array() ## what the materials were last given (written only on change)
+var _live_ids: Dictionary = {} ## scratch set of the players alive this frame
+const HARVEST_LAYER: int = 1 << 4 ## physics layer 5, the one weapons hit (data/harvest.json "clover": the sickle cuts it)
+const HARVEST_SPREAD: float = 0.55 ## the hurtbox is three discs along the field's long axis, this far apart (x radius)
+var key: String = "" ## "c:x,y" of the field's centre: its harvest state is kept under this key (WorldLevel)
+var level: WorldLevel ## who keeps the state; null in the workbenches
+var cut: bool = false ## cut by the sickle: hidden until it grows back at sunrise
+var _harvest: HarvestHurtbox
+var _kick: float = 0.0 ## 0..1: how hard something just rustled the clumps
+var _kick_at: Vector2 = Vector2.ZERO ## where, in the world
+const CUT_RADIUS: float = 20.0 ## px: one sickle blow takes the clumps within this far of its spot
+var _pieces: Array[Dictionary] = [] ## every clump: {"multimeshes", "index", "xform", "at" (field-local)}, so single clumps can be cut away
+var _cut_points: Array = [] ## field-local spots already cut (the host's state "pts")
 
 
 ## Everything a field is, drawn from `rng` (the caller seeds it from the chunk, so every peer gets the same field).
@@ -55,11 +69,13 @@ static func plan(rng: RandomNumberGenerator) -> Dictionary:
 	}
 
 
-func setup(field: Dictionary, center: Vector2) -> void:
+func setup(field: Dictionary, center: Vector2, world: WorldLevel = null) -> void:
 	position = center
 	name = "CloverField"
 	y_sort_enabled = true ## the bands sort with Ellie, trees and bushes in the level's Props chain
 	radius = Vector2(float(field.rx), float(field.ry))
+	level = world
+	key = "c:%d,%d" % [roundi(center.x), roundi(center.y)]
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = int(field.seed)
 	var images: Array[Image] = _make_atlas(field, rng)
@@ -98,6 +114,20 @@ func setup(field: Dictionary, center: Vector2) -> void:
 	_notifier.screen_entered.connect(func() -> void: _on_screen = true)
 	_notifier.screen_exited.connect(func() -> void: _on_screen = false)
 	add_child(_notifier)
+	# the sickle finds the field through three discs along its long axis (physics layer 5)
+	_harvest = HarvestHurtbox.new()
+	_harvest.name = "Harvest"
+	_harvest.harvest_target = self
+	_harvest.collision_layer = HARVEST_LAYER
+	_harvest.collision_mask = 0
+	for side: float in [-HARVEST_SPREAD, 0.0, HARVEST_SPREAD]:
+		var circle: CircleShape2D = CircleShape2D.new()
+		circle.radius = radius.y * 0.95
+		var shape: CollisionShape2D = CollisionShape2D.new()
+		shape.shape = circle
+		shape.position = Vector2(side * radius.x, 0.0)
+		_harvest.add_child(shape)
+	add_child(_harvest)
 
 
 func _add_band(key: int, clumps: Array, textures: Array[ImageTexture]) -> void:
@@ -123,10 +153,16 @@ func _add_band(key: int, clumps: Array, textures: Array[ImageTexture]) -> void:
 		instance.multimesh.use_custom_data = true
 		instance.multimesh.mesh = quad
 		instance.multimesh.instance_count = clumps.size()
+		var first_layer: int = _pieces.size() if layer == 0 else _pieces.size() - clumps.size()
 		for i: int in clumps.size():
 			var c: Dictionary = clumps[i]
 			var at: Vector2 = (c.at as Vector2).round() - Vector2(0.0, band.position.y)
-			instance.multimesh.set_instance_transform_2d(i, Transform2D(Vector2(-1.0 if bool(c.flip) else 1.0, 0.0), Vector2(0.0, 1.0), at + Vector2(0.0, -9.0)))
+			var xform: Transform2D = Transform2D(Vector2(-1.0 if bool(c.flip) else 1.0, 0.0), Vector2(0.0, 1.0), at + Vector2(0.0, -9.0))
+			instance.multimesh.set_instance_transform_2d(i, xform)
+			if layer == 0:
+				_pieces.append({"multimeshes": [instance.multimesh], "index": i, "xform": xform, "at": c.at as Vector2})
+			else:
+				((_pieces[first_layer + i] as Dictionary).multimeshes as Array).append(instance.multimesh)
 			instance.multimesh.set_instance_color(i, Color(c.tint, c.tint, c.tint, 1.0))
 			instance.multimesh.set_instance_custom_data(i, Color(float(c.cell) / float(CELLS), float(c.phase), float(c.sway), at.x / 256.0 + 0.5))
 		band.add_child(instance)
@@ -136,10 +172,16 @@ func _add_band(key: int, clumps: Array, textures: Array[ImageTexture]) -> void:
 func _process(delta: float) -> void:
 	if not _on_screen:
 		return
-	var actors: PackedVector4Array = _no_actors()
+	if _actors.size() != ACTOR_SLOTS: _actors = _no_actors()
+	_actors.fill(Vector4.ZERO)
 	var used: int = 0
+	_live_ids.clear()
+	_kick = move_toward(_kick, 0.0, delta * 2.2)
 	for player: Player in Player.all:
-		if not is_instance_valid(player) or used >= ACTOR_SLOTS:
+		if not is_instance_valid(player):
+			continue
+		_live_ids[player.get_instance_id()] = true
+		if used >= ACTOR_SLOTS - 1: ## the last slot is the rustle of a blow
 			continue
 		var rel: Vector2 = player.global_position - global_position
 		if absf(rel.x) > radius.x * 1.3 + 24.0 or absf(rel.y) > radius.y * 1.3 + 24.0:
@@ -149,10 +191,86 @@ func _process(delta: float) -> void:
 		var moving: float = clampf(player.velocity.length() / 70.0, 0.0, 1.0)
 		energy = move_toward(energy, moving, delta * (7.0 if moving > energy else 0.7))
 		_energy[id] = energy
-		actors[used] = Vector4(player.global_position.x, player.global_position.y, 0.4 + 0.6 * energy, 0.0)
+		_actors[used] = Vector4(player.global_position.x, player.global_position.y, 0.4 + 0.6 * energy, 0.0)
 		used += 1
-	for shader_material: ShaderMaterial in _materials:
-		shader_material.set_shader_parameter("actors", actors)
+	for id: Variant in _energy.keys(): ## forget players who left or were freed
+		if not _live_ids.has(id): _energy.erase(id)
+	if _kick > 0.0: ## a blow or a cut: the clumps round the spot bend away, then settle
+		_actors[ACTOR_SLOTS - 1] = Vector4(_kick_at.x, _kick_at.y, 0.4 + 0.6 * _kick, 0.0)
+	if _actors != _sent_actors:
+		_sent_actors = _actors.duplicate()
+		for shader_material: ShaderMaterial in _materials:
+			shader_material.set_shader_parameter("actors", _sent_actors)
+
+
+## Harvest rules (data/harvest.json "clover"): the sickle cuts the field, it is gone until sunrise.
+func spec() -> Dictionary:
+	return DataRegistry.table("harvest").get("clover", {}) as Dictionary
+
+
+func is_depleted() -> bool:
+	return cut
+
+
+## Host: the hurtbox was hit (WorldLevel decides what that means).
+func harvest_hit(source: int) -> void:
+	if level != null:
+		level.harvest_field_hit(self, source)
+
+
+## Everyone: the host's state for this field. A cut field is hidden and no longer found; `fx` "hit" / "rustle" /
+## "strip" / "regrow" only decides what the clumps do; `at` is where the blow came from (world position).
+func apply_harvest(state: Dictionary, fx: String, at: Vector2) -> void:
+	cut = bool(state.get("f", 0))
+	visible = not cut
+	_harvest.collision_layer = 0 if cut else HARVEST_LAYER
+	_cut_points = (state.get("pts", []) as Array).duplicate()
+	_show_pieces()
+	if fx == "" or fx == "regrow":
+		return
+	_kick = 1.0 if fx == "strip" else (0.7 if fx == "hit" else 0.35)
+	_kick_at = at if at != Vector2.ZERO else global_position
+
+
+## Host: the spot of the next blow = the standing clump nearest to `from` (world), so each blow takes a patch of the field, piece by piece.
+func next_cut(from: Vector2) -> Vector2:
+	var best: Vector2 = global_position
+	var best_distance: float = INF
+	for piece: Dictionary in _pieces:
+		var at: Vector2 = piece.at as Vector2
+		if _is_cut(at, _cut_points):
+			continue
+		var d: float = to_global(at).distance_squared_to(from)
+		if d < best_distance:
+			best_distance = d
+			best = to_global(at)
+	return best
+
+
+## True when every clump lies within a cut spot (`points`: field-local) or `world_extra` (a world spot, optional).
+func all_cut(points: Array) -> bool:
+	for piece: Dictionary in _pieces:
+		if not _is_cut(piece.at as Vector2, points):
+			return false
+	return true
+
+
+func _is_cut(at: Vector2, points: Array) -> bool:
+	for point: Variant in points:
+		if at.distance_to(point as Vector2) <= CUT_RADIUS:
+			return true
+	return false
+
+
+## Cut clumps vanish (a zero-size instance); the rest stay as they were.
+func _show_pieces() -> void:
+	for piece: Dictionary in _pieces:
+		var gone: bool = _is_cut(piece.at as Vector2, _cut_points)
+		var xform: Transform2D = piece.xform as Transform2D
+		if gone:
+			xform = Transform2D(Vector2.ZERO, Vector2.ZERO, xform.origin)
+		for multimesh: MultiMesh in piece.multimeshes as Array:
+			multimesh.set_instance_transform_2d(int(piece.index), xform)
 
 
 static func _no_actors() -> PackedVector4Array:

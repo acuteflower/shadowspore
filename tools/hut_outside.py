@@ -242,3 +242,75 @@ def vane_arr():
         px(4 + k, 8 - 1 - k, 3 if k < 3 else 2)
         px(4 + k, 9 + 1 + k, 1)
     return arr
+
+
+def banner_arr():
+    """The town's big banner for the renewed hut (22 x 46): hangs at the roof's right end from an iron bracket and a wooden crossbar, deep teal with a gold stripe at the
+    top and the hem, a gold spore-flower (a violet heart) in the middle and a swallow tail. Hand-placed pixels with the same ramps as the pennants on the other buildings;
+    Hut sways its rows in the wind (sway_rows.gdshader), the first rows stay put."""
+    teal = [tuple(c[:3]) for c in h.RAMPS[BANNER]]
+    iron = [tuple(c[:3]) for c in h.RAMPS[IRON]]
+    wood = [tuple(c[:3]) for c in h.RAMPS[PLANK_W]]
+    gold = [(120, 96, 52), (160, 130, 66), (212, 188, 120), (240, 220, 160)]
+    ink = (20, 14, 30)
+    W, H = 22, 46
+    arr = np.zeros((H, W, 4), np.uint8)
+
+    def px(x, y, col):
+        if 0 <= x < W and 0 <= y < H:
+            arr[y, x] = (*col, 255)
+
+    for x in range(0, 13):  # the bracket reaching out from under the eave
+        px(x, 1, ink)
+        px(x, 2, iron[3] if x < 6 else iron[2])
+        px(x, 3, iron[1])
+    for k in range(4):  # its brace
+        px(3 + k, 4 + k, iron[1])
+        px(2 + k, 4 + k, ink)
+    for x in range(6, 22):  # the crossbar
+        px(x, 5, ink)
+        px(x, 6, wood[3] if x < 12 else wood[2])
+        px(x, 7, wood[1])
+        px(x, 8, ink)
+    for x in (6, 21):  # its knobs
+        px(x, 6, iron[3])
+        px(x, 7, iron[1])
+    x0, x1 = 8, 19  # the cloth: 12 wide
+    top, hem = 9, 40
+    for y in range(top, hem + 1):
+        for x in range(x0, x1 + 1):
+            tone = 3 if x <= x0 + 1 else 2 if x <= x0 + 6 else 1  # lit on the left, shaded on the right
+            if (x + y) % 7 == 0 and tone > 1:
+                tone -= 1  # a weave
+            px(x, y, teal[tone])
+        px(x0 - 1, y, ink)
+        px(x1 + 1, y, ink)
+    for x in range(x0, x1 + 1):  # a fold of shadow right under the bar
+        px(x, top, teal[0])
+    for y0 in (11, 36):  # the gold stripes at the top and the hem
+        for y in (y0, y0 + 1):
+            for x in range(x0, x1 + 1):
+                px(x, y, gold[2] if x <= x0 + 5 else gold[1])
+    cx, cy = (x0 + x1) // 2, 24  # the emblem: a spore-flower, four petals round a violet heart
+    for dx, dy in ((0, -4), (0, 4), (-4, 0), (4, 0)):
+        for ox, oy in ((0, 0), (1, 0), (0, 1), (-1, 0), (0, -1)):
+            px(cx + dx + ox, cy + dy + oy, gold[2] if dx <= 0 and dy <= 0 else gold[1])
+    for dx, dy in ((-2, -2), (2, -2), (-2, 2), (2, 2)):
+        px(cx + dx, cy + dy, gold[1])
+    for dx in range(-1, 2):
+        for dy in range(-1, 2):
+            px(cx + dx, cy + dy, (150, 100, 220) if dx + dy <= 0 else (110, 70, 180))
+    px(cx, cy, (230, 200, 255))
+    mid = (x0 + x1) / 2.0
+    for j in range(1, 6):  # the swallow tail: a notch that opens towards the point
+        for x in range(x0 - 1, x1 + 2):
+            if abs(x - mid) < 0.6 + j * 0.9 and j > 1 or j == 1 and abs(x - mid) < 0.6:
+                arr[hem + j, x] = 0
+            elif x0 <= x <= x1:
+                px(x, hem + j, teal[1 if x > mid else 2])
+    for y in range(hem + 1, H):  # ink round everything the tail has taken a pixel from
+        for x in range(W):
+            if arr[y, x, 3] == 0 and any(0 <= y + dy < H and 0 <= x + dx < W and arr[y + dy, x + dx, 3] and tuple(arr[y + dy, x + dx, :3]) != ink and (y + dy) >= hem
+                                         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                px(x, y, ink)
+    return arr

@@ -25,6 +25,9 @@ var _shadow_args: Array = []
 var _shadow_alpha: float = 0.0 ## the shadow rises out of the deep and sinks away again
 var _shadow_last: Array = []
 var _leaps: Array[Dictionary] = []
+var _leaving: Array[Dictionary] = [] ## shadows swimming off: a fish that turned away, was scared or got loose
+var _state_seen: int = -1
+var _state_age: float = 0.0
 const SIDE: Texture2D = preload("res://assets/fishing/fish_side.png")
 
 
@@ -52,16 +55,43 @@ func _on_fx(kind: String, pos: Vector2, data: Dictionary) -> void:
 	elif kind == "lost":
 		var reason: String = String(data.get("reason", ""))
 		if messages.has(reason):
-			_texts.append({"pos": pos, "text": String(messages[reason]), "age": 0.0, "bad": reason in ["snapped", "escaped"]})
+			_texts.append({"pos": pos, "text": String(messages[reason]), "age": 0.0, "bad": reason in ["snapped", "escaped", "unhooked", "torn"]})
+		_leave(pos, data, 1.6 if reason in ["escaped", "unhooked", "torn", "snapped"] else 1.0)
 	elif kind == "leap":
 		_leaps.append({"pos": pos, "row": ORDER.find(String(data.get("species", ""))), "age": 0.0})
 	elif kind == "scared":
 		_texts.append({"pos": pos, "text": String(messages["scared"]), "age": 0.0, "bad": false})
+		_leave(pos, data, 1.8)
+	elif kind == "refuse":
+		_texts.append({"pos": pos, "text": String(messages["refused"]), "age": 0.0, "bad": false, "dim": true})
+		_leave(pos, data, 0.7)
+
+
+## A fish swims off where everybody can see it (instead of the shadow simply fading on the spot).
+func _leave(pos: Vector2, data: Dictionary, hurry: float) -> void:
+	var row: int = ORDER.find(String(data.get("species", "")))
+	var dir: Vector2 = data.get("dir", Vector2.ZERO) as Vector2
+	if row < 0 or dir == Vector2.ZERO:
+		return
+	var start: Vector2 = pos
+	if not _shadow_last.is_empty():
+		start = (_shadow_last[0] as Rect2).get_center()
+	_leaving.append({"pos": start, "dir": dir.normalized(), "row": row, "age": 0.0, "hurry": hurry, "bend": randf_range(-0.6, 0.6)})
+	_shadow_alpha = 0.0
+	_shadow_last = []
 
 
 func _process(delta: float) -> void:
 	_time += delta
 	_tap_age += delta
+	if _c.state != _state_seen:
+		_state_seen = _c.state
+		_state_age = 0.0
+	_state_age += delta
+	for i: int in range(_leaving.size() - 1, -1, -1):
+		_leaving[i]["age"] = float(_leaving[i]["age"]) + delta
+		if float(_leaving[i]["age"]) > 1.3:
+			_leaving.remove_at(i)
 	for i: int in range(_leaps.size() - 1, -1, -1):
 		_leaps[i]["age"] = float(_leaps[i]["age"]) + delta
 		if float(_leaps[i]["age"]) > 0.55:
@@ -72,7 +102,7 @@ func _process(delta: float) -> void:
 		_texts[i]["age"] = float(_texts[i]["age"]) + delta
 		if float(_texts[i]["age"]) > 1.4:
 			_texts.remove_at(i)
-	var active: bool = _c.state != FishingComponent.S.IDLE or not _texts.is_empty() or (_c.rod_active() and _c.is_multiplayer_authority()) or not _leaps.is_empty() or _shadow_alpha > 0.0
+	var active: bool = _c.state != FishingComponent.S.IDLE or not _texts.is_empty() or (_c.rod_active() and _c.is_multiplayer_authority()) or not _leaps.is_empty() or not _leaving.is_empty() or _shadow_alpha > 0.0
 	if not active:
 		return
 	var goal: Vector2 = _c.bobber
@@ -187,16 +217,32 @@ func _shadow_for(s: int) -> Array:
 		return []
 	var at: Vector2 = _shown
 	var face: Vector2 = Vector2.RIGHT
+	var down: Vector2 = _c.current_at(_shown)
+	var upstream: Vector2 = -down.normalized() if down.length() > 0.05 else (_shown - _c.approach_from).normalized()
+	var hold: Vector2 = _shown - upstream * 7.0 ## fish stand head into the current, just below the drifting bait
 	match s:
 		FishingComponent.S.DRIFTING:
+			## a curve out of the deep, a pause halfway to look, then the last careful glide into place below the float
 			var k: float = 1.0 - clampf(_c.approach_time / maxf(_c.approach_total, 0.01), 0.0, 1.0)
-			var eased: float = 1.0 - pow(1.0 - k, 2.0)
-			at = _c.approach_from.lerp(_shown, eased)
-			face = (_shown - _c.approach_from).normalized()
-		FishingComponent.S.NIBBLE, FishingComponent.S.BITE:
-			var a: float = _time * 1.3
-			at = _shown + Vector2(cos(a), sin(a) * 0.6) * 7.0
-			face = Vector2(-sin(a), cos(a) * 0.6).normalized()
+			var eased: float = 0.55 * (1.0 - pow(1.0 - minf(k / 0.45, 1.0), 2.0)) + 0.45 * smoothstep(0.62, 1.0, k)
+			var side: float = 1.0 if fmod(absf(_c.approach_from.x * 0.37 + _c.approach_from.y * 0.61), 2.0) < 1.0 else -1.0
+			var bend: Vector2 = (_c.approach_from + hold) * 0.5 + (hold - _c.approach_from).orthogonal() * 0.35 * side
+			at = _c.approach_from.lerp(bend, eased).lerp(bend.lerp(hold, eased), eased)
+			var ahead: float = minf(eased + 0.05, 1.0)
+			var next: Vector2 = _c.approach_from.lerp(bend, ahead).lerp(bend.lerp(hold, ahead), ahead)
+			face = (next - at).normalized() if next.distance_to(at) > 0.01 else upstream
+			face = face.slerp(upstream, smoothstep(0.8, 1.0, k)).normalized() ## it turns into the current to wait
+			at += face.orthogonal() * sin(_time * 7.0) * 0.6 * (1.0 - k) ## a little tail beat
+		FishingComponent.S.NIBBLE:
+			var dart: float = 1.0 - clampf(_tap_age / 0.25, 0.0, 1.0) ## every tap: it darts up and mouths the bait
+			at = hold.lerp(_shown, 0.7 * dart) + upstream.orthogonal() * sin(_time * 2.1) * 1.2
+			face = upstream.slerp((_shown - hold).normalized(), 0.4 * dart).normalized()
+		FishingComponent.S.BITE:
+			## it takes the bait and turns away with it: the float goes under, the shadow heads off
+			var turn: float = smoothstep(0.0, 0.35, _state_age)
+			var off: Vector2 = upstream.orthogonal() * (1.0 if fmod(absf(_shown.x), 2.0) < 1.0 else -1.0)
+			face = upstream.slerp(off, turn).normalized()
+			at = _shown + off * 5.0 * turn - upstream * 2.0
 		FishingComponent.S.DRILL:
 			face = (_c.tip() - _shown).normalized() if _c.phase == "tire" else _c.heading
 		_:
@@ -208,6 +254,19 @@ func _shadow_for(s: int) -> Array:
 
 
 func _paint_shadow() -> void:
+	var near_tone: Color = Color(0.5, 0.74, 0.8, 0.58)
+	for leave: Dictionary in _leaving: ## a fish leaving speeds off, bends away and sinks out of sight
+		var age: float = float(leave["age"])
+		var hurry: float = float(leave["hurry"])
+		var dir: Vector2 = (leave["dir"] as Vector2).rotated(float(leave["bend"]) * smoothstep(0.0, 0.8, age))
+		var travel: float = (18.0 * age + 26.0 * age * age) * hurry
+		var at: Vector2 = (leave["pos"] as Vector2) + dir * travel
+		var index: int = posmod(roundi(dir.angle() / TAU * 16.0), 16)
+		var frame: int = int(_time * 12.0) % 2 ## a fast tail beat
+		var src: Rect2 = Rect2((index * 2 + frame) * 32, int(leave["row"]) * 32, 32, 32)
+		var tone: Color = near_tone
+		tone.a *= 1.0 - smoothstep(0.2, 1.3, age)
+		_shadow_layer.draw_texture_rect_region(SHADOWS, Rect2((at - Vector2(16, 16)).round(), Vector2(32, 32)), src, tone)
 	if not _shadow_args.is_empty():
 		_shadow_last = _shadow_args
 	if _shadow_last.is_empty() or _shadow_alpha <= 0.0:
@@ -230,5 +289,5 @@ func _draw_texts() -> void:
 		var age: float = float(t["age"])
 		var text: String = String(t["text"])
 		var pos: Vector2 = (t["pos"] as Vector2) + Vector2(-PixelText.width(text) * 0.5, -18.0 - age * 10.0)
-		var color: Color = Color("ff4a63") if bool(t["bad"]) else Color("e9e3f7")
+		var color: Color = Color("ff4a63") if bool(t["bad"]) else (DIM if bool(t.get("dim", false)) else Color("e9e3f7"))
 		PixelText.draw(self, text, Vector2i(pos.round()), Color(color, clampf(2.0 - age * 1.4, 0.0, 1.0)), Color("1b1a2e"))

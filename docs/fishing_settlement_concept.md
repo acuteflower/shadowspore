@@ -1,11 +1,11 @@
 # Siedlungs- & Expeditions-Fischerei: „Strömung & Vorrat“
-## Systemkonzept für Infrastruktur, Siedler, Handwerk & Langzeit-Progression in Voidbloom
+## Systemkonzept für Infrastruktur, Siedler, Handwerk & Langzeit-Progression in Shadowspore
 
 ---
 
 ### 1. Kernvision & Philosophie
 
-In *Voidbloom* ist die Welt in ein dämmriges, kühles Petrol getaucht. Licht ist nicht bloß Zierde, sondern die Grundbedingung für Leben, Sicherheit und Expansion (**„Licht ist Land“**). Bisher endet die Siedlung an der Uferkante der reißenden Flussläufe: Wasser galt als Hindernis, unpassierbar in den Tiefen, gefährlich in der Nacht.
+In *Shadowspore* ist die Welt in ein dämmriges, kühles Petrol getaucht. Licht ist nicht bloß Zierde, sondern die Grundbedingung für Leben, Sicherheit und Expansion (**„Licht ist Land“**). Bisher endet die Siedlung an der Uferkante der reißenden Flussläufe: Wasser galt als Hindernis, unpassierbar in den Tiefen, gefährlich in der Nacht.
 
 Das System **„Strömung & Vorrat“** schlägt die Brücke vom trockenen Land hinein in das dynamische Adernetz der Welt:
 1. **Das Wasser zähmen, ohne es zu zerstören:** Mit dem Bau von Stegen, Reusen und Räuchereien wächst die Siedlung organisch ins Wasser hinein. Wo die Laterne auf die Wellen scheint, wird der Fluss vom unberechenbaren Grenzstreifen zur Lebensader der Dorfgemeinschaft.
@@ -135,7 +135,7 @@ Die neue Kategorie `water` („WASSER & HAFEN“) erweitert das Baumenü (Taste 
 
 ### 4. Wirtschaft, Handwerk & Haltbarmachung
 
-Ein zentrales Problem in vielen RPGs ist die Entwertung von Nahrungsmitteln im Mid- und Endgame. In *Voidbloom* ist Fischerei eng mit der Überlebensökonomie der Mine und der Siedlungserweiterung verzahnt.
+Ein zentrales Problem in vielen RPGs ist die Entwertung von Nahrungsmitteln im Mid- und Endgame. In *Shadowspore* ist Fischerei eng mit der Überlebensökonomie der Mine und der Siedlungserweiterung verzahnt.
 
 ```mermaid
 graph LR
@@ -230,7 +230,7 @@ Jeder Gewässerabschnitt besitzt sein eigenes ökologisches Profil:
 
 ### 6. Mehrwert & Spielerlebnis
 
-Warum bereichert dieses System die Spielerfahrung von *Voidbloom* nachhaltig?
+Warum bereichert dieses System die Spielerfahrung von *Shadowspore* nachhaltig?
 
 1. **Perfekte Ergänzung der Spielphasen (Pacing & Downtime)**:
    - Nach nervenaufreibenden Kämpfen in den Minen oder gefährlichen Nächten im Wald bietet der Steg einen meditativen, atmosphärischen Rückzugsort. Das sanfte Plätschern des Wassers, das Schaukeln der Laterne im Wind (`WorldWind`) und die Reflexe des Petrol-Wassers erzeugen intensive Immersion.
@@ -239,7 +239,7 @@ Warum bereichert dieses System die Spielerfahrung von *Voidbloom* nachhaltig?
 3. **Befriedigende Automatisierung & Progression**:
    - Man startet mit einer einfachen Schnur an einem Weidenast und kämpft um jeden kleinen Barsch.
    - Später besitzt die Stadt ausgebaute Piers mit Zuchtbecken, automatisierte Reusenstrecken, die von Maren betreut werden, und eine rauchende Fischräucherei, die ganze Expeditionskisten mit energiereichem Reiseproviant füllt.
-4. **Stimmige Ästhetik im Voidbloom-Stil**:
+4. **Stimmige Ästhetik im Shadowspore-Stil**:
    - Die optische Verflechtung von mystischem Türkis-Glühen auf dunklem Wasser, Holzpfählen mit Moosbewuchs und aufsteigenden Rauchfahnen der Räucherei fügt sich nahtlos in die handgezeichnete Ästhetik des Spiels ein.
 
 ---
@@ -409,7 +409,7 @@ In `data/town.json` wird die Kategorie `water` ergänzt:
 ```
 
 #### 7.3. Klassenstruktur & Host-Authoritative Synchronisation
-Um Bandbreite zu sparen und Desynchronisationen zu verhindern, folgt die Fischerei dem bewährten Netzwerkmodell von Voidbloom:
+Um Bandbreite zu sparen und Desynchronisationen zu verhindern, folgt die Fischerei dem bewährten Netzwerkmodell von Shadowspore:
 
 ```
 [Client (Angler)]               [Server / Host]                 [Client 2 (Co-op Helfer)]
@@ -443,4 +443,4 @@ Um Bandbreite zu sparen und Desynchronisationen zu verhindern, folgt die Fischer
 
 ### 8. Fazit
 
-Das Konzept **„Strömung & Vorrat“** erweitert *Voidbloom* um ein tiefgreifendes, mechanisch geerdetes System, das weit über ein herkömmliches Angel-Minispiel hinausgeht. Es verwandelt die Gewässer von reinen Barrieren in lebendige Versorgungsadern, bettet sich organisch in das Siedlungs- und Licht-Konstruktionssystem ein, schenkt der Dorfgemeinschaft eine charismatische neue Bewohnerin und stattet Expeditionsteams mit unverzichtbaren Proviant- und Lichtressourcen für die Tiefen der Welt aus.
+Das Konzept **„Strömung & Vorrat“** erweitert *Shadowspore* um ein tiefgreifendes, mechanisch geerdetes System, das weit über ein herkömmliches Angel-Minispiel hinausgeht. Es verwandelt die Gewässer von reinen Barrieren in lebendige Versorgungsadern, bettet sich organisch in das Siedlungs- und Licht-Konstruktionssystem ein, schenkt der Dorfgemeinschaft eine charismatische neue Bewohnerin und stattet Expeditionsteams mit unverzichtbaren Proviant- und Lichtressourcen für die Tiefen der Welt aus.

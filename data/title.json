@@ -1,0 +1,15 @@
+{
+ "wind": {"base": 0.25, "swing": 0.45, "period": 9.0, "gust": 0.25},
+ "plants": {"amount": 2.2, "flutter": 0.55, "speed": 2.1},
+ "glow": {"intensity": 1.0, "beat_rate": 0.8},
+ "eye": {"sequence": [4, 3, 0, 7, 1, 7, 0, 3], "step": 0.6, "glitch_frames": [2, 5, 6], "glitch_every": 9.0, "glitch_len": 0.18},
+ "lamp": {"fps": 7.0, "wobble": 0.6, "flicker": [1.0, 0.94, 1.06, 0.97, 1.08, 0.92, 1.02, 0.96]},
+ "glint": {"every": 12.0, "length": 2.6, "strength": 0.3, "width": 10.0, "from": 100.0, "to": 520.0},
+ "glitch": {"every": 7.0, "length": 0.14, "rows": [1, 3], "shift": [2, 3], "top": 4, "bottom": 2},
+ "halo": {"void": 0.8, "life": 0.8, "lamp": 0.8, "void_beat": 0.3, "life_breath": 0.15},
+ "spores": {"count": 16, "bloom_share": 0.55, "life": [4.5, 7.5], "rise": [6.0, 12.0], "gold_every": 4},
+ "motes": {"count": 18, "life": [3.0, 6.0], "rise": [5.0, 10.0], "spread": 44.0, "magenta_share": 0.12},
+ "drips": {"count": 6, "every": [2.6, 4.4], "fall": 9.0, "fall_time": 0.9},
+ "build": {"total": 6.2, "crack": [0.8, 1.8], "crack_half": 250.0, "blueprint": [1.5, 2.0], "letters": [1.8, 4.4], "fall_span": 0.09,
+  "plants": [3.6, 4.7], "impact": 4.5, "ignite_void": 4.7, "ignite_life": 4.95, "front": [4.8, 5.8], "idle_in": [5.6, 6.2]}
+}

@@ -36,10 +36,11 @@ const LAYERS: Array[Dictionary] = [
 	{"id": 20, "name": "shroom_patch", "cell": 17, "reach": 5},
 	{"id": 21, "name": "fairy_ring", "cell": 44, "reach": 9},
 	{"id": 22, "name": "water_edge", "cell": 4, "reach": 4},
+	{"id": 23, "name": "lone_snapper", "cell": 21, "reach": 3},
 ]
 const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail"] ## may grow at the water's edge
 const TREE_KINDS: Array[String] = ["tree", "willow", "blossom", "birch"] ## what has a trunk and a crown
-const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25} ## mushrooms give way to everything, so they never change what else stands where
+const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3} ## mushrooms give way to everything, so they never change what else stands where
 const BED_RX: Array[float] = [40.0, 48.0, 56.0, 64.0, 72.0, 80.0] ## px, the gravel beds (assets/props/stonebed.png)
 const BED_FLATTEN: float = 0.64
 const GAP: float = 3.0 ## px kept free between footprints
@@ -66,6 +67,7 @@ var _exclude: Rect2i
 var _seed: int
 var _plants: Dictionary
 var _cache: Dictionary = {}
+const CACHE_LIMIT: int = 4096 ## clusters kept at most; beyond it the cache starts over
 
 
 func _init(zone: FastNoiseLite, sdf: PackedByteArray, relief: Relief, exclude: Rect2i, world_seed: int) -> void:
@@ -237,6 +239,8 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 	var shore: float = _shore(center)
 	var slope: float = aspect(center) ## -1 north-facing slope / cliff foot .. +1 south-facing slope
 	var shade: float = clampf(wild - 0.45 * slope, 0.0, 1.0) ## shaded, damp ground: the noise's shade plus what the slope adds
+	var damp: float = damp_at(center)
+	var lush: float = lerpf(0.45, 1.0, smoothstep(0.1, 0.45, damp)) ## dry slopes carry less than damp ground
 	var found: Array[Dictionary] = []
 	match String(layer.name):
 		"grove":
@@ -252,7 +256,7 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 			if rng.randf() < lerpf(0.5, 0.8, wild):
 				_add(found, rng, "tree", [0, 0, 1, 1, 2][rng.randi() % 5], center)
 		"lone_bush":
-			if rng.randf() < 0.42:
+			if rng.randf() < 0.42 * lush:
 				var kind: String = _berry_kind(center, "berry_bush") if rng.randf() < 0.12 else "bush"
 				_add(found, rng, kind, _weighted(rng, kind), center)
 		"lone_stone":
@@ -262,7 +266,7 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 				else:
 					_add(found, rng, "pebble", _weighted(rng, "pebble"), center)
 		"lone_mushroom":
-			if rng.randf() < 0.1 + 0.5 * shade: ## they like the shade (and north slopes and cliff feet)
+			if rng.randf() < (0.1 + 0.5 * shade) * (0.5 + damp): ## they like the shade (and north slopes and cliff feet) and the damp
 				_add(found, rng, "mushroom", _weighted(rng, "mushroom"), center)
 		"lone_grass":
 			if rng.randf() < 0.5 - 0.3 * wild + 0.15 * maxf(slope, 0.0): ## more in the open meadow and on sunny slopes
@@ -285,8 +289,11 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 		"lone_blossom":
 			if rng.randf() < 0.1 + 0.16 * (1.0 - wild):
 				_add(found, rng, "blossom", _weighted(rng, "blossom"), center)
+		"lone_snapper": ## the odd night flower of the dark, damp shade (it only bites at night, and not inside the town's light)
+			if rng.randf() < 0.04 + 0.22 * shade * damp:
+				_add(found, rng, "snapper", _weighted(rng, "snapper"), center)
 		"lone_flora":
-			if rng.randf() < 0.5:
+			if rng.randf() < 0.5 * lush:
 				var flora: String = _flora_kind(rng, center, shade, shore, slope)
 				_add(found, rng, flora, _weighted(rng, flora), center)
 		"lone_root": ## the odd root vegetable out in the wild: nightbeets in deep shade, ember carrots toward the light
@@ -300,7 +307,7 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 			if rng.randf() < 0.08 + 0.12 * (1.0 - wild):
 				_add(found, rng, "birch", _weighted(rng, "birch"), center, -0.4)
 		"shroom_patch": ## glow morels and moon parasols in small groups, in the shade and on the edge of the birch drifts
-			if rng.randf() < 0.1 + 0.4 * shade:
+			if rng.randf() < (0.1 + 0.4 * shade) * (0.5 + damp):
 				var shroom: String = "ember_morel" if rng.randf() < 0.55 else "moon_parasol"
 				for _i: int in rng.randi_range(2, 5):
 					_add(found, rng, shroom, _weighted(rng, shroom), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.0, 3.5))
@@ -312,8 +319,11 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 			if gap >= 6.0 and gap <= 120.0 and rng.randf() < 0.75 * (1.0 - 0.5 * smoothstep(20.0, 120.0, gap)):
 				_water_edge(found, rng, center)
 		"flora_patch":
-			if rng.randf() < 0.5:
+			if rng.randf() < 0.5 * lush:
 				_flora_patch(found, rng, center, shade, shore, slope)
+	## Pure: a cluster depends only on its key, the seed and the static world inputs (set once before any chunk, and `_cache` is
+	## cleared on terrain edits), so a cleared entry is simply computed again with the same result.
+	if _cache.size() >= CACHE_LIMIT: _cache.clear()
 	_cache[key] = found
 	return found
 
@@ -499,6 +509,15 @@ func aspect(at: Vector2) -> float:
 	if _relief.wall_above(Vector2i(floori(at.x), floori(at.y))):
 		slope = minf(slope, -0.7) ## the foot of a wall lies in its shadow
 	return slope
+
+
+## 0 dry .. 1 damp ground at `at` (tiles): north slopes and cliff feet, the water's edge and low ground are damp; sunny slopes and
+## high ground are dry (docs/plant_life.md). Pure, so every peer and every chunk agrees.
+func damp_at(at: Vector2) -> float:
+	var near: float = _near_water(at)
+	var height: float = _relief.level_at(at * 16.0)
+	var variation: float = _zone.get_noise_2d(at.x * 0.6 + 311.0, at.y * 0.6 - 97.0) * 0.12
+	return clampf(0.42 - 0.34 * aspect(at) + 0.4 * near - 0.1 * height + variation, 0.0, 1.0)
 
 
 ## Which tree grows at `at`: willows on wet ground near the coast, blossom trees in the open, else firs.

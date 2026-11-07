@@ -57,6 +57,9 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	var town: TownManager = tree.get_first_node_in_group("town") as TownManager
 	if town != null and town.founded:
 		data["town"] = town.export_state() ## the pieces, the stock, the ways, the residents (docs/town.md)
+	var waystones: Waystones = Waystones.of(tree)
+	if waystones != null and waystones.awake_count() > 0:
+		data["waystones"] = waystones.export_state() ## the awakened goddess statues (docs/waystones.md)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
@@ -103,6 +106,9 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	var town: TownManager = tree.get_first_node_in_group("town") as TownManager
 	if town != null and data.has("town"):
 		town.import_state(data.town as Dictionary)
+	var waystones: Waystones = Waystones.of(tree)
+	if waystones != null and data.has("waystones"):
+		waystones.import_state(data.waystones as Dictionary)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null and data.has("map"):
 		discovery.import_saved(Marshalls.base64_to_raw(String(data["map"])))

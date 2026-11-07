@@ -24,6 +24,7 @@ var _population: Node
 
 
 func _ready() -> void:
+	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_spec = DataRegistry.get_entry("wildlife", species)
 	_rng.seed = hash(name)
 	_population = get_parent().get_parent()

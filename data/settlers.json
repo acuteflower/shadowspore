@@ -184,6 +184,7 @@
   "founder": true,
   "takes_over": "knight",
   "actor": "knight",
+  "alert_watch": true,
   "counts": false,
   "spots": {
    "door": {

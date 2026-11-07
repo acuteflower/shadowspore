@@ -18,6 +18,8 @@ var _origin: Vector2
 var _jellies: Array[Dictionary] = []
 var _water_glows: Dictionary = {} ## water-plant sprite -> its glow sprite (same frame)
 var _water_homes: Dictionary = {} ## water-plant sprite -> where it floats
+var _bank_glow_sheet: Texture2D
+var _flora_shader: Shader ## river_flora.gdshader; the materials stay per plant (bend and current are per-plant uniforms)
 
 func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> void:
 	_rivers = rivers
@@ -30,6 +32,7 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"])))
 	var spacing: int = int(_spec["spacing"])
+	var sheet: Texture2D = load("res://assets/water/river_details.png") as Texture2D
 	for y: int in range(16, 512, spacing):
 		for x: int in range(16, 512, spacing):
 			if _sprites.size() >= int(_spec["max_chunk"]): break
@@ -51,7 +54,7 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 			if row == 0 and rivers.lake_at(at) and field.y < 0.48 and rng.randf() < 0.3:
 				row = 5
 			var sprite: Sprite2D = Sprite2D.new()
-			sprite.texture = load("res://assets/water/river_details.png") as Texture2D
+			sprite.texture = sheet
 			sprite.hframes = 8
 			sprite.vframes = 6
 			sprite.centered = false
@@ -60,10 +63,9 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 			sprite.z_index = -6 if row in [0, 4, 5] else 0
 			if row in [0, 4]: sprite.modulate = Color(0.65, 0.85, 0.8, 0.65)
 			if row in [0, 1]:
-				var mat: ShaderMaterial = ShaderMaterial.new()
-				mat.shader = load("res://assets/shaders/river_flora.gdshader") as Shader
-				sprite.material = mat
+				sprite.material = _flora_material()
 			add_child(sprite)
+			if row in [0, 1, 4, 5]: _make_cuttable(sprite)
 			if row == 1: sprite.add_to_group("river_perches")
 			if row in [2, 3]: sprite.add_to_group("river_cover")
 			_sprites.append(sprite)
@@ -82,7 +84,7 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 		var at: Vector2 = Vector2(float(outlet[0]), float(outlet[1])) + Vector2(5, -2)
 		if Vector2i((at / 512.0).floor()) != cell or _sprites.size() >= int(_spec["max_chunk"]): continue
 		var pad: Sprite2D = Sprite2D.new()
-		pad.texture = load("res://assets/water/river_details.png") as Texture2D
+		pad.texture = sheet
 		pad.hframes = 8
 		pad.vframes = 6
 		pad.centered = false
@@ -98,6 +100,13 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 	_water_glow(rivers, cell)
 	_water_flora(rivers, cell)
 	_spawn_jellies(rivers, cell)
+
+## The sickle can cut this plant (see WaterPlantCut).
+func _make_cuttable(sprite: Sprite2D) -> void:
+	var cutter: WaterPlantCut = WaterPlantCut.new()
+	cutter.setup(sprite)
+	add_child(cutter)
+
 
 ## Shore dressing (rows 10-15 of `_rows` = rows 0-5 of bank_details.png): reeds, stones, driftwood,
 ## wet-grass tufts with blooms, ferns and foam-lapped stones, placed in random clumps along the bank.
@@ -147,13 +156,15 @@ func _add_bank_sprite(sheet: Texture2D, at: Vector2, kind: int, variant: int, rn
 		sprite.material = _flora_material()
 	if kind >= 7: sprite.z_index = -6  # in the water, under the y-sorted shore props
 	add_child(sprite)
+	if kind in [0, 3, 4, 6, 7, 8]: _make_cuttable(sprite)
 	_sprites.append(sprite)
 	_rows.append(10 + kind)
 	_phases.append(rng.randf() * TAU)
 	_flows.append(Vector2.ZERO)
 	if kind in [3, 6, 7, 8]:  # luminous plants: only the glowing pixels, drawn unlit and brighter at night
 		var glow: Sprite2D = Sprite2D.new()
-		glow.texture = load("res://assets/water/bank_details_glow.png") as Texture2D
+		if _bank_glow_sheet == null: _bank_glow_sheet = load("res://assets/water/bank_details_glow.png") as Texture2D
+		glow.texture = _bank_glow_sheet
 		glow.hframes = 6
 		glow.vframes = 9
 		glow.frame = sprite.frame
@@ -212,6 +223,7 @@ func _add_water_sprite(sheet: Texture2D, glow_sheet: Texture2D, at: Vector2, kin
 	if kind == 22:
 		sprite.material = _flora_material()
 	add_child(sprite)
+	_make_cuttable(sprite)
 	_sprites.append(sprite)
 	_rows.append(kind)
 	_phases.append(rng.randf() * TAU)
@@ -328,8 +340,9 @@ func _drift_jellies(delta: float) -> void:
 		sprite.position = (jelly["pos"] as Vector2).round() + Vector2(0.0, roundf(sin(_time * 0.7 + float(jelly["phase"]) * 6.0) * 2.0))
 
 func _flora_material() -> ShaderMaterial:
+	if _flora_shader == null: _flora_shader = load("res://assets/shaders/river_flora.gdshader") as Shader
 	var mat: ShaderMaterial = ShaderMaterial.new()
-	mat.shader = load("res://assets/shaders/river_flora.gdshader") as Shader
+	mat.shader = _flora_shader
 	return mat
 
 ## Called by DayNight through the group `night_lights`.
@@ -340,12 +353,25 @@ func set_night(amount: float) -> void:
 	for mat: ShaderMaterial in glow_materials:
 		mat.set_shader_parameter("night", amount)
 
+## Plants farther than this from every player are not updated. Their frame and bend come from the
+## absolute clock (`_time`), so they are correct again on the first frame they come back into range.
+const ANIMATE_RADIUS: float = 420.0
+
+func _near_any(at: Vector2, players: PackedVector2Array, radius: float) -> bool:
+	for spot: Vector2 in players:
+		if at.distance_squared_to(spot) <= radius * radius: return true
+	return false
+
 func _process(delta: float) -> void:
 	_time += delta
 	_drift_jellies(delta)
+	# Players are collected once per frame. With no player at all (workbenches) everything animates as before.
+	var players: PackedVector2Array = PackedVector2Array()
+	for player: Player in Player.all: players.append(player.global_position)
 	for i: int in _sprites.size():
 		var sprite: Sprite2D = _sprites[i]
 		var row: int = _rows[i]
+		if not players.is_empty() and not _near_any(sprite.global_position, players, ANIMATE_RADIUS): continue
 		if row >= 20:
 			_animate_water_plant(sprite, row, _phases[i], _flows[i])
 			if row == 22:
@@ -354,8 +380,8 @@ func _process(delta: float) -> void:
 		if row < 10: sprite.frame = row * 8 + posmod(int(_time * float(_spec["plant_fps"] if row in [0, 1, 5] else _spec["rock_fps"]) + _phases[i]), 8)
 		if sprite.material is ShaderMaterial:
 			var bend: float = sin(_time * 1.4 + _phases[i]) * 0.7
-			for player: Player in Player.all:
-				var gap: Vector2 = sprite.global_position - player.global_position
+			for spot: Vector2 in players:
+				var gap: Vector2 = sprite.global_position - spot
 				if gap.length() < float(_spec["bend_radius"]): bend += signf(gap.x) * 2.0 * (1.0 - gap.length() / float(_spec["bend_radius"]))
 			(sprite.material as ShaderMaterial).set_shader_parameter("bend", clampf(bend, -2.0, 2.0))
 			if row == 0 or row == 18: (sprite.material as ShaderMaterial).set_shader_parameter("current_push", _flows[i] * (0.8 + 0.4 * sin(_time * 1.5 + _phases[i])))

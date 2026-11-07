@@ -172,6 +172,22 @@ def streamer(m, x, y_top, z, length, mat=None):
     m.ell(V(x + 1.3, y_top - length - 0.8, z + 0.6), (1.1, 1.5, 0.35), mat)
 
 
+def side_banner(m, x, y_top, z, length, out=1, half=2.6, what="banner"):
+    """The town's teal banner (gold stripe, swallow tail) hung at the SIDE of a roof: an iron bracket reaches out under the eave's end (`out` = +1 right, -1 left) and the banner
+    hangs from a crossbar on it, beside the wall. The banner is its own picture (swaying), the bracket stays in the piece."""
+    bx = x + out * 5.0
+    if what == "bracket":  # stays in the piece
+        m.limb(V(x - out * 1.5, y_top + 0.6, z), V(bx, y_top + 0.6, z), 0.5, 0.5, IRON)
+        m.limb(V(x + out * 1.5, y_top - 2.2, z), V(bx - out * 0.3, y_top + 0.2, z), 0.4, 0.4, IRON)  # its brace
+        m.ell(V(bx, y_top + 0.6, z), (0.9, 0.9, 0.9), IRON)
+        return
+    log(m, V(bx - half - 0.8, y_top - 0.4, z + 0.5), V(bx + half + 0.8, y_top - 0.4, z + 0.5), 0.45, IRON, step=0.8)  # the crossbar
+    slab(m, V(bx, y_top - 0.8, z + 0.9), V(bx, y_top - length, z + 0.9), half, 0.5, BANNER, (0, 0, 1), step=1.0)
+    slab(m, V(bx, y_top - length * 0.4, z + 1.2), V(bx, y_top - length * 0.4 - 1.6, z + 1.2), half + 0.05, 0.4, STRAW, (0, 0, 1), step=0.9)
+    m.ell(V(bx - half * 0.5, y_top - length - 0.8, z + 0.9), (half * 0.55, 1.6, 0.35), BANNER)  # the two tails
+    m.ell(V(bx + half * 0.5, y_top - length - 0.8, z + 0.9), (half * 0.55, 1.6, 0.35), BANNER)
+
+
 def pole(m, x, y0, y1, z, bar=3.8):
     upright(m, x, z, y0, y1, 0.9, BARK, 0.9)
     log(m, V(x - bar, y1 - 0.8, z), V(x + bar, y1 - 0.8, z), 0.45, IRON, step=0.8)
@@ -320,7 +336,7 @@ def stockpile():
     for k in range(3):
         y.cap(m, V(W - 22 + k * 6.6, 3.4, front - 3.2), (0, 0, 1), 2.9, PLANK_W)
     crate(m, (-22, 0.9, front - 10), (6.0, 4.4, 6.0), PLANK, rng)  # one more outside, a lid half open
-    pole(m, W + 1, 40.0, 49.0, back - 5)  # the pennant's pole on the roof's back corner
+    side_banner(m, W + 8, 40.0, back - 5, 14.0, out=1, what="bracket")  # the banner's bracket at the roof peak, right end
     roof(m, rng, -W - 5, W + 5, (41.0, back - 5), (32.5, rf + 7), ROOF, 3.4, moss=0.12)
     for k in range(3):
         m.ell(V(-W + 4 + k * 18, 31.4, rf + 1.5), (0.9, 0.9, 0.9), h.TEAL, kind="emit")
@@ -337,7 +353,7 @@ def stockpile():
         sm.ell(V(5 + k * 3.2, 24.0, rf + 0.5), (0.8, 1.6 - 0.3 * (k % 2), 0.3), BARK_D)
     part("stockpile_sign", sm, 120, 80, 68, seed=4)
     pm = h.Model()
-    streamer(pm, W + 1, 49.0, back - 5, 9.0)
+    side_banner(pm, W + 8, 40.0, back - 5, 14.0, out=1)
     part("stockpile_pennant", pm, 120, 80, 68, seed=5)
     # the lantern's light on the floor under the roof (an additive picture, breathing with the light)
     fb = fire_box(lantern_arr)
@@ -422,7 +438,7 @@ def workshop():
         m.ell(V(fmx + gx * 5.0, 56.0, fz0 + 5.0), (1.4, 1.6, 4.2), STONE)
     for k in range(3):
         m.ell(V(fx0 + 3 + k * 7.0, 1.6, fz1 + 2.0), (3.0, 1.2, 2.0), STONE_L)  # stones at its foot
-    pole(m, -W - 3, 53.0, 63.0, back - 6)
+    side_banner(m, -W - 9, 53.0, back - 6, 17.0, out=-1, half=3.0, what="bracket")  # the banner's bracket at the roof peak, left end
     roof(m, rng, -W - 6, W + 6, (54.0, back - 6), (43.0, rf + 8), ROOF, 3.5, moss=0.12)
     for k in range(3):
         m.ell(V(-W + 6 + k * 16, 42.0, rf + 1.0), (0.9, 0.9, 0.9), h.TEAL, kind="emit")
@@ -432,7 +448,7 @@ def workshop():
     lantern(lm, (-W + 16, 41.0, rf - 1), hang=2.4)
     lantern_arr, (lx, ly) = part("workshop_lantern", lm, 144, 112, 98, glow=True, seed=6)
     pm = h.Model()
-    streamer(pm, -W - 3, 63.0, back - 6, 11.0)
+    side_banner(pm, -W - 9, 53.0, back - 6, 17.0, out=-1, half=3.0)
     part("workshop_pennant", pm, 144, 112, 98, seed=8)
     mouth = fire_box(arr)  # the forge's mouth: its light spills on the floor in front of the hearth, the lantern's under the roof
     mx = (mouth[0] + mouth[1]) / 2.0

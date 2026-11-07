@@ -16,7 +16,10 @@ func _ready() -> void:
 func host_singleplayer() -> Error:
 	if multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server() and multiplayer.get_peers().is_empty():
 		return OK
-	return _host(1, "127.0.0.1")
+	var err: Error = _host(1, "127.0.0.1")
+	if err != OK:
+		err = _host(1, "127.0.0.1", 0)
+	return err
 
 
 func host_multiplayer(port: int = DEFAULT_PORT) -> Error:

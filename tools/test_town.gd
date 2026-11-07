@@ -137,7 +137,7 @@ func _run() -> void:
 		var tree: WorldProp = world._things[tree_cell] as WorldProp
 		_check(world.town_soft_cells(Rect2(tree.position - Vector2(3, 3), Vector2(6, 6))).is_empty(), "a standing tree is not swept away")
 		_check(world.town_probe(Rect2(tree.position - Vector2(8, 8), Vector2(16, 16))) != "", "a standing tree is in the way (%s)" % world.town_probe(Rect2(tree.position - Vector2(8, 8), Vector2(16, 16))))
-	# --- used-up props inside the light vanish for good (no stump, no regrowth)
+	# --- used-up props inside the light stay as they are (stump, rubble, regrowth): the light sweeps nothing away
 	var spent: Dictionary = {}
 	for cell: Vector2i in world._things:
 		var thing: WorldProp = world._things[cell] as WorldProp
@@ -151,7 +151,7 @@ func _run() -> void:
 	await _frames(70)
 	for kind: String in spent:
 		var cell: Vector2i = spent[kind]
-		_check(not world._things.has(cell) and town.cleared.has(cell) and not world._thing_states.has(cell), "a used-up %s in the light is gone for good" % kind)
+		_check(world._things.has(cell) and not town.cleared.has(cell) and world._thing_states.has(cell), "a used-up %s in the light stays and grows back" % kind)
 	# --- demolish: a finished piece gives back 60 %, rounded up, into the stock
 	var stock_wood: int = int(town.stock.get("wood", 0))
 	town.request_demolish(lamp_id)
@@ -503,7 +503,7 @@ func _run() -> void:
 	_check(town.cleared.has(soft_cell) or soft_cell.x < 0, "cleared props stay cleared")
 	_check(world._town_node.cleared.has(soft_cell) or soft_cell.x < 0, "and the world knows")
 	# --- the save file (SaveGame): the town goes in and comes out
-	var path: String = OS.get_environment("VOIDBLOOM_TEST_SAVE_PATH")
+	var path: String = OS.get_environment("SHADOWSPORE_TEST_SAVE_PATH")
 	if path.is_empty(): path = "user://test_town_save.json"
 	_check(SaveGame.save(get_tree(), path), "the game saves with a town")
 	var pieces: int = town.structures.size()

@@ -7,6 +7,7 @@ extends TestLevel
 ## (assets/world/land_sdf.png, see tools/bake_land_sdf.gd): the void beyond is blocked by collision
 ## and drawn by `VoidEdge`; a violet light shines along the edge at night.
 
+const SKY_CLEAVER_SCENE: PackedScene = preload("res://src/entities/enemies/sky_cleaver.tscn")
 const CHUNK: int = 32 ## tiles per chunk side
 const STREAM_BUDGET_USEC: int = 2000 ## cooperative CPU preparation per frame
 const DETAIL_BUCKET: float = 64.0
@@ -41,12 +42,17 @@ var _warp_x: FastNoiseLite
 var _warp_y: FastNoiseLite
 var _props: Node2D ## y-sorted: bushes
 var _generator: PropGenerator
+var sowing: PlantSowing ## plants that seeded themselves (saved with the props)
 var _things: Dictionary = {} ## Vector2i cell -> WorldProp (loaded ones)
 var _young: Dictionary = {} ## cell -> {"age", "variant"}: saplings the generator planted; their stage follows the day (see `_young_state`), nothing is stored
 var _thing_states: Dictionary = {} ## cell -> state dict, only for props that are not untouched (every peer)
+var _harvest_states: Dictionary = {} ## "c:x,y" clover field / "l:x,y" fallen log -> state ({"h": hits, "f": 1 = cut}), only where touched (every peer)
+var _harvest_nodes: Dictionary = {} ## the same keys -> the CloverField / FallenLog node while its chunk is loaded
 var _sdf: PackedByteArray ## baked coast: one byte per tile, 128 = coast, above = land
 var _outer_sdf: PackedByteArray ## exterior coast only: inland lakes carry no void rim/light
 var _rivers: WorldRivers
+var _arena_zones: Array[Dictionary] = [] ## boss arenas nobody has entered yet: {spec, poly}
+var _arena_phase: Dictionary = {} ## arena id -> the phase its boss fight restarts from after a wipe (set by `SkyCleaver.checkpoint_reached`, not saved)
 var _relief: Relief ## baked height levels (walls, ramps, stairs)
 var _start: Vector2i
 var cover_node: ManholeCover ## the manhole cover (the intro animates its lid)
@@ -56,6 +62,8 @@ var _stone_cells: Dictionary = {} ## tiles lying on the old flagstones: no trees
 var opening_over: bool = false
 var _cover_at: Vector2 = Vector2.ZERO ## the manhole cover (world px), where the story starts; zero = none baked
 var _building: ChunkBuild
+var _paused_builds: Dictionary = {} ## Vector2i -> ChunkBuild: half-prepared chunks the stream moved away from; kept while still wanted
+var _pending_commit: ChunkBuild ## committed ground waiting one frame for its props (see `_finish_commit`)
 var night: NightDirector ## host: spawns and steers the creatures of the night
 var knight_taken: bool = false ## Valdric is a settler (`take_knight`): the story actor stays hidden
 var _town_node: TownManager ## the player's town (docs/town.md): what it has cleared stays cleared
@@ -70,6 +78,7 @@ class Chunk:
 	var cells: Dictionary = {} ## biome id -> Array[Vector2i] painted on that layer
 	var atlas: Dictionary = {} ## cell -> atlas coordinates, applied only at commit
 	var glow_cells: Array[Vector2i] = []
+	var water_near: bool = true ## no river chunk in the 3x3 neighbourhood: every tile is clear of water (see `_paint`)
 	var things: Array[WorldProp] = []
 	var fallen_logs: Array[FallenLog] = []
 	var clover: Array[CloverField] = [] ## standing clover fields, y-sorted in the Props chain
@@ -92,12 +101,17 @@ class ChunkBuild:
 	var custom: Dictionary = {}
 	var obstacles: Array[Dictionary] = []
 	var obstacle_grid: Dictionary = {}
+	var log_grid: Dictionary = {} ## every obstacle by the bucket of its centre, for FallenLogScatter (edited ones included)
+	var log_reach: float = 0.0 ## the largest final-check radius among them
 	var beds: Array[Dictionary] = [] ## the forest floors of this chunk and its neighbours {pos, rx}: what grows between the trees changes there
 	var points: Array[Dictionary] = []
+	var density: Dictionary = {} ## the wind's detail densities, read once per chunk
+	var patches_seen: Array[Node] = [] ## Terrain.patches as this chunk last saw them (compared per candidate)
 
 
 func _fill_ground() -> void:
 	RenderingServer.set_default_clear_color(Color("120e1f")) ## the void behind the land
+	LightTexture.prewarm(PackedInt32Array([24, 26, 28, 34, 36, 40])) ## the common glow/night light cookies, before the first chunk needs them
 	_map = RegionMap.new(0, DataRegistry.table("world_map"))
 	_tiles = DataRegistry.table("grass_tiles")
 	_props = Node2D.new()
@@ -124,6 +138,9 @@ func _fill_ground() -> void:
 	var discovery: MapDiscovery = MapDiscovery.new() ## the fog of the map (M)
 	discovery.name = "MapDiscovery"
 	add_child(discovery)
+	var waystones: Waystones = Waystones.new() ## the goddess statues (teleport points): which are awake (docs/waystones.md)
+	waystones.name = "Waystones"
+	add_child(waystones)
 	_relief = Relief.new()
 	Terrain.relief = _relief
 	if multiplayer.is_server():
@@ -144,6 +161,7 @@ func _fill_ground() -> void:
 	_start = _map.start if _map.start.x >= 0 else _map.anchor(_map.start_region)
 	var cleared: Rect2i = Rect2i() ## nothing is cleared by area any more: the generator fills the start like everywhere else (only the footpath and the cover stay free)
 	_generator = PropGenerator.new(_zone, _sdf, _relief, cleared, _map.world_seed)
+	Moisture.world_seed = _map.world_seed
 	_generator.blocked_cells = _add_ground_decals()
 	_generator.extra_props = _extra_props()
 	_rivers = WorldRivers.new()
@@ -162,6 +180,9 @@ func _fill_ground() -> void:
 	encounters.name = "WildlifeEvents"
 	encounters.setup(self)
 	add_child(encounters)
+	sowing = PlantSowing.new() ## seed flight and the town's edge flowers (docs/plant_life.md)
+	sowing.setup(self)
+	add_child(sowing)
 	night = NightDirector.new() ## the night (docs/nacht_monster_konzept.md): the host's director
 	night.setup(self)
 	add_child(night)
@@ -172,11 +193,13 @@ func _fill_ground() -> void:
 	fallen_knight.position = Vector2(float(knight_tile[0]), float(knight_tile[1])) * 16 + Vector2(8,8)
 	add_child(fallen_knight)
 	_spawn_guards.call_deferred()
+	_watch_arenas.call_deferred()
 	if multiplayer.is_server() and not opening_over:
 		TimeManager.lock_at(0.0) ## day 1, 00:00: the opening is at night, the clock stands still until she reaches the town
 	TimeManager.day_started.connect(_age_young) ## every peer counts the days itself
 	if multiplayer.is_server():
 		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_thing_snapshot.rpc_id(id, _thing_states))
+		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_harvest_snapshot.rpc_id(id, _harvest_states))
 		TimeManager.day_started.connect(_grow_things)
 		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_editor_snapshot.rpc_id(id, edits.data()))
 
@@ -225,6 +248,16 @@ func _add_ground_decals() -> Dictionary:
 		post.flag = String(sign_spec.get("flag", ""))
 		add_child(post)
 		_clear_around(clear, post.position, int(sign_spec.get("clear_radius", 3)))
+	for stone_spec: Dictionary in DataRegistry.table("waystones").get("statues", []) as Array: ## the waystones, goddess statues on their plinths (WaystoneStatue)
+		var statue: WaystoneStatue = WaystoneStatue.new()
+		var wtile: Array = stone_spec.tile as Array
+		statue.name = "Waystone_" + String(stone_spec.id)
+		statue.id = String(stone_spec.id)
+		statue.display_name = String(stone_spec.get("name", ""))
+		statue.reveal_cells = float(stone_spec.get("reveal", 15.0))
+		statue.position = Vector2(float(wtile[0]), float(wtile[1])) * 16.0 + Vector2(8, 8)
+		add_child(statue)
+		_clear_around(clear, statue.position, int(stone_spec.get("clear_radius", 5)))
 	for hut_spec: Dictionary in DataRegistry.table("ground").get("huts", []) as Array: ## buildings with an interior behind their door
 		var hut: Hut = Hut.new()
 		var htile: Array = hut_spec.tile as Array
@@ -252,6 +285,7 @@ func _add_ground_decals() -> Dictionary:
 		add_child(gate)
 		(get_node("Mines") as MineManager).entrance = gate.exit_position
 		_clear_around(clear, gate.position + Vector2(0, -20), int(mine_spec.get("clear_radius", 10)))
+	_add_arenas(clear)
 	if baked.has("manhole"):
 		var at: Vector2 = Vector2(float((baked.manhole as Array)[0]), float((baked.manhole as Array)[1]))
 		var cover: ManholeCover = ManholeCover.new()
@@ -273,6 +307,128 @@ func _add_ground_decals() -> Dictionary:
 			for step: int in range(int(a.distance_to(b) / 8.0) + 1):
 				_clear_around(clear, a.lerp(b, step * 8.0 / maxf(a.distance_to(b), 1.0)), reach)
 	return clear
+
+
+## Boss arenas (data/ground.json "arenas": a flagstone floor baked as a ground decal, plus pillars): every tile inside the drawn polygon
+## (and `clear_margin` px around it) stays free of generated trees, bushes and plants, so the stage is empty but for what is placed by hand.
+func _add_arenas(clear: Dictionary) -> void:
+	for spec: Dictionary in DataRegistry.table("ground").get("arenas", []) as Array:
+		var tile: Array = spec.tile as Array
+		var origin: Vector2 = Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8)
+		var poly: PackedVector2Array = PackedVector2Array()
+		for point: Array in spec.poly as Array:
+			poly.append(origin + Vector2(float(point[0]), float(point[1])))
+		var zones: Array[PackedVector2Array] = [poly]
+		for grown: PackedVector2Array in Geometry2D.offset_polygon(poly, float(spec.get("clear_margin", 16.0))):
+			zones.append(grown)
+		var lo: Vector2i = Vector2i(poly[0] / 16.0)
+		var hi: Vector2i = lo
+		for p: Vector2 in poly:
+			lo = Vector2i(mini(lo.x, int(p.x / 16.0)), mini(lo.y, int(p.y / 16.0)))
+			hi = Vector2i(maxi(hi.x, int(p.x / 16.0)), maxi(hi.y, int(p.y / 16.0)))
+		for ty: int in range(lo.y - 3, hi.y + 4):
+			for tx: int in range(lo.x - 3, hi.x + 4):
+				var centre: Vector2 = Vector2(tx, ty) * 16.0 + Vector2(8, 8)
+				for zone: PackedVector2Array in zones:
+					if Geometry2D.is_point_in_polygon(centre, zone):
+						clear[Vector2i(tx, ty)] = true
+						break
+		for pillar_spec: Dictionary in spec.get("pillars", []) as Array:
+			var at: Array = pillar_spec.pos as Array
+			var pillar: ArenaPillar = ArenaPillar.new()
+			pillar.index = (spec.pillars as Array).find(pillar_spec)
+			pillar.arena = String(spec.id)
+			pillar.name = "Pillar_%s_%d" % [String(spec.id), pillar.index]
+			pillar.variant = int(pillar_spec.get("variant", 0))
+			pillar.position = origin + Vector2(float(at[0]), float(at[1]))
+			add_child(pillar)
+			_clear_around(clear, pillar.position, 2)
+
+
+## The boss of every arena that names one (data/ground.json "arenas[].boss" {species, pillar}) is not there until somebody steps onto the arena's floor
+## (the drawn polygon): the host watches for that four times a second and then summons it once (`_summon_arena_boss`). Not saved, so a fresh start of
+## the game hides it again.
+func _watch_arenas() -> void:
+	if not multiplayer.is_server():
+		return
+	for spec: Dictionary in DataRegistry.table("ground").get("arenas", []) as Array:
+		if (spec.get("boss", {}) as Dictionary).is_empty():
+			continue
+		var origin: Vector2 = _arena_origin(spec)
+		var poly: PackedVector2Array = PackedVector2Array()
+		for point: Array in spec.poly as Array:
+			poly.append(origin + Vector2(float(point[0]), float(point[1])))
+		_arena_zones.append({"spec": spec, "poly": poly})
+	if _arena_zones.is_empty():
+		return
+	var timer: Timer = Timer.new()
+	timer.name = "ArenaWatch"
+	timer.wait_time = 0.25
+	timer.timeout.connect(_check_arenas)
+	add_child(timer)
+	timer.start()
+
+
+func _arena_origin(spec: Dictionary) -> Vector2:
+	var tile: Array = spec.tile as Array
+	return Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8)
+
+
+func _check_arenas() -> void:
+	for zone: Dictionary in _arena_zones.duplicate():
+		for player: Player in Player.all:
+			if player.health.current > 0.0 and Geometry2D.is_point_in_polygon(player.global_position, zone.poly as PackedVector2Array):
+				_arena_zones.erase(zone)
+				_summon_arena_boss(zone.spec as Dictionary, player.global_position)
+				break
+
+
+## The boss flies in from beyond the screen: it spawns `arrival.distance` px past its pillar (seen from the one who stepped in, and farther if need be
+## so that no player has it on the screen) at `arrival.height`, and swoops onto the pillar (`SkyCleaver`: FLYING -> HOVER -> LANDING).
+func _summon_arena_boss(spec: Dictionary, trigger_at: Vector2) -> void:
+	var boss: Dictionary = spec.get("boss", {}) as Dictionary
+	var start: int = int(boss.get("pillar", 0))
+	var at: Array = ((spec.pillars as Array)[start] as Dictionary).pos as Array
+	var perch: Vector2 = _arena_origin(spec) + Vector2(float(at[0]), float(at[1]))
+	var arrival: Dictionary = DataRegistry.get_entry("enemies", String(boss.species)).get("arrival", {}) as Dictionary
+	var away: Vector2 = (perch - trigger_at).normalized()
+	if away == Vector2.ZERO:
+		away = Vector2.UP
+	var distance: float = float(arrival.get("distance", 460.0))
+	var entry: Vector2 = perch + away * distance
+	for attempt: int in 8: ## nobody may see it appear: the screen reaches about 370 px from its middle
+		var seen: bool = false
+		for player: Player in Player.all:
+			if player.global_position.distance_to(entry) < 430.0:
+				seen = true
+				break
+		if not seen:
+			break
+		distance += 60.0
+		entry = perch + away * distance
+	var node: SkyCleaver = SKY_CLEAVER_SCENE.instantiate() as SkyCleaver
+	_enemy_count += 1
+	node.name = "Boss%d" % _enemy_count
+	node.enemy_id = String(boss.species)
+	node.arena = String(spec.id)
+	node.pillar_index = start
+	node.arrive_height = float(arrival.get("height", 210.0))
+	node.start_phase = int(_arena_phase.get(String(spec.id), 0)) ## a wipe in the judgement sends the next fight back to the beginning of phase 2, not of the fight
+	node.position = entry
+	_enemies.add_child(node)
+	node.reset_requested.connect(_reset_arena_boss.bind(node, spec))
+	node.checkpoint_reached.connect(func(p: int) -> void: _arena_phase[String(spec.id)] = maxi(p, int(_arena_phase.get(String(spec.id), 0))))
+
+
+## Nobody is left in the fight (everyone fell or left): the boss and its feathers go, the pillars stand again, and the next one to step onto the floor wakes it anew.
+func _reset_arena_boss(node: SkyCleaver, spec: Dictionary) -> void:
+	if is_instance_valid(node):
+		node.queue_free()
+	var origin: Vector2 = _arena_origin(spec)
+	var poly: PackedVector2Array = PackedVector2Array()
+	for point: Array in spec.poly as Array:
+		poly.append(origin + Vector2(float(point[0]), float(point[1])))
+	_arena_zones.append({"spec": spec, "poly": poly})
 
 
 ## The opening (intro, spider gate, knight, crossroads, rescue) ends when she wakes up in the hut and the town begins: the story calls
@@ -658,6 +814,8 @@ func _clamp_spawn(pos: Vector2) -> Vector2:
 
 var _wood_clock: float = 0.0
 var _wood_busy: bool = false
+var _stream_settled: bool = false ## the last `_stream(false)` left nothing to load or drop (see `_stream`)
+var _stream_centers: Array[Vector2i] = [] ## the chunk centres of that pass
 
 
 func _process(delta: float) -> void:
@@ -720,6 +878,7 @@ func _make_layer(biome: String, tint: Color) -> TileMapLayer:
 ## Keeps the chunks around the players painted: `all` loads the whole ring now (start), otherwise
 ## nearest first. Runtime preparation is budgeted; activation is atomic.
 func _stream(all: bool) -> void:
+	_finish_commit() ## the ground committed last frame gets its props now
 	var centers: Array[Vector2i] = []
 	if all:
 		centers.append(_start / CHUNK)
@@ -729,8 +888,13 @@ func _stream(all: bool) -> void:
 			centers.append(Vector2i(Interiors.outer(get_tree(), (player as Node2D).position) / (16.0 * CHUNK)))
 	if is_instance_valid(editor_camera):
 		centers.append(Vector2i(editor_camera.position / (16.0 * CHUNK)))
+	# Nothing changed since a pass that left nothing to load or drop: only a moved player, a pending build or the editor needs the loops.
+	if not all and _stream_settled and not is_instance_valid(editor_camera) and centers == _stream_centers:
+		return
+	_stream_settled = false
 	var best: Vector2i = Vector2i(-1, -1)
 	var best_d: int = 1 << 30
+	var wanted: Dictionary = {} ## the chunks round the players (loaded ones too); used to keep or drop paused builds
 	for center: Vector2i in centers:
 		var radius: int = LOAD_RADIUS
 		if is_instance_valid(editor_camera) and center == Vector2i(editor_camera.position / (16.0 * CHUNK)):
@@ -738,6 +902,7 @@ func _stream(all: bool) -> void:
 		for dy: int in range(-radius, radius + 1):
 			for dx: int in range(-radius, radius + 1):
 				var c: Vector2i = center + Vector2i(dx, dy)
+				wanted[c] = true ## (loaded ones too: the prune only looks at unloaded builds)
 				if _chunks.has(c) or c.x < 0 or c.y < 0 or c.x * CHUNK >= RegionMap.WORLD_TILES or c.y * CHUNK >= RegionMap.WORLD_TILES:
 					continue
 				if all:
@@ -746,15 +911,24 @@ func _stream(all: bool) -> void:
 					best_d = dx * dx + dy * dy
 					best = c
 	if not all:
-		if best.x < 0 or (_building != null and _building.cell != best):
-			_discard_chunk_build()
-		if best.x >= 0:
-			if _building == null: _building = _begin_chunk(best)
-			# Teleports, large windows and the editor must never expose unfinished land.
-			var deadline: int = 0 if best_d == 0 or _chunk_in_view(best) else Time.get_ticks_usec() + STREAM_BUDGET_USEC
+		# Builds nobody wants any more are dropped; a build the nearest target has overtaken waits in `_paused_builds` with its progress.
+		for paused: Vector2i in _paused_builds.keys():
+			if not wanted.has(paused):
+				_free_build(_paused_builds[paused] as ChunkBuild)
+				_paused_builds.erase(paused)
+		if _building != null and not wanted.has(_building.cell):
+			_free_build(_building)
+			_building = null
+		if best.x >= 0 and (_building == null or _building.cell != best):
+			if _building != null: _paused_builds[_building.cell] = _building
+			_building = _take_build(best)
+		if _building != null:
+			# Only the player's own chunk while it is not loaded at all (startup, teleport) is built at once; every other chunk, in view or not, uses the budget.
+			var deadline: int = 0 if best_d == 0 else Time.get_ticks_usec() + STREAM_BUDGET_USEC
 			if _advance_chunk(_building, deadline):
-				_commit_chunk(_building)
+				var finished: ChunkBuild = _building
 				_building = null
+				_commit_chunk(finished)
 	if all or centers.is_empty():
 		return
 	for c: Vector2i in _chunks.keys():
@@ -768,6 +942,8 @@ func _stream(all: bool) -> void:
 				break
 		if not near:
 			_unload_chunk(c)
+	_stream_centers = centers
+	_stream_settled = best.x < 0 and _building == null and _paused_builds.is_empty() and _pending_commit == null
 
 
 func _land_at(x: int, y: int) -> bool:
@@ -781,7 +957,7 @@ func _land_at(x: int, y: int) -> bool:
 func _land_biome(cell: Vector2i) -> String:
 	if not _map.world_biome.is_empty():
 		return _map.world_biome
-	var authored: Dictionary = edits.terrain.get(WorldEdits.key(cell), {})
+	var authored: Dictionary = {} if edits.terrain.is_empty() else edits.terrain.get(WorldEdits.key(cell), {})
 	if authored.has("biome"):
 		return String(authored.biome)
 	var bend: Vector2i = Vector2i(roundi(_warp_x.get_noise_2d(cell.x, cell.y) * BORDER_WARP), roundi(_warp_y.get_noise_2d(cell.x, cell.y) * BORDER_WARP))
@@ -802,15 +978,26 @@ func _biome_at(cell: Vector2i) -> String:
 
 
 func _load_chunk(c: Vector2i) -> void:
+	_finish_commit()
 	if _chunks.has(c): return
 	var build: ChunkBuild
 	if _building != null and _building.cell == c:
 		build = _building
 		_building = null
 	else:
-		build = _begin_chunk(c)
+		build = _take_build(c)
 	_advance_chunk(build)
 	_commit_chunk(build)
+	_finish_commit()
+
+
+## A paused build of `c` continues where it stopped; otherwise a new one starts.
+func _take_build(c: Vector2i) -> ChunkBuild:
+	if _paused_builds.has(c):
+		var resumed: ChunkBuild = _paused_builds[c] as ChunkBuild
+		_paused_builds.erase(c)
+		return resumed
+	return _begin_chunk(c)
 
 
 func _begin_chunk(c: Vector2i) -> ChunkBuild:
@@ -824,6 +1011,8 @@ func _begin_chunk(c: Vector2i) -> ChunkBuild:
 	build.rng.seed = hash(Vector3i(c.x, c.y, _map.world_seed))
 	build.query = _generator.begin_chunk(Rect2i(c * CHUNK, Vector2i(CHUNK, CHUNK)))
 	build.custom_keys = edits.props.keys()
+	build.chunk.water_near = _rivers.near_water(c)
+	build.density = DataRegistry.get_entry("wind", "detail_density")
 	return build
 
 
@@ -890,6 +1079,7 @@ func _advance_chunk(build: ChunkBuild, deadline: int = 0) -> bool:
 					build.rng.seed = hash(Vector4i(build.cell.x, build.cell.y, _map.world_seed, 7919))
 					continue
 				_index_detail_obstacle(build, build.obstacles[build.index])
+				build.log_reach = maxf(build.log_reach, FallenLogScatter.index_obstacle(build.log_grid, build.obstacles[build.index]))
 				build.index += 1
 			6:
 				_detail_candidate(build)
@@ -898,11 +1088,11 @@ func _advance_chunk(build: ChunkBuild, deadline: int = 0) -> bool:
 					build.phase = 7
 					build.index = 0
 			7:
-				var log_spec: Dictionary = FallenLogScatter.candidate(self,build.cell,build.index,build.obstacles)
+				var log_spec: Dictionary = FallenLogScatter.candidate(self,build.cell,build.index,build.obstacles,build.log_grid,build.log_reach)
 				if not log_spec.is_empty():
 					var log_node: FallenLog = FallenLog.new()
 					log_node.name = "FallenLog_%d_%d_%d" % [build.cell.x,build.cell.y,build.index]
-					log_node.setup(log_spec.pos as Vector2,int(log_spec.frame))
+					log_node.setup(log_spec.pos as Vector2,int(log_spec.frame),self)
 					build.chunk.fallen_logs.append(log_node)
 				build.index += 1
 				if build.index == 16: build.phase = 8
@@ -961,6 +1151,17 @@ func _commit_chunk(build: ChunkBuild) -> void:
 	for cell: Vector2i in chunk.glow_cells:
 		_glow.set_cell(cell, 0, chunk.atlas[cell])
 	chunk.atlas.clear()
+	add_child(chunk.node) ## the ground (collision, lights, details) enters the world now; props follow next frame
+	_pending_commit = build
+
+
+## Second half of a commit, one frame later: props, fallen logs, clover, river surface, registration and wildlife. Until then the
+## chunk is not in `_chunks`, so nothing unloads or builds it twice.
+func _finish_commit() -> void:
+	var build: ChunkBuild = _pending_commit
+	if build == null: return
+	_pending_commit = null
+	var chunk: Chunk = build.chunk
 	if _town_node != null and not _town_node.cleared.is_empty(): ## a chunk that was in preparation while the town cleared a foundation
 		var kept: Array[WorldProp] = []
 		for prepared: WorldProp in chunk.things:
@@ -977,30 +1178,42 @@ func _commit_chunk(build: ChunkBuild) -> void:
 			var pos: Array = spec.get("pos", [thing.position.x, thing.position.y])
 			thing.position = Vector2(float(pos[0]), float(pos[1]))
 			thing.scale = Vector2(float(spec.get("scale", 1.0)) * (-1.0 if bool(spec.get("flip", false)) else 1.0), float(spec.get("scale", 1.0)))
-	for log_node: FallenLog in chunk.fallen_logs: _props.add_child(log_node)
-	for field: CloverField in chunk.clover: _props.add_child(field)
+	if sowing != null:
+		sowing.populate(build.cell, chunk)
+	for log_node: FallenLog in chunk.fallen_logs:
+		_props.add_child(log_node)
+		_register_harvest(log_node)
+	for field: CloverField in chunk.clover:
+		_props.add_child(field)
+		_register_harvest(field)
 	_rivers.attach_chunk(chunk.node, build.cell)
-	add_child(chunk.node)
 	_chunks[build.cell] = chunk
 	_wildlife.chunk_loaded(build.cell)
 
 
-func _chunk_in_view(c: Vector2i) -> bool:
-	var inverse: Transform2D = get_viewport().get_canvas_transform().affine_inverse()
-	var view: Rect2 = Rect2(inverse * Vector2.ZERO, Vector2.ZERO).expand(inverse * get_viewport_rect().size).grow(64.0)
-	return view.intersects(Rect2(Vector2(c * CHUNK) * 16.0, Vector2.ONE * CHUNK * 16.0))
+## Frees a build that never became live (its things and logs are not in the tree; a committed node is queued).
+func _free_build(build: ChunkBuild) -> void:
+	for thing: WorldProp in build.chunk.things: thing.free()
+	for log_node: FallenLog in build.chunk.fallen_logs: log_node.free()
+	for field: CloverField in build.chunk.clover: field.free()
+	if build.chunk.node.is_inside_tree(): build.chunk.node.queue_free()
+	else: build.chunk.node.free()
 
 
 func _discard_chunk_build() -> void:
-	if _building == null: return
-	for thing: WorldProp in _building.chunk.things: thing.free()
-	for log_node: FallenLog in _building.chunk.fallen_logs: log_node.free()
-	for field: CloverField in _building.chunk.clover: field.free()
-	_building.chunk.node.free()
-	_building = null
+	_finish_commit() ## a committed chunk becomes whole first, so an unload sees all of it
+	if _building != null:
+		_free_build(_building)
+		_building = null
+	for paused: ChunkBuild in _paused_builds.values():
+		_free_build(paused)
+	_paused_builds.clear()
 
 
 func _exit_tree() -> void:
+	if _pending_commit != null: ## its props never entered the tree: free them here, not in `_finish_commit`
+		_free_build(_pending_commit)
+		_pending_commit = null
 	_discard_chunk_build()
 
 
@@ -1073,7 +1286,7 @@ func _add_edge_light(parent: Node2D, cell: Vector2i, taken: Dictionary) -> void:
 
 
 func _paint(chunk: Chunk, cell: Vector2i, biome: String, rng: RandomNumberGenerator) -> void:
-	var authored: Dictionary = edits.terrain.get(WorldEdits.key(cell), {})
+	var authored: Dictionary = {} if edits.terrain.is_empty() else edits.terrain.get(WorldEdits.key(cell), {}) ## (no key string per tile without edits)
 	biome = RegionMap.active_biome(String(authored.get("biome", biome)))
 	var kind: String = "plain"
 	if biome == "meadow":
@@ -1083,7 +1296,7 @@ func _paint(chunk: Chunk, cell: Vector2i, biome: String, rng: RandomNumberGenera
 	if _relief.kind(cell.x, cell.y) != Relief.FLOOR: ## walls, ramps and stairs are drawn over plain ground
 		kind = "plain"
 	kind = String(authored.get("ground", kind))
-	if not _rivers.clear_for_prop(Vector2(cell) * 16.0 + Vector2(8, 8), 0.0): kind = "plain"
+	if chunk.water_near and not _rivers.clear_for_prop(Vector2(cell) * 16.0 + Vector2(8, 8), 0.0): kind = "plain"
 	var options: Array = _tiles.get(kind, _tiles["plain"])
 	var atlas: Array = options[rng.randi() % options.size()]
 	var coords: Vector2i = Vector2i(int(atlas[0]), int(atlas[1]))
@@ -1110,9 +1323,11 @@ func _unload_chunk(c: Vector2i) -> void:
 		_props.remove_child(thing)
 		thing.queue_free()
 	for log_node: FallenLog in chunk.fallen_logs:
+		_unregister_harvest(log_node)
 		_props.remove_child(log_node)
 		log_node.queue_free()
 	for field: CloverField in chunk.clover:
+		_unregister_harvest(field)
 		_props.remove_child(field)
 		field.queue_free()
 	remove_child(chunk.node)
@@ -1149,7 +1364,7 @@ func _detail_candidate(build: ChunkBuild) -> void:
 	if not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
 		return
 	var biome: String = _land_biome(cell)
-	var density: float = float(DataRegistry.get_entry("wind","detail_density").get(biome,0.3))
+	var density: float = float(build.density.get(biome, 0.3))
 	var patch: float = _zone.get_noise_2d(cell.x * 2.3, cell.y * 2.3)
 	if build.rng.randf() > density * (0.8 + patch):
 		return
@@ -1158,7 +1373,8 @@ func _detail_candidate(build: ChunkBuild) -> void:
 	if not _relief.flat_around(pos, 10.0):
 		return
 	var obstructed: bool = false
-	for patch_node: Node in Terrain.patches:
+	if Terrain.patches != build.patches_seen: build.patches_seen.assign(Terrain.patches) ## re-read only when the list changed, so the check below stays exact
+	for patch_node: Node in build.patches_seen:
 		if String(patch_node.call("surface_at", pos)) != "":
 			obstructed = true
 			break
@@ -1195,6 +1411,12 @@ func _detail_candidate(build: ChunkBuild) -> void:
 			kind = [9,10,11,18,19,24,25][build.rng.randi_range(0,6)] ## north slopes and cliff feet: damp, ferns and moss
 		elif slope > 0.35 and build.rng.randf() < 0.55:
 			kind = [22,23,0,2,22,23][build.rng.randi_range(0,5)] ## sunny slopes: dry straw and thin grass
+		else:
+			var damp: float = _generator.damp_at(pos / 16.0)
+			if damp > 0.7 and build.rng.randf() < 0.5:
+				kind = [9,10,11,18,19,24,25][build.rng.randi_range(0,6)] ## wet ground: moss and ferns
+			elif damp < 0.18 and build.rng.randf() < 0.5:
+				kind = [22,23,0,2,22,23][build.rng.randi_range(0,5)] ## dry ground: straw and thin grass
 	var tint: Color = Color.WHITE
 	match biome:
 		"mist_forest": tint = Color(0.79,0.95,0.94)
@@ -1250,7 +1472,7 @@ func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 	if not ok:
 		return false
 	var node: CloverField = CloverField.new()
-	node.setup(field, center)
+	node.setup(field, center, self)
 	build.chunk.clover.append(node)
 	return true
 
@@ -1330,21 +1552,35 @@ func export_things() -> Dictionary:
 	var out: Dictionary = {}
 	for cell: Vector2i in _thing_states:
 		out["%d,%d" % [cell.x, cell.y]] = _thing_states[cell]
+	for key: String in _harvest_states: ## clover fields and fallen logs: "h:" + their key
+		out["h:" + key] = _harvest_states[key]
+	if sowing != null:
+		out.merge(sowing.export()) ## plants that seeded themselves: "s:x,y"
 	return out
 
 
 ## Host, after loading a save: every prop takes the saved state (the others become untouched).
 func import_things(saved: Dictionary) -> void:
 	_thing_states.clear()
+	_harvest_states.clear()
+	if sowing != null:
+		sowing.import_saved(saved)
 	for key: String in saved:
-		var parts: PackedStringArray = key.split(",")
+		if key.begins_with("s:"):
+			continue
 		var state: Dictionary = {}
 		for field: String in (saved[key] as Dictionary):
 			var value: Variant = (saved[key] as Dictionary)[field]
 			state[field] = int(value) if value is float else value ## JSON has only floats
+		if key.begins_with("h:"):
+			_harvest_states[key.trim_prefix("h:")] = state
+			continue
+		var parts: PackedStringArray = key.split(",")
 		_thing_states[Vector2i(int(parts[0]), int(parts[1]))] = state
 	for cell: Vector2i in _things:
 		(_things[cell] as WorldProp).apply_state(thing_state(cell), "")
+	for key: String in _harvest_nodes:
+		_apply_harvest_to(key, "")
 
 
 func thing_state(cell: Vector2i) -> Dictionary:
@@ -1395,6 +1631,12 @@ func _host_pick(cell: Vector2i, peer: int) -> void:
 		return
 	if thing.reach_distance(player.global_position) > Interactable.INTERACT_RANGE + PICK_SLACK:
 		return
+	_pick_thing(thing)
+
+
+## Host: hand over what `thing` gives when picked and mark it picked (E, or a sickle blow on a plant that is picked).
+func _pick_thing(thing: WorldProp) -> void:
+	var cell: Vector2i = thing.cell
 	var pickup: Dictionary = thing.spec().get("pickup", {}) as Dictionary
 	if pickup.is_empty():
 		return
@@ -1410,18 +1652,69 @@ func _host_pick(cell: Vector2i, peer: int) -> void:
 	_rpc_thing_state.rpc(cell, next, "pick")
 
 
+## Host -> everyone: a prop plays a one-off effect (the Fangblume snapping shut). Props are found by cell, so a peer that has not loaded it skips it.
+@rpc("authority", "call_local", "reliable")
+func _rpc_thing_fx(cell: Vector2i, fx: String, at: Vector2) -> void:
+	var thing: WorldProp = _things.get(cell) as WorldProp
+	if is_instance_valid(thing) and thing.has_method("play_fx"):
+		thing.call("play_fx", fx, at)
+
+
+## Local player pressed E at an undergrowth animal on a bush (`LeafCritter`).
+func request_catch(cell: Vector2i) -> void:
+	if multiplayer.is_server():
+		_host_catch(cell, multiplayer.get_unique_id(), true)
+	else:
+		_rpc_catch.rpc_id(1, cell)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_catch(cell: Vector2i) -> void:
+	if multiplayer.is_server():
+		_host_catch(cell, multiplayer.get_remote_sender_id(), true)
+
+
+## Host: take (or scare off) the animal sitting on the bush at `cell`. By hand it is a sure catch, with the sickle 55 %; either way it is
+## gone until tomorrow. A catch is an item (bait for the river).
+func _host_catch(cell: Vector2i, peer: int, by_hand: bool) -> void:
+	var thing: WorldProp = _things.get(cell) as WorldProp
+	var player: Player = _players.get_node_or_null(str(peer)) as Player
+	if thing == null or player == null or player.health.current <= 0.0:
+		return
+	if by_hand and thing.reach_distance(player.global_position) > Interactable.INTERACT_RANGE + PICK_SLACK:
+		return ## (a sickle blow was already measured by the hit scan)
+	var animal: String = LeafCritter.today(thing)
+	if animal == "":
+		return
+	var caught: bool = by_hand or randf() < 0.55
+	if caught:
+		DropComponent.spawn_drops(get_tree(), [{"id": LeafCritter.ITEMS[animal], "chance": 1.0, "min": 1, "max": 1}], thing.global_position + Vector2(0, -10))
+	var next: Dictionary = thing.state.duplicate()
+	next["c"] = TimeManager.day + 1
+	next["k"] = thing.kind
+	_rpc_thing_state.rpc(cell, next, "catch" if caught else "scare")
+
+
 ## Host: a weapon's hit scan found `thing`. Only the prop's tool (sickle, pickaxe) harvests it, any
 ## other weapon just makes it rustle.
 func harvest_hit(thing: WorldProp, source: int) -> void:
 	if not multiplayer.is_server():
 		return
 	var harvest: Dictionary = thing.spec().get("harvest", {})
-	if harvest.is_empty() or thing.is_depleted():
-		return
 	var player: Player = _players.get_node_or_null(str(source)) as Player
 	var tool_id: String = ""
 	if player != null:
 		tool_id = String(Items.definition(player.inventory.active_stack()).get("tool", ""))
+	if tool_id == "sickle" and thing.spec().has("critters") and LeafCritter.today(thing) != "":
+		_host_catch(thing.cell, source, false) ## the blow shakes the animal off (or it is caught)
+	if harvest.is_empty() and thing.spec().has("pickup") and not thing.spec().has("pull"): ## plants E picks: the sickle cuts them too
+		if tool_id == "sickle" and thing.prompt() != "":
+			_pick_thing(thing)
+		elif thing.prompt() != "":
+			_rpc_thing_state.rpc(thing.cell, thing.state, "rustle")
+		return
+	if harvest.is_empty() or thing.is_depleted():
+		return
 	if tool_id != String(harvest.tool):
 		_rpc_thing_state.rpc(thing.cell, thing.state, "rustle")
 		return
@@ -1442,6 +1735,7 @@ func harvest_hit(thing: WorldProp, source: int) -> void:
 ## Host, every sunrise: each harvested prop gets one slot back per `regrow_days` of its kind, picked
 ## berries and stones come back after the kind's pickup `regrow_days`. Nothing ever disappears.
 func _grow_things(day: int) -> void:
+	_grow_harvest()
 	for cell: Vector2i in _thing_states.keys():
 		var before: Dictionary = _thing_states[cell]
 		var plant: Dictionary = DataRegistry.get_entry("plants", String(before.get("k", "bush")))
@@ -1452,6 +1746,10 @@ func _grow_things(day: int) -> void:
 			if int(next.h) <= 0:
 				next.erase("h")
 		var pick_days: int = int((plant.get("pickup", {}) as Dictionary).get("regrow_days", 3))
+		if Moisture.is_wet_day(day):
+			pick_days = maxi(1, pick_days - 1) ## a damp day: mushrooms, moss and herbs come back faster
+		if next.has("c") and int(next.c) != day + 1:
+			next.erase("c")
 		if next.has("p") and day + 1 - int(next.p) >= pick_days:
 			next.erase("p")
 		if not next.has("h"):
@@ -1471,23 +1769,81 @@ func _rpc_thing_state(cell: Vector2i, state: Dictionary, fx: String) -> void:
 	var thing: WorldProp = _things.get(cell) as WorldProp
 	if thing != null:
 		thing.apply_state(state, fx)
-		if multiplayer.is_server() and fx in ["strip", "hit", "pick"] and _spent(thing):
-			_sweep_spent(thing)
 
 
-## A prop that has given everything it had: a stripped bush, a felled tree, a mined-out rock, a picked pebble or mushroom (berries and blossoms grow back, the plant stays).
-func _spent(thing: WorldProp) -> bool:
-	return bool(thing.state.get("p", 0)) if thing is Pebble else thing.is_depleted()
-
-
-## Host: inside the town's light a spent prop does not stay as a stump, rubble or a regrowing sapling: after its effect it is gone for good.
-func _sweep_spent(thing: WorldProp) -> void:
-	if _town_node == null or not _town_node.founded or not _town_node.in_territory(thing.position):
+## Clover fields and fallen logs (data/harvest.json): a sickle cuts a clover field, an axe chops a fallen log up. Only the host decides;
+## every peer shows the state of the nodes its chunks have loaded.
+func harvest_field_hit(node: Node, source: int) -> void:
+	if not multiplayer.is_server():
 		return
-	var cell: Vector2i = thing.cell
-	await get_tree().create_timer(5.0 if thing.kind in PropGenerator.TREE_KINDS else 0.9).timeout ## the fall / the burst plays out first
-	if _town_node != null and _things.has(cell):
-		_town_node.clear_spent([cell])
+	var spec: Dictionary = node.call("spec") as Dictionary
+	var key: String = String(node.get("key"))
+	if spec.is_empty() or bool(node.call("is_depleted")):
+		return
+	var player: Player = _players.get_node_or_null(str(source)) as Player
+	var tool_id: String = ""
+	if player != null:
+		tool_id = String(Items.definition(player.inventory.active_stack()).get("tool", ""))
+	var at: Vector2 = player.global_position if player != null else (node as Node2D).global_position
+	var state: Dictionary = (_harvest_states.get(key, {}) as Dictionary).duplicate()
+	if tool_id != String(spec.get("tool", "")):
+		_rpc_harvest_state.rpc(key, state, "rustle", at)
+		return
+	state["h"] = int(state.get("h", 0)) + 1
+	var strip: bool = int(state["h"]) >= int(spec.get("hits", 1))
+	if node.has_method("next_cut"): ## clover: each blow takes the clumps round one spot; the field is gone when none are left
+		var points: Array = (state.get("pts", []) as Array).duplicate()
+		points.append((node as Node2D).to_local(node.call("next_cut", at) as Vector2))
+		state["pts"] = points
+		if bool(node.call("all_cut", points)):
+			strip = true
+	var entries: Array = (spec.drops as Array).duplicate()
+	if strip:
+		state["f"] = 1
+		entries.append_array(spec.final_drops as Array)
+	DropComponent.spawn_drops(get_tree(), entries, (node as Node2D).global_position + Vector2(0, -6))
+	_rpc_harvest_state.rpc(key, state, "strip" if strip else "hit", at)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_harvest_state(key: String, state: Dictionary, fx: String, at: Vector2) -> void:
+	if state.is_empty():
+		_harvest_states.erase(key)
+	else:
+		_harvest_states[key] = state
+	_apply_harvest_to(key, fx, at)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_harvest_snapshot(snapshot: Dictionary) -> void:
+	_harvest_states = snapshot
+	for key: String in _harvest_nodes:
+		_apply_harvest_to(key, "")
+
+
+func _apply_harvest_to(key: String, fx: String, at: Vector2 = Vector2.ZERO) -> void:
+	var node: Object = _harvest_nodes.get(key)
+	if is_instance_valid(node):
+		node.call("apply_harvest", _harvest_states.get(key, {}), fx, at)
+
+
+func _register_harvest(node: Node) -> void:
+	var key: String = String(node.get("key"))
+	_harvest_nodes[key] = node
+	_apply_harvest_to(key, "")
+
+
+func _unregister_harvest(node: Node) -> void:
+	var key: String = String(node.get("key"))
+	if _harvest_nodes.get(key) == node:
+		_harvest_nodes.erase(key)
+
+
+## Host, every sunrise: a clover field or water plant that was cut grows back whole. Fallen logs stay chopped.
+func _grow_harvest() -> void:
+	for key: String in _harvest_states.keys():
+		if key.begins_with("c:") or key.begins_with("w:"):
+			_rpc_harvest_state.rpc(key, {}, "regrow", Vector2.ZERO)
 
 
 ## A peer that joins gets every prop that is not untouched.
@@ -1527,10 +1883,10 @@ func _fauna_habitat(at: Vector2, species: String) -> bool:
 ## Real painted meadow blossoms, not arbitrary air positions. Called after a chunk is painted.
 func _flower_targets(chunk: Vector2i) -> Array[Vector2]:
 	var result: Array[Vector2] = []
-	var atlases: Array[Vector2i] = []
+	var atlases: Dictionary = {} ## a set of atlas coordinates (lookups per cell, not a list scan)
 	for kind: String in DataRegistry.get_entry("wildlife", "butterfly").get("flower_kinds", []):
 		for xy: Array in _tiles.get(kind, []):
-			atlases.append(Vector2i(int(xy[0]), int(xy[1])))
+			atlases[Vector2i(int(xy[0]), int(xy[1]))] = true
 	for y: int in CHUNK:
 		for x: int in CHUNK:
 			var cell: Vector2i = chunk * CHUNK + Vector2i(x, y)
@@ -1583,6 +1939,7 @@ func editor_height(cell: Vector2i) -> int:
 	return _relief.level(cell.x, cell.y)
 
 func editor_refresh() -> void:
+	_stream_settled = false
 	_stream(false)
 
 

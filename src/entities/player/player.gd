@@ -29,6 +29,7 @@ const ATTACK_LEGS: int = 7
 const ATTACK_COLS: int = 3 * ATTACK_LEGS * ATTACK_FRAMES
 const PICK_SHEET: Texture2D = preload("res://assets/characters/player_pick.png")
 const EAT_SHEET: Texture2D = preload("res://assets/characters/player_eat.png")
+const TOUCH_SHEET: Texture2D = preload("res://assets/characters/player_touch.png") ## tools/art_hero3d.py touchonly: both palms on a waystone statue
 const PULL_SHEET: Texture2D = preload("res://assets/characters/player_pull.png") ## tools/art_hero3d.py pullonly: she heaves a root out of the ground
 const FISH_SHEET: Texture2D = preload("res://assets/characters/player_fish.png") ## tools/art_hero_fish.py: the rod's body clips (cast, strike, fight, land, snap, sag)
 const FISH_BLOOD: Texture2D = preload("res://assets/characters/player_fish_blood.png")
@@ -41,7 +42,7 @@ const STANDBY_COLS: int = STANDBY_FRAMES * STANDBY_CLIPS
 const BLOOD_MAPS: Array[Texture2D] = [ ## the baked blood thresholds of each sheet (main, sword, pick, eat), see hit_flash.gdshader
 	preload("res://assets/characters/player_blood.png"), preload("res://assets/characters/player_attack_blood.png"),
 	preload("res://assets/characters/player_pick_blood.png"), preload("res://assets/characters/player_eat_blood.png"),
-	preload("res://assets/characters/player_pull_blood.png")]
+	preload("res://assets/characters/player_pull_blood.png"), preload("res://assets/characters/player_touch_blood.png")]
 const EMERGE_BLOOD: Texture2D = preload("res://assets/characters/player_emerge_blood.png")
 const FAINT_SHEET: Texture2D = preload("res://assets/characters/player_faint.png") ## tools/art_hero_faint.py: she collapses (side view, facing east)
 const SIT_SHEET: Texture2D = preload("res://assets/characters/player_sit.png") ## tools/art_hero_sit.py: she sits down by the fire
@@ -59,6 +60,8 @@ const EAT_VARIANTS: int = 7 ## the eat sheet repeats every frame per leg variant
 const PICK_FRAMES: int = 12 ## the one-second action animations (picking, eating): 12 frames, sampled at (i + 0.5) / 12
 const PICK_SECONDS: float = 1.0
 const PICK_GRAB_TIME: float = 0.34 ## picking: the hand closes around the berries here
+const TOUCH_TIME: float = 0.45 ## touching a statue: the palms lie on the stone here (the statue wakes)
+const TOUCH_HOLD_AT: float = 0.52 ## and stay there until `release_touch`
 const PULL_GRAB_TIME: float = 0.52 ## pulling a root: it gives here and she is thrown back
 const EAT_USE_TIME: float = 0.48 ## eating: the berry reaches her mouth (EatEffect.BITE) and takes effect
 const IDLE_FPS: float = 3.5 ## idle frames per second (breathing, hair)
@@ -99,6 +102,10 @@ var _rig_pick_shoulder: PackedVector2Array ## and for the picking sheet
 var _rig_pick_hand: PackedVector2Array
 var _rig_pull_shoulder: PackedVector2Array ## and for the pulling sheet
 var _rig_pull_hand: PackedVector2Array
+var _rig_touch_shoulder: PackedVector2Array ## and for the touching sheet
+var _rig_touch_hand: PackedVector2Array
+var touch_hold: bool = false ## the palms stay on the stone (frozen at the end of the reach) until `release_touch`
+var _touch_wait: float = 0.0
 var _rig_eat_shoulder: PackedVector2Array ## and for the eating sheet
 var _rig_eat_hand: PackedVector2Array
 var _rig_eat_mouth: PackedVector2Array
@@ -135,10 +142,14 @@ var _stumble_wait: float = 0.0
 var _stumble_cough_at: float = 1.4
 var _stumble_prompt: InteractPrompt
 var _stumble_fired: Dictionary = {}
+const INTERACT_SCAN_SECONDS: float = 0.2 ## how often the interactables group is searched for the prompt (a press always searches)
+var _scan_clock: float = 0.0
+var _candidate: Interactable = null ## the nearest usable thing of the last scan, re-checked every frame
 var fainting: bool = false ## the faint sheet is shown (AmbushScene drives the frames)
 var _respawn_asked: bool = false
 var story_lock: bool = false ## a cutscene holds her still (she still animates, the HUD stays)
 var auto_walk: Vector2 = Vector2.INF ## while `story_lock`: a cutscene walks her slowly to this point (her limp and all)
+var auto_walk_factor: float = -1.0 ## share of her top speed for that walk (< 0: the slow wounded walk)
 var intro: Node ## while a story scene owns her (IntroScene, WakeScene) she cannot move or act
 var bandaged: bool = false ## the rescuer dressed the wound: no blood, no red border, no heartbeat any more (she still limps while her health is low)
 
@@ -197,6 +208,9 @@ func _ready() -> void:
 	_camera.enabled = is_multiplayer_authority()
 	_camera.reset_smoothing()
 	if is_multiplayer_authority():
+		var free_cam: FreeCam = FreeCam.new()
+		free_cam.name = "FreeCam"
+		add_child(free_cam) ## L: the free camera (dev tool)
 		quests = QuestComponent.new()
 		quests.name = "QuestComponent"
 		add_child(quests)
@@ -270,7 +284,7 @@ func _physics_process(delta: float) -> void:
 		if story_lock and intro == null and auto_walk != Vector2.INF and is_multiplayer_authority():
 			var to_goal: Vector2 = auto_walk - global_position
 			if to_goal.length() > 2.0:
-				velocity = to_goal.normalized() * max_speed * WOUND_SPEED * 0.8
+				velocity = to_goal.normalized() * max_speed * (auto_walk_factor if auto_walk_factor > 0.0 else WOUND_SPEED * 0.8)
 				facing = to_goal.normalized()
 				move_and_slide()
 		_set_focus(null)
@@ -283,6 +297,8 @@ func _physics_process(delta: float) -> void:
 	elif is_multiplayer_authority():
 		_move(delta)
 		_update_interact()
+	else:
+		position += velocity * delta ## remote player: the synchronizer sends at 20 Hz, so carry on with the synced velocity until the next packet
 	_wound = move_toward(_wound, _wound_target(), delta * 0.5)
 	(_sprite.material as ShaderMaterial).set_shader_parameter("wound", _wound)
 	attack.wound = _wound
@@ -512,6 +528,23 @@ func begin_pull(dir: Vector2, on_grab: Callable) -> void:
 	_begin_action("pull", dir, on_grab, PULL_GRAB_TIME)
 
 
+## Local player: lays both palms on something (a waystone statue) toward `dir`; `on_touch` runs when they lie on it. She keeps the hands there until
+## `release_touch()` (the statue's light runs over it), then draws back. Hit or stopped: the hold ends by itself after 14 s.
+func begin_touch(dir: Vector2, on_touch: Callable) -> void:
+	_begin_action("touch", dir, on_touch, TOUCH_TIME)
+
+
+## Ends the hold of `begin_touch` (any peer may call it for the local player; it is replicated).
+func release_touch() -> void:
+	if is_multiplayer_authority():
+		_play_release_touch.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _play_release_touch() -> void:
+	touch_hold = false
+
+
 ## Local player: eats what is in hotbar slot `slot` (a consumable), if that would do anything. The
 ## berry is used up when it reaches her mouth (EAT_USE_TIME); being hit before that stops it.
 func use_slot(slot: int) -> void:
@@ -544,6 +577,8 @@ func _play_action(kind: String, dir: Vector2) -> void:
 	_busy = true
 	_busy_kind = kind
 	_busy_time = 0.0
+	touch_hold = kind == "touch"
+	_touch_wait = 0.0
 	sprinting = false
 	if dir != Vector2.ZERO:
 		facing = dir
@@ -580,31 +615,55 @@ func _slow_factor() -> float:
 	return factor
 
 
-## The nearest thing within reach that E can use gets the prompt; E uses it.
+## The nearest thing within reach that E can use gets the prompt; E uses it. The group is scanned five times a second; in between the stored
+## candidate is only re-checked (still there, usable, in reach), and a press scans again first, so E always uses what is current.
 func _update_interact() -> void:
 	if _busy:
 		return
-	var best: Interactable = null
-	var best_distance: float = Interactable.INTERACT_RANGE
-	if not InputManager.ui_blocking:
-		for node: Node in get_tree().get_nodes_in_group("interactables"):
-			var item: Interactable = node as Interactable
-			if item == null:
-				continue
-			if absf(item.global_position.x - global_position.x) > 48.0 or absf(item.global_position.y - global_position.y) > 48.0:
-				continue
-			if item.prompt() == "":
-				continue
-			var distance: float = item.reach_distance(global_position)
-			if distance < best_distance:
-				best_distance = distance
-				best = item
-	_set_focus(best)
+	_scan_clock -= get_physics_process_delta_time()
+	if _scan_clock <= 0.0 or InputManager.interact_pressed():
+		_scan_clock = INTERACT_SCAN_SECONDS
+		_candidate = _scan_interact()
+	elif not is_instance_valid(_candidate) or not _candidate_usable(_candidate):
+		_candidate = null
+	_set_focus(_candidate)
 	if InputManager.interact_pressed():
 		if _focus != null:
 			_focus.interact(self)
 		elif _hotbar != null: ## nothing to use here: E eats from the selected hotbar slot
 			use_slot(_hotbar.selected)
+
+
+## The full scan of the interactables group (what `_update_interact` picks up).
+func _scan_interact() -> Interactable:
+	var best: Interactable = null
+	var best_distance: float = Interactable.INTERACT_RANGE
+	if InputManager.ui_blocking:
+		return null
+	for node: Node in get_tree().get_nodes_in_group("interactables"):
+		var item: Interactable = node as Interactable
+		if item == null:
+			continue
+		if absf(item.global_position.x - global_position.x) > 48.0 or absf(item.global_position.y - global_position.y) > 48.0:
+			continue
+		if item.prompt() == "":
+			continue
+		var distance: float = item.reach_distance(global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = item
+	return best
+
+
+## The cheap per-frame check of the stored candidate: same rules as `_scan_interact`, for one item.
+func _candidate_usable(item: Interactable) -> bool:
+	if InputManager.ui_blocking or not item.is_in_group("interactables"):
+		return false
+	if absf(item.global_position.x - global_position.x) > 48.0 or absf(item.global_position.y - global_position.y) > 48.0:
+		return false
+	if item.prompt() == "":
+		return false
+	return item.reach_distance(global_position) < Interactable.INTERACT_RANGE
 
 
 func _set_focus(item: Interactable) -> void:
@@ -636,6 +695,10 @@ func _load_rig() -> void:
 		_rig_pull_shoulder.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("pull_hand", []):
 		_rig_pull_hand.append(Vector2(float(point[0]), float(point[1])))
+	for point: Array in rig.get("touch_shoulder", []):
+		_rig_touch_shoulder.append(Vector2(float(point[0]), float(point[1])))
+	for point: Array in rig.get("touch_hand", []):
+		_rig_touch_hand.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("eat_shoulder", []):
 		_rig_eat_shoulder.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("eat_hand", []):
@@ -744,7 +807,13 @@ func _animate(delta: float) -> void:
 		shoulder = _rig_shoulder[main_frame]
 		hand = _rig_hand[main_frame]
 	if _busy:
-		_busy_time += delta
+		var holding: bool = _busy_kind == "touch" and touch_hold and _busy_time >= TOUCH_HOLD_AT
+		if holding:
+			_touch_wait += delta
+			if _touch_wait > 14.0:
+				touch_hold = false
+		else:
+			_busy_time += delta
 		if _busy_time >= PICK_SECONDS:
 			_busy = false
 	var fish_frame: Dictionary = fishing.body_frame(_sector, moving) if fishing != null and not _busy else {}
@@ -761,9 +830,10 @@ func _animate(delta: float) -> void:
 		var legs: int = 1 + clampi(int(_walk_time), 0, WALK_FRAMES - 1) if moving and eating else 0 ## eating while walking keeps the walk cycle's legs
 		var base: int = _sector * PICK_FRAMES * (EAT_VARIANTS if eating else 1) + legs * PICK_FRAMES
 		var pulling: bool = _busy_kind == "pull" and not _rig_pull_hand.is_empty()
-		var hands: PackedVector2Array = _rig_eat_hand if eating else (_rig_pull_hand if pulling else _rig_pick_hand)
-		var shoulders: PackedVector2Array = _rig_eat_shoulder if eating else (_rig_pull_shoulder if pulling else _rig_pick_shoulder)
-		_use_sheet(3 if eating else (4 if pulling else 2))
+		var touching: bool = _busy_kind == "touch" and not _rig_touch_hand.is_empty()
+		var hands: PackedVector2Array = _rig_eat_hand if eating else (_rig_touch_hand if touching else (_rig_pull_hand if pulling else _rig_pick_hand))
+		var shoulders: PackedVector2Array = _rig_eat_shoulder if eating else (_rig_touch_shoulder if touching else (_rig_pull_shoulder if pulling else _rig_pick_shoulder))
+		_use_sheet(3 if eating else (5 if touching else (4 if pulling else 2)))
 		_sprite.frame = base + clampi(int(position_in_sheet), 0, PICK_FRAMES - 1)
 		hand = hands[base + i].lerp(hands[base + i + 1], f)
 		shoulder = shoulders[base + i].lerp(shoulders[base + i + 1], f)
@@ -1128,8 +1198,8 @@ func _use_sheet(sheet: int) -> void:
 			_sprite.texture = ATTACK_SHEET
 			_sprite.hframes = ATTACK_COLS
 			_sprite.vframes = 8
-		2, 3, 4:
-			_sprite.texture = PICK_SHEET if sheet == 2 else (EAT_SHEET if sheet == 3 else PULL_SHEET)
+		2, 3, 4, 5:
+			_sprite.texture = PICK_SHEET if sheet == 2 else (EAT_SHEET if sheet == 3 else (TOUCH_SHEET if sheet == 5 else PULL_SHEET))
 			_sprite.hframes = PICK_FRAMES * (EAT_VARIANTS if sheet == 3 else 1)
 			_sprite.vframes = 8
 		10:

@@ -448,4 +448,141 @@
    "volume_db": -6
   }
  }
+ ,"boss_sky_cleaver": {
+  "name": "Mornath, der Himmelsspalter",
+  "boss": true,
+  "max_health": 900,
+  "heavy_knockback": 100,
+  "perch": {
+   "dwell_min": 5.0,
+   "dwell_max": 8.0,
+   "first_dwell": 3.0,
+   "takeoff": 0.6,
+   "stagger": 0.5,
+   "stagger_dwell": 3.5,
+   "look_range": 320,
+   "turn_speed": 2.2
+  },
+  "flight": {
+   "speed": 140,
+   "min_time": 0.8,
+   "arc": 72,
+   "hover_above": 16,
+   "hover_min": 0.4,
+   "hover_max": 0.8,
+   "curve": 0.32,
+   "turn_rate": 7.0
+  },
+  "intro": {
+   "name": "MORNATH",
+   "epithet": "DER HIMMELSSPALTER",
+   "range": 700
+  },
+  "arrival": {
+   "distance": 460,
+   "height": 210,
+   "speed": 170,
+   "arc": 24,
+   "curve": 0.12,
+   "hover": 0.35
+  },
+  "landing": {
+   "duration": 0.5,
+   "shake": 0.9
+  },
+  "crash": {
+   "fall": 0.7,
+   "dead": 1.8
+  },
+  "fight": {
+   "gap": [0.5, 1.0],
+   "rotation": ["shot", "rain", "shot", "chase", "shot", "rain", "move"],
+   "line_chance": 0.35,
+   "armour": {"shot": 0.75, "droop": 1.7, "grounded": 2.0},
+   "reset": {"radius": 460, "after": 8.0},
+   "phases": [
+    {"break_at": 0.6667, "pillar": 1, "to": 0.64},
+    {"break_at": 0.3333, "pillar": 0, "to": 0.31, "judgement": true}
+   ],
+   "barrier": {"delay": 0.9, "first": 0.7, "between": 1.0, "fly": 0.6, "stagger": 0.1, "damage": 14, "radius": 12, "lift": 30, "end": 3.9},
+   "rain": {"lift": 26, "rise": 0.45, "waves": 3, "first_warn": 0.5, "wave_gap": 0.8, "warn": 0.95, "strip_step": 0.045, "strip": 24, "damage": 16, "knock": 90, "droop": 2.2},
+   "shot": {"charge": 0.6, "lock_before": 0.25, "speed": 340, "damage": 18, "knock": 120, "radius": 9, "fuse": 0.7, "zone_radius": 24, "zone_damage": 8, "tick_damage": 3, "ticks": 4, "recover": 0.45},
+   "line": {"charge": 0.65, "lock_before": 0.3, "warn": 0.4, "half_width": 15, "segments": 10, "seg_step": 0.03, "damage": 17, "knock": 100, "length": 300, "recover": 0.5},
+   "chase": {"speed": 98, "lag": 0.4, "max_time": 3.2, "close": 46, "radius": 60, "warn": 0.7, "damage": 22, "knock": 170, "feathers": 30, "land": 0.4, "grounded": 2.2, "hover": 36, "takeoff": 0.4},
+   "blast": {"trigger_range": 62, "trigger_time": 0.9, "cooldown": 5.0, "radius": 84, "warn": 0.5, "damage": 13, "knock": 240, "recover": 0.6},
+   "rest": {"fall_time": 0.7, "pillar_hp": 70},
+   "finisher": {"to": 0.64, "react": 1.1, "rise": 0.9, "rise_height": 30},
+   "transition": {"lift": 64, "burst_at": 0.55, "corrupt_at": 0.95, "scream_at": 1.75, "rift_at": 2.05, "rift_time": 0.95, "title_at": 2.35, "cut_at": 3.75, "leave_at": 3.85, "end": 4.5, "push_radius": 200, "push_knock": 270, "push_damage": 2, "text": "DER HIMMEL REISST"},
+   "rift": {"half_width": 4.5, "hurt_range": 11.5, "damage": 7, "knock": 200, "tick": 0.5, "breath_first": 15.0, "breath_min": 25.0, "breath_max": 30.0, "gap_warn": 1.1, "gap_open": 4.0, "gap_len": 78.0},
+   "p2": {
+    "gap": [0.3, 0.7],
+    "rotation": ["pincer+", "rain", "hands", "chase", "cage", "pincer", "rain", "move", "hands", "pincer+", "cage", "chase"],
+    "haste_below": 0.45,
+    "haste": 1.1,
+    "armour": {"shot": 0.75, "droop": 1.7, "grounded": 2.0},
+    "rain": {"lift": 26, "rise": 0.4, "waves": 3, "first_warn": 0.4, "wave_gap": 0.7, "warn": 0.78, "strip_step": 0.04, "strip": 24, "period": 84, "damage": 16, "knock": 90, "droop": 1.8, "puddle_damage": 3, "puddle_ticks": 4, "puddle_half": 17},
+    "pincer": {
+     "charge": 0.5, "lock_before": 0.22, "swap": 0.18, "recover": 0.4, "offset_angle": 0.2,
+     "shot": {"speed": 380, "damage": 18, "knock": 120, "radius": 9, "fuse": 0.6, "zone_radius": 22, "zone_damage": 8, "tick_damage": 3, "ticks": 3},
+     "line": {"warn": 0.36, "half_width": 13, "segments": 10, "seg_step": 0.028, "damage": 17, "knock": 100, "length": 300}
+    },
+    "chase": {"speed": 112, "lag": 0.25, "max_time": 3.0, "close": 46, "radius": 60, "warn": 0.5, "damage": 22, "knock": 170, "feathers": 34, "land": 0.35, "grounded": 1.4, "hover": 36, "takeoff": 0.35, "echo_after": 0.4, "echo_inner": 70, "echo_outer": 112, "echo_damage": 16, "double_damage": 18},
+    "hands": {"warn": 0.7, "sweep": 1.6, "angle": 120, "segments": 16, "half_width": 13, "length": 250, "damage": 18, "knock": 150, "recover": 0.55, "charge": 0.4},
+    "cage": {"charge": 0.5, "lock_before": 0.2, "fall": 0.3, "close_after": 0.5, "close_time": 1.25, "outer": 92, "inner": 30, "gap": 40, "wall_half": 5, "damage": 20, "knock": 170, "burst_damage": 20, "burst_after": 0.2, "recover": 0.55},
+    "blast": {"trigger_range": 62, "trigger_time": 0.8, "cooldown": 5.0, "radius": 84, "warn": 0.42, "damage": 13, "knock": 240, "recover": 0.5, "outer_inner": 92, "outer_radius": 152, "outer_after": 0.34, "outer_damage": 12}
+   },
+   "judgement": {"time": 28.0, "pillar_hp": 240, "hp_per_extra": 0.7, "ring_radius": 150, "pulse_first": 3.0, "pulse_every": 5.0, "pulse_radius": 90, "pulse_warn": 0.8, "pulse_damage": 16, "pulse_knock": 220, "wreath_inner": 112, "wreath_outer": 140, "wreath_after": 0.3, "wreath_damage": 14, "fail_after": 1.4, "success_flash": 1.0, "dark": 0.5}
+  },
+  "bar_range": 300,
+  "shake_radius": 240,
+  "loot": {
+   "award": "all",
+   "xp": 150,
+   "copper": {
+    "min": 60,
+    "max": 90
+   },
+   "items": [
+    {
+     "id": "void_splinter",
+     "chance": 1.0,
+     "min": 4,
+     "max": 6
+    },
+    {
+     "id": "shadow_core",
+     "chance": 0.7,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "void_slag",
+     "chance": 0.3,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "audio": {
+   "wing_soft": "res://assets/audio/sky_cleaver_wing_soft.wav",
+   "wing_strong": "res://assets/audio/sky_cleaver_wing_strong.wav",
+   "takeoff": "res://assets/audio/sky_cleaver_takeoff.wav",
+   "land": "res://assets/audio/sky_cleaver_land.wav",
+   "bead": "res://assets/audio/sky_cleaver_bead.wav",
+   "crash": "res://assets/audio/sky_cleaver_crash.wav",
+   "breath": "res://assets/audio/sky_cleaver_breath.wav",
+   "hit": "res://assets/audio/sky_cleaver_hit.wav",
+   "charge": "res://assets/audio/sky_cleaver_charge.wav",
+   "feather_launch": "res://assets/audio/sky_cleaver_feather_launch.wav",
+   "feather_stick": "res://assets/audio/sky_cleaver_feather_stick.wav",
+   "feather_hit": "res://assets/audio/sky_cleaver_feather_hit.wav",
+   "rain": "res://assets/audio/sky_cleaver_rain.wav",
+   "blast": "res://assets/audio/sky_cleaver_blast.wav",
+   "roar": "res://assets/audio/sky_cleaver_roar.wav",
+   "pillar_crack": "res://assets/audio/sky_cleaver_pillar_crack.wav",
+   "pillar_break": "res://assets/audio/sky_cleaver_pillar_break.wav",
+   "finisher": "res://assets/audio/sky_cleaver_finisher.wav",
+   "volume_db": -6
+  }
+ }
 }

@@ -10,6 +10,7 @@ signal town_founded
 signal built(piece: String, id: int)
 signal resident_joined(settler: String)
 signal notice(text: String, good: bool) ## a short message for the local builder ("NICHT GENUG HOLZ")
+signal event(kind: String, data: Dictionary) ## what happened to the town, on every peer: "lamp_out", "level_up", "alert" (docs/town_ausbau.md; the settlers' chatter and the map listen)
 
 const SETTLERS_TABLE: String = "settlers"
 const PROGRESS_FULL: int = 1000
@@ -47,6 +48,21 @@ var _settler_root: Node2D
 var _circles: Array[Vector3] = []
 var _circles_dirty: bool = true
 var _circles_version: int = 0
+var _lit: Array[Vector3] = [] ## the circles of what really burns (a lamp post without flame carries none)
+var _lit_dirty: bool = true
+var _seat_root: Node2D
+var _seats: Dictionary = {} ## "id_index" -> BenchSeat (always there, whether or not the bench's picture is loaded)
+var _last_level: int = -1
+var chatter: SettlerChatter
+var alert_on: bool = false ## the dark gathers at the edge of the light (a raid is warned): Valdric keeps the watch, the edge of the light glows brighter
+var alert_angle: float = 0.0 ## from the middle of the town towards where it gathers
+var _touch_msec: int = 0
+var _inside: bool = false ## the local player stands in the town
+var _entered_day: int = -1
+var wear: Dictionary = {} ## Vector2i cell (8 px) -> 0..1 how trodden the ground is (`TownWear`, computed on every peer from the state)
+var _wear_dirty: bool = true
+var _wear_clock: float = 0.0
+var _wear_tex: ImageTexture
 var light_scale: float = 1.0 ## 1, or less on a fog night: the light reaches that share as far
 var _scaled: Array[Vector3] = []
 var _scaled_version: int = -1
@@ -80,6 +96,14 @@ func _ready() -> void:
 	_path_root.name = "Ways"
 	_path_root.z_index = -9
 	add_child(_path_root)
+	chatter = SettlerChatter.new()
+	chatter.name = "Chatter"
+	chatter.town = self
+	add_child(chatter)
+	_seat_root = Node2D.new()
+	_seat_root.name = "Seats"
+	_seat_root.y_sort_enabled = true
+	add_child(_seat_root)
 	_settler_root = Node2D.new()
 	_settler_root.name = "Settlers"
 	_settler_root.y_sort_enabled = true
@@ -88,7 +112,10 @@ func _ready() -> void:
 	if multiplayer.is_server():
 		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_snapshot.rpc_id(id, export_state()))
 	built.connect(_on_built)
-	town_founded.connect(func() -> void: _announce("STADT GEGRÜNDET", town_name()))
+	changed.connect(func() -> void: _wear_dirty = true)
+	town_founded.connect(func() -> void:
+		_entered_day = TimeManager.day ## the founding says the name already
+		_announce("STADT GEGRÜNDET", town_name()))
 	resident_joined.connect(func(sid: String) -> void: _announce("%s ZIEHT EIN" % String(settler_spec(sid).get("name", sid)), String(settler_spec(sid).get("title", ""))))
 	TimeManager.day_started.connect(_on_day_started)
 
@@ -104,6 +131,8 @@ func _on_built(piece: String, _id: int) -> void:
 	var player: Player = local_player()
 	if player != null and player.quests != null:
 		player.quests.set_flag("built_" + piece)
+	if player != null and TownRules.piece(piece).has("fuel"):
+		notice.emit("E AM PFOSTEN: ANZÜNDEN", true) ## a new lamp post is cold until somebody lights it
 
 
 func _announce(title: String, sub: String) -> void:
@@ -116,6 +145,7 @@ func _announce(title: String, sub: String) -> void:
 
 
 func _on_day_started(_day: int) -> void:
+	_wear_dirty = true ## the ground wears in with the days
 	var player: Player = local_player()
 	if founded and player != null and player.quests != null and player.quests.has_flag("rebuild_done"):
 		player.quests.set_flag("town_morning")
@@ -230,12 +260,194 @@ func circles() -> Array[Vector3]:
 			if reach > 0.0 and int(data.g) >= PROGRESS_FULL:
 				_circles.append(Vector3(float(data.x), float(data.y) - 8.0, reach))
 		_circles_dirty = false
+		_lit_dirty = true
 		_circles_version += 1
 	return _circles
 
 
 func in_territory(pos: Vector2) -> bool:
 	return TownRules.covers(circles(), pos)
+
+
+# ---------- lamp posts: cold, lit, empty (docs/town_ausbau.md B9) ----------
+
+## The fuel data of a lamp post ({} for every other piece).
+func lamp_spec(id: int) -> Dictionary:
+	if not structures.has(id):
+		return {}
+	return TownRules.piece(String((structures[id] as Dictionary).p)).get("fuel", {}) as Dictionary
+
+
+## {f fuel 0..1000, l 1 once lit}. A lamp from an older save has no state: it burns, full.
+func lamp_u(id: int) -> Dictionary:
+	var u: Variant = (structures[id] as Dictionary).get("u", null) if structures.has(id) else null
+	if u is Dictionary:
+		return {"f": int((u as Dictionary).get("f", 0)), "l": int((u as Dictionary).get("l", 0))}
+	return {"f": 1000, "l": 1}
+
+
+## "" (not a lamp), "cold" (never lit), "lit", "empty" (burnt down).
+func lamp_state(id: int) -> String:
+	if lamp_spec(id).is_empty():
+		return ""
+	var u: Dictionary = lamp_u(id)
+	if int(u.l) == 0:
+		return "cold"
+	return "lit" if int(u.f) > 0 else "empty"
+
+
+func is_lamp_burning(id: int) -> bool:
+	return lamp_state(id) == "lit"
+
+
+## What E does at a lamp post ("" = nothing).
+func lamp_prompt(id: int) -> String:
+	match lamp_state(id):
+		"cold":
+			return "ANZÜNDEN"
+		"empty":
+			return "NACHFÜLLEN"
+		"lit":
+			return "NACHFÜLLEN" if int(lamp_u(id).f) <= 600 else ""
+	return ""
+
+
+func request_lamp(id: int) -> void:
+	if multiplayer.is_server():
+		_host_lamp(id, multiplayer.get_unique_id())
+	else:
+		_rpc_lamp_request.rpc_id(1, id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_lamp_request(id: int) -> void:
+	if multiplayer.is_server():
+		_host_lamp(id, multiplayer.get_remote_sender_id())
+
+
+func _host_lamp(id: int, peer: int) -> void:
+	var spec: Dictionary = lamp_spec(id)
+	var player: Player = player_of(peer)
+	if spec.is_empty() or player == null or not is_built(id) or lamp_prompt(id) == "":
+		return
+	if player.global_position.distance_to(rect_of(id).get_center()) > 90.0:
+		return
+	var cost: Dictionary = {String(spec.item): 1}
+	if not can_afford(cost, player):
+		_tell(peer, missing_text(cost, player), false)
+		return
+	_pay(cost, player)
+	_sync_stock()
+	_rpc_lamp.rpc(id, mini(1000, int(lamp_u(id).f) + int(spec.get("per_item", 500))), 1, true)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_lamp(id: int, fuel: int, lit: int, spark: bool) -> void:
+	if not structures.has(id):
+		return
+	(structures[id] as Dictionary).u = {"f": fuel, "l": lit}
+	_circles_dirty = true ## the night's circles follow the flames
+	if _views.has(id):
+		(_views[id] as TownStructure).refresh_lamp(spark)
+	changed.emit()
+
+
+## Host, every game hour: lit lamps burn down while it is night; a lamp that goes out says so.
+func _burn_lamps() -> void:
+	if not TimeManager.is_night():
+		return
+	var out: int = 0
+	for id: int in structures.keys():
+		var spec: Dictionary = lamp_spec(id)
+		if spec.is_empty() or not is_built(id) or not is_lamp_burning(id):
+			continue
+		var per_hour: int = int(round(1000.0 / (float(spec.get("nights", 3.0)) * 8.0)))
+		var fuel: int = maxi(int(lamp_u(id).f) - per_hour, 0)
+		_rpc_lamp.rpc(id, fuel, 1, false)
+		if fuel == 0:
+			out += 1
+	if out > 0:
+		banner("EIN LICHT ERLISCHT" if out == 1 else "%d LICHTER ERLISCHEN" % out, "")
+		emit_event("lamp_out", {"count": out})
+
+
+## Host: the dark gathers (or the alarm is over). Everyone's settlers and the glow of the light's edge follow.
+func set_alert(on: bool, angle: float) -> void:
+	if multiplayer.is_server() and (on != alert_on or (on and not is_equal_approx(angle, alert_angle))):
+		_rpc_alert.rpc(on, angle)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_alert(on: bool, angle: float) -> void:
+	alert_on = on
+	alert_angle = angle
+
+
+## Host: a creature is turned back at the edge of the light at `pos`: sparks on every peer (at most four a second).
+func light_touch(pos: Vector2) -> void:
+	if not multiplayer.is_server() or not founded:
+		return
+	var now: int = Time.get_ticks_msec()
+	if now - _touch_msec < 250:
+		return
+	_touch_msec = now
+	_rpc_light_touch.rpc(pos)
+
+
+@rpc("authority", "call_local", "unreliable")
+func _rpc_light_touch(pos: Vector2) -> void:
+	var near: bool = false
+	for center: Vector2 in _view_centers():
+		near = near or center.distance_to(pos) < 420.0
+	if not near:
+		return
+	var sparks: CPUParticles2D = CPUParticles2D.new()
+	sparks.one_shot = true
+	sparks.emitting = true
+	sparks.amount = 14
+	sparks.lifetime = 0.6
+	sparks.explosiveness = 0.9
+	sparks.direction = Vector2.UP
+	sparks.spread = 180.0
+	sparks.gravity = Vector2(0.0, 30.0)
+	sparks.initial_velocity_min = 18.0
+	sparks.initial_velocity_max = 54.0
+	sparks.scale_amount_min = 1.0
+	sparks.scale_amount_max = 1.5
+	sparks.color = Color("9ff7ea")
+	sparks.material = Unlit.material()
+	sparks.global_position = pos
+	sparks.z_index = 8
+	add_child(sparks)
+	get_tree().create_timer(1.0).timeout.connect(sparks.queue_free)
+	if ResourceLoader.exists("res://assets/audio/town/light_touch.wav"):
+		var sound: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+		sound.stream = load("res://assets/audio/town/light_touch.wav") as AudioStream
+		sound.volume_db = -12.0
+		sound.max_distance = 300.0
+		sound.global_position = pos
+		add_child(sound)
+		sound.finished.connect(sound.queue_free)
+		sound.play()
+
+
+## Host: tells every peer what happened to the town.
+func emit_event(kind: String, data: Dictionary = {}) -> void:
+	if multiplayer.is_server():
+		_rpc_event.rpc(kind, data)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_event(kind: String, data: Dictionary) -> void:
+	event.emit(kind, data)
+
+
+## Host: a rise in the town's level is an event.
+func _check_level() -> void:
+	var now: int = level()
+	if _last_level >= 0 and now > _last_level:
+		emit_event("level_up", {"level": now, "name": TownRules.level_name(now)})
+	_last_level = now
 
 
 # ---------- the night (docs/nacht_monster_konzept.md): light is land ----------
@@ -247,12 +459,21 @@ func light_depth(pos: Vector2) -> float:
 
 ## The circles as the night sees them: shrunk on a fog night (`light_scale`, set by `NightAtmosphere` on every peer). Building rules still use `circles()`.
 func lit_circles() -> Array[Vector3]:
-	var base: Array[Vector3] = circles()
+	circles() ## (rebuilds the building circles first, which also marks the lit ones as old)
+	if _lit_dirty:
+		_lit.clear()
+		for id: int in structures:
+			var data: Dictionary = structures[id] as Dictionary
+			var reach: float = float(TownRules.piece(String(data.p)).get("reach", 0.0))
+			if reach > 0.0 and int(data.g) >= PROGRESS_FULL and (lamp_spec(id).is_empty() or is_lamp_burning(id)):
+				_lit.append(Vector3(float(data.x), float(data.y) - 8.0, reach))
+		_lit_dirty = false
+		_circles_version += 1
 	if is_equal_approx(light_scale, 1.0):
-		return base
+		return _lit
 	if _scaled_version != _circles_version or not is_equal_approx(_scaled_for, light_scale):
 		_scaled.clear()
-		for c: Vector3 in base:
+		for c: Vector3 in _lit:
 			_scaled.append(Vector3(c.x, c.y, c.z * light_scale))
 		_scaled_version = _circles_version
 		_scaled_for = light_scale
@@ -503,20 +724,6 @@ func _rpc_added(id: int, data: Dictionary, cells: Array) -> void:
 	changed.emit()
 
 
-## Host: props the light has swept away after they were used up (`WorldLevel._sweep_spent`): gone for good, saved with the town.
-func clear_spent(cells: Array) -> void:
-	if multiplayer.is_server():
-		_rpc_cleared.rpc(cells)
-
-
-@rpc("authority", "call_local", "reliable")
-func _rpc_cleared(cells: Array) -> void:
-	for cell: Variant in cells:
-		cleared[cell as Vector2i] = true
-	if world != null:
-		world.town_clear_cells(cells)
-
-
 ## Developer checkpoint (Escape menu -> ENTWICKLER -> FERTIGE STADT): the town is founded, every piece of the catalogue stands finished round the hut (what is there already is kept) and
 ## every settler whose building stands is at home. Nothing is paid, nothing is asked. Solo / host only.
 func debug_build_all() -> void:
@@ -559,6 +766,8 @@ func debug_build_all() -> void:
 		if bool(spec.get("paths", false)):
 			_host_make_way(id)
 		_rpc_done.rpc(id)
+		if spec.has("fuel"):
+			_rpc_lamp.rpc(id, 1000, 1, false) ## the checkpoint town burns
 		(structures[id] as Dictionary).b = TimeManager.day - 6 ## the checkpoint town has stood a while: its wear is already there
 	for sid: String in settler_ids():
 		var settler: Dictionary = settler_spec(sid)
@@ -833,6 +1042,7 @@ func _rpc_removed(id: int) -> void:
 	_refresh_ways()
 	_circles_dirty = true
 	_rebuild_surfaces()
+	_sync_seats()
 	changed.emit()
 
 
@@ -902,6 +1112,8 @@ func _rpc_done(id: int) -> void:
 	var data: Dictionary = structures[id] as Dictionary
 	data.g = PROGRESS_FULL
 	data.b = TimeManager.day ## the day it was finished: what a piece collects with age (TownStructure `wear`)
+	if TownRules.piece(String(data.p)).has("fuel") and not data.has("u"):
+		data.u = {"f": 0, "l": 0} ## a new lamp post is cold until it is lit by hand
 	for way: Variant in paths:
 		if int((way as Dictionary).s) == id:
 			(way as Dictionary).d = 1
@@ -910,7 +1122,10 @@ func _rpc_done(id: int) -> void:
 	_register(id)
 	if _views.has(id):
 		(_views[id] as TownStructure).set_progress(PROGRESS_FULL, true)
+	_sync_seats()
 	built.emit(String(data.p), id)
+	if multiplayer.is_server():
+		_check_level()
 	changed.emit()
 
 
@@ -1065,6 +1280,7 @@ func _host_talk(sid: String) -> void:
 
 ## Host, every game hour: residents with a trade work for the town while they are at their place.
 func _hour_tick() -> void:
+	_burn_lamps()
 	for sid: String in residents:
 		var spec: Dictionary = settler_spec(sid)
 		var made: Dictionary = spec.get("produces", {}) as Dictionary
@@ -1396,6 +1612,57 @@ func local_player() -> Player:
 	return null
 
 
+# ---------- care ----------
+
+## Is this building looked after? A resident who lives there looks after it; a piece nobody is assigned to (the stockpile) is looked after as soon as anybody lives in the town.
+## A building whose settler has not come yet is not (cobwebs, moss: `wear` entries with `track: "neglect"`).
+func cared(id: int) -> bool:
+	if not structures.has(id):
+		return false
+	var kind: String = String((structures[id] as Dictionary).p)
+	var assigned: bool = false
+	for sid: String in settler_ids():
+		var spec: Dictionary = settler_spec(sid)
+		if String(spec.get("home", "")) == kind and bool(spec.get("enabled", true)):
+			assigned = true
+			if residents.has(sid):
+				return true
+	return not assigned and population() > 0
+
+
+# ---------- seats ----------
+
+## The benches' places (`seats` of the piece) as nodes that exist on every peer for every finished bench.
+func _sync_seats() -> void:
+	var wanted: Dictionary = {}
+	for id: int in structures:
+		var data: Dictionary = structures[id] as Dictionary
+		if int(data.g) < PROGRESS_FULL:
+			continue
+		var list: Array = TownRules.piece(String(data.p)).get("seats", []) as Array
+		for i: int in list.size():
+			wanted["%d_%d" % [id, i]] = [id, i]
+	for key: String in _seats.keys():
+		if not wanted.has(key):
+			(_seats[key] as BenchSeat).queue_free()
+			_seats.erase(key)
+	for key: String in wanted:
+		if _seats.has(key):
+			(_seats[key] as BenchSeat).refresh()
+			continue
+		var seat: BenchSeat = BenchSeat.new()
+		_seat_root.add_child(seat)
+		seat.setup(self, int((wanted[key] as Array)[0]), int((wanted[key] as Array)[1]))
+		_seats[key] = seat
+
+
+func seat_nodes() -> Array[BenchSeat]:
+	var out: Array[BenchSeat] = []
+	for seat: Variant in _seats.values():
+		out.append(seat as BenchSeat)
+	return out
+
+
 # ---------- views ----------
 
 func _register(id: int) -> void:
@@ -1473,6 +1740,8 @@ func _apply_all() -> void:
 		_ensure_settler(sid, false)
 	_refresh_ways()
 	_stream_views(true)
+	_sync_seats()
+	_last_level = level() if founded else -1
 	changed.emit()
 
 
@@ -1498,6 +1767,11 @@ func _process(delta: float) -> void:
 			if player != null and player.quests != null and player.quests.has_flag("rebuild_done"):
 				request_found()
 		return
+	_watch_territory(delta)
+	_wear_clock += delta
+	if _wear_dirty and _wear_clock >= 1.0:
+		_wear_clock = 0.0
+		_update_wear()
 	if multiplayer.is_server():
 		_arrival_clock += delta
 		if _arrival_clock >= 1.0:
@@ -1508,6 +1782,46 @@ func _process(delta: float) -> void:
 			if _last_hour >= 0:
 				_hour_tick()
 			_last_hour = hour
+
+
+func wear_at(pos: Vector2) -> float:
+	return float(wear.get(TownWear.cell_of(pos), 0.0))
+
+
+## Recomputes the trodden ground (only while somebody of this peer is near the town) and hands it to the ground shader and to the small plants.
+func _update_wear() -> void:
+	var near: bool = false
+	for center: Vector2 in _view_centers():
+		near = near or center.distance_to(self.center) < 1500.0
+	if not near:
+		return
+	_wear_dirty = false
+	wear = TownWear.compute(structures, paths, TimeManager.day)
+	var origin: Vector2 = TownWear.origin_for(center)
+	var img: Image = TownWear.field_image(wear, origin)
+	if _wear_tex == null:
+		_wear_tex = ImageTexture.create_from_image(img)
+		RenderingServer.global_shader_parameter_set("g_town_wear", _wear_tex)
+	else:
+		_wear_tex.update(img)
+	RenderingServer.global_shader_parameter_set("g_town_wear_rect", Vector4(origin.x, origin.y, TownWear.SIZE * TownWear.CELL, TownWear.SIZE * TownWear.CELL))
+	for node: Node in get_tree().get_nodes_in_group("meadow_details"):
+		(node as MeadowDetails).apply_wear(self)
+
+
+## The local player enters the town's ground (not a room): its name comes once a day, quietly (docs/town_ausbau.md C19).
+func _watch_territory(_delta: float) -> void:
+	var player: Player = local_player()
+	if player == null or Interiors.slot_at(player.global_position) >= 0 or MineManager.in_mine(player.global_position):
+		return
+	var depth: float = TownRules.light_depth(circles(), player.global_position)
+	if not _inside and depth > 10.0:
+		_inside = true
+		if _entered_day != TimeManager.day and not player.story_lock and player.intro == null:
+			_entered_day = TimeManager.day
+			_announce(town_name(), "%s · TAG %d" % [level_label(), TimeManager.day + 1])
+	elif _inside and depth < -20.0:
+		_inside = false
 
 
 # ---------- saving and joining ----------
@@ -1552,6 +1866,8 @@ func import_state(data: Dictionary) -> void:
 	for key: String in saved:
 		var entry: Dictionary = saved[key] as Dictionary
 		structures[int(key)] = {"p": String(entry.p), "x": float(entry.x), "y": float(entry.y), "f": int(entry.get("f", 0)), "g": int(entry.get("g", PROGRESS_FULL)), "b": int(entry.get("b", founded_day))}
+		if entry.get("u", null) is Dictionary:
+			(structures[int(key)] as Dictionary).u = {"f": int((entry.u as Dictionary).get("f", 0)), "l": int((entry.u as Dictionary).get("l", 0))}
 		if int((structures[int(key)] as Dictionary).g) < PROGRESS_FULL:
 			_progress[int(key)] = float((structures[int(key)] as Dictionary).g)
 	var items: Dictionary = data.get("stock", {}) as Dictionary

@@ -35,7 +35,9 @@ func build(layout: MineLayout, chunk_cell: Vector2i) -> MineField:
 	var ty0: int = chunk.y * MineChunk.SIZE - MARGIN
 	var raw: PackedFloat32Array = PackedFloat32Array()
 	raw.resize(SIDE * SIDE)
-	kinds = Image.create(tiles, tiles, false, Image.FORMAT_R8)
+	var kind_bytes: PackedByteArray = PackedByteArray() ## one byte per tile, one Image at the end (no set_pixel per tile)
+	kind_bytes.resize(tiles * tiles)
+	kind_bytes.fill(0)
 	var ballast: Dictionary = {} ## tiles with rails on them
 	for dy: int in range(-1, 2):
 		for dx: int in range(-1, 2):
@@ -50,12 +52,13 @@ func build(layout: MineLayout, chunk_cell: Vector2i) -> MineField:
 					var rect: Rect2i = layout.rooms[room].rect as Rect2i
 					if rect.has_point(Vector2i(tx0 + tx, ty0 + ty)):
 						kind = kind_of(String(layout.rooms[room].type))
-				kinds.set_pixel(tx, ty, Color8(kind, 0, 0))
+				kind_bytes[ty * tiles + tx] = kind
 				continue
 			for cy: int in 4:
 				var row: int = (ty * 4 + cy) * SIDE + tx * 4
 				for cx: int in 4:
 					raw[row + cx] = 1.0
+	kinds = Image.create_from_data(tiles, tiles, false, Image.FORMAT_R8, kind_bytes)
 	var blurred: PackedFloat32Array = _blur(_blur(raw))
 	_bend(blurred, tx0 * 4, ty0 * 4, 3, 11, 0.20)
 	_bend(blurred, tx0 * 4, ty0 * 4, 7, 29, 0.14)

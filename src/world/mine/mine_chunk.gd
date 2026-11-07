@@ -62,7 +62,7 @@ func setup(chunk_cell: Vector2i, mine_layout: MineLayout, atlas: Texture2D) -> v
 	_bake()
 
 
-## Paints the ground and the rock once (a SubViewport renders the shader for one frame) and keeps the picture as a texture.
+## Paints the ground and the rock once: a SubViewport renders the shader for one frame, then it stays as the chunk's child (UPDATE_DISABLED) and its texture is the ground sprite.
 func _bake() -> void:
 	if DisplayServer.get_name() == "headless":
 		return
@@ -105,15 +105,12 @@ func _baked(view: SubViewport) -> void:
 		return
 	if not is_instance_valid(view):
 		return
-	var image: Image = view.get_texture().get_image()
-	view.queue_free()
-	if image == null or image.is_empty():
-		return
+	view.render_target_update_mode = SubViewport.UPDATE_DISABLED ## rendered once: the picture stays on the GPU as the viewport's texture (no CPU readback)
 	_ground = Sprite2D.new()
 	_ground.name = "Ground"
 	_ground.centered = false
 	_ground.show_behind_parent = true ## under the rails and ropes this node draws itself
-	_ground.texture = ImageTexture.create_from_image(image)
+	_ground.texture = view.get_texture()
 	add_child(_ground)
 
 

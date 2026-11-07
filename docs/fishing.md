@@ -21,8 +21,9 @@ Basis ist [fishing_master_concept.md](fishing_master_concept.md). Dieses Dokumen
 | Zielen | heller Ring am Cursor (rot: Land) | Maus |
 | Wurf | 0,45 s Flug, Platsch, Ring | Linksklick |
 | Drift | Pose treibt mit `RiverFauna.flow_at` | Linksklick halten = Schnur geben, antippen = Zupfen, Rechtsklick = einholen |
-| Knabbern | Schatten kommt, Pose zuckt (2–3 Mal) | Klick jetzt = zu früh |
-| Biss | Pose weg, „!“, Schaumring, Fenster 0,8–1,4 s | Linksklick = Anschlag |
+| Anschwimmen | Schatten steigt aus der Tiefe, kommt im Bogen, zögert, stellt sich unterhalb der Pose gegen die Strömung; kann verschmähen | Zupfen reizt Räuber, scheucht scheue Arten |
+| Knabbern | Pose zuckt 1–4 Mal, der Schatten stößt jedes Mal vor; kann loslassen | Klick jetzt = zu früh |
+| Biss | Pose weg, „!“, Schaumring, Fisch dreht mit dem Köder ab, Fenster je Art 0,4–0,95 s | Linksklick = Anschlag |
 | Drill | Flucht: nachgeben (Bewegungsrichtung zum Fisch). Ermüdung: einholen | WASD zum Fisch, Linksklick halten |
 | Kescher | ein Freund presst E am Fisch (nahe Ufer) | E (andere Spielerin) |
 | Landung | Fisch ≤ 18 px | – |
@@ -31,26 +32,40 @@ Köder wechseln: **Z**, Pose: **H**, Flussbuch: **N** (W/S wählen, Esc/N schlie
 
 Verloren geht der Fang bei: zu früh/zu spät, Schnur reißt, Fisch entwischt, Treffer, Rutenwechsel, zu weit weg (190 px), vollem Beutel (Fisch wird freigelassen). Der Beutel wird beim Anschlag geprüft.
 
+## Wann und wo Fische kommen (Überarbeitung 2026-11-06)
+
+Vorher: Die tiefe Flussmitte war tagsüber leer (harte Habitat-Grenzen, dort lebte keine Tagesart), nahe Würfe bissen nach 2–5 s, und `flow_at` liefert nur eine Richtung (Betrag überall ≈ 1), sodass der Karpfen (`calm`) nie vorkam. Jetzt:
+
+- **Weiche Lebensräume** (`FishingRules.fit`, `settings.soft`): Tiefe, Uferabstand, Tageszeit und Strömung fallen am Rand weich ab statt hart abzubrechen. Jede Art von Wasser hat bei Tag und Nacht etwas; tief und weit draußen stehen Forelle und Gründling, flach am Ufer Silberströmer, im Stillwasser der Karpfen.
+- **Echte Strömungsstärke** (`FishingComponent.current_at`, `FishingRules.current_strength`, `settings.current`): Richtung aus dem Flussfeld, Stärke aus dem Uferabstand (Uferstreifen 0,25, Rinne 1,0), Seen 0,08, Sammelbecken 0,15. Die Pose treibt in der Rinne schneller; Arten haben optional `flow` [von, bis] (Forelle: Strömung, Karpfen: Stillwasser).
+- **Aktivität** (`FishingRules.activity`, `settings.activity`): Morgen-/Abenddämmerung +50 %, Mittagssonne treibt Fische aus dem Flachwasser (bis −30 %), **Wachsamkeit**: Fische direkt vor ihren Füßen (unter 20 px) sind nur zu 40 % so aktiv, ab 64 px normal, und ein **Angeldruck** pro Stelle (siehe unten) senkt sie bis −85 %.
+- **Biss als Zufallsprozess** (`FishingRules.bite_delay`): erst 2,5–4,5 s Beruhigung nach dem Platsch, dann eine exponentielle Wartezeit mit Mittel `bite.mean / (Interesse · Aktivität)` (7 s bei Interesse 1), höchstens 100 s. Kein Wurf fühlt sich gleich an, nah ist nicht mehr „sofort“, weit ist nicht mehr „nie“. Der Schatten kommt aus 34–46 px, bevorzugt aus der Tiefe stromab, und braucht 2,2–3,4 s.
+- **Verschmähen** (`FishingRules.refuse_chance`, `settings.refuse`): Am Köder angekommen dreht ein Fisch mit `caution · (1 − Vorliebe für den Köder) · 0,8 + Druck · 0,4` ab (Karpfen am blanken Haken ~48 %, mit Sumpfdotter 0 %). Ein Zupfen während des Anschwimmens halbiert das bei Räubern (`_lured`). Beim Knabbern kann er wieder loslassen. Wer verschmäht hat, bleibt 10 s weg; man sieht ihn davonschwimmen („VERSCHMÄHT“, gedimmt).
+- **Angeldruck** (`FishingComponent.add_pressure / pressure_at`, Host, gemeinsam für alle Angler): jeder Wurf +0,04, ein verpatzter Anschlag oder verscheuchter Fisch +0,2, ein verschmähter Köder +0,08, ein Fang +0,3, ein im Drill verlorener Fisch +0,45, im Umkreis von 56 px, klingt mit τ = 180 s ab. Eine abgefischte Stelle wird still, ein paar Meter weiter ist es frisch.
+- **Größe**: Die Länge wird beim Anhieb gewürfelt, tiefes Wasser hält die großen (`roll_length(..., depth)`). Größere Fische ziehen stärker (±15 %) und halten länger durch (+45 %); die Fangkarte zeigt genau diesen Fisch.
+
 ## Drill-Modell (`FishingRules.drill_step`)
 
-Fisch: `pull`, `speed`, `flee`/`tire` Dauern, `stamina`, `burst`. Die Spannung folgt einem Ziel mit Zeitkonstante `1/k`:
+Der Fisch hat einen Kraftvorrat (`stamina` 1 → 0, Art-`endurance` in Sekunden straffer Schnur). **Straffe Schnur (Gold) ermüdet ihn**, jede Flucht kostet zusätzlich, lockere Schnur lässt ihn verschnaufen. Mit der Kraft sinken Zug (`vigor` 0,4–1) und Fluchttempo; ein erschöpfter Fisch flieht nicht mehr. Die Spannung folgt einem Ziel mit Zeitkonstante `1/k`:
 
-- **Flucht:** Ziel `pull·(1,15 − 0,95·give)/flex`. Einholen in der Flucht +0,6/s. Die Distanz wächst mit `speed·(0,15 + 0,45·give)`. Über die Schnurlänge hinaus steigt die Spannung zusätzlich.
-- **Ermüdung:** Ziel `0,08 + 0,38·pull` beim Einholen, sonst 0,08. Die Distanz sinkt mit der Kurbel (`rod.reel`·(1 − 0,4·Ausdauer)). Vor jeder neuen Flucht 0,45 s Ankündigung.
-- Jede Flucht kostet `burst` Ausdauer; leer = nur noch Ermüdung.
-- **Ende:** Spannung ≥ 1 für 0,3 s: Schnur reißt. Distanz > Schnur·1,25: Fisch entwischt. Distanz ≤ 18: gelandet.
-- **Kescher:** Ein anderer lebender Spieler innerhalb von 40 px am Fisch, Distanz ≤ 46: der Fisch wird mit 60 px/s eingezogen, die Spannung ist auf 0,8 gedeckelt, der Fang ist ein **Prachtexemplar** (zwei Fische, Karte zeigt es). `FishNetSpot` ist der E-Punkt unter dem Fisch (nur für andere).
+- **Flucht:** Ziel `pull · (0,55 + 0,45 · vigor) · (1,15 − 0,95 · give) / flex` plus Kopfstöße (`shake`). **Kurbeln gegen eine Flucht** legt `0,6 · (0,5 + pull) · surge` drauf und die blockierte Rolle nimmt die Last 2,5× schneller (`lock_k`): wer am Anfang einer Flucht weiterkurbelt, reißt.
+- **Ermüdung:** Kurbeln: Ziel `0,28 + 0,42 · pull · vigor`, Einholtempo `reel · (1 − 0,45 · pull) · (0,55 … 1)` (müde Fische kommen leichter). Nur halten: Ziel `0,14 + 0,2 · pull · vigor`, der Fisch erholt sich (+0,04/s) und zieht langsam davon. Nachgeben ohne Zug: Schnur wird schlaff.
+- **Vorwarnung** (Zittern) je Art und Flucht zufällig: Forelle 0,18–0,42 s, Zander 0,2–0,4 s, Gründling 0,4–0,6 s.
+- **Letzte Flucht:** Forelle, Karpfen, Zander (`last_run`) machen beim ersten Uferkontakt (< 42 px) noch einmal einen kurzen Ausbruch, wenn sie nicht erschöpft sind.
+- **Ende:** Spannung ≥ 1 für 0,3 s: Schnur reißt. Kleine weiche Mäuler (`mouth` 0,8–0,85: Silberströmer, Glimmer-Schmerle) **schlitzen** schon früher aus („AUSGESCHLITZT“). Spannung < 0,1 länger als die Art-`hold` (0,75–1,6 s): **abgeschüttelt**. Distanz > Schnur · 1,25: entwischt. Distanz ≤ 18: gelandet.
+- **Kescher:** Ein anderer lebender Spieler innerhalb von 40 px am Fisch, Distanz ≤ 46: der Fisch wird mit 60 px/s eingezogen, Spannung auf 0,8 gedeckelt, weder Reißen noch Abschütteln, der Fang ist ein **Prachtexemplar** (zwei Fische). `FishNetSpot` ist der E-Punkt unter dem Fisch (nur für andere).
+- Kurbel 52 px/s (vorher 80).
 
-Die Zahlen wurden mit Bots abgeglichen (`tools/test_fishing.gd`): perfekt gespielt ≥ 90 %, eine Viertelsekunde zu spät noch meist, Dauer-Einholen reißt starke Fische (Zug ≥ 0,7), Dauer-Nachgeben landet nie. **Wie sich das mit echten Händen anfühlt, ist nicht erprobt.**
+Abgeglichen mit Bots, die nur sehen, was das Spiel zeigt (Farbe, Zittern, Flucht ja/nein) und verzögert reagieren (`tools/test_fishing.gd` `reader`): 0,2 s und 0,3 s Reaktionszeit landen alles, 0,42 s verliert ~30 % der Forellen und ~50 % der Zander, **Dauer-Einholen landet fast nie** (vorher 4 von 7 Arten zu 100 %), immer Nachgeben oder Nichtstun nie. Kämpfe dauern 4–5 s (kleine) bis 12–14 s (Aal, Zander). **Wie sich das mit echten Händen anfühlt, ist nicht erprobt.**
 
 ## Ökologie (Tabelle `species`)
 
 | Art | Wasser | Zeit | Köder | Besonderheit |
 |---|---|---|---|---|
-| Silberströmer | flach | Tag | Dämmerbeere | scheu (zu viel Zupfen scheucht ihn) |
-| Kupferkies-Gründling | mittel/tief | immer | Glimmkappe | stur, zäh |
-| Mondforelle | tiefer | Tag | Bachminze | schnell |
-| Goldbauch-Karpfen | ruhig, flach | Tag | Bachminze, Sumpfdotter | nur bei schwacher Strömung, schwer |
+| Silberströmer | flach, mit Strömung | Tag | Dämmerbeere | scheu (zu viel Zupfen scheucht ihn), weiches Maul |
+| Kupferkies-Gründling | mittel bis ganz tief | immer | Glimmkappe | stur, zäh, wenig vorsichtig |
+| Mondforelle | tief, Strömung | Tag | Bachminze | schnell, kurze Vorwarnung, letzte Flucht |
+| Goldbauch-Karpfen | Stillwasser (Uferstreifen, Seen, Becken) | Tag | Bachminze, Sumpfdotter | sehr vorsichtig, schwer |
 | Glimmer-Schmerle | flach | Nacht | Glimmkappe | Glimm-Pose lockt sie |
 | Schleier-Aal | tief | Nacht | Glimmkappe | beißt nur im Dunkeln |
 | Abyssischer Zander | sehr tief | Nacht | Glimmkappe, Glimmer-Schmerle | beißt nur im Dunkeln, sehr stark |
@@ -72,7 +87,7 @@ Der Fisch ist ein Punkt **im Wasser** (nicht mehr ein Strahl um Ellie): `Fishing
 
 ## Fischschatten
 
-Der Schatten taucht mit der Zeit aus der Tiefe auf (blass und durchsichtig → dunkel und deutlich) und sinkt beim Verscheuchen oder Verlust wieder ab. Er kommt aus der Richtung mit dem tiefsten Wasser (`_deep_offset`), nicht aus Pflanzen.
+Der Schatten taucht mit der Zeit aus der Tiefe auf (blass und durchsichtig → dunkel und deutlich). Er kommt aus 34–46 px aus der Richtung mit dem tiefsten Wasser, bevorzugt stromab (`_deep_offset`), schwimmt einen Bogen mit einem Zögern auf halbem Weg, dreht sich am Ende gegen die Strömung und wartet knapp unterhalb der Pose. Beim Knabbern stößt er zu jedem Zucken vor, beim Biss dreht er mit dem Köder ab. Wer verschmäht, verscheucht wird oder sich losreißt, **schwimmt sichtbar davon** (beschleunigt, im Bogen, sinkt weg; `FishingView._leaving`), statt auf der Stelle zu verblassen.
 
 ## Bilder (Look-Studie, `tools/preview_fishing.tscn`, Kamera 2x)
 
@@ -87,8 +102,8 @@ Der Schatten taucht mit der Zeit aus der Tiefe auf (blass und durchsichtig → d
 
 | Was | Befehl |
 |---|---|
-| Regeln, Daten, Bots, Buch (387) | `Godot --headless --path . tools/test_fishing.tscn` |
-| Ablauf auf echten Flussdaten (55) | `Godot --headless --path . tools/test_fishing_flow.tscn` |
+| Regeln, Daten, Bots, Buch | `Godot --headless --path . tools/test_fishing.tscn` |
+| Ablauf auf echten Flussdaten (inkl. Wartezeit nah/weit/Dämmerung, Angeldruck, Verschmähen) | `Godot --headless --path . tools/test_fishing_flow.tscn` |
 | Netzwerk, zwei Prozesse, Port 17898 | `tools/test_fishing_network.tscn -- --server`, danach ohne Argument |
 | Look-Studie mit echtem Spieler | `Godot --rendering-driver opengl3 --path . tools/preview_fishing.tscn -- --dir=/abs [--night]` |
 | Kunst / Ton | `python3 tools/art_fishing.py`, `python3 tools/art_weapons.py`, `python3 tools/audio_fishing.py`, danach `Godot --headless --import` |

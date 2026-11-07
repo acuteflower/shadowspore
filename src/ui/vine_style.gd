@@ -236,3 +236,89 @@ static func paper(canvas: CanvasItem, rect: Rect2, fade: float, void_level: floa
 			canvas.draw_rect(Rect2(rect.position + Vector2(x, top), Vector2(1, bottom - top)), Color(edge, fade))
 		previous_top = top
 		previous_bottom = bottom
+
+
+# ---------------------------------------------------------------------------------------------- key caps
+## Every key the HUD shows is drawn by `key_cap`, so they all look the same: a little polished seed-stone set in bark.
+
+const KEY_NAMES: Dictionary = {"Ctrl": "STRG", "Shift": "UMSCH", "Alt": "ALT", "Space": "LEER", "Tab": "TAB", "Escape": "ESC", "Enter": "ENTER"}
+const CAP_HEIGHT: int = 12
+const MOUSE_LEFT: String = "LMT"
+const MOUSE_RIGHT: String = "RMT"
+
+
+## The label of the first key (or mouse button) bound to `action`, in the game's words ("STRG", "LEER", "LMT").
+static func key_name(action: String, fallback: String = "?") -> String:
+	for event: InputEvent in InputMap.action_get_events(action):
+		var button: InputEventMouseButton = event as InputEventMouseButton
+		if button != null:
+			return MOUSE_LEFT if button.button_index == MOUSE_BUTTON_LEFT else MOUSE_RIGHT
+		var key: InputEventKey = event as InputEventKey
+		if key != null:
+			var code: Key = key.keycode if key.keycode != KEY_NONE else DisplayServer.keyboard_get_keycode_from_physical(key.physical_keycode)
+			var label: String = OS.get_keycode_string(code)
+			return String(KEY_NAMES.get(label, label.to_upper()))
+	return fallback
+
+
+## How wide `key_cap` draws `key`.
+static func cap_width(key: String) -> int:
+	if key == MOUSE_LEFT or key == MOUSE_RIGHT:
+		return CAP_HEIGHT - 1
+	return maxi(CAP_HEIGHT - 1, PixelText.width(key) + 7)
+
+
+## A key cap with its top-left at `at`: ink outline with cut corners, a stone face lit from the top left, a darker lip
+## below that gives it depth, a sprig of moss on one shoulder and the key in petal white. `lit` 0..1 (held, or the
+## key to press now): it sinks a pixel, the face fills with the teal of life and glows. By night the void tints it.
+## Mouse buttons ("LMT", "RMT") are drawn as a small mouse with that half lit. Returns the cap's width.
+static func key_cap(canvas: CanvasItem, at: Vector2, key: String, fade: float = 1.0, lit: float = 0.0, void_level: float = 0.0) -> int:
+	var w: int = cap_width(key)
+	var h: int = CAP_HEIGHT
+	var o: Vector2 = at.round()
+	var press: int = 1 if lit > 0.5 else 0
+	var ink: Color = Color(OUTLINE, fade)
+	var face_dark: Color = Color("2a2340").lerp(Color("120a24"), void_level)
+	var face: Color = Color("3d3358").lerp(Color("24164a"), void_level).lerp(UiStyle.ACCENT.darkened(0.25), lit)
+	var shine: Color = BARK_LIGHT.lerp(BARK_VOID_LIGHT, void_level).lerp(UiStyle.ACCENT.lightened(0.45), lit)
+	var lip: Color = Color("17112a").lerp(UiStyle.ACCENT.darkened(0.6), lit * 0.6)
+	if lit > 0.0:
+		glow(canvas, o + Vector2(w / 2.0, h / 2.0 + 1), maxf(8.0, w * 0.6), UiStyle.ACCENT, 0.55 * lit * fade)
+	# outline and lip (the cap's depth), corners cut
+	canvas.draw_rect(Rect2(o + Vector2(1, 0), Vector2(w - 2, h)), ink)
+	canvas.draw_rect(Rect2(o + Vector2(0, 1), Vector2(w, h - 2)), ink)
+	canvas.draw_rect(Rect2(o + Vector2(1, h - 3), Vector2(w - 2, 2)), Color(lip, fade))
+	var top: float = o.y + 1 + press
+	var face_h: int = h - 4 - press
+	if key == MOUSE_LEFT or key == MOUSE_RIGHT:
+		_mouse_face(canvas, Vector2(o.x, top), w, face_h, key == MOUSE_LEFT, fade, lit, face_dark, face, shine)
+		return w
+	canvas.draw_rect(Rect2(o.x + 1, top, w - 2, face_h), Color(face_dark, fade))
+	canvas.draw_rect(Rect2(o.x + 2, top, w - 4, face_h - 1), Color(face, fade)) ## the dished face
+	canvas.draw_rect(Rect2(o.x + 2, top, w - 4, 1), Color(shine, fade)) ## light from the top left
+	canvas.draw_rect(Rect2(o.x + 1, top + 1, 1, face_h - 2), Color(shine, 0.55 * fade))
+	var moss: Color = LEAF.lerp(LEAF_VOID, void_level)
+	canvas.draw_rect(Rect2(o.x + w - 3, o.y - 1 + press, 2, 1), Color(moss, fade)) ## a sprig of moss on the shoulder
+	canvas.draw_rect(Rect2(o.x + w - 2, o.y - 2 + press, 1, 1), Color(LEAF_LIGHT.lerp(LEAF_VOID_LIGHT, void_level), fade))
+	var text_color: Color = PETAL.lerp(OUTLINE, smoothstep(0.4, 0.9, lit))
+	PixelText.draw(canvas, key, Vector2i(int(o.x) + (w - PixelText.width(key) + 1) / 2, int(top) - 1), Color(text_color, fade))
+	return w
+
+
+static func _mouse_face(canvas: CanvasItem, at: Vector2, w: int, h: int, left: bool, fade: float, lit: float, dark: Color, face: Color, shine: Color) -> void:
+	canvas.draw_rect(Rect2(at.x + 1, at.y, w - 2, h), Color(dark, fade))
+	canvas.draw_rect(Rect2(at.x + 2, at.y, w - 4, h - 1), Color(face, fade))
+	canvas.draw_rect(Rect2(at.x + 2, at.y, w - 4, 1), Color(shine, fade))
+	## a small mouse drawn in petal white on the face, the button in question filled with teal
+	var glyph: Array[String] = [".###.", "#ab.#", "#ab.#", "#####", "#...#", "#...#", ".###."]
+	var ox: float = at.x + floorf((w - 5) / 2.0)
+	var oy: float = at.y + maxf(0.0, floorf((h - 7) / 2.0))
+	var button: Color = UiStyle.ACCENT.lerp(Color.WHITE, 0.3 * lit)
+	for y: int in glyph.size():
+		for x: int in 5:
+			var cell: String = glyph[y][x]
+			var gx: int = x if left else 4 - x
+			if cell == "#":
+				canvas.draw_rect(Rect2(ox + gx, oy + y, 1, 1), Color(PETAL, fade))
+			elif cell == "a" or cell == "b":
+				canvas.draw_rect(Rect2(ox + gx, oy + y, 1, 1), Color(button, fade))

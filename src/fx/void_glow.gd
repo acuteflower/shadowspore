@@ -24,7 +24,7 @@ static func pulse(time: float, phase: float = 0.0, rate: float = 0.8, floor_valu
 
 
 ## A one pixel light. `bloom` up to 0.5 is a vein pixel (a faint 3x3 so a line stays a thin line); above it is an eye or a core: a stronger 3x3 plus 5x5 and 7x7 steps that scale with `bloom`.
-static func halo(canvas: Node2D, point: Vector2, color: Color, strength: float, bloom: float = 0.5) -> void:
+static func halo(canvas: CanvasItem, point: Vector2, color: Color, strength: float, bloom: float = 0.5) -> void:
 	if strength <= 0.01:
 		return
 	var at: Vector2 = point.round()

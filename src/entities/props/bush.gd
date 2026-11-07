@@ -15,6 +15,7 @@ var _idle_phase: float = 0.0
 var _sway_rate: float = 0.0
 var _on_screen: bool = true
 var _notifier: VisibleOnScreenNotifier2D
+var _critter: LeafCritter ## an undergrowth animal on the bush (plants.json "critters"), see LeafCritter
 
 @onready var _foliage: Area2D = $Foliage
 
@@ -29,6 +30,10 @@ func _setup_prop() -> void:
 	_notifier.screen_entered.connect(func() -> void: _on_screen = true)
 	_notifier.screen_exited.connect(func() -> void: _on_screen = false)
 	add_child(_notifier)
+	if _spec.has("critters"):
+		_critter = LeafCritter.new()
+		_critter.setup(self)
+		add_child(_critter)
 
 
 func _process(_delta: float) -> void:
@@ -78,6 +83,12 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 			_burst(7, _pick_colors())
 		"regrow":
 			_burst(6, REGROW_BURST, 0.0)
+		"catch":
+			_burst(6, [Color("ffe08a"), Color("fff4c8")], 30.0, Vector2(0, -_height * 0.6))
+		"scare":
+			_rustle(randf_range(-1.0, 1.0), 0.1)
+	if _critter != null:
+		_critter.refresh(fx)
 	if _prompt_node != null:
 		set_focused(_prompt_node.visible)
 
@@ -85,12 +96,17 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 func prompt() -> String:
 	if _spec.has("pickup") and not is_depleted() and not bool(state.get("p", 0)):
 		return String((_spec.pickup as Dictionary).prompt)
+	if _critter != null and LeafCritter.today(self) != "":
+		return "ABLESEN" ## something small sits on a leaf
 	return ""
 
 
 ## She faces the bush and picks (about a second); the berries come at the grab, not at the key press.
 func interact(player: Player) -> void:
 	var toward: Vector2 = global_position + Vector2(0, -_radius * 0.45) - player.global_position
+	if not (_spec.has("pickup") and not is_depleted() and not bool(state.get("p", 0))):
+		player.begin_pick(toward.normalized(), func() -> void: level.request_catch(cell))
+		return
 	player.begin_pick(toward.normalized(), func() -> void: level.request_pick(cell))
 
 
@@ -100,6 +116,8 @@ func _on_enter(body: Node2D) -> void:
 	if player == null:
 		return
 	_inside.append(player)
+	if _critter != null:
+		_critter.startle()
 	_rustle(signf(player.velocity.x) if absf(player.velocity.x) > 5.0 else randf_range(-1.0, 1.0))
 	if player.is_multiplayer_authority():
 		player.set_slow(self, float(_spec.slow))

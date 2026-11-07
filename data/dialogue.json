@@ -1090,5 +1090,27 @@
     "text": "Mauern schützen vor Wind, aber ein Zuhause wird es erst, wenn jemand am Tisch sitzt. Mach weiter so, Kleines. Ich bau dir den Rest."
    }
   ]
+ },
+ "waystone_discover": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Eine Statue. Hier oben, mitten im Nirgendwo? Irgendwer hat sich Mühe gegeben, und dann hat das Moos übernommen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Und diese Kristalle... schwarz wie Tinte. Sie wachsen nicht an ihr, sie sitzen IN ihr. Als würden sie auf etwas warten."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Mein Kopf sagt: Finger weg. Mein Bauch sagt: leg die Hände drauf. Wann hat mein Bauch zuletzt recht gehabt?"
+   }
+  ]
  }
 }

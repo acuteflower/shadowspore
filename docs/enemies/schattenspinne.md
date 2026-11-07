@@ -58,7 +58,7 @@
   * **Aim-Lock:** Exakt 0.30 Sekunden vor dem Zuschlagen friert die Ausrichtung der Spinne ein (`aim_locked = true`). Die Warnfläche flackert grell auf – das unmissverständliche Signal für den Spieler, zur Seite auszuweichen oder wegzusprinten.
 * **Was die Spinne NIE tun würde:**
   * Fliegen, schweben oder aus der Luft abseilen.
-  * Graue Staub- oder Rauchwolken erzeugen (Verstoß gegen die Voidbloom-Designregeln).
+  * Graue Staub- oder Rauchwolken erzeugen (Verstoß gegen die Shadowspore-Designregeln).
   * Wie eine gewöhnliche Chitinspinne mit starren Kniegelenken mechanisch tippeln.
 
 ---
@@ -130,4 +130,4 @@
 3. **Multiplayer-Synchronisation:**
    * Sämtliche Angriffsursprünge (`attack_origin`), Zielrichtungen (`attack_dir`), Ankerpunkte (`anchor`) und Seiten (`attack_side`) werden atomar via RPC übertragen. Lokale Clients interpolieren nur die kosmetische Beinanpassung.
 4. **Kein Partikel-Rauch:**
-   * Niemals Standard-Rauch-Emitter an die Beine hängen. Schattenmanifestationen in Voidbloom hinterlassen stattdessen Bodenbefall über Shader-Materialien (`ShadowTrailComponent` / `shadow_patch.gdshader`).
+   * Niemals Standard-Rauch-Emitter an die Beine hängen. Schattenmanifestationen in Shadowspore hinterlassen stattdessen Bodenbefall über Shader-Materialien (`ShadowTrailComponent` / `shadow_patch.gdshader`).

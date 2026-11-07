@@ -26,12 +26,12 @@ void vertex() {
 		contact += normalize(d + vec2(0.001)) * f * vec2(7.0, 3.5);
 		press += f;
 	}
-	float rooted = pow(1.0 - UV.y, 1.4);
+	float rooted = pow(UV.y, 1.4);
 	VERTEX += round((wind + contact) * rooted) + vec2(0.0, round(min(press, 1.0) * 2.5 * rooted));
 }
 
 void fragment() {
 	float kind = floor(detail.r * count + 0.5);
-	COLOR = texture(TEXTURE, vec2((UV.x + kind) / count, UV.y));
+	COLOR = texture(TEXTURE, vec2((UV.x + kind) / count, 1.0 - UV.y));
 	COLOR.a *= 0.15 + 0.6 * g_night;
 }

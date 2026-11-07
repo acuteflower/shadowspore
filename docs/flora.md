@@ -45,3 +45,10 @@ Zufall: `plan` zieht alles aus dem Seed des Feldes, und `_make_atlas` malt die B
 ## Wind-Wackeln beim Laufen (Fehler behoben)
 
 Die Wind-Shader haben Position und Phase aus der Modellmatrix und einem Hash der Position gelesen; sobald die Kamera mitlief, sprangen die Phasen. Jetzt hat jede Pflanze ihr eigenes Material mit festen Uniforms (`origin`, `phase_seed`), Kleestreifen bekommen `band_origin` und den Versatz im Instanz-Datenfeld. Nichts im Wind hängt mehr von der Kamera ab.
+
+## Klee mähen und Stämme hacken (`data/harvest.json`)
+
+- **Kleefelder mit der Sichel:** jedes Feld hat drei Treffer (`hits`). Die Sichel findet es über drei Scheiben auf Physik-Layer 5 (`HarvestHurtbox`, `harvest_target`); jeder Treffer gibt Blätter und Pflanzenfaser, der letzte mehr. Ein gemähtes Feld ist weg (versteckt, nicht mehr trefferbar) und wächst bei Sonnenaufgang ganz nach (`WorldLevel._grow_harvest`). Andere Waffen lassen es nur rascheln.
+- **Umgefallene Stämme mit der Axt:** drei Treffer, Tannenholz und Stöcke; danach ist der Stamm für immer weg (er sinkt aus dem Bild und ist kein Sitzplatz mehr für Vögel). Stand im Speicherstand unter `things` als `h:l:x,y`, Klee als `h:c:x,y`.
+- Host entscheidet, alle Peers zeigen den Stand der geladenen Knoten (`_rpc_harvest_state`, Snapshot für Beitretende). Tests: `tools/test_harvest.tscn`.
+- Noch offen: ein eigener Klee-Gegenstand (Icon-Kunst fehlt), vorerst fallen Blätter und Pflanzenfaser.

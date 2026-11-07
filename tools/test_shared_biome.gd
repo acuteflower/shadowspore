@@ -58,7 +58,7 @@ func _run() -> void:
 	_check(not WorldEdits.compatible_map("unrelated-world"), "unrelated legacy worlds stay rejected")
 	for previous: Dictionary in data.get("editor_compatible_maps", []):
 		_check(WorldEdits.compatible_map(String(previous.hash)), "previous editor save format remains accepted")
-		var path: String = OS.get_temp_dir().path_join("voidbloom-shared-biome-edits.json")
+		var path: String = OS.get_temp_dir().path_join("shadowspore-shared-biome-edits.json")
 		var payload: Dictionary = {"version": 1, "map": previous.hash, "props": {"10,10": {"kind": "tree", "variant": 3}}, "terrain": {"10,10": {"ground": "plain", "biome": "glass_cliffs"}}}
 		var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
 		file.store_string(JSON.stringify(payload))

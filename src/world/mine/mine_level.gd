@@ -38,11 +38,14 @@ func setup(level_number: int, mine_layout: MineLayout) -> void:
 	add_child(_backdrop)
 
 
-## Builds the chunks around the given positions (level px); `step` lets one far chunk per frame come in, the near ones are built at once.
+## Builds the chunks around the given positions (level px). A chunk a player stands in is built at once; every other missing chunk comes in
+## one per frame, the near ones (within NEAR) before the far ones, nearest first, so a fresh level never builds a ring of chunks in one frame.
 func stream(points: Array[Vector2]) -> void:
 	idle = 0.0
 	_points = points
 	var wanted: Dictionary = {}
+	var near_cell: Vector2i = Vector2i(-1, -1)
+	var near_d: float = 1e30
 	var queue_cell: Vector2i = Vector2i(-1, -1)
 	var queue_d: float = 1e30
 	for p: Vector2 in points:
@@ -59,13 +62,18 @@ func stream(points: Array[Vector2]) -> void:
 				var rect: Rect2 = Rect2(Vector2(n * CHUNK * 16), Vector2.ONE * CHUNK * 16.0)
 				var d: float = rect.grow(0.0).get_center().distance_to(p)
 				var gap: float = maxf(maxf(rect.position.x - p.x, p.x - rect.end.x), maxf(rect.position.y - p.y, p.y - rect.end.y))
-				if gap < NEAR:
+				if gap <= 0.0: ## the player stands in it: at once
 					build(n)
+				elif gap < NEAR:
+					if d < near_d:
+						near_d = d
+						near_cell = n
 				elif d < queue_d:
 					queue_d = d
 					queue_cell = n
-	if queue_cell.x >= 0 and not chunks.has(queue_cell):
-		build(queue_cell)
+	var pick: Vector2i = near_cell if near_cell.x >= 0 else queue_cell
+	if pick.x >= 0 and not chunks.has(pick):
+		build(pick)
 	for c: Vector2i in chunks.keys():
 		var far: bool = true
 		for p: Vector2 in points:

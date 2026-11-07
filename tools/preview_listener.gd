@@ -67,7 +67,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	PixelText.draw(self, "VOIDBLOOM / LEERENHORCHER", Vector2i(18, 17), Color("cbaaff"))
+	PixelText.draw(self, "SHADOWSPORE / LEERENHORCHER", Vector2i(18, 17), Color("cbaaff"))
 	for i: int in 6:
 		var cell: Vector2i = Vector2i(10 + (i % 3) * 210, 42 + (i / 3) * 145)
 		draw_rect(Rect2(cell, Vector2i(198, 135)), Color("223a35"))

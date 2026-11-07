@@ -207,8 +207,16 @@ func _smoke(parent: Node2D) -> void:
 	parent.add_child(smoke)
 
 
+const ANIMATE_RANGE: float = 600.0 ## px: yards far from every player are not animated (`_time` keeps running)
+
+func _near_player(radius: float) -> bool:
+	for player: Player in Player.all:
+		if is_instance_valid(player) and player.global_position.distance_squared_to(global_position) <= radius * radius: return true
+	return false
+
 func _process(delta: float) -> void:
 	_time += delta
+	if not Player.all.is_empty() and not _near_player(ANIMATE_RANGE): return
 	var night: float = MineManager.night_at(self, TimeManager.night_amount())
 	for entry: Dictionary in _anims:
 		var sprite: Sprite2D = entry.sprite as Sprite2D

@@ -282,6 +282,7 @@ func _on_ui_input(event: InputEvent) -> void:
 		_hover = _option_at(motion.position)
 		if _hover >= 0:
 			_focus = _hover
+		GameCursor.set_hint(_ui, &"click" if _hover >= 0 else &"") ## the cursor sparkles over an option
 	elif click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
 		var index: int = _option_at(click.position)
 		if index >= 0:

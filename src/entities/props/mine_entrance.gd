@@ -12,6 +12,7 @@ var exit_position: Vector2 ## world px, in front of the gate
 
 func _ready() -> void:
 	y_sort_enabled = true
+	add_to_group("mine_gates") ## MineManager prefetches level 1's layout when she comes near
 	var picture: Sprite2D = Sprite2D.new()
 	picture.texture = load("res://assets/mine/props/entrance.png") as Texture2D
 	picture.offset = Vector2(0, FRAME.y / 2.0 - FEET)

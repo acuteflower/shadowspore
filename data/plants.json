@@ -81,7 +81,10 @@
    "regrow_days": 1
   },
   "scene": "res://src/entities/props/bush.tscn",
-  "edge_margin": 4
+  "edge_margin": 4,
+  "critters": {
+   "chance": 0.2
+  }
  },
  "berry_bush": {
   "name": "Dämmerbeerenbusch",
@@ -168,7 +171,10 @@
    "regrow_days": 3
   },
   "scene": "res://src/entities/props/bush.tscn",
-  "edge_margin": 4
+  "edge_margin": 4,
+  "critters": {
+   "chance": 0.2
+  }
  },
  "grass": {
   "name": "Flüstergras",
@@ -234,7 +240,10 @@
    "regrow_days": 1
   },
   "scene": "res://src/entities/props/bush.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "critters": {
+   "chance": 0.2
+  }
  },
  "ember_bush": {
   "name": "Glutbeerenranke",
@@ -316,7 +325,10 @@
    ]
   },
   "scene": "res://src/entities/props/bush.tscn",
-  "edge_margin": 4
+  "edge_margin": 4,
+  "critters": {
+   "chance": 0.2
+  }
  },
  "pebble": {
   "name": "Kiesel",
@@ -977,7 +989,12 @@
   ],
   "slow": 0.9,
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "sow": {
+   "chance": 0.2,
+   "range": 4,
+   "lifespan": 10
+  }
  },
  "wound_leaf": {
   "name": "Wundblatt",
@@ -1020,7 +1037,12 @@
   ],
   "slow": 0.88,
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "sow": {
+   "chance": 0.15,
+   "range": 3,
+   "lifespan": 10
+  }
  },
  "puffseed": {
   "name": "Wispersaat",
@@ -1067,7 +1089,12 @@
   ],
   "slow": 0.92,
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "sow": {
+   "chance": 0.35,
+   "range": 6,
+   "lifespan": 9
+  }
  },
  "glowfern": {
   "name": "Leuchtfern",
@@ -1144,7 +1171,10 @@
   ],
   "slow": 0.7,
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "critters": {
+   "chance": 0.2
+  }
  },
  "cattail": {
   "name": "Rohrkolben",
@@ -1202,7 +1232,10 @@
   ],
   "slow": 0.85,
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 4
+  "edge_margin": 4,
+  "critters": {
+   "chance": 0.2
+  }
  },
  "sunbloom": {
   "name": "Sonnenwende",
@@ -1246,7 +1279,12 @@
   ],
   "slow": 0.9,
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "sow": {
+   "chance": 0.2,
+   "range": 5,
+   "lifespan": 9
+  }
  },
  "voidbloom": {
   "name": "Leerenblüte",
@@ -1486,7 +1524,12 @@
    ]
   },
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "sow": {
+   "chance": 0.15,
+   "range": 3,
+   "lifespan": 12
+  }
  },
  "spark_poppy": {
   "name": "Funkenmohn",
@@ -1539,7 +1582,12 @@
    ]
   },
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "sow": {
+   "chance": 0.3,
+   "range": 5,
+   "lifespan": 8
+  }
  },
  "birch": {
   "name": "Mondbirke",
@@ -1934,5 +1982,75 @@
   },
   "scene": "res://src/entities/props/flora.tscn",
   "edge_margin": 4
+ },
+ "snapper": {
+  "name": "Fangblume",
+  "texture": "res://assets/props/snapper.png",
+  "glow": "res://assets/props/snapper_glow.png",
+  "stripped": "res://assets/props/snapper_stripped.png",
+  "light": {
+   "color": "#ff4ad0",
+   "radius": 12,
+   "energy": 0.16
+  },
+  "sway": 0.03,
+  "leaf_colors": [
+   "#2c6e54",
+   "#449a62",
+   "#8a2a98"
+  ],
+  "snapper": {
+   "damage": 4,
+   "range": 15,
+   "cooldown": 3.0,
+   "open_from": 0.45
+  },
+  "harvest": {
+   "tool": "sickle",
+   "hits": 2,
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "leaf",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.8,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "leaf",
+     "chance": 0.6,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  },
+  "columns": 3,
+  "rows": 3,
+  "weights": [
+   3,
+   3,
+   2
+  ],
+  "radius": [
+   8,
+   7,
+   10
+  ],
+  "height": [
+   26,
+   20,
+   24
+  ],
+  "slow": 0.85,
+  "scene": "res://src/entities/props/snapper.tscn",
+  "edge_margin": 3
  }
 }

@@ -6,7 +6,7 @@
 [ext_resource type="Shader" path="res://assets/shaders/hit_flash.gdshader" id="4_flash"]
 [ext_resource type="Script" path="res://src/components/health_component.gd" id="5_health"]
 [ext_resource type="Script" path="res://src/components/hurtbox_component.gd" id="6_hurtbox"]
-[ext_resource type="Script" path="res://src/fx/world_health_bar.gd" id="7_bar"]
+[ext_resource type="Script" path="res://src/fx/void_health_bar.gd" id="7_bar"]
 [ext_resource type="Texture2D" path="res://assets/fx/void_shard.png" id="8_shard"]
 [ext_resource type="Script" path="res://src/components/shadow_trail_component.gd" id="9_trail"]
 [ext_resource type="Script" path="res://src/components/drop_component.gd" id="10_drop"]
@@ -147,3 +147,4 @@ script = ExtResource("10_drop")
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_sync")
+replication_interval = 0.05

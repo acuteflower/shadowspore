@@ -31,6 +31,7 @@ var _voice: AudioStreamPlayer2D
 @onready var _ripples: WaterRipples = $Ripples
 
 func _ready() -> void:
+	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_population = get_parent().get_parent() as RiverFauna
 	_spec = DataRegistry.get_entry("river_animals", kind)
 	_rng.seed = hash(name) + member * 173

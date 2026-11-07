@@ -33,6 +33,7 @@ var _player: Player
 func setup(owner_town: TownManager) -> void:
 	town = owner_town
 	name = "BuildMode"
+	add_to_group("build_mode") ## the cursor (GameCursor) asks it what to show
 	z_index = 90
 	material = Unlit.material()
 	_ghost = Sprite2D.new()

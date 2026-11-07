@@ -26,6 +26,7 @@ func _run() -> void:
 		world._advance_chunk(build)
 		check(not world._chunks.has(c) and world._rivers._materials.is_empty(), "Partial river entered live world")
 		world._commit_chunk(build)
+		world._finish_commit()
 		check(world._chunks[c].node.has_node("RiverSurface"), "Missing streamed river")
 		for thing: WorldProp in world._chunks[c].things:
 			var plant: Dictionary = DataRegistry.get_entry("plants", thing.kind)

@@ -27,6 +27,14 @@ var _spill: Sprite2D ## the lamp light that leaves the window: a bloom on the wa
 var _window_light: NightLight
 var _vane: Sprite2D ## the weathervane on the renewed roof ridge: turns with the wind
 var _vane_dir: float = 1.0
+var _banner_mat: ShaderMaterial ## the town banner at the renewed roof's right end: its rows sway in the wind
+var _sway_mats: Array[ShaderMaterial] = [] ## every swaying picture of the renewed hut (the banners, the flags)
+var _banner_left: Sprite2D ## the second banner (village and up), at the roof's left end
+var _flags: Array[Sprite2D] = [] ## flags on the ridge (borough: one, town: two)
+var _ivy: Array[Sprite2D] = [] ## the ivy that climbs the right corner with the days
+var _town: TownManager
+var _town_look: float = 0.0
+var _town_ready: bool = false ## the first look at the town is not animated
 
 
 func is_done() -> bool: ## the hut always stands (RoofPerch asks)
@@ -68,7 +76,7 @@ func _ready() -> void:
 	for x: float in ([-62.0, 10.0, 62.0] if art == "hut" else []): ## birds on the ridge (the renewed one has a vane, the chimney stands left of the middle)
 		var perch: RoofPerch = RoofPerch.new()
 		perch.host = self
-		perch.perch_height = 86.0
+		perch.perch_height = 85.0
 		perch.position = Vector2(x, 3.0)
 		add_child(perch)
 	exit_position = global_position + Vector2(0, float(look.exit))
@@ -172,13 +180,80 @@ func set_renewed(on: bool) -> void:
 		_vane = Sprite2D.new()
 		_vane.texture = load(dir + "vane.png") as Texture2D
 		_vane.offset = Vector2(0.0, -15.0) ## its foot on the position: the ridge beam, right of the chimney
-		_vane.position = Vector2(36.0, -82.0)
+		_vane.position = Vector2(36.0, -81.0)
 		_picture.add_child(_vane) ## a child of the picture: drawn right after the roof it stands on (as a child of the y-sorting hut it would sort behind it)
+	if ResourceLoader.exists(dir + "banner.png"):
+		var banner: Sprite2D = _hang(dir + "banner.png", Vector2(171.0 - 104.0, 88.0 - 174.0), 9.0, 3.0) ## frame pixel (171, 88): the bracket sits at the roof's peak, right end
+		_banner_mat = banner.material as ShaderMaterial
+		_banner_left = _hang(dir + "banner.png", Vector2(14.0 - 104.0, 88.0 - 174.0), 9.0, 3.0) ## its twin on the left (village and up)
+		_banner_left.flip_h = true
+		_banner_left.visible = false
+	if ResourceLoader.exists(dir + "hut_flag.png"):
+		for k: int in 2:
+			var flag: Sprite2D = _hang(dir + "hut_flag.png", Vector2((98.0 + 24.0 * k) - 104.0, 65.0 - 174.0), -1.0, 0.0) ## the pole's foot on the ridge
+			flag.flip_h = k == 1
+			flag.visible = false
+			_flags.append(flag)
+	for name: String in ["hut_ivy_a", "hut_ivy_b"]:
+		if ResourceLoader.exists(dir + name + ".png"):
+			var ivy: Sprite2D = Sprite2D.new()
+			ivy.texture = load(dir + name + ".png") as Texture2D
+			ivy.centered = false
+			ivy.position = Vector2(-104.0, -174.0)
+			ivy.visible = false
+			_picture.add_child(ivy)
+			_ivy.append(ivy)
 	if _window_light != null: ## the real light: bigger, warmer, flickers like the fire behind the glass
 		_window_light.position = Vector2(36, 12)
 		_window_light.radius = 56
 		_window_light.base_energy = 0.62
 		_window_light.pulse = 0.3
+
+
+## A picture that hangs from a bracket and sways with the wind (rows below `pivot` slide in whole pixels, `sway_rows.gdshader`).
+func _hang(path: String, at: Vector2, pivot: float, amount: float) -> Sprite2D:
+	var sprite: Sprite2D = Sprite2D.new()
+	sprite.texture = load(path) as Texture2D
+	sprite.centered = false
+	sprite.position = at
+	if pivot >= 0.0: ## (a negative pivot: it does not sway)
+		var mat: ShaderMaterial = ShaderMaterial.new()
+		mat.shader = load("res://assets/shaders/sway_rows.gdshader") as Shader
+		mat.set_shader_parameter("pivot_row", pivot) ## the bracket and the crossbar stay put
+		mat.set_shader_parameter("amount", amount)
+		mat.set_shader_parameter("flutter", 0.8)
+		mat.set_shader_parameter("cell_w", 30.0)
+		sprite.material = mat
+		_sway_mats.append(mat)
+	_picture.add_child(sprite)
+	return sprite
+
+
+## The renewed hut grows with the town (docs/town_ausbau.md A2): a second banner in a village, flags on the ridge in a borough and a town, ivy with the days.
+func _refresh_town_look() -> void:
+	if _town == null or not is_instance_valid(_town):
+		_town = get_tree().get_first_node_in_group("town") as TownManager
+	if _town == null or not _town.founded or _banner_mat == null:
+		return
+	var level: int = _town.level()
+	var age: int = TimeManager.day - int((_town.structures.get(0, {}) as Dictionary).get("b", TimeManager.day))
+	var wanted: Array[bool] = [level >= 2]
+	for k: int in _flags.size():
+		wanted.append(level >= 3 + k)
+	var shown: Array[Sprite2D] = [_banner_left]
+	shown.append_array(_flags)
+	for k: int in shown.size():
+		var sprite: Sprite2D = shown[k]
+		if sprite != null and wanted[k] and not sprite.visible:
+			sprite.visible = true
+			if _town_ready: ## it unrolls from its bar
+				sprite.scale = Vector2(1.0, 0.05)
+				create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(sprite, "scale:y", 1.0, 0.9)
+		elif sprite != null and not wanted[k]:
+			sprite.visible = false
+	for k: int in _ivy.size():
+		_ivy[k].visible = (age >= 9) if k == 1 else (age >= 4 and age < 9)
+	_town_ready = true
 
 
 ## The lamp light that leaves the window (an additive picture of the building's size, see hut_lib.window_spill).
@@ -196,23 +271,41 @@ func _load_spill(path: String) -> void:
 	_spill.texture = load(path) as Texture2D
 
 
+const ANIMATE_RANGE: float = 600.0 ## px: the vane, the fire and the lamp are not updated while every player is farther away
+
+func _near_player(radius: float) -> bool:
+	for player: Player in Player.all:
+		if is_instance_valid(player) and player.global_position.distance_squared_to(global_position) <= radius * radius: return true
+	return false
+
 func _process(delta: float) -> void:
+	if art == "cabin": ## the quest watch keeps running everywhere (it is cheap: twice a second)
+		_watch -= delta
+		if _watch <= 0.0:
+			_watch = 0.5
+			_watch_for_player()
+	if not Player.all.is_empty() and not _near_player(ANIMATE_RANGE): return
 	if _vane != null: ## the arrow swings round when the wind turns (it squashes through the middle), and trembles a little in a strong one
 		var wind: float = WorldWind.sample(global_position).x
 		if absf(wind) > 0.08:
 			_vane_dir = signf(wind)
 		_vane.scale.x = move_toward(_vane.scale.x, _vane_dir, delta * 2.5)
 		_vane.rotation = sin(Time.get_ticks_msec() * 0.004) * 0.05 * clampf(absf(wind) * 2.0, 0.0, 1.0)
+	if not _sway_mats.is_empty():
+		var wind_x: float = WorldWind.sample(global_position).x
+		var clock: float = Time.get_ticks_msec() * 0.001
+		for mat: ShaderMaterial in _sway_mats:
+			mat.set_shader_parameter("wind", wind_x)
+			mat.set_shader_parameter("time", clock)
+		_town_look -= delta
+		if _town_look <= 0.0:
+			_town_look = 1.0
+			_refresh_town_look()
 	_glow.modulate.a = lerpf(0.55, 1.0, TimeManager.night_amount())
 	if _spill != null: ## the fire flickers: two slow waves and a quick one, a little brighter at night
 		var t: float = Time.get_ticks_msec() * 0.001
 		var flicker: float = 0.86 + 0.07 * sin(t * 2.3) + 0.05 * sin(t * 5.1 + 1.3) + 0.03 * sin(t * 11.7)
 		_spill.modulate.a = lerpf(0.18, 1.0, TimeManager.night_amount()) * flicker
-	if art == "cabin":
-		_watch -= delta
-		if _watch <= 0.0:
-			_watch = 0.5
-			_watch_for_player()
 
 
 ## The lumberjack's cabin notices her coming (quest step "find the cabin"): the step is done, the marker now points at the cabin itself.

@@ -1,6 +1,6 @@
-# Voidbloom – Gegner-Kompendium & Dossiers
+# Shadowspore – Gegner-Kompendium & Dossiers
 
-Dieses Verzeichnis versammelt die verbindlichen Charakter- und Verhaltensdossiers sämtlicher Gegner und Schattenkreaturen in *Voidbloom*. Sie folgen dem Standard der Figuren-Dossiers aus [`docs/characters/`](../characters/) und dienen als gestalterische, animatische und systemische Richtschnur für Enemy Artists, Gameplay-Programmierer und Level-Designer.
+Dieses Verzeichnis versammelt die verbindlichen Charakter- und Verhaltensdossiers sämtlicher Gegner und Schattenkreaturen in *Shadowspore*. Sie folgen dem Standard der Figuren-Dossiers aus [`docs/characters/`](../characters/) und dienen als gestalterische, animatische und systemische Richtschnur für Enemy Artists, Gameplay-Programmierer und Level-Designer.
 
 ---
 
@@ -20,6 +20,10 @@ Dieses Verzeichnis versammelt die verbindlichen Charakter- und Verhaltensdossier
    * **Typ:** Schwerer Frontlinien-Koloss, Tank & Raumverdränger (*Juggernaut / Vanguard*)
    * **Mechaniken:** 80 HP, frontale 75%-Schadensreduktion, spaltender Bodenschlag (120°-Bodenfächer mit 54 px Radius), Rammstoß (Bull Rush mit Kollisions-Stun an Felsen/Bäumen), freiliegender Nackenkern (300 % Kritischer Schaden bei Flankenangriffen).
    * **Rig:** Asymmetrisches Hybrid-Rig (massiver Basaltkeulen-Arm rechts, Tasttentakeln links, Chitin-Schildkragen, pulsierender Kern-Glowpass im Nacken).
+
+4. **[Boss 1: Mornath, der Himmelsspalter (Sky Cleaver)](boss_mornath.md)**
+   * **Typ:** Titanische Schattenschwinge & Säulenwächter (*Aerial Boss / Tri-Pillar Percher*)
+   * **Dossier:** Vollständige Lore, Mythologie, Entropie-Trauma, Säulen-Dramaturgie (Lunarith-Trigon), psychologischer Kern und Voice-Checks für Ellie & Valdric.
 
 *(Vorgemerkt für spätere Realisierung: **Der Schattengleiter** – flüssiger Schatten-Assassine / Bodenphantom).*
 

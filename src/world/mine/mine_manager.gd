@@ -11,6 +11,7 @@ const SLOT: float = 6400.0 ## 400 tiles: wider than the biggest level (304)
 const MARGIN: float = 400.0 ## the void around a level, still inside its slot
 const MAX_LEVELS: int = 32
 const TILE: float = 16.0
+const PREFETCH_RANGE: float = 640.0 ## px: how close she must come to the gate or the stairs down for the next layout to be made
 
 var world_seed: int = 0
 var entrance: Vector2 = Vector2.ZERO ## where the world outside is while a player is in the mine (the mine's door), world px
@@ -19,6 +20,7 @@ var _view_level: int = -1
 var state: Dictionary = {} ## "chest:<level>:<tile>" -> 1 ... what has changed in the levels (opened chests; later mined rocks, cleared rooms): the host decides, everyone keeps the table
 var _layouts: Dictionary = {} ## level -> MineLayout (kept: small, and the generator is deterministic anyway)
 var _levels: Dictionary = {} ## level -> MineLevel (built while players are in it, freed `unload_seconds` after the last one left)
+var _prefetch_clock: float = 0.0 ## counts down to the next `_prefetch_near_player`
 
 
 func _ready() -> void:
@@ -289,6 +291,10 @@ func _local() -> Player:
 
 func _process(delta: float) -> void:
 	_stream_levels(delta)
+	_prefetch_clock -= delta
+	if _prefetch_clock <= 0.0:
+		_prefetch_clock = 0.5
+		_prefetch_near_player()
 	var player: Player = _local()
 	if player == null:
 		return
@@ -326,6 +332,25 @@ func _stream_levels(delta: float) -> void:
 			if built.idle > wait:
 				built.queue_free()
 				_levels.erase(level)
+
+
+## A layout is one synchronous generation (deterministic, cached for good), so its cost is only moved earlier: level 1 is made when a player comes near
+## the gate, the next level when she comes near the stairs down of the level she is in. Half a second apart, from the local player only.
+func _prefetch_near_player() -> void:
+	var player: Player = _local()
+	if player == null:
+		return
+	var at: Vector2 = player.global_position
+	for gate: Node in get_tree().get_nodes_in_group("mine_gates"):
+		if (gate as Node2D).global_position.distance_to(at) < PREFETCH_RANGE:
+			layout(1)
+			break
+	var level: int = level_at(at)
+	if level > 0 and level < MAX_LEVELS:
+		var l: MineLayout = layout(level)
+		var stairs: Vector2 = origin(level) + l.tile_center(l.exit_stairs) ## the stairs down of this level
+		if stairs.distance_to(at) < PREFETCH_RANGE:
+			layout(level + 1)
 
 
 ## The camera stays on the level while a player is in it; outside it is free again (the interiors do the same for their rooms).

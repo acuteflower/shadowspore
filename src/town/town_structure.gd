@@ -50,6 +50,11 @@ var _wear: Array[Dictionary] = [] ## {sprite, days}: what the piece collects wit
 var _wear_check: float = 0.0
 var _wear_loaded: bool = false
 var _built_look: bool = false ## the build shaders are gone, the piece is whole
+var _shutters: Array[Dictionary] = [] ## {sprite, frames, t 0 shut .. 1 propped open}: the market-stall flaps (data `shutters`)
+var _shutter_forced: float = 0.0 ## seconds the flap stays up although it is night (somebody asked for the stock)
+var _shutter_check: float = 0.0
+var _shutter_near: bool = false
+var _lamp_k: float = 1.0 ## a lamp post: 1 burning, 0.2 only embers (empty), 0 cold; every other piece 1
 
 
 func setup(owner_manager: TownManager, structure_id: int) -> void:
@@ -116,13 +121,17 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	if _spec.has("sparks"):
 		_make_sparks()
 	_make_wear()
+	_make_shutters()
 	_make_perches()
+	if bool(_spec.get("fireflies", false)):
+		_sprite.add_to_group("flora_glow") ## the night's fireflies gather here
 	var window: Array = _spec.get("window", [0.0, 1.0]) as Array
 	_shown = float(progress) / float(TownManager.PROGRESS_FULL)
 	_add_layer(_sprite, float(window[0]), float(window[1]), false)
 	for part: Dictionary in _parts:
 		_add_layer(part.sprite as Sprite2D, float(part.from), float(part.to), part.sway != null)
 	add_to_group("night_lights")
+	_update_lamp_k()
 	_apply_progress()
 	set_night(TimeManager.night_amount())
 
@@ -305,7 +314,73 @@ func _make_wear() -> void:
 		sprite.flip_h = _flipped
 		sprite.visible = false
 		_sprite.add_child(sprite)
-		_wear.append({"sprite": sprite, "days": int(entry.days)})
+		_wear.append({"sprite": sprite, "days": int(entry.days), "track": String(entry.get("track", "age"))})
+
+
+## The market-stall flaps (data `shutters` [{texture, frame, at, frames}]): a strip of frames from shut (0) to propped up as an awning (last). They are picture only.
+func _make_shutters() -> void:
+	for raw: Variant in _spec.get("shutters", []) as Array:
+		var spec: Dictionary = raw as Dictionary
+		var frame: Array = spec.get("frame", [16, 16]) as Array
+		var at: Array = spec.get("at", [0, 0]) as Array
+		var sprite: Sprite2D = Sprite2D.new()
+		sprite.texture = load(DIR + String(spec.texture) + ".png") as Texture2D
+		sprite.centered = false
+		sprite.hframes = int(spec.get("frames", 5))
+		sprite.flip_h = _flipped
+		sprite.position = Vector2(float(at[0]) if not _flipped else _frame.x - float(at[0]) - float(frame[0]), float(at[1]))
+		sprite.visible = false
+		sprite.z_index = 1
+		_sprite.add_child(sprite)
+		var night: bool = TimeManager.night_amount() > 0.5
+		_shutters.append({"sprite": sprite, "frames": sprite.hframes, "t": 0.0 if night else 1.0})
+
+
+## Day: the flap is up. Night: it is down, unless somebody stands at the front or has asked for the stock (the flap rises for 20 s). Only the picture; nothing is blocked.
+func open_shutters() -> void:
+	_shutter_forced = 20.0
+
+
+func _update_shutters(delta: float) -> void:
+	if _shutters.is_empty() or not manager.structures.has(id): ## (a piece that is being taken down is no longer in the state)
+		return
+	var done: bool = progress >= TownManager.PROGRESS_FULL
+	_shutter_forced = maxf(_shutter_forced - delta, 0.0)
+	_shutter_check -= delta
+	if _shutter_check <= 0.0:
+		_shutter_check = 0.3
+		_shutter_near = false
+		var zone: Rect2 = manager.front_of(id).grow(30.0) if manager.front_of(id).has_area() else manager.rect_of(id).grow(34.0)
+		for node: Node in get_tree().get_nodes_in_group("players"):
+			if zone.has_point((node as Node2D).global_position):
+				_shutter_near = true
+		for sid: String in manager.settler_ids():
+			var settler: Settler = manager.settler_node(sid)
+			if settler != null and settler.visible and zone.has_point(settler.global_position):
+				_shutter_near = true
+	var open: bool = TimeManager.night_amount() <= 0.5 or _shutter_forced > 0.0 or _shutter_near
+	for entry: Dictionary in _shutters:
+		var sprite: Sprite2D = entry.sprite as Sprite2D
+		sprite.visible = done
+		var before: float = float(entry.t)
+		var now: float = move_toward(before, 1.0 if open else 0.0, delta / 0.6)
+		entry.t = now
+		sprite.frame = clampi(roundi(now * float(int(entry.frames) - 1)), 0, int(entry.frames) - 1)
+		if done and _time > 1.0 and ((before <= 0.0 and now > 0.0) or (before >= 1.0 and now < 1.0)):
+			_shutter_sound(now > before)
+
+
+func _shutter_sound(opening: bool) -> void:
+	var path: String = "res://assets/audio/town/shutter_%s.wav" % ("open" if opening else "close")
+	if not ResourceLoader.exists(path):
+		return
+	var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+	player.stream = load(path) as AudioStream
+	player.volume_db = -8.0
+	player.max_distance = 340.0
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
 
 
 ## Where birds may land on this piece (data `perches`).
@@ -336,6 +411,11 @@ func _update_wear() -> void:
 	for entry: Dictionary in _wear:
 		var sprite: Sprite2D = entry.sprite as Sprite2D
 		var wanted: bool = done and age >= int(entry.days)
+		match String(entry.get("track", "age")):
+			"care":
+				wanted = wanted and manager.cared(id)
+			"neglect":
+				wanted = wanted and not manager.cared(id)
 		if wanted and not sprite.visible:
 			sprite.visible = true
 			if _wear_loaded:
@@ -365,7 +445,7 @@ func _apply_progress() -> void:
 	for part: Dictionary in _parts:
 		(part.sprite as Sprite2D).visible = fraction > float(part.from)
 	if _light != null:
-		_light.visible = done
+		_light.visible = done and _lamp_k > 0.0
 	if _spill != null:
 		_spill.visible = done
 	set_night(TimeManager.night_amount())
@@ -384,9 +464,36 @@ func set_progress(value: int, done: bool = false) -> void:
 func set_night(amount: float) -> void:
 	amount = MineManager.night_at(self, amount)
 	for glow: Sprite2D in _glows:
-		glow.modulate.a = lerpf(GLOW_BY_DAY, 1.0, amount)
+		glow.modulate.a = lerpf(GLOW_BY_DAY, 1.0, amount) * _lamp_k
 	if _motes != null:
-		_motes.emitting = amount > 0.4 and progress >= TownManager.PROGRESS_FULL
+		_motes.emitting = amount > 0.4 and progress >= TownManager.PROGRESS_FULL and _lamp_k > 0.5
+
+
+## A lamp post shows its flame by its state (cold / lit / empty, `TownManager.lamp_state`): the lantern's glow, the vein of light and the pool of light follow `_lamp_k`.
+func _update_lamp_k() -> void:
+	match manager.lamp_state(id):
+		"cold":
+			_lamp_k = 0.0
+		"empty":
+			_lamp_k = 0.2
+		_:
+			_lamp_k = 1.0
+
+
+## The state of the lamp changed (host told everyone): `spark` = somebody just lit or fed it.
+func refresh_lamp(spark: bool) -> void:
+	_update_lamp_k()
+	_apply_progress()
+	if spark:
+		_burst(18, Color(1.0, 0.86, 0.5, 0.9), 58.0)
+		if ResourceLoader.exists("res://assets/audio/town/lamp_light.wav"):
+			var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+			player.stream = load("res://assets/audio/town/lamp_light.wav") as AudioStream
+			player.volume_db = -6.0
+			player.max_distance = 360.0
+			add_child(player)
+			player.finished.connect(player.queue_free)
+			player.play()
 
 
 ## Taken down (or the town was reloaded): a little dust, then gone.
@@ -453,6 +560,7 @@ func _process(delta: float) -> void:
 			_smoke.restart() ## preprocess: the thread is already there, not growing from nothing
 		_smoke.emitting = puffing
 		_smoke.gravity = Vector2(WorldWind.sample(global_position).x * 6.0 + 2.0, -1.5)
+	_update_shutters(delta)
 	_wear_check -= delta
 	if _wear_check <= 0.0:
 		_wear_check = 1.0
@@ -469,7 +577,7 @@ func _process(delta: float) -> void:
 		_sparks.emitting = burning
 	if _light != null and _flicker > 0.0 and _light.visible:
 		var level: float = lerpf(0.4, 1.0, _active) if _spec.has("smoke") else 1.0 ## the forge sinks to embers when nobody tends it
-		_light.base_energy = _light_base * level * (1.0 - _flicker * (0.5 + 0.5 * sin(_time * 11.0 + float(id)) * sin(_time * 4.3 + 1.0)))
+		_light.base_energy = _light_base * level * _lamp_k * (1.0 - _flicker * (0.5 + 0.5 * sin(_time * 11.0 + float(id)) * sin(_time * 4.3 + 1.0)))
 	if progress < TownManager.PROGRESS_FULL:
 		queue_redraw()
 		if Time.get_ticks_msec() - _last_gain_msec < 700:
@@ -563,6 +671,8 @@ func _draw() -> void:
 func prompt() -> String:
 	if progress < TownManager.PROGRESS_FULL or InputManager.ui_blocking:
 		return ""
+	if _spec.has("fuel"):
+		return manager.lamp_prompt(id)
 	return "LAGER ÖFFNEN" if String(_spec.get("role", "")) == "stock" else ""
 
 
@@ -577,5 +687,10 @@ func prompt_position() -> Vector2:
 
 
 func interact(player: Player) -> void:
+	if _spec.has("fuel"):
+		if prompt() != "" and player.is_multiplayer_authority():
+			manager.request_lamp(id)
+		return
 	if String(_spec.get("role", "")) == "stock":
+		open_shutters()
 		StockWindow.open(get_tree(), player, manager, global_position + Vector2(0.0, -20.0))

@@ -65,9 +65,17 @@ func reach_distance(from: Vector2) -> float:
 	return from.distance_to(global_position + BODY) - 12
 func prompt_position() -> Vector2:
 	return Vector2(6, -34)
+const ANIMATE_RANGE: float = 600.0 ## px: the knight's glow is not updated while every player is farther away
+
+func _near_player(radius: float) -> bool:
+	for player: Player in Player.all:
+		if is_instance_valid(player) and player.global_position.distance_squared_to(global_position) <= radius * radius: return true
+	return false
+
 func _process(delta: float) -> void:
 	_time += delta
-	_glow.modulate.a = lerpf(0.4, 1.0, TimeManager.night_amount()) * (0.72 + 0.28 * sin(_time * 1.5) * sin(_time * 0.7 + 1.0))
+	if not Player.all.is_empty() and not _near_player(ANIMATE_RANGE): return
+	_glow.modulate.a =lerpf(0.4, 1.0, TimeManager.night_amount()) * (0.72 + 0.28 * sin(_time * 1.5) * sin(_time * 0.7 + 1.0))
 func interact(player: Player) -> void:
 	if multiplayer.is_server(): _inspect(player.name.to_int())
 	else: _request_inspect.rpc_id(1)

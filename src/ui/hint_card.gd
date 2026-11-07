@@ -8,7 +8,6 @@ const WIDTH: float = 176.0
 const HEIGHT: float = 92.0
 const SHOW_SECONDS: float = 14.0 ## a lesson stays this long, then it withers (the quest vine keeps the task)
 const PAPER: Color = Color("140e24")
-const KEY_NAMES: Dictionary = {"Ctrl": "STRG", "Shift": "UMSCH", "Alt": "ALT", "Space": "LEER", "Tab": "TAB"}
 
 var _quests: QuestComponent
 var _dialogue: DialogueBox
@@ -77,13 +76,7 @@ func _process(delta: float) -> void:
 
 
 func _key_label(action: String = "sneak") -> String:
-	for event: InputEvent in InputMap.action_get_events(action):
-		var key: InputEventKey = event as InputEventKey
-		if key != null:
-			var code: Key = key.keycode if key.keycode != KEY_NONE else DisplayServer.keyboard_get_keycode_from_physical(key.physical_keycode)
-			var label: String = OS.get_keycode_string(code)
-			return String(KEY_NAMES.get(label, label.to_upper()))
-	return "STRG" if action == "sneak" else "M"
+	return VineStyle.key_name(action, "STRG" if action == "sneak" else "M")
 
 
 func _draw() -> void:
@@ -131,13 +124,8 @@ func _draw() -> void:
 	# the key cap: a bud with the key in it, bright while she sneaks
 	var bud: Vector2 = origin + Vector2(20, 24)
 	var key: String = _key_label("map" if is_map else "sneak")
-	var cap_w: int = maxi(PixelText.width(key) + 8, 16)
-	VineStyle.glow(self, bud + Vector2(cap_w / 2.0 - 8, 0), 12.0, UiStyle.ACCENT, (0.25 + 0.5 * live_glow + 0.15 * sin(_time * 3.0)) * fade)
-	draw_rect(Rect2(bud + Vector2(-8, -8), Vector2(cap_w, 16)), Color(UiStyle.ACCENT.darkened(0.45 - 0.2 * live_glow), fade))
-	draw_rect(Rect2(bud + Vector2(-7, -7), Vector2(cap_w - 2, 14)), Color(UiStyle.ACCENT.darkened(0.15 - 0.15 * live_glow), fade))
-	draw_rect(Rect2(bud + Vector2(-7, -7), Vector2(cap_w - 2, 1)), Color(UiStyle.ACCENT.lightened(0.4), fade))
-	PixelText.draw(self, key, Vector2i(int(bud.x) - 8 + (cap_w - PixelText.width(key)) / 2, int(bud.y) - 2), Color(VineStyle.OUTLINE, fade))
-	var text_x: int = int(origin.x) + 20 + cap_w + 6
+	var cap_w: int = VineStyle.key_cap(self, bud + Vector2(-8, -6), key, fade, live_glow, void_level)
+	var text_x: int = int(origin.x) + 20 + cap_w + 2
 	PixelText.draw(self, "KARTE" if is_map else "SCHLEICHEN", Vector2i(text_x, int(origin.y) + 8), Color(VineStyle.WARM_GLOW, fade), Color(VineStyle.OUTLINE, fade))
 	var lines: Array[String] = ["HALTE %s GEDRUECKT." % key, "SO ENTDECKEN DICH", "SCHATTENWESEN SPAET."]
 	if is_map:

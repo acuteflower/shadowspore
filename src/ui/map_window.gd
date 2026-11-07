@@ -78,9 +78,19 @@ var _lake_image: Image
 var _hover_marker: Dictionary = {}
 var _hover_id: String = ""
 var _hover_t: float = 0.0
+signal travel_chosen(from_id: String, to_id: String) ## travel mode: the player held on another waystone
+signal travel_cancelled ## travel mode: the map was closed without choosing
+
+var _ways: MapWaystones = MapWaystones.new()
+var _ws_mouse: bool = false ## the left button is held on a waystone (travel mode)
+var _present_left: float = 0.0 ## `present`: seconds the map stays open on its own (a waystone woke up)
+var _present_age: float = 0.0
+var _present_ring: float = 0.0 ## tiles: the radius of the ring that runs out of the statue
+var _present_tile: Vector2 = Vector2.ZERO
 
 
 func _ready() -> void:
+	add_to_group("map_window")
 	visible = false
 	z_index = 30 ## above the HUD vines (clock, hotbar, purse), like the skill window
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -241,6 +251,11 @@ func _process(delta: float) -> void:
 			_set_open(false)
 		elif not InputManager.ui_blocking:
 			_set_open(true)
+	if _present_left > 0.0 and _opening:
+		_present_left -= delta
+		_present_age += delta
+		if _present_left <= 0.0:
+			_set_open(false)
 	_open_t = move_toward(_open_t, 1.0 if _opening else 0.0, delta / (OPEN_SECONDS if _opening else CLOSE_SECONDS))
 	visible = _open_t > 0.0
 	if not visible:
@@ -249,6 +264,12 @@ func _process(delta: float) -> void:
 	_hover_t = move_toward(_hover_t, 0.0 if _hover_id.is_empty() else 1.0, delta / (0.12 if _hover_id.is_empty() else 0.18))
 	if _hover_t <= 0.0 and _hover_id.is_empty():
 		_hover_marker.clear()
+	var pick: String = _ways.update(delta, get_tree(), _cursor, _to_screen, _ws_mouse, InputManager.interact_held() and _opening, InputManager.map_select_step() if _opening else 0)
+	if pick != "":
+		var from_id: String = _ways.travel_from
+		_ways.travel_from = ""
+		_set_open(false)
+		travel_chosen.emit(from_id, pick)
 	_advance_fog(delta)
 	_navigate(delta)
 	_push_uniforms()
@@ -256,7 +277,57 @@ func _process(delta: float) -> void:
 	_overlay.queue_redraw()
 
 
+## Opens the map on its own, centred on `tile`, and closes it again after `seconds` (or when the player does): the waystone scene shows what its light revealed.
+## `ring_tiles` > 0 runs a ring of light out of the tile to that radius, as the fog clears.
+## Travel mode (at an awakened waystone): the map opens showing every awakened statue, the others highlighted; holding the mouse (or E) on one chooses it
+## (`travel_chosen`), Esc / M closes without (`travel_cancelled`). Returns false when the map cannot open.
+func open_travel(from_id: String) -> bool:
+	if _opening:
+		return false
+	_ways.travel_from = from_id
+	_set_open(true)
+	if not _opening:
+		_ways.travel_from = ""
+		return false
+	var tiles: Array[Vector2] = []
+	var manager: Waystones = Waystones.of(get_tree())
+	for entry: Dictionary in manager.entries():
+		if bool(entry.awake):
+			var tile: Array = entry.tile as Array
+			tiles.append(Vector2(float(tile[0]), float(tile[1])))
+	var lo: Vector2 = tiles[0]
+	var hi: Vector2 = tiles[0]
+	for t: Vector2 in tiles:
+		lo = Vector2(minf(lo.x, t.x), minf(lo.y, t.y))
+		hi = Vector2(maxf(hi.x, t.x), maxf(hi.y, t.y))
+	_center = (lo + hi) / 2.0
+	_scale = 0.4
+	_scale_target = clampf(minf(size.x * 0.55 / maxf(hi.x - lo.x, 40.0), size.y * 0.5 / maxf(hi.y - lo.y, 40.0)), SCALE_MIN, 1.4)
+	return true
+
+
+func present(tile: Vector2, seconds: float, ring_tiles: float = 0.0) -> void:
+	if _opening:
+		return
+	_set_open(true)
+	if not _opening:
+		return
+	_center = tile
+	_scale = 0.7
+	_scale_target = clampf(1.3, SCALE_MIN, SCALE_MAX)
+	_present_left = seconds
+	_present_age = 0.0
+	_present_ring = ring_tiles
+	_present_tile = tile
+
+
 func _set_open(open: bool) -> void:
+	_present_left = 0.0
+	_present_ring = 0.0
+	_ws_mouse = false
+	if not open and _ways.travel_from != "":
+		_ways.travel_from = ""
+		travel_cancelled.emit()
 	if open and not _loaded:
 		_load_data()
 		if not _loaded:
@@ -402,6 +473,7 @@ func _gui_input(event: InputEvent) -> void:
 			if button.pressed:
 				_press(button)
 			else:
+				_ws_mouse = false
 				_dragging = false
 				_slider_drag = false
 				if _since_motion > 0.08:
@@ -413,6 +485,9 @@ func _gui_input(event: InputEvent) -> void:
 
 func _press(button: InputEventMouseButton) -> void:
 	if button.button_index == MOUSE_BUTTON_LEFT:
+		if _ways.can_press():
+			_ws_mouse = true ## the hold on a waystone (travel mode)
+			return
 		if absf(button.position.x - ZOOM_X) < 12.0 and button.position.y > ZOOM_TOP - 10.0 and button.position.y < ZOOM_BOTTOM + 10.0:
 			_slider_drag = true
 			_set_zoom_from(button.position.y)
@@ -465,6 +540,8 @@ func _draw_overlay() -> void:
 	_draw_trail(fade)
 	_draw_labels(fade)
 	_draw_start(fade)
+	_draw_town(fade)
+	_ways.draw(_overlay, _scale, fade, _time, size, [_present_tile, _present_ring, _present_age] if _present_ring > 0.0 else [])
 	_draw_quest(fade)
 	_draw_pins(fade)
 	_draw_presence(fade)
@@ -524,6 +601,54 @@ func _draw_start(fade: float) -> void:
 	_overlay.draw_rect(Rect2(at, Vector2.ONE), Color(VineStyle.PETAL, fade))
 	if _scale > 0.6:
 		_text_centered("START", at + Vector2(0, 6), Color(VineStyle.WARM_GLOW, 0.9), fade)
+
+
+const TOWN_TEAL: Color = Color("78f4e6")
+const TOWN_GLYPHS: Dictionary = {
+	"lamp_post": [".....", "..X..", ".XXX.", "..X..", "..X.."],
+	"stockpile": ["XXXXX", "X...X", "XXXXX", "X...X", "XXXXX"],
+	"workshop": ["..X..", ".XXX.", "XXXXX", "X.X.X", "XXXXX"],
+	"bench": [".....", ".....", "XXXXX", "X...X", "....."],
+	"banner_post": ["XXX..", "XXX..", "X....", "X....", "X...."],
+}
+const TOWN_FLAG: Array = ["XX...", "XXX..", "XXXX.", "X....", "X...."]
+
+
+## The town on the map (docs/town_ausbau.md C19): a flag at the hut with the town's name, the rings of the light (what burns bright, what only carries the town's building ground
+## faint), and from zoom 0.9 a small sign for every lamp post, store, workshop, bench and banner post (an empty or cold lamp pale).
+func _draw_town(fade: float) -> void:
+	var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
+	if town == null or not town.founded:
+		return
+	var lit: Array[Vector3] = town.lit_circles()
+	for pass_index: int in 2:
+		for c: Vector3 in town.circles() if pass_index == 0 else lit:
+			var around: Vector2 = _to_screen(Vector2(c.x, c.y) / 16.0)
+			var radius: float = c.z / 16.0 * _scale
+			if radius < 3.0 or around.x + radius < 0.0 or around.y + radius < 0.0 or around.x - radius > size.x or around.y - radius > size.y:
+				continue
+			var tone: Color = Color(TOWN_TEAL, (0.16 if pass_index == 0 else 0.55) * fade)
+			VineStyle.ring(_overlay, around, int(radius), tone, 0.6 if pass_index == 1 else 0.3)
+	var at: Vector2 = _to_screen(town.center / 16.0)
+	if _on_screen(at):
+		_glyph(TOWN_FLAG, at + Vector2(0, -3), TOWN_TEAL, fade)
+		_overlay.draw_rect(Rect2(at + Vector2(-2, -5), Vector2(1, 8)), Color(VineStyle.BARK_LIGHT, fade))
+		if _scale > 0.3:
+			_text_centered(town.town_name(), at + Vector2(0, 9), Color(VineStyle.WARM_GLOW, 0.95), fade)
+	if _scale < 0.9:
+		return
+	for id: int in town.structures:
+		var data: Dictionary = town.structures[id] as Dictionary
+		var rows: Variant = TOWN_GLYPHS.get(String(data.p))
+		if rows == null or not town.is_built(id):
+			continue
+		var spot: Vector2 = _to_screen(Vector2(float(data.x), float(data.y) - 6.0) / 16.0)
+		if not _on_screen(spot):
+			continue
+		var color: Color = VineStyle.PETAL
+		if String(data.p) == "lamp_post":
+			color = VineStyle.WARM_GLOW if town.is_lamp_burning(id) else Color("8a7f96")
+		_glyph(rows as Array, spot, color, fade)
 
 
 ## The goal of the current quest: a golden bloom with rings that open outwards, a stem and its name; off screen a chevron at the edge points to it.
@@ -928,7 +1053,11 @@ func _draw_frame(fade: float, void_level: float) -> void:
 	_draw_list(fade, void_level)
 	_draw_zoom_vine(fade, void_level)
 	_draw_compass(fade)
-	_text_centered("ZIEHEN: SCHIEBEN   RAD: ZOOM   RECHTSKLICK: ZEICHEN   LEERTASTE: ZU MIR   M: SCHLIESSEN", Vector2(size.x / 2.0, 299.0), Color(UiStyle.TEXT_DIM, 0.6), fade)
+	if _ways.travel_from != "":
+		var hint: String = "WEGSTEIN WAEHLEN: MAUS ODER A D   HALTEN: REISEN   ESC: ABBRECHEN" if not _ways.destinations().is_empty() else "KEIN ANDERER WEGSTEIN ERWACHT   ESC: ABBRECHEN"
+		_text_centered(hint, Vector2(size.x / 2.0, 299.0), Color(Color("9ff5ec"), 0.8), fade)
+	else:
+		_text_centered("ZIEHEN: SCHIEBEN   RAD: ZOOM   RECHTSKLICK: ZEICHEN   LEERTASTE: ZU MIR   M: SCHLIESSEN", Vector2(size.x / 2.0, 299.0), Color(UiStyle.TEXT_DIM, 0.6), fade)
 
 
 func _draw_readout(fade: float) -> void:

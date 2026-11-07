@@ -16,41 +16,92 @@ func check(ok: bool, label: String) -> void:
 		push_error("FAIL: " + label)
 
 
-func bot(species: String, mode: String, seed_value: int) -> String:
+var fight_time: float = 0.0 ## seconds of the last bot fight
+
+
+## A player who reads only what the game shows (the line's colour, its shiver before a run, whether it runs or not) and
+## reacts `lag` seconds late. While the fish runs: hold, give way once the line turns red, stop giving once it is gold
+## again. While it tires: crank, but stop at the shiver.
+static func reader(d: Dictionary, lag_state: Dictionary, lag: float, delta: float) -> Array:
+	var fleeing: bool = String(d["phase"]) == "flee"
+	var history: Array = lag_state.get("h", []) as Array
+	history.append([fleeing, float(d["tension"]), bool(d["tell"])])
+	var keep: int = maxi(1, int(round(lag / delta)) + 1)
+	while history.size() > keep:
+		history.pop_front()
+	lag_state["h"] = history
+	var seen: Array = history[0] as Array ## what she saw `lag` seconds ago
+	var giving: bool = bool(lag_state.get("giving", false))
+	if bool(seen[0]):
+		if float(seen[1]) > 0.74:
+			giving = true
+		elif float(seen[1]) < 0.42:
+			giving = false
+	else:
+		giving = false
+	lag_state["giving"] = giving
+	return [1.0 if giving else 0.0, not bool(seen[0]) and not bool(seen[2])]
+
+
+func bot(species: String, mode: String, seed_value: int, size: float = -1.0) -> String:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = seed_value
 	var rod: Dictionary = FishingRules.rods()["rod_basic"] as Dictionary
-	var d: Dictionary = FishingRules.new_drill(species, rod, rng.randf_range(50.0, 110.0), rng)
+	var big: float = rng.randf() if size < 0.0 else size
+	var d: Dictionary = FishingRules.new_drill(species, rod, rng.randf_range(50.0, 110.0), rng, big)
+	var lag_state: Dictionary = {}
 	var t: float = 0.0
-	while t < 40.0:
-		t += 1.0 / 60.0
-		var fleeing: bool = String(d["phase"]) == "flee"
+	var dt: float = 1.0 / 60.0
+	while t < 90.0:
+		t += dt
 		var give: float = 0.0
 		var reel: bool = false
 		match mode:
-			"perfect":
-				give = 1.0 if fleeing else 0.0
-				reel = not fleeing and not bool(d["tell"])
-			"never_give":
+			"skilled":
+				var input: Array = reader(d, lag_state, 0.2, dt)
+				give = float(input[0])
+				reel = bool(input[1])
+			"casual":
+				var input: Array = reader(d, lag_state, 0.3, dt)
+				give = float(input[0])
+				reel = bool(input[1])
+			"late": ## reacts almost half a second late to everything
+				var input: Array = reader(d, lag_state, 0.42, dt)
+				give = float(input[0])
+				reel = bool(input[1])
+			"never_give": ## just holds the button down the whole time
 				reel = true
 			"always_give":
 				give = 1.0
-			"late":  ## reacts a quarter second late to every change of phase
-				var lag_flee: bool = fleeing and float(d["t"]) > 0.25
-				give = 1.0 if lag_flee else 0.0
-				reel = not fleeing and float(d["t"]) > 0.25 and not bool(d["tell"])
-		var result: String = FishingRules.drill_step(d, give, reel, 1.0 / 60.0, rod, rng)
+			"idle":
+				pass
+			"old_perfect": ## the old recipe: always give during a run, always reel otherwise
+				give = 1.0 if String(d["phase"]) == "flee" else 0.0
+				reel = String(d["phase"]) != "flee" and not bool(d["tell"])
+		var result: String = FishingRules.drill_step(d, give, reel, dt, rod, rng)
 		if result != "":
+			fight_time = t
 			return result
+	fight_time = t
 	return "timeout"
 
 
 func rate(species: String, mode: String, outcome: String) -> float:
 	var n: int = 0
-	for i: int in 30:
+	for i: int in 40:
 		if bot(species, mode, 1000 + i) == outcome:
 			n += 1
-	return float(n) / 30.0
+	return float(n) / 40.0
+
+
+func mean_time(species: String, mode: String) -> float:
+	var sum: float = 0.0
+	var n: int = 0
+	for i: int in 40:
+		if bot(species, mode, 2000 + i) == "landed":
+			sum += fight_time
+			n += 1
+	return sum / maxf(1.0, float(n))
 
 
 func rules_checks() -> void:
@@ -133,9 +184,52 @@ func rules_checks() -> void:
 	var cap: Dictionary = bare.duplicate()
 	cap["bait"] = "glow_cap"
 	check(float(FishingRules.weights(cap)["copper_loach"]) > float(FishingRules.weights(bare)["copper_loach"]), "the glow cap draws the loach")
+	# every kind of water holds something by day and by night (the old tables left the deep channel empty by day)
+	for depth: float in [0.1, 0.3, 0.5, 0.7, 0.9, 1.0]:
+		for x: float in [-4.0, -8.0, -14.0, -24.0]:
+			for n: float in [0.0, 1.0]:
+				var any: Dictionary = {"x": x, "y": depth, "flow": FishingRules.current_strength(x, false, false), "night": n, "light_depth": -9999.0, "bait": "", "pose": "cork"}
+				check(FishingRules.total(FishingRules.weights(any)) > 0.1, "something lives at x %.0f, depth %.1f, night %.0f (%s)" % [x, depth, n, FishingRules.weights(any)])
+	var deep_day: Dictionary = {"x": -22.0, "y": 0.95, "flow": 1.0, "night": 0.0, "light_depth": -9999.0, "bait": "", "pose": "cork"}
+	check(FishingRules.weights(deep_day).has("moon_trout") and FishingRules.weights(deep_day).has("copper_loach"), "the deep channel by day: trout and loach")
+	check(not FishingRules.weights(deep_day).has("silverling"), "no silverlings out in the deep")
+	check(FishingRules.fit(0.5, [0.0, 0.4], 0.25) > 0.0 and FishingRules.fit(0.5, [0.0, 0.4], 0.25) < 1.0 and FishingRules.fit(0.2, [0.0, 0.4], 0.25) == 1.0, "habitats fade softly")
+	# the current: slack by the bank, strong in the channel, still in lakes
+	check(FishingRules.current_strength(-5.0, false, false) < 0.4 and FishingRules.current_strength(-20.0, false, false) > 0.95, "slack water by the bank, the full current in the channel")
+	check(FishingRules.current_strength(-30.0, true, false) < 0.15 and FishingRules.current_strength(-20.0, false, true) < 0.2, "lakes and pools are still")
+	var edge_calm: Dictionary = {"x": -7.0, "y": 0.35, "flow": FishingRules.current_strength(-7.0, false, false), "night": 0.0, "light_depth": -9999.0, "bait": "marsh_gold", "pose": "cork"}
+	check(FishingRules.weights(edge_calm).has("gold_carp"), "the carp finds the slack water along a real river bank")
+	# how lively the fish are: the angler right above them, the hour, a fished-out spot
+	var act: Dictionary = {"y": 0.5, "reach": 100.0, "sun": 0.0, "golden": 0.0, "pressure": 0.0}
+	var near_act: Dictionary = act.duplicate()
+	near_act["reach"] = 30.0
+	check(FishingRules.activity(near_act) < FishingRules.activity(act) * 0.6, "fish right under her feet are wary")
+	var dusk_act: Dictionary = act.duplicate()
+	dusk_act["golden"] = 1.0
+	check(FishingRules.activity(dusk_act) > FishingRules.activity(act) * 1.3, "dawn and dusk are feeding time")
+	var noon_shallow: Dictionary = act.duplicate()
+	noon_shallow["sun"] = 1.0
+	noon_shallow["y"] = 0.1
+	check(FishingRules.activity(noon_shallow) < FishingRules.activity(act) * 0.8, "noon sun drives the fish out of the shallows")
+	var pressed: Dictionary = act.duplicate()
+	pressed["pressure"] = 0.6
+	check(FishingRules.activity(pressed) < FishingRules.activity(act) * 0.5, "a fished-out spot goes quiet")
+	check(FishingRules.refuse_chance("gold_carp", "marsh_gold", 0.0, false) < 0.05 and FishingRules.refuse_chance("gold_carp", "", 0.0, false) > 0.3, "the cautious carp turns away from a bare hook, not from its bait")
+	check(FishingRules.refuse_chance("abyss_pike", "", 0.0, true) < FishingRules.refuse_chance("abyss_pike", "", 0.0, false), "a twitch makes a hunter forget its caution")
 	# timing, lengths, colours
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = 99
+	var waits: Array[float] = []
+	for i: int in 400:
+		waits.append(FishingRules.bite_delay(1.0, rng))
+	waits.sort()
+	check(waits[0] >= 2.5 and waits[200] > 6.0 and waits[200] < 14.0 and waits[380] > 18.0, "a fair spot: never before the fish settle, about ten seconds, sometimes long (%.1f / %.1f / %.1f)" % [waits[0], waits[200], waits[380]])
+	var shallow_len: float = 0.0
+	var deep_len: float = 0.0
+	for i: int in 300:
+		shallow_len += FishingRules.roll_length("copper_loach", rng, 0.2)
+		deep_len += FishingRules.roll_length("copper_loach", rng, 1.0)
+	check(deep_len > shallow_len * 1.08, "the big ones live in deep water")
 	var slow: float = 0.0
 	var quick: float = 0.0
 	for i: int in 200:
@@ -179,17 +273,57 @@ func rules_checks() -> void:
 func _run() -> void:
 	var table: Dictionary = FishingRules.species_table()
 	var report: String = ""
+	var strong_late: float = 0.0
+	var strong_n: int = 0
 	for id: String in table:
-		var perfect: float = rate(id, "perfect", "landed")
+		var skilled: float = rate(id, "skilled", "landed")
+		var casual: float = rate(id, "casual", "landed")
 		var late: float = rate(id, "late", "landed")
-		var yank: float = rate(id, "never_give", "snapped")
-		var lazy: float = rate(id, "always_give", "escaped")
-		report += "%s perfect %.2f late %.2f yank-snap %.2f give-escape %.2f\n" % [id, perfect, late, yank, lazy]
-		check(perfect >= 0.9, id + ": a good fighter lands it (>=90%%): %.2f" % perfect)
-		check(late >= 0.6, id + ": a slightly late fighter still often lands it: %.2f" % late)
-		if float((table[id] as Dictionary)["pull"]) >= 0.7:
-			check(yank >= 0.8, id + ": a strong fish snaps the line of someone who never gives way: %.2f" % yank)
-		check(rate(id, "always_give", "landed") <= 0.1, id + ": never reeling never lands it")
+		var yank: float = rate(id, "never_give", "landed")
+		var old: float = rate(id, "old_perfect", "landed")
+		var lazy: float = rate(id, "always_give", "landed")
+		var idle: float = rate(id, "idle", "landed")
+		var secs: float = mean_time(id, "skilled")
+		report += "%s skilled %.2f (%.1f s) casual %.2f late %.2f yank %.2f old-recipe %.2f give %.2f idle %.2f\n" % [id, skilled, secs, casual, late, yank, old, lazy, idle]
+		check(skilled >= 0.85, id + ": someone who reads the line lands it (>=85%%): %.2f" % skilled)
+		check(late >= 0.25, id + ": reacting half a second late still lands some: %.2f" % late)
+		if float((table[id] as Dictionary)["pull"]) >= 0.6:
+			strong_late += late
+			strong_n += 1
+		check(yank <= 0.2, id + ": holding the button down the whole time rarely lands it: %.2f" % yank)
+		check(lazy <= 0.05, id + ": always giving line never lands it: %.2f" % lazy)
+		check(idle <= 0.05, id + ": doing nothing never lands it: %.2f" % idle)
+		check(secs >= 4.0 and secs <= 40.0, id + ": a fight takes a while (%.1f s)" % secs)
+	check(strong_late / maxf(1.0, float(strong_n)) <= 0.8, "with the strong fish, a late hand loses a good share (%.2f landed)" % (strong_late / maxf(1.0, float(strong_n))))
+	var small: float = 0.0
+	var big: float = 0.0
+	for i: int in 30:
+		bot("moon_trout", "skilled", 3000 + i, 0.0)
+		small += fight_time
+		bot("moon_trout", "skilled", 3000 + i, 1.0)
+		big += fight_time
+	check(big > small * 1.15, "a big trout fights longer than a small one (%.1f vs %.1f s)" % [big / 30.0, small / 30.0])
+	var d: Dictionary = FishingRules.new_drill("gold_carp", FishingRules.rods()["rod_basic"] as Dictionary, 80.0, RandomNumberGenerator.new(), 0.5)
+	var runs_seen: Array[float] = []
+	var rng_runs: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng_runs.seed = 5
+	var lag: Dictionary = {}
+	for i: int in 60 * 60:
+		var input: Array = reader(d, lag, 0.2, 1.0 / 60.0)
+		if FishingRules.drill_step(d, float(input[0]), bool(input[1]), 1.0 / 60.0, FishingRules.rods()["rod_basic"] as Dictionary, rng_runs, false) != "":
+			break
+		if String(d["phase"]) == "flee" and float(d["t"]) < 0.02:
+			runs_seen.append(float(d["stamina"]))
+	check(runs_seen.size() >= 2 and runs_seen[runs_seen.size() - 1] < runs_seen[0], "every run leaves the carp weaker (%s)" % [runs_seen])
+	var limp: Dictionary = FishingRules.new_drill("silverling", FishingRules.rods()["rod_basic"] as Dictionary, 80.0, RandomNumberGenerator.new(), 0.5)
+	limp["phase"] = "tire"
+	limp["dur"] = 99.0
+	var limp_result: String = ""
+	for i: int in 60 * 4:
+		limp_result = FishingRules.drill_step(limp, 1.0, false, 1.0 / 60.0, FishingRules.rods()["rod_basic"] as Dictionary, RandomNumberGenerator.new())
+		if limp_result != "":
+			break
+	check(limp_result == "unhooked", "a slack line lets the fish shake the hook (%s)" % limp_result)
 	print(report)
 	rules_checks()
 	print("Fishing tests: %d checks, %d failures" % [checks, failures])

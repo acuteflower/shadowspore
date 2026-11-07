@@ -3,6 +3,7 @@ extends Node
 ## Godot --rendering-driver opengl3 --path . tools/preview_fishing.tscn -- --dir=/abs/folder [--night]
 const WORLD: PackedScene = preload("res://src/world/world_level.tscn")
 const DT: float = 1.0 / 60.0
+const RULES_TEST: GDScript = preload("res://tools/test_fishing.gd") ## its `reader` plays like a person who reads the line
 class EmptyWorld:
 	extends WorldLevel
 	func _spawn_player(_id: int) -> void: pass
@@ -16,7 +17,7 @@ func _ready() -> void:
 
 
 func shot(name: String) -> void:
-	for i: int in 4:
+	for i: int in 15: ## the HUD leaf settles its width and words
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png("%s/fishing_%s.png" % [out, name])
@@ -107,30 +108,44 @@ func _run() -> void:
 	tick(2.0)
 	await shot("3_drift")
 	var guard: float = 0.0
+	## from here in real time: the shadow fades in over frames, a loop inside one frame would never show it
 	while f.state == FishingComponent.S.DRIFTING and guard < 60.0:
 		f._host_tick(DT)
+		await get_tree().process_frame
 		guard += DT
-		if f._bite_t > 2.2:
-			f._bite_t = 2.2
-		if f._approaching and f.approach_time < 1.0:
+		if f._bite_t > 3.4 and not f._approaching:
+			f._bite_t = 3.4
+		if f._approaching and f.approach_time < 1.4:
 			break
 	await shot("4_shadow_approach")
+	while f.state == FishingComponent.S.DRIFTING and f.approach_time > 0.15 and guard < 70.0:
+		f._host_tick(DT)
+		await get_tree().process_frame
+		guard += DT
+	await shot("4b_shadow_holds")
 	while f.state != FishingComponent.S.NIBBLE and guard < 80.0:
 		f._host_tick(DT)
+		await get_tree().process_frame
 		guard += DT
+	tick(0.05)
 	await shot("5_nibble")
 	while f.state != FishingComponent.S.BITE and guard < 90.0:
 		f._host_tick(DT)
+		await get_tree().process_frame
 		guard += DT
+	for i: int in 12:
+		await get_tree().process_frame
 	await shot("6_bite")
 	f._host_request("strike", [])
 	if OS.get_cmdline_user_args().has("--fight"): ## a fight in steps of 0.45 s, played well: the path of the fish along the river
+		var lag: Dictionary = {}
 		for n: int in 14:
 			if f.state != FishingComponent.S.DRILL:
 				break
 			for k: int in 27:
-				f._give = 1.0 if f.phase == "flee" else 0.0
-				f._reel = f.phase == "tire" and not f.tell
+				var input: Array = RULES_TEST.reader({"phase": f.phase, "tension": f.tension, "tell": f.tell}, lag, 0.2, DT)
+				f._give = float(input[0])
+				f._reel = bool(input[1])
 				f._host_tick(DT)
 			await shot("fight_%02d" % n)
 		return
@@ -144,6 +159,10 @@ func _run() -> void:
 	f._host_end("", "")
 	player.fishing._rpc_fx("lost", f.bobber, {"reason": "snapped"})
 	await shot("8_snapped_text")
+	player.fishing._rpc_fx("refuse", f.bobber, {"species": "moon_trout", "dir": (f.bobber - f.feet()).normalized()})
+	for i: int in 20:
+		await get_tree().process_frame
+	await shot("8b_fish_turns_away")
 	f.book.record("moon_trout", 31, 2)
 	f.book.record("silverling", 17, 2)
 	f.book.record("moon_trout", 41, 3)

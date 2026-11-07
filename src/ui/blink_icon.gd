@@ -59,12 +59,7 @@ func _process(delta: float) -> void:
 
 
 func _hotkey() -> String:
-	for event: InputEvent in InputMap.action_get_events(ACTION):
-		var key: InputEventKey = event as InputEventKey
-		if key != null:
-			var code: Key = key.keycode if key.keycode != KEY_NONE else DisplayServer.keyboard_get_keycode_from_physical(key.physical_keycode)
-			return OS.get_keycode_string(code)
-	return "?"
+	return VineStyle.key_name(ACTION, "?")
 
 
 func _draw() -> void:
@@ -115,5 +110,5 @@ func _draw() -> void:
 			var angle: float = k * TAU / 12.0 + 0.3
 			draw_rect(Rect2(roundf(center.x + cos(angle) * radius), roundf(center.y + sin(angle) * radius * 0.8), 1, 1), Color(CORE, _ring))
 
-	var key_color: Color = CORE if ready_now else VineStyle.BARK_LIGHT.lerp(DIM, 0.6)
-	PixelText.draw(self, _key, Vector2i(roundi(ANCHOR_X) - PixelText.width(_key) / 2, int(top) + GLYPH.size() + 2), key_color, VineStyle.OUTLINE)
+	var key_color: Color = UiStyle.TEXT.lerp(Color.WHITE, _press) if ready_now else UiStyle.TEXT_DIM ## plain label like the hotbar numbers, no cap
+	PixelText.draw(self, _key, Vector2i(roundi(ANCHOR_X - PixelText.width(_key) / 2.0), int(top) + GLYPH.size() + 5), key_color, VineStyle.OUTLINE)

@@ -5,10 +5,15 @@ float n_bayer(vec2 px) {
 	return N_BAYER[int(mod(px.y, 4.0)) * 4 + int(mod(px.x, 4.0))] / 16.0;
 }
 
+// Integer hash of a lattice point (callers pass whole numbers). The old float hash (fract(p * 456.21) ...) ran out of precision at world
+// coordinates: neighbouring lattice points got the same value, and the pools showed hard rectangular blocks.
 float n_hash(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
+	uvec2 q = uvec2(ivec2(floor(p)) + ivec2(65536));
+	uint h = q.x * 1597334677u ^ q.y * 3812015801u;
+	h = (h ^ (h >> 16u)) * 2246822519u;
+	h = (h ^ (h >> 13u)) * 3266489917u;
+	h ^= h >> 16u;
+	return float(h >> 8u) / 16777216.0;
 }
 
 float n_vnoise(vec2 p) {

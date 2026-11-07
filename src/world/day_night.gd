@@ -4,6 +4,12 @@ extends CanvasModulate
 ## HUD layers and anything with an unshaded material (see Unlit) stay untouched.
 
 var _last_night: float = -1.0
+const GLOBAL_EPSILON: float = 0.0005 ## shader globals below this change are not worth a server call
+const NIGHT_CALL_MS: int = 100 ## the night lights hear about a change at most this often
+var _g_sun: float = -1000.0
+var _g_night: float = -1000.0
+var _g_dew: float = -1000.0
+var _night_sent_ms: int = -1000
 var _glow: ShaderMaterial
 var _ground: ShaderMaterial
 var _sun_glow: ShaderMaterial
@@ -66,6 +72,9 @@ func _update() -> void:
 		room = _mines.ambient_color() ## the mine has the colour of its zone
 	color = room if room.a > 0.0 else TimeManager.ambient_color() ## inside a room it has its own light
 	var indoors: bool = room.a > 0.0 ## rooms and the mine have their own light, no sun
+	if not indoors:
+		var wet: float = Moisture.wetness() ## a damp day or after a fog night: the world is a little cooler and darker
+		color = color.lerp(color * Color(0.9, 0.95, 1.0, 1.0), wet * 0.6)
 	var sun: float = 0.0 if indoors else TimeManager.sun_amount()
 	if _ground != null:
 		_ground.set_shader_parameter("sun", sun)
@@ -73,11 +82,22 @@ func _update() -> void:
 	if _sun_glow != null:
 		_sun_glow.set_shader_parameter("sun", sun)
 		_sun_glow.set_shader_parameter("golden", 0.0 if indoors else TimeManager.golden_amount())
-	RenderingServer.global_shader_parameter_set("g_sun", sun) ## water glints, crystal and flora sparkle, void lip
-	RenderingServer.global_shader_parameter_set("g_night", 0.0 if indoors else TimeManager.night_amount())
-	RenderingServer.global_shader_parameter_set("g_dew", 0.0 if indoors else TimeManager.dew_amount())
+	## water glints, crystal and flora sparkle, void lip: only sent when they really moved
+	var g_night: float = 0.0 if indoors else TimeManager.night_amount()
+	var g_dew: float = 0.0 if indoors else maxf(TimeManager.dew_amount(), 0.7 * Moisture.wetness()) ## the wet ground shows dew drops
+	if absf(sun - _g_sun) > GLOBAL_EPSILON:
+		_g_sun = sun
+		RenderingServer.global_shader_parameter_set("g_sun", sun)
+	if absf(g_night - _g_night) > GLOBAL_EPSILON:
+		_g_night = g_night
+		RenderingServer.global_shader_parameter_set("g_night", g_night)
+	if absf(g_dew - _g_dew) > GLOBAL_EPSILON:
+		_g_dew = g_dew
+		RenderingServer.global_shader_parameter_set("g_dew", g_dew)
 	var night: float = TimeManager.night_amount()
-	if absf(night - _last_night) > 0.002:
+	var now: int = Time.get_ticks_msec()
+	if absf(night - _last_night) > 0.002 and now - _night_sent_ms >= NIGHT_CALL_MS: ## at most 10 times a second during dusk
+		_night_sent_ms = now
 		_last_night = night
 		get_tree().call_group("night_lights", "set_night", night)
 	_ambience.follow(sun, night, indoors, get_process_delta_time())

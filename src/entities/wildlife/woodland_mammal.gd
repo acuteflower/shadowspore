@@ -49,6 +49,7 @@ var _visual_facing: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_load_species()
 	_population = get_parent().get_parent()
 	_rng.seed = hash(name) + hash(family_id)

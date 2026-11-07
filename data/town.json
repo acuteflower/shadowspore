@@ -89,7 +89,12 @@
    "front": [
     48,
     34
-   ]
+   ],
+   "trample": {
+    "strength": 0.8,
+    "margin": 20,
+    "front": true
+   }
   },
   "lamp_post": {
    "name": "LICHTPFOSTEN",
@@ -173,7 +178,17 @@
      3,
      62
     ]
-   ]
+   ],
+   "fuel": {
+    "item": "glow_cap",
+    "nights": 3.0,
+    "per_item": 500
+   },
+   "trample": {
+    "strength": 0.5,
+    "margin": 9,
+    "front": false
+   }
   },
   "fence": {
    "name": "ZAUNSTÜCK",
@@ -202,7 +217,12 @@
      3,
      22
     ]
-   ]
+   ],
+   "trample": {
+    "strength": 0.25,
+    "margin": 5,
+    "front": false
+   }
   },
   "bench": {
    "name": "BANK",
@@ -231,7 +251,83 @@
      3,
      20
     ]
-   ]
+   ],
+   "seats": [
+    [
+     -9,
+     -2,
+     2
+    ],
+    [
+     9,
+     -2,
+     2
+    ]
+   ],
+   "trample": {
+    "strength": 0.8,
+    "margin": 10,
+    "front": false
+   }
+  },
+  "banner_post": {
+   "name": "STANDARTE",
+   "category": "living",
+   "texture": "banner_post",
+   "frame": [
+    32,
+    64
+   ],
+   "feet": 56,
+   "foot": [
+    8,
+    6
+   ],
+   "snap": 8,
+   "cost": {
+    "wood": 2,
+    "plant_fiber": 1
+   },
+   "build_seconds": 2.5,
+   "worth": 1,
+   "info": "DAS BANNER DER STADT",
+   "glow": false,
+   "preview": "banner_post_preview",
+   "fireflies": true,
+   "perches": [
+    [
+     0,
+     3,
+     48
+    ]
+   ],
+   "parts": [
+    {
+     "texture": "banner_post_cloth",
+     "frame": [
+      12,
+      22
+     ],
+     "at": [
+      10,
+      14
+     ],
+     "window": [
+      0.5,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 3.0,
+      "flutter": 0.9
+     }
+    }
+   ],
+   "trample": {
+    "strength": 0.55,
+    "margin": 10,
+    "front": false
+   }
   },
   "path_stone": {
    "name": "TRITTPLATTE",
@@ -254,7 +350,12 @@
    },
    "build_seconds": 1.0,
    "worth": 0.1,
-   "info": "FESTER WEG"
+   "info": "FESTER WEG",
+   "trample": {
+    "strength": 0.95,
+    "margin": 6,
+    "front": false
+   }
   },
   "stockpile": {
    "name": "VORRATSLAGER",
@@ -344,12 +445,12 @@
     {
      "texture": "stockpile_pennant",
      "frame": [
-      6,
-      9
+      10,
+      16
      ],
      "at": [
-      90,
-      0
+      99,
+      5
      ],
      "window": [
       0.8,
@@ -359,6 +460,54 @@
       "pivot": 0,
       "amount": 3.0,
       "flutter": 0.9
+     }
+    },
+    {
+     "texture": "stockpile_lantern_l",
+     "frame": [
+      6,
+      8
+     ],
+     "at": [
+      29,
+      31
+     ],
+     "window": [
+      0.75,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 1,
+      "fps": 1
+     }
+    },
+    {
+     "texture": "stockpile_lantern_r",
+     "frame": [
+      6,
+      8
+     ],
+     "at": [
+      85,
+      31
+     ],
+     "window": [
+      0.75,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 1,
+      "fps": 1
      }
     }
    ],
@@ -378,6 +527,26 @@
     {
      "texture": "stockpile_wear_c",
      "days": 4
+    },
+    {
+     "texture": "stockpile_ivy_a",
+     "days": 4,
+     "track": "age"
+    },
+    {
+     "texture": "stockpile_ivy_b",
+     "days": 9,
+     "track": "age"
+    },
+    {
+     "texture": "stockpile_flowers",
+     "days": 1,
+     "track": "care"
+    },
+    {
+     "texture": "stockpile_neglect",
+     "days": 2,
+     "track": "neglect"
     }
    ],
    "perches": [
@@ -396,7 +565,26 @@
      3,
      68
     ]
-   ]
+   ],
+   "shutters": [
+    {
+     "texture": "stockpile_shutter",
+     "frame": [
+      64,
+      30
+     ],
+     "at": [
+      28,
+      31
+     ],
+     "frames": 5
+    }
+   ],
+   "trample": {
+    "strength": 0.9,
+    "margin": 16,
+    "front": true
+   }
   },
   "workshop": {
    "name": "WERKSTATT",
@@ -473,12 +661,12 @@
     {
      "texture": "workshop_pennant",
      "frame": [
-      7,
-      13
+      10,
+      18
      ],
      "at": [
-      18,
-      4
+      6,
+      12
      ],
      "window": [
       0.8,
@@ -488,6 +676,30 @@
       "pivot": 0,
       "amount": 3.2,
       "flutter": 0.9
+     }
+    },
+    {
+     "texture": "workshop_lantern_l",
+     "frame": [
+      5,
+      8
+     ],
+     "at": [
+      29,
+      46
+     ],
+     "window": [
+      0.75,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 1,
+      "fps": 1
      }
     }
    ],
@@ -515,6 +727,26 @@
     {
      "texture": "workshop_wear_c",
      "days": 6
+    },
+    {
+     "texture": "workshop_ivy_a",
+     "days": 4,
+     "track": "age"
+    },
+    {
+     "texture": "workshop_ivy_b",
+     "days": 9,
+     "track": "age"
+    },
+    {
+     "texture": "workshop_flowers",
+     "days": 1,
+     "track": "care"
+    },
+    {
+     "texture": "workshop_neglect",
+     "days": 2,
+     "track": "neglect"
     }
    ],
    "perches": [
@@ -533,7 +765,30 @@
      3,
      91
     ]
-   ]
+   ],
+   "shutters": [
+    {
+     "texture": "workshop_shutter",
+     "frame": [
+      92,
+      40
+     ],
+     "at": [
+      26,
+      46
+     ],
+     "frames": 5
+    }
+   ],
+   "trample": {
+    "strength": 1.0,
+    "margin": 18,
+    "front": true
+   }
   }
+ },
+ "rest": {
+  "rate": 0.4,
+  "cap": 0.7
  }
 }

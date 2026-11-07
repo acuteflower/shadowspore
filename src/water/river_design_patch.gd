@@ -155,6 +155,6 @@ func bake() -> void:
 func _process(delta: float) -> void:
 	water_time += delta
 	if material is ShaderMaterial:
-		(material as ShaderMaterial).set_shader_parameter("water_time", water_time)
+		RenderingServer.global_shader_parameter_set("g_water_time", water_time) ## the shader reads the global clock
 	for fall: Sprite2D in _falls:
 		fall.frame = int(water_time * float(_settings["waterfall_fps"])) % int(_settings["waterfall_frames"])

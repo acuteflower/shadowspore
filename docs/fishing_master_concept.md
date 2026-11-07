@@ -1,4 +1,4 @@
-# Voidbloom – Das Große Angelsystem: „Atem des Stroms“
+# Shadowspore – Das Große Angelsystem: „Atem des Stroms“
 *(Master-Konzept: Ökologie, Nacht-Spannung & Siedlungs-Infrastruktur)*
 
 **Status:** Vollständiger Master-Entwurf (Synthese aus Konzept 1, 2 und 3)  
@@ -12,7 +12,7 @@
 ### 1.1 Leitgedanke: *Atem des Stroms*
 > *„Am Tage liest du das Wasser und nahrst den Stamm. Bei Nacht blickst du in den Schlund und forderst die Leere heraus. Am Steg schließt sich der Kreis aus Licht, Holz und Vorrat.“*
 
-Das Angelsystem in Voidbloom verbindet die drei prägenden Säulen des Spiels zu einem zusammenhängenden Erlebnis:
+Das Angelsystem in Shadowspore verbindet die drei prägenden Säulen des Spiels zu einem zusammenhängenden Erlebnis:
 1. **Das sensorische Naturerlebnis (Tag):** Achtsames Beobachten der echten Wasserströmung, Reaktionen der Ufervögel und natürliches Posen-Driften ohne störende UI-Balken – ganz im Geiste von *„Lies den Kessel“*.
 2. **Der existentielle Nervenkitzel (Nacht):** Das **Licht-Dilemma** am Wasser. Seltene Tiefenwesen und versunkene Schätze fordern Fischen in absoluter Finsternis abseits der rettenden Stadtlichter. Der Lärm des Drills lockt nächtliche Schattenwesen an und erfordert asymmetrisches Koop-Teamplay.
 3. **Die Siedlungs- & Expeditions-Infrastruktur:** Baubare Stege, Ufer-Lichtpfosten, Reusen und Räuchereien binden den Fluss an die Stadt an. Siedlerin **Maren** automatisiert die Grundversorgung des gemeinsamen Lagers, während Fischöl, Fischleim und Räucherproviant lange Abstiege in die Minen (`mine.md`) ermöglichen.
@@ -99,7 +99,7 @@ Sobald `TimeManager.night_amount() >= 0.3` erreicht, kippt die friedliche Flussa
 ```
 
 ### 3.1 Das Licht-Dilemma (`light_shyness`)
-Das Grundaxiom von Voidbloom lautet: **„Licht ist Land“**. Doch unter Wasser verkehrt sich dieser Schutz in ein taktisches Dilemma:
+Das Grundaxiom von Shadowspore lautet: **„Licht ist Land“**. Doch unter Wasser verkehrt sich dieser Schutz in ein taktisches Dilemma:
 * Gewöhnliche Fische und die friedliche *Glimmer-Schmerle* beißen auch im Licht.
 * **Mythische Schattenkreaturen** (*Schleier-Aal*, *Abyssischer Zander*, *versunkene Reliquiare*) besitzen `light_shyness = 1.0`: **Sie beißen ausschließlich in absoluter Finsternis** (`TownManager.light_depth < -32 px`).
 * Fällt der Schein einer Fackel oder eines Laternenpfostens auf die Fangstelle, taucht die Beute sofort in die Tiefe ab!
@@ -242,7 +242,7 @@ Seltene Fänge liefern **Schleier-Essenzen**, die im Fähigkeitenbaum als Kataly
 
 ## 7. Zusammenfassung des Spielerlebnisses
 
-Mit dem Gesamtsystem **„Atem des Stroms“** erhält Voidbloom eine perfekte Balance aus drei emotionalen Zuständen:
+Mit dem Gesamtsystem **„Atem des Stroms“** erhält Shadowspore eine perfekte Balance aus drei emotionalen Zuständen:
 1. **Entspannung & Naturverbundenheit:** Am sonnigen Nachmittag am Flussufer stehen, die Libellen beobachten, den Strömungsdrift genießen und frische Forellen für den abendlichen Kessel fangen.
 2. **Hochspannung & Koop-Adrenalin:** Bei Mitternacht im Stockdunkeln die Obsidian-Pose in den tiefen Kolk werfen. Wenn der Schleier-Aal anbeißt und das Wasser peitscht, pirschen Schattenspinnen heran – während der Mitspieler mit gezogener Klinge die Finsternis abwehrt.
 3. **Stolz auf den Siedlungsfortschritt:** Zu sehen, wie Stege und Lampen das Ufer erleuchten, Maren morgens die Reusen leert, aus der Räucherkammer aromatischer Rauch weht und die Gruppe mit geräuchertem Proviant und Fischöl-Laternen bestens gerüstet in die tiefsten Minenschächte aufbricht.

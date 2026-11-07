@@ -5,6 +5,7 @@ extends Node2D
 var _data: Dictionary
 var _spec: Dictionary
 var _queries: Dictionary = {}
+const QUERY_LIMIT: int = 64 ## the bake has 41 river chunks today; the cap only bounds a future, larger bake
 var _materials: Array[ShaderMaterial] = []
 var _falls: Array[Sprite2D] = []
 var _springs: Array[Sprite2D] = []
@@ -41,6 +42,7 @@ func _query(cell: Vector2i) -> Image:
 	var key: String = _key(cell)
 	if not (_data.get("chunks", {}) as Dictionary).has(key): return null
 	if not _queries.has(cell):
+		if _queries.size() >= QUERY_LIMIT: _queries.clear() ## images are immutable: a later query simply reads them again
 		var path: String = String((_data["chunks"][key] as Dictionary)["query"])
 		_queries[cell] = (load(path) as Texture2D).get_image()
 	return _queries[cell] as Image
@@ -52,6 +54,16 @@ func field_at(point: Vector2) -> Vector2:
 	var local: Vector2i = Vector2i(((point - Vector2(cell) * 512.0) / 4.0).floor())
 	var pixel: Color = image.get_pixel(clampi(local.x, 0, 127), clampi(local.y, 0, 127))
 	return Vector2(pixel.r8 - 128.0, pixel.g)
+
+## False when no river chunk lies in the 3x3 chunks round `cell`: then `clear_for_prop` is true for every point inside it
+## (its search reach stays within those chunks), so the caller can skip the per-tile query.
+func near_water(cell: Vector2i) -> bool:
+	if float(_spec["prop_margin"]) * 1.5 > 512.0: return true
+	for dy: int in range(-1, 2):
+		for dx: int in range(-1, 2):
+			if (_data["chunks"] as Dictionary).has(_key(cell + Vector2i(dx, dy))): return true
+	return false
+
 
 func clear_for_prop(point: Vector2, radius: float) -> bool:
 	# Distance fields are conservative minima over each 4px cell. Sampling the
@@ -111,7 +123,6 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 	shader_material.set_shader_parameter("water_detail", load("res://assets/water/water_detail.png"))
 	shader_material.set_shader_parameter("bank_material", load("res://assets/water/bank_material.png"))
 	shader_material.set_shader_parameter("world_origin", sprite.position)
-	shader_material.set_shader_parameter("water_time", _clock)
 	sprite.material = shader_material
 	_materials.append(shader_material)
 	sprite.tree_exiting.connect(func() -> void: _materials.erase(shader_material))
@@ -135,7 +146,6 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 	glow_material.set_shader_parameter("bank_map", load(String(record["bank"])))
 	glow_material.set_shader_parameter("bank_width", float(_spec["bank_width"]))
 	glow_material.set_shader_parameter("world_origin", sprite.position)
-	glow_material.set_shader_parameter("water_time", _clock)
 	glow_material.set_shader_parameter("night", TimeManager.night_amount())
 	night_glow.material = glow_material
 	_materials.append(glow_material)
@@ -233,8 +243,7 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
-	for shader_material: ShaderMaterial in _materials:
-		shader_material.set_shader_parameter("water_time", _clock)
+	RenderingServer.global_shader_parameter_set("g_water_time", _clock) ## one global clock for every river and glow material
 	var fall_frame: int = int(_clock * 10.0) % 8
 	for fall: Sprite2D in _falls:
 		fall.frame = fall_frame

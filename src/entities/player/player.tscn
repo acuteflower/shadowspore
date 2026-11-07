@@ -51,13 +51,13 @@ properties/2/spawn = true
 properties/2/replication_mode = 1
 properties/3/path = NodePath(".:sprinting")
 properties/3/spawn = true
-properties/3/replication_mode = 1
+properties/3/replication_mode = 2
 properties/4/path = NodePath("StealthComponent:sneaking")
 properties/4/spawn = true
-properties/4/replication_mode = 1
+properties/4/replication_mode = 2
 properties/5/path = NodePath("AttackComponent:held_weapon")
 properties/5/spawn = true
-properties/5/replication_mode = 1
+properties/5/replication_mode = 2
 
 [node name="Player" type="CharacterBody2D"]
 y_sort_enabled = true
@@ -206,3 +206,4 @@ z_index = 1
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_sync")
+replication_interval = 0.05

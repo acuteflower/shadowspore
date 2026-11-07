@@ -1,7 +1,7 @@
-# Game Design & Architektur-Konzept: Schatten- & Schleier-Angeln in Voidbloom
+# Game Design & Architektur-Konzept: Schatten- & Schleier-Angeln in Shadowspore
 
 **Autor:** Konzepter 2 – Fokus: *Schatten- & Schleier-Angeln (Risk & Reward, Nacht-Spannung & Leeren-Ökologie)*  
-**Projekt:** Voidbloom (Godot 4.7 / GDScript, 2D Top-Down Action-RPG, 640×360 Pixel, 1–4 Spieler Co-op)  
+**Projekt:** Shadowspore (Godot 4.7 / GDScript, 2D Top-Down Action-RPG, 640×360 Pixel, 1–4 Spieler Co-op)  
 **Status:** Vollständiger Konzeptentwurf  
 
 ---
@@ -13,8 +13,8 @@
 * **Leitmotiv:**  
   > *„Wer am Tage die Schnur auswirft, nährt den Leib. Wer bei Nacht in den Fluss lauscht, dem blickt die Tiefe entgegen.“*
 
-### 1.2 Warum Schleier-Angeln Voidbloom transformiert
-In vielen klassischen RPGs ist das Angeln eine isolierte, meditative Nebenbeschäftigung – ein rein mechanischer Zeitvertreib zum Sammeln von Kochzutaten oder Trophäen. In Voidbloom darf Angeln kein generisches Minispiel sein.
+### 1.2 Warum Schleier-Angeln Shadowspore transformiert
+In vielen klassischen RPGs ist das Angeln eine isolierte, meditative Nebenbeschäftigung – ein rein mechanischer Zeitvertreib zum Sammeln von Kochzutaten oder Trophäen. In Shadowspore darf Angeln kein generisches Minispiel sein.
 
 Das Schleier-Angeln verbindet die ruhige Schönheit der Fluss- und Seenlandschaften (`docs/water_design.md`, `docs/water_life.md`) mit der existentiellen Kernspannung des Spiels: **Tag vs. Nacht**, **„Licht ist Land“ vs. die lauernde Dunkelheit** (`docs/nacht_monster_konzept.md`) und dem mystischen **Schleiergeflecht** (`docs/skill_tree.md`).
 
@@ -24,7 +24,7 @@ Während der 8-minütige Tag friedliche Ufer, fließende Reflexe und nahrhafte S
 
 ## 2. Die Fangmechanik: Tag vs. Nacht & Schleier-Drill
 
-Das Angeln in Voidbloom gliedert sich in zwei eng miteinander verzahnte Phasen, die den Tag-Nacht-Rhythmus des Spiels widerspiegeln.
+Das Angeln in Shadowspore gliedert sich in zwei eng miteinander verzahnte Phasen, die den Tag-Nacht-Rhythmus des Spiels widerspiegeln.
 
 ```
       TAG (06:00 - 18:00)                    DÄMMERUNG & NACHT (18:00 - 06:00)
@@ -79,7 +79,7 @@ Im Koop-Modus (1–4 Spieler) entfaltet das Schleier-Angeln seine stärkste Dyna
 
 ## 3. Licht-Mechanik am Wasser: Das Licht-Dilemma
 
-Das Grundaxiom von Voidbloom lautet: **„Licht ist Land“** (`TownRules.light_depth`). Doch am Wasser verkehrt sich dieser Schutz in ein spannungsgeladenes Risiko.
+Das Grundaxiom von Shadowspore lautet: **„Licht ist Land“** (`TownRules.light_depth`). Doch am Wasser verkehrt sich dieser Schutz in ein spannungsgeladenes Risiko.
 
 ```
        LICHTKREIS DER BASIS / LATERNE                 DUNKLES, WILDES FLUSSUFER
@@ -118,7 +118,7 @@ Köder werden im Inventar auf die Rute gesockelt und modifizieren Geruch, Geschm
 
 ## 4. Beute, Schatten-Kreaturen & Belohnungen
 
-Die Belohnungen aus dem Schleier-Angeln sind eng mit den Hauptsystemen von Voidbloom verzahnt: Kochen (`cooking.md`), Skilltree (`skill_tree.md`), Ausrüstung und Alchemie.
+Die Belohnungen aus dem Schleier-Angeln sind eng mit den Hauptsystemen von Shadowspore verzahnt: Kochen (`cooking.md`), Skilltree (`skill_tree.md`), Ausrüstung und Alchemie.
 
 ### 4.1 Die Kreaturen der Tiefe
 1. **Glimmer-Schmerle *(Glow Loach)* – Ungewöhnlich:** 14px lang, schlank, schimmert in zartem Türkis (`78f4e6`). Liefert *Glimmer-Galle* & *Zartes Schmerlenfilet*.

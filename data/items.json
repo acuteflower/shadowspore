@@ -37,6 +37,25 @@
   },
   "description": "Testgegenstand: besser als das Standardschwert."
  },
+ "sword_void": {
+  "name": "Leerenklinge",
+  "kind": "weapon",
+  "slot": "main_hand",
+  "weapon_class": "sword_1h",
+  "rarity": "legendary",
+  "enchant_slots": 2,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/sword_void.png",
+  "held": "res://assets/items/sword_void_held.png",
+  "stats": {
+   "damage": 30,
+   "speed": 1.15,
+   "reach": 34,
+   "knockback": 60
+  },
+  "description": "Testgegenstand: eine Klinge aus verdichteter Leere, stark genug für einen Bosskampf."
+ },
  "shadow_core": {
   "name": "Schattenkern",
   "kind": "material",
@@ -611,5 +630,35 @@
    "reach": 130
   },
   "description": "Geschälte Esche und Flachsfaser, biegsam wie Weide. In der Schnellleiste gewählt: Maus zielt aufs Wasser, Linksklick wirft. Z wechselt den Köder, H die Pose."
+ },
+ "shimmer_beetle": {
+  "name": "Schimmerkäfer",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/shimmer_beetle.png",
+  "description": "Ein Käfer mit blaugrün glänzendem Panzer. Fische mögen ihn als Köder."
+ },
+ "leaf_caterpillar": {
+  "name": "Blattraupe",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/leaf_caterpillar.png",
+  "description": "Dick, grün und gefräßig. Als Köder schwer zu schlagen."
+ },
+ "leaf_snail": {
+  "name": "Laubschnecke",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/leaf_snail.png",
+  "description": "Eine kleine Schnecke mit rosigem Haus. Zieht sich bei jedem Geräusch zurück."
  }
 }

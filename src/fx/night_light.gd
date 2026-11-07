@@ -22,7 +22,7 @@ var _on_screen: bool = true
 
 func _ready() -> void:
 	var variant: int = absi(int(position.x * 7.0 + position.y * 13.0)) % 3
-	texture = LightTexture.get_texture(radius * 2, squash, variant)
+	LightTexture.apply(self, radius * 2, squash, variant)
 	color = glow_color
 	_phase = fposmod(position.x * 0.37 + position.y * 0.71, TAU)
 	add_to_group("night_lights")

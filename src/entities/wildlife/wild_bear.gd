@@ -19,6 +19,7 @@ func _init() -> void:
 func _ready() -> void:
 	super._ready()
 	add_to_group("bears")
+	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	if not is_cub():
 		add_to_group("predators")
 	_meal_cd = _range("hunt_cooldown") * 0.3

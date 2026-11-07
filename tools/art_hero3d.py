@@ -523,6 +523,46 @@ PULL_KEYS = [
 ]
 
 
+# Touching a waystone statue (E at the goddess): one second like the other actions. She raises both hands, lays the palms flat on the stone at about 0.45 s
+# (the game wakes the statue there), keeps them there (the game holds the frames 5-6 until the statue's light has run over it) and then draws back.
+# `python3 tools/art_hero3d.py touchonly` writes player_touch.png, player_touch_blood.png and the "touch" entries of data/hero_rig.json.
+TOUCH_KEYS = [
+    (0.00, P(0.0, 0.03, 0.0, STAND, REST_R, REST_L, (0.0, 0.0, 0.0))),
+    (0.16, P(0.05, 0.06, 0.3, STAND, (-4.5, 30.5, 7.5), (5.0, 30.0, 7.0), (0.2, 0.1, 0.1))),
+    (0.34, P(0.06, 0.14, 1.0, STAND, (-3.0, 34.0, 13.0), (3.6, 34.2, 12.6), (0.6, 0.4, 0.3))),
+    (0.44, P(0.06, 0.18, 1.5, STAND, (-2.8, 34.5, 14.2), (3.4, 34.8, 13.8), (1.0, 0.6, 0.4), 0.03)),
+    (0.62, P(0.05, 0.17, 1.4, STAND, (-2.8, 34.4, 14.0), (3.4, 34.6, 13.6), (0.8, 0.5, 0.3), 0.03)),
+    (0.80, P(0.03, 0.08, 0.5, STAND, (-4.5, 30.0, 8.0), (5.0, 29.5, 7.5), (-0.3, 0.1, 0.0))),
+    (1.00, P(0.0, 0.03, 0.0, STAND, REST_R, REST_L, (0.0, 0.0, 0.0))),
+]
+
+
+def write_touch():
+    """Only the touch animation: colour sheet, blood thresholds and rig entries."""
+    import json
+    global WANT_BLOOD, frame
+    rows, shoulders, hands, _m = pick_sheet(TOUCH_KEYS)
+    write_png(ROOT / "characters" / "player_touch.png", PICK_FRAMES * FW, 8 * FH, paste(rows, PICK_FRAMES, 8))
+    rig_path = ROOT.parent / "data" / "hero_rig.json"
+    rig = json.loads(rig_path.read_text())
+    rig.update({"touch_cols": PICK_FRAMES, "touch_shoulder": shoulders, "touch_hand": hands})
+    rig_path.write_text(json.dumps(rig, separators=(",", ":")) + "\n")
+    WANT_BLOOD = True
+    real_frame, collected = frame, []
+
+    def collecting(*args, **kwargs):
+        result = real_frame(*args, **kwargs)
+        collected.append(LAST_BLOOD)
+        return result
+
+    frame = collecting
+    pick_sheet(TOUCH_KEYS)
+    frame = real_frame
+    WANT_BLOOD = False
+    brows = [collected[r * PICK_FRAMES:(r + 1) * PICK_FRAMES] for r in range(8)]
+    write_png(ROOT / "characters" / "player_touch_blood.png", PICK_FRAMES * FW, 8 * FH, paste(brows, PICK_FRAMES, 8))
+
+
 def write_pull():
     """Only the pull animation: colour sheet, blood thresholds and rig entries (a few seconds)."""
     import json
@@ -967,6 +1007,8 @@ if __name__ == "__main__":
         blood_sheets()
     elif len(sys.argv) > 1 and sys.argv[1] == "pullonly":
         write_pull()
+    elif len(sys.argv) > 1 and sys.argv[1] == "touchonly":
+        write_touch()
     elif len(sys.argv) > 1 and sys.argv[1] == "jog":
         update_jog()
     elif len(sys.argv) > 1 and sys.argv[1] == "attack":

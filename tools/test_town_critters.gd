@@ -78,7 +78,15 @@ func _run() -> void:
 		var shown: int = 0
 		for entry: Dictionary in view._wear:
 			shown += 1 if (entry.sprite as Sprite2D).visible else 0
-		_check(shown == view._wear.size() and shown == 3, "all its wear shows (%d)" % shown)
+		var expected: int = 0
+		for entry: Dictionary in view._wear: ## the ageing and care overlays (docs/town_ausbau.md) show by their own rules
+			var want: bool = view.age_days() >= int(view._spec.wear[view._wear.find(entry)].days)
+			match String(entry.get("track", "age")):
+				"care": want = want and town.cared(shop_id)
+				"neglect": want = want and not town.cared(shop_id)
+			expected += 1 if want else 0
+			_check((entry.sprite as Sprite2D).visible == want, "a wear overlay shows exactly when its days and track allow it (%s)" % str(entry.get("track", "age")))
+		_check(shown == expected and shown >= 4, "the wear that has had time shows (%d of %d)" % [shown, expected])
 		_check(view._spill != null and view._sparks != null, "the workshop has forge light and sparks")
 	# --- Gustav's day has a splitting block and a bench
 	var gustav: Settler = town.settler_node("gustav")

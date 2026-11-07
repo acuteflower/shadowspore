@@ -70,6 +70,7 @@ func limit(enemy: Node2D, velocity: Vector2, _delta: float) -> Vector2:
 	var depth: float = town.light_depth(here)
 	if depth > 0.0:
 		out = out.limit_length(top_speed * float(behavior.light_slow)) ## in pain
+		town.light_touch(here)
 		return out if excited else out + town.light_outward(here) * float(behavior.light_push)
 	if excited or out == Vector2.ZERO:
 		return out
@@ -79,4 +80,5 @@ func limit(enemy: Node2D, velocity: Vector2, _delta: float) -> Vector2:
 		var inward: float = -out.dot(outward) ## how much of the move leads in
 		if inward > 0.0:
 			out += outward * inward ## slide along the edge, never in
+			town.light_touch(here + out.normalized() * 10.0)
 	return out

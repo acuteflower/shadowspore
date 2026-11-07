@@ -3,6 +3,7 @@ extends Node
 ## bait, rod swap, invalid targets, the book. Uses the real river data and the real player; time is driven by hand.
 const BOOK: String = "user://fish_book_test_only.json"
 const DT: float = 1.0 / 60.0
+const RULES_TEST: GDScript = preload("res://tools/test_fishing.gd") ## its `reader` plays like a person who reads the line
 var failures: int = 0
 var checks: int = 0
 var rivers: WorldRivers
@@ -72,17 +73,40 @@ func select_rod() -> void:
 	player._on_inventory_changed() ## the player node does this itself once its HUD is bound
 
 
+## A cast into fresh water: the test casts the same spot dozens of times, which in the game would fish it out
+## (the pressure is tested on its own below).
 func cast(spot: Dictionary, bait: String = "") -> void:
+	FishingComponent.clear_pressure()
 	f._host_request("cast", [spot["target"], bait, "cork"])
 
 
+## Fights like a player who reads the line: only the replicated state (phase, tension, shiver) is used.
 func fight_perfectly() -> void:
 	var guard: float = 0.0
+	var lag: Dictionary = {}
 	while f.state == FishingComponent.S.DRILL and guard < 90.0:
-		f._give = 1.0 if f.phase == "flee" else 0.0
-		f._reel = f.phase == "tire" and not f.tell
+		var input: Array = RULES_TEST.reader({"phase": f.phase, "tension": f.tension, "tell": f.tell}, lag, 0.2, DT)
+		f._give = float(input[0])
+		f._reel = bool(input[1])
 		f._host_tick(DT)
 		guard += DT
+
+
+## Seconds from the splash until a shadow starts to swim in, averaged over `n` casts at `target`.
+func wait_for_fish(target: Vector2, n: int) -> float:
+	var sum: float = 0.0
+	for i: int in n:
+		FishingComponent.clear_pressure()
+		f._host_end("", "")
+		f._host_request("cast", [target, "", "cork"])
+		until(func() -> bool: return f.state == FishingComponent.S.DRIFTING, 2.0)
+		var waited: float = 0.0
+		while f.state == FishingComponent.S.DRIFTING and not f._approaching and waited < 130.0:
+			f._host_tick(DT)
+			waited += DT
+		sum += waited
+	f._host_end("", "")
+	return sum / float(n)
 
 
 func _run() -> void:
@@ -157,7 +181,7 @@ func _run() -> void:
 	tick(3.0)
 	check(f.bobber.distance_to(start) > 0.5 or f._flow(f.bobber).length() < 0.05, "the current carries the float")
 	check(f._field(f.bobber).x < -3.0, "the float stays on the water")
-	check(until(func() -> bool: return f.state == FishingComponent.S.NIBBLE or f.state == FishingComponent.S.BITE, 40.0), "a fish comes (%s)" % [f._bite_species])
+	check(until(func() -> bool: return f.state == FishingComponent.S.NIBBLE or f.state == FishingComponent.S.BITE, 120.0), "a fish comes (%s)" % [f._bite_species])
 	check(fx_log.has("approach"), "the shadow approached before the bite")
 	check(f.species != "", "the species is known to the shadow")
 	check(until(func() -> bool: return f.state == FishingComponent.S.BITE, 8.0), "the nibbles become a bite")
@@ -179,7 +203,7 @@ func _run() -> void:
 		fx_log.clear()
 		cast(spot)
 		check(until(func() -> bool: return f.state == FishingComponent.S.DRIFTING, 2.0), mode + ": drifting")
-		check(until(func() -> bool: return f.state == FishingComponent.S.NIBBLE, 60.0), mode + ": nibbling")
+		check(until(func() -> bool: return f.state == FishingComponent.S.NIBBLE, 200.0), mode + ": nibbling")
 		if mode == "early":
 			f._host_request("strike", [])
 		else:
@@ -187,6 +211,20 @@ func _run() -> void:
 			tick(2.0)
 		check(f.state == FishingComponent.S.IDLE, mode + " strike loses the fish")
 		check(fx_log.has("lost"), mode + ": the loss is shown")
+
+	# a long wait: the float drifts until the line is out, then the line holds it (it does not break by itself)
+	cast(spot)
+	until(func() -> bool: return f.state == FishingComponent.S.DRIFTING, 2.0)
+	f._bite_species = ""
+	f._bite_t = -1.0
+	var far_drift: float = 0.0
+	for i: int in 60 * 60:
+		f._host_tick(DT)
+		f._bite_t = -1.0 ## nobody comes
+		f._bite_species = ""
+		far_drift = maxf(far_drift, f.bobber.distance_to(f.feet()))
+	check(f.state == FishingComponent.S.DRIFTING and far_drift <= 190.0, "a minute of drifting: the line holds the float (%.0f px out)" % far_drift)
+	f._host_request("reel", [])
 
 	# strike while drifting is not a strike; reel in
 	cast(spot)
@@ -232,7 +270,7 @@ func _run() -> void:
 	await get_tree().physics_frame
 	var before_count: int = 0
 	cast(spot)
-	check(until(func() -> bool: return f.state == FishingComponent.S.BITE, 120.0), "net: a fish bites")
+	check(until(func() -> bool: return f.state == FishingComponent.S.BITE, 240.0), "net: a fish bites")
 	var net_item: String = String((FishingRules.species_table()[f.species] as Dictionary)["item"])
 	before_count = player.inventory.count_item(net_item)
 	f._host_request("strike", [])
@@ -286,6 +324,7 @@ func _run() -> void:
 	var sharpest: float = 0.0
 	var last_step: Vector2 = Vector2.ZERO
 	var trace: Array = []
+	var read_landed: int = 0
 	for species_id: String in FishingRules.species_table():
 		for mode: int in 3:
 			f._host_end("", "")
@@ -294,16 +333,18 @@ func _run() -> void:
 			f.species = species_id
 			f._set_state(FishingComponent.S.BITE)
 			f._window = 5.0
+			var before_fish: int = player.inventory.count_item(String((FishingRules.species_table()[species_id] as Dictionary)["item"]))
 			f._host_request("strike", [])
 			if f.state != FishingComponent.S.DRILL:
 				continue
 			fights += 1
 			last_step = Vector2.ZERO
 			var elapsed: float = 0.0
+			var lag: Dictionary = {}
 			while f.state == FishingComponent.S.DRILL and elapsed < 80.0:
-				var fleeing: bool = f.phase == "flee"
-				f._give = (1.0 if fleeing else 0.0) if mode == 0 else (0.0 if mode == 1 else 1.0)
-				f._reel = (not fleeing and not f.tell) if mode == 0 else (mode == 1)
+				var input: Array = RULES_TEST.reader({"phase": f.phase, "tension": f.tension, "tell": f.tell}, lag, 0.2, DT)
+				f._give = float(input[0]) if mode == 0 else (0.0 if mode == 1 else 1.0)
+				f._reel = bool(input[1]) if mode == 0 else (mode == 1)
 				var before: Vector2 = f.bobber
 				f._host_tick(DT)
 				if f.state == FishingComponent.S.DRILL:
@@ -319,13 +360,17 @@ func _run() -> void:
 						off_water += 1
 					max_dist = maxf(max_dist, f.dist)
 				elapsed += DT
-			if f.state == FishingComponent.S.IDLE and elapsed < 80.0 and player.inventory.count_item(String((FishingRules.species_table()[species_id] as Dictionary)["item"])) > 0:
+			if f.state == FishingComponent.S.IDLE and elapsed < 80.0 and player.inventory.count_item(String((FishingRules.species_table()[species_id] as Dictionary)["item"])) > before_fish:
 				landed_n += 1
+				if mode == 0:
+					read_landed += 1
 	check(fights >= 18, "water fights: all hooked (%d)" % fights)
 	check(off_water == 0, "water fights: the fish never leaves the water (%d ticks on land)" % off_water)
 	check(worst_jump < 3.2, "water fights: no teleporting, at most %.2f px per tick" % worst_jump)
 	check(max_dist < 260.0, "water fights: the fish stays within reach of the line (%.0f)" % max_dist)
 	check(sharpest < 1.6, "water fights: no kinks, the step changes by at most %.2f px per tick" % sharpest)
+	check(read_landed >= 5, "water fights: reading the line lands most species in the real river (%d of 7)" % read_landed)
+	check(landed_n - read_landed <= 1, "water fights: yanking or always giving line hardly ever lands one (%d)" % (landed_n - read_landed))
 	var dump: String = OS.get_environment("FISH_TRACE")
 	if dump != "" and not trace.is_empty():
 		var field: Array = []
@@ -342,9 +387,75 @@ func _run() -> void:
 	player.inventory.give("rod_basic", 1)
 	select_rod()
 
+	# where and when the fish come: near the feet they are wary, out in the deep channel they come too (they did not before)
+	stand_at(spot)
+	var near_target: Vector2 = Vector2.INF
+	var far_target: Vector2 = Vector2.INF
+	for a: int in 48:
+		var dir: Vector2 = Vector2.from_angle(TAU * float(a) / 48.0)
+		for r: int in range(28, 131, 2):
+			var at: Vector2 = player.global_position + dir * float(r)
+			var field: Vector2 = rivers.field_at(at)
+			if near_target == Vector2.INF and r <= 36 and field.x <= -5.0 and field.y < 0.6:
+				near_target = at
+			if far_target == Vector2.INF and r >= 90 and field.x <= -12.0 and field.y >= 0.85:
+				far_target = at
+	check(near_target != Vector2.INF and far_target != Vector2.INF, "a near shallow and a far deep target exist (%s %s)" % [near_target, far_target])
+	if near_target != Vector2.INF and far_target != Vector2.INF:
+		TimeManager.time_of_day = 0.5
+		var near_wait: float = wait_for_fish(near_target, 16)
+		var far_wait: float = wait_for_fish(far_target, 16)
+		print("first shadow after: near %.1f s, far deep %.1f s (noon, no bait)" % [near_wait, far_wait])
+		check(near_wait > 6.0, "a cast right under her feet is not taken at once (%.1f s)" % near_wait)
+		check(far_wait < 40.0, "a far cast into the deep channel brings fish by day (%.1f s)" % far_wait)
+		check(far_wait < near_wait, "the far cast is the better one at noon (%.1f vs %.1f s)" % [far_wait, near_wait])
+		TimeManager.time_of_day = 0.757
+		var dusk_wait: float = wait_for_fish(far_target, 16)
+		print("at dusk: far deep %.1f s" % dusk_wait)
+		check(dusk_wait < far_wait, "dusk is feeding time (%.1f vs %.1f s)" % [dusk_wait, far_wait])
+		TimeManager.time_of_day = 0.5
+		# a fished-out spot goes quiet, a fresh one does not
+		FishingComponent.clear_pressure()
+		for i: int in 3:
+			FishingComponent.add_pressure(far_target, 0.3)
+		check(FishingComponent.pressure_at(far_target) > 0.6 and FishingComponent.pressure_at(far_target + Vector2(200, 0)) == 0.0, "pressure lies on the spot, not on the whole river")
+		var ctx: Dictionary = {"y": 0.9, "reach": 100.0, "sun": 0.0, "golden": 0.0, "pressure": FishingComponent.pressure_at(far_target)}
+		check(FishingRules.activity(ctx) < 0.45, "three catches on one spot leave it quiet (%.2f)" % FishingRules.activity(ctx))
+		await get_tree().physics_frame
+		FishingComponent._age_pressure(900.0)
+		check(FishingComponent.pressure_at(far_target) < 0.05, "after a quarter of an hour the spot has recovered")
+		FishingComponent.clear_pressure()
+		# the current is strong in the channel and slack along the bank
+		check(f.current_at(far_target).length() > f.current_at(near_target).length(), "the channel flows faster than the slack water by the bank")
+	# a hooked fish has its length from the strike on, and the card shows that length
+	cast(spot)
+	until(func() -> bool: return f.state == FishingComponent.S.DRIFTING, 2.0)
+	f.species = "moon_trout"
+	f._set_state(FishingComponent.S.BITE)
+	f._window = 5.0
+	f._host_request("strike", [])
+	check(f._length > 0 and float(f._drill["pull"]) > 0.0, "the hooked fish has its size (%d cm)" % f._length)
+	var hooked_length: int = f._length
+	var cards_before: int = caught_signals.size()
+	fight_perfectly()
+	if caught_signals.size() > cards_before:
+		check(int(caught_signals[caught_signals.size() - 1]["l"]) == hooked_length, "the card shows the fish that was fought")
+	# a fish that turns away swims off visibly, and the same one stays away for a while
+	fx_log.clear()
+	cast(spot)
+	until(func() -> bool: return f.state == FishingComponent.S.DRIFTING, 2.0)
+	f._bite_species = "gold_carp"
+	f.species = "gold_carp"
+	f._approaching = true
+	f.approach_from = f.bobber + Vector2(30, 0)
+	f._refuse(f.bobber)
+	check(fx_log.has("refuse") and f.species == "" and f._refused.has("gold_carp"), "a refusing fish leaves and keeps away")
+	check(not FishingRules.weights(f._ctx()).has("gold_carp"), "it is not picked again right away")
+	f._host_end("", "")
+
 	# the full bag releases the fish
 	cast(spot)
-	until(func() -> bool: return f.state == FishingComponent.S.BITE, 80.0)
+	until(func() -> bool: return f.state == FishingComponent.S.BITE, 240.0)
 	var full_item: String = String((FishingRules.species_table()[f.species] as Dictionary)["item"])
 	for i: int in InventoryComponent.SIZE:
 		if player.inventory.slots[i].is_empty() or String(player.inventory.slots[i]["id"]) == full_item: ## fish stacks count as room too

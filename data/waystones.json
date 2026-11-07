@@ -1,0 +1,64 @@
+{
+	"settings": {
+		"reach": 46.0,
+		"reveal_delay": 6.3
+	},
+	"statues": [
+		{
+			"id": "hang_wachterin",
+			"name": "WÄCHTERIN AM HANG",
+			"tile": [840, 649],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "ebene_wachterin",
+			"name": "WÄCHTERIN DER EBENE",
+			"tile": [598, 523],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "lichtung_wachterin",
+			"name": "WÄCHTERIN DER LICHTUNG",
+			"tile": [373, 858],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "klippen_wachterin",
+			"name": "WÄCHTERIN DER KLIPPEN",
+			"tile": [215, 660],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "glaskamm_wachterin",
+			"name": "WÄCHTERIN DES GLASKAMMS",
+			"tile": [142, 355],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "bluete_wachterin",
+			"name": "WÄCHTERIN DER BLÜTE",
+			"tile": [408, 322],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "mauern_wachterin",
+			"name": "WÄCHTERIN DER ALTEN MAUERN",
+			"tile": [664, 390],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "versunkene_wachterin",
+			"name": "WÄCHTERIN DER VERSUNKENEN",
+			"tile": [915, 308],
+			"reveal": 15.0,
+			"clear_radius": 5
+		}
+	]
+}

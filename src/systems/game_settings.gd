@@ -8,7 +8,7 @@ const PATH: String = "user://settings.cfg"
 const DEFAULTS: Dictionary = {
 	"master": 80, "music": 70, "sfx": 80,
 	"fullscreen": false, "vsync": true, "shake": 100,
-	"numbers": true, "language": "de", "position": true,
+	"numbers": true, "language": "de", "position": true, "cursor": true,
 }
 
 static var _values: Dictionary = {}

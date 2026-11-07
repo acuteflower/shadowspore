@@ -119,5 +119,5 @@ def main():
     save_png(ROOT/'assets/wildlife/bear.png',main)
     save_png(ROOT/'assets/wildlife/bear_attack.png',attack)
     save_png(ROOT/'assets/wildlife/bear_play.png',play)
-    save_png(Path('/private/tmp/voidbloom-bear-art.png'),preview)
+    save_png(Path('/private/tmp/shadowspore-bear-art.png'),preview)
 if __name__=='__main__': main()

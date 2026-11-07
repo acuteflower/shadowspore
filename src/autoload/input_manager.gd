@@ -8,6 +8,9 @@ var ui_blocking: bool = false
 ## True while the Escape menu is open (the inventory stays shut then).
 var menu_open: bool = false
 
+## True while the free camera (L) flies: she stands still and nothing in the world reacts to the keys.
+var freecam_open: bool = false
+
 ## True while the town's build mode (B) is on: LMB places instead of swinging, the number keys and the wheel choose a piece instead of a hotbar slot.
 var build_open: bool = false
 
@@ -31,7 +34,7 @@ func _input(event: InputEvent) -> void:
 
 
 func move_vector() -> Vector2:
-	return Vector2.ZERO if map_open or skills_open else map_pan_vector()
+	return Vector2.ZERO if map_open or skills_open or freecam_open else map_pan_vector()
 
 
 func skills_pressed() -> bool:
@@ -45,6 +48,11 @@ func skills_center_pressed() -> bool:
 ## The move keys / left stick as they are, for menus that pan (the map).
 func map_pan_vector() -> Vector2:
 	return Input.get_vector("move_left", "move_right", "move_up", "move_down")
+
+
+## L: fly the free camera / land where it is. Works with menus shut only.
+func freecam_pressed() -> bool:
+	return not ui_blocking and not menu_open and Input.is_action_just_pressed("freecam")
 
 
 func map_pressed() -> bool:
@@ -69,7 +77,7 @@ func sprint_held() -> bool:
 
 
 func attack_pressed() -> bool:
-	return not ui_blocking and not build_open and Input.is_action_pressed("action_primary")
+	return not ui_blocking and not build_open and not freecam_open and Input.is_action_pressed("action_primary")
 
 
 ## Dev key: spawn an enemy at the cursor.
@@ -91,9 +99,18 @@ func debug_time_pressed() -> bool:
 	return Input.is_action_just_pressed("debug_time")
 
 
+## The map's travel mode: E held (the hold on a waystone's marker) and A / D or the arrow keys to step through the destinations.
+func interact_held() -> bool:
+	return Input.is_action_pressed("interact")
+
+
+func map_select_step() -> int:
+	return int(Input.is_action_just_pressed("ui_right")) - int(Input.is_action_just_pressed("ui_left"))
+
+
 ## E (gamepad Y): talk to / use whatever the prompt above an object offers.
 func interact_pressed() -> bool:
-	return not ui_blocking and Input.is_action_just_pressed("interact")
+	return not ui_blocking and not freecam_open and Input.is_action_just_pressed("interact")
 
 
 func inventory_pressed() -> bool:
@@ -108,7 +125,7 @@ const HOTBAR_ACTIONS: Array[StringName] = [
 
 ## Number key 1-8 pressed this frame -> 0-7, else -1.
 func hotbar_pick() -> int:
-	if skills_open or build_open:
+	if skills_open or build_open or freecam_open:
 		return -1
 	for i: int in 8:
 		if Input.is_action_just_pressed(HOTBAR_ACTIONS[i]):
@@ -118,7 +135,7 @@ func hotbar_pick() -> int:
 
 ## Mouse wheel: +1 next, -1 previous, 0 none.
 func hotbar_step() -> int:
-	if ui_blocking or build_open: ## the wheel zooms the map / chooses the piece to build
+	if ui_blocking or build_open or freecam_open: ## the wheel zooms the map / chooses the piece to build
 		return 0
 	if Input.is_action_just_pressed("hotbar_next"):
 		return 1
@@ -128,11 +145,11 @@ func hotbar_step() -> int:
 
 
 func sneak_held() -> bool:
-	return not skills_open and Input.is_action_pressed("sneak")
+	return not skills_open and not freecam_open and Input.is_action_pressed("sneak")
 
 
 func blink_pressed() -> bool:
-	return not skills_open and Input.is_action_just_pressed("blink")
+	return not skills_open and not freecam_open and Input.is_action_just_pressed("blink")
 
 
 func aim_world_position() -> Vector2:
@@ -166,15 +183,15 @@ func build_step() -> int:
 # ---------- fishing (docs/fishing.md) ----------
 
 func fish_press() -> bool:
-	return not ui_blocking and not build_open and not map_open and Input.is_action_just_pressed("action_primary")
+	return not ui_blocking and not build_open and not map_open and not freecam_open and Input.is_action_just_pressed("action_primary")
 
 
 func fish_held() -> bool:
-	return not ui_blocking and not build_open and not map_open and Input.is_action_pressed("action_primary")
+	return not ui_blocking and not build_open and not map_open and not freecam_open and Input.is_action_pressed("action_primary")
 
 
 func fish_reel_in_pressed() -> bool:
-	return not ui_blocking and not build_open and not map_open and Input.is_action_just_pressed("action_secondary")
+	return not ui_blocking and not build_open and not map_open and not freecam_open and Input.is_action_just_pressed("action_secondary")
 
 
 func fish_bait_pressed() -> bool:

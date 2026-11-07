@@ -117,6 +117,9 @@ func habitat_text(id: String) -> String:
 	var window: Array = spec["night"] as Array
 	var when: String = "NUR NACHTS" if float(window[0]) >= 0.3 else ("TAGS" if float(window[1]) <= 0.6 else "TAG UND NACHT")
 	var line: String = "%s, %s" % [depth, when]
+	if spec.has("flow"):
+		var flow: Array = spec["flow"] as Array
+		line += ", STARKE STRÖMUNG" if float(flow[0]) >= 0.4 else (", STILLES WASSER" if float(flow[1]) <= 0.45 else "")
 	if float(spec.get("shy", 0.0)) > 0.0:
 		line += ", MEIDET LICHT"
 	return line

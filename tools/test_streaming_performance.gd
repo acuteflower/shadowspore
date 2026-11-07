@@ -59,6 +59,7 @@ func _run() -> void:
 	check(slices > 1, "runtime chunk preparation spans multiple frames")
 	var began: int = Time.get_ticks_usec()
 	world._commit_chunk(build)
+	world._finish_commit()
 	print("TIMING cold preparation: %.2f ms total, %.2f ms largest slice, %d slices; commit %.2f ms" % [total / 1000.0, largest / 1000.0, slices, (Time.get_ticks_usec() - began) / 1000.0])
 	check(world._chunks.has(c) and world._things.size() >= before_props, "complete chunk activates atomically")
 	var staged: Array = signature(world, c)
@@ -78,6 +79,7 @@ func _run() -> void:
 	while not world._advance_chunk(build, Time.get_ticks_usec() + WorldLevel.STREAM_BUDGET_USEC):
 		await get_tree().process_frame
 	world._commit_chunk(build)
+	world._finish_commit()
 	check(signature(world, c) == custom_sync, "authored moved/scaled props survive incremental loading")
 	world.edits.assign(authored)
 

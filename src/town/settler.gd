@@ -40,6 +40,12 @@ var _cycle_t: float = 0.0
 var _cycle_pause: bool = false
 var _enter_t: float = 99.0 ## seconds since they stopped walking (the `enter` clip plays for its first moments)
 var _last_line: String = ""
+var _bubble: SettlerBubble
+var _alert_mode: int = 0 ## 0 the plan, 1 walking out to the edge of the light, 2 holding it, 3 walking back (`alert_watch`, docs/town_ausbau.md C20)
+var _alert_route: PackedVector2Array = PackedVector2Array()
+var _alert_d: float = 0.0
+var _alert_sector: int = 2
+const ALERT_SPEED: float = 52.0
 
 
 func setup(owner_town: TownManager, settler_id: String, fresh: bool) -> void:
@@ -205,6 +211,7 @@ func _process(delta: float) -> void:
 			_arrive_t = -1.0
 	elif not _talking:
 		global_position = placed.pos as Vector2
+	_alert_step(delta, placed.pos as Vector2)
 	visible = _arrive_t >= 0.0 or not (_spot == "rest" and (bool(placed.done) or String(plan.prev) == "rest")) ## asleep inside once they have walked in
 	var step: Vector2 = global_position - _last_pos
 	_moving = step.length() > 0.02
@@ -224,6 +231,9 @@ func _process(delta: float) -> void:
 			_sector = Adventurer.sector_of(_vec(spec.get("face_fire", [1, 0])))
 	_last_pos = global_position
 	var wanted: String = "walk" if _moving else _spot_clip(cfg, delta)
+	if _alert_mode == 2 and not _moving: ## on watch at the edge of the light: standing, sword at his side, looking out
+		wanted = "idle" if _has_clip("idle") else wanted
+		_sector = _alert_sector
 	if _talking and not _moving:
 		wanted = "idle" if _has_clip("idle") else wanted
 	if wanted != _clip:
@@ -351,6 +361,65 @@ func _draw() -> void:
 		draw_rect(Rect2(1, -8, 4, 8), Color("2a2438"))
 		draw_circle(Vector2(0, -29), 5.0, Color("c8946a"))
 		draw_rect(Rect2(-5, -35, 10, 3), Color("8c8a96"))
+
+
+# ---------- chatter and the watch ----------
+
+func spot_name() -> String:
+	return _spot
+
+
+## Says something to the town (the small bubble over the head, `SettlerChatter`).
+func say(text: String, seconds: float) -> void:
+	if _bubble == null:
+		_bubble = SettlerBubble.new()
+		_bubble.position = Vector2(0.0, -float(_rig.get("height", 54)) - 10.0)
+		add_child(_bubble)
+	_bubble.show_text(text, seconds)
+
+
+## The point on the inside of the light's edge, in the direction the creatures gather (`TownManager.alert_angle`).
+func _alert_target() -> Vector2:
+	var dir: Vector2 = Vector2.from_angle(town.alert_angle)
+	var edge: Vector2 = town.dark_edge(town.center + dir * 900.0, town.center, 0.0)
+	if edge.distance_to(town.center) > 800.0:
+		edge = town.center + dir * 200.0
+	return edge - dir * 22.0
+
+
+func _alert_start(mode: int, target: Vector2) -> void:
+	_alert_route = town.walk_route(global_position, target)
+	if _alert_route.size() < 2:
+		_alert_route = PackedVector2Array([global_position, target])
+	_alert_d = 0.0
+	_alert_mode = mode
+	_alert_sector = Adventurer.sector_of(Vector2.from_angle(town.alert_angle))
+
+
+## A resident with `alert_watch` (Valdric) leaves his plan while the town's light is in alarm, walks to the edge where the dark gathers, stands there and goes back afterwards.
+func _alert_step(delta: float, plan_pos: Vector2) -> void:
+	var watching: bool = town != null and town.alert_on and bool(spec.get("alert_watch", false)) and _arrive_t < 0.0 and not _talking
+	match _alert_mode:
+		0, 3:
+			if watching:
+				_alert_start(1, _alert_target())
+		1, 2:
+			if not watching:
+				_alert_start(3, plan_pos)
+	if _alert_mode == 0:
+		return
+	if _alert_mode == 2:
+		global_position = _alert_route[_alert_route.size() - 1]
+		return
+	_alert_d += ALERT_SPEED * delta
+	if _alert_d >= _length(_alert_route):
+		if _alert_mode == 1:
+			_alert_mode = 2
+			global_position = _alert_route[_alert_route.size() - 1]
+		else:
+			_alert_mode = 0
+		return
+	global_position = _along(_alert_route, _alert_d)
 
 
 # ---------- talking ----------

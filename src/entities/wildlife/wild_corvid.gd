@@ -47,6 +47,7 @@ var _calls: Array[AudioStream] = []
 
 
 func _ready() -> void:
+	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_load_species()
 	_start = global_position
 	_end = global_position

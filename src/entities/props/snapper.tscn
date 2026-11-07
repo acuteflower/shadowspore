@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" path="res://src/entities/props/flora.tscn" id="1_flora"]
+[ext_resource type="Script" path="res://src/entities/props/snapper.gd" id="2_script"]
+
+[node name="Snapper" instance=ExtResource("1_flora")]
+script = ExtResource("2_script")

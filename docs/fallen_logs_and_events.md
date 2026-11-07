@@ -37,3 +37,7 @@ Spielerannäherung, Raubgegner und bestehende Angstreaktionen können die Begegn
 - Bestehende Hasen-, Krähen- und Waldsäugerprüfungen: 211, 814 beziehungsweise 53 Prüfungen ohne Fehler. Die ersten beiden laden wie die Waldsäugerprüfung die Welt-Szene vor ihren eingebetteten Welt-Testklassen vor.
 
 Weltvorschau aus dem Integrationstest: `/tmp/fallen-logs-world.png`.
+
+## Umgefallene Stämme abbauen (2026-11-06)
+
+Mit der Axt (`axe_basic`) lassen sich Stämme in drei Treffern zerlegen (`data/harvest.json` `fallen_log`: Tannenholz, Stöcke). Der gefällte Stamm verschwindet dauerhaft, Vögel auf ihm fliegen ab. Ein Stamm trägt eine Trefferkapsel auf Physik-Layer 5 entlang seiner Mittellinie. Details und Test: [docs/flora.md](flora.md) („Klee mähen und Stämme hacken“), `tools/test_harvest.tscn`.

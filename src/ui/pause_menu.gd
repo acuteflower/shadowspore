@@ -61,6 +61,9 @@ var _quit_t: float = -1.0
 var _dirty: bool = false
 var _paused_here: bool = false
 var _vignette: GradientTexture2D
+var _tp_text: String = "" ## the teleport field of the developer tab: "x, y" in tiles
+var _scroll: float = 0.0 ## the page is taller than the screen: how far it is scrolled up (px)
+var _editing: bool = false ## the teleport field takes the keys
 
 
 func _ready() -> void:
@@ -112,6 +115,9 @@ func _set_open(open: bool) -> void:
 	if open:
 		_tab = 0
 		_tab_t = 0.0
+		_editing = false
+		_scroll = 0.0
+		_tp_text = ""
 		_bloom_x = float(TABS[0]["x"])
 		_armed = ""
 		_save_info = SaveGame.info()
@@ -151,6 +157,7 @@ func _select_tab(index: int) -> void:
 	_tab = index
 	_tab_t = 0.0
 	_drag = -1
+	_scroll = 0.0
 	_build_items()
 
 
@@ -191,6 +198,7 @@ func _build_items() -> void:
 			_add(1, "heading", "SPIEL")
 			_add(1, "toggle", "SCHADENSZAHLEN", "numbers")
 			_add(1, "toggle", "POSITION", "position")
+			_add(1, "toggle", "EIGENER CURSOR", "cursor") ## the pixel cursor (GameCursor); off = the system pointer
 			_add(1, "choice", "SPRACHE", "language", {"soon": true, "text": "DEUTSCH"})
 			_add(1, "heading", "STEUERUNG")
 			for row: Array in CONTROLS:
@@ -204,8 +212,11 @@ func _build_items() -> void:
 			if multiplayer.is_server() and get_tree().get_first_node_in_group("world") is WorldLevel:
 				_add(0, "button", "VORSTOSS AUSLÖSEN", "", {"action": "raid"})
 			_add(0, "heading", "SPIELER")
+			_add(0, "button", "TITELKARTE ZEIGEN", "", {"action": "title_card"})
 			_add(0, "button", "HEILEN", "", {"action": "heal"})
 			_add(0, "button", "AUF 5 HP SETZEN", "", {"action": "hurt5"})
+			if multiplayer.is_server():
+				_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
 			if multiplayer.is_server():
 				_add(0, "heading", "ANGELN")
 				_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
@@ -221,6 +232,13 @@ func _build_items() -> void:
 				for lvl: int in [1, 5, 10, 20]:
 					_add(0, "button", "EBENE %d" % lvl, "", {"action": "mine_%d" % lvl})
 				_add(0, "button", "ZURÜCK NACH OBEN", "", {"action": "mine_out"})
+			if _player != null:
+				_add(1, "heading", "TELEPORT")
+				if _tp_text == "":
+					var feet: Vector2 = (_player as Node2D).global_position
+					_tp_text = "%d, %d" % [int(floorf(feet.x / 16.0)), int(floorf(feet.y / 16.0))]
+				_add(1, "field", "KOORDINATEN", "tp")
+				_add(1, "button", "ZUM ZIEL", "", {"action": "teleport"})
 			_add(1, "heading", "WELTWERKSTATT")
 			if multiplayer.is_server() and multiplayer.get_peers().is_empty() and get_tree().get_first_node_in_group("world") is WorldLevel:
 				_add(1, "button", "MAP-EDITOR ÖFFNEN", "", {"action": "editor"})
@@ -232,6 +250,7 @@ func _build_items() -> void:
 				_add(1, "button", "LIES DEN KESSEL", "", {"action": "cook"})
 			_add(1, "heading", "SPIELSTAND")
 			_add(1, "button", "SPEICHERSTAND LÖSCHEN & START", "", {"action": "reset", "risky": true})
+	_scroll = clampf(_scroll, 0.0, _max_scroll())
 	for item: Dictionary in _items:
 		if _focus < 0 and _interactive(item):
 			_focus = int(item["idx"])
@@ -317,7 +336,7 @@ func _on_town_changed() -> void:
 
 
 func _interactive(item: Dictionary) -> bool:
-	return String(item["kind"]) in ["slider", "toggle", "choice", "button"]
+	return String(item["kind"]) in ["slider", "toggle", "choice", "button", "field"]
 
 
 func _key_of(action: String) -> String:
@@ -338,7 +357,34 @@ func _column_x(col: int) -> float:
 
 
 func _item_rect(item: Dictionary) -> Rect2:
-	return Rect2(_column_x(int(item["col"])), float(item["y"]), COLUMN_W, float(item["h"]))
+	return Rect2(_column_x(int(item["col"])), float(item["y"]) - _scroll, COLUMN_W, float(item["h"]))
+
+
+func _view_bottom() -> float:
+	return size.y - 14.0
+
+
+## A row is shown and can be hit only while it lies wholly inside the page area.
+func _row_visible(item: Dictionary) -> bool:
+	var rect: Rect2 = _item_rect(item)
+	return rect.position.y >= TOP_Y - 4.0 and rect.end.y <= _view_bottom()
+
+
+func _max_scroll() -> float:
+	return maxf(maxf(_cursor[0], _cursor[1]) + 6.0 - _view_bottom(), 0.0)
+
+
+func _scroll_by(amount: float) -> void:
+	_scroll = clampf(_scroll + amount, 0.0, _max_scroll())
+
+
+## Scrolls so that the focused row is inside the page area.
+func _reveal(item: Dictionary) -> void:
+	var rect: Rect2 = _item_rect(item)
+	if rect.position.y < TOP_Y - 4.0:
+		_scroll_by(rect.position.y - (TOP_Y - 4.0))
+	elif rect.end.y > _view_bottom():
+		_scroll_by(rect.end.y - _view_bottom())
 
 
 func _slider_rect(item: Dictionary) -> Rect2:
@@ -374,6 +420,8 @@ func _activate(item: Dictionary) -> void:
 			_toggle(item)
 		"choice":
 			_change(item, 1)
+		"field":
+			_editing = true
 		"button":
 			_run_action(String(item["action"]))
 
@@ -417,6 +465,11 @@ func _run_action(action: String) -> void:
 			get_tree().root.add_child(layer)
 			layer.add_child(kitchen)
 			kitchen.start(_player)
+		"title_card":
+			_set_open(false)
+			_open_t = 0.0
+			visible = false
+			TitleCard.show_card(self)
 		"town_jump":
 			var town_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if town_world == null or not town_world.debug_can_return_home():
@@ -458,6 +511,8 @@ func _run_action(action: String) -> void:
 				mines.leave(_player as Player)
 			else:
 				mines.enter(_player as Player, action.trim_prefix("mine_").to_int())
+		"teleport":
+			_teleport_to_field()
 		"day":
 			TimeManager.set_time(0.4)
 		"night":
@@ -474,6 +529,17 @@ func _run_action(action: String) -> void:
 		"hurt5":
 			if _player != null:
 				_player.call("request_set_health", 5.0)
+		"strong_sword": ## the void blade (30 damage) into the bag and into her hand (host)
+			var fighter: Player = _player as Player
+			if fighter == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if not fighter.inventory.has_item("sword_void"):
+				fighter.inventory.give("sword_void", 1)
+			for i: int in fighter.inventory.slots.size():
+				if not fighter.inventory.slots[i].is_empty() and String(fighter.inventory.slots[i]["id"]) == "sword_void":
+					fighter.inventory.request("equip", [i, ""])
+					break
 		"fish_kit": ## the rod, every bait and the two materials of the floats; the rod is selected (host)
 			var angler: Player = _player as Player
 			if angler == null or not multiplayer.is_server():
@@ -560,6 +626,13 @@ func _begin_quit() -> void:
 # ---------- input ----------
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _editing and _opening:
+		var typed: InputEventKey = event as InputEventKey
+		if typed != null:
+			if typed.pressed:
+				_type_into_field(typed)
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("ui_cancel"):
 		if _opening:
 			if _quit_t < 0.0:
@@ -593,12 +666,60 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
+## Keys for the teleport field: digits, minus, comma and space; Backspace, Ctrl+V, Enter goes, Escape leaves the field.
+func _type_into_field(key: InputEventKey) -> void:
+	match key.physical_keycode:
+		KEY_ESCAPE:
+			_editing = false
+		KEY_ENTER, KEY_KP_ENTER:
+			_editing = false
+			_run_action("teleport")
+		KEY_BACKSPACE:
+			_tp_text = _tp_text.substr(0, _tp_text.length() - 1)
+		_:
+			var text: String = ""
+			if key.ctrl_pressed and key.physical_keycode == KEY_V:
+				text = DisplayServer.clipboard_get()
+			elif key.unicode > 0:
+				text = char(key.unicode)
+			for c: String in text:
+				if c in "0123456789-, " and _tp_text.length() < 18:
+					_tp_text += c
+
+
+func _teleport_to_field() -> void:
+	var found: Array[RegExMatch] = RegEx.create_from_string("-?[0-9]+").search_all(_tp_text)
+	if found.size() < 2 or _player == null:
+		_failed_flash = 2.5
+		return
+	var tile: Vector2i = Vector2i(found[0].get_string().to_int(), found[1].get_string().to_int())
+	var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+	if world != null:
+		tile = Vector2i(clampi(tile.x, 0, RegionMap.WORLD_TILES - 1), clampi(tile.y, 0, RegionMap.WORLD_TILES - 1))
+		if not bool(world.call("_land_at", tile.x, tile.y)):
+			var land: Vector2i = Vector2i(-1, -1) ## open sea or void: the nearest dry tile (rings up to 16 tiles)
+			for r: int in range(1, 17):
+				for dy: int in range(-r, r + 1):
+					for dx: int in range(-r, r + 1):
+						if maxi(absi(dx), absi(dy)) == r and land.x < 0 and bool(world.call("_land_at", tile.x + dx, tile.y + dy)):
+							land = tile + Vector2i(dx, dy)
+			if land.x < 0:
+				_failed_flash = 2.5
+				return
+			tile = land
+	_set_open(false)
+	_open_t = 0.0
+	visible = false
+	_player.call("request_teleport", Vector2(tile) * 16.0 + Vector2(8.0, 8.0))
+
+
 func _move_focus(direction: int) -> void:
 	var index: int = _focus
 	for _i: int in _items.size():
 		index = posmod(index + direction, _items.size())
 		if _interactive(_items[index]):
 			_focus = index
+			_reveal(_items[index])
 			return
 
 
@@ -616,12 +737,18 @@ func _gui_input(event: InputEvent) -> void:
 	if motion != null:
 		_hover_tab = _tab_at(motion.position)
 		_hover_foot = _foot_at(motion.position)
+		var over: bool = (_hover_tab >= 0 and not bool(TABS[_hover_tab]["sealed"])) or _hover_foot >= 0 ## for the cursor: something clickable
 		if _drag >= 0:
 			_set_slider(_items[_drag], motion.position.x)
+			over = true
 		else:
 			for item: Dictionary in _items:
-				if _interactive(item) and _item_rect(item).has_point(motion.position):
+				if _interactive(item) and _row_visible(item) and _item_rect(item).has_point(motion.position):
 					_focus = int(item["idx"])
+					over = true
+		GameCursor.set_hint(self, &"click" if over else &"")
+	elif button != null and button.pressed and button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		_scroll_by(-26.0 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 26.0)
 	elif button != null and button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
 			_click(button.position)
@@ -634,6 +761,7 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _click(point: Vector2) -> void:
+	_editing = false
 	var tab: int = _tab_at(point)
 	if tab >= 0:
 		_select_tab(tab)
@@ -643,7 +771,7 @@ func _click(point: Vector2) -> void:
 		_footer_click(foot)
 		return
 	for item: Dictionary in _items:
-		if not _interactive(item) or not _item_rect(item).has_point(point):
+		if not _interactive(item) or not _row_visible(item) or not _item_rect(item).has_point(point):
 			continue
 		_focus = int(item["idx"])
 		if String(item["kind"]) == "slider":
@@ -813,14 +941,35 @@ func _draw_page(void_level: float) -> void:
 	var reach: float = minf(_p(0.4, 0.45), clampf(_tab_t / 0.4, 0.0, 1.0))
 	var last: Array[float] = [0.0, 0.0]
 	for item: Dictionary in _items:
-		last[int(item["col"])] = maxf(last[int(item["col"])], float(item["y"]) + float(item["h"]))
+		last[int(item["col"])] = maxf(last[int(item["col"])], float(item["y"]) + float(item["h"]) - _scroll)
 	for col: int in 2:
 		if last[col] > 0.0:
-			_draw_column_vine(_column_x(col) + 2.0, TOP_Y - 10.0, last[col], reach, void_level)
+			_draw_column_vine(_column_x(col) + 2.0, TOP_Y - 10.0, minf(last[col], _view_bottom()), reach, void_level)
 	for item: Dictionary in _items:
 		var p: float = _row_p(item)
-		if p > 0.0:
+		if p > 0.0 and _row_visible(item):
 			_draw_row(item, p, void_level)
+	_draw_scrollbar(reach, void_level)
+
+
+## A thin thread with a bud on it at the right of the page while the page is taller than the screen.
+func _draw_scrollbar(reach: float, void_level: float) -> void:
+	var max_scroll: float = _max_scroll()
+	if max_scroll <= 0.0:
+		return
+	var x: float = _column_x(1) + COLUMN_W + 6.0
+	var top: float = TOP_Y
+	var length: float = (_view_bottom() - top) * reach
+	var taken: float = _taken(x)
+	var tone: Color = ACCENT_WARM.lerp(VineStyle.VOID_GLOW, taken)
+	for i: int in int(length):
+		draw_rect(Rect2(x, top + i, 1, 1), Color(VineStyle.BARK_LIGHT.lerp(VineStyle.BARK_VOID_LIGHT, taken), 0.7 if i % 3 != 1 else 0.35))
+	var handle: float = top + (length - 12.0) * (_scroll / max_scroll)
+	draw_rect(Rect2(x - 1.0, handle, 3, 12), Color(VineStyle.OUTLINE, reach))
+	draw_rect(Rect2(x, handle + 1.0, 1, 10), Color(tone, reach))
+	VineStyle.glow(self, Vector2(x, handle + 6.0), 9.0, tone, 0.5 * reach)
+	if _scroll < max_scroll - 1.0:
+		_text("v", Vector2(x - 1.0, _view_bottom() - 5.0), Color(tone, 0.8), reach)
 
 
 ## The vine each column hangs on: thick at the top, thin at the bottom, with a twig per row.
@@ -873,6 +1022,17 @@ func _draw_row(item: Dictionary, p: float, void_level: float) -> void:
 			_text(on, Vector2(control_x + 16.0, rect.position.y + 5.0), UiStyle.TEXT if bool(GameSettings.get_value(String(item["key"]))) else UiStyle.TEXT_DIM, p)
 		"choice":
 			_text(String(item["text"]), Vector2(control_x, rect.position.y + 5.0), UiStyle.TEXT_DIM, p)
+		"field":
+			var box: Rect2 = Rect2(control_x, rect.position.y + 2.0, 112.0, 13.0)
+			draw_rect(box, Color(VineStyle.OUTLINE, p))
+			draw_rect(box.grow(-1.0), Color(VineStyle.BARK_VOID.lerp(VineStyle.BARK, 0.35), p))
+			if _editing:
+				draw_rect(Rect2(box.position.x, box.end.y - 1.0, box.size.x, 1.0), Color(tone, p)) ## a lit lower edge while it takes the keys
+				VineStyle.glow(self, box.get_center(), 50.0, tone, 0.12 * p)
+			var shown: String = _tp_text if (_tp_text != "" or _editing) else "X, Y"
+			_text(shown, Vector2(box.position.x + 4.0, box.position.y + 3.0), UiStyle.TEXT if _tp_text != "" else Color(UiStyle.TEXT_DIM, 0.6), p)
+			if _editing and int(_time * 2.0) % 2 == 0:
+				draw_rect(Rect2(box.position.x + 4.0 + PixelText.width(_tp_text) + 2.0, box.position.y + 2.0, 1.0, 8.0), Color(tone, p))
 		"info":
 			var text: String = String(item["text"])
 			if text != "": ## a row that only says something (no value) has no plate

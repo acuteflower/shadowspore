@@ -1,4 +1,4 @@
-"""Gustav, Voidbloom's carpenter. Eight true directions, idle/walk/run/work.
+"""Gustav, Shadowspore's carpenter. Eight true directions, idle/walk/run/work.
 
 OPENBLAS_NUM_THREADS=1 .venv/bin/python tools/art_gustav.py [preview.png]
 Outputs assets/characters/gustav.png and data/gustav_rig.json.

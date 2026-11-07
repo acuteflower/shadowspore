@@ -91,10 +91,10 @@ Godot --headless --path . tools/test_skill_tree_network.tscn -- --server --self-
 
 Der Solo-Test benutzt einen echten Player samt HUD ohne Welt und ohne Lesen des normalen Saves.
 Er prüft Sichtbarkeit, Gedrückthalten/Abbruch, unveränderte Spielwerte, Speicherrundlauf mit
-`/tmp/voidbloom-skill-tree-test.json`, alte/ungültige Daten, Eingabesperre, Menüwechsel und
+`/tmp/shadowspore-skill-tree-test.json`, alte/ungültige Daten, Eingabesperre, Menüwechsel und
 Aufräumen. Zusätzliche Navigationstests prüfen die volle Zeichenfläche, kontinuierlich
 mausverankerten Zoom, Ziehen in den früheren Panelbereichen, Nachlauf, Zoom-Ranken-Endpunkte
 und den Bewegungs-Anhänger. Gerendert entstehen Momentaufnahmen unter
-`/tmp/voidbloom-skills-*.png`, einschließlich einer herangezoomten Ansicht.
+`/tmp/shadowspore-skills-*.png`, einschließlich einer herangezoomten Ansicht.
 Der Netzwerktest startet zwei Prozesse auf dem isolierten Loopback-Port 17913 und prüft
 Besitzerisolation, Einstiegssnapshot, Host-Bestätigung und abgewiesene ungültige Anfragen.

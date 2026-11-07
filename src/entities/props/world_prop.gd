@@ -23,6 +23,12 @@ var wind_boost: float = 1.0 ## set by the world level for Krummholz (stunted tre
 var _tween: Tween
 var _glow: Sprite2D ## the emissive parts of the sprite's frame (plants.json "glow", same sheet layout), drawn unshaded
 var _night_light: NightLight
+var blight: float = 0.0 ## 0..1: how far the Void has got into this plant (near the world's edge), see `_setup_blight`
+var _blight_glow: Sprite2D ## violet shimmer of a blighted plant in moonlit nights (plants without a glow sheet of their own)
+
+const BLIGHT_REACH: float = 14.0 ## tiles from the coast where small plants begin to wither (the baked coast field only knows about 16)
+const BLIGHT_TINT: Color = Color(0.62, 0.55, 0.72)
+const BLIGHT_GLOW: Color = Color(0.72, 0.38, 1.0)
 
 @onready var _sprite: Sprite2D = $Sprite
 @onready var _hurtbox: HarvestHurtbox = get_node_or_null("Hurtbox") as HarvestHurtbox
@@ -48,6 +54,7 @@ func _ready() -> void:
 		_shape($Hurtbox/Shape, _radius * 0.85, Vector2(0, -_radius * 0.5))
 	_setup_glow()
 	_setup_prop()
+	_setup_blight()
 	var saved: Dictionary = level.thing_state(cell) if level != null else {}
 	apply_state(saved if String(saved.get("k", kind)) == kind else {}, "") ## a state of another kind (an old save) is ignored
 
@@ -68,8 +75,35 @@ func _setup_glow() -> void:
 	set_night(TimeManager.night_amount())
 
 
+## Near the world's edge the Void eats the plants (docs/plant_life.md): small plants fade toward grey-violet and sag the closer they
+## stand to the coast, and in moonlit nights they glimmer violet. Only a look (trees and rocks are left alone).
+func _setup_blight() -> void:
+	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "mine_rock", "mine_collapse"]:
+		return
+	blight = 1.0 - smoothstep(2.0, BLIGHT_REACH, level.coast_tiles(global_position))
+	if blight <= 0.02:
+		blight = 0.0
+		return
+	_sprite.self_modulate = Color.WHITE.lerp(BLIGHT_TINT, blight * 0.85)
+	_sprite.scale.y = 1.0 - 0.14 * blight ## the stalks sag
+	if _glow == null:
+		_blight_glow = Sprite2D.new()
+		_blight_glow.centered = false
+		_blight_glow.offset = _sprite.offset
+		_blight_glow.material = Unlit.material()
+		_blight_glow.modulate = Color(BLIGHT_GLOW, 0.0)
+		_sprite.add_child(_blight_glow)
+		add_to_group("night_lights")
+	set_night(TimeManager.night_amount())
+
+
 ## Subclasses call this after changing `_sprite`'s texture or frame: the glow takes the same frame (or hides).
 func _sync_glow(lit: bool) -> void:
+	if _blight_glow != null:
+		_blight_glow.texture = _sprite.texture
+		_blight_glow.hframes = _sprite.hframes
+		_blight_glow.vframes = _sprite.vframes
+		_blight_glow.frame = _sprite.frame
 	if _glow != null:
 		_glow.visible = lit
 		_glow.hframes = _sprite.hframes
@@ -82,6 +116,10 @@ func set_night(amount: float) -> void:
 	amount = MineManager.night_at(self, amount)
 	if _glow != null:
 		_glow.modulate.a = lerpf(GLOW_BY_DAY, 1.0, amount)
+		if blight > 0.0: ## the glow of a blighted plant turns violet
+			_glow.self_modulate = Color.WHITE.lerp(BLIGHT_GLOW, blight * 0.7)
+	if _blight_glow != null:
+		_blight_glow.modulate.a = blight * amount * (0.12 + 0.3 * TimeManager.moon_light())
 
 
 ## A soft pool of light on the ground that shines at night (made once, shown or hidden with `on`).

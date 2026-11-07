@@ -3,8 +3,11 @@ render_mode unshaded;
 #include "res://assets/shaders/night_noise.gdshaderinc"
 // Moonlight and violet ambient light (docs/nacht_atmosphaere.md). Moonlight is LIGHT, not paint: it does not lay a pale colour over the picture, it
 // brightens what is there (the grass becomes brighter, bluer green, the bark shows its violet), so the pools read as lit ground. Each pool has a bright
-// core and falls off in dithered steps; leaf-dappled breaks inside it make the texture of light through branches; slanting shafts cross it; single
+// core and falls off smoothly; leaf-dappled breaks inside it make the texture of light through branches; slanting shafts cross it; single
 // pixels glint. A faint violet breath and a deepening towards the edges come on top. Fog dims the pools; the new moon is dim, the full moon bright.
+//
+// Smooth on purpose: the pools used to be quantised to six steps with a Bayer dither in art pixels (640 x 360), which at 2x showed as blocks. Now
+// the light is continuous at screen resolution; only the glints stay art-pixel sized, and a hair of per-pixel noise breaks up 8 bit banding.
 
 uniform sampler2D screen_texture : hint_screen_texture, filter_nearest;
 uniform vec2 world_origin = vec2(0.0);
@@ -16,9 +19,10 @@ uniform vec3 violet : source_color = vec3(0.42, 0.22, 0.74);
 uniform vec3 moon_color : source_color = vec3(0.52, 0.70, 1.0);
 
 void fragment() {
-	vec2 px = floor(UV * view_px);
-	vec2 w = floor(world_origin) + px;
-	float dither = n_bayer(px);
+	vec2 origin = floor(world_origin);
+	vec2 w = origin + UV * view_px; // smooth world position (not snapped to art pixels)
+	vec2 art = origin + floor(UV * view_px); // art pixel, for the glints only
+	float noise = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	vec3 scene = texture(screen_texture, SCREEN_UV).rgb;
 	float lum = dot(scene, vec3(0.30, 0.59, 0.11));
 	float strength = night * moon * (1.0 - 0.45 * fog);
@@ -29,17 +33,17 @@ void fragment() {
 	float core = smoothstep(0.54 - breath, 0.72 - breath, p);
 	float dapple = n_fbm(w / 16.0 + vec2(TIME * 0.02, -TIME * 0.013) + 40.0);
 	float broken = mix(1.0, smoothstep(0.34, 0.60, dapple), 0.55);
-	float level = floor(core * broken * 6.0 + dither) / 6.0;
+	float level = core * broken;
 	// slanting shafts through the pools
 	float band = n_vnoise(vec2((w.x + w.y * 0.6) / 46.0, TIME * 0.012));
-	float shaft = floor(smoothstep(0.52, 0.74, band) * 3.0 + dither) / 3.0 * smoothstep(0.48 - breath, 0.62 - breath, p);
+	float shaft = smoothstep(0.52, 0.74, band) * smoothstep(0.48 - breath, 0.62 - breath, p);
 	float light = clamp(level + 0.35 * shaft, 0.0, 1.0) * strength;
 	// a wide soft halo round every pool: the glow that bleeds out of the light
 	float halo = smoothstep(0.42 - breath, 0.58 - breath, p) * (1.0 - core);
 	vec3 lit = scene * (1.0 + 2.4 * light) + moon_color * (0.05 + 0.45 * lum) * light + moon_color * halo * 0.045 * strength;
 	// glints: single pixels that flare up and die away inside the pools
-	if (level > 0.4 && mod(w.x, 4.0) < 1.0 && mod(w.y, 4.0) < 1.0) {
-		float h = n_hash(floor(w / 4.0) + 17.0);
+	if (level > 0.4 && mod(art.x, 4.0) < 1.0 && mod(art.y, 4.0) < 1.0) {
+		float h = n_hash(floor(art / 4.0) + 17.0);
 		if (h > 0.72) {
 			float tw = smoothstep(0.7, 1.0, sin(TIME * 1.4 + h * 90.0) * 0.5 + 0.5);
 			lit += vec3(0.85, 0.93, 1.0) * tw * 0.75 * strength;
@@ -49,6 +53,6 @@ void fragment() {
 	vec2 c = (UV - 0.5) * vec2(1.0, 0.85);
 	float edge = smoothstep(0.18, 0.62, length(c));
 	float wash = night * (0.010 + 0.040 * edge) * (0.88 + 0.12 * sin(TIME * 0.27));
-	lit += violet * floor(wash * 22.0 + dither) / 22.0;
-	COLOR = vec4(lit, 1.0);
+	lit += violet * wash;
+	COLOR = vec4(lit + vec3(noise / 255.0), 1.0);
 }

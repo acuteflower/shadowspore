@@ -86,6 +86,7 @@ var _meter: JudgementMeter
 var _judge_total: float = 28.0
 var _judge_hp: float = 240.0
 var _kill_at: float = -1.0
+var _aura: BossAura
 
 
 func setup(p_boss: SkyCleaver, p_field: FeatherField) -> void:
@@ -102,6 +103,7 @@ func setup(p_boss: SkyCleaver, p_field: FeatherField) -> void:
 				broken.break_silently()
 		boss.set_corruption(1.0)
 	boss.set_floor(_floor_for(phase))
+	_aura = BossAura.begin(self)
 	for i: int in SOUNDS:
 		var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
 		player.max_distance = 700.0
@@ -227,6 +229,20 @@ func _floor_for(p: int) -> float:
 	if p >= phases.size():
 		return 0.0
 	return float((phases[p] as Dictionary)["break_at"]) * boss.max_health() + 0.5
+
+
+## How heavy the mood of the fight is (BossAura): nothing before it starts, faint in the first phase, heavy in the second, the heaviest in the judgement.
+func aura_level() -> float:
+	if boss == null or boss.state == SkyCleaver.State.DEAD or boss.state == SkyCleaver.State.CRASHED or mode == Mode.WAIT:
+		return 0.0
+	if mode == Mode.JUDGEMENT:
+		return 1.3 if judge_failed else 1.1 + 0.2 * clampf(judge_elapsed() / maxf(judge_total(), 0.01), 0.0, 1.0)
+	return 0.58 if phase < 1 else 0.85
+
+
+func _kick(amount: float) -> void:
+	if _aura != null:
+		_aura.kick(amount)
 
 
 func _sound(cue: String, at: Vector2, volume_db: float = 0.0, pitch: float = 1.0) -> void:
@@ -1045,6 +1061,7 @@ func _lock_shot(point: Vector2, now: float, lock: float, s: Dictionary, wing: in
 
 
 func _fire_shot(point: Vector2, t1: float, variant: int, s: Dictionary, wing: int) -> void:
+	_kick(0.3)
 	_kick_wing(wing, 1.0)
 	var origin: Dictionary = _wing_origin(wing, 2)
 	field.add_flight(origin["ground"] as Vector2, float(origin["h"]), point, 0.0, field.now(), t1, VoidFeather.SHOT, variant, float(s["fuse"]) + 0.15, float(s["damage"]), float(s["knock"]), float(s["radius"]), VoidFeather.SHOT_STUCK, true)
@@ -1063,6 +1080,9 @@ func _lock_line(point: Vector2, now: float, lock: float, s: Dictionary, wing: in
 	var count: int = int(s["segments"])
 	var seg: float = length / float(count)
 	var fire: float = now + float(s["warn"]) + delay
+	var wing_src: Dictionary = _wing_origin(w, 2)
+	field.add_beam(_base_pos + dir * 14.0, _base_pos + dir * (14.0 + length), wing_src["screen"] as Vector2, now, fire, float(count) * float(s["seg_step"]), 0.2, float(s["half_width"]), 1 if act == Act.PINCER else 0)
+	_at(_t + float(s["warn"]) + delay, _kick.bind(0.35))
 	for i: int in count:
 		var a: Vector2 = _base_pos + dir * (14.0 + seg * float(i))
 		var b: Vector2 = _base_pos + dir * (14.0 + seg * float(i + 1))
@@ -1210,6 +1230,7 @@ func _lock_cage(point: Vector2, now: float, lock: float, s: Dictionary) -> void:
 
 
 func _cage_burst(point: Vector2, radius: float) -> void:
+	_kick(0.6)
 	ShockRing.burst(boss.get_parent(), point, radius, 0.9)
 	boss.shake_near(point, 1.4)
 	_sound("feather_hit", point, 2.0, 0.7)
@@ -1238,6 +1259,7 @@ func _start_blast() -> void:
 
 
 func _blast_hits() -> void:
+	_kick(0.55)
 	var bl: Dictionary = _sp("blast")
 	ShockRing.burst(boss.get_parent(), _base_pos, float(bl["radius"]), 1.0)
 	boss.shake_near(_base_pos, 2.2)
@@ -1246,6 +1268,7 @@ func _blast_hits() -> void:
 
 
 func _blast_outer() -> void:
+	_kick(0.7)
 	var bl: Dictionary = _sp("blast")
 	ShockRing.burst(boss.get_parent(), _base_pos, float(bl["outer_radius"]), 1.3)
 	boss.shake_near(_base_pos, 1.8)
@@ -1412,6 +1435,7 @@ func _rpc_commit(pos: Vector2, twin: Vector2) -> void:
 
 
 func _chase_burst(pos: Vector2, radius: float) -> void:
+	_kick(0.6)
 	var c: Dictionary = _sp("chase")
 	var count: int = int(c["feathers"]) + 4 * _extra()
 	var now: float = field.now()
@@ -1792,6 +1816,7 @@ func _drive_transition() -> void:
 
 
 func _tr_burst() -> void:
+	_kick(0.8)
 	boss.rig.burst_blades()
 	boss.rig.hit_flash()
 	ShockRing.burst(boss.get_parent(), boss.global_position, 70.0, 0.8)
@@ -1809,6 +1834,7 @@ func _tr_corrupt() -> void:
 
 
 func _tr_scream() -> void:
+	_kick(1.0)
 	var tr: Dictionary = _spec["transition"] as Dictionary
 	boss.set_pose(SkyCleaverRig.Pose.HOVER, 60.0)
 	boss.rig.crack_flash()
@@ -1985,6 +2011,7 @@ func _judge_pulse() -> void:
 
 
 func _judge_pulse_hits(at: Vector2, radius: float) -> void:
+	_kick(0.8)
 	ShockRing.burst(boss.get_parent(), at, radius, 1.1)
 	boss.shake_near(at, 1.6)
 	_sound("blast", at, 2.0, 0.9)
@@ -1997,6 +2024,7 @@ func _judge_wreath_hits(at: Vector2, radius: float) -> void:
 
 ## The time ran out: the pillar of light comes down on everything.
 func _judge_fail() -> void:
+	_kick(1.0)
 	if judge_failed or mode != Mode.JUDGEMENT:
 		return
 	var j: Dictionary = _spec["judgement"] as Dictionary

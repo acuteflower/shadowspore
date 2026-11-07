@@ -60,6 +60,11 @@ var _bolt_next: float = 0.4
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _dead: bool = false
 var _pillar_s: PackedFloat32Array = PackedFloat32Array()
+var _sheet: Node2D ## the standing tear (dark void, lit from behind)
+var _dense: PackedVector2Array = PackedVector2Array() ## one sample per pixel along the crack (screen point)
+var _dense_s: PackedFloat32Array = PackedFloat32Array() ## its distance along the line
+var _prof: PackedFloat32Array = PackedFloat32Array() ## its random jaggedness 0..1
+var _shards: Array[Dictionary] = [] ## pieces of the broken sky that hang over the tear and drift up
 
 
 ## `a`, `b`: the two pillars' feet; the line runs through both and on to the edge of the floor on either side (`on_floor`: Callable(Vector2) -> bool).
@@ -106,6 +111,12 @@ func setup(a: Vector2, b: Vector2, on_floor: Callable, p_host: bool, seed_v: int
 	_floor.z_index = FLOOR_Z
 	_floor.draw.connect(_draw_floor)
 	add_child(_floor)
+	_build_dense()
+	_sheet = Node2D.new()
+	_sheet.name = "Sheet"
+	_sheet.z_index = 1
+	_sheet.draw.connect(_draw_sheet)
+	add_child(_sheet)
 	_veil = Node2D.new()
 	_veil.name = "Veil"
 	_veil.z_index = VEIL_Z
@@ -257,6 +268,7 @@ func _process(delta: float) -> void:
 			_hurt_step(delta)
 	_step_bolts(delta)
 	_floor.queue_redraw()
+	_sheet.queue_redraw()
 	_veil.queue_redraw()
 
 
@@ -374,7 +386,7 @@ func _draw_floor() -> void:
 		var a: Vector2 = _pts[i].round()
 		var b: Vector2 = _pts[i + 1].round()
 		var born: float = 1.0 - clampf((absf(s - _origin_s) - (reach - 30.0)) / 30.0, 0.0, 1.0) ## the front of the tear is thin
-		var w: float = 1.0 + 8.0 * born
+		var w: float = 3.0 + 9.0 * born
 		_floor.draw_line(a, b, Color(RIM, 0.55 * solid), w + 4.0)
 		_floor.draw_line(a, b, Color(OUTLINE, 0.96 * solid), w + 2.0)
 		_floor.draw_line(a, b, Color(DARK, solid), maxf(w - 2.0, 1.0))
@@ -426,56 +438,145 @@ func _step_bolts(delta: float) -> void:
 	_bolts.append({"pts": points, "age": 0.0, "life": _rng.randf_range(0.07, 0.14), "s": (s0 + s1) * 0.5})
 
 
+func _build_dense() -> void:
+	var s: float = 0.0
+	var soft: float = 0.5
+	var target: float = 0.5
+	var i: int = 0
+	while s <= _length:
+		if i % 5 == 0:
+			target = _rng.randf()
+		soft = lerpf(soft, target, 0.35)
+		_dense.append(_point_at(s).round())
+		_dense_s.append(s)
+		_prof.append(clampf(soft * 0.7 + _rng.randf() * 0.3, 0.0, 1.0))
+		s += 1.0
+		i += 1
+	for k: int in 14: ## the shards that drift above the tear
+		_shards.append({"s": _rng.randf() * _length, "phase": _rng.randf() * 60.0, "speed": _rng.randf_range(7.0, 16.0), "size": _rng.randi_range(1, 3), "sway": _rng.randf() * TAU})
+
+
+## How tall the tear stands at sample `i` (px): a slit, tallest in the middle, torn and uneven.
+func _height_at(i: int) -> float:
+	var u: float = _dense_s[i] / maxf(_length, 1.0)
+	var slit: float = pow(sin(PI * clampf(u, 0.0, 1.0)), 0.55)
+	var beat: float = VoidGlow.beat(_clock, 0.0, 0.8)
+	return (10.0 + 40.0 * slit) * (0.5 + 0.7 * _prof[i]) + 3.0 * beat * slit
+
+
+## 0 at the front of the tear while it opens (it is thin there), 1 further back.
+func _born(s: float, reach: float) -> float:
+	return 1.0 - clampf((absf(s - _origin_s) - (reach - 34.0)) / 34.0, 0.0, 1.0)
+
+
+## The standing tear: a dark slit in the picture (void with a faint depth, torn spikes along its top and a bright edge), world-lit.
+func _draw_sheet() -> void:
+	var reach: float = _reach()
+	if reach < 0.0:
+		return
+	var fade: float = _fade()
+	for i: int in _dense.size():
+		var s: float = _dense_s[i]
+		if absf(s - _origin_s) > reach:
+			continue
+		var solid: float = _solid(s) * fade
+		if solid <= 0.03:
+			continue
+		var h: float = _height_at(i) * solid * _born(s, reach)
+		if h < 1.5:
+			continue
+		var p: Vector2 = _dense[i]
+		var x: float = p.x
+		var y: float = p.y
+		_sheet.draw_rect(Rect2(x, y - h * 0.5, 1.0, h * 0.5 + 1.0), Color(0.012, 0.0, 0.035, 0.9 * solid))
+		_sheet.draw_rect(Rect2(x, y - h * 0.82, 1.0, h * 0.32), Color(0.02, 0.0, 0.06, 0.74 * solid))
+		_sheet.draw_rect(Rect2(x, y - h, 1.0, h * 0.18), Color(0.03, 0.01, 0.09, 0.45 * solid))
+		_sheet.draw_rect(Rect2(x, y - h - 1.0, 1.0, 2.0), Color(OUTLINE, 0.95 * solid)) ## the torn top edge
+		if i % 6 == 0: ## basalt spikes along the edge, like the shards of broken glass
+			var spike: float = 3.0 + 7.0 * _prof[i]
+			_sheet.draw_rect(Rect2(x, y - h - spike, 1.0, spike), Color(OUTLINE, solid))
+			_sheet.draw_rect(Rect2(x + 1.0, y - h - spike * 0.6, 1.0, spike * 0.6), Color(RIM, 0.9 * solid))
+		if i % 11 == 3: ## the lips of the tear on the floor: low black teeth
+			_sheet.draw_rect(Rect2(x - 1.0, y - 3.0, 3.0, 4.0), Color(OUTLINE, 0.9 * solid))
+
+
+## The light of the tear (additive): depth behind the slit (stars, rising streaks of light), the bright edge, the base seam, a halo, shafts and drifting shards, bolts and the front.
 func _draw_veil() -> void:
 	var reach: float = _reach()
 	if reach < 0.0:
 		return
 	var fade: float = _fade()
 	var beat: float = VoidGlow.beat(_clock, 0.0, 0.8)
-	var s: float = maxf(_origin_s - reach, 0.0)
-	var end_s: float = minf(_origin_s + reach, _length)
-	var lines: PackedVector2Array = PackedVector2Array()
-	var colors: PackedColorArray = PackedColorArray()
-	var cell: int = 0
-	while s <= end_s:
+	var tick: int = int(_clock * 7.0)
+	for i: int in _dense.size():
+		var s: float = _dense_s[i]
+		if absf(s - _origin_s) > reach:
+			continue
 		var solid: float = _solid(s) * fade
-		if solid > 0.03:
-			var p: Vector2 = _point_at(s).round()
-			var tall: float = 7.0 + 15.0 * _hash(cell, int(_clock * 9.0)) + 5.0 * beat
-			var born: float = 1.0 - clampf((absf(s - _origin_s) - (reach - 26.0)) / 26.0, 0.0, 1.0)
-			tall *= born
-			var alpha: float = solid * (0.5 + 0.3 * _hash(cell + 7, int(_clock * 6.0)))
-			lines.append(p)
-			lines.append(p + Vector2(0.0, -tall * 0.4))
-			colors.append(Color(CORE_HOT, alpha * 0.55))
-			lines.append(p + Vector2(0.0, -tall * 0.4))
-			lines.append(p + Vector2(0.0, -tall * 0.75))
-			colors.append(Color(VEIN_LIGHT, alpha * 0.34))
-			lines.append(p + Vector2(0.0, -tall * 0.75))
-			lines.append(p + Vector2(0.0, -tall))
-			colors.append(Color(VEIN, alpha * 0.12))
-			# a little glow on the ground round the crack
-			_veil.draw_rect(Rect2(p + Vector2(-4, -1), Vector2(9, 3)), Color(VEIN, solid * 0.1 * (0.6 + 0.4 * beat)))
-		s += 4.0
-		cell += 1
-	if lines.size() >= 2:
-		_veil.draw_multiline_colors(lines, colors, 2.0)
+		if solid <= 0.03:
+			continue
+		var born: float = _born(s, reach)
+		var h: float = _height_at(i) * solid * born
+		if h < 1.5:
+			continue
+		var p: Vector2 = _dense[i]
+		var x: float = p.x
+		var y: float = p.y
+		if i % 3 == 0: ## a soft halo of violet over and beside the tear
+			_veil.draw_rect(Rect2(x - 2.0, y - h - 6.0, 5.0, h + 7.0), Color(VEIN, 0.1 * solid * (0.7 + 0.5 * beat)))
+		# the depth of the slit: stars that twinkle and streaks of light that climb inside it
+		var star: float = _hash(i, 31)
+		if star > 0.9:
+			var sy: float = y - h * (0.1 + 0.8 * fposmod(star * 7.0 + _hash(i, 5), 1.0))
+			_veil.draw_rect(Rect2(x, sy, 1.0, 1.0), Color(CORE if star > 0.96 else VEIN_LIGHT, (0.35 + 0.5 * absf(sin(_clock * (1.5 + 3.0 * star) + float(i)))) * solid))
+		if i % 8 == 2:
+			var climb: float = fposmod(_clock * (16.0 + 22.0 * _hash(i, 9)) + _hash(i, 2) * 90.0, h)
+			var streak: float = 3.0 + 4.0 * _hash(i, 4)
+			_veil.draw_rect(Rect2(x, y - climb - streak, 1.0, streak), Color(VEIN_LIGHT, 0.55 * (1.0 - climb / h) * solid))
+		# the edge: a bright thread along the top, hot where it is high, flaring in magenta now and then
+		var hot: float = 0.65 + 0.35 * beat
+		_veil.draw_rect(Rect2(x, y - h - 1.0, 1.0, 1.0), Color(CORE_HOT, hot * solid))
+		_veil.draw_rect(Rect2(x, y - h, 1.0, 1.0), Color(VEIN_LIGHT, 0.7 * solid))
+		if _hash(i, tick) > 0.985:
+			_veil.draw_rect(Rect2(x - 1.0, y - h - 3.0, 3.0, 4.0), Color(MAGENTA, 0.5 * solid))
+		# the seam on the floor
+		_veil.draw_rect(Rect2(x, y - 1.0, 1.0, 2.0), Color(CORE_HOT, (0.45 + 0.4 * beat) * solid))
+		if i % 29 == 7: ## a shaft of light climbing out of the tear
+			var rise: float = 26.0 + 30.0 * _hash(i, 8)
+			_veil.draw_rect(Rect2(x, y - h - rise * 0.5, 1.0, rise * 0.5), Color(VEIN_LIGHT, 0.2 * solid))
+			_veil.draw_rect(Rect2(x, y - h - rise, 1.0, rise * 0.5), Color(VEIN, 0.1 * solid))
+	# pieces of the broken sky hang over the tear and drift up (lit edge and a hot dot)
+	for shard: Dictionary in _shards:
+		var s2: float = float(shard["s"])
+		if absf(s2 - _origin_s) > reach or (_collapse_at >= 0.0 and _fade() < 0.3):
+			continue
+		var idx: int = clampi(int(s2), 0, _dense.size() - 1)
+		var solid2: float = _solid(s2) * fade
+		var rise2: float = fposmod(_clock * float(shard["speed"]) + float(shard["phase"]), 64.0)
+		var base: Vector2 = _dense[idx] + Vector2(sin(_clock * 0.9 + float(shard["sway"])) * 4.0, -_height_at(idx) * 0.6 - rise2)
+		var life: float = (1.0 - rise2 / 64.0) * solid2 * smoothstep(0.0, 6.0, rise2)
+		var size: int = int(shard["size"])
+		_veil.draw_rect(Rect2(base.round(), Vector2(size + 1, size)), Color(VEIN, 0.55 * life))
+		_veil.draw_rect(Rect2(base.round(), Vector2(1, 1)), Color(CORE_HOT, 0.9 * life))
 	for bolt: Dictionary in _bolts:
 		var pts: PackedVector2Array = bolt["pts"] as PackedVector2Array
 		var k: float = 1.0 - float(bolt["age"]) / float(bolt["life"])
 		var solid3: float = _solid(float(bolt["s"])) * fade
-		for i: int in pts.size() - 1:
-			_veil.draw_line(pts[i].round(), pts[i + 1].round(), Color(MAGENTA, 0.55 * k * solid3), 3.0)
-			_veil.draw_line(pts[i].round(), pts[i + 1].round(), Color(CORE_HOT, k * solid3), 1.0)
-	# the front of the tear throws sparks of light
+		for i2: int in pts.size() - 1:
+			_veil.draw_line(pts[i2].round(), pts[i2 + 1].round(), Color(MAGENTA, 0.55 * k * solid3), 3.0)
+			_veil.draw_line(pts[i2].round(), pts[i2 + 1].round(), Color(CORE_HOT, k * solid3), 1.0)
+	# the front of the tear throws a bright knot and sparks of light while it opens
 	if _open_at >= 0.0 and reach < maxf(_origin_s, _length - _origin_s) + 18.0 and _collapse_at < 0.0:
 		for side: float in [-1.0, 1.0]:
 			var fs: float = _origin_s + side * reach
 			if fs < 0.0 or fs > _length:
 				continue
 			var front: Vector2 = _point_at(fs).round()
-			_veil.draw_rect(Rect2(front + Vector2(-2, -3), Vector2(5, 7)), Color(CORE_HOT, 0.8))
-			_veil.draw_rect(Rect2(front + Vector2(-5, -6), Vector2(11, 13)), Color(VEIN_LIGHT, 0.25))
+			_veil.draw_rect(Rect2(front + Vector2(-2, -22), Vector2(5, 24)), Color(CORE_HOT, 0.6))
+			_veil.draw_rect(Rect2(front + Vector2(-6, -30), Vector2(13, 34)), Color(VEIN_LIGHT, 0.2))
+			for n: int in 3:
+				var off: Vector2 = Vector2(_hash(n, tick) * 12.0 - 6.0, -_hash(n, tick + 4) * 36.0)
+				_veil.draw_rect(Rect2((front + off).round(), Vector2.ONE), Color(CORE_HOT, 0.9))
 
 
 func _hash(a: int, b: int) -> float:

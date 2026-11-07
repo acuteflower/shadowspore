@@ -284,7 +284,7 @@ func _resolve() -> Look:
 	var view: Viewport = get_viewport()
 	var over: Look = _control_look(view.gui_get_hovered_control(), kind)
 	if InputManager.ui_blocking or InputManager.menu_open or InputManager.map_open or InputManager.skills_open:
-		if view.gui_is_dragging():
+		if view.gui_is_dragging() or _holds_stack(player):
 			return Look.GRABBING
 		if InputManager.map_open or InputManager.skills_open: ## both are dragged around
 			if over == Look.ARROW_HOT:
@@ -333,6 +333,11 @@ func _resolve() -> Look:
 	if _hover == HOVER_FAUNA:
 		return Look.TINY
 	return Look.AIM
+
+
+## A stack of items on the cursor (the inventory window): duck-typed, the cursor never names Player.
+func _holds_stack(player: Object) -> bool:
+	return player != null and not (player.inventory.held as Dictionary).is_empty()
 
 
 ## What a hovered control or a hint asks for; HIDDEN = nothing special.

@@ -2,9 +2,13 @@ extends Control
 ## Inventory (Tab or I): the vines grow into the screen. Equipment hangs like wind chimes from a
 ## branch out of the left edge around the heroine, who stands in a ritual circle and looks at the
 ## cursor; the rucksack hangs from three branches growing out of the right edge. The hotbar vine
-## stays where it is and is part of it (drag between them). Items glow in their rarity color,
-## pendants lift when hovered, empty equipment slots are rune rings, drag targets light up.
-## Drag items between slots; right-click or double-click equips and unequips.
+## stays where it is and is part of it. Items glow in their rarity color, pendants lift when hovered,
+## empty equipment slots are rune rings, slots that take the stack on the cursor light up.
+## **The cursor stack** (the host holds it, `InventoryComponent.held`): LMB takes a whole stack and puts it down (tops up, swaps);
+## RMB takes half of a stack / puts ONE down / equips a single piece of gear; SHIFT+LMB moves a stack at once (gear to its slot, else
+## hotbar <-> rucksack); the number keys 1-8 over a slot swap it with that hotbar slot (with a stack on the cursor they put it there);
+## Q over a slot or with a stack on the cursor throws ONE piece out, CTRL+Q everything; a click on nothing throws the stack (RMB: one);
+## R stacks and sorts the rucksack. Closing the window puts the cursor stack back into the bag.
 
 const COLUMNS: int = 8
 const ROWS: int = 3
@@ -56,9 +60,9 @@ func bind(inventory: InventoryComponent, hotbar: Hotbar) -> void:
 		var row: int = i / COLUMNS
 		var col: int = i % COLUMNS
 		_make_slot("inv", InventoryComponent.HOTBAR_SIZE + i, {"anchor_x": -(56.0 + (COLUMNS - 1 - col) * 34.0), "len": 8.0 + VineStyle.rand(i + 11) * 9.0, "row": row, "delay": 0.15 + row * 0.12 + col * 0.04})
-	for slot: ItemSlot in hotbar.get_slots(): ## hovering the hotbar shows tooltips too
-		slot.hovered.connect(_on_slot_hovered)
-		slot.unhovered.connect(func() -> void: _tooltip.hide())
+	for slot: ItemSlot in hotbar.get_slots(): ## hovering the hotbar shows tooltips too and counts for the number keys
+		slot.hovered.connect(func(s: ItemSlot) -> void: _hover = s; _on_slot_hovered(s))
+		slot.unhovered.connect(func() -> void: _hover = null; _tooltip.hide())
 		_hotbar_slots.append(slot)
 	_tooltip = ItemTooltip.new()
 	_tooltip.visible = false
@@ -66,6 +70,7 @@ func bind(inventory: InventoryComponent, hotbar: Hotbar) -> void:
 	_tooltip.z_index = 20 ## above the HUD vines, which draw after this window
 	_overlay = Control.new()
 	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.z_index = 15 ## the stack on the cursor lies over the HUD vines (the tooltip is at 20)
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
 	add_child(_tooltip)
@@ -105,6 +110,9 @@ func _process(delta: float) -> void:
 		_set_open(not _opening) ## (not while a town window hangs on the screen)
 	_open_t = move_toward(_open_t, 1.0 if _opening else 0.0, delta / (OPEN_SECONDS if _opening else CLOSE_SECONDS))
 	visible = _open_t > 0.0
+	InputManager.item_keys_claimed = false
+	if _opening and _open_t >= 0.7:
+		_item_keys()
 	if not visible:
 		return
 	_ritual_pulse = maxf(_ritual_pulse - 0.9 * delta, 0.0)
@@ -127,13 +135,50 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## A click on nothing: the stack on the cursor is thrown into the world (RMB: one piece). (Slots take their own clicks.)
+func _gui_input(event: InputEvent) -> void:
+	var click: InputEventMouseButton = event as InputEventMouseButton
+	if click == null or not click.pressed or not _opening or _inventory == null or _inventory.held.is_empty():
+		return
+	if click.button_index == MOUSE_BUTTON_LEFT:
+		_inventory.request("throw", [true])
+	elif click.button_index == MOUSE_BUTTON_RIGHT:
+		_inventory.request("throw", [false])
+	accept_event()
+
+
+## Number keys, Q and R while the window is open (the hotbar must not also select on a number key that was used here).
+func _item_keys() -> void:
+	var over: bool = _hover != null and is_instance_valid(_hover)
+	var holding: bool = _inventory != null and not _inventory.held.is_empty()
+	InputManager.item_keys_claimed = over or holding
+	for n: int in 8:
+		if Input.is_action_just_pressed(InputManager.HOTBAR_ACTIONS[n]):
+			if over and not (_inventory.stack_at(_hover.kind, _hover.ref).is_empty() and _inventory.stack_at("inv", n).is_empty()):
+				_inventory.request("hotkey", [_hover.kind, _hover.ref, n])
+			elif holding:
+				_inventory.request("hotkey", ["held", 0, n])
+	var all: bool = Input.is_key_pressed(KEY_CTRL)
+	if Input.is_action_just_pressed("item_throw"):
+		if holding:
+			_inventory.request("throw", [all])
+		elif over:
+			_inventory.request("dropslot", [_hover.kind, _hover.ref, all])
+	if Input.is_action_just_pressed("item_sort"):
+		_inventory.request("sort", [0])
+
+
 func _set_open(open: bool) -> void:
 	_opening = open
 	InputManager.ui_blocking = open
+	InputManager.inventory_open = open
 	if open:
 		_hover = null
-	elif _tooltip != null:
-		_tooltip.hide()
+	else:
+		if _inventory != null:
+			_inventory.request("stow", [0]) ## whatever is on the cursor goes back into the bag
+		if _tooltip != null:
+			_tooltip.hide()
 
 
 # ---------- layout ----------
@@ -210,10 +255,15 @@ func _draw() -> void:
 	_draw_tag("AUSRÜSTUNG", Vector2(26, _branch_y(-1, 26.0)), 0.25, void_level)
 	_draw_tag("RUCKSACK", Vector2(size.x - 24, _branch_y(0, size.x - 24.0)), 0.3, void_level)
 
-	var drag: Variant = get_viewport().gui_get_drag_data()
+	var held: Dictionary = _inventory.held if _inventory != null else {}
 	for i: int in _slots.size():
-		_draw_pendant(i, drag, void_level)
-	PixelText.draw(self, "ZIEHEN: VERSCHIEBEN   RECHTSKLICK: AUSRÜSTEN   TAB: SCHLIESSEN", Vector2i(int(size.x / 2.0) - 126, int(size.y) - 62), Color(UiStyle.TEXT_DIM, 0.5 * fade), Color(VineStyle.OUTLINE, 0.5 * fade))
+		_draw_pendant(i, held, void_level)
+	var hints: Array[String] = [
+		"LMT: NEHMEN / ABLEGEN    RMT: HÄLFTE / EINES / AUSRÜSTEN    UMSCH+LMT: SCHNELL VERSCHIEBEN",
+		"1-8: IN DIE HOTBAR    Q: EINES WERFEN (STRG: ALLES)    R: SORTIEREN    INS LEERE KLICKEN: WERFEN    TAB: SCHLIESSEN",
+	]
+	for line: int in hints.size():
+		PixelText.draw(self, hints[line], Vector2i(int(size.x / 2.0) - PixelText.width(hints[line]) / 2, int(size.y) - 64 + line * 9), Color(UiStyle.TEXT_DIM, 0.5 * fade), Color(VineStyle.OUTLINE, 0.5 * fade))
 
 
 func _draw_hero(fade: float, void_level: float) -> void:
@@ -255,7 +305,7 @@ func _rarity_index(stack: Dictionary) -> int:
 	return maxi(RARITIES.find(String(Items.definition(stack).get("rarity", "common"))), 0)
 
 
-func _draw_pendant(i: int, drag: Variant, void_level: float) -> void:
+func _draw_pendant(i: int, held: Dictionary, void_level: float) -> void:
 	var p: float = _progress(i)
 	if p <= 0.0:
 		return
@@ -299,14 +349,22 @@ func _draw_pendant(i: int, drag: Variant, void_level: float) -> void:
 			var phase: float = fposmod(_time * 0.7 + k * 0.5 + i * 0.13, 1.0)
 			draw_rect(Rect2(roundf(c.x + (k * 2 - 1) * 8.0 + sin(_time * 3.0 + k) * 2.0), roundf(c.y + 8.0 - phase * 20.0), 1, 1), Color(glow_color, (1.0 - phase) * p))
 
-	if drag is Dictionary and (drag as Dictionary).has("kind") and (drag as Dictionary).has("ref"): ## drag targets: a ring where it would land
-		var d: Dictionary = drag
-		var ok: bool = _inventory.can_drop(d["kind"], d["ref"], slot.kind, slot.ref)
-		if ok and not (d["kind"] == slot.kind and d["ref"] == slot.ref):
-			VineStyle.ring(self, c, 10, Color(UiStyle.ACCENT, (0.5 + 0.4 * sin(_time * 8.0)) * p), 1.0)
+	if not held.is_empty() and _inventory.can_place(slot.kind, slot.ref): ## the stack on the cursor: a ring where it would land
+		VineStyle.ring(self, c, 10, Color(UiStyle.ACCENT, (0.5 + 0.4 * sin(_time * 8.0)) * p), 1.0)
 
 
 func _draw_overlay() -> void:
+	if _opening and _inventory != null and not _inventory.held.is_empty(): ## the stack on the cursor
+		var held: Dictionary = _inventory.held
+		var at: Vector2 = _overlay.get_local_mouse_position().round() + Vector2(6, 6)
+		VineStyle.glow(_overlay, at, 13.0, Items.rarity_color(held), 0.45)
+		var icon: Texture2D = Items.icon(held)
+		if icon != null:
+			_overlay.draw_texture(icon, at - Vector2(8, 8))
+		var count: int = int(held.get("count", 1))
+		if count > 1:
+			var label: String = str(count)
+			PixelText.draw(_overlay, label, Vector2i(int(at.x) + 8 - PixelText.width(label), int(at.y) + 1), UiStyle.TEXT, UiStyle.OUTLINE)
 	for i: int in _slots.size(): ## a flash of sparks when a slot's content changes
 		if _pop[i] > 0.0 and _progress(i) >= 1.0:
 			var c: Vector2 = _slot_center(i)

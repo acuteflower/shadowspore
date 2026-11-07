@@ -4,6 +4,8 @@ extends Node
 
 ## Set by open full-screen UI (inventory) so clicks and keys don't reach the game world.
 var ui_blocking: bool = false
+var inventory_open: bool = false ## the inventory window is open: its slots take clicks and number keys
+var item_keys_claimed: bool = false ## the inventory uses the number keys this frame (an item under the mouse or on the cursor): the hotbar must not select
 
 ## True while the Escape menu is open (the inventory stays shut then).
 var menu_open: bool = false
@@ -125,7 +127,7 @@ const HOTBAR_ACTIONS: Array[StringName] = [
 
 ## Number key 1-8 pressed this frame -> 0-7, else -1.
 func hotbar_pick() -> int:
-	if skills_open or build_open or freecam_open:
+	if skills_open or build_open or freecam_open or item_keys_claimed:
 		return -1
 	for i: int in 8:
 		if Input.is_action_just_pressed(HOTBAR_ACTIONS[i]):

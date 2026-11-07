@@ -80,6 +80,22 @@ static func spawn_drops(tree: SceneTree, entries: Array, origin: Vector2) -> voi
 		container.add_child(drop)
 
 
+## Host: a stack the player threw out of the inventory: it flies a good way in `direction` (further than the magnet reaches).
+static func spawn_thrown(tree: SceneTree, id: String, count: int, origin: Vector2, direction: Vector2) -> void:
+	var container: Node = tree.get_first_node_in_group("drops")
+	if container == null:
+		return
+	var drop: ItemDrop = (load(ITEM_DROP_PATH) as PackedScene).instantiate() as ItemDrop
+	_drop_count += 1
+	drop.name = "Drop%d" % _drop_count
+	drop.item_id = id
+	drop.count = count
+	drop.position = origin
+	var way: Vector2 = direction.normalized() if direction.length() > 0.1 else Vector2.DOWN
+	drop.launch = way * 70.0
+	container.add_child(drop)
+
+
 ## Cosmetic on every peer: coins and XP orbs fly to each winner and show what they got on arrival.
 @rpc("authority", "call_local", "reliable")
 func _reward_fx(from: Vector2, ids: PackedInt32Array, copper: int, xp: int) -> void:

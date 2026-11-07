@@ -12,6 +12,7 @@ const LOADOUT: String = "default"
 
 var slots: Array = [] ## Dictionary stacks, index < HOTBAR_SIZE is the hotbar
 var equipment: Dictionary = {} ## slot name -> stack
+var held: Dictionary = {} ## the stack on the cursor while the inventory window is open (the host holds the truth, the owner sees it)
 var selected: int = 0 ## the hotbar slot in use (the owner's choice, told to the host with the "select" op)
 
 
@@ -53,8 +54,12 @@ func stack_at(kind: String, ref: Variant) -> Dictionary:
 	return equipment.get(String(ref), {})
 
 
-## Asks for a change. ops: "move" [from, to], "equip" [from, slot or ""], "unequip" [slot, to or -1],
-## "use" [slot, 0] (eat/drink one item of a consumable).
+## Asks for a change. ops (kind = "inv" with an index, or "equip" with a slot name):
+##   "move" [from, to], "equip" [from, slot or ""], "unequip" [slot, to or -1], "use" [slot, 0] (eat/drink one item), "select" [slot, 0];
+##   the cursor stack: "click" [kind, ref] (take the stack / put it down, top up or swap), "rclick" [kind, ref] (empty hand: take half,
+##   a single piece of gear: equip; full hand: put down ONE), "quick" [kind, ref] (shift-click: gear to its slot, else hotbar <-> rucksack),
+##   "hotkey" [kind or "held", ref, n] (number key: swap with hotbar slot n), "throw" [all] (throw the cursor stack or one piece into the world),
+##   "dropslot" [kind, ref, all] (throw from a slot: one piece or all), "sort" [0] (stack and sort the rucksack), "stow" [0] (cursor stack back into the bag).
 func request(op: String, args: Array) -> void:
 	if multiplayer.is_server():
 		_apply(op, args)
@@ -138,30 +143,9 @@ func has_item(id: String) -> bool:
 	return false
 
 
-## UI helper: would dragging this onto that be accepted? (The host re-checks everything.)
-func can_drop(from_kind: String, from_ref: Variant, to_kind: String, to_ref: Variant) -> bool:
-	var source: Dictionary = stack_at(from_kind, from_ref)
-	if source.is_empty():
-		return false
-	var target: Dictionary = stack_at(to_kind, to_ref)
-	match [from_kind, to_kind]:
-		["inv", "inv"]:
-			return from_ref != to_ref and _fits(int(to_ref), source) and _fits(int(from_ref), target)
-		["inv", "equip"]:
-			return Items.fits_slot(String(to_ref), source) and _fits(int(from_ref), target)
-		["equip", "inv"]:
-			return _fits(int(to_ref), source) and (target.is_empty() or Items.fits_slot(String(from_ref), target))
-	return false
-
-
-func drop(from_kind: String, from_ref: Variant, to_kind: String, to_ref: Variant) -> void:
-	match [from_kind, to_kind]:
-		["inv", "inv"]:
-			request("move", [from_ref, to_ref])
-		["inv", "equip"]:
-			request("equip", [from_ref, to_ref])
-		["equip", "inv"]:
-			request("unequip", [from_ref, to_ref])
+## UI helper: would the stack on the cursor be accepted by this slot? (The host re-checks everything.)
+func can_place(to_kind: String, to_ref: Variant) -> bool:
+	return not held.is_empty() and _exists(to_kind, to_ref) and _accepts(to_kind, to_ref, held)
 
 
 ## Empties the bag, the hotbar and the worn equipment (the wake-up in the hut: the story starts again with nothing). Host only.
@@ -170,6 +154,7 @@ func clear_all() -> void:
 		slots[i] = {}
 	for slot_name: String in equipment:
 		equipment[slot_name] = {}
+	held = {}
 	_commit()
 
 
@@ -201,11 +186,11 @@ func _commit() -> void:
 	changed.emit()
 	var owner_id: int = get_multiplayer_authority()
 	if owner_id != multiplayer.get_unique_id():
-		_rpc_state.rpc_id(owner_id, {"slots": slots, "equipment": equipment})
+		_rpc_state.rpc_id(owner_id, {"slots": slots, "equipment": equipment, "held": held})
 
 
 func _apply(op: String, args: Array) -> void:
-	if args.size() != 2:
+	if args.is_empty():
 		return
 	var ok: bool = false
 	match op:
@@ -217,6 +202,22 @@ func _apply(op: String, args: Array) -> void:
 			ok = _unequip(String(args[0]), int(args[1]))
 		"use":
 			ok = _use(int(args[0]))
+		"click":
+			ok = _click(String(args[0]), args[1])
+		"rclick":
+			ok = _rclick(String(args[0]), args[1])
+		"quick":
+			ok = _quick(String(args[0]), args[1])
+		"hotkey":
+			ok = _hotkey(String(args[0]), args[1], int(args[2]))
+		"throw":
+			ok = _throw_held(bool(args[0]))
+		"dropslot":
+			ok = _drop_slot(String(args[0]), args[1], bool(args[2]))
+		"sort":
+			ok = _sort()
+		"stow":
+			ok = _stow()
 		"select":
 			selected = clampi(int(args[0]), 0, HOTBAR_SIZE - 1)
 			ok = true
@@ -246,6 +247,239 @@ func _use(index: int) -> bool:
 	if int(stack["count"]) <= 0:
 		slots[index] = {}
 	return true
+
+
+# ---------------------------------------------------------------- the cursor stack
+func _exists(kind: String, ref: Variant) -> bool:
+	return _valid(int(ref)) if kind == "inv" else (kind == "equip" and equipment.has(String(ref)))
+
+
+func _set_stack(kind: String, ref: Variant, stack: Dictionary) -> void:
+	if kind == "inv":
+		slots[int(ref)] = stack
+	else:
+		equipment[String(ref)] = stack
+
+
+## May this slot hold `stack`? The hotbar takes tools and consumables only, an equipment slot one matching piece of gear.
+func _accepts(kind: String, ref: Variant, stack: Dictionary) -> bool:
+	if stack.is_empty():
+		return true
+	if kind == "inv":
+		return _fits(int(ref), stack)
+	return int(stack["count"]) == 1 and Items.fits_slot(String(ref), stack)
+
+
+## Left click: take the whole stack; with a full hand put it down (an empty slot), top up a stack of the same item (the rest stays in the
+## hand) or swap with what lies there.
+func _click(kind: String, ref: Variant) -> bool:
+	if not _exists(kind, ref):
+		return false
+	var current: Dictionary = stack_at(kind, ref)
+	if held.is_empty():
+		if current.is_empty():
+			return false
+		held = current
+		_set_stack(kind, ref, {})
+		return true
+	if current.is_empty():
+		if not _accepts(kind, ref, held):
+			return false
+		_set_stack(kind, ref, held)
+		held = {}
+		return true
+	if kind == "inv" and String(current["id"]) == String(held["id"]) and Items.max_stack(held) > 1:
+		var room: int = Items.max_stack(held) - int(current["count"])
+		if room <= 0:
+			return false
+		var moved: int = mini(room, int(held["count"]))
+		current["count"] = int(current["count"]) + moved
+		held["count"] = int(held["count"]) - moved
+		if int(held["count"]) <= 0:
+			held = {}
+		return true
+	if not _accepts(kind, ref, held):
+		return false
+	_set_stack(kind, ref, held)
+	held = current
+	return true
+
+
+## Right click: with an empty hand take half of a stack (rounded up); a single piece of gear is equipped, worn gear taken off.
+## With a full hand put down exactly one piece.
+func _rclick(kind: String, ref: Variant) -> bool:
+	if not _exists(kind, ref):
+		return false
+	var current: Dictionary = stack_at(kind, ref)
+	if held.is_empty():
+		if current.is_empty():
+			return false
+		if kind == "equip":
+			return _unequip(String(ref), -1)
+		if Items.max_stack(current) <= 1:
+			if Items.definition(current).has("slot") and _slot_for(current) != "":
+				return _equip(int(ref), "")
+			held = current
+			_set_stack(kind, ref, {})
+			return true
+		var take: int = ceili(float(current["count"]) / 2.0)
+		held = {"id": String(current["id"]), "count": take}
+		current["count"] = int(current["count"]) - take
+		if int(current["count"]) <= 0:
+			_set_stack(kind, ref, {})
+		return true
+	if kind != "inv" or not _accepts(kind, ref, {"id": held["id"], "count": 1}):
+		return false
+	if current.is_empty():
+		slots[int(ref)] = {"id": String(held["id"]), "count": 1}
+	elif String(current["id"]) == String(held["id"]) and int(current["count"]) < Items.max_stack(current):
+		current["count"] = int(current["count"]) + 1
+	else:
+		return false
+	held["count"] = int(held["count"]) - 1
+	if int(held["count"]) <= 0:
+		held = {}
+	return true
+
+
+## Shift-click: gear goes to its slot (worn gear back into the bag); anything else jumps between hotbar and rucksack.
+func _quick(kind: String, ref: Variant) -> bool:
+	if not _exists(kind, ref) or not held.is_empty():
+		return false
+	var current: Dictionary = stack_at(kind, ref)
+	if current.is_empty():
+		return false
+	if kind == "equip":
+		return _unequip(String(ref), -1)
+	if Items.definition(current).has("slot") and _slot_for(current) != "":
+		return _equip(int(ref), "")
+	var from: int = int(ref)
+	var first: int = 0 if from >= HOTBAR_SIZE else HOTBAR_SIZE
+	var last: int = HOTBAR_SIZE if from >= HOTBAR_SIZE else SIZE
+	var moved: bool = false
+	for pass_index: int in 2: ## first top up stacks of the same item, then use free slots
+		for i: int in range(first, last):
+			if int(current["count"]) <= 0 or not _fits(i, current):
+				continue
+			var target: Dictionary = slots[i]
+			if pass_index == 0 and not target.is_empty() and String(target["id"]) == String(current["id"]) and int(target["count"]) < Items.max_stack(target):
+				var room: int = mini(Items.max_stack(target) - int(target["count"]), int(current["count"]))
+				target["count"] = int(target["count"]) + room
+				current["count"] = int(current["count"]) - room
+				moved = true
+			elif pass_index == 1 and target.is_empty():
+				slots[i] = current.duplicate()
+				current["count"] = 0
+				moved = true
+	if int(current["count"]) <= 0:
+		slots[from] = {}
+	return moved
+
+
+## A number key over a slot: it swaps with hotbar slot `n` (an item goes in, whatever stood there comes out); with a full hand and no
+## slot under the cursor the cursor stack goes into hotbar slot `n`.
+func _hotkey(kind: String, ref: Variant, n: int) -> bool:
+	if n < 0 or n >= HOTBAR_SIZE:
+		return false
+	if kind == "held":
+		return _click("inv", n)
+	if not _exists(kind, ref):
+		return false
+	if kind == "equip":
+		if stack_at("equip", ref).is_empty():
+			return _equip(n, String(ref))
+		return _unequip(String(ref), n)
+	var from: int = int(ref)
+	if from == n:
+		return false
+	return _move(n, from) if (slots[from] as Dictionary).is_empty() else _move(from, n)
+
+
+## Q with the cursor stack: one piece (or, with `all`, everything) is thrown into the world.
+func _throw_held(all: bool) -> bool:
+	if held.is_empty():
+		return false
+	var count: int = int(held["count"]) if all else 1
+	if not _throw(String(held["id"]), count):
+		return false
+	held["count"] = int(held["count"]) - count
+	if int(held["count"]) <= 0:
+		held = {}
+	return true
+
+
+## Q over a slot: one piece of the stack (or the whole stack) is thrown into the world.
+func _drop_slot(kind: String, ref: Variant, all: bool) -> bool:
+	if not _exists(kind, ref):
+		return false
+	var current: Dictionary = stack_at(kind, ref)
+	if current.is_empty():
+		return false
+	var count: int = int(current["count"]) if (all or kind == "equip") else 1
+	if not _throw(String(current["id"]), count):
+		return false
+	current["count"] = int(current["count"]) - count
+	if int(current["count"]) <= 0:
+		_set_stack(kind, ref, {})
+	return true
+
+
+func _throw(id: String, count: int) -> bool:
+	var player: Player = get_parent() as Player
+	if player == null or player.health.current <= 0.0 or count <= 0:
+		return false
+	DropComponent.spawn_thrown(get_tree(), id, count, player.global_position + Vector2(0, -8), player.facing)
+	return true
+
+
+## Merges equal stacks in the rucksack (not the hotbar) and sorts it: tools, gear, food, materials; rarer first, then by name.
+func _sort() -> bool:
+	var stacks: Array[Dictionary] = []
+	for i: int in range(HOTBAR_SIZE, SIZE):
+		var stack: Dictionary = (slots[i] as Dictionary).duplicate()
+		for other: Dictionary in stacks:
+			if not stack.is_empty() and String(other["id"]) == String(stack["id"]) and int(other["count"]) < Items.max_stack(other):
+				var room: int = mini(Items.max_stack(other) - int(other["count"]), int(stack["count"]))
+				other["count"] = int(other["count"]) + room
+				stack["count"] = int(stack["count"]) - room
+		if not stack.is_empty() and int(stack["count"]) > 0:
+			stacks.append(stack)
+	var rarities: Array = DataRegistry.table("rarities").keys()
+	var order: Array[String] = ["tool", "weapon", "armor", "consumable", "material"]
+	stacks.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var da: Dictionary = Items.definition(a)
+		var db: Dictionary = Items.definition(b)
+		var ka: int = order.find(String(da.get("kind", "")))
+		var kb: int = order.find(String(db.get("kind", "")))
+		ka = ka if ka >= 0 else order.size()
+		kb = kb if kb >= 0 else order.size()
+		if ka != kb:
+			return ka < kb
+		var ra: int = rarities.find(String(da.get("rarity", "common")))
+		var rb: int = rarities.find(String(db.get("rarity", "common")))
+		if ra != rb:
+			return ra > rb
+		return String(da.get("name", a["id"])) < String(db.get("name", b["id"])))
+	for i: int in range(HOTBAR_SIZE, SIZE):
+		slots[i] = stacks[i - HOTBAR_SIZE] if i - HOTBAR_SIZE < stacks.size() else {}
+	return true
+
+
+## The cursor stack goes back into the bag (what does not fit is thrown out). Host.
+func _stow() -> bool:
+	if held.is_empty():
+		return false
+	var left: int = add_item(String(held["id"]), int(held["count"]))
+	if left > 0:
+		_throw(String(held["id"]), left)
+	held = {}
+	return true
+
+
+## Host: puts the cursor stack away and tells the owner (the window closing, a save).
+func stow_held() -> void:
+	if multiplayer.is_server() and _stow():
+		_commit()
 
 
 func _move(from: int, to: int) -> bool:
@@ -334,4 +568,5 @@ func _rpc_state(state: Dictionary) -> void:
 		return
 	slots = state["slots"]
 	equipment = state["equipment"]
+	held = state.get("held", {})
 	changed.emit()

@@ -121,6 +121,21 @@ func _run() -> void:
 		await get_tree().process_frame
 		_sample(idle_stats)
 	_report("idle", idle_stats)
+	var aura: BossAura = _fight._aura
+	print("AURA node ", aura, " visible ", aura.visible if aura != null else false, " level ", _fight.aura_level(), " size ", aura.size if aura != null else Vector2.ZERO, " near ", aura._near if aura != null else -1.0, " lvl ", aura._level if aura != null else -1.0)
+	if aura != null and _acts.has("aura"):
+		await _shot("aura_a")
+		aura.kick(1.0)
+		aura._left = 0.5
+		await get_tree().process_frame
+		await _shot("aura_b")
+		aura.visible = false
+		await get_tree().process_frame
+		await _shot("aura_off")
+		aura.visible = true
+	if aura != null:
+		var mat: ShaderMaterial = aura.material as ShaderMaterial
+		print("AURA dusk ", mat.get_shader_parameter("dusk"), " vignette ", mat.get_shader_parameter("vignette"), " glitch ", mat.get_shader_parameter("glitch"))
 	for act: String in _acts:
 		if act != "barrier":
 			await _wait_idle()

@@ -28,6 +28,10 @@ var _bits: Array[Dictionary] = []
 var _marks: Array[Dictionary] = []
 var _hands: Array[Dictionary] = [] ## blades that sweep over the floor like the hands of a clock (cosmetic: the damage is the lanes')
 var _cages: Array[Dictionary] = [] ## rings of feather stakes that close in
+var _beams: Array[Dictionary] = [] ## cosmetic beams of light along a lane (the line of the wing)
+var _deck: Node2D ## what lies on the floor (scorch, the sweep of a blade): under every entity
+var _deck_glow: Node2D
+var _hand_spark_t: float = 0.0
 var _ground: ColorRect
 var _material: ShaderMaterial = ShaderMaterial.new()
 var _sky: Node2D
@@ -78,6 +82,19 @@ func setup(decal: Dictionary, p_host: bool) -> void:
 	_ground.material = _material
 	_ground.visible = false
 	add_child(_ground)
+	_deck = Node2D.new()
+	_deck.name = "Deck"
+	_deck.z_index = GROUND_Z + 1
+	add_child(_deck)
+	_deck_glow = Node2D.new()
+	_deck_glow.name = "DeckGlow"
+	var deck_add: CanvasItemMaterial = CanvasItemMaterial.new()
+	deck_add.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	deck_add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	_deck_glow.material = deck_add
+	_deck.add_child(_deck_glow)
+	_deck.draw.connect(_draw_deck)
+	_deck_glow.draw.connect(_draw_deck_glow)
 	_sky = Node2D.new()
 	_sky.name = "Sky"
 	_sky.z_index = SKY_Z
@@ -159,10 +176,16 @@ func add_hand(origin: Vector2, a0: float, a1: float, length: float, show: float,
 	_hands.append({"o": origin, "a0": a0, "a1": a1, "len": length, "show": show, "t0": t0, "t1": t1})
 
 
+## A beam of light along the lane from `a` to `b` (ground points): from `show` a thread of charging light runs from `src` (a point on the screen: the wing tip) to `a`, at `fire`
+## the beam runs out from `a` to `b` in `reveal` seconds, holds for `hold` and fades. `half` is the half width of the lane it belongs to; `kind` 0 cold white-violet, 1 magenta-white.
+func add_beam(a: Vector2, b: Vector2, src: Vector2, show: float, fire: float, reveal: float, hold: float, half: float, kind: int = 0) -> void:
+	_beams.append({"a": a, "b": b, "src": src, "show": show, "fire": fire, "reveal": reveal, "hold": hold, "half": half, "kind": kind, "seed": randf() * 50.0, "burst": false})
+
+
 ## A ring of feather stakes round `centre` at radius `r0` (with a gap of `gap_w` radians pointing along `gap_a`) that falls in at `t_start - 0.3`, closes to radius `r1` between
 ## `t_start` and `t_end` and hurts whoever the wall passes through (host). The warning (a dotted circle and the gap) shows from `show`.
 func add_cage(centre: Vector2, r0: float, r1: float, gap_a: float, gap_w: float, show: float, t_start: float, t_end: float, damage: float, knock: float, wall_half: float) -> void:
-	_cages.append({"c": centre, "r0": r0, "r1": r1, "ga": gap_a, "gw": gap_w, "show": show, "t0": t_start, "t1": t_end, "damage": damage, "knock": knock, "half": wall_half, "struck": [], "n": 26})
+	_cages.append({"c": centre, "r0": r0, "r1": r1, "ga": gap_a, "gw": gap_w, "show": show, "t0": t_start, "t1": t_end, "damage": damage, "knock": knock, "half": wall_half, "struck": [], "n": 36})
 
 
 ## Sparks that fly out of a point of the picture (where a feather leaves a wing).
@@ -199,10 +222,11 @@ func clear() -> void:
 	_marks.clear()
 	_hands.clear()
 	_cages.clear()
+	_beams.clear()
 
 
 func busy() -> bool:
-	return not _zones.is_empty() or _fall_count > 0 or not _flights.is_empty() or not _hands.is_empty() or not _cages.is_empty()
+	return not _zones.is_empty() or _fall_count > 0 or not _flights.is_empty() or not _hands.is_empty() or not _cages.is_empty() or not _beams.is_empty()
 
 
 # --- running -------------------------------------------------------------------------------------------------------
@@ -225,14 +249,19 @@ func _process(delta: float) -> void:
 		_run_cages()
 	if not _hands.is_empty():
 		_prune_hands()
+		_hand_sparks(delta)
+	if not _beams.is_empty():
+		_run_beams()
 	for i: int in range(_marks.size() - 1, -1, -1):
 		if _clock >= float((_marks[i] as Dictionary)["until"]) or not is_instance_valid((_marks[i] as Dictionary)["node"]):
 			_marks.remove_at(i)
 	_push_shapes()
-	var active: bool = _fall_count > 0 or not _flights.is_empty() or not _bits.is_empty() or not _marks.is_empty() or not _hands.is_empty() or not _cages.is_empty()
+	var active: bool = _fall_count > 0 or not _flights.is_empty() or not _bits.is_empty() or not _marks.is_empty() or not _hands.is_empty() or not _cages.is_empty() or not _beams.is_empty()
 	if active or _drew:
 		_sky.queue_redraw()
 		_sky_glow.queue_redraw()
+		_deck.queue_redraw()
+		_deck_glow.queue_redraw()
 	_drew = active
 	stat_us += Time.get_ticks_usec() - t0
 
@@ -316,6 +345,38 @@ func _run_flights() -> void:
 				_impact(f["dst"] as Vector2, 1.0 if float(f["stay"]) > 0.0 else 0.4)
 		if _clock >= t1 + maxf(float(f["stay"]), 0.0) + 0.05:
 			_flights.remove_at(i)
+
+
+func _run_beams() -> void:
+	for i: int in range(_beams.size() - 1, -1, -1):
+		var b: Dictionary = _beams[i]
+		var fire: float = float(b["fire"])
+		if not bool(b["burst"]) and _clock >= fire:
+			b["burst"] = true
+			_impact(b["a"] as Vector2, 1.0)
+			add_sparks(b["src"] as Vector2, 8)
+		if _clock >= fire and _clock < fire + float(b["reveal"]) + float(b["hold"]):
+			var s: float = clampf((_clock - fire) / maxf(float(b["reveal"]), 0.01), 0.0, 1.0)
+			var head: Vector2 = (b["a"] as Vector2).lerp(b["b"] as Vector2, s)
+			for n: int in 2: ## sparks fly off where the beam burns the floor
+				var dir: Vector2 = Vector2.from_angle(randf() * TAU)
+				_bits.append({"kind": 0, "pos": head + dir * 2.0, "vel": Vector2(dir.x * randf_range(20.0, 80.0), randf_range(-90.0, -30.0)), "age": 0.0, "life": randf_range(0.2, 0.45), "white": randf() < 0.6})
+		if _clock > fire + float(b["reveal"]) + float(b["hold"]) + 1.4:
+			_beams.remove_at(i)
+
+
+## Sparks run off the tip of every blade that sweeps.
+func _hand_sparks(delta: float) -> void:
+	_hand_spark_t -= delta
+	if _hand_spark_t > 0.0:
+		return
+	_hand_spark_t = 0.035
+	for h: Dictionary in _hands:
+		if _clock < float(h["t0"]) or _clock > float(h["t1"]):
+			continue
+		var tip: Vector2 = (h["o"] as Vector2) + Vector2.from_angle(_hand_angle(h)) * float(h["len"])
+		var dir: Vector2 = Vector2.from_angle(randf() * TAU)
+		_bits.append({"kind": 0, "pos": tip, "vel": Vector2(dir.x * randf_range(15.0, 60.0), randf_range(-70.0, -25.0)), "age": 0.0, "life": randf_range(0.2, 0.4), "white": randf() < 0.5})
 
 
 func _prune_hands() -> void:
@@ -592,6 +653,168 @@ func _hand_angle(h: Dictionary) -> float:
 	return lerpf(float(h["a0"]), float(h["a1"]), s)
 
 
+func _blade_poly(origin: Vector2, angle: float, length: float, root_w: float, grow: float) -> Array[PackedVector2Array]:
+	# the blade as a row of convex pieces (a tapering trapezoid per section) so it can be drawn without triangulation problems
+	var dir: Vector2 = Vector2.from_angle(angle)
+	var perp: Vector2 = dir.orthogonal()
+	var pieces: Array[PackedVector2Array] = []
+	var n: int = 12
+	for i: int in n:
+		var u0: float = float(i) / float(n)
+		var u1: float = float(i + 1) / float(n)
+		var w0: float = maxf(root_w * (1.0 - pow(u0, 1.6)) * (1.0 + 0.25 * sin(u0 * 9.0)), 0.7)
+		var w1: float = maxf(root_w * (1.0 - pow(u1, 1.6)) * (1.0 + 0.25 * sin(u1 * 9.0)), 0.7)
+		var p0: Vector2 = origin + dir * (8.0 + (length - 8.0) * u0)
+		var p1: Vector2 = origin + dir * (8.0 + (length - 8.0) * u1)
+		pieces.append(PackedVector2Array([p0 - perp * w0, p1 - perp * w1, p1 + perp * w1, p0 + perp * w0]))
+	return pieces
+
+
+func _draw_deck() -> void:
+	# what the blades and beams leave on the floor: dark scorch, in the colours of the shadow patches
+	for h: Dictionary in _hands:
+		if _clock < float(h["t0"]):
+			continue
+		var origin: Vector2 = (h["o"] as Vector2) + Vector2(0.0, -2.0)
+		var fade: float = 1.0 - smoothstep(float(h["t1"]), float(h["t1"]) + 0.9, _clock)
+		var a_now: float = _hand_angle(h)
+		var a0: float = float(h["a0"])
+		var steps: int = 22
+		var length: float = float(h["len"])
+		for r: int in 3: ## three scorched arcs behind the blade
+			var rad: float = length * (0.45 + 0.27 * float(r))
+			var prev: Vector2 = origin + Vector2.from_angle(a0) * rad
+			for k: int in range(1, steps + 1):
+				var ang: float = lerpf(a0, a_now, float(k) / float(steps))
+				var pt: Vector2 = origin + Vector2.from_angle(ang) * rad
+				_deck.draw_line(prev.round(), pt.round(), Color(VoidFeather.OUTLINE, 0.45 * fade), 5.0 - float(r))
+				prev = pt
+	for b: Dictionary in _beams:
+		var fire: float = float(b["fire"])
+		if _clock < fire:
+			continue
+		var s: float = clampf((_clock - fire) / maxf(float(b["reveal"]), 0.01), 0.0, 1.0)
+		var fade: float = 1.0 - smoothstep(fire + float(b["reveal"]) + float(b["hold"]), fire + float(b["reveal"]) + float(b["hold"]) + 1.4, _clock)
+		var head: Vector2 = (b["a"] as Vector2).lerp(b["b"] as Vector2, s)
+		_deck.draw_line((b["a"] as Vector2).round(), head.round(), Color(VoidFeather.OUTLINE, 0.5 * fade), float(b["half"]) * 0.7)
+		_deck.draw_line((b["a"] as Vector2).round(), head.round(), Color(VoidFeather.RIM, 0.35 * fade), float(b["half"]) * 0.25)
+
+
+func _draw_deck_glow() -> void:
+	for h: Dictionary in _hands:
+		if _clock < float(h["show"]):
+			continue
+		var origin: Vector2 = (h["o"] as Vector2) + Vector2(0.0, -2.0)
+		var grow: float = smoothstep(float(h["show"]), float(h["t0"]), _clock)
+		var fade: float = 1.0 - smoothstep(float(h["t1"]), float(h["t1"]) + 0.5, _clock)
+		var length: float = float(h["len"]) * grow
+		# the hub: a ring of runes that turns, a core that beats
+		var spin: float = _clock * 2.2
+		for k: int in 12:
+			var ang: float = spin + TAU * float(k) / 12.0
+			var p: Vector2 = origin + Vector2.from_angle(ang) * Vector2(11.0, 6.6)
+			_deck_glow.draw_rect(Rect2(p.round(), Vector2.ONE * (2 if k % 3 == 0 else 1)), Color(VoidFeather.VEIN_LIGHT, 0.7 * fade * grow))
+		_deck_glow.draw_rect(Rect2(origin.round() + Vector2(-3, -2), Vector2(7, 5)), Color(HOT, 0.5 * fade * grow * (0.7 + 0.3 * sin(_clock * 20.0))))
+		if _clock < float(h["t0"]) or length < 6.0:
+			continue
+		# the wedge the blade has swept: fades behind it
+		var a_now: float = _hand_angle(h)
+		var span: float = a_now - float(h["a0"])
+		if absf(span) < 0.03:
+			continue
+		var slices: int = 16
+		for k: int in slices:
+			var u0: float = float(k) / float(slices)
+			var u1: float = float(k + 1) / float(slices)
+			var back: float = minf(absf(span), 0.9)
+			var ang0: float = a_now - signf(span) * back * u0
+			var ang1: float = a_now - signf(span) * back * u1
+			var alpha: float = pow(1.0 - u0, 2.2) * 0.2 * fade
+			_poly(_deck_glow, PackedVector2Array([origin, origin + Vector2.from_angle(ang0) * length, origin + Vector2.from_angle(ang1) * length]), Color(VoidFeather.VEIN, alpha))
+	for b: Dictionary in _beams:
+		_draw_beam_glow(b, _deck_glow, true)
+
+
+func _beam_colors(kind: int) -> Array[Color]:
+	var out: Array[Color] = []
+	if kind == 1:
+		out.assign([Color("ffd6f6"), Color("ff4fd8"), Color("c0307f")])
+	else:
+		out.assign([Color("fff7ff"), VoidFeather.VEIN_LIGHT, VoidFeather.VEIN])
+	return out
+
+
+func _jag(a: Vector2, b: Vector2, seed_v: float, amount: float) -> PackedVector2Array:
+	var pts: PackedVector2Array = PackedVector2Array()
+	var count: int = maxi(2, int(a.distance_to(b) / 10.0))
+	var perp: Vector2 = (b - a).orthogonal().normalized()
+	var tick: float = floorf(_clock * 22.0)
+	for i: int in count + 1:
+		var t: float = float(i) / float(count)
+		var edge: float = minf(t, 1.0 - t) * 6.0
+		var off: float = (sin(seed_v * 91.7 + float(i) * 12.9898 + tick * 3.1) * 43758.5453)
+		off = (off - floorf(off) - 0.5) * 2.0 * amount * clampf(edge, 0.0, 1.0)
+		pts.append(a.lerp(b, t) + perp * off)
+	return pts
+
+
+## The charging thread, the beam itself and the flash where it starts. `glow` draws the additive half; the body half is the thin hot core on top of the dark scorch.
+func _draw_beam_glow(b: Dictionary, canvas: Node2D, glow: bool) -> void:
+	var show: float = float(b["show"])
+	var fire: float = float(b["fire"])
+	if _clock < show:
+		return
+	var cols: Array[Color] = _beam_colors(int(b["kind"]))
+	var a: Vector2 = b["a"] as Vector2
+	var src: Vector2 = b["src"] as Vector2
+	var half: float = float(b["half"])
+	if _clock < fire:
+		# the wing gathers light and spills a thread of it onto the floor where the beam will start; motes run down the thread
+		var k: float = smoothstep(show, fire, _clock)
+		var thread: PackedVector2Array = _jag(src, a, float(b["seed"]), 2.0 + 3.0 * (1.0 - k))
+		for i: int in thread.size() - 1:
+			canvas.draw_line(thread[i].round(), thread[i + 1].round(), Color(cols[1], (0.15 + 0.5 * k) * (0.7 + 0.3 * sin(_clock * 40.0))), 1.0)
+		for m: int in 5:
+			var u: float = fposmod(_clock * (1.2 + 0.4 * float(m)) + float(m) * 0.37, 1.0)
+			var p: Vector2 = src.lerp(a, u)
+			canvas.draw_rect(Rect2(p.round(), Vector2.ONE * (2 if m % 2 == 0 else 1)), Color(cols[0], 0.7 * k))
+		var r: float = 4.0 + 8.0 * (1.0 - k)
+		for i2: int in 14: ## a ring closes in on the starting point
+			var ang: float = TAU * float(i2) / 14.0 + _clock * 3.0
+			canvas.draw_rect(Rect2((a + Vector2.from_angle(ang) * Vector2(r, r * 0.6)).round(), Vector2.ONE), Color(cols[0], 0.3 + 0.6 * k))
+		canvas.draw_rect(Rect2(a.round() + Vector2(-2, -1), Vector2(5, 3)), Color(cols[0], 0.4 + 0.5 * k))
+		return
+	var reveal: float = maxf(float(b["reveal"]), 0.01)
+	var s: float = clampf((_clock - fire) / reveal, 0.0, 1.0)
+	var end: float = fire + reveal + float(b["hold"])
+	var fade: float = 1.0 - smoothstep(end, end + 0.35, _clock)
+	var head: Vector2 = a.lerp(b["b"] as Vector2, s)
+	var thin: float = 1.0 - smoothstep(end - 0.12, end + 0.35, _clock) * 0.8
+	var burn: float = 1.0 + 0.4 * sin(_clock * 55.0)
+	var pts: PackedVector2Array = _jag(a, head, float(b["seed"]), 2.5)
+	# a wall of light standing on the lane (the beam has height: a short curtain above it), then the bright body
+	for i: int in pts.size() - 1:
+		var p0: Vector2 = pts[i].round()
+		var p1: Vector2 = pts[i + 1].round()
+		if glow:
+			canvas.draw_line(p0, p1, Color(cols[2], 0.16 * fade), half * 1.6)
+			canvas.draw_line(p0, p1, Color(cols[1], 0.3 * fade), half * 0.7 * thin)
+			canvas.draw_line(p0, p1, Color(cols[0], 0.8 * fade), 3.0 * thin * burn)
+			canvas.draw_line(p0 + Vector2(0, -6), p1 + Vector2(0, -6), Color(cols[1], 0.2 * fade), 2.0)
+	if glow:
+		# the thread from the wing stays lit while the beam is born, and the head is a bright knot with a flare
+		if _clock < fire + reveal + 0.1:
+			var thread: PackedVector2Array = _jag(src, a, float(b["seed"]), 1.5)
+			for i: int in thread.size() - 1:
+				canvas.draw_line(thread[i].round(), thread[i + 1].round(), Color(cols[0], 0.6 * fade), 1.0)
+		if s < 1.0:
+			canvas.draw_rect(Rect2(head.round() + Vector2(-3, -3), Vector2(7, 7)), Color(cols[0], 0.85))
+			canvas.draw_rect(Rect2(head.round() + Vector2(-7, -2), Vector2(15, 5)), Color(cols[1], 0.3))
+		var flash: float = 1.0 - clampf((_clock - fire) / 0.22, 0.0, 1.0)
+		if flash > 0.0:
+			canvas.draw_rect(Rect2(a.round() + Vector2(-8, -5), Vector2(17, 11)), Color(cols[0], 0.6 * flash))
+
+
 func _draw_hand(h: Dictionary, glow: bool) -> void:
 	if _clock < float(h["show"]):
 		return
@@ -599,37 +822,58 @@ func _draw_hand(h: Dictionary, glow: bool) -> void:
 	var grow: float = smoothstep(float(h["show"]), float(h["t0"]), _clock)
 	var fade: float = 1.0 - smoothstep(float(h["t1"]), float(h["t1"]) + 0.4, _clock)
 	var length: float = float(h["len"]) * grow
-	if length < 4.0 or fade <= 0.0:
+	if length < 18.0 or fade <= 0.0:
 		return
 	var origin: Vector2 = (h["o"] as Vector2) + Vector2(0.0, -4.0)
 	var angle: float = _hand_angle(h)
-	if _clock >= float(h["t0"]):
-		var span: float = float(h["a1"]) - float(h["a0"])
-		for k: int in range(4, 0, -1): ## afterimages behind the blade
-			var back: float = angle - signf(span) * 0.07 * float(k)
-			if (back - float(h["a0"])) * signf(span) < 0.0:
-				continue
-			var tail: Vector2 = origin + Vector2.from_angle(back) * length
-			if glow:
-				canvas.draw_line(origin.round(), tail.round(), Color(VoidFeather.VEIN, 0.07 * fade / float(k)), 5.0)
-			else:
-				canvas.draw_line((origin + Vector2.from_angle(back) * 8.0).round(), tail.round(), Color(VoidFeather.VEIN, 0.16 * fade / float(k)), 1.0)
+	var sweeping: bool = _clock >= float(h["t0"])
+	var width: float = 7.5 * (0.5 + 0.5 * grow)
+	var pieces: Array[PackedVector2Array] = _blade_poly(origin, angle, length, width, grow)
 	var dir: Vector2 = Vector2.from_angle(angle)
-	var root: Vector2 = (origin + dir * 8.0).round()
-	var tip: Vector2 = (origin + dir * length).round()
-	var mid: Vector2 = root.lerp(tip, 0.55).round()
-	var pulse: float = 0.7 + 0.3 * sin(_clock * 30.0)
+	var perp: Vector2 = dir.orthogonal()
+	var flare: float = 0.7 + 0.3 * sin(_clock * 28.0)
 	if glow:
-		canvas.draw_line(root, tip, Color(VoidFeather.VEIN, 0.2 * fade), 9.0)
-		canvas.draw_line(root, tip, Color(HOT, 0.4 * fade * pulse), 3.0)
-		canvas.draw_rect(Rect2(tip + Vector2(-2, -2), Vector2(5, 5)), Color(HOT, 0.8 * fade))
-		canvas.draw_rect(Rect2(origin.round() + Vector2(-5, -5), Vector2(11, 11)), Color(VoidFeather.VEIN_LIGHT, 0.3 * fade * pulse))
-	else:
-		canvas.draw_line(root, tip, Color(VoidFeather.OUTLINE, 0.92 * fade), 7.0)
-		canvas.draw_line(root, mid, Color(VoidFeather.RIM, fade), 5.0)
-		canvas.draw_line(mid, tip, Color(VoidFeather.RIM, fade), 3.0)
-		canvas.draw_line(root, tip, Color(VoidFeather.CORE, fade), 3.0 if grow > 0.6 else 1.0)
-		canvas.draw_line(root, tip, Color("fff7ff", fade), 1.0)
+		canvas.draw_line((origin + dir * 8.0).round(), (origin + dir * length).round(), Color(VoidFeather.VEIN, 0.18 * fade), width * 2.8)
+		for piece: PackedVector2Array in pieces:
+			_poly(canvas, piece, Color(HOT, 0.35 * fade * flare))
+		canvas.draw_line((origin + dir * 8.0).round(), (origin + dir * length).round(), Color(Color("fff7ff"), 0.85 * fade), 1.0)
+		var tip: Vector2 = (origin + dir * length).round()
+		canvas.draw_rect(Rect2(tip + Vector2(-2, -2), Vector2(5, 5)), Color(HOT, 0.9 * fade))
+		if sweeping:
+			canvas.draw_rect(Rect2(tip + Vector2(-5, -1), Vector2(11, 3)), Color(VoidFeather.VEIN_LIGHT, 0.35 * fade))
+		return
+	# the body: a dark outline, a rim of violet and a core of pale light; serrations (lamellae like the wing blades) along both edges
+	for piece: PackedVector2Array in pieces:
+		_poly(canvas, _grow_poly(piece, 1.6), Color(VoidFeather.OUTLINE, 0.95 * fade))
+	for piece: PackedVector2Array in pieces:
+		_poly(canvas, piece, Color(VoidFeather.RIM, fade))
+	for k: int in 9:
+		var u: float = 0.1 + 0.095 * float(k)
+		var base: Vector2 = origin + dir * (8.0 + (length - 8.0) * u)
+		var w: float = width * (1.0 - pow(u, 1.6))
+		for side: float in [-1.0, 1.0]:
+			var root: Vector2 = base + perp * side * w
+			var tooth: PackedVector2Array = PackedVector2Array([root - dir * 2.0, root + perp * side * 6.0 - dir * 7.0, root + dir * 4.0])
+			_poly(canvas, tooth, Color(VoidFeather.OUTLINE, 0.95 * fade))
+			_poly(canvas, PackedVector2Array([root - dir * 0.8, root + perp * side * 4.4 - dir * 5.4, root + dir * 2.6]), Color(VoidFeather.VEIN, fade))
+	for piece: PackedVector2Array in pieces:
+		var core: PackedVector2Array = PackedVector2Array()
+		var mid: Vector2 = (piece[0] + piece[1] + piece[2] + piece[3]) * 0.25
+		for v: Vector2 in piece:
+			core.append(mid.lerp(v, 0.45))
+		_poly(canvas, core, Color(VoidFeather.CORE, fade))
+	canvas.draw_line((origin + dir * 9.0).round(), (origin + dir * (length - 2.0)).round(), Color("fff7ff", fade), 1.0)
+
+
+func _grow_poly(poly: PackedVector2Array, amount: float) -> PackedVector2Array:
+	var c: Vector2 = Vector2.ZERO
+	for v: Vector2 in poly:
+		c += v
+	c /= float(poly.size())
+	var out: PackedVector2Array = PackedVector2Array()
+	for v: Vector2 in poly:
+		out.append(v + (v - c).normalized() * amount)
+	return out
 
 
 func _draw_cage(c: Dictionary, glow: bool) -> void:
@@ -646,17 +890,17 @@ func _draw_cage(c: Dictionary, glow: bool) -> void:
 			return
 		var urgency: float = smoothstep(float(c["show"]), t0, _clock)
 		var r0: float = float(c["r0"])
-		for k: int in 90:
-			var a: float = TAU * float(k) / 90.0
+		for k: int in 120:
+			var a: float = TAU * float(k) / 120.0
 			if _in_cage_gap(c, a):
 				continue
 			var p: Vector2 = centre + Vector2.from_angle(a) * r0
 			canvas.draw_rect(Rect2(p.round(), Vector2.ONE * (2 if k % 3 == 0 else 1)), Color(1.0, 0.45 + 0.4 * urgency, 0.6 + 0.2 * urgency, 0.45 + 0.4 * urgency))
 		for side: float in [-1.0, 1.0]:
 			var edge: float = gap_a + side * gap_w * 0.5
-			for step: int in 6:
-				var q: Vector2 = centre + Vector2.from_angle(edge) * (r0 - 4.0 + float(step) * 3.0)
-				canvas.draw_rect(Rect2(q.round(), Vector2(1, 1)), Color(HOT, 0.8))
+			for step: int in 8:
+				var q: Vector2 = centre + Vector2.from_angle(edge) * (r0 - 6.0 + float(step) * 3.0)
+				canvas.draw_rect(Rect2(q.round(), Vector2(1, 2)), Color(HOT, 0.8))
 		var out: Vector2 = Vector2.from_angle(gap_a)
 		var side_v: Vector2 = out.orthogonal()
 		for ring: int in 3:
@@ -670,12 +914,44 @@ func _draw_cage(c: Dictionary, glow: bool) -> void:
 	var fade: float = 1.0 - smoothstep(float(c["t1"]), float(c["t1"]) + 0.45, _clock)
 	var n: int = int(c["n"])
 	var span: float = TAU - gap_w
+	var beat: float = VoidGlow.beat(_clock, 0.0, 1.2)
+	var stakes: PackedVector2Array = PackedVector2Array()
 	for i: int in n:
 		var a2: float = gap_a + gap_w * 0.5 + span * (float(i) + 0.5) / float(n)
-		var pos: Vector2 = centre + Vector2.from_angle(a2) * radius + Vector2(0.0, -90.0 * (1.0 - drop * drop))
+		var pos: Vector2 = centre + Vector2.from_angle(a2) * radius + Vector2(0.0, -110.0 * (1.0 - drop * drop))
+		stakes.append(pos)
 		var lean: int = (i % 3) - 1
-		var art: Dictionary = VoidFeather.art(VoidFeather.FALL.x, VoidFeather.FALL.y, PI / 2.0 + VoidFeather.LEANS[lean + 1], i % 4)
+		var art: Dictionary = VoidFeather.art(VoidFeather.LINE_STUCK.x, VoidFeather.LINE_STUCK.y, PI / 2.0 + VoidFeather.LEANS[lean + 1], i % 2)
 		if glow:
 			_put(canvas, art["glow"] as Texture2D, art["tip"] as Vector2, pos, fade * (0.7 + 0.3 * sin(_clock * 22.0 + float(i))))
 		else:
 			_put(canvas, art["body"] as Texture2D, art["tip"] as Vector2, pos, fade)
+	if glow and drop >= 1.0:
+		# the wall of light between the stakes: a line at the height of the feathers' shafts, vertical threads that flicker, a bright pulse that runs round
+		var run: float = fposmod(_clock * 1.6, 1.0)
+		for i2: int in n - 1:
+			var p0: Vector2 = stakes[i2] + Vector2(0.0, -14.0)
+			var p1: Vector2 = stakes[i2 + 1] + Vector2(0.0, -14.0)
+			var near: float = 1.0 - clampf(absf(float(i2) / float(n) - run) * 7.0, 0.0, 1.0)
+			canvas.draw_line(p0.round(), p1.round(), Color(VoidFeather.VEIN, (0.28 + 0.2 * beat + 0.5 * near) * fade), 1.0)
+			canvas.draw_line((p0 + Vector2(0, 5)).round(), (p1 + Vector2(0, 5)).round(), Color(VoidFeather.VEIN_LIGHT, 0.12 * fade), 1.0)
+			if i2 % 2 == 0:
+				var tall: float = 8.0 + 8.0 * fposmod(sin(float(i2) * 12.9 + floorf(_clock * 9.0)) * 43758.5, 1.0)
+				canvas.draw_line(stakes[i2].round() + Vector2(0, -2), stakes[i2].round() + Vector2(0, -2.0 - tall), Color(HOT, 0.28 * fade), 1.0)
+		for side: float in [-1.0, 1.0]: ## the gap: two bright posts
+			var edge_a: float = gap_a + side * gap_w * 0.5
+			var post: Vector2 = centre + Vector2.from_angle(edge_a) * radius
+			canvas.draw_line(post.round(), post.round() + Vector2(0, -26), Color(HOT, 0.7 * fade), 1.0)
+			canvas.draw_rect(Rect2(post.round() + Vector2(-2, -28), Vector2(5, 3)), Color(HOT, 0.8 * fade))
+
+
+## draw_colored_polygon without the error for a polygon that has collapsed into a line (a blade seen edge-on, the first slice of a sweep)
+func _poly(canvas: Node2D, points: PackedVector2Array, color: Color) -> void:
+	var area: float = 0.0
+	for i: int in points.size():
+		var p: Vector2 = points[i]
+		var q: Vector2 = points[(i + 1) % points.size()]
+		area += p.x * q.y - q.x * p.y
+	if absf(area) < 6.0:
+		return
+	canvas.draw_colored_polygon(points, color)

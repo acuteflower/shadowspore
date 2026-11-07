@@ -1,7 +1,7 @@
 class_name ItemSlot
 extends Control
-## One inventory or equipment cell. Draws the item with a rarity-colored ring, supports
-## drag & drop, and right-click / double-click to equip or unequip.
+## One inventory or equipment cell. Draws the item with a rarity-colored ring; clicks go to the inventory
+## (the cursor stack model: take, put down, half, one, shift-click, number keys, see InventoryWindow).
 
 signal hovered(slot: ItemSlot)
 signal unhovered
@@ -14,6 +14,7 @@ var inventory: InventoryComponent
 var selected: bool = false
 var bare: bool = false ## no frame: only the icon and count (the hotbar draws its own setting)
 var hint: String = "" ## dim text shown while empty (slot name or hotbar number)
+var _dragging: bool = false
 
 
 func _ready() -> void:
@@ -48,31 +49,15 @@ func _draw() -> void:
 		PixelText.draw(self, label, Vector2i(SIZE - 2 - PixelText.width(label), SIZE - 9), UiStyle.TEXT, UiStyle.OUTLINE)
 
 
+## Clicks while the inventory is open (the host decides what they do, see InventoryComponent.request):
+## LMB takes a stack / puts the stack on the cursor down, SHIFT+LMB moves it at once, RMB takes half (or puts ONE down).
 func _gui_input(event: InputEvent) -> void:
 	var click: InputEventMouseButton = event as InputEventMouseButton
-	if click == null or not click.pressed:
+	if click == null or not click.pressed or inventory == null or not InputManager.inventory_open:
 		return
-	if click.button_index == MOUSE_BUTTON_RIGHT or (click.button_index == MOUSE_BUTTON_LEFT and click.double_click):
-		if kind == "inv":
-			inventory.request("equip", [ref, ""])
-		else:
-			inventory.request("unequip", [ref, -1])
-
-
-func _get_drag_data(_at: Vector2) -> Variant:
-	var item: Dictionary = stack()
-	if item.is_empty():
-		return null
-	var preview: TextureRect = TextureRect.new()
-	preview.texture = Items.icon(item)
-	preview.modulate.a = 0.85
-	set_drag_preview(preview)
-	return {"kind": kind, "ref": ref}
-
-
-func _can_drop_data(_at: Vector2, data: Variant) -> bool:
-	return data is Dictionary and data.has("kind") and data.has("ref") and inventory != null and inventory.can_drop(data["kind"], data["ref"], kind, ref)
-
-
-func _drop_data(_at: Vector2, data: Variant) -> void:
-	inventory.drop(data["kind"], data["ref"], kind, ref)
+	if click.button_index == MOUSE_BUTTON_LEFT:
+		inventory.request("quick" if click.shift_pressed else "click", [kind, ref])
+		accept_event()
+	elif click.button_index == MOUSE_BUTTON_RIGHT:
+		inventory.request("rclick", [kind, ref])
+		accept_event()

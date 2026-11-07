@@ -156,15 +156,11 @@ func _process(delta: float) -> void:
 
 
 func _update_drag_targets() -> void:
-	var drag: Variant = get_viewport().gui_get_drag_data()
-	_dragging = drag is Dictionary and (drag as Dictionary).has("kind")
+	_dragging = _inventory != null and not _inventory.held.is_empty() ## a stack on the cursor
 	_drag_any = false
 	_drag_ok.clear()
 	for i: int in _slots.size():
-		var ok: bool = false
-		if drag is Dictionary and (drag as Dictionary).has("kind") and _inventory != null:
-			var d: Dictionary = drag
-			ok = _inventory.can_drop(d["kind"], d["ref"], "inv", i) and not (d["kind"] == "inv" and d["ref"] == i)
+		var ok: bool = _dragging and _inventory.can_place("inv", i)
 		_drag_ok.append(ok)
 		_drag_any = _drag_any or ok
 

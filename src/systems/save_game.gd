@@ -29,6 +29,7 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	var player: Player = _local_player(tree)
 	if player == null or not tree.root.multiplayer.is_server():
 		return false
+	player.inventory.stow_held() ## a stack on the cursor goes back into the bag first
 	var data: Dictionary = {
 		"version": VERSION,
 		"saved_at": int(Time.get_unix_time_from_system()),

@@ -104,6 +104,7 @@ func setup(p_boss: SkyCleaver, p_field: FeatherField) -> void:
 		boss.set_corruption(1.0)
 	boss.set_floor(_floor_for(phase))
 	_aura = BossAura.begin(self)
+	_preload_sounds()
 	for i: int in SOUNDS:
 		var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
 		player.max_distance = 700.0
@@ -245,6 +246,15 @@ func _kick(amount: float) -> void:
 		_aura.kick(amount)
 
 
+## Loads every cue in the background now, so the first use in an attack is a cache hit and not a disk read on the main thread.
+func _preload_sounds() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	for cue: Variant in (boss.def_value("audio") as Dictionary).values():
+		if cue is String and String(cue).begins_with("res://"):
+			ResourceLoader.load_threaded_request(String(cue))
+
+
 func _sound(cue: String, at: Vector2, volume_db: float = 0.0, pitch: float = 1.0) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
@@ -253,7 +263,8 @@ func _sound(cue: String, at: Vector2, volume_db: float = 0.0, pitch: float = 1.0
 	if path.is_empty() or not ResourceLoader.exists(path):
 		return
 	if not _stream_cache.has(path):
-		_stream_cache[path] = load(path) as AudioStream
+		var loaded: bool = ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED
+		_stream_cache[path] = (ResourceLoader.load_threaded_get(path) if loaded else load(path)) as AudioStream
 	var player: AudioStreamPlayer2D = _sounds[_sound_i % SOUNDS]
 	_sound_i += 1
 	player.stream = _stream_cache[path] as AudioStream
@@ -660,7 +671,7 @@ func _end_act() -> void:
 	_clear_body()
 	boss.settle_on_perch()
 	if multiplayer.is_server() and (_combo or _hurry):
-		_gap = 0.06 if _combo else 0.12 ## the second half of a combination follows at once; the rift's gap is open: attack now
+		_gap = 0.8 if _combo else 0.6 ## (was 0.06 / 0.12: area attacks came back to back) the second half of a combination follows at once; the rift's gap is open: attack now
 		_combo = false
 		_hurry = false
 		return
@@ -1081,7 +1092,7 @@ func _lock_line(point: Vector2, now: float, lock: float, s: Dictionary, wing: in
 	var seg: float = length / float(count)
 	var fire: float = now + float(s["warn"]) + delay
 	var wing_src: Dictionary = _wing_origin(w, 2)
-	field.add_beam(_base_pos + dir * 14.0, _base_pos + dir * (14.0 + length), wing_src["screen"] as Vector2, now, fire, float(count) * float(s["seg_step"]), 0.2, float(s["half_width"]), 1 if act == Act.PINCER else 0)
+	field.add_beam(_base_pos + dir * 14.0, _base_pos + dir * (14.0 + length), wing_src["screen"] as Vector2, now, fire, float(count) * float(s["seg_step"]), 0.45, float(s["half_width"]), 1 if act == Act.PINCER else 0)
 	_at(_t + float(s["warn"]) + delay, _kick.bind(0.35))
 	for i: int in count:
 		var a: Vector2 = _base_pos + dir * (14.0 + seg * float(i))
@@ -1909,7 +1920,7 @@ func _host_rift(delta: float) -> void:
 		if _hurry_in < 0.0:
 			_hurry_in = -1.0
 			if mode == Mode.IDLE:
-				_gap = minf(_gap, 0.12)
+				_gap = minf(_gap, 0.6)
 			else:
 				_hurry = true
 	if _rift_left < 0.0:

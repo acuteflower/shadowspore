@@ -1103,5 +1103,295 @@
     "scale": 0.7
    }
   ]
+ },
+ "personalraum": {
+  "title": "Personalraum",
+  "dir": "res://assets/interior/personalraum/",
+  "size": [
+   304,
+   252
+  ],
+  "floor": [
+   16,
+   72,
+   272,
+   160
+  ],
+  "front_y": 210,
+  "surface": "stone",
+  "door_locked": true,
+  "ambient": {
+   "day": "#dcd6e8",
+   "night": "#4c4870"
+  },
+  "entry": [
+   232,
+   198
+  ],
+  "exit_door": {
+   "id": "door",
+   "pos": [
+    232,
+    228
+   ],
+   "leaf": [
+    204,
+    192
+   ]
+  },
+  "start": [
+   112,
+   150
+  ],
+  "shell": [
+   {
+    "tex": "floor.png",
+    "pos": [
+     16,
+     72
+    ],
+    "z": -6
+   },
+   {
+    "tex": "sky.png",
+    "pos": [
+     119,
+     26
+    ],
+    "z": -7
+   },
+   {
+    "tex": "wall.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5
+   },
+   {
+    "tex": "side_l.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5
+   },
+   {
+    "tex": "side_r.png",
+    "pos": [
+     288,
+     0
+    ],
+    "z": -5
+   }
+  ],
+  "crows": [
+   {
+    "perch": [
+     132,
+     54
+    ],
+    "exit": [
+     137,
+     6
+    ]
+   }
+  ],
+  "walls": [
+   [
+    16,
+    48,
+    272,
+    28
+   ],
+   [
+    0,
+    40,
+    24,
+    220
+   ],
+   [
+    280,
+    40,
+    24,
+    220
+   ],
+   [
+    0,
+    220,
+    208,
+    30
+   ],
+   [
+    256,
+    220,
+    48,
+    30
+   ],
+   [
+    208,
+    242,
+    48,
+    10
+   ]
+  ],
+  "props": [
+   {
+    "id": "broom_mount",
+    "tex": "broom_mount.png",
+    "pos": [
+     70,
+     67
+    ],
+    "feet": 51
+   },
+   {
+    "id": "broom",
+    "tex": "broom.png",
+    "pos": [
+     70,
+     68
+    ],
+    "feet": 52
+   },
+   {
+    "id": "broom_clips",
+    "tex": "broom_clips.png",
+    "pos": [
+     70,
+     69
+    ],
+    "feet": 53
+   },
+   {
+    "id": "rake_mount",
+    "tex": "rake_mount.png",
+    "pos": [
+     98,
+     67
+    ],
+    "feet": 51
+   },
+   {
+    "id": "rake",
+    "tex": "rake.png",
+    "pos": [
+     98,
+     68
+    ],
+    "feet": 52
+   },
+   {
+    "id": "rake_clips",
+    "tex": "rake_clips.png",
+    "pos": [
+     98,
+     69
+    ],
+    "feet": 53
+   },
+   {
+    "id": "shelf",
+    "tex": "shelf.png",
+    "pos": [
+     186,
+     57
+    ],
+    "feet": 32
+   },
+   {
+    "id": "bed",
+    "tex": "bed.png",
+    "pos": [
+     62,
+     128
+    ],
+    "feet": 50,
+    "solid": [
+     70,
+     12,
+     -35,
+     -10
+    ]
+   },
+   {
+    "id": "nightstand",
+    "tex": "nightstand.png",
+    "pos": [
+     40,
+     108
+    ],
+    "feet": 40,
+    "solid": [
+     18,
+     8,
+     -9,
+     -6
+    ],
+    "glow": "nightstand_glow.png"
+   },
+   {
+    "id": "wardrobe",
+    "tex": "wardrobe.png",
+    "pos": [
+     248,
+     92
+    ],
+    "feet": 74,
+    "solid": [
+     46,
+     12,
+     -23,
+     -14
+    ]
+   },
+   {
+    "id": "bucket",
+    "tex": "bucket.png",
+    "pos": [
+     270,
+     124
+    ],
+    "feet": 26,
+    "solid": [
+     12,
+     5,
+     -6,
+     -3
+    ]
+   },
+   {
+    "id": "boots",
+    "tex": "boots.png",
+    "pos": [
+     100,
+     140
+    ],
+    "feet": 14
+   }
+  ],
+  "decals": [
+   {
+    "tex": "rug.png",
+    "pos": [
+     26,
+     138
+    ],
+    "z": -4
+   }
+  ],
+  "lights": [
+   {
+    "pos": [
+     38,
+     92
+    ],
+    "color": "#ffb468",
+    "radius": 120,
+    "squash": 0.8,
+    "energy": 1.0,
+    "flicker": 0.22
+   }
+  ]
  }
 }

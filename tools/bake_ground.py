@@ -31,6 +31,7 @@ BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]])
 CELL = 13  # size of a flagstone
 PATH = [hexc(c) for c in ("55465a", "75666a", "958776", "b3a58a", "cfc2a2", "e4d8ba")]  # packed dry earth, violet in the shade
 STONE_CODE, PATH_CODE = 60, 80
+ARENA_GLOW = {}  # arena id -> glow picture (only the inlaid light of the floor), filled by bake_arena
 
 
 def clampi(v, lo, hi):
@@ -158,6 +159,9 @@ def bake_stone_field(spec, seed, centre):
     keep &= ~((holes > 0.72 + (bayer - 0.5) * 0.1))
     keep &= ~(relief_zone(x0, y0, w, h, centre) > 0.42 + (bayer - 0.5) * 0.5)  # nothing runs up onto a cliff
     keep &= ~((pits > 0.84) & (bayer > 0.2))
+    import arena_design  # the carved sun sigil, the ley lines to the pillars, the frieze (tools/arena_design.py)
+    paint, glow, solid = arena_design.design(spec, X, Y, sd, seed)
+    keep |= solid & top  # no hole of grass in the sigil or under a pillar
     img = np.zeros((h, w, 4), dtype=np.uint8)
     mask = np.zeros((h, w, 4), dtype=np.uint8)
     ys, xs = np.nonzero(keep)
@@ -282,6 +286,9 @@ def bake_arena(spec, seed):
     for pillar in spec.get("pillars", []):  # every pillar stands on paving, whatever the lip does
         near = np.hypot((X - pillar["pos"][0]) / 1.0, (Y - pillar["pos"][1]) * 1.6) < 26
         keep |= near & top & (holes < 0.8)
+    import arena_design  # the carved sun sigil, the ley lines to the pillars, the frieze (tools/arena_design.py)
+    paint, glow, solid = arena_design.design(spec, X, Y, sd, seed)
+    keep |= solid & top  # no hole of grass in the sigil or under a pillar
     img = np.zeros((h, w, 4), dtype=np.uint8)
     mask = np.zeros((h, w, 4), dtype=np.uint8)
     ys, xs = np.nonzero(keep)
@@ -291,6 +298,14 @@ def bake_arena(spec, seed):
         mask[y, x] = (STONE_CODE, 0, 0, 255)
         if depth[y, x] < 16 and grown[y, x] > 0.30 + depth[y, x] / 24.0:  # moss and grass grow over the stones near the lip
             img[y, x] = MOSS[(x + y) % 3] if grown[y, x] < 0.62 else (BUSH[3] if (x * 7 + y * 3) % 5 else MEADOW[3])
+    pm = (paint[:, :, 3] == 255) & keep
+    img[pm] = paint[pm]
+    glow[~pm] = 0
+    mossy = pm & (depth < 14) & (grown > 0.55 + depth / 30.0)  # moss and grass grow over the carvings too, near the lip
+    for y, x in zip(*np.nonzero(mossy)):
+        img[y, x] = MOSS[(x + y) % 3]
+        glow[y, x] = 0
+    ARENA_GLOW[spec["id"]] = glow
     rng = random.Random(seed)
     for _ in range(int(w * h / 38)):  # grass blades and tufts creeping over the lip
         x, y = rng.randrange(4, w - 4), rng.randrange(8, h - 2)
@@ -307,6 +322,8 @@ def bake_arena(spec, seed):
         x, y = rng.randrange(4, w - 4), rng.randrange(8, h - 2)
         if keep[y, x] and sd[y, x] > -12:
             tuft(img, x, y, rng.randrange(3, 6), rng, MEADOW)
+    arena_design.rubble(img, keep, top, sd, spec, X, Y, seed)
+    arena_design.plant_remains(img, keep, sd, spec, X, Y, seed)
     for _ in range(int(w * h / 650)):  # loose pebbles and chips just outside
         x, y = rng.randrange(2, w - 2), rng.randrange(2, h - 2)
         if not keep[y, x] and top[y, x] and -6 < sd[y, x] < 12 and img[y, x, 3] == 0:
@@ -315,6 +332,42 @@ def bake_arena(spec, seed):
             if rng.random() < 0.4:
                 img[y, x + 1] = STONE[1]
     return img, mask, (x0, y0)
+
+
+def bake_arena_zone(spec):
+    """Where the boss fight reaches: the WHOLE top of the plateau (not only the flagstones that survived: the grass between them and the green rim count too), cut 2 px inside
+    the lip, and only the piece that is connected to the drawn polygon. Returns (RGBA picture with alpha 255 inside, (ox, oy) relative to the tile's centre)."""
+    from PIL import Image, ImageDraw
+    poly = spec["poly"]
+    pad = 70
+    x0, y0 = int(min(p[0] for p in poly)) - pad, int(min(p[1] for p in poly)) - pad
+    x1, y1 = int(max(p[0] for p in poly)) + pad, int(max(p[1] for p in poly)) + pad
+    w, h = x1 - x0, y1 - y0
+    centre = (spec["tile"][0] * 16 + 8, spec["tile"][1] * 16 + 8)
+    X = np.arange(w)[None, :] + x0 + 0.5
+    Y = np.arange(h)[:, None] + y0 + 0.5
+    PX, PY = np.broadcast_arrays(X + centre[0], Y + centre[1])
+    field = relief_field(int(spec.get("level", 3)) - 1, PX, PY)
+    top = ~_grow(field <= 0.58, 2)
+    shape = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(shape).polygon([(p[0] - x0, p[1] - y0) for p in poly], fill=255)
+    seed_px = np.array(shape) > 0
+    zone = np.zeros((h, w), bool)
+    stack = [tuple(p) for p in zip(*np.nonzero(seed_px & top))][::97]  # a few seeds inside the polygon, then flood over the plateau top
+    for y, x in stack:
+        if zone[y, x]:
+            continue
+        zone[y, x] = True
+        todo = [(y, x)]
+        while todo:
+            cy, cx = todo.pop()
+            for ny, nx in ((cy + 1, cx), (cy - 1, cx), (cy, cx + 1), (cy, cx - 1)):
+                if 0 <= ny < h and 0 <= nx < w and top[ny, nx] and not zone[ny, nx]:
+                    zone[ny, nx] = True
+                    todo.append((ny, nx))
+    img = np.zeros((h, w, 4), dtype=np.uint8)
+    img[zone] = (STONE_CODE, 0, 0, 255)
+    return img, (x0, y0)
 
 
 # ------------------------------------------------------------------ the footpath
@@ -730,8 +783,11 @@ def main():
         name = arena["id"] + "_arena"
         save(ROOT / "assets" / "world" / "ground" / (name + ".png"), img)
         save(ROOT / "assets" / "world" / "ground" / (name + "_mask.png"), mask)
+        save(ROOT / "assets" / "world" / "ground" / (name + "_glow.png"), ARENA_GLOW[arena["id"]])
+        zone, (zx, zy) = bake_arena_zone(arena)
+        save(ROOT / "assets" / "world" / "ground" / (name + "_zone.png"), zone)
         feet = (arena["tile"][0] * 16 + 8, arena["tile"][1] * 16 + 8)
-        baked.append({"id": name, "texture": "res://assets/world/ground/%s.png" % name, "mask": "res://assets/world/ground/%s_mask.png" % name, "x": feet[0] + ox, "y": feet[1] + oy})
+        baked.append({"zone": "res://assets/world/ground/%s_zone.png" % name, "zone_x": feet[0] + zx, "zone_y": feet[1] + zy, "id": name, "texture": "res://assets/world/ground/%s.png" % name, "mask": "res://assets/world/ground/%s_mask.png" % name, "glow": "res://assets/world/ground/%s_glow.png" % name, "x": feet[0] + ox, "y": feet[1] + oy})
         yards.append((img, mask, (ox, oy)))
         print("baked", name, img.shape[1], "x", img.shape[0])
     if only_yards:

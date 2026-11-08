@@ -109,7 +109,12 @@ func _ready() -> void:
 	_canvas.name = "Canvas"
 	_canvas.draw.connect(_paint)
 	add_child(_canvas)
+	get_window().mouse_entered.connect(func() -> void: _in_window = true)
+	get_window().mouse_exited.connect(func() -> void: _in_window = false)
 	Input.use_accumulated_input = false ## every mouse event counts: the cursor follows without a stutter
+
+
+var _in_window: bool = true ## the pointer is over the game window (mouse_entered / mouse_exited)
 
 
 func _exit_tree() -> void:
@@ -133,7 +138,7 @@ func _process(_delta: float) -> void:
 	_last_usec = now
 	_enabled = bool(GameSettings.get_value("cursor"))
 	if Input.mouse_mode == Input.MOUSE_MODE_HIDDEN or Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
-		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN if _enabled else Input.MOUSE_MODE_VISIBLE
+		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN if _enabled and _in_window else Input.MOUSE_MODE_VISIBLE ## outside the window the system pointer must show
 	_canvas.visible = _enabled
 	if not _enabled:
 		return

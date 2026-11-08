@@ -128,7 +128,7 @@ func _ready() -> void:
 	_last_pos = global_position
 	_last_height = _height
 	heading = (_centre - global_position).angle()
-	_rig.tick_hz = 60.0 ## physics runs at 120 Hz; the rig (about 9 ms a rebuild) needs no more than the screen shows
+	_rig.tick_hz = 40.0 ## physics runs at 120 Hz; the rig (about 9 ms a rebuild) needs no more than the screen shows
 	_shadow.draw.connect(_draw_shadow)
 	_rig.wing_beat.connect(_on_wing_beat)
 	_rig.bead_dropped.connect(_on_bead_dropped)
@@ -164,12 +164,13 @@ func _process(_delta: float) -> void:
 
 
 ## Is any living player close enough to see it? (the screen reaches about 370 px from its middle; the picture is lifted by `_height`)
-## How often the rig is rebuilt (about 9 ms a rebuild): 60 a second while anything moves fast, 30 while he only sits, rests or lies there.
+## How often the rig is rebuilt (6-10 ms a rebuild, measured with tools/bench_sky_cleaver.tscn): 40 a second while anything moves fast, 30 while he only
+## sits, rests or lies there. Both divide the 120 Hz physics tick evenly; the old 60 doubled the cost exactly when an attack started (the lag).
 func _wanted_tick() -> float:
 	if state in [State.FLYING, State.HOVER, State.TAKEOFF, State.LANDING, State.STAGGER, State.CRASHED, State.DEAD]:
-		return 60.0
+		return 40.0
 	if fight != null and fight.wants_fast():
-		return 60.0
+		return 40.0
 	return 30.0
 
 

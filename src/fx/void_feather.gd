@@ -48,11 +48,11 @@ static func warm_list() -> Array[Array]:
 			for v: int in 4:
 				_warm.append([length, BARRIER_WIDTH, PI / 2.0 + lean, v])
 		for stuck: Vector2i in [SHOT_STUCK, SALVO_STUCK, LINE_STUCK]:
-			for v: int in 2:
+			for v: int in 4:
 				_warm.append([stuck.x, stuck.y, PI / 2.0 + lean, v])
 	for k: int in STEPS:
 		for size: Vector2i in [THROWN, SHOT, SALVO, LINE]:
-			for v: int in (2 if size == SHOT else 1):
+			for v: int in 4: ## the fight rolls 0..3 for every one of them: a missing picture is drawn in the middle of the attack (0.5-1.6 ms each, a chase salvo needs ~30)
 				_warm.append([size.x, size.y, float(k) / float(STEPS) * TAU, v])
 	return _warm
 

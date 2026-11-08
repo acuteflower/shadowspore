@@ -46,6 +46,7 @@ var _shape_a: PackedVector4Array = PackedVector4Array()
 var _shape_b: PackedVector4Array = PackedVector4Array()
 var _shape_c: PackedVector4Array = PackedVector4Array()
 var _shapes_on: bool = false
+var _shader_warm: int = 4
 var _drew: bool = false
 var stat_us: int = 0 ## profiling: microseconds spent in _process and the two draws since the reader last reset it
 
@@ -56,13 +57,13 @@ func setup(decal: Dictionary, p_host: bool) -> void:
 	top_level = true
 	global_position = Vector2.ZERO
 	z_index = 0
-	var mask_texture: Texture2D = load(String(decal["mask"])) as Texture2D
+	var mask_texture: Texture2D = load(String(decal.get("zone", decal["mask"]))) as Texture2D ## the fight reaches the whole top of the plateau (`zone`), not only the flagstones
 	var image: Image = mask_texture.get_image()
 	image.convert(Image.FORMAT_RGBA8)
 	_mask_bytes = image.get_data()
 	_mask_w = image.get_width()
 	_mask_h = image.get_height()
-	_mask_origin = Vector2(float(decal["x"]), float(decal["y"]))
+	_mask_origin = Vector2(float(decal.get("zone_x", decal["x"])), float(decal.get("zone_y", decal["y"])))
 	_material.shader = SHADER
 	_material.set_shader_parameter("floor_mask", mask_texture)
 	_material.set_shader_parameter("mask_origin", _mask_origin)
@@ -80,7 +81,7 @@ func setup(decal: Dictionary, p_host: bool) -> void:
 	_ground.size = Vector2(_mask_w, _mask_h)
 	_ground.z_index = GROUND_Z
 	_ground.material = _material
-	_ground.visible = false
+	_ground.visible = true ## shown empty for a few frames so the shader is compiled before the first warning (a first-use compile is a hitch)
 	add_child(_ground)
 	_deck = Node2D.new()
 	_deck.name = "Deck"
@@ -361,7 +362,12 @@ func _run_beams() -> void:
 			for n: int in 2: ## sparks fly off where the beam burns the floor
 				var dir: Vector2 = Vector2.from_angle(randf() * TAU)
 				_bits.append({"kind": 0, "pos": head + dir * 2.0, "vel": Vector2(dir.x * randf_range(20.0, 80.0), randf_range(-90.0, -30.0)), "age": 0.0, "life": randf_range(0.2, 0.45), "white": randf() < 0.6})
-		if _clock > fire + float(b["reveal"]) + float(b["hold"]) + 1.4:
+		var shut: float = fire + float(b["reveal"]) + float(b["hold"])
+		if not bool(b.get("shut", false)) and _clock >= shut:
+			b["shut"] = true
+			for k: int in 5: ## the tear snaps shut: dust and chips all along it
+				_impact((b["a"] as Vector2).lerp(b["b"] as Vector2, (float(k) + 0.5) / 5.0), 0.5)
+		if _clock > shut + 1.7:
 			_beams.remove_at(i)
 
 
@@ -436,8 +442,10 @@ func _run_bits(delta: float) -> void:
 
 func _push_shapes() -> void:
 	if _zones.is_empty():
-		if _shapes_on:
-			_shapes_on = false
+		_shapes_on = false
+		if _shader_warm > 0:
+			_shader_warm -= 1
+		else:
 			_ground.visible = false
 		return
 	var n: int = 0
@@ -653,21 +661,15 @@ func _hand_angle(h: Dictionary) -> float:
 	return lerpf(float(h["a0"]), float(h["a1"]), s)
 
 
-func _blade_poly(origin: Vector2, angle: float, length: float, root_w: float, grow: float) -> Array[PackedVector2Array]:
-	# the blade as a row of convex pieces (a tapering trapezoid per section) so it can be drawn without triangulation problems
+## The spine of a wing sickle: from the hub along `angle`, its tip bowing back against the sweep (at most 8 px, the lane is 13 px wide on each side, so what is drawn stays inside what hurts).
+func _sickle_spine(origin: Vector2, angle: float, length: float, sdir: float) -> PackedVector2Array:
 	var dir: Vector2 = Vector2.from_angle(angle)
 	var perp: Vector2 = dir.orthogonal()
-	var pieces: Array[PackedVector2Array] = []
-	var n: int = 12
-	for i: int in n:
-		var u0: float = float(i) / float(n)
-		var u1: float = float(i + 1) / float(n)
-		var w0: float = maxf(root_w * (1.0 - pow(u0, 1.6)) * (1.0 + 0.25 * sin(u0 * 9.0)), 0.7)
-		var w1: float = maxf(root_w * (1.0 - pow(u1, 1.6)) * (1.0 + 0.25 * sin(u1 * 9.0)), 0.7)
-		var p0: Vector2 = origin + dir * (8.0 + (length - 8.0) * u0)
-		var p1: Vector2 = origin + dir * (8.0 + (length - 8.0) * u1)
-		pieces.append(PackedVector2Array([p0 - perp * w0, p1 - perp * w1, p1 + perp * w1, p0 + perp * w0]))
-	return pieces
+	var pts: PackedVector2Array = PackedVector2Array()
+	for i: int in 13:
+		var u: float = float(i) / 12.0
+		pts.append(origin + dir * (8.0 + (length - 8.0) * u) - perp * sdir * 8.0 * u * u)
+	return pts
 
 
 func _draw_deck() -> void:
@@ -690,14 +692,7 @@ func _draw_deck() -> void:
 				_deck.draw_line(prev.round(), pt.round(), Color(VoidFeather.OUTLINE, 0.45 * fade), 5.0 - float(r))
 				prev = pt
 	for b: Dictionary in _beams:
-		var fire: float = float(b["fire"])
-		if _clock < fire:
-			continue
-		var s: float = clampf((_clock - fire) / maxf(float(b["reveal"]), 0.01), 0.0, 1.0)
-		var fade: float = 1.0 - smoothstep(fire + float(b["reveal"]) + float(b["hold"]), fire + float(b["reveal"]) + float(b["hold"]) + 1.4, _clock)
-		var head: Vector2 = (b["a"] as Vector2).lerp(b["b"] as Vector2, s)
-		_deck.draw_line((b["a"] as Vector2).round(), head.round(), Color(VoidFeather.OUTLINE, 0.5 * fade), float(b["half"]) * 0.7)
-		_deck.draw_line((b["a"] as Vector2).round(), head.round(), Color(VoidFeather.RIM, 0.35 * fade), float(b["half"]) * 0.25)
+		_draw_cleave(b, _deck, false)
 
 
 func _draw_deck_glow() -> void:
@@ -732,7 +727,7 @@ func _draw_deck_glow() -> void:
 			var alpha: float = pow(1.0 - u0, 2.2) * 0.2 * fade
 			_poly(_deck_glow, PackedVector2Array([origin, origin + Vector2.from_angle(ang0) * length, origin + Vector2.from_angle(ang1) * length]), Color(VoidFeather.VEIN, alpha))
 	for b: Dictionary in _beams:
-		_draw_beam_glow(b, _deck_glow, true)
+		_draw_cleave(b, _deck_glow, true)
 
 
 func _beam_colors(kind: int) -> Array[Color]:
@@ -758,63 +753,114 @@ func _jag(a: Vector2, b: Vector2, seed_v: float, amount: float) -> PackedVector2
 	return pts
 
 
-## The charging thread, the beam itself and the flash where it starts. `glow` draws the additive half; the body half is the thin hot core on top of the dark scorch.
-func _draw_beam_glow(b: Dictionary, canvas: Node2D, glow: bool) -> void:
+## The sky cleave (replaces the old beam): the wing draws a hairline crack across the floor along the lane (`show` .. `fire`), at `fire` the crack tears open from `a` to `b` in
+## `reveal` seconds into a lens of torn sky as wide as the lane (the same look as the rift wall: black void, cold lips with basalt teeth, a sky of violet turning magenta
+## with a hot seam, streaks of light rising out of it), holds, snaps shut (flash, dust) and leaves a scar that fades. `glow` draws the additive half, the other half the
+## opaque floor (scorch, lips, void, teeth).
+func _draw_cleave(b: Dictionary, canvas: Node2D, glow: bool) -> void:
 	var show: float = float(b["show"])
 	var fire: float = float(b["fire"])
 	if _clock < show:
 		return
 	var cols: Array[Color] = _beam_colors(int(b["kind"]))
+	var rim: Color = VoidFeather.RIM if int(b["kind"]) == 0 else Color("c0307f")
 	var a: Vector2 = b["a"] as Vector2
+	var e: Vector2 = b["b"] as Vector2
 	var src: Vector2 = b["src"] as Vector2
 	var half: float = float(b["half"])
+	var seed_v: float = float(b["seed"])
 	if _clock < fire:
-		# the wing gathers light and spills a thread of it onto the floor where the beam will start; motes run down the thread
+		# the cut: the wing draws a jagged hairline from the start towards the end, a thin thread of light from the wing tip follows its head
 		var k: float = smoothstep(show, fire, _clock)
-		var thread: PackedVector2Array = _jag(src, a, float(b["seed"]), 2.0 + 3.0 * (1.0 - k))
-		for i: int in thread.size() - 1:
-			canvas.draw_line(thread[i].round(), thread[i + 1].round(), Color(cols[1], (0.15 + 0.5 * k) * (0.7 + 0.3 * sin(_clock * 40.0))), 1.0)
-		for m: int in 5:
-			var u: float = fposmod(_clock * (1.2 + 0.4 * float(m)) + float(m) * 0.37, 1.0)
-			var p: Vector2 = src.lerp(a, u)
-			canvas.draw_rect(Rect2(p.round(), Vector2.ONE * (2 if m % 2 == 0 else 1)), Color(cols[0], 0.7 * k))
-		var r: float = 4.0 + 8.0 * (1.0 - k)
-		for i2: int in 14: ## a ring closes in on the starting point
-			var ang: float = TAU * float(i2) / 14.0 + _clock * 3.0
-			canvas.draw_rect(Rect2((a + Vector2.from_angle(ang) * Vector2(r, r * 0.6)).round(), Vector2.ONE), Color(cols[0], 0.3 + 0.6 * k))
-		canvas.draw_rect(Rect2(a.round() + Vector2(-2, -1), Vector2(5, 3)), Color(cols[0], 0.4 + 0.5 * k))
+		var tip: Vector2 = a.lerp(e, k)
+		var cut: PackedVector2Array = _jag(a, tip, seed_v, 1.6)
+		for n: int in cut.size() - 1:
+			if glow:
+				canvas.draw_line(cut[n].round(), cut[n + 1].round(), Color(cols[1], 0.25 + 0.45 * k), 1.0)
+			else:
+				canvas.draw_line(cut[n].round(), cut[n + 1].round(), Color(VoidFeather.OUTLINE, 0.6), 2.0)
+		if glow:
+			var thread: PackedVector2Array = _jag(src, tip, seed_v, 2.0 + 2.0 * (1.0 - k))
+			for n2: int in thread.size() - 1:
+				canvas.draw_line(thread[n2].round(), thread[n2 + 1].round(), Color(cols[1], (0.1 + 0.3 * k) * (0.7 + 0.3 * sin(_clock * 40.0))), 1.0)
+			canvas.draw_rect(Rect2(tip.round() + Vector2(-1, -1), Vector2(3, 3)), Color(cols[0], 0.8))
+			for m: int in 3: ## dust lifts off the crack behind the tip
+				var h: float = fposmod(sin(seed_v * 12.9 + float(m) * 78.2 + floorf(_clock * 14.0)) * 43758.5, 1.0)
+				canvas.draw_rect(Rect2((a.lerp(tip, h) + Vector2(0.0, -fposmod(_clock * 22.0 + h * 9.0, 8.0))).round(), Vector2.ONE), Color(cols[0], 0.6 * k))
 		return
 	var reveal: float = maxf(float(b["reveal"]), 0.01)
-	var s: float = clampf((_clock - fire) / reveal, 0.0, 1.0)
-	var end: float = fire + reveal + float(b["hold"])
-	var fade: float = 1.0 - smoothstep(end, end + 0.35, _clock)
-	var head: Vector2 = a.lerp(b["b"] as Vector2, s)
-	var thin: float = 1.0 - smoothstep(end - 0.12, end + 0.35, _clock) * 0.8
-	var burn: float = 1.0 + 0.4 * sin(_clock * 55.0)
-	var pts: PackedVector2Array = _jag(a, head, float(b["seed"]), 2.5)
-	# a wall of light standing on the lane (the beam has height: a short curtain above it), then the bright body
-	for i: int in pts.size() - 1:
-		var p0: Vector2 = pts[i].round()
-		var p1: Vector2 = pts[i + 1].round()
-		if glow:
-			canvas.draw_line(p0, p1, Color(cols[2], 0.16 * fade), half * 1.6)
-			canvas.draw_line(p0, p1, Color(cols[1], 0.3 * fade), half * 0.7 * thin)
-			canvas.draw_line(p0, p1, Color(cols[0], 0.8 * fade), 3.0 * thin * burn)
-			canvas.draw_line(p0 + Vector2(0, -6), p1 + Vector2(0, -6), Color(cols[1], 0.2 * fade), 2.0)
-	if glow:
-		# the thread from the wing stays lit while the beam is born, and the head is a bright knot with a flare
-		if _clock < fire + reveal + 0.1:
-			var thread: PackedVector2Array = _jag(src, a, float(b["seed"]), 1.5)
-			for i: int in thread.size() - 1:
-				canvas.draw_line(thread[i].round(), thread[i + 1].round(), Color(cols[0], 0.6 * fade), 1.0)
-		if s < 1.0:
-			canvas.draw_rect(Rect2(head.round() + Vector2(-3, -3), Vector2(7, 7)), Color(cols[0], 0.85))
-			canvas.draw_rect(Rect2(head.round() + Vector2(-7, -2), Vector2(15, 5)), Color(cols[1], 0.3))
-		var flash: float = 1.0 - clampf((_clock - fire) / 0.22, 0.0, 1.0)
-		if flash > 0.0:
-			canvas.draw_rect(Rect2(a.round() + Vector2(-8, -5), Vector2(17, 11)), Color(cols[0], 0.6 * flash))
+	var open_end: float = fire + reveal + float(b["hold"])
+	var scar: float = 1.0 - smoothstep(open_end + 0.3, open_end + 1.6, _clock)
+	if scar <= 0.0:
+		return
+	var close: float = smoothstep(open_end, open_end + 0.28, _clock) ## snaps shut
+	var length: float = a.distance_to(e)
+	var head_d: float = clampf((_clock - fire) / reveal, 0.0, 1.0) * length
+	var u: Vector2 = (e - a).normalized()
+	var nrm: Vector2 = u.orthogonal()
+	var count: int = maxi(6, int(length / 6.0))
+	var beat: float = VoidGlow.beat(_clock, 0.0, 0.8)
+	var pts: PackedVector2Array = PackedVector2Array()
+	var widths: PackedFloat32Array = PackedFloat32Array()
+	for i: int in count + 1:
+		var t: float = float(i) / float(count)
+		var d: float = t * length
+		if d > head_d:
+			break
+		var behind: float = smoothstep(0.0, 34.0, head_d - d) ## the front of the tear is a thin crack
+		var lens: float = pow(sin(PI * clampf(t, 0.03, 0.97)), 0.55)
+		var rag: float = 0.8 + 0.4 * fposmod(sin(seed_v * 7.3 + float(i) * 12.9898) * 43758.5453, 1.0)
+		pts.append(a + u * d + nrm * sin(t * 9.0 + seed_v) * 2.0)
+		widths.append(half * 2.0 * lens * behind * rag * (1.0 - close))
+	if pts.size() < 2:
+		return
+	for i2: int in pts.size() - 1:
+		var p0: Vector2 = pts[i2].round()
+		var p1: Vector2 = pts[i2 + 1].round()
+		var w: float = (widths[i2] + widths[i2 + 1]) * 0.5
+		if not glow:
+			canvas.draw_line(p0, p1, Color(VoidFeather.OUTLINE, 0.55 * scar), maxf(w + 10.0, 3.0) * (1.0 if w > 1.0 else 0.2)) ## scorch round the lips
+			if w > 1.0:
+				canvas.draw_line(p0, p1, Color(rim, 0.85), w + 3.0)
+				canvas.draw_line(p0, p1, Color(0.012, 0.0, 0.035, 0.97), w)
+				if i2 % 2 == 0 and w > 6.0: ## basalt teeth on both lips
+					var tooth: float = 2.0 + 3.0 * fposmod(sin(seed_v * 3.1 + float(i2) * 4.7) * 43758.5453, 1.0)
+					for side: float in [-1.0, 1.0]:
+						var root: Vector2 = p0 + nrm * side * (w * 0.5 + 1.0)
+						canvas.draw_line(root.round(), (root + nrm * side * tooth + u * 2.0).round(), Color(VoidFeather.OUTLINE, 1.0), 2.0)
+						canvas.draw_rect(Rect2((root + nrm * side * tooth).round(), Vector2.ONE), Color(rim, 0.9))
+			else:
+				canvas.draw_line(p0, p1, Color(VoidFeather.OUTLINE, 0.6 * scar), 2.0) ## the scar that stays
+		elif w > 1.0:
+			canvas.draw_line(p0, p1, Color(cols[2], 0.1 + 0.05 * beat), w * 0.8) ## the sky inside: deep colour, a hotter band, the seam
+			canvas.draw_line(p0, p1, Color(cols[1], 0.09), w * 0.45)
+	if not glow:
+		return
+	var seam: PackedVector2Array = _jag(pts[0], pts[pts.size() - 1], seed_v, 1.6)
+	var snap: float = clampf(close * 3.0, 0.0, 1.0) * (1.0 - close) ## a white flash as it shuts
+	for n3: int in seam.size() - 1:
+		canvas.draw_line(seam[n3].round(), seam[n3 + 1].round(), Color(cols[0], (0.85 + 0.15 * beat) * (1.0 - close * 0.6)), 1.0 + 2.0 * snap)
+	for m2: int in 12: ## streaks of light climb out of the tear
+		var hh: float = fposmod(sin(seed_v * 5.7 + float(m2) * 31.7) * 43758.5453, 1.0)
+		var along: float = hh * head_d
+		var wid: float = half * 2.0 * pow(sin(PI * clampf(along / maxf(length, 1.0), 0.03, 0.97)), 0.55) * (1.0 - close)
+		if wid < 3.0:
+			continue
+		var base: Vector2 = a + u * along + nrm * (fposmod(hh * 9.0, 1.0) - 0.5) * wid * 0.8
+		var rise: float = fposmod(_clock * (16.0 + 20.0 * hh) + hh * 60.0, 28.0)
+		canvas.draw_rect(Rect2((base + Vector2(0.0, -rise - 3.0)).round(), Vector2(1.0, 2.0 + 4.0 * hh)), Color(cols[1], (1.0 - rise / 28.0) * 0.8 * (1.0 - close)))
+	if head_d < length: ## the head of the tear: a bright knot
+		var head: Vector2 = a + u * head_d
+		canvas.draw_rect(Rect2(head.round() + Vector2(-3, -3), Vector2(7, 7)), Color(cols[0], 0.8))
+		canvas.draw_rect(Rect2(head.round() + Vector2(-7, -2), Vector2(15, 5)), Color(cols[1], 0.3))
+	var flash: float = 1.0 - clampf((_clock - fire) / 0.22, 0.0, 1.0)
+	if flash > 0.0:
+		canvas.draw_rect(Rect2(a.round() + Vector2(-8, -5), Vector2(17, 11)), Color(cols[0], 0.6 * flash))
 
 
+## One hand of the clock, drawn as a great wing blade that sweeps over the floor like a sickle: a curved razor of black flesh with a lit leading edge, the trailing edge fringed with
+## feather barbs (the lamellae of his own wings), a vein of light along its spine, a root plate with three stubs at the pillar, and three fading afterimages behind it.
+## The lane that hurts is the straight line under its spine (a hair wider than the blade); the afterimages are ghosts and only drawn in the additive layer.
 func _draw_hand(h: Dictionary, glow: bool) -> void:
 	if _clock < float(h["show"]):
 		return
@@ -827,42 +873,64 @@ func _draw_hand(h: Dictionary, glow: bool) -> void:
 	var origin: Vector2 = (h["o"] as Vector2) + Vector2(0.0, -4.0)
 	var angle: float = _hand_angle(h)
 	var sweeping: bool = _clock >= float(h["t0"])
-	var width: float = 7.5 * (0.5 + 0.5 * grow)
-	var pieces: Array[PackedVector2Array] = _blade_poly(origin, angle, length, width, grow)
+	var sdir: float = signf(float(h["a1"]) - float(h["a0"]))
+	var width: float = 7.0 * (0.5 + 0.5 * grow)
 	var dir: Vector2 = Vector2.from_angle(angle)
 	var perp: Vector2 = dir.orthogonal()
+	var spine: PackedVector2Array = _sickle_spine(origin, angle, length, sdir)
 	var flare: float = 0.7 + 0.3 * sin(_clock * 28.0)
 	if glow:
-		canvas.draw_line((origin + dir * 8.0).round(), (origin + dir * length).round(), Color(VoidFeather.VEIN, 0.18 * fade), width * 2.8)
-		for piece: PackedVector2Array in pieces:
-			_poly(canvas, piece, Color(HOT, 0.35 * fade * flare))
-		canvas.draw_line((origin + dir * 8.0).round(), (origin + dir * length).round(), Color(Color("fff7ff"), 0.85 * fade), 1.0)
-		var tip: Vector2 = (origin + dir * length).round()
+		if sweeping: ## afterimages: the same sickle a little further back in the sweep
+			for k: int in range(1, 4):
+				var ghost: PackedVector2Array = _sickle_spine(origin, angle - sdir * 0.1 * float(k), length * (1.0 - 0.04 * float(k)), sdir)
+				for n: int in ghost.size() - 1:
+					canvas.draw_line(ghost[n].round(), ghost[n + 1].round(), Color(VoidFeather.VEIN, 0.2 / float(k) * fade), maxf(width * (1.0 - float(n) / 12.0) * 1.2, 1.0))
+		for n2: int in spine.size() - 1:
+			var w2: float = width * (1.0 - pow(float(n2) / 12.0, 1.4))
+			canvas.draw_line(spine[n2].round(), spine[n2 + 1].round(), Color(VoidFeather.VEIN, 0.16 * fade), w2 * 2.6)
+			canvas.draw_line(spine[n2].round(), spine[n2 + 1].round(), Color(Color("fff7ff"), (0.55 + 0.35 * flare) * fade), 1.0)
+			var edge0: Vector2 = spine[n2] + perp * sdir * w2 ## the razor edge on the side the sweep moves towards
+			var edge1: Vector2 = spine[n2 + 1] + perp * sdir * w2
+			canvas.draw_line(edge0.round(), edge1.round(), Color(HOT, 0.7 * fade), 1.0)
+		var tip: Vector2 = spine[12].round()
 		canvas.draw_rect(Rect2(tip + Vector2(-2, -2), Vector2(5, 5)), Color(HOT, 0.9 * fade))
 		if sweeping:
 			canvas.draw_rect(Rect2(tip + Vector2(-5, -1), Vector2(11, 3)), Color(VoidFeather.VEIN_LIGHT, 0.35 * fade))
 		return
-	# the body: a dark outline, a rim of violet and a core of pale light; serrations (lamellae like the wing blades) along both edges
-	for piece: PackedVector2Array in pieces:
-		_poly(canvas, _grow_poly(piece, 1.6), Color(VoidFeather.OUTLINE, 0.95 * fade))
-	for piece: PackedVector2Array in pieces:
-		_poly(canvas, piece, Color(VoidFeather.RIM, fade))
-	for k: int in 9:
-		var u: float = 0.1 + 0.095 * float(k)
-		var base: Vector2 = origin + dir * (8.0 + (length - 8.0) * u)
-		var w: float = width * (1.0 - pow(u, 1.6))
-		for side: float in [-1.0, 1.0]:
-			var root: Vector2 = base + perp * side * w
-			var tooth: PackedVector2Array = PackedVector2Array([root - dir * 2.0, root + perp * side * 6.0 - dir * 7.0, root + dir * 4.0])
-			_poly(canvas, tooth, Color(VoidFeather.OUTLINE, 0.95 * fade))
-			_poly(canvas, PackedVector2Array([root - dir * 0.8, root + perp * side * 4.4 - dir * 5.4, root + dir * 2.6]), Color(VoidFeather.VEIN, fade))
-	for piece: PackedVector2Array in pieces:
-		var core: PackedVector2Array = PackedVector2Array()
-		var mid: Vector2 = (piece[0] + piece[1] + piece[2] + piece[3]) * 0.25
-		for v: Vector2 in piece:
-			core.append(mid.lerp(v, 0.45))
-		_poly(canvas, core, Color(VoidFeather.CORE, fade))
-	canvas.draw_line((origin + dir * 9.0).round(), (origin + dir * (length - 2.0)).round(), Color("fff7ff", fade), 1.0)
+	# the body: outline, a dark trailing half, a lit leading half
+	for n3: int in 12:
+		var u0: float = float(n3) / 12.0
+		var u1: float = float(n3 + 1) / 12.0
+		var w0: float = maxf(width * (1.0 - pow(u0, 1.4)), 0.8)
+		var w1: float = maxf(width * (1.0 - pow(u1, 1.4)), 0.8)
+		var a0: Vector2 = spine[n3]
+		var a1: Vector2 = spine[n3 + 1]
+		var d: Vector2 = (a1 - a0).normalized()
+		var pp: Vector2 = d.orthogonal()
+		_poly(canvas, PackedVector2Array([a0 - pp * (w0 + 1.6), a1 - pp * (w1 + 1.6), a1 + pp * (w1 + 1.6), a0 + pp * (w0 + 1.6)]), Color(VoidFeather.OUTLINE, 0.95 * fade))
+		var lead_sign: float = sdir
+		_poly(canvas, PackedVector2Array([a0, a1, a1 + pp * lead_sign * w1, a0 + pp * lead_sign * w0]), Color(VoidFeather.RIM, fade)) ## lit leading half
+		_poly(canvas, PackedVector2Array([a0, a1, a1 - pp * lead_sign * w1, a0 - pp * lead_sign * w0]), Color(VoidFeather.MID, fade)) ## dark trailing half
+		_poly(canvas, PackedVector2Array([a0 + pp * lead_sign * (w0 - 1.2), a1 + pp * lead_sign * (w1 - 1.2), a1 + pp * lead_sign * w1, a0 + pp * lead_sign * w0]), Color(VoidFeather.VEIN_LIGHT, fade)) ## rim of the razor
+	# feather barbs along the trailing edge, longest in the middle, swept back towards the root
+	for k: int in 11:
+		var u: float = 0.1 + 0.08 * float(k)
+		var idx: int = clampi(int(u * 12.0), 0, 11)
+		var base: Vector2 = spine[idx].lerp(spine[idx + 1], fposmod(u * 12.0, 1.0))
+		var w: float = width * (1.0 - pow(u, 1.4))
+		var root: Vector2 = base - perp * sdir * w
+		var barb: float = (3.0 + 5.0 * sin(PI * u)) * (0.8 + 0.2 * grow) ## barbs end inside the 13 px of the lane
+		var tipb: Vector2 = root - perp * sdir * barb - dir * (barb * 0.8)
+		_poly(canvas, PackedVector2Array([root + dir * 3.0, tipb, root - dir * 3.0]), Color(VoidFeather.OUTLINE, 0.95 * fade))
+		canvas.draw_line((root - dir * 0.5).round(), (root + (tipb - root) * 0.85).round(), Color(VoidFeather.VEIN, fade), 1.0)
+	# the root plate: a dark disc with a rim and three stubby primaries
+	canvas.draw_circle(origin.round(), 7.0, Color(VoidFeather.OUTLINE, 0.95 * fade))
+	canvas.draw_circle(origin.round(), 5.0, Color(VoidFeather.ROCK2, fade))
+	canvas.draw_circle(origin.round() + Vector2(-1, -1), 2.0, Color(VoidFeather.ROCK3, fade))
+	for st: int in 3:
+		var sa: float = angle + PI + sdir * (0.5 + 0.45 * float(st))
+		canvas.draw_line(origin.round(), (origin + Vector2.from_angle(sa) * (9.0 + 3.0 * float(st))).round(), Color(VoidFeather.OUTLINE, fade), 3.0)
+		canvas.draw_line(origin.round(), (origin + Vector2.from_angle(sa) * (8.0 + 3.0 * float(st))).round(), Color(VoidFeather.RIM, fade), 1.0)
 
 
 func _grow_poly(poly: PackedVector2Array, amount: float) -> PackedVector2Array:

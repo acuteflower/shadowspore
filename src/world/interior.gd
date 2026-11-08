@@ -87,6 +87,10 @@ func setup(interior_id: String, data: Dictionary) -> void:
 	_front()
 	_dust()
 	_make_moths()
+	for item: Dictionary in data.get("crows", []) as Array: ## a crow on the window sill that flies out when somebody comes near
+		var crow: InteriorCrow = InteriorCrow.new()
+		crow.setup(_vec(item.perch), _vec(item.exit))
+		add_child(crow)
 	if data.has("body"): ## the dead lumberjack of the cabin and his axe (story: the search for the lumberjack's hut)
 		var corpse: LumberjackBody = LumberjackBody.new()
 		corpse.name = "Lumberjack"

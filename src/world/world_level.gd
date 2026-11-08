@@ -106,6 +106,9 @@ class ChunkBuild:
 	var beds: Array[Dictionary] = [] ## the forest floors of this chunk and its neighbours {pos, rx}: what grows between the trees changes there
 	var points: Array[Dictionary] = []
 	var density: Dictionary = {} ## the wind's detail densities, read once per chunk
+	var clover_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	var clover_count: int = 0
+	var commit_index: int = 0 ## props of `chunk.things` already added to the tree by `_finish_commit`
 	var patches_seen: Array[Node] = [] ## Terrain.patches as this chunk last saw them (compared per candidate)
 
 
@@ -212,7 +215,7 @@ func _add_ground_decals() -> Dictionary:
 	for i: int in range(decals.size() - 1, -1, -1): ## the footpath first, the stones lie over its start
 		var spec: Dictionary = decals[i] as Dictionary
 		var decal: GroundDecal = GroundDecal.new()
-		decal.setup(String(spec.texture), String(spec.mask), Vector2(float(spec.x), float(spec.y)))
+		decal.setup(String(spec.texture), String(spec.mask), Vector2(float(spec.x), float(spec.y)), String(spec.get("glow", "")))
 		add_child(decal)
 		var size: Vector2 = decal.texture.get_size()
 		for ty: int in range(int(spec.y) / 16, int((float(spec.y) + size.y) / 16.0) + 1):
@@ -343,6 +346,15 @@ func _add_arenas(clear: Dictionary) -> void:
 			pillar.position = origin + Vector2(float(at[0]), float(at[1]))
 			add_child(pillar)
 			_clear_around(clear, pillar.position, 2)
+		for item: Dictionary in spec.get("decor", []) as Array: ## rubble, stumps, braziers, banners ... (tools/art_arena_decor.py): one HutYard each, so every piece sorts by its own feet
+			var at_item: Array = item.pos as Array
+			var yard: HutYard = HutYard.new()
+			yard.name = "Decor_%s_%s" % [String(spec.id), String(item.get("id", "item"))]
+			yard.position = origin + Vector2(float(at_item[0]), float(at_item[1]))
+			var prop: Dictionary = item.duplicate()
+			prop["pos"] = [0, 0]
+			yard.setup([prop], "res://assets/props/arena/")
+			add_child(yard)
 
 
 ## The boss of every arena that names one (data/ground.json "arenas[].boss" {species, pillar}) is not there until somebody steps onto the arena's floor
@@ -878,7 +890,8 @@ func _make_layer(biome: String, tint: Color) -> TileMapLayer:
 ## Keeps the chunks around the players painted: `all` loads the whole ring now (start), otherwise
 ## nearest first. Runtime preparation is budgeted; activation is atomic.
 func _stream(all: bool) -> void:
-	_finish_commit() ## the ground committed last frame gets its props now
+	var frame_deadline: int = Time.get_ticks_usec() + STREAM_BUDGET_USEC ## one budget for adding last frame's props and preparing the next chunk
+	_finish_commit(frame_deadline) ## the ground committed last frame gets its props now (over several frames when it has many)
 	var centers: Array[Vector2i] = []
 	if all:
 		centers.append(_start / CHUNK)
@@ -922,9 +935,9 @@ func _stream(all: bool) -> void:
 		if best.x >= 0 and (_building == null or _building.cell != best):
 			if _building != null: _paused_builds[_building.cell] = _building
 			_building = _take_build(best)
-		if _building != null:
+		if _building != null and _pending_commit == null:
 			# Only the player's own chunk while it is not loaded at all (startup, teleport) is built at once; every other chunk, in view or not, uses the budget.
-			var deadline: int = 0 if best_d == 0 else Time.get_ticks_usec() + STREAM_BUDGET_USEC
+			var deadline: int = 0 if best_d == 0 else frame_deadline
 			if _advance_chunk(_building, deadline):
 				var finished: ChunkBuild = _building
 				_building = null
@@ -1017,7 +1030,7 @@ func _begin_chunk(c: Vector2i) -> ChunkBuild:
 
 
 func _advance_chunk(build: ChunkBuild, deadline: int = 0) -> bool:
-	while build.phase < 9:
+	while build.phase < 10:
 		if deadline > 0 and Time.get_ticks_usec() >= deadline: return false
 		match build.phase:
 			0:
@@ -1095,15 +1108,27 @@ func _advance_chunk(build: ChunkBuild, deadline: int = 0) -> bool:
 					log_node.setup(log_spec.pos as Vector2,int(log_spec.frame),self)
 					build.chunk.fallen_logs.append(log_node)
 				build.index += 1
-				if build.index == 16: build.phase = 8
-			8:
-				_build_clover_fields(build)
+				if build.index == 16:
+					build.phase = 8
+					build.index = 0
+			8: ## one clover field per step (each paints its own atlas), then the details in a step of their own
+				if build.index == 0:
+					build.clover_rng.seed = hash(Vector4i(build.cell.x, build.cell.y, _map.world_seed, 6151))
+					build.clover_count = 2 + (1 if build.clover_rng.randf() < 0.6 else 0) + (1 if build.clover_rng.randf() < 0.3 else 0)
+				if build.index < build.clover_count:
+					for _attempt: int in 5: ## a spot that is not open ground is given up on, the next try is somewhere else
+						if _try_clover_field(build, build.clover_rng):
+							break
+					build.index += 1
+				else:
+					build.phase = 9
+			9:
 				if not build.points.is_empty():
 					var details: MeadowDetails = MeadowDetails.new()
 					details.name = "MeadowDetails"
 					details.setup(build.points, Vector2(build.cell * CHUNK) * 16.0)
 					build.chunk.node.add_child(details)
-				build.phase = 9
+				build.phase = 10
 	return true
 
 
@@ -1157,12 +1182,11 @@ func _commit_chunk(build: ChunkBuild) -> void:
 
 ## Second half of a commit, one frame later: props, fallen logs, clover, river surface, registration and wildlife. Until then the
 ## chunk is not in `_chunks`, so nothing unloads or builds it twice.
-func _finish_commit() -> void:
+func _finish_commit(deadline: int = 0) -> void:
 	var build: ChunkBuild = _pending_commit
 	if build == null: return
-	_pending_commit = null
 	var chunk: Chunk = build.chunk
-	if _town_node != null and not _town_node.cleared.is_empty(): ## a chunk that was in preparation while the town cleared a foundation
+	if build.commit_index == 0 and _town_node != null and not _town_node.cleared.is_empty(): ## a chunk that was in preparation while the town cleared a foundation
 		var kept: Array[WorldProp] = []
 		for prepared: WorldProp in chunk.things:
 			if _town_node.cleared.has(prepared.cell):
@@ -1170,7 +1194,11 @@ func _finish_commit() -> void:
 			else:
 				kept.append(prepared)
 		chunk.things = kept
-	for thing: WorldProp in chunk.things:
+	while build.commit_index < chunk.things.size(): ## props enter the tree one by one: each runs its _ready (sprites, glow, light), which adds up on a thick wood
+		if deadline > 0 and build.commit_index > 0 and Time.get_ticks_usec() >= deadline:
+			return ## the rest follows next frame; the chunk is not in `_chunks` until it is whole
+		var thing: WorldProp = chunk.things[build.commit_index]
+		build.commit_index += 1
 		_props.add_child(thing)
 		_things[thing.cell] = thing
 		if build.custom.has(thing.cell):
@@ -1178,6 +1206,7 @@ func _finish_commit() -> void:
 			var pos: Array = spec.get("pos", [thing.position.x, thing.position.y])
 			thing.position = Vector2(float(pos[0]), float(pos[1]))
 			thing.scale = Vector2(float(spec.get("scale", 1.0)) * (-1.0 if bool(spec.get("flip", false)) else 1.0), float(spec.get("scale", 1.0)))
+	_pending_commit = null
 	if sowing != null:
 		sowing.populate(build.cell, chunk)
 	for log_node: FallenLog in chunk.fallen_logs:
@@ -1428,16 +1457,6 @@ func _detail_candidate(build: ChunkBuild) -> void:
 
 ## Small clover fields: each one is a crowd of standing clumps drawn from its own seed (CloverField), y-sorted so you stand in it. A field only
 ## lies on open, flat, dry meadow, off the footpath and stone floors; it may lie under trees and bushes (they stand over it).
-func _build_clover_fields(build: ChunkBuild) -> void:
-	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = hash(Vector4i(build.cell.x, build.cell.y, _map.world_seed, 6151))
-	var count: int = 2 + (1 if rng.randf() < 0.6 else 0) + (1 if rng.randf() < 0.3 else 0)
-	for _i: int in count:
-		for _attempt: int in 5: ## a spot that is not open ground is given up on, the next try is somewhere else
-			if _try_clover_field(build, rng):
-				break
-
-
 func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 	var field: Dictionary = CloverField.plan(rng)
 	var tile: Vector2i = build.cell * CHUNK + Vector2i(rng.randi_range(5, CHUNK - 6), rng.randi_range(5, CHUNK - 6))

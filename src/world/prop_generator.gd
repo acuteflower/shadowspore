@@ -67,7 +67,9 @@ var _exclude: Rect2i
 var _seed: int
 var _plants: Dictionary
 var _cache: Dictionary = {}
-const CACHE_LIMIT: int = 4096 ## clusters kept at most; beyond it the cache starts over
+var _cluster_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+const CACHE_LIMIT: int = 40000 ## clusters kept at most; beyond it the cache starts over (one chunk alone asks for ~4000, neighbours share most of them)
+const LAYER_NEEDS: Dictionary = {"lone_bush": 2, "lone_grass": 1, "tussock": 1, "lone_mushroom": 2, "lone_snapper": 2, "lone_flora": 2, "lone_root": 1, "shroom_patch": 2, "flora_patch": 2} ## layers that read the slope (1) or slope and damp (2) of a cluster
 
 
 func _init(zone: FastNoiseLite, sdf: PackedByteArray, relief: Relief, exclude: Rect2i, world_seed: int) -> void:
@@ -231,15 +233,17 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 	var key: Vector3i = Vector3i(int(layer.id), cc.x, cc.y)
 	if _cache.has(key):
 		return _cache[key]
-	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	var rng: RandomNumberGenerator = _cluster_rng ## one generator, reseeded per cluster (a new object per cluster cost ~4000 allocations a chunk)
 	rng.seed = hash(Vector4i(int(layer.id), cc.x, cc.y, _seed))
 	var size: float = float(layer.cell)
 	var center: Vector2 = (Vector2(cc) + Vector2(rng.randf(), rng.randf())) * size
 	var wild: float = _wild(center)
 	var shore: float = _shore(center)
-	var slope: float = aspect(center) ## -1 north-facing slope / cliff foot .. +1 south-facing slope
+	# Slope and damp cost ~20 us each and only some layers read them (LAYER_NEEDS); the rest skip them (they use no rng, so the result is the same).
+	var needs: int = int(LAYER_NEEDS.get(String(layer.name), 0))
+	var slope: float = aspect(center) if needs != 0 else 0.0 ## -1 north-facing slope / cliff foot .. +1 south-facing slope
 	var shade: float = clampf(wild - 0.45 * slope, 0.0, 1.0) ## shaded, damp ground: the noise's shade plus what the slope adds
-	var damp: float = damp_at(center)
+	var damp: float = damp_at(center, slope) if needs == 2 else 0.0
 	var lush: float = lerpf(0.45, 1.0, smoothstep(0.1, 0.45, damp)) ## dry slopes carry less than damp ground
 	var found: Array[Dictionary] = []
 	match String(layer.name):
@@ -513,11 +517,11 @@ func aspect(at: Vector2) -> float:
 
 ## 0 dry .. 1 damp ground at `at` (tiles): north slopes and cliff feet, the water's edge and low ground are damp; sunny slopes and
 ## high ground are dry (docs/plant_life.md). Pure, so every peer and every chunk agrees.
-func damp_at(at: Vector2) -> float:
+func damp_at(at: Vector2, slope: float = INF) -> float: ## `slope` = aspect(at) when the caller has it already
 	var near: float = _near_water(at)
 	var height: float = _relief.level_at(at * 16.0)
 	var variation: float = _zone.get_noise_2d(at.x * 0.6 + 311.0, at.y * 0.6 - 97.0) * 0.12
-	return clampf(0.42 - 0.34 * aspect(at) + 0.4 * near - 0.1 * height + variation, 0.0, 1.0)
+	return clampf(0.42 - 0.34 * (aspect(at) if slope == INF else slope) + 0.4 * near - 0.1 * height + variation, 0.0, 1.0)
 
 
 ## Which tree grows at `at`: willows on wet ground near the coast, blossom trees in the open, else firs.

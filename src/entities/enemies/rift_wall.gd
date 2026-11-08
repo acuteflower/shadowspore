@@ -17,6 +17,8 @@ const STEP: float = 12.0 ## px between the points of the jagged line
 const OUTLINE: Color = Color("040208")
 const DARK: Color = Color("07040d")
 const RIM: Color = Color("5a36b8")
+const ROCK2: Color = Color("262440")
+const ROCK3: Color = Color("45436a")
 const VEIN: Color = Color("7d57e0")
 const VEIN_LIGHT: Color = Color("a98af0")
 const CORE: Color = Color("ecd2ff")
@@ -461,7 +463,15 @@ func _height_at(i: int) -> float:
 	var u: float = _dense_s[i] / maxf(_length, 1.0)
 	var slit: float = pow(sin(PI * clampf(u, 0.0, 1.0)), 0.55)
 	var beat: float = VoidGlow.beat(_clock, 0.0, 0.8)
-	return (10.0 + 40.0 * slit) * (0.5 + 0.7 * _prof[i]) + 3.0 * beat * slit
+	return ((10.0 + 40.0 * slit) * (0.5 + 0.7 * _prof[i]) + 3.0 * beat * slit) * lerpf(0.14, 1.0, _clear(_dense_s[i]))
+
+
+## 0 right at a pillar, 1 from about 46 px away along the line: the tear sinks to a low crack where it runs into a pillar, so the pillar stands in front of it and is never hidden.
+func _clear(s: float) -> float:
+	var near: float = 1e9
+	for ps: float in _pillar_s:
+		near = minf(near, absf(s - ps))
+	return smoothstep(12.0, 46.0, near)
 
 
 ## 0 at the front of the tear while it opens (it is thin there), 1 further back.
@@ -492,10 +502,15 @@ func _draw_sheet() -> void:
 		_sheet.draw_rect(Rect2(x, y - h * 0.82, 1.0, h * 0.32), Color(0.02, 0.0, 0.06, 0.74 * solid))
 		_sheet.draw_rect(Rect2(x, y - h, 1.0, h * 0.18), Color(0.03, 0.01, 0.09, 0.45 * solid))
 		_sheet.draw_rect(Rect2(x, y - h - 1.0, 1.0, 2.0), Color(OUTLINE, 0.95 * solid)) ## the torn top edge
-		if i % 6 == 0: ## basalt spikes along the edge, like the shards of broken glass
-			var spike: float = 3.0 + 7.0 * _prof[i]
-			_sheet.draw_rect(Rect2(x, y - h - spike, 1.0, spike), Color(OUTLINE, solid))
-			_sheet.draw_rect(Rect2(x + 1.0, y - h - spike * 0.6, 1.0, spike * 0.6), Color(RIM, 0.9 * solid))
+		if i % 7 == 0: ## torn basalt plates along the lip, like the blade lamellae of his wings: dark body, a lit left edge, a violet rim on top
+			var clear: float = _clear(s)
+			var ph: float = (4.0 + 11.0 * _hash(i, 12)) * (0.35 + 0.65 * clear)
+			var pw: float = 2.0 + floorf(_hash(i, 13) * 2.0)
+			var lean: float = floorf((_hash(i, 14) - 0.5) * 3.0)
+			_sheet.draw_rect(Rect2(x - 1.0, y - h - ph - 1.0 + lean, pw + 2.0, ph + 2.0), Color(OUTLINE, solid))
+			_sheet.draw_rect(Rect2(x, y - h - ph + lean, pw, ph + 1.0), Color(ROCK2, solid))
+			_sheet.draw_rect(Rect2(x, y - h - ph + lean, 1.0, ph + 1.0), Color(ROCK3, solid))
+			_sheet.draw_rect(Rect2(x, y - h - ph + lean, pw, 1.0), Color(RIM, 0.9 * solid))
 		if i % 11 == 3: ## the lips of the tear on the floor: low black teeth
 			_sheet.draw_rect(Rect2(x - 1.0, y - 3.0, 3.0, 4.0), Color(OUTLINE, 0.9 * solid))
 
@@ -524,6 +539,13 @@ func _draw_veil() -> void:
 		var y: float = p.y
 		if i % 3 == 0: ## a soft halo of violet over and beside the tear
 			_veil.draw_rect(Rect2(x - 2.0, y - h - 6.0, 5.0, h + 7.0), Color(VEIN, 0.1 * solid * (0.7 + 0.5 * beat)))
+		if i % 2 == 0: ## the sky behind the tear: deep violet at the foot, magenta-hot towards the lip, slow bands of light drifting through it (dithered)
+			var band: float = fposmod(0.2 * float(i / 24) + _clock * 0.06, 1.0)
+			for k: int in 3:
+				var f0: float = float(k) / 3.0
+				var tint: Color = VEIN.lerp(MAGENTA, f0 * 0.7)
+				var glow: float = (0.05 + 0.1 * f0 + 0.1 * maxf(0.0, 1.0 - absf(f0 + 0.17 - band) * 5.0)) * solid
+				_veil.draw_rect(Rect2(x, y - h * (f0 + 0.34), 1.0, h * 0.34), Color(tint, glow))
 		# the depth of the slit: stars that twinkle and streaks of light that climb inside it
 		var star: float = _hash(i, 31)
 		if star > 0.9:

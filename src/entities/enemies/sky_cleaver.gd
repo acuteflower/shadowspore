@@ -12,7 +12,8 @@ extends CharacterBody2D
 signal touched_down ## the first touchdown on its pillar after the entrance flight (the boss entrance screen waits for it)
 signal perched ## every time it has settled on a pillar (every peer)
 signal reset_requested ## host: nobody is left in the fight; the level removes the boss and arms the arena again
-signal checkpoint_reached(phase: int) ## host: the fight reached a phase it restarts from after a wipe (the level remembers it for the next summoning)
+signal defeated ## host and clients: the boss died (the level forgets the checkpoint: the next summoning begins at phase 1)
+signal checkpoint_reached(phase: int)## host: the fight reached a phase it restarts from after a wipe (the level remembers it for the next summoning)
 
 enum State { PERCHED, TAKEOFF, FLYING, HOVER, LANDING, STAGGER, CRASHED, DEAD, ACT } ## ACT: the fight (src/entities/enemies/mornath_fight.gd) puts it where it wants (`puppet_*`)
 const TITLE: String = "MORNATH" ## the name over the boss bar (the full title is the entrance screen's: data `intro`)
@@ -112,6 +113,13 @@ func _ready() -> void:
 		if pillar != null and pillar.arena == arena:
 			_pillars.append(pillar)
 	_pillars.sort_custom(func(a: ArenaPillar, b: ArenaPillar) -> bool: return a.index < b.index)
+	if start_phase == 0: ## a fresh fight (also one called back by the hologram after a victory): every pillar stands whole and cold again, on every peer
+		for pillar: ArenaPillar in _pillars:
+			if pillar.broken:
+				pillar.restore()
+			else:
+				pillar.set_armed(false)
+				pillar.extinguish(0.0)
 	if _pillars.is_empty():
 		set_physics_process(false)
 		return
@@ -573,6 +581,7 @@ func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
 
 func _on_died() -> void:
 	_set_hittable(false)
+	defeated.emit()
 	get_tree().call_group("arena_story", "boss_defeated", arena) ## the arena's story (quest, knight, hologram) on every peer
 	if multiplayer.is_server():
 		_rpc_ground_crash.rpc(global_position, _height, _velocity * 0.35 if state == State.FLYING else Vector2.ZERO)

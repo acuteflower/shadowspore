@@ -112,7 +112,16 @@ func _run() -> void:
 	var boss: SkyCleaver = get_tree().get_nodes_in_group("bosses")[0] as SkyCleaver
 	if _story.hologram.active:
 		return _fail("the hologram shows while the boss is there")
-	# 5. the boss dies: the quest ends, the knight dissolves, the hologram comes
+	# 5. the boss dies after the fight had reached the last phase (checkpoint 3, two pillars broken, the last one burning): the quest ends, the knight dissolves, the hologram comes
+	var pillars: Array[ArenaPillar] = []
+	for node: Node in get_tree().get_nodes_in_group("arena_pillars"):
+		if (node as ArenaPillar).arena == _story.arena_id:
+			pillars.append(node as ArenaPillar)
+	pillars.sort_custom(func(a: ArenaPillar, b: ArenaPillar) -> bool: return a.index < b.index)
+	_story.level._arena_phase[_story.arena_id] = 2
+	pillars[0].break_silently()
+	pillars[1].break_silently()
+	pillars[pillars.size() - 1].ignite(0.0)
 	boss._health.kill()
 	if not await _until(func() -> bool: return _player.quests.is_finished("mornath"), 60 * 3):
 		return _fail("the quest did not finish when the boss fell")
@@ -131,5 +140,27 @@ func _run() -> void:
 		return _fail("the hologram did not call the boss back")
 	if _player.story_lock:
 		return _fail("she is still held after calling him")
+	# 7. the second fight really starts from the beginning: phase 1, full health, every pillar whole and cold
+	var again: SkyCleaver = null
+	for node: Node in get_tree().get_nodes_in_group("bosses"):
+		if node is SkyCleaver and not node.is_queued_for_deletion() and (node as SkyCleaver).arena == _story.arena_id:
+			again = node as SkyCleaver
+	if again == null:
+		return _fail("no second boss found")
+	if again.start_phase != 0:
+		return _fail("the second fight starts at phase %d, not at the beginning" % again.start_phase)
+	if not is_equal_approx(again._health.current, again._health.max_health):
+		return _fail("the second boss is not at full health (%f / %f)" % [again._health.current, again._health.max_health])
+	for pillar: ArenaPillar in pillars:
+		if pillar.broken:
+			return _fail("pillar %d is still broken in the second fight" % pillar.index)
+		if pillar.fury() > 0.0:
+			return _fail("pillar %d still burns in the second fight" % pillar.index)
+	await _frames(240)
+	if again.fight != null and again.fight.phase != 0:
+		return _fail("the second fight jumped to phase %d" % again.fight.phase)
+	for pillar: ArenaPillar in pillars:
+		if pillar.broken:
+			return _fail("pillar %d broke at the start of the second fight" % pillar.index)
 	print("MORNATH QUEST: ok")
 	get_tree().quit(0)

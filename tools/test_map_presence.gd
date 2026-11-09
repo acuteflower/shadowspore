@@ -101,6 +101,22 @@ func _run() -> void:
 	var first: Vector2 = map._place_marker(Vector2(320, 180))
 	var second: Vector2 = map._place_marker(Vector2(320, 180))
 	_check(first.distance_to(second) >= 14.0, "overlapping markers fan out without losing their anchor")
+	var story: ArenaStory = get_tree().get_first_node_in_group("arena_story") as ArenaStory
+	_check(story != null, "the boss arena's story exists")
+	if story != null:
+		story.set_physics_process(false)
+		_check(_marker(map, "mornath").is_empty(), "no Mornath marker while his hologram is away")
+		story.hologram.set_active(true)
+		story.hologram._appear = 1.0
+		var boss_marker: Dictionary = _marker(map, "mornath")
+		_check(not boss_marker.is_empty() and String(boss_marker.kind) == "boss", "Mornath's hologram has its own boss marker")
+		_check(not boss_marker.is_empty() and (boss_marker.tile as Vector2).is_equal_approx(story.hologram.global_position / 16.0), "the marker stands on the hologram")
+		_check(not boss_marker.is_empty() and String(boss_marker.name) == "MORNATH" and not String(boss_marker.extra).is_empty(), "name and extra line come from map_markers.json")
+		var card: Rect2 = map._presence_card_rect(boss_marker.merged({"screen": Vector2(320, 180)}))
+		_check(card.size.y > 57.0 and map.get_rect().size.x >= 0.0, "his card has the extra line")
+		story.hologram._appear = 0.2
+		_check(_marker(map, "mornath").is_empty(), "a hologram that is still fading in or out is not marked")
+		story.hologram._appear = 1.0
 	_check(map._water_image != null and map._water_image.get_width() == RegionMap.WORLD_TILES, "water atlas loaded at tile resolution")
 	var wet_tiles: int = 0
 	for y: int in map._water_image.get_height():
@@ -132,7 +148,11 @@ func _run() -> void:
 			map._center = Vector2(550, 550)
 			map._scale = 0.31
 			map._scale_target = 0.31
-		var hover: String = "gustav"
+		if OS.get_cmdline_user_args().has("--mornath") and story != null:
+			map._center = story.hologram.global_position / 16.0 + Vector2(-6, 6)
+			map._scale = 4.0
+			map._scale_target = 4.0
+		var hover: String = "mornath" if OS.get_cmdline_user_args().has("--mornath") else "gustav"
 		for argument: String in OS.get_cmdline_user_args():
 			if argument.begins_with("--hover="):
 				hover = argument.trim_prefix("--hover=")

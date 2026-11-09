@@ -35,6 +35,7 @@ var _glitch_timer: float = 3.0
 
 
 func _ready() -> void:
+	add_to_group("quest_actors") ## so the map finds `map_marker`
 	_viewport = SubViewport.new()
 	_viewport.size = VIEW
 	_viewport.transparent_bg = true
@@ -109,6 +110,18 @@ func _additive() -> CanvasItemMaterial:
 	material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	return material
+
+
+## The map (M) shows his own marker while the hologram stands (`MapWindow._live_markers`, style `mornath` in data/map_markers.json): no `actor_position`, only a mark.
+func map_marker() -> Dictionary:
+	if not active or _appear < 0.5:
+		return {}
+	return {"id": "mornath", "position": global_position}
+
+
+## `quest_actors` members answer this for quest steps with an `actor`; the hologram is nobody's goal.
+func actor_position(_id: String) -> Vector2:
+	return Vector2.INF
 
 
 ## The story turns it on (the quest is done, or a wipe left the arena empty) and off (the boss is there).

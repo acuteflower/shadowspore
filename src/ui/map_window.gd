@@ -33,6 +33,12 @@ const PIN_KINDS: Array[Dictionary] = [
 	{"name": "LAGER", "color": Color("a6e68f"), "rows": ["..X..", ".XXX.", "XXXXX", "X...X", "X...X"]},
 ]
 const PLAYER_TONES: Array[Color] = [Color("b9f3ee"), Color("ffd98a"), Color("ff7fd8"), Color("a6e68f")]
+const BOSS_MAGENTA: Color = Color("f35cf3") ## the second ghost of Mornath's hologram marker (like `MornathHologram.MAGENTA`)
+## Mornath's marker: the hologram's bird, 11 x 7, two wing beats (up, down).
+const BOSS_WINGS: Array = [
+	["X.........X", "XX...X...XX", ".XX.XXX.XX.", ".XXXXXXXXX.", "..XXXXXXX..", "....XXX....", ".....X....."],
+	[".....X.....", "....XXX....", ".XXXXXXXXX.", "XXXXXXXXXXX", "XX.XXXXX.XX", "X...XXX...X", ".....X....."],
+]
 
 var _player: Node2D
 var _discovery: MapDiscovery
@@ -802,7 +808,8 @@ func _live_markers() -> Array[Dictionary]:
 		if not _world_tile(tile) or _discovery == null or not _discovery.is_seen(tile):
 			continue
 		marker["tile"] = tile
-		marker["kind"] = "npc"
+		marker["kind"] = String(style.get("kind", "npc")) ## "npc" or "boss" (Mornath's hologram: own look and card)
+		marker["extra"] = String(style.get("extra", ""))
 		marker["name"] = String(style.get("name", marker.get("name", marker.id)))
 		marker["title"] = String(style.get("title", marker.get("title", "BEWOHNER")))
 		marker["tone"] = Color(String(style.get("color", "a6ceae")))
@@ -851,6 +858,7 @@ func _draw_presence(fade: float) -> void:
 	_marker_labels.clear()
 	var hovered: Dictionary = {}
 	var nearest: float = 11.0
+	var boss_seen: bool = false
 	for marker: Dictionary in _live_markers():
 		var anchor: Vector2 = _to_screen(marker.tile as Vector2)
 		var tone: Color = marker.tone
@@ -871,6 +879,9 @@ func _draw_presence(fade: float) -> void:
 			_glyph(marker.rows as Array, at, tone, fade * strength)
 			if bool(marker.get("resting", false)):
 				_text("Z", Vector2i(at + Vector2(5, -8)), tone, fade * 0.7)
+		elif kind == "boss":
+			_draw_boss_marker(at, tone, fade)
+			boss_seen = true
 		elif kind == "self":
 			_draw_hero(at, tone, 1.0, fade)
 		else:
@@ -878,7 +889,10 @@ func _draw_presence(fade: float) -> void:
 			_glyph(["..X..", ".X.X.", "X.X.X", ".X.X.", "..X.."], at, tone, fade)
 		if bool(marker.get("inside", false)):
 			_glyph([".XXX.", ".X.X.", ".X.X.", ".X.X.", ".XXX."], at + Vector2(7, 5), tone, fade * 0.8)
-		if _scale >= 2.0:
+		if kind == "boss":
+			if _scale > 0.3:
+				_presence_label(String(marker.name), at + Vector2(0, 3), tone.lerp(VineStyle.PETAL, 0.2), fade)
+		elif _scale >= 2.0:
 			_presence_label(String(marker.name), at, tone, fade * 0.85)
 		var distance: float = _cursor.distance_to(at)
 		if distance < nearest and not _dragging and not _slider_drag:
@@ -888,7 +902,70 @@ func _draw_presence(fade: float) -> void:
 	_set_presence_hover(hovered)
 	if not _hover_marker.is_empty() and _hover_t > 0.0:
 		_draw_presence_tooltip(_hover_marker, fade)
-	_draw_presence_legend(fade)
+	_draw_presence_legend(fade, boss_seen)
+
+
+## Mornath's hologram on the map: the bird of the arena's projection (wings beating, scanlines, now and then a tear with a magenta ghost) over a ring of broken
+## runes, a cone of calling rings pulsing out, glitch specks rising. Fixed screen size at every zoom, like the other marks.
+func _draw_boss_marker(at: Vector2, tone: Color, fade: float) -> void:
+	var phase: float = 0.5 + 0.5 * sin(_time * 2.4)
+	var glitch: float = _boss_glitch()
+	VineStyle.glow(_overlay, at, 17.0 + 3.0 * phase, tone, 0.34 * fade)
+	VineStyle.glow(_overlay, at + Vector2(0, 3), 10.0, BOSS_MAGENTA, (0.1 + 0.22 * glitch) * fade)
+	for k: int in 2: # the call: two rings widening out of the bird
+		var t: float = fposmod(_time * 0.45 + k * 0.5, 1.0)
+		VineStyle.ring(_overlay, at, 9 + int(t * 22.0), Color(tone, (1.0 - t) * 0.55 * fade), 0.6)
+	for ring: int in 2: # the floor sigil: broken arcs turning against each other
+		var radius: float = 10.0 + 6.0 * ring
+		var turn: float = _time * (0.5 if ring == 0 else -0.35)
+		var steps: int = 40 + ring * 16
+		for i: int in steps:
+			if (i * 5 + ring * 3) % 7 < 2 or (glitch > 0.3 and (i + int(_time * 14.0)) % 3 == 0):
+				continue
+			var a: float = turn + TAU * float(i) / float(steps)
+			var p: Vector2 = at + Vector2(0, 4) + Vector2(roundf(cos(a) * radius), roundf(sin(a) * radius * 0.5))
+			_overlay.draw_rect(Rect2(p, Vector2.ONE), Color(tone if ring == 0 else BOSS_MAGENTA, (0.75 - 0.2 * ring) * fade))
+	_draw_boss_bird(at + Vector2(0, roundf(sin(_time * 1.3) * 1.5) - 3.0), tone, fade, glitch)
+	for k: int in 3: # glitch specks rising
+		var t: float = fposmod(_time * 0.55 + k * 0.33, 1.0)
+		var speck: Vector2 = at + Vector2(roundf(sin(k * 5.1 + _time * 0.3) * 9.0), -6.0 - roundf(t * 16.0))
+		_overlay.draw_rect(Rect2(speck, Vector2(2, 1) if k == 1 else Vector2.ONE), Color(BOSS_MAGENTA if k == 2 else tone, (1.0 - t) * 0.8 * fade))
+
+
+## 0..1: a short tear of the hologram, every few seconds (two uneven rhythms).
+func _boss_glitch() -> float:
+	var a: float = clampf(1.0 - fposmod(_time, 3.3) / 0.25, 0.0, 1.0)
+	var b: float = clampf(1.0 - fposmod(_time * 1.3 + 1.1, 5.7) / 0.18, 0.0, 1.0)
+	return maxf(a, b)
+
+
+## The bird (11 x 7, `at` = its middle) as a hologram: every second row dimmer, a bright core, and in a tear rows slip sideways over a magenta ghost.
+func _draw_boss_bird(at: Vector2, tone: Color, fade: float, glitch: float) -> void:
+	var rows: Array = BOSS_WINGS[int(_time * 2.2) % 2] as Array
+	var origin: Vector2 = (at - Vector2(5, 3)).round()
+	var slip: Array[int] = []
+	for y: int in 7:
+		slip.append(((1 if (y + int(_time * 17.0)) % 2 == 0 else -2) if glitch > 0.0 and (y + int(_time * 30.0)) % 3 == 0 else 0))
+	for pass_index: int in 3:
+		for y: int in 7:
+			var row: String = String(rows[y])
+			for x: int in 11:
+				if row[x] != "X":
+					continue
+				var cell: Vector2 = origin + Vector2(x + slip[y], y)
+				if pass_index == 0:
+					for offset: Vector2 in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]:
+						_overlay.draw_rect(Rect2(cell + offset, Vector2.ONE), Color(VineStyle.OUTLINE, 0.9 * fade))
+				elif pass_index == 1:
+					if glitch > 0.0:
+						_overlay.draw_rect(Rect2(cell + Vector2(2, 0), Vector2.ONE), Color(BOSS_MAGENTA, 0.6 * glitch * fade))
+				else:
+					var color: Color = tone.lerp(VineStyle.PETAL, clampf(0.55 - float(x + y) * 0.04, 0.05, 0.55))
+					if y % 2 == 1:
+						color = color.darkened(0.2)
+					if x == 5 and y == 3:
+						color = VineStyle.PETAL
+					_overlay.draw_rect(Rect2(cell, Vector2.ONE), Color(color, fade))
 
 
 func _presence_label(label: String, at: Vector2, tone: Color, fade: float) -> void:
@@ -932,17 +1009,26 @@ func _presence_role(marker: Dictionary) -> String:
 	return String(marker.get("title", "BEWOHNER"))
 
 
+## An extra line under the status (only Mornath's card has one: "ERNEUTER KAMPF BEREIT").
+func _presence_extra(marker: Dictionary) -> String:
+	return String(marker.get("extra", ""))
+
+
 func _presence_card_rect(marker: Dictionary) -> Rect2:
+	var extra: String = _presence_extra(marker)
 	var width: float = maxf(116.0, maxf(PixelText.width(String(marker.name)) * 2.0, PixelText.width(_presence_role(marker))) + 53.0)
 	width = maxf(width, PixelText.width(_presence_status(marker)) + 25.0)
+	if not extra.is_empty():
+		width = maxf(width, PixelText.width(extra) + 25.0)
+	var height: float = 57.0 + (12.0 if not extra.is_empty() else 0.0)
 	var anchor: Vector2 = marker.screen as Vector2
 	var at: Vector2 = anchor + Vector2(18, -68)
 	if at.x + width > size.x - 14.0:
 		at.x = anchor.x - width - 18.0
 	if at.y < 50.0:
 		at.y = anchor.y + 15.0
-	at = at.clamp(Vector2(14, 50), size - Vector2(width + 14, 128)).round()
-	return Rect2(at, Vector2(width, 57))
+	at = at.clamp(Vector2(14, 50), size - Vector2(width + 14, 71.0 + height)).round()
+	return Rect2(at, Vector2(width, height))
 
 
 ## A small living bark sign: the same paper and leaves as the inventory, with a personal seal.
@@ -963,9 +1049,10 @@ func _draw_presence_tooltip(marker: Dictionary, fade: float) -> void:
 	VineStyle.paper(_overlay, box, alpha, void_level, salt)
 	var at: Vector2 = box.position
 	# Fine grain and a little of the marker's colour caught in the upper bark edge.
+	var boss: bool = String(marker.kind) == "boss"
 	for x: int in range(7, int(box.size.x) - 7):
 		if (x + salt) % 5 != 0:
-			_overlay.draw_rect(Rect2(at + Vector2(x, 4), Vector2.ONE), Color(tone, 0.17 * alpha))
+			_overlay.draw_rect(Rect2(at + Vector2(x, 4), Vector2.ONE), Color(BOSS_MAGENTA if boss and x % 11 == 0 else tone, (0.3 if boss and x % 11 == 0 else 0.17) * alpha))
 	var emblem: Vector2 = at + Vector2(21, 23)
 	VineStyle.glow(_overlay, emblem, 17.0, tone, 0.32 * alpha)
 	_overlay.draw_circle(emblem + Vector2(0, 1), 12.0, Color(VineStyle.OUTLINE, alpha))
@@ -975,9 +1062,12 @@ func _draw_presence_tooltip(marker: Dictionary, fade: float) -> void:
 	var rows: Array = marker.get("rows", ["..X..", ".XXX.", "XXXXX", ".XXX.", "..X.."]) as Array
 	if String(marker.kind) == "player":
 		rows = ["..X..", ".X.X.", "X.X.X", ".X.X.", "..X.."]
-	_overlay.draw_set_transform(emblem, 0.0, Vector2(2, 2))
-	_glyph(rows, Vector2.ZERO, tone.lerp(VineStyle.PETAL, 0.18), alpha)
-	_overlay.draw_set_transform(Vector2.ZERO)
+	if boss:
+		_draw_boss_bird(emblem + Vector2(0, -1), tone, alpha, _boss_glitch())
+	else:
+		_overlay.draw_set_transform(emblem, 0.0, Vector2(2, 2))
+		_glyph(rows, Vector2.ZERO, tone.lerp(VineStyle.PETAL, 0.18), alpha)
+		_overlay.draw_set_transform(Vector2.ZERO)
 	_overlay.draw_set_transform(at + Vector2(40, 9), 0.0, Vector2(2, 2))
 	PixelText.draw(_overlay, String(marker.name), Vector2i.ZERO, Color(tone.lerp(VineStyle.PETAL, 0.28), alpha), Color(VineStyle.OUTLINE, alpha))
 	_overlay.draw_set_transform(Vector2.ZERO)
@@ -986,6 +1076,10 @@ func _draw_presence_tooltip(marker: Dictionary, fade: float) -> void:
 		_overlay.draw_rect(Rect2(at + Vector2(x, 38), Vector2.ONE), Color(VineStyle.BARK_LIGHT.lerp(tone, 0.25), (0.4 if x % 3 == 0 else 0.18) * alpha))
 	_overlay.draw_rect(Rect2(at + Vector2(12, 46), Vector2(2, 2)), Color(tone, 0.8 * alpha))
 	_text(_presence_status(marker), Vector2i(at + Vector2(20, 43)), Color(UiStyle.TEXT, 0.85), alpha)
+	var extra: String = _presence_extra(marker)
+	if not extra.is_empty():
+		_overlay.draw_rect(Rect2(at + Vector2(12, 58), Vector2(2, 2)), Color(BOSS_MAGENTA, 0.85 * alpha))
+		_text(extra, Vector2i(at + Vector2(20, 55)), Color(BOSS_MAGENTA.lerp(UiStyle.TEXT, 0.35), 0.95), alpha)
 	_presence_card_vine(at + Vector2(-2, 3), 1, 35, tone, alpha, ease)
 	_presence_card_vine(at + Vector2(box.size.x + 1, box.size.y - 3), -1, 29, tone, alpha, ease)
 	VineStyle.leaf(_overlay, emblem + Vector2(-11, 5), -1, -1, 3, Color(VineStyle.LEAF, alpha), Color(tone, 0.7 * alpha))
@@ -1001,9 +1095,9 @@ func _presence_card_vine(origin: Vector2, direction: int, length: int, tone: Col
 			VineStyle.leaf(_overlay, p, direction, -1, 3, Color(VineStyle.LEAF, fade), Color(VineStyle.LEAF_LIGHT.lerp(tone, 0.35), fade))
 
 
-func _draw_presence_legend(fade: float) -> void:
+func _draw_presence_legend(fade: float, boss: bool = false) -> void:
 	var y: float = size.y - 37.0
-	var x: float = size.x / 2.0 - 112.0
+	var x: float = size.x / 2.0 - (134.0 if boss else 112.0)
 	var mine: int = int(_player_slots.get(_player.name.to_int(), 0)) if _player != null else 0
 	_glyph(["..X..", ".XXX.", "XXXXX", ".XXX.", "..X.."], Vector2(x, y + 2), PLAYER_TONES[mine], fade * 0.8)
 	_text("DU", Vector2i(x + 9, y), UiStyle.TEXT_DIM, fade * 0.8)
@@ -1011,6 +1105,9 @@ func _draw_presence_legend(fade: float) -> void:
 	_text("MITSPIELER", Vector2i(x + 53, y), UiStyle.TEXT_DIM, fade * 0.8)
 	_glyph(["XXXXX", "X.X.X", "X.X.X", ".XXX.", "..X.."], Vector2(x + 132, y + 2), Color("c8b8ed"), fade * 0.8)
 	_text("BEWOHNER", Vector2i(x + 141, y), UiStyle.TEXT_DIM, fade * 0.8)
+	if boss:
+		_glyph(["X...X", "XX.XX", ".XXX.", "..X..", "..X.."], Vector2(x + 184, y + 2), Color("6fe8ff"), fade * 0.8)
+		_text("MORNATH", Vector2i(x + 193, y), UiStyle.TEXT_DIM, fade * 0.8)
 
 
 ## A diamond with a pulsing ring: where somebody stands.

@@ -451,6 +451,7 @@ func _summon_arena_boss(spec: Dictionary, trigger_at: Vector2) -> void:
 	node.position = entry
 	_enemies.add_child(node)
 	node.reset_requested.connect(_reset_arena_boss.bind(node, spec))
+	node.defeated.connect(func() -> void: _arena_phase.erase(String(spec.id))) ## won: the next call (hologram) starts from phase 1 again
 	node.checkpoint_reached.connect(func(p: int) -> void: _arena_phase[String(spec.id)] = maxi(p, int(_arena_phase.get(String(spec.id), 0))))
 
 

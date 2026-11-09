@@ -15,5 +15,13 @@
     "title": "ZIMMERMANN",
     "color": "e6c488",
     "rows": ["XXXX.", ".XX.X", "..X..", "..X..", "..X.."]
+  },
+  "mornath": {
+    "kind": "boss",
+    "name": "MORNATH",
+    "title": "DER HIMMELSSPALTER",
+    "extra": "ERNEUTER KAMPF BEREIT",
+    "color": "6fe8ff",
+    "rows": ["X...X", "XX.XX", ".XXX.", "..X..", "..X.."]
   }
 }

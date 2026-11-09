@@ -62,7 +62,7 @@ var _dirty: bool = false
 var _paused_here: bool = false
 var _vignette: GradientTexture2D
 var _tp_text: String = "" ## the teleport field of the developer tab: "x, y" in tiles
-var _scroll: float = 0.0 ## the page is taller than the screen: how far it is scrolled up (px)
+var _scrolls: Array[float] = [0.0, 0.0] ## per column: how far it is scrolled up (px); a column taller than the screen scrolls on its own
 var _editing: bool = false ## the teleport field takes the keys
 
 
@@ -116,7 +116,7 @@ func _set_open(open: bool) -> void:
 		_tab = 0
 		_tab_t = 0.0
 		_editing = false
-		_scroll = 0.0
+		_scrolls = [0.0, 0.0]
 		_tp_text = ""
 		_bloom_x = float(TABS[0]["x"])
 		_armed = ""
@@ -157,7 +157,7 @@ func _select_tab(index: int) -> void:
 	_tab = index
 	_tab_t = 0.0
 	_drag = -1
-	_scroll = 0.0
+	_scrolls = [0.0, 0.0]
 	_build_items()
 
 
@@ -264,7 +264,8 @@ func _build_items() -> void:
 				_add(1, "button", "LIES DEN KESSEL", "", {"action": "cook"})
 			_add(1, "heading", "SPIELSTAND")
 			_add(1, "button", "SPEICHERSTAND LÖSCHEN & START", "", {"action": "reset", "risky": true})
-	_scroll = clampf(_scroll, 0.0, _max_scroll())
+	for col: int in 2:
+		_scrolls[col] = clampf(_scrolls[col], 0.0, _max_scroll(col))
 	for item: Dictionary in _items:
 		if _focus < 0 and _interactive(item):
 			_focus = int(item["idx"])
@@ -371,11 +372,11 @@ func _column_x(col: int) -> float:
 
 
 func _item_rect(item: Dictionary) -> Rect2:
-	return Rect2(_column_x(int(item["col"])), float(item["y"]) - _scroll, COLUMN_W, float(item["h"]))
+	return Rect2(_column_x(int(item["col"])), float(item["y"]) - _scrolls[int(item["col"])], COLUMN_W, float(item["h"]))
 
 
 func _view_bottom() -> float:
-	return size.y - 14.0
+	return minf(size.y - 14.0, FOOT_Y - 6.0) ## the footer (save text, save buttons) lives below the page area
 
 
 ## A row is shown and can be hit only while it lies wholly inside the page area.
@@ -384,21 +385,27 @@ func _row_visible(item: Dictionary) -> bool:
 	return rect.position.y >= TOP_Y - 4.0 and rect.end.y <= _view_bottom()
 
 
-func _max_scroll() -> float:
-	return maxf(maxf(_cursor[0], _cursor[1]) + 6.0 - _view_bottom(), 0.0)
+func _max_scroll(col: int) -> float:
+	return maxf(_cursor[col] + 6.0 - _view_bottom(), 0.0)
 
 
-func _scroll_by(amount: float) -> void:
-	_scroll = clampf(_scroll + amount, 0.0, _max_scroll())
+func _scroll_by(amount: float, col: int) -> void:
+	_scrolls[col] = clampf(_scrolls[col] + amount, 0.0, _max_scroll(col))
+
+
+## The column the mouse is over (the one the wheel scrolls): the right one from a little left of its vine on.
+func _column_at(x: float) -> int:
+	return 1 if x >= _column_x(1) - 24.0 else 0
 
 
 ## Scrolls so that the focused row is inside the page area.
 func _reveal(item: Dictionary) -> void:
 	var rect: Rect2 = _item_rect(item)
+	var col: int = int(item["col"])
 	if rect.position.y < TOP_Y - 4.0:
-		_scroll_by(rect.position.y - (TOP_Y - 4.0))
+		_scroll_by(rect.position.y - (TOP_Y - 4.0), col)
 	elif rect.end.y > _view_bottom():
-		_scroll_by(rect.end.y - _view_bottom())
+		_scroll_by(rect.end.y - _view_bottom(), col)
 
 
 func _slider_rect(item: Dictionary) -> Rect2:
@@ -820,7 +827,7 @@ func _gui_input(event: InputEvent) -> void:
 					over = true
 		GameCursor.set_hint(self, &"click" if over else &"")
 	elif button != null and button.pressed and button.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-		_scroll_by(-26.0 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 26.0)
+		_scroll_by(-26.0 if button.button_index == MOUSE_BUTTON_WHEEL_UP else 26.0, _column_at(button.position.x))
 	elif button != null and button.button_index == MOUSE_BUTTON_LEFT:
 		if button.pressed:
 			_click(button.position)
@@ -925,8 +932,11 @@ func _taken(x: float) -> float:
 
 
 func _row_p(item: Dictionary) -> float:
-	var open: float = _p(0.45 + int(item["col"]) * 0.06 + int(item["idx"]) * 0.025, 0.3)
-	return minf(open, clampf((_tab_t - int(item["idx"]) * 0.04) / 0.35, 0.0, 1.0))
+	## The stagger is capped: long pages (the developer tab has 40+ rows) must still be fully shown once
+	## _open_t and _tab_t reach 1, or the rows with a high index would never appear.
+	var idx: int = int(item["idx"])
+	var open: float = _p(0.45 + int(item["col"]) * 0.06 + minf(idx * 0.025, 0.18), 0.3)
+	return minf(open, clampf((_tab_t - minf(idx * 0.04, 0.5)) / 0.35, 0.0, 1.0))
 
 
 # ---------- drawing ----------
@@ -1013,7 +1023,7 @@ func _draw_page(void_level: float) -> void:
 	var reach: float = minf(_p(0.4, 0.45), clampf(_tab_t / 0.4, 0.0, 1.0))
 	var last: Array[float] = [0.0, 0.0]
 	for item: Dictionary in _items:
-		last[int(item["col"])] = maxf(last[int(item["col"])], float(item["y"]) + float(item["h"]) - _scroll)
+		last[int(item["col"])] = maxf(last[int(item["col"])], float(item["y"]) + float(item["h"]) - _scrolls[int(item["col"])])
 	for col: int in 2:
 		if last[col] > 0.0:
 			_draw_column_vine(_column_x(col) + 2.0, TOP_Y - 10.0, minf(last[col], _view_bottom()), reach, void_level)
@@ -1021,26 +1031,27 @@ func _draw_page(void_level: float) -> void:
 		var p: float = _row_p(item)
 		if p > 0.0 and _row_visible(item):
 			_draw_row(item, p, void_level)
-	_draw_scrollbar(reach, void_level)
+	for col: int in 2:
+		_draw_scrollbar(col, reach, void_level)
 
 
 ## A thin thread with a bud on it at the right of the page while the page is taller than the screen.
-func _draw_scrollbar(reach: float, void_level: float) -> void:
-	var max_scroll: float = _max_scroll()
+func _draw_scrollbar(col: int, reach: float, void_level: float) -> void:
+	var max_scroll: float = _max_scroll(col)
 	if max_scroll <= 0.0:
 		return
-	var x: float = _column_x(1) + COLUMN_W + 6.0
+	var x: float = _column_x(col) + COLUMN_W + 6.0
 	var top: float = TOP_Y
 	var length: float = (_view_bottom() - top) * reach
 	var taken: float = _taken(x)
 	var tone: Color = ACCENT_WARM.lerp(VineStyle.VOID_GLOW, taken)
 	for i: int in int(length):
 		draw_rect(Rect2(x, top + i, 1, 1), Color(VineStyle.BARK_LIGHT.lerp(VineStyle.BARK_VOID_LIGHT, taken), 0.7 if i % 3 != 1 else 0.35))
-	var handle: float = top + (length - 12.0) * (_scroll / max_scroll)
+	var handle: float = top + (length - 12.0) * (_scrolls[col] / max_scroll)
 	draw_rect(Rect2(x - 1.0, handle, 3, 12), Color(VineStyle.OUTLINE, reach))
 	draw_rect(Rect2(x, handle + 1.0, 1, 10), Color(tone, reach))
 	VineStyle.glow(self, Vector2(x, handle + 6.0), 9.0, tone, 0.5 * reach)
-	if _scroll < max_scroll - 1.0:
+	if _scrolls[col] < max_scroll - 1.0:
 		_text("v", Vector2(x - 1.0, _view_bottom() - 5.0), Color(tone, 0.8), reach)
 
 

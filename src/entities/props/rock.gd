@@ -11,6 +11,17 @@ const REGROW_BURST: Array[Color] = [Color("d9c8ff"), Color("78f4e6")]
 @onready var _body_shape: CollisionShape2D = $Body/Shape
 
 
+## The chips that fly off: the stone's, or the colours the data names (`chips`, hex): iron ore throws rust and stone.
+func _chips() -> Array:
+	var named: Array = _spec.get("chips", []) as Array
+	if named.is_empty():
+		return CHIPS
+	var colors: Array[Color] = []
+	for hex: Variant in named:
+		colors.append(Color(String(hex)))
+	return colors
+
+
 func _setup_prop() -> void:
 	var rect: RectangleShape2D = RectangleShape2D.new()
 	rect.size = Vector2(_radius * 1.5, 7.0)
@@ -38,9 +49,9 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 			_rustle(randf_range(-1.0, 1.0), 0.04) ## other weapons only make it ring
 		"hit":
 			_rustle(randf_range(-1.0, 1.0), 0.05)
-			_burst(7, CHIPS, 46.0, Vector2(0, -_radius * 0.8))
+			_burst(7, _chips(), 46.0, Vector2(0, -_radius * 0.8))
 		"strip":
 			_rustle(randf_range(-1.0, 1.0), 0.07)
-			_burst(16, CHIPS, 60.0, Vector2(0, -_radius * 0.6))
+			_burst(16, _chips(), 60.0, Vector2(0, -_radius * 0.6))
 		"regrow":
 			_burst(6, REGROW_BURST, 0.0)

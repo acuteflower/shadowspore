@@ -50,6 +50,8 @@ func _run() -> void:
 	var aged: bool = false ## --aged: every piece has stood six days (all the wear shows)
 	var old_hut: bool = false ## --oldhut: like --hut, but the hut stays broken
 	var hut_view: bool = false ## --hut: the renewed hut with its window light, the camera in front of it
+	var smithy_view: bool = false ## --smithy: Torben's smithy next to the workshop, the camera in front of it (add --night, --aged)
+	var forge_window: bool = false ## --forge (with --tab=N): Torben's shop window opens at tab N (4 = VERFEINERN) with a weapon, material and money in the bag
 	var walk: bool = false ## Gustav on his way from the bench to the fire (a quarter of the way round the workshop)
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture="): capture = arg.get_slice("=", 1)
@@ -68,6 +70,8 @@ func _run() -> void:
 		elif arg == "--oldhut": hut_view = true; old_hut = true
 		elif arg == "--early": early = true
 		elif arg == "--south": south = true
+		elif arg == "--smithy": smithy_view = true
+		elif arg == "--forge": smithy_view = true; forge_window = true
 		elif arg == "--lamps": lamps = true
 		elif arg.begins_with("--valdric="): valdric_at = arg.get_slice("=", 1).to_float()
 		elif arg.begins_with("--tab="): shop_tab = arg.get_slice("=", 1).to_int()
@@ -83,13 +87,17 @@ func _run() -> void:
 	await _frames(120)
 	player.quests.set_flag("rebuild_done")
 	await _frames(70)
-	for item: String in ["wood", "stone", "glow_cap", "plant_fiber"]:
+	for item: String in ["wood", "stone", "glow_cap", "plant_fiber", "plank", "iron_ore"]:
 		player.inventory.give(item, 90)
 	var lamp: Vector2 = _site(town, "lamp_post", hut.position + Vector2(-80, 120))
 	_put(town, "lamp_post", lamp)
 	var lamp2: Vector2 = _site(town, "lamp_post", hut.position + Vector2(150, 140))
 	_put(town, "lamp_post", lamp2)
 	await _frames(3)
+	if smithy_view: ## the workshop and the smithy wait for their residents
+		town.residents["gustav"] = {"trust": 0, "talked": -1}
+		if not forge_window:
+			town.residents["torben"] = {"trust": 0, "talked": -1}
 	var shop: Vector2 = _site(town, "workshop", hut.position + Vector2(40, 175))
 	_put(town, "workshop", shop, false, not site)
 	var store: Vector2 = _site(town, "stockpile", hut.position + Vector2(-110, 190))
@@ -104,6 +112,11 @@ func _run() -> void:
 			_put(town, "fence", fence, k % 2 == 1)
 	var bench: Vector2 = _site(town, "bench", hut.position + Vector2(80, 100))
 	_put(town, "bench", bench)
+	var forge: Vector2 = Vector2.INF
+	if smithy_view:
+		forge = _site(town, "smithy", hut.position + Vector2(150, 205))
+		print("smithy at ", forge - hut.position, " check ", town.check_site("smithy", forge))
+		_put(town, "smithy", forge)
 	await _frames(3)
 	if not site:
 		await _frames(900)
@@ -111,7 +124,7 @@ func _run() -> void:
 		TimeManager.time_of_day = 0.96
 	else:
 		TimeManager.time_of_day = 0.5
-	player.request_teleport(shop + Vector2(10, 40))
+	player.request_teleport((forge + Vector2(-10, 30)) if smithy_view and forge != Vector2.INF else shop + Vector2(10, 40))
 	if ghost:
 		await _frames(30)
 		var builder: BuildMode = town.build_mode()
@@ -142,6 +155,22 @@ func _run() -> void:
 		if shop_tab > 0:
 			shop_window._set_tab(shop_tab)
 		await _frames(28 if early else 110)
+	if forge_window:
+		TimeManager.locked = true
+		TimeManager.time_of_day = 0.4
+		town._rpc_resident.rpc("torben", {"trust": 60, "talked": -1}, false) ## he moves in properly (a figure at his anvil)
+		await _frames(10)
+		for item: String in ["iron_plate", "void_splinter", "iron_ingot"]:
+			player.inventory.give(item, 5)
+		player.progress.award(900, 0)
+		player.inventory.give("sword_iron", 1, {"r": 7, "rp": 2})
+		player.inventory.give("sword_basic", 1, {"r": 3})
+		player.inventory.give("sword_void", 1)
+		player.request_teleport(forge + Vector2(-10, 60))
+		await _frames(240)
+		var forge_shop: ShopWindow = ShopWindow.open(get_tree(), player, town, "torben_forge")
+		forge_shop._set_tab(shop_tab if shop_tab > 0 else 4)
+		await _frames(110)
 	if stock:
 		player.request_teleport(store + Vector2(0, 40))
 		await _frames(30)
@@ -213,6 +242,9 @@ func _run() -> void:
 			for pt: Dictionary in view._parts:
 				var spr: Sprite2D = pt.sprite as Sprite2D
 				print("part ", view.piece, " ", spr.texture.resource_path, " vis ", spr.visible, " pos ", spr.position, " size ", spr.texture.get_size(), " mat ", spr.material != null, " gpos ", spr.global_position)
+		for v2: Variant in town._views.values():
+			var view2: TownStructure = v2 as TownStructure
+			print("VIEW ", view2.piece, " at ", view2.global_position - hut.position, " visible ", view2.visible, " sprite ", view2._sprite.texture.get_size() if view2._sprite != null and view2._sprite.texture != null else "none")
 		await _frames(4)
 		get_viewport().get_texture().get_image().save_png(capture)
 		print("saved ", capture, " town pieces: ", town.structures.size(), " residents: ", town.residents.keys(), " ways (points, joined): ", town.paths.map(func(w: Variant) -> String: return "%d/%s" % [((w as Dictionary).p as Array).size(), "door" if int((w as Dictionary).e) == 1 else "joined"]))

@@ -1,0 +1,36 @@
+{
+  "population": {
+    "square_tiles": 16,
+    "border_tiles": 2,
+    "dry_snail_share": 0.16,
+    "wet_snail_share": 0.58
+  },
+  "departure_seconds": 1.4,
+  "catch_seconds": 0.3,
+  "species": {
+    "beetle": {
+      "rest_seconds": 26.0,
+      "move_seconds": 3.2,
+      "step_pixels": 4.0,
+      "leaf_band": [0.28, 0.72],
+      "sense_range": 20.0,
+      "night_limit": 0.35
+    },
+    "caterpillar": {
+      "rest_seconds": 31.0,
+      "move_seconds": 4.8,
+      "step_pixels": 3.0,
+      "leaf_band": [0.36, 0.82],
+      "sense_range": 16.0,
+      "night_limit": 0.35
+    },
+    "snail": {
+      "rest_seconds": 34.0,
+      "move_seconds": 9.0,
+      "step_pixels": 3.0,
+      "leaf_band": [0.48, 0.9],
+      "sense_range": 28.0,
+      "night_limit": 0.75
+    }
+  }
+}

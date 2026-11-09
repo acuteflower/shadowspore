@@ -203,10 +203,15 @@ func _run() -> void:
 	# ---- undergrowth animals
 	var seen: Dictionary = {}
 	var host: Bush = null
-	for i: int in 400:
+	var bushes: Array[WorldProp] = []
+	for i: int in 1600:
 		var b: Bush = (load(String(plants.bush.scene)) as PackedScene).instantiate() as Bush
 		b.setup(world, Vector2i(2000 + i, 5), "bush", 0)
 		add_child(b)
+		bushes.append(b)
+	LeafCritter.settle_chunk(bushes)
+	for prop: WorldProp in bushes:
+		var b: Bush = prop as Bush
 		var animal: String = LeafCritter.today(b)
 		check_quiet(animal == LeafCritter.today(b))
 		seen[animal] = int(seen.get(animal, 0)) + 1
@@ -215,7 +220,7 @@ func _run() -> void:
 		else:
 			b.queue_free()
 	check(int(seen.get("beetle", 0)) > 5 and int(seen.get("caterpillar", 0)) > 5 and int(seen.get("snail", 0)) > 3, "all three animals turn up on bushes (%s)" % [seen])
-	check(int(seen.get("", 0)) > 200, "most bushes carry nothing")
+	check(int(seen.get("", 0)) > 1450, "more than 90 percent of bushes carry nothing")
 	check(host != null and host.prompt() == "ABLESEN", "a bush with an animal on it offers ABLESEN")
 	if host != null:
 		host.apply_state({"c": TimeManager.day + 1, "k": "bush"}, "catch")

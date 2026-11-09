@@ -83,7 +83,8 @@
   "scene": "res://src/entities/props/bush.tscn",
   "edge_margin": 4,
   "critters": {
-   "chance": 0.2
+   "chance": 0.12,
+   "snail_bias": 1.0
   }
  },
  "berry_bush": {
@@ -173,7 +174,8 @@
   "scene": "res://src/entities/props/bush.tscn",
   "edge_margin": 4,
   "critters": {
-   "chance": 0.2
+   "chance": 0.12,
+   "snail_bias": 0.8
   }
  },
  "grass": {
@@ -242,7 +244,8 @@
   "scene": "res://src/entities/props/bush.tscn",
   "edge_margin": 3,
   "critters": {
-   "chance": 0.2
+   "chance": 0.1,
+   "snail_bias": 0.8
   }
  },
  "ember_bush": {
@@ -327,7 +330,8 @@
   "scene": "res://src/entities/props/bush.tscn",
   "edge_margin": 4,
   "critters": {
-   "chance": 0.2
+   "chance": 0.12,
+   "snail_bias": 0.7
   }
  },
  "pebble": {
@@ -731,6 +735,94 @@
   },
   "scene": "res://src/entities/props/rock.tscn",
   "edge_margin": 4
+ },
+ "iron_rock": {
+  "name": "Eisenerzfels",
+  "texture": "res://assets/props/iron_rock.png",
+  "glow": "res://assets/props/iron_rock_glow.png",
+  "light": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0.22
+  ],
+  "columns": 6,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   1,
+   2,
+   1
+  ],
+  "radius": [
+   10,
+   14,
+   20,
+   8,
+   18,
+   14
+  ],
+  "height": [
+   22,
+   30,
+   42,
+   50,
+   20,
+   36
+  ],
+  "hits": [
+   3,
+   4,
+   6,
+   5,
+   4,
+   6
+  ],
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 3,
+   "drops": [
+    {
+     "id": "iron_ore",
+     "chance": 0.7,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stone",
+     "chance": 0.35,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "iron_ore",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "stone",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "scene": "res://src/entities/props/rock.tscn",
+  "edge_margin": 4,
+  "chips": [
+   "8c4a30",
+   "c27a42",
+   "665f94",
+   "47436f"
+  ]
  },
  "tree": {
   "name": "Tanne",
@@ -1173,7 +1265,8 @@
   "scene": "res://src/entities/props/flora.tscn",
   "edge_margin": 3,
   "critters": {
-   "chance": 0.2
+   "chance": 0.12,
+   "snail_bias": 1.35
   }
  },
  "cattail": {
@@ -1234,7 +1327,8 @@
   "scene": "res://src/entities/props/flora.tscn",
   "edge_margin": 4,
   "critters": {
-   "chance": 0.2
+   "chance": 0.14,
+   "snail_bias": 1.4
   }
  },
  "sunbloom": {

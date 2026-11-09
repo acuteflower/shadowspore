@@ -506,5 +506,165 @@
     "Eine Stadt beginnt mit einem Licht und einem, der es hütet."
    ]
   }
+ },
+ "torben": {
+  "name": "TORBEN",
+  "title": "SCHMIED",
+  "art": "torben",
+  "enabled": false,
+  "role": "smith",
+  "home": "smithy",
+  "arrive": {
+   "needs": "smithy",
+   "delay": 0.0,
+   "angle": 200.0,
+   "distance": 260.0
+  },
+  "spots": {
+   "work": {
+    "of": "home",
+    "at": [
+     28,
+     5
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "work",
+    "sound": "hammer",
+    "strike": 4,
+    "pitch": 0.62
+   },
+   "bellows": {
+    "of": "home",
+    "at": [
+     6,
+     -1
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "bellows"
+   },
+   "quench": {
+    "of": "home",
+    "at": [
+     17,
+     6
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "quench"
+   },
+   "fire": {
+    "of": "center",
+    "at": [
+     14,
+     86
+    ],
+    "face": [
+     -1,
+     0
+    ],
+    "clip": "stand"
+   },
+   "watch": {
+    "of": "home",
+    "at": [
+     0,
+     34
+    ],
+    "face": [
+     0,
+     1
+    ],
+    "clip": "stand"
+   },
+   "rest": {
+    "of": "home",
+    "at": [
+     -15,
+     -6
+    ]
+   }
+  },
+  "schedule": [
+   [
+    0.24,
+    0.29,
+    "bellows"
+   ],
+   [
+    0.29,
+    0.54,
+    "work"
+   ],
+   [
+    0.54,
+    0.56,
+    "quench"
+   ],
+   [
+    0.56,
+    0.62,
+    "fire"
+   ],
+   [
+    0.62,
+    0.78,
+    "work"
+   ],
+   [
+    0.78,
+    0.8,
+    "quench"
+   ],
+   [
+    0.8,
+    0.88,
+    "fire"
+   ],
+   [
+    0.88,
+    0.24,
+    "rest"
+   ]
+  ],
+  "chat": {
+   "_note": "PLACEHOLDER lines for the dialogue writer (docs/prompts/dialogue_writer.md, docs/characters/torben.md): he never says more than three to five words",
+   "spot": {
+    "work": [
+     "Hält.",
+     "Kalt. Noch mal.",
+     "Schrott."
+    ],
+    "bellows": [
+     "Mehr Glut."
+    ],
+    "quench": [
+     "Zischt gut."
+    ],
+    "fire": [
+     "Hm.",
+     "Lass."
+    ]
+   },
+   "night": [
+    "Hinter mich.",
+    "Schlaf."
+   ],
+   "any": [
+    "Was.",
+    "Hält.",
+    "Lass.",
+    "Zu heiß für dich.",
+    "Komm später."
+   ]
+  },
+  "shop": "torben_forge"
  }
 }

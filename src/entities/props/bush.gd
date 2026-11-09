@@ -96,7 +96,7 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 func prompt() -> String:
 	if _spec.has("pickup") and not is_depleted() and not bool(state.get("p", 0)):
 		return String((_spec.pickup as Dictionary).prompt)
-	if _critter != null and LeafCritter.today(self) != "":
+	if _critter != null and LeafCritter.can_catch(self):
 		return "ABLESEN" ## something small sits on a leaf
 	return ""
 

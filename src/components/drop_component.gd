@@ -81,7 +81,7 @@ static func spawn_drops(tree: SceneTree, entries: Array, origin: Vector2) -> voi
 
 
 ## Host: a stack the player threw out of the inventory: it flies a good way in `direction` (further than the magnet reaches).
-static func spawn_thrown(tree: SceneTree, id: String, count: int, origin: Vector2, direction: Vector2) -> void:
+static func spawn_thrown(tree: SceneTree, id: String, count: int, origin: Vector2, direction: Vector2, extra: Dictionary = {}) -> void:
 	var container: Node = tree.get_first_node_in_group("drops")
 	if container == null:
 		return
@@ -90,6 +90,8 @@ static func spawn_thrown(tree: SceneTree, id: String, count: int, origin: Vector
 	drop.name = "Drop%d" % _drop_count
 	drop.item_id = id
 	drop.count = count
+	drop.refine = int(extra.get(RefineRules.KEY_LEVEL, 0))
+	drop.refine_pity = int(extra.get(RefineRules.KEY_PITY, 0))
 	drop.position = origin
 	var way: Vector2 = direction.normalized() if direction.length() > 0.1 else Vector2.DOWN
 	drop.launch = way * 70.0

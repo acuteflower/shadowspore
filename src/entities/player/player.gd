@@ -422,7 +422,9 @@ func _rpc_heal() -> void:
 
 
 func _on_inventory_changed() -> void:
-	attack.held_weapon = String(inventory.active_stack().get("id", "")) ## a selected tool replaces the weapon
+	var in_hand: Dictionary = inventory.active_stack()
+	attack.held_weapon = String(in_hand.get("id", "")) ## a selected tool replaces the weapon
+	attack.held_refine = Items.refine(in_hand)
 
 
 ## Everyone sees the hit; the owner also gets knocked back and shaken.

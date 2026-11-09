@@ -348,7 +348,8 @@ func _run() -> void:
 	town.request_craft("plank")
 	await _frames(3)
 	_check(player.inventory.count_item("plank") == planks + 2 and town.available("wood", player) == wood_now - 2, "two wood became two planks")
-	_check(town.recipe_block("sword_iron", player) == "" or town.recipe_block("sword_iron", player) != "", "the sword recipe answers")
+	## Gustav has no commission of his own since the forged sword went to Torben: this test registers one (the shop's order tab is added below too)
+	(town.recipes() as Dictionary)["gustav_test_order"] = {"name": "GESCHMIEDETES SCHWERT", "station": "workshop", "in": {"sword_basic": 1, "plank": 2, "stone": 4, "void_splinter": 2}, "out": {"sword_iron": 1}, "seconds": 3.5, "trust": 20, "info": "TEST", "by": "npc", "npc": "gustav", "work": 100.0}
 	_check(town.recipe_block("axe_basic", player) == "", "an axe can be crafted when she has none")
 	player.inventory.give("axe_basic", 1)
 	_check(town.recipe_block("axe_basic", player) != "", "but not twice (%s)" % town.recipe_block("axe_basic", player))
@@ -356,8 +357,9 @@ func _run() -> void:
 	await _frames(2)
 	var shop: ShopWindow = ShopWindow.open(get_tree(), player, town, "gustav_bench")
 	await _frames(60)
-	_check(shop != null and shop.tabs.size() == 4 and shop.speaker == gustav, "the workbench is a shop with four tabs and Gustav answers")
+	_check(shop != null and shop.tabs.size() == 3 and shop.speaker == gustav, "the workbench is a shop with three tabs and Gustav answers")
 	if shop != null:
+		shop.tabs.insert(1, {"id": "order", "name": "BESTELLEN", "kind": "order"})
 		_check(not shop.rows.is_empty() and String(shop.rows[0].kind) == "craft", "the first tab lists what she can make herself")
 		var made_before: int = player.inventory.count_item("plank")
 		shop.focus = 0
@@ -368,7 +370,7 @@ func _run() -> void:
 		shop._set_tab(1)
 		var sword_row: int = -1
 		for i: int in shop.rows.size():
-			if String(shop.rows[i].get("recipe", "")) == "sword_iron":
+			if String(shop.rows[i].get("recipe", "")) == "gustav_test_order":
 				sword_row = i
 		_check(sword_row >= 0 and String(shop.rows[sword_row].kind) == "order", "the sword is a commission")
 		town.stock["plank"] = 4
@@ -377,8 +379,8 @@ func _run() -> void:
 		player.inventory.give("void_splinter", 2)
 		(town.residents["gustav"] as Dictionary).trust = 30
 		await _frames(2)
-		_check(town.order_block("sword_iron", player) == "", "with trust and material it can be ordered (%s)" % town.order_block("sword_iron", player))
-		town.request_order("sword_iron")
+		_check(town.order_block("gustav_test_order", player) == "", "with trust and material it can be ordered (%s)" % town.order_block("gustav_test_order", player))
+		town.request_order("gustav_test_order")
 		await _frames(3)
 		_check(town.orders.size() == 1 and not bool((town.orders[0] as Dictionary).done) and not player.inventory.has_item("sword_basic"), "the material is handed over and the order is on the bench")
 		var left_a: float = float((town.orders[0] as Dictionary).left)

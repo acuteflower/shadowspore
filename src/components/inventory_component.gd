@@ -67,20 +67,23 @@ func request(op: String, args: Array) -> void:
 		_rpc_request.rpc_id(1, op, args)
 
 
-## Host only. Returns how many items did not fit.
-func add_item(id: String, count: int = 1) -> int:
+## Host only. Returns how many items did not fit. `extra` is what a stack carries besides id and count (the refinement of a weapon, `Items.extras`):
+## such a stack is never merged into another one.
+func add_item(id: String, count: int = 1, extra: Dictionary = {}) -> int:
 	var probe: Dictionary = {"id": id, "count": 1}
 	var limit: int = Items.max_stack(probe)
 	for i: int in SIZE: ## top up existing stacks first
 		var existing: Dictionary = slots[i]
-		if count > 0 and not existing.is_empty() and existing["id"] == id and int(existing["count"]) < limit:
+		if extra.is_empty() and count > 0 and not existing.is_empty() and existing["id"] == id and Items.extras(existing).is_empty() and int(existing["count"]) < limit:
 			var added: int = mini(limit - int(existing["count"]), count)
 			existing["count"] = int(existing["count"]) + added
 			count -= added
 	for i: int in SIZE:
 		if count > 0 and slots[i].is_empty() and _fits(i, probe):
 			var placed: int = mini(limit, count)
-			slots[i] = {"id": id, "count": placed}
+			var fresh: Dictionary = {"id": id, "count": placed}
+			fresh.merge(extra)
+			slots[i] = fresh
 			count -= placed
 	return count
 
@@ -100,8 +103,8 @@ func has_room(id: String) -> bool:
 
 
 ## Host only: adds items and syncs the owner. Returns how many did not fit.
-func give(id: String, count: int = 1) -> int:
-	var left: int = add_item(id, count)
+func give(id: String, count: int = 1, extra: Dictionary = {}) -> int:
+	var left: int = add_item(id, count, extra)
 	if left < count:
 		_commit()
 	return left
@@ -116,11 +119,24 @@ func count_item(id: String) -> int:
 	return total
 
 
+## How many of `id` the bag holds that are not refined: a refined weapon is never sold by accident.
+func count_plain(id: String) -> int:
+	var total: int = 0
+	for stack: Dictionary in slots:
+		if not stack.is_empty() and String(stack["id"]) == id and Items.refine(stack) == 0:
+			total += int(stack["count"])
+	return total
+
+
 ## Host only: takes `count` of `id` out of the bag (false, and nothing taken, if there are fewer).
 func remove_item(id: String, count: int) -> bool:
 	if count_item(id) < count:
 		return false
+	var order: Array[int] = [] ## plain pieces go first: a refined weapon is only given up when nothing else is left
 	for i: int in SIZE:
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool: return Items.refine(slots[a] as Dictionary) < Items.refine(slots[b] as Dictionary) or (Items.refine(slots[a] as Dictionary) == Items.refine(slots[b] as Dictionary) and a < b))
+	for i: int in order:
 		var stack: Dictionary = slots[i]
 		if count > 0 and not stack.is_empty() and String(stack["id"]) == id:
 			var taken: int = mini(int(stack["count"]), count)
@@ -146,6 +162,36 @@ func has_item(id: String) -> bool:
 ## UI helper: would the stack on the cursor be accepted by this slot? (The host re-checks everything.)
 func can_place(to_kind: String, to_ref: Variant) -> bool:
 	return not held.is_empty() and _exists(to_kind, to_ref) and _accepts(to_kind, to_ref, held)
+
+
+## Is there such a slot ("inv" with an index, "equip" with a slot name)?
+func slot_exists(kind: String, ref: Variant) -> bool:
+	return _exists(kind, ref)
+
+
+## Host only: takes the stack out of a slot (`kind` "inv" with an index or "equip" with a slot name) and hands it over, with everything it carries. {} if there is none.
+func take_stack(kind: String, ref: Variant) -> Dictionary:
+	if not _exists(kind, ref) or stack_at(kind, ref).is_empty():
+		return {}
+	var taken: Dictionary = stack_at(kind, ref)
+	_set_stack(kind, ref, {})
+	_commit()
+	return taken
+
+
+## Developer cheat (host): sets the refinement of the weapon in her hand (0 = plain, up to the weapon's cap, Glut cleared). False when she holds nothing refinable.
+func debug_set_refine(level: int) -> bool:
+	var stack: Dictionary = active_stack()
+	if not RefineRules.is_refinable(stack):
+		return false
+	var level_now: int = clampi(level, 0, RefineRules.cap(stack))
+	if level_now > 0:
+		stack[RefineRules.KEY_LEVEL] = level_now
+	else:
+		stack.erase(RefineRules.KEY_LEVEL)
+	stack.erase(RefineRules.KEY_PITY)
+	_commit()
+	return true
 
 
 ## Empties the bag, the hotbar and the worn equipment (the wake-up in the hut: the story starts again with nothing). Host only.
@@ -298,7 +344,7 @@ func _click(kind: String, ref: Variant) -> bool:
 		_set_stack(kind, ref, held)
 		held = {}
 		return true
-	if kind == "inv" and String(current["id"]) == String(held["id"]) and Items.max_stack(held) > 1:
+	if kind == "inv" and String(current["id"]) == String(held["id"]) and Items.extras(current) == Items.extras(held) and Items.max_stack(held) > 1:
 		var room: int = Items.max_stack(held) - int(current["count"])
 		if room <= 0:
 			return false
@@ -341,8 +387,10 @@ func _rclick(kind: String, ref: Variant) -> bool:
 	if kind != "inv" or not _accepts(kind, ref, {"id": held["id"], "count": 1}):
 		return false
 	if current.is_empty():
-		slots[int(ref)] = {"id": String(held["id"]), "count": 1}
-	elif String(current["id"]) == String(held["id"]) and int(current["count"]) < Items.max_stack(current):
+		var one: Dictionary = (held as Dictionary).duplicate() ## keeps the refinement of a single weapon
+		one["count"] = 1
+		slots[int(ref)] = one
+	elif String(current["id"]) == String(held["id"]) and Items.extras(current) == Items.extras(held) and int(current["count"]) < Items.max_stack(current):
 		current["count"] = int(current["count"]) + 1
 	else:
 		return false
@@ -372,7 +420,7 @@ func _quick(kind: String, ref: Variant) -> bool:
 			if int(current["count"]) <= 0 or not _fits(i, current):
 				continue
 			var target: Dictionary = slots[i]
-			if pass_index == 0 and not target.is_empty() and String(target["id"]) == String(current["id"]) and int(target["count"]) < Items.max_stack(target):
+			if pass_index == 0 and not target.is_empty() and String(target["id"]) == String(current["id"]) and Items.extras(target) == Items.extras(current) and int(target["count"]) < Items.max_stack(target):
 				var room: int = mini(Items.max_stack(target) - int(target["count"]), int(current["count"]))
 				target["count"] = int(target["count"]) + room
 				current["count"] = int(current["count"]) - room
@@ -410,7 +458,7 @@ func _throw_held(all: bool) -> bool:
 	if held.is_empty():
 		return false
 	var count: int = int(held["count"]) if all else 1
-	if not _throw(String(held["id"]), count):
+	if not _throw(held, count):
 		return false
 	held["count"] = int(held["count"]) - count
 	if int(held["count"]) <= 0:
@@ -426,7 +474,7 @@ func _drop_slot(kind: String, ref: Variant, all: bool) -> bool:
 	if current.is_empty():
 		return false
 	var count: int = int(current["count"]) if (all or kind == "equip") else 1
-	if not _throw(String(current["id"]), count):
+	if not _throw(current, count):
 		return false
 	current["count"] = int(current["count"]) - count
 	if int(current["count"]) <= 0:
@@ -434,11 +482,11 @@ func _drop_slot(kind: String, ref: Variant, all: bool) -> bool:
 	return true
 
 
-func _throw(id: String, count: int) -> bool:
+func _throw(stack: Dictionary, count: int) -> bool:
 	var player: Player = get_parent() as Player
 	if player == null or player.health.current <= 0.0 or count <= 0:
 		return false
-	DropComponent.spawn_thrown(get_tree(), id, count, player.global_position + Vector2(0, -8), player.facing)
+	DropComponent.spawn_thrown(get_tree(), String(stack["id"]), count, player.global_position + Vector2(0, -8), player.facing, Items.extras(stack))
 	return true
 
 
@@ -448,7 +496,7 @@ func _sort() -> bool:
 	for i: int in range(HOTBAR_SIZE, SIZE):
 		var stack: Dictionary = (slots[i] as Dictionary).duplicate()
 		for other: Dictionary in stacks:
-			if not stack.is_empty() and String(other["id"]) == String(stack["id"]) and int(other["count"]) < Items.max_stack(other):
+			if not stack.is_empty() and String(other["id"]) == String(stack["id"]) and Items.extras(other) == Items.extras(stack) and int(other["count"]) < Items.max_stack(other):
 				var room: int = mini(Items.max_stack(other) - int(other["count"]), int(stack["count"]))
 				other["count"] = int(other["count"]) + room
 				stack["count"] = int(stack["count"]) - room
@@ -479,9 +527,9 @@ func _sort() -> bool:
 func _stow() -> bool:
 	if held.is_empty():
 		return false
-	var left: int = add_item(String(held["id"]), int(held["count"]))
+	var left: int = add_item(String(held["id"]), int(held["count"]), Items.extras(held))
 	if left > 0:
-		_throw(String(held["id"]), left)
+		_throw(held, left)
 	held = {}
 	return true
 
@@ -499,7 +547,7 @@ func _move(from: int, to: int) -> bool:
 	var b: Dictionary = slots[to]
 	if a.is_empty() or not _fits(to, a) or not _fits(from, b):
 		return false
-	if not b.is_empty() and a["id"] == b["id"] and Items.max_stack(a) > 1: ## merge stacks
+	if not b.is_empty() and a["id"] == b["id"] and Items.extras(a) == Items.extras(b) and Items.max_stack(a) > 1: ## merge stacks
 		var room: int = Items.max_stack(a) - int(b["count"])
 		var moved: int = mini(room, int(a["count"]))
 		if moved > 0:

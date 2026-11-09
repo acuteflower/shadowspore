@@ -1,16 +1,20 @@
 class_name SkillTreeWindow
 extends Control
-## F: a living, explorable veil. Only the three existing abilities are real skills.
-## Holding on a placeholder explores the graph for free; it never buys an upgrade.
+## F: a living, explorable veil (docs/skill_tree.md, docs/faehigkeiten_kampf_konzept.md).
+## Roots are real abilities. Their upgrades are not separate orbs: they grow on the flower itself (slot buds round it, more petals per
+## upgrade) and are learned by holding on that flower once the level and the points allow it. Holding on a placeholder explores the
+## graph for free and never costs anything.
 const VEIL: Shader = preload("res://assets/shaders/skill_veil.gdshader")
 const OPEN_SECONDS: float = 0.85
 const CLOSE_SECONDS: float = 0.3
 const HOLD_SECONDS: float = 0.7
+const LEARN_SECONDS: float = 0.95
+const READY: Color = Color("ffe08a")
 const REVEAL_SECONDS: float = 1.1
 const ZOOM_MIN: float = 0.55
 const ZOOM_MAX: float = 1.8
 const ZOOM_STEP: float = 1.28
-const HOME: Vector2 = Vector2(-46, -4) ## keeps every node clear of the corner vines
+const HOME: Vector2 = Vector2(-46, 20) ## keeps every node clear of the corner vines and the detail blocks at the bottom
 const TEXT: Color = Color("e8e4f4")
 const DIM: Color = Color("a79abf")
 const INK: Color = Color("08050f")
@@ -97,6 +101,7 @@ func bind(player: Node) -> void:
 	_player = player
 	_skills = player.get_node("SkillTreeComponent") as SkillTreeComponent
 	_skills.explored.connect(_on_explored)
+	_skills.learned.connect(_on_learned)
 	var health: HealthComponent = player.get_node("HealthComponent") as HealthComponent
 	health.changed.connect(func(current: float, _maximum: float) -> void:
 		if current <= 0.0 and _owns_input:
@@ -206,13 +211,18 @@ func _process(delta: float) -> void:
 		var inside: bool = _hover == _selected if _hold_on_orb else _action_rect().has_point(get_local_mouse_position())
 		if not inside:
 			_cancel_hold()
-	if _held and _opening and _skills.can_explore(_selected) and _pending.is_empty():
-		_hold = minf(_hold + delta / HOLD_SECONDS, 1.0)
+	if _held and _opening and _holdable(_selected) and _pending.is_empty():
+		_hold = minf(_hold + delta / (LEARN_SECONDS if not _next_ready(_selected).is_empty() else HOLD_SECONDS), 1.0)
 		if _hold >= 1.0:
-			_pending = _selected
+			var chosen: String = _selected
+			_pending = chosen
 			_pending_time = 0.0
 			_cancel_hold()
-			_skills.request_explore(_selected)
+			var upgrade_id: String = _next_ready(chosen)
+			if not upgrade_id.is_empty():
+				_skills.request_learn(upgrade_id)
+			else:
+				_skills.request_explore(chosen)
 	if not _pending.is_empty():
 		_pending_time += delta
 		if _pending_time >= 3.0:
@@ -344,7 +354,7 @@ func _appearance(id: String) -> float:
 func _push_veil() -> void:
 	var lights: PackedVector4Array = PackedVector4Array()
 	for id: String in _skills.definitions():
-		if not _skills.is_explored(id):
+		if not _skills.is_explored(id) or _skills.is_upgrade(id):
 			continue
 		var t: float = clampf(float(_reveal.get(id, REVEAL_SECONDS)) / REVEAL_SECONDS, 0.0, 1.0)
 		var point: Vector2 = _pos(id)
@@ -374,6 +384,45 @@ func _on_explored(id: String) -> void:
 	_play("reveal")
 
 
+## An upgrade was learned (host-confirmed): the flower opens, a ring of light runs out, the root flower's slot fills.
+func _on_learned(id: String) -> void:
+	var root: String = id
+	for _step: int in _skills.definitions().size():
+		var parent_id: String = String(_skills.node(root).get("parent", ""))
+		if parent_id.is_empty() or not _skills.is_upgrade(root):
+			break
+		root = parent_id
+	_reveal[root] = 0.0
+	_pending = ""
+	_play("learn")
+
+
+## Upgrades live on their skill's flower, they are no orbs of their own.
+func _shown(id: String) -> bool:
+	return _skills.is_visible(id) and not _skills.is_upgrade(id)
+
+
+## The first upgrade of a skill that can be bought right now ("" = none).
+func _next_ready(id: String) -> String:
+	for upgrade_id: String in _skills.upgrade_chain(id):
+		if _skills.can_learn(upgrade_id):
+			return upgrade_id
+	return ""
+
+
+## The first upgrade of a skill that is not learned yet ("" = all learned or none exist).
+func _next_open(id: String) -> String:
+	for upgrade_id: String in _skills.upgrade_chain(id):
+		if not _skills.is_learned(upgrade_id):
+			return upgrade_id
+	return ""
+
+
+## Something the hold gesture can do right now: explore a placeholder (free) or learn an upgrade (points).
+func _holdable(id: String) -> bool:
+	return _skills.can_explore(id) or not _next_ready(id).is_empty()
+
+
 func _play(kind: String) -> void:
 	var path: String = "res://assets/audio/skills/" + kind + ".wav"
 	if ResourceLoader.exists(path):
@@ -390,7 +439,7 @@ func _pick(at: Vector2) -> String:
 	if not Rect2(Vector2.ZERO, _stage.size).has_point(at) or _ui_visibility(at) < 0.5:
 		return ""
 	for id: String in _skills.definitions():
-		if _skills.is_visible(id) and _appearance(id) > 0.6 and _screen(id).distance_to(at) <= maxf(15.0, _orb_radius(id) + 5.0):
+		if _shown(id) and _appearance(id) > 0.6 and _screen(id).distance_to(at) <= maxf(15.0, _orb_radius(id) + 5.0):
 			return id
 	return ""
 
@@ -398,8 +447,9 @@ func _pick(at: Vector2) -> String:
 ## Let the graph pass behind floating labels without competing with their text.
 ## This attenuates only graph marks; there is no panel or opaque surface.
 func _ui_visibility(at: Vector2) -> float:
+	var lift: float = maxf(_details_height() - 78.0, 0.0)
 	var zones: Array[Rect2] = [
-		Rect2(0, size.y - 108, 250, 81),
+		Rect2(0, size.y - 108 - lift, 250, 81 + lift),
 		_action_rect(),
 		Rect2(size.x - 132, 48, 132, 17),
 	]
@@ -497,7 +547,7 @@ func _input(event: InputEvent) -> void:
 
 
 func _begin_hold(mouse: bool, on_orb: bool) -> void:
-	if _skills.can_explore(_selected) and _pending.is_empty() and _open_t > 0.8:
+	if _holdable(_selected) and _pending.is_empty() and _open_t > 0.8:
 		_held = true
 		_hold_mouse = mouse
 		_hold_on_orb = on_orb
@@ -514,7 +564,7 @@ func _navigate(direction: Vector2) -> void:
 	var best: String = ""
 	var score: float = INF
 	for id: String in _skills.definitions():
-		if id == _selected or not _skills.is_visible(id) or _appearance(id) < 0.6:
+		if id == _selected or not _shown(id) or _appearance(id) < 0.6:
 			continue
 		var offset: Vector2 = _pos(id) - _pos(_selected)
 		var alignment: float = offset.normalized().dot(direction)
@@ -588,37 +638,117 @@ func _draw_points_vine(void_level: float) -> void:
 	var course: Callable = func(x: float) -> float: return 42.0 + 3.0 * sin((size.x - x) * 0.045)
 	VineStyle.branch(_chrome, size.x, size.x - 132.0, course, 4, void_level, 45.0, _time, reach)
 	VineStyle.foliage(_chrome, size.x, size.x - 132.0, course, 7, 470, void_level, 45.0, _time, reach)
-	var progress: ProgressComponent = _player.get_node("ProgressComponent") as ProgressComponent
-	_text(_chrome, "%d PUNKTE / FÜR SPÄTER" % maxi(progress.level - 1, 0), Vector2(size.x - 124, 54), Color("e6c468"))
+	var free: int = _skills.points_free()
+	var glow: float = 0.7 + 0.3 * sin(_time * 3.0) if free > 0 else 0.0
+	var tone: Color = Color("e6c468").lerp(READY, glow) if free > 0 else Color("e6c468").darkened(0.25)
+	_text(_chrome, "%d PUNKT%s FREI" % [free, "" if free == 1 else "E"], Vector2(size.x - 124, 54), tone)
+
+
+## Height of the detail block of the selected node: a root lists its upgrades one per row.
+func _details_height() -> float:
+	if _skills == null or not _skills.is_root(_selected):
+		return 78.0
+	return 78.0 + 11.0 * maxi(_skills.upgrade_chain(_selected).size() - 1, 0)
+
+
+func _points_word(count: int) -> String:
+	return "PUNKT" if count == 1 else "PUNKTE"
+
+
+## The one line that says what an upgrade still needs.
+func _requirement(id: String) -> String:
+	var def: Dictionary = _skills.node(id)
+	var cost: int = _skills.cost(id)
+	match _skills.upgrade_state(id):
+		&"learned":
+			return "ERLERNT"
+		&"ready":
+			return "STUFE %d / %d %s / BEREIT" % [_skills.required_level(id), cost, _points_word(cost)]
+		&"short":
+			return "BRAUCHT %d %s" % [cost, _points_word(cost)]
+		&"locked":
+			return "AB STUFE %d / %d %s" % [_skills.required_level(id), cost, _points_word(cost)]
+		&"blocked":
+			return "ERST %s" % String(_skills.node(String(def.get("parent", ""))).get("name", "?"))
+	return ""
+
+
+func _requirement_color(id: String, tone: Color) -> Color:
+	match _skills.upgrade_state(id):
+		&"learned":
+			return tone
+		&"ready":
+			return READY
+		&"short":
+			return Color("e6c468").darkened(0.15)
+	return DIM
 
 
 func _draw_details() -> void:
 	var node: Dictionary = _skills.definitions()[_selected]
 	var branch: Dictionary = DataRegistry.get_entry("skills", "branches")[node.branch]
 	var color: Color = _color(_selected)
-	var y: float = size.y - 119
+	var height: float = _details_height()
+	var y: float = size.y - 119 - maxf(height - 78.0, 0.0)
 	var void_level: float = VineStyle.void_amount()
 	var reach: float = clampf((_open_t - 0.42) / 0.5, 0.0, 1.0)
 	var course: Callable = func(x: float) -> float: return y + 3.0 * sin(x / 244.0 * PI) + sin(x * 0.07 + 2.0) * 1.1
-	var block: Rect2 = Rect2(6, y + 7, 244, 66 if _skills.is_awake(_selected) else 78)
+	var block: Rect2 = Rect2(6, y + 7, 244, height)
 	_text_backing(block, color, 0.94)
 	for x: float in [18.0, 232.0]:
 		_chrome.draw_line(Vector2(x, float(course.call(x)) + 2), Vector2(x, block.position.y), VineStyle.BARK_LIGHT, 1.0)
 	VineStyle.branch(_chrome, 0.0, 244.0, course, 4, void_level, 50.0, _time, reach)
 	VineStyle.foliage(_chrome, 0.0, 244.0, course, 9, 570, void_level, 50.0, _time, reach)
-	_text(_chrome, String(branch.name) + (" / ERLERNT" if _skills.is_awake(_selected) else " / PLATZHALTER"), Vector2(12, y + 12), color)
-	_text(_chrome, String(node.name), Vector2(12, y + 25), TEXT, 2.0)
+	var upgrade: bool = _skills.is_upgrade(_selected)
+	var kind: String = " / PLATZHALTER"
 	if _skills.is_awake(_selected):
+		kind = " / UPGRADE / ERLERNT" if upgrade else " / ERLERNT"
+	elif upgrade:
+		kind = " / UPGRADE"
+	_text(_chrome, String(branch.name) + kind, Vector2(12, y + 12), color)
+	_text(_chrome, String(node.name), Vector2(12, y + 25), TEXT, 2.0)
+	if _skills.is_awake(_selected) or upgrade:
 		_text(_chrome, String(node.description), Vector2(12, y + 46), DIM)
-		var detail: String = String(node.detail)
-		if _selected == "shadow_blink":
-			var blink: BlinkComponent = _player.get_node("BlinkComponent") as BlinkComponent
-			detail = "REICHWEITE %d / ABKLINGZEIT %d S" % [roundi(blink.blink_range), roundi(blink.cooldown)]
-		_text(_chrome, detail, Vector2(12, y + 59), color)
+		_text(_chrome, _detail_line(_selected), Vector2(12, y + 59), color)
+		if upgrade:
+			_text(_chrome, _requirement(_selected), Vector2(12, y + 70), _requirement_color(_selected, color))
+		else:
+			_draw_upgrade_rows(_selected, y + 70.0, color)
 	else:
 		_text(_chrome, "NOCH KEINE FÄHIGKEIT. KEINE SPIELWIRKUNG.", Vector2(12, y + 46), DIM)
 		_text(_chrome, "ERKUNDEN IST KOSTENLOS.", Vector2(12, y + 59), color)
 		_text(_chrome, "PUNKTE BLEIBEN ERHALTEN.", Vector2(12, y + 70), DIM)
+
+
+## The detail line of a skill: data text, or live numbers where the game knows them.
+func _detail_line(id: String) -> String:
+	var node: Dictionary = _skills.node(id)
+	if id == "shadow_blink":
+		var blink: BlinkComponent = _player.get_node("BlinkComponent") as BlinkComponent
+		return "REICHWEITE %d / ABKLINGZEIT %d S" % [roundi(blink.blink_range), roundi(blink.cooldown)]
+	if id == "sneak":
+		var stealth: StealthComponent = _player.get_node_or_null("StealthComponent") as StealthComponent
+		if stealth != null:
+			return "%s HALTEN / SICHTWEITE %d %%" % [VineStyle.key_name("sneak", "STRG"), roundi(stealth.sneak_detection_multiplier * 100.0)]
+	return String(node.get("detail", ""))
+
+
+## One row per upgrade of a root: a pip (full = learned), the name and what it still needs.
+func _draw_upgrade_rows(id: String, top: float, tone: Color) -> void:
+	var chain: Array[String] = _skills.upgrade_chain(id)
+	if chain.is_empty():
+		_text(_chrome, "KEINE UPGRADES", Vector2(12, top), DIM)
+		return
+	for i: int in chain.size():
+		var upgrade_id: String = chain[i]
+		var row_y: float = top + 11.0 * i
+		var state: StringName = _skills.upgrade_state(upgrade_id)
+		var row_color: Color = _requirement_color(upgrade_id, tone)
+		var pip: Rect2 = Rect2(12, row_y + 1, 3, 3)
+		_chrome.draw_rect(pip.grow(1.0), VineStyle.OUTLINE)
+		_chrome.draw_rect(pip, row_color if state == &"learned" or state == &"ready" else Color(INK, 0.9))
+		var label: String = "%s  %s" % [String(_skills.node(upgrade_id).name), _requirement(upgrade_id)]
+		_text(_chrome, label, Vector2(20, row_y), row_color)
 
 
 func _draw_action_vine(void_level: float) -> void:
@@ -632,7 +762,7 @@ func _draw_action_vine(void_level: float) -> void:
 	VineStyle.branch(_chrome, size.x, size.x - 216.0, course, 4, void_level, 50.0, _time, reach)
 	VineStyle.foliage(_chrome, size.x, size.x - 216.0, course, 8, 610, void_level, 50.0, _time, reach)
 	var color: Color = _color(_selected)
-	var active: bool = _skills.can_explore(_selected)
+	var active: bool = _holdable(_selected)
 	var charge: float = _charge(_selected)
 	var slot: Vector2 = Vector2(size.x - 80, block.position.y + 25 + sin(_time * 1.3) * 1.0)
 	var breath: float = sin(_time * 1.15) * 0.5 + 0.5
@@ -643,12 +773,29 @@ func _draw_action_vine(void_level: float) -> void:
 	if charge > 0.0:
 		var pulse: float = 0.6 + 0.4 * sin(_time * 14.0) if _pending == _selected else 1.0
 		_chrome.draw_arc(slot, 13.0, -PI * 0.5, -PI * 0.5 + TAU * charge, 48, Color(color, pulse), 2.0)
-	var label: String = "HALTEN ZUM ERKUNDEN" if active else ("BEREITS ERLERNT" if _skills.is_awake(_selected) else "BEREITS ERKUNDET")
-	var status: String = "KOSTENLOS / PLATZHALTER" if active else ("BESTEHENDE FÄHIGKEIT" if _skills.is_awake(_selected) else "PLATZHALTER / OHNE WIRKUNG")
+	var label: String
+	var status: String
+	var ready_id: String = _next_ready(_selected)
+	var open_id: String = _next_open(_selected)
+	if not ready_id.is_empty():
+		label = "HALTEN ZUM LERNEN"
+		status = "%s / %d %s" % [String(_skills.node(ready_id).name), _skills.cost(ready_id), _points_word(_skills.cost(ready_id))]
+	elif _skills.can_explore(_selected):
+		label = "HALTEN ZUM ERKUNDEN"
+		status = "KOSTENLOS / PLATZHALTER"
+	elif _skills.is_awake(_selected) and not open_id.is_empty():
+		label = "UPGRADE NOCH GESPERRT"
+		status = "%s %s" % [String(_skills.node(open_id).name), _requirement(open_id)]
+	elif _skills.is_awake(_selected) and not _skills.upgrade_chain(_selected).is_empty():
+		label = "ALLE UPGRADES ERLERNT"
+		status = "%d VON %d" % [_skills.learned_count(_selected), _skills.upgrade_chain(_selected).size()]
+	else:
+		label = "BEREITS ERLERNT" if _skills.is_awake(_selected) else "BEREITS ERKUNDET"
+		status = "BESTEHENDE FÄHIGKEIT" if _skills.is_awake(_selected) else "PLATZHALTER / OHNE WIRKUNG"
 	if not _pending.is_empty():
 		label = "SCHLEIER ANTWORTET ..."
 	_text(_chrome, label, Vector2(size.x - 208, block.position.y + 12), color if active else DIM)
-	_text(_chrome, status, Vector2(size.x - 208, block.position.y + 25), DIM)
+	_text(_chrome, status, Vector2(size.x - 208, block.position.y + 25), READY if not ready_id.is_empty() else DIM)
 
 
 func _draw_zoom_vine(void_level: float) -> void:
@@ -706,7 +853,7 @@ func _draw_web() -> void:
 		return
 	for id: String in _skills.definitions():
 		var node: Dictionary = _skills.definitions()[id]
-		if not _skills.is_visible(id) or not node.has("parent"):
+		if not _shown(id) or not node.has("parent"):
 			continue
 		var parent_id: String = String(node.parent)
 		var points: PackedVector2Array = _connection_points(id)
@@ -746,7 +893,7 @@ func _draw_orbs() -> void:
 	if _skills == null:
 		return
 	for id: String in _skills.definitions():
-		if not _skills.is_visible(id):
+		if not _shown(id):
 			continue
 		var appear: float = _appearance(id)
 		if appear <= 0.01:
@@ -757,6 +904,7 @@ func _draw_orbs() -> void:
 		var phase: float = _phase(id)
 		var awake: bool = _skills.is_awake(id)
 		var explored: bool = _skills.is_explored(id)
+		var ready: bool = awake and _skills.has_ready_upgrade(id)
 		var interest: float = float(_interest.get(id, 0.0))
 		var radius: float = _orb_radius(id) * lerpf(0.55, 1.0, VineStyle.back_out(clampf(appear, 0.0, 1.0)))
 		var charge: float = _charge(id)
@@ -765,16 +913,26 @@ func _draw_orbs() -> void:
 		var awakening: float = maxf(0.0, 1.0 - float(_reveal.get(id, 10.0)) / 1.1)
 		heartbeat = maxf(heartbeat, awakening)
 		var life: float = 1.0 if explored else 0.38
+		var ready_pulse: float = (0.5 + 0.5 * sin(_time * 3.2 + phase)) if ready else 0.0
 		_halo(_orbs, at, radius + 20.0, tone, alpha * (0.7 + breath * 0.35 + heartbeat * 0.9 + interest * 0.5 + charge * 0.9) * life)
+		if ready:
+			_halo(_orbs, at, radius + 26.0, READY, alpha * (0.5 + ready_pulse * 0.7))
 		# A flower: a closed bud while the place is unexplored, opening petal by petal once explored, in full bloom for a learned skill.
 		var open: float = 1.0 if awake else (0.7 if explored else 0.12)
 		open = clampf(open + interest * 0.12 + charge * 0.4 + heartbeat * 0.08, 0.0, 1.0)
 		if _reveal.has(id) and not awake:
 			open = maxf(0.12, lerpf(0.12, open, smoothstep(0.0, 1.1, float(_reveal[id]))))
-		BloomOrb.draw(_orbs, at, radius * 1.22, tone, alpha, open, life, breath, _time, id.hash() & 0xffff, interest + charge, 10 if awake else 7)
+		var petals: int = 10 if awake else 7
+		var learned_upgrades: int = _skills.learned_count(id)
+		if awake and learned_upgrades > 0:
+			petals = 10 + learned_upgrades * 2 ## every learned upgrade adds petals to the crown
+		BloomOrb.draw(_orbs, at, radius * 1.22, tone, alpha, open, life, breath, _time, id.hash() & 0xffff, interest + charge + ready_pulse * 0.4, petals)
+		var icon: String = String((_skills.definitions()[id] as Dictionary).get("icon", ""))
+		if awake and SkillIcons.has_icon(icon):
+			_orbs.draw_circle(at, 8.5, Color(INK, alpha * 0.86))
+			SkillIcons.draw(_orbs, icon, at, tone, alpha * 0.95)
 		if awake:
-			_orbs.draw_circle(at, 6.5, Color(INK, alpha * 0.82))
-			_draw_glyph(at, String((_skills.definitions()[id] as Dictionary).icon), Color(tone.lightened(0.45), alpha * 0.95))
+			_draw_slots(id, at, radius, tone, alpha)
 		# Tiny orbiting seeds bind the globe to the drifting veil, rather than a flat button.
 		for mote: int in (4 if awake else 2):
 			var orbit: float = phase + _time * (0.35 + mote * 0.07) + mote * 2.4
@@ -805,23 +963,36 @@ func _draw_orbs() -> void:
 			var label: String = String((_skills.definitions()[id] as Dictionary).name)
 			var label_at: Vector2 = at + Vector2(-PixelText.width(label) * 0.5, radius + 11)
 			_text(_orbs, label, label_at, Color(tone, alpha * _ui_visibility(label_at)))
+			var next_id: String = _next_open(id)
+			if not next_id.is_empty(): ## the flower says that more is to come, and what it asks for
+				var hint: String = "UPGRADE BEREIT" if ready else "UPGRADE AB STUFE %d" % _skills.required_level(next_id)
+				var hint_at: Vector2 = at + Vector2(-PixelText.width(hint) * 0.5, radius + 19)
+				_text(_orbs, hint, hint_at, Color(READY if ready else DIM, alpha * _ui_visibility(hint_at) * (0.7 + ready_pulse * 0.3 if ready else 0.8)))
 		elif id == _selected or id == _hover:
 			_text(_orbs, "PLATZHALTER", at + Vector2(-21, radius + 9), Color(DIM, alpha))
 
 
-func _draw_glyph(at: Vector2, icon: String, color: Color, target: CanvasItem = null) -> void:
-	var canvas: CanvasItem = _orbs if target == null else target
-	match icon:
-		"sword":
-			canvas.draw_line(at + Vector2(-4, 5), at + Vector2(5, -5), color)
-			canvas.draw_line(at + Vector2(-4, 0), at + Vector2(0, 4), color)
-			canvas.draw_rect(Rect2(at + Vector2(3, -5), Vector2(2, 2)), Color(TEXT, color.a))
-		"stride":
-			for i: int in 2:
-				var p: Vector2 = at + Vector2(-4 + i * 5, -3)
-				canvas.draw_polyline(PackedVector2Array([p, p + Vector2(3, 3), p + Vector2(0, 3)]), color)
-		"rift":
-			canvas.draw_polyline(PackedVector2Array([at + Vector2(2, -6), at + Vector2(-3, 0), at + Vector2(2, 0), at + Vector2(-2, 6)]), color)
+## The slot buds of a root flower: one small bud per upgrade on a ring round it, hollow until learned, gold and breathing when one can be bought.
+func _draw_slots(id: String, at: Vector2, radius: float, tone: Color, alpha: float) -> void:
+	var chain: Array[String] = _skills.upgrade_chain(id)
+	if chain.is_empty():
+		return
+	for i: int in chain.size():
+		var angle: float = -PI * 0.5 + (float(i) - (chain.size() - 1) * 0.5) * 0.5
+		var spot: Vector2 = (at + Vector2.from_angle(angle) * (radius * 1.22 + 9.0)).round()
+		var state: StringName = _skills.upgrade_state(chain[i])
+		var pulse: float = 0.5 + 0.5 * sin(_time * 3.2 + i)
+		_orbs.draw_line(at + Vector2.from_angle(angle) * (radius * 1.1), spot, Color(tone.darkened(0.5), alpha * 0.8), 1.0)
+		_orbs.draw_circle(spot, 4.5, Color(INK, alpha))
+		_orbs.draw_circle(spot, 3.5, Color(tone.darkened(0.85), alpha))
+		if state == &"learned":
+			_orbs.draw_circle(spot, 2.5, Color(tone.lightened(0.45), alpha))
+			_orbs.draw_rect(Rect2(spot + Vector2(-1, -1), Vector2.ONE * 2.0), Color(VineStyle.PETAL, alpha * 0.9))
+		elif state == &"ready":
+			_orbs.draw_circle(spot, 1.8 + pulse * 1.2, Color(READY, alpha))
+			_orbs.draw_rect(Rect2(spot + Vector2(-1, -1), Vector2.ONE), Color(VineStyle.PETAL, alpha))
+		else:
+			_orbs.draw_rect(Rect2(spot + Vector2(-1, -1), Vector2.ONE * 2.0), Color(tone.darkened(0.55), alpha * 0.8))
 
 
 func _text(canvas: CanvasItem, value: String, at: Vector2, color: Color, scale_value: float = 1.0) -> void:

@@ -27,6 +27,9 @@ const ATTACK_SHEET: Texture2D = preload("res://assets/characters/player_attack.p
 const ATTACK_FRAMES: int = 6
 const ATTACK_LEGS: int = 7
 const ATTACK_COLS: int = 3 * ATTACK_LEGS * ATTACK_FRAMES
+const COMBO_SHEET: Texture2D = preload("res://assets/characters/player_combo.png") ## tools/art_hero_combo.py: the learned 4th and 5th strike (skill upgrades), per sector 2 blocks x 7 leg variants x 6 keys
+const COMBO_BLOOD: Texture2D = preload("res://assets/characters/player_combo_blood.png")
+const COMBO_COLS: int = 2 * ATTACK_LEGS * ATTACK_FRAMES
 const HEAVY_SHEET: Texture2D = preload("res://assets/characters/player_heavy.png") ## tools/art_hero_heavy.py: the sword's heavy blow (charge, chop, recover)
 const HEAVY_BLOOD: Texture2D = preload("res://assets/characters/player_heavy_blood.png")
 const HEAVY_KEYS: int = 10
@@ -99,6 +102,8 @@ var _standby_last: int = -1
 var _standby_time: float = 0.0
 var _rig_standby_shoulder: PackedVector2Array
 var _rig_standby_hand: PackedVector2Array
+var _rig_combo_shoulder: PackedVector2Array
+var _rig_combo_hand: PackedVector2Array
 var _rig_heavy_shoulder: PackedVector2Array
 var _rig_heavy_hand: PackedVector2Array
 var _rig_shoulder: PackedVector2Array ## per sheet frame, relative to the feet (data/hero_rig.json)
@@ -781,6 +786,10 @@ func _load_rig() -> void:
 		_rig_attack_shoulder.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("attack_hand", []):
 		_rig_attack_hand.append(Vector2(float(point[0]), float(point[1])))
+	for point: Array in rig.get("combo_shoulder", []):
+		_rig_combo_shoulder.append(Vector2(float(point[0]), float(point[1])))
+	for point: Array in rig.get("combo_hand", []):
+		_rig_combo_hand.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("heavy_shoulder", []):
 		_rig_heavy_shoulder.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("heavy_hand", []):
@@ -952,19 +961,22 @@ func _animate(delta: float) -> void:
 	elif attack.is_swinging() and not _rig_attack_hand.is_empty():
 		## The swing has its own sheet: upper body from the keyframe, legs planted while she stands and
 		## following the walk cycle while she moves.
-		var swing: Vector2 = attack.animation_state() ## x: which attack, y: keyframe position (-1 winding up .. 5)
+		var swing: Vector2 = attack.animation_state() ## x: which attack (3 and 4 = the learned combo steps), y: keyframe position (-1 winding up .. 5)
 		var legs: int = 1 + clampi(int(_walk_time), 0, WALK_FRAMES - 1) if moving else 0
-		var base: int = _sector * ATTACK_COLS + (int(swing.x) * ATTACK_LEGS + legs) * ATTACK_FRAMES
+		var learned_step: bool = swing.x >= 3.0 and not _rig_combo_hand.is_empty() ## the 4th / 5th strike have their own sheet
+		var base: int = _sector * COMBO_COLS + ((int(swing.x) - 3) * ATTACK_LEGS + legs) * ATTACK_FRAMES if learned_step else _sector * ATTACK_COLS + (mini(int(swing.x), 2) * ATTACK_LEGS + legs) * ATTACK_FRAMES
+		var swing_hands: PackedVector2Array = _rig_combo_hand if learned_step else _rig_attack_hand
+		var swing_shoulders: PackedVector2Array = _rig_combo_shoulder if learned_step else _rig_attack_shoulder
 		var key: float = swing.y
 		var i: int = clampi(int(maxf(key, 0.0)), 0, ATTACK_FRAMES - 2)
 		var f: float = maxf(key, 0.0) - float(i)
-		_use_sheet(1)
+		_use_sheet(12 if learned_step else 1)
 		_sprite.frame = base + clampi(int(maxf(key, 0.0)), 0, ATTACK_FRAMES - 1)
-		var to_hand: Vector2 = _rig_attack_hand[base + i].lerp(_rig_attack_hand[base + i + 1], f)
-		var to_shoulder: Vector2 = _rig_attack_shoulder[base + i].lerp(_rig_attack_shoulder[base + i + 1], f)
+		var to_hand: Vector2 = swing_hands[base + i].lerp(swing_hands[base + i + 1], f)
+		var to_shoulder: Vector2 = swing_shoulders[base + i].lerp(swing_shoulders[base + i + 1], f)
 		if key < 0.0: ## winding up: from where the hand was into the first keyframe
-			to_hand = hand.lerp(_rig_attack_hand[base], key + 1.0)
-			to_shoulder = shoulder.lerp(_rig_attack_shoulder[base], key + 1.0)
+			to_hand = hand.lerp(swing_hands[base], key + 1.0)
+			to_shoulder = shoulder.lerp(swing_shoulders[base], key + 1.0)
 		hand = to_hand
 		shoulder = to_shoulder
 	elif fish_frame_ok:
@@ -1325,7 +1337,7 @@ func _use_sheet(sheet: int) -> void:
 	if sheet == _sheet:
 		return
 	_sheet = sheet
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null))))
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
 	match sheet:
 		1:
 			_sprite.texture = ATTACK_SHEET
@@ -1334,6 +1346,10 @@ func _use_sheet(sheet: int) -> void:
 		2, 3, 4, 5:
 			_sprite.texture = PICK_SHEET if sheet == 2 else (EAT_SHEET if sheet == 3 else (TOUCH_SHEET if sheet == 5 else PULL_SHEET))
 			_sprite.hframes = PICK_FRAMES * (EAT_VARIANTS if sheet == 3 else 1)
+			_sprite.vframes = 8
+		12:
+			_sprite.texture = COMBO_SHEET
+			_sprite.hframes = COMBO_COLS
 			_sprite.vframes = 8
 		11:
 			_sprite.texture = HEAVY_SHEET

@@ -111,6 +111,7 @@ var _burst_heavy: bool = false
 var _flash: float = 0.0 ## the fully-charged flash at the tip (seconds left)
 var _sounds: Dictionary = {}
 var _stamina: StaminaComponent
+var _skills: SkillTreeComponent ## which combo steps are learned (data/skills.json upgrades)
 
 @onready var _hand: Node2D = $Hand ## its y decides if the sword is drawn in front of or behind the body
 @onready var _weapon: Sprite2D = $Hand/Weapon
@@ -125,6 +126,7 @@ func _ready() -> void:
 	_trail.draw.connect(_draw_trail)
 	_arm.draw.connect(_draw_arm)
 	_stamina = get_node_or_null("../StaminaComponent") as StaminaComponent
+	_skills = get_node_or_null("../SkillTreeComponent") as SkillTreeComponent
 	_refresh_weapon()
 
 
@@ -207,12 +209,14 @@ func is_in_combat(timeout: float = 1.5) -> bool:
 	return _phase != Phase.IDLE or _charging or _since_swing < timeout
 
 
-## For the body animation: x = which attack (0 forehand, 1 backhand, 2 thrust), y = keyframe position
+## For the body animation: x = which attack (0 forehand, 1 backhand, 2 thrust, 3 and 4 the learned combo steps from player_combo.png), y = keyframe position
 ## (-1..0 winding up into the first pose, 0..3 striking, 3..5 recovering). Zero when not swinging.
 func animation_state() -> Vector2:
 	if _phase == Phase.IDLE or _step.is_empty() or bool(_step.get("heavy", false)):
 		return Vector2.ZERO
 	var block: float = 2.0 if String(_step["style"]) == "thrust" else (0.0 if float(_step["sweep"]) < 0.0 else 1.0)
+	if int(_step.get("block", -1)) >= 3:
+		block = float(_step["block"])
 	var key: float = 0.0
 	match _phase:
 		Phase.WINDUP:
@@ -456,6 +460,7 @@ func _server_swing(dir: Vector2, step_index: int) -> void:
 	if step.is_empty():
 		return
 	if step_index != 0 and (step_index != _server_combo_index or now > _server_combo_until): return
+	if not _step_unlocked(step): return ## a combo step she has not learned (a modified client cannot swing it)
 	_server_combo_index = step_index + 1
 	var combo_window: float = float(DataRegistry.get_entry("weapon_classes", String(def.get("weapon_class", ""))).get("combo_window", 0.5))
 	_server_combo_until = now + int((float(step["windup"]) + float(step["active"]) + float(step["recovery"]) + combo_window) * 1000)
@@ -526,8 +531,23 @@ func _spawn_sparks(point: Vector2, dir: Vector2, heavy: bool = false) -> void:
 	get_tree().create_timer(0.6).timeout.connect(sparks.queue_free)
 
 
+## How many steps of the weapon class's combo she can swing: the leading ones whose `requires` skill is learned.
 func _combo_size(def: Dictionary) -> int:
-	return (DataRegistry.get_entry("weapon_classes", String(def.get("weapon_class", ""))).get("combo", []) as Array).size()
+	var combo: Array = DataRegistry.get_entry("weapon_classes", String(def.get("weapon_class", ""))).get("combo", [])
+	var count: int = 0
+	for step: Variant in combo:
+		if not _skill_learned(String((step as Dictionary).get("requires", ""))):
+			break
+		count += 1
+	return count
+
+
+func _skill_learned(requires: String) -> bool:
+	return requires.is_empty() or (_skills != null and _skills.is_learned(requires))
+
+
+func _step_unlocked(step: Dictionary) -> bool:
+	return _skill_learned(String(step.get("requires", "")))
 
 
 ## One combo step with its times scaled by the weapon's `speed` stat.
@@ -550,6 +570,8 @@ func _step_data(stack: Dictionary, index: int) -> Dictionary:
 		"knock": float(step.get("knock", 1)),
 		"lunge": float(step.get("lunge", 0)),
 		"shake": float(step.get("shake", 1)),
+		"block": int(step.get("block", -1)),
+		"requires": String(step.get("requires", "")),
 	}
 
 

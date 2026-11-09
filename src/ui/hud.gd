@@ -22,6 +22,60 @@ var _opened: bool = false
 var _was_locked: bool = false ## the story held parts of the HUD back until now
 var _prepared: Array[Dictionary] = [] ## {node, material, children: [[child, material, use_parent]]}
 
+const IDLE_HIDE_SECONDS: float = 10.0 ## no input, no cursor movement and no movement of her for this long: the HUD fades away
+const IDLE_FADE_OUT: float = 1.4 ## seconds to fade away
+const IDLE_FADE_IN: float = 0.25 ## seconds to come back on activity
+const IDLE_PARTS: Array[String] = ["ClockVine", "PurseVine", "Hotbar", "HealthBar", "StaminaBar", "BlinkIcon", "StatusTags", "QuestVine", "HintCard", "FishingHud"]
+
+var _player: Node2D
+var _idle_time: float = 0.0
+var _idle_alpha: float = 1.0 ## 1 = HUD shown, 0 = hidden by idling
+var _cover_alpha: Dictionary = {} ## part name -> fade of the full-screen menus (QuestVine, HintCard)
+var _last_pos: Vector2 = Vector2.INF
+
+
+## Any real input or cursor movement counts as activity.
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		if (event as InputEventMouseMotion).relative != Vector2.ZERO:
+			_idle_time = 0.0
+	elif event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton:
+		_idle_time = 0.0
+	elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.25:
+		_idle_time = 0.0
+
+
+## True while something keeps the HUD up even without input (menus, cutscenes, fishing, taking damage).
+func _holds_hud(covered: bool) -> bool:
+	if covered or _intro_active or InputManager.ui_blocking or InputManager.menu_open:
+		return true
+	if _player != null and is_instance_valid(_player):
+		if _last_pos != Vector2.INF and _player.global_position.distance_squared_to(_last_pos) > 0.0001:
+			return true
+		_last_pos = _player.global_position
+		var fishing: FishingComponent = _player.get("fishing") as FishingComponent
+		if fishing != null and fishing.state != FishingComponent.S.IDLE:
+			return true
+	return false
+
+
+func _on_player_damaged(_amount: float, _from: Vector2, _knockback: float) -> void:
+	_idle_time = 0.0
+
+
+func _apply_idle_fade(delta: float, covered: bool) -> void:
+	if _holds_hud(covered):
+		_idle_time = 0.0
+	else:
+		_idle_time += delta
+	var fade_out: bool = _idle_time >= IDLE_HIDE_SECONDS
+	var speed: float = 1.0 / (IDLE_FADE_OUT if fade_out else IDLE_FADE_IN)
+	_idle_alpha = move_toward(_idle_alpha, 0.0 if fade_out else 1.0, delta * speed)
+	for part: String in IDLE_PARTS:
+		var node: CanvasItem = get_node_or_null(part) as CanvasItem
+		if node != null:
+			node.modulate.a = _idle_alpha * float(_cover_alpha.get(part, 1.0))
+
 
 ## Full-screen menus cover the quest branch and tutorial card.
 func _process(delta: float) -> void:
@@ -33,9 +87,8 @@ func _process(delta: float) -> void:
 	if boss != null:
 		boss.set_covered(covered)
 	for part: String in ["QuestVine", "HintCard"]:
-		var node: CanvasItem = get_node_or_null(part) as CanvasItem
-		if node != null:
-			node.modulate.a = move_toward(node.modulate.a, 0.0 if covered else 1.0, delta * 8.0)
+		_cover_alpha[part] = move_toward(float(_cover_alpha.get(part, 1.0)), 0.0 if covered else 1.0, delta * 8.0)
+	_apply_idle_fade(delta, covered)
 
 
 func _ready() -> void:
@@ -45,6 +98,9 @@ func _ready() -> void:
 
 ## `player` is untyped on purpose: the player scene preloads this HUD.
 func bind(player: Node) -> void:
+	_player = player as Node2D
+	if player.health != null:
+		player.health.damaged.connect(_on_player_damaged)
 	$SneakVignette.bind(player.stealth)
 	$StaminaBar.bind(player.stamina)
 	$HealthBar.bind(player.health)

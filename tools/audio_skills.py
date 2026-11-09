@@ -14,6 +14,7 @@ def main() -> None:
         ("open", 0.8, [146.83, 220.0, 293.66]),
         ("focus", 0.13, [660.0]),
         ("reveal", 1.4, [220.0, 329.63, 440.0, 659.26]),
+        ("learn", 1.2, [293.66, 440.0, 587.33, 880.0, 1174.66]),
     ]
     for name, duration, notes in sounds:
         rng = random.Random(42)
@@ -22,7 +23,7 @@ def main() -> None:
             time = i / rate
             value = 0.0
             for j, frequency in enumerate(notes):
-                age = time - j * (0.12 if name == "reveal" else 0.035)
+                age = time - j * (0.12 if name in ("reveal", "learn") else 0.035)
                 if age < 0:
                     continue
                 envelope = (1 - math.exp(-age * 45)) * math.exp(-age * (4.5 if name == "focus" else 3.2))

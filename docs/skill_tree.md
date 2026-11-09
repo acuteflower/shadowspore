@@ -91,10 +91,22 @@ Godot --headless --path . tools/test_skill_tree_network.tscn -- --server --self-
 
 Der Solo-Test benutzt einen echten Player samt HUD ohne Welt und ohne Lesen des normalen Saves.
 Er prüft Sichtbarkeit, Gedrückthalten/Abbruch, unveränderte Spielwerte, Speicherrundlauf mit
-`/tmp/shadowspore-skill-tree-test.json`, alte/ungültige Daten, Eingabesperre, Menüwechsel und
+`user://shadowspore-skill-tree-test.json`, alte/ungültige Daten, Eingabesperre, Menüwechsel und
 Aufräumen. Zusätzliche Navigationstests prüfen die volle Zeichenfläche, kontinuierlich
 mausverankerten Zoom, Ziehen in den früheren Panelbereichen, Nachlauf, Zoom-Ranken-Endpunkte
 und den Bewegungs-Anhänger. Gerendert entstehen Momentaufnahmen unter
 `/tmp/shadowspore-skills-*.png`, einschließlich einer herangezoomten Ansicht.
 Der Netzwerktest startet zwei Prozesse auf dem isolierten Loopback-Port 17913 und prüft
 Besitzerisolation, Einstiegssnapshot, Host-Bestätigung und abgewiesene ungültige Anfragen.
+
+## Upgrades (Kampfseite, docs/faehigkeiten_kampf_konzept.md)
+
+Seit dem Kampf-Schritt hat der Graph vier Wurzeln (DREIKLANG, ANTRITT, SCHLEICHEN, SCHATTENBLINK) und
+Platzhalter. **Upgrades sind keine Orbs**: `data/skills.json` Knoten mit `upgrade`, `level`, `cost`, `parent`
+(Kette `combo_four` → `combo_five`) wachsen an der Blume ihrer Fähigkeit (Knospen auf dem Rand, mehr
+Blütenblätter, „UPGRADE BEREIT“). Halten auf der Blume lernt das nächste bereite Upgrade
+(`SkillTreeComponent.request_learn`, Host validiert Stufe/Punkte/Vorgänger, `learned`-Signal, Snapshot
+`_state(discovered, learned, new_id)`). Punkte = erreichte Stufe − 1 − ausgegeben; SaveGame
+`player.skill_tree` = `{discovered, learned}`, Import trimmt gegen Stufe und Punkte. Die Kombo (AttackComponent)
+zählt Schritte mit `requires`; die Schläge 4/5 benutzen das Blatt `player_combo.png` (`tools/art_hero_combo.py`).
+Icons: `tools/art_skill_icons.py` → `src/ui/skill_icon_art.gd`, gebacken von `SkillIcons`.

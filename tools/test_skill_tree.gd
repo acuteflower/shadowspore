@@ -1,7 +1,7 @@
 extends Node
 ## Isolated real-player/UI regression. Never opens the world or reads the user's save.
 const PLAYER: PackedScene = preload("res://src/entities/player/player.tscn")
-const SAVE: String = "/tmp/shadowspore-skill-tree-test.json"
+const SAVE: String = "user://shadowspore-skill-tree-test.json" ## user:// so it also works on Windows (no /tmp)
 var failures: int = 0
 var checks: int = 0
 
@@ -79,7 +79,7 @@ func record_animation(window: SkillTreeWindow, skills: SkillTreeComponent, folde
 	window._zoom = window._fit_zoom()
 	window._zoom_target = window._zoom
 	window._time = 0.0
-	window._select("combat_echo_a")
+	window._select("movement_echo_a")
 	for frame: int in 60:
 		if frame == 18: key(KEY_ENTER, true)
 		if frame == 29: key(KEY_ENTER, false)
@@ -87,7 +87,87 @@ func record_animation(window: SkillTreeWindow, skills: SkillTreeComponent, folde
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(folder.path_join("%03d.png" % frame))
 	key(KEY_ENTER, false)
-	check(skills.is_explored("combat_echo_a"), "recorded real hold and reveal completes")
+	check(skills.is_explored("movement_echo_a"), "recorded real hold and reveal completes")
+
+
+## Holds on the flower of a skill; the next ready upgrade `id` of it is what gets learned.
+func hold_learn(window: SkillTreeWindow, skills: SkillTreeComponent, root: String, id: String) -> void:
+	window._select(root)
+	window._cancel_hold()
+	key(KEY_ENTER, true)
+	await get_tree().process_frame
+	if DisplayServer.get_name() == "headless":
+		window._process(SkillTreeWindow.LEARN_SECONDS + 0.05)
+	else:
+		await get_tree().create_timer(SkillTreeWindow.LEARN_SECONDS + 0.1, true).timeout
+	key(KEY_ENTER, false)
+	for _wait: int in 60:
+		await get_tree().process_frame
+		if skills.is_learned(id):
+			break
+
+
+func check_upgrades(player: Player, window: SkillTreeWindow, skills: SkillTreeComponent) -> void:
+	var def: Dictionary = {"weapon_class": "sword_1h"} ## an item definition, as AttackComponent reads it
+	var discovered: Array = skills.export_data().discovered
+	check(skills.is_visible("combo_four") and skills.is_visible("combo_five") and not skills.is_awake("combo_four"), "upgrades are always visible but not learned")
+	check(skills.points_total() == 4 and skills.points_free() == 4, "level 5 gives four skill points")
+	check(skills.upgrade_state("combo_four") == &"ready" and skills.upgrade_state("combo_five") == &"blocked", "level 5: the first upgrade is ready, the second waits for it")
+	check(player.attack._combo_size(def) == 3, "without upgrades the combo has three strikes")
+	skills.request_learn("combo_five")
+	skills.request_learn("sword_combo")
+	skills.request_learn("movement_echo_a")
+	check(not skills.is_learned("combo_five") and (skills.export_data().learned as Array).is_empty(), "invalid learn requests do nothing")
+	window._select("sword_combo")
+	check(window._holdable("sword_combo") and window._next_ready("sword_combo") == "combo_four", "the skill's flower can be held on while an upgrade is ready")
+	check(not window._shown("combo_four") and not window._shown("combo_five") and window._shown("sword_combo"), "upgrades are no orbs of their own")
+	window._flying = false ## the earlier reveal flew the view away from HOME
+	window._velocity = Vector2.ZERO
+	window._center = SkillTreeWindow.HOME
+	window._zoom = window._fit_zoom()
+	window._zoom_target = window._zoom
+	check(window._pick(window._screen("sword_combo")) == "sword_combo", "the flower is picked")
+	window._process(0.1)
+	await capture("upgrade-ready")
+	# released early: nothing is bought
+	key(KEY_ENTER, true)
+	await get_tree().process_frame
+	window._process(0.3)
+	key(KEY_ENTER, false)
+	await get_tree().process_frame
+	check(not skills.is_learned("combo_four"), "releasing early does not learn")
+	await hold_learn(window, skills, "sword_combo", "combo_four")
+	check(skills.is_learned("combo_four") and skills.is_awake("combo_four"), "a completed hold learns the upgrade")
+	check(skills.points_free() == 3 and skills.learned_count("sword_combo") == 1, "learning costs exactly one point")
+	check(player.attack._combo_size(def) == 4, "the combo has a fourth strike")
+	check(window._reveal.has("sword_combo"), "host-confirmed learning plays the animation on the flower")
+	check(skills.upgrade_state("combo_five") == &"locked", "level 5: the fifth strike is locked by level")
+	skills.request_learn("combo_five")
+	check(not skills.is_learned("combo_five"), "an upgrade below its level cannot be learned")
+	await get_tree().create_timer(0.5, true).timeout
+	await capture("upgrade-learned")
+	player.progress.xp = Levels.xp_at(15)
+	check(skills.points_total() == 14 and skills.upgrade_state("combo_five") == &"ready" and skills.has_ready_upgrade("sword_combo"), "level 15: the fifth strike is ready")
+	await hold_learn(window, skills, "sword_combo", "combo_five")
+	check(skills.is_learned("combo_five") and skills.points_free() == 11, "the fifth strike costs two points")
+	check(player.attack._combo_size(def) == 5 and skills.learned_count("sword_combo") == 2, "the combo has five strikes")
+	check(not skills.has_ready_upgrade("sword_combo"), "nothing left to buy")
+	await capture("upgrade-all")
+	var saved: Dictionary = skills.export_data()
+	skills.import_data({})
+	check(not skills.is_learned("combo_four") and player.attack._combo_size(def) == 3, "old saves start without upgrades")
+	skills.import_data(saved)
+	check(skills.is_learned("combo_four") and skills.is_learned("combo_five") and player.attack._combo_size(def) == 5, "learned upgrades survive a save round trip")
+	skills.import_data({"learned": ["combo_five"]})
+	check(not skills.is_learned("combo_five"), "an upgrade whose parent is missing is rejected")
+	skills.import_data({"learned": ["combo_five", "combo_four", "combo_four", "unknown", "sprint"]})
+	check(skills.is_learned("combo_five") and skills.is_learned("combo_four") and (skills.export_data().learned as Array).size() == 2, "unordered saves restore the chain, duplicates and unknown IDs are dropped")
+	player.progress.xp = Levels.xp_at(5)
+	skills.import_data(saved)
+	check(skills.is_learned("combo_four") and not skills.is_learned("combo_five"), "a save with an upgrade above the level is trimmed")
+	skills.import_data({"learned": "invalid"})
+	check((skills.export_data().learned as Array).is_empty(), "a malformed learned list is ignored")
+	skills.import_data({"discovered": discovered, "learned": ["combo_four"]}) ## what the real save below must bring back
 
 
 func _run() -> void:
@@ -104,16 +184,18 @@ func _run() -> void:
 	var skills: SkillTreeComponent = player.get_node("SkillTreeComponent") as SkillTreeComponent
 	var window: SkillTreeWindow = player._hud.get_node("SkillTreeWindow") as SkillTreeWindow
 	var nodes: Dictionary = skills.definitions()
-	check(nodes.size() == 12, "three roots and nine placeholders")
+	check(nodes.size() == 12, "four roots (sneak included), two upgrades and six placeholders")
 	var roots: int = 0
 	var visible_count: int = 0
 	for id: String in nodes:
 		if skills.is_awake(id): roots += 1
 		if skills.is_visible(id): visible_count += 1
-		check(skills.is_awake(id) or bool((nodes[id] as Dictionary).get("placeholder", false)), "every non-root is explicitly cosmetic")
-	check(roots == 3 and visible_count == 9, "only three starters and their direct neighbours initially visible")
-	check(not skills.can_explore("combat_echo_c"), "hidden descendants cannot be explored")
-	skills.request_explore("combat_echo_c")
+		check(skills.is_awake(id) or skills.is_upgrade(id) or bool((nodes[id] as Dictionary).get("placeholder", false)), "every non-root is an upgrade or explicitly cosmetic")
+	check(roots == 4 and visible_count == 10, "four starters, both upgrades and the direct placeholder neighbours initially visible")
+	check(skills.is_root("sneak") and skills.upgrades_of("sneak").is_empty() and skills.upgrades_of("sprint").is_empty(), "sprint and sneak have no upgrades")
+	check(not skills.can_explore("movement_echo_b"), "hidden descendants cannot be explored")
+	check(skills.points_free() == 0 and skills.upgrade_state("combo_four") == &"locked", "level 1: no points, the first upgrade is locked")
+	skills.request_explore("movement_echo_b")
 	skills.request_explore("unknown")
 	skills.request_explore("sword_combo")
 	check((skills.export_data().discovered as Array).is_empty(), "invalid or real-skill requests do nothing")
@@ -199,7 +281,7 @@ func _run() -> void:
 	await get_tree().process_frame
 	key(KEY_I, false)
 	check(not inventory.visible, "inventory cannot overlap the skill menu")
-	window._select("combat_echo_a")
+	window._select("movement_echo_a")
 	await capture("placeholder")
 	key(KEY_ENTER, true)
 	await get_tree().process_frame
@@ -207,7 +289,7 @@ func _run() -> void:
 	await capture("holding")
 	key(KEY_ENTER, false)
 	await get_tree().process_frame
-	check(not skills.is_explored("combat_echo_a"), "releasing early does not explore")
+	check(not skills.is_explored("movement_echo_a"), "releasing early does not explore")
 	key(KEY_ENTER, true)
 	await get_tree().process_frame
 	if DisplayServer.get_name() == "headless":
@@ -217,27 +299,29 @@ func _run() -> void:
 	key(KEY_ENTER, false)
 	for _wait: int in 60: ## the host answer may need a few frames under load
 		await get_tree().process_frame
-		if skills.is_explored("combat_echo_a"):
+		if skills.is_explored("movement_echo_a"):
 			break
-	check(skills.is_explored("combat_echo_a") and skills.is_visible("combat_echo_c"), "completed hold reveals the next neighbour")
-	check(not skills.is_awake("combat_echo_a"), "exploration never makes a placeholder into a skill")
-	check(window._reveal.has("combat_echo_a"), "host-confirmed discovery starts reveal animation")
+	check(skills.is_explored("movement_echo_a") and skills.is_visible("movement_echo_b"), "completed hold reveals the next neighbour")
+	check(not skills.is_awake("movement_echo_a"), "exploration never makes a placeholder into a skill")
+	check(window._reveal.has("movement_echo_a"), "host-confirmed discovery starts reveal animation")
 	await get_tree().create_timer(0.35, true).timeout
 	await capture("reveal")
 	await get_tree().create_timer(0.9, true).timeout
 	await capture("explored")
 	check(player.progress.xp == xp and player.progress.copper == copper and player.blink.blink_range == blink_range and player.blink.cooldown == cooldown and player.sprint_speed == sprint_speed and player.burst_speed == burst_speed and DataRegistry.get_entry("weapon_classes", "sword_1h") == combo, "exploration changes no XP, money or ability stats")
 	var before: Dictionary = skills.export_data()
-	skills.request_explore("combat_echo_a")
+	skills.request_explore("movement_echo_a")
 	check(skills.export_data() == before, "duplicate exploration is idempotent")
+	await check_upgrades(player, window, skills)
 	check(SaveGame.save(get_tree(), SAVE), "isolated save writes discovery")
 	skills.import_data({})
-	check(not skills.is_explored("combat_echo_a"), "old saves start with roots only")
-	check(SaveGame.load_into(get_tree(), SAVE) and skills.is_explored("combat_echo_a"), "save round trip restores discovery")
-	skills.import_data({"discovered": ["combat_echo_c", "unknown", "sword_combo", "combat_echo_a", "combat_echo_a"]})
-	check((skills.export_data().discovered as Array).size() == 2 and skills.is_explored("combat_echo_c"), "unordered saves restore connected nodes and discard duplicates and unknown IDs")
-	skills.import_data({"discovered": ["combat_echo_c"]})
-	check(not skills.is_explored("combat_echo_c"), "disconnected save data is rejected")
+	check(not skills.is_explored("movement_echo_a"), "old saves start with roots only")
+	check(SaveGame.load_into(get_tree(), SAVE) and skills.is_explored("movement_echo_a"), "save round trip restores discovery")
+	check(skills.is_learned("combo_four") and not skills.is_learned("combo_five") and player.attack._combo_size({"weapon_class": "sword_1h"}) == 4, "SaveGame restores learned upgrades")
+	skills.import_data({"discovered": ["movement_echo_b", "unknown", "sword_combo", "movement_echo_a", "movement_echo_a"]})
+	check((skills.export_data().discovered as Array).size() == 2 and skills.is_explored("movement_echo_b"), "unordered saves restore connected nodes and discard duplicates and unknown IDs")
+	skills.import_data({"discovered": ["movement_echo_b"]})
+	check(not skills.is_explored("movement_echo_b"), "disconnected save data is rejected")
 	skills.import_data({"discovered": "invalid"})
 	check((skills.export_data().discovered as Array).is_empty(), "malformed discovery list is ignored")
 	for argument: String in OS.get_cmdline_user_args():
@@ -282,6 +366,6 @@ func _run() -> void:
 	window.queue_free()
 	await get_tree().process_frame
 	check(not get_tree().paused and not InputManager.ui_blocking and not InputManager.skills_open, "unexpected window removal restores input and pause")
-	DirAccess.remove_absolute(SAVE)
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE))
 	print("SKILL TREE: %d checks, %d failures" % [checks, failures])
 	get_tree().quit(1 if failures else 0)

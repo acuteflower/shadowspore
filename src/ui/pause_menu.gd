@@ -679,17 +679,7 @@ func _reset_and_restart() -> void:
 	_armed = ""
 	SaveGame.delete()
 	_set_open(false)
-	get_tree().paused = false
-	InputManager.ui_blocking = false
-	InputManager.menu_open = false
-	InputManager.build_open = false
-	InputManager.map_open = false
-	InputManager.skills_open = false
-	InputManager.progress_open = false
-	Terrain.relief = null
-	if not (multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server() and multiplayer.get_peers().is_empty()):
-		NetworkManager.leave()
-	get_tree().change_scene_to_file.call_deferred("res://src/world/main.tscn")
+	GameLauncher.launch(get_tree(), {"mode": "new"}) ## a new game: the intro plays (no menu in between)
 
 
 func _arm(action: String) -> void:

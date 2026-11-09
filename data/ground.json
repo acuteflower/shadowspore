@@ -1071,6 +1071,16 @@
    }
   }
  ],
+ "wagons": [
+  {
+   "id": "gustav",
+   "tile": [
+    884,
+    689
+   ],
+   "clear_radius": 12
+  }
+ ],
  "quarries": [
   {
    "id": "quarry",

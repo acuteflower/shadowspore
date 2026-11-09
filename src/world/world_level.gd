@@ -280,6 +280,13 @@ func _add_ground_decals() -> Dictionary:
 		quarry.position = Vector2(float(qtile[0]), float(qtile[1])) * 16.0 + Vector2(8, 8)
 		add_child(quarry)
 		_clear_around(clear, quarry.position + Vector2(-50, -14), int(quarry_spec.get("clear_radius", 9)))
+	for wagon_spec: Dictionary in DataRegistry.table("ground").get("wagons", []) as Array: ## Gustav's wrecked wagon (quest gustav_rescue)
+		var wagon: GustavWagon = GustavWagon.new()
+		var wtile2: Array = wagon_spec.tile as Array
+		wagon.name = "Wagon_" + String(wagon_spec.id)
+		wagon.position = Vector2(float(wtile2[0]), float(wtile2[1])) * 16.0 + Vector2(8, 8)
+		add_child(wagon)
+		_clear_around(clear, wagon.position + Vector2(20, -6), int(wagon_spec.get("clear_radius", 12)))
 	for mine_spec: Dictionary in DataRegistry.table("ground").get("mines", []) as Array: ## the old mine's gate (docs/mine.md)
 		var gate: MineEntrance = MineEntrance.new()
 		var mtile: Array = mine_spec.tile as Array
@@ -537,6 +544,42 @@ func start_cabin_spider(player: Player, talked: bool = false) -> void:
 	scene.start(player, self, cabin, talked)
 
 
+func _wagon() -> GustavWagon:
+	return get_node_or_null("Wagon_gustav") as GustavWagon
+
+
+## Quest `gustav_rescue`: the spider at the wagon (mode "fight") and the first talk with the stranger (mode "meet"), see GustavRescueScene.
+func start_gustav_rescue(player: Player, mode: String) -> void:
+	var wagon: GustavWagon = _wagon()
+	if wagon == null or not player.is_multiplayer_authority() or player.get_node_or_null("GustavRescueScene") != null:
+		return
+	var scene: GustavRescueScene = GustavRescueScene.new()
+	scene.name = "GustavRescueScene"
+	player.add_child(scene)
+	scene.start(player, self, wagon, mode)
+
+
+## Gustav is packed: the escort home through the dusk (GustavEscortScene).
+func start_gustav_escort(player: Player) -> void:
+	var wagon: GustavWagon = _wagon()
+	if wagon == null or _town_node == null or not player.is_multiplayer_authority() or player.get_node_or_null("GustavEscortScene") != null:
+		return
+	var scene: GustavEscortScene = GustavEscortScene.new()
+	scene.name = "GustavEscortScene"
+	player.add_child(scene)
+	scene.start(player, self, wagon, _town_node)
+
+
+## Gustav stands in the light: he walks to Valdric, the welcome dialogue, he moves in (GustavWelcomeScene).
+func start_gustav_welcome(player: Player) -> void:
+	if _town_node == null or not player.is_multiplayer_authority() or player.get_node_or_null("GustavWelcomeScene") != null:
+		return
+	var scene: GustavWelcomeScene = GustavWelcomeScene.new()
+	scene.name = "GustavWelcomeScene"
+	player.add_child(scene)
+	scene.start(player, self, _town_node)
+
+
 ## She goes to bed (the bed's E): black, the night, the second morning (WakeScene as a second wake-up).
 func start_sleep(player: Player, rest: bool = false) -> void:
 	if not player.is_multiplayer_authority() or player.get_node_or_null("SleepScene") != null:
@@ -679,32 +722,57 @@ func debug_jump_town() -> void:
 	var player: Player = _players.get_child(0) as Player
 	var saved: Dictionary = player.quests.export_data()
 	var flags: Dictionary = saved.flags as Dictionary
-	for quest_id: String in ["rebuild_hut", "town_start"]:
-		var until: String = "meet_stranger" if quest_id == "town_start" else ""
-		(saved.active as Dictionary).erase(quest_id)
-		(saved.active_steps as Dictionary).erase(quest_id)
-		var steps: Array = DataRegistry.get_entry("quests", quest_id).steps as Array
-		for i: int in steps.size():
-			var step: Dictionary = steps[i] as Dictionary
-			if until != "" and String(step.get("id", "")) == until:
-				(saved.active as Dictionary)[quest_id] = i
-				(saved.active_steps as Dictionary)[quest_id] = until
-				break
-			if step.has("flag"):
-				flags[String(step.flag)] = true
-			for task: Variant in step.get("tasks", []) as Array:
-				if (task as Dictionary).has("flag"):
-					flags[String((task as Dictionary).flag)] = true
-		if until == "" and not (saved.done as Array).has(quest_id):
-			(saved.done as Array).append(quest_id)
-	for flag: String in ["rebuild_done", "lumberjack_reported", "rebuild_delivered", "rebuild_wood_delivered", "hut_mushrooms_removed", "hut_tree_felled"]:
+	for quest_id: String in ["rebuild_hut", "town_start", "gustav_rescue", "town_workshop"]:
+		var until: String = "ws_pickaxe" if quest_id == "town_workshop" else ""
+		_quest_to_step(saved, quest_id, until)
+	for flag: String in ["rebuild_done", "lumberjack_reported", "rebuild_delivered", "rebuild_wood_delivered", "hut_mushrooms_removed", "hut_tree_felled", "knows_gustav", "gustav_packed", "gustav_joined", "built_workshop", "workshop_done"]:
 		flags[flag] = true
 	player.quests.import_data(saved)
-	for item: String in ["sickle_basic", "pickaxe_basic"]:
-		if not player.inventory.has_item(item):
-			player.inventory.give(item, 1)
+	if not player.inventory.has_item("sickle_basic"):
+		player.inventory.give("sickle_basic", 1) ## Gustav's gift; the pickaxe is made at his bench
 	resume_story(player) ## the hut mended, the knight at the door
 	_town_node.debug_build_all() ## she stands at the hut's door: the workshop and its craftsman are a short walk away
+
+
+## Marks `quest_id` in an exported quest state (QuestComponent.export_data) as done, or as running at step `until` with every earlier step's flags set.
+func _quest_to_step(saved: Dictionary, quest_id: String, until: String) -> void:
+	var flags: Dictionary = saved.flags as Dictionary
+	(saved.active as Dictionary).erase(quest_id)
+	(saved.active_steps as Dictionary).erase(quest_id)
+	var steps: Array = DataRegistry.get_entry("quests", quest_id).steps as Array
+	for i: int in steps.size():
+		var step: Dictionary = steps[i] as Dictionary
+		if until != "" and String(step.get("id", "")) == until:
+			(saved.active as Dictionary)[quest_id] = i
+			(saved.active_steps as Dictionary)[quest_id] = until
+			return
+		if step.has("flag"):
+			flags[String(step.flag)] = true
+		for task: Variant in step.get("tasks", []) as Array:
+			if (task as Dictionary).has("flag"):
+				flags[String((task as Dictionary).flag)] = true
+	if not (saved.done as Array).has(quest_id):
+		(saved.done as Array).append(quest_id)
+
+
+## Developer checkpoint "GUSTAV GERETTET": the escort is over, Gustav lives in the town; the quest waits at the workshop's material list (sickle in the bag, nothing built yet).
+func debug_jump_gustav() -> void:
+	if not debug_can_return_home() or _town_node == null:
+		return
+	debug_return_home()
+	var player: Player = _players.get_child(0) as Player
+	var saved: Dictionary = player.quests.export_data()
+	var flags: Dictionary = saved.flags as Dictionary
+	for quest_id: String in ["rebuild_hut", "town_start", "gustav_rescue", "town_workshop"]:
+		_quest_to_step(saved, quest_id, "ws_gather" if quest_id == "town_workshop" else "")
+	for flag: String in ["rebuild_done", "lumberjack_reported", "rebuild_delivered", "rebuild_wood_delivered", "hut_mushrooms_removed", "hut_tree_felled", "built_lamp_post", "knows_gustav", "gustav_packed", "gustav_joined"]:
+		flags[flag] = true
+	player.quests.import_data(saved)
+	if not player.inventory.has_item("sickle_basic"):
+		player.inventory.give("sickle_basic", 1)
+	resume_story(player)
+	_town_node.request_found()
+	_town_node.add_story_resident("gustav", false) ## he is simply at the camp by the fire
 
 
 ## A loaded save that stopped in the middle of the wake-up starts it again.
@@ -721,6 +789,19 @@ func resume_story(player: Player) -> void:
 		place_knight("door")
 	if player.quests != null and String(player.quests.current().get("step_id", "")) == "kill_spider":
 		start_cabin_spider(player, true) ## a save from in the fight: a spider rises again when she is inside
+	if player.quests != null:
+		var gustav_step: String = String(player.quests.current().get("step_id", ""))
+		var wagon: GustavWagon = _wagon()
+		if wagon != null and player.quests.has_flag("wagon_opened"):
+			wagon.set_open(true, false) ## the door stays open once she has freed him
+		if gustav_step == "kill_wagon_spider":
+			start_gustav_rescue(player, "fight") ## a save from in the fight: the spider is there again
+		elif gustav_step == "gustav_meet":
+			start_gustav_rescue(player, "meet")
+		elif gustav_step == "escort":
+			start_gustav_escort(player)
+		elif gustav_step == "welcome":
+			start_gustav_welcome(player)
 	if player.quests != null and String(player.quests.current().get("step_id", "")) == "report_back" and not player.inventory.has_item("axe_basic"):
 		player.inventory.give("axe_basic", 1) ## a save from between dropping and picking up the axe: never soft-locked without it
 	var hut_room: Interior = (get_node("Interiors") as Interiors).interior("hut")
@@ -746,6 +827,12 @@ func resume_story(player: Player) -> void:
 		var next: String = String(DataRegistry.get_entry("quests", "lumberjack").get("next", ""))
 		if next != "":
 			player.quests.start(next)
+	if player.quests != null: ## the town quests lead into each other; a migrated old save may stand between two (start() keeps existing progress)
+		for chained: String in ["town_start", "gustav_rescue"]:
+			if player.quests.is_finished(chained):
+				var follow: String = String(DataRegistry.get_entry("quests", chained).get("next", ""))
+				if follow != "":
+					player.quests.start(follow)
 
 
 ## Hand-placed props around the start (data/ground.json "props": kind, variant, tile offset from the start tile).

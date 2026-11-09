@@ -89,6 +89,9 @@ func _draw() -> void:
 	if _hint == "build":
 		_draw_build_hint()
 		return
+	if _hint == "craft":
+		_draw_craft_hint()
+		return
 	if _hint != "sneak" and _hint != "map":
 		return
 	var is_map: bool = _hint == "map"
@@ -217,6 +220,38 @@ func _draw_build_hint() -> void:
 		PixelText.draw(self, String(lines[i]), Vector2i(at + Vector2(9, 22 + i * 9)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 	for i: int in 3:
 		draw_rect(Rect2(at + Vector2(11 + i * 12, 55), Vector2(8, 3)), Color(UiStyle.ACCENT if (i == page or (InputManager.build_open and i == 0)) else UiStyle.TEXT_DIM, fade))
+	if _bloom > 0:
+		for i: int in 12:
+			var angle: float = TAU * i / 12
+			var p: Vector2 = at + Vector2(77, 33) + Vector2(cos(angle), sin(angle)) * (1 - _bloom) * 42
+			draw_rect(Rect2(p.round(), Vector2.ONE), Color(VineStyle.WARM_GLOW, _bloom))
+
+
+## The workbench lesson (quest step "make a pickaxe"): go to Gustav's bench, pick the recipe, wait for the work to be done.
+func _draw_craft_hint() -> void:
+	var g: float = _grow * _grow * (3 - 2 * _grow)
+	var void_level: float = VineStyle.void_amount()
+	var curve: Callable = func(x: float) -> float: return 6 + sin(x * 0.06) * 1.5
+	VineStyle.branch(self, 0, WIDTH - 12, curve, 4, void_level, 12, _time, g)
+	VineStyle.foliage(self, 0, WIDTH - 12, curve, 5, 130, void_level, 12, _time, g)
+	if g < 0.6:
+		return
+	var at: Vector2 = Vector2(10, roundf(22 - (1 - g) * 20))
+	var fade: float = clampf((g - 0.6) / 0.4, 0, 1)
+	VineStyle.paper(self, Rect2(at, Vector2(WIDTH - 22, HEIGHT - 26)), fade, void_level)
+	var page: int = int(_time / 5.0) % 3
+	var titles: Array[String] = ["WERKBANK", "HERSTELLEN", "SPITZHACKE"]
+	var pages: Array = [
+		["GEH ZUR WERKBANK UND", "DRÜCKE " + _action_label("interact") + ", UM", "SIE ZU BENUTZEN."],
+		["WÄHLE IM REITER FERTIGEN", "EIN REZEPT. ES BRAUCHT", "ROHSTOFFE AUS BEUTEL/LAGER."],
+		["2 HOLZ UND 3 STEIN", "BRECHEN FELSEN UND", "ÖFFNEN DEN WEG IN DEN BERG."],
+	]
+	PixelText.draw(self, titles[page], Vector2i(at + Vector2(9, 8)), Color(VineStyle.WARM_GLOW, fade), VineStyle.OUTLINE)
+	var lines: Array = pages[page] as Array
+	for i: int in lines.size():
+		PixelText.draw(self, String(lines[i]), Vector2i(at + Vector2(9, 22 + i * 9)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	for i: int in 3:
+		draw_rect(Rect2(at + Vector2(11 + i * 12, 55), Vector2(8, 3)), Color(UiStyle.ACCENT if i == page else UiStyle.TEXT_DIM, fade))
 	if _bloom > 0:
 		for i: int in 12:
 			var angle: float = TAU * i / 12

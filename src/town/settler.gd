@@ -67,6 +67,11 @@ func setup(owner_town: TownManager, settler_id: String, fresh: bool) -> void:
 	var taken_at: Vector2 = Vector2.INF
 	if String(spec.get("takes_over", "")) == "knight" and town.world != null:
 		taken_at = town.world.take_knight() ## the story's actor is put away: he is this settler now
+	elif String(spec.get("takes_over", "")) == "story_gustav": ## Gustav's escort figure is put away: he is this settler now
+		for node: Node in get_tree().get_nodes_in_group("story_gustav"):
+			if node is Node2D:
+				taken_at = (node as Node2D).global_position
+				node.queue_free()
 	var plan: Dictionary = plan_at(TimeManager.time_of_day)
 	var target: Vector2 = _plan_position(plan).pos as Vector2
 	global_position = target
@@ -132,6 +137,8 @@ func resolve_spot(spot: String) -> String:
 ## The plan at time `t` (0..1 of the day): {spot, prev, k, seconds}: k 0..1 how far the change window from `prev` to `spot` has run, seconds since it opened.
 func plan_at(t: float) -> Dictionary:
 	var schedule: Array = spec.get("schedule", []) as Array
+	if spec.has("schedule_camp") and town.built_ids(String(spec.get("home", ""))).is_empty():
+		schedule = spec.schedule_camp as Array ## without their house they live at the fire (Gustav before the workshop stands)
 	for i: int in schedule.size():
 		var window: Array = schedule[i] as Array
 		var a: float = float(window[0])

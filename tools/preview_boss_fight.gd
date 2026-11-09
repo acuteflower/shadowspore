@@ -3,6 +3,7 @@ extends Node
 ##   Godot --rendering-driver opengl3 --path . --fixed-fps 60 tools/preview_boss_fight.tscn -- --dir=/abs/folder [--acts=barrier,rain,shot,line,chase,blast,break] [--every=15] [--skip-intro]
 ## Plays the acts one after the other (forced, in that order) and saves a picture every `every` frames (60 = a second) of each. The player cannot die.
 ## Offline: no save is read or written.
+const P3_ACTS: Array[String] = ["dive3", "glut3", "splitter3", "mark3", "floor3", "judge3"] ## acts that start the fight at the third phase
 var _dir: String = ""
 var _acts: Array[String] = ["barrier", "rain", "shot", "line", "chase", "blast", "break"]
 var _every: int = 15
@@ -96,6 +97,14 @@ func _run() -> void:
 	for i: int in 3:
 		await get_tree().process_frame
 	_player = world._players.get_child(0) as Player
+	var in_p3: bool = false
+	for a3: String in _acts:
+		if a3 in P3_ACTS:
+			in_p3 = true
+	if in_p3 and _player.quests != null:
+		_player.quests.set_flag("hud_unlocked") ## the HUD (status tags) is shown in the story world only after this
+	if _acts.has("phase3") or in_p3:
+		world._arena_phase["boss_arena"] = 2 ## the fight starts at the third phase: the transition (push, scream, fire) plays after the opening
 	var spec: Dictionary = (DataRegistry.table("ground").get("arenas", []) as Array)[0] as Dictionary
 	var tile: Array = spec.tile as Array
 	_origin = Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8)
@@ -137,7 +146,11 @@ func _run() -> void:
 		var mat: ShaderMaterial = aura.material as ShaderMaterial
 		print("AURA dusk ", mat.get_shader_parameter("dusk"), " vignette ", mat.get_shader_parameter("vignette"), " glitch ", mat.get_shader_parameter("glitch"))
 	for act: String in _acts:
-		if act != "barrier":
+		if act in P3_ACTS:
+			while _fight._final or _fight.mode == MornathFight.Mode.TRANSITION or _fight.mode == MornathFight.Mode.WAIT:
+				await get_tree().physics_frame
+			await _wait_idle()
+		elif act != "barrier" and act != "phase3":
 			await _wait_idle()
 		else:
 			while _fight.mode != MornathFight.Mode.ACTING and not _fight.barrier_done:
@@ -200,6 +213,51 @@ func _run() -> void:
 			"rain2":
 				_fight._rpc_act.rpc(MornathFight.Act.RAIN, 11, Vector2.ZERO, Vector2.ZERO, 0, 1.0)
 				await _film("rain2", func() -> bool: return _fight.mode == MornathFight.Mode.IDLE, 60 * 14)
+			"phase3":
+				while not (_fight._final and _fight.mode == MornathFight.Mode.TRANSITION):
+					await get_tree().physics_frame
+				await _film("p3", func() -> bool: return not _fight._final, 60 * 14)
+				await get_tree().create_timer(1.5).timeout
+				await _shot("p3_after")
+				for i: int in _boss.pillar_count():
+					var pl: ArenaPillar = _boss.pillar(i)
+					print("pillar ", i, " broken ", pl.broken, " fury ", pl.fury(), " base material ", pl._sprite.material, " flames ", pl._flames.flame_count() if pl._flames != null else -1, " teal visible ", pl._teal_glow.visible if pl._teal_glow != null else false)
+				_player.global_position = _boss.pillar(2).global_position + Vector2(40, 30)
+				await get_tree().create_timer(0.8).timeout
+				await _shot("p3_pillar")
+			"dive3":
+				_player.global_position = _boss.arena_middle() + Vector2(60, 20)
+				_fight._last_target = int(_player.name)
+				_fight._rpc_act.rpc(MornathFight.Act.DIVE, 21, _player.global_position, Vector2.ZERO, int(_player.name), 1.0)
+				await _film("dive", func() -> bool: return bool(_fight._dive.get("committed", false)), 60 * 8)
+				await _film("grab", func() -> bool: return _fight.mode != MornathFight.Mode.ACTING, 60 * 6)
+				await get_tree().create_timer(0.6).timeout
+				await _shot("dive_burn")
+			"glut3":
+				_player.global_position = _boss.arena_middle() + Vector2(40, 20)
+				_fight._last_target = int(_player.name)
+				_fight._rpc_act.rpc(MornathFight.Act.GLUT, 31, _player.global_position, Vector2.ZERO, int(_player.name), 1.0)
+				await _film("glut", func() -> bool: return _fight.mode == MornathFight.Mode.IDLE, 60 * 14)
+			"splitter3":
+				_player.global_position = _boss.arena_middle() + Vector2(-30, 30)
+				_fight._rpc_act.rpc(MornathFight.Act.SPLITTER, 32, Vector2.ZERO, Vector2.ZERO, 0, 1.0)
+				await _film("splitter", func() -> bool: return _fight.mode == MornathFight.Mode.IDLE, 60 * 14)
+			"mark3":
+				_player.global_position = _boss.arena_middle() + Vector2(0, 40)
+				_fight._last_target = int(_player.name)
+				_fight._rpc_act.rpc(MornathFight.Act.MARK, 33, _player.global_position, Vector2.ZERO, int(_player.name), 1.0)
+				await _film("mark", func() -> bool: return _fight.mode == MornathFight.Mode.IDLE, 60 * 14)
+			"floor3":
+				_boss._health.set_health(_boss.max_health() * 0.15)
+				await get_tree().create_timer(2.5).timeout
+				await _shot("rim_a")
+				_player.global_position = _boss.arena_middle() + Vector2(0, 30)
+				await get_tree().create_timer(0.6).timeout
+				await _shot("rim_b")
+			"judge3":
+				_boss._health.take_damage(100000.0, _player.global_position, 0.0, 0)
+				await _film("judge3", func() -> bool: return _fight.mode == MornathFight.Mode.JUDGEMENT, 60 * 14)
+				await _film("judge3_run", func() -> bool: return _fight.judge_elapsed() > 9.0, 60 * 14)
 			"judge":
 				_boss._health.take_damage(100000.0, _player.global_position, 0.0, 0)
 				await _film("judge", func() -> bool: return _fight.mode == MornathFight.Mode.JUDGEMENT, 60 * 14)

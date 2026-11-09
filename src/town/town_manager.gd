@@ -546,6 +546,9 @@ func is_unlocked(piece: String) -> bool:
 		return false
 	if level() < int(spec.get("level", 0)):
 		return false
+	var needs_who: String = String(spec.get("needs_resident", ""))
+	if needs_who != "" and not residents.has(needs_who):
+		return false ## the workshop waits for Gustav (story: he is rescued first)
 	var needs: String = String(spec.get("needs", ""))
 	return needs == "" or has_built(needs)
 
@@ -554,6 +557,9 @@ func lock_reason(piece: String) -> String:
 	var spec: Dictionary = TownRules.piece(piece)
 	if level() < int(spec.get("level", 0)):
 		return "STUFE %s NÖTIG" % TownRules.level_name(int(spec.get("level", 0)))
+	var needs_who: String = String(spec.get("needs_resident", ""))
+	if needs_who != "" and not residents.has(needs_who):
+		return "BRAUCHT %s" % String(settler_spec(needs_who).get("name", needs_who))
 	var needs: String = String(spec.get("needs", ""))
 	if needs != "" and not has_built(needs):
 		return "BRAUCHT %s" % String(TownRules.piece(needs).get("name", needs))
@@ -1227,12 +1233,21 @@ func _check_arrivals(delta: float) -> void:
 			_rpc_resident.rpc(sid, {"trust": 0, "talked": -1}, true)
 			continue
 		var arrive: Dictionary = spec.get("arrive", {}) as Dictionary
+		if String(arrive.get("story", "")) != "": ## the story brings them (Gustav: `add_story_resident`), no waiting for a piece
+			continue
 		if has_built(String(arrive.get("needs", ""))):
 			_arrivals[sid] = float(_arrivals.get(sid, 0.0)) + delta
 			if float(_arrivals[sid]) >= float(arrive.get("delay", 8.0)):
 				_rpc_resident.rpc(sid, {"trust": 0, "talked": -1}, true)
 		else:
 			_arrivals.erase(sid)
+
+
+## Host: the story lets `sid` move in (Gustav after the escort). `fresh` plays the walk-in; without it they are simply at home.
+func add_story_resident(sid: String, fresh: bool = false) -> void:
+	if not multiplayer.is_server() or residents.has(sid) or not settler_ids().has(sid):
+		return
+	_rpc_resident.rpc(sid, {"trust": 0, "talked": -1}, fresh)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -1561,6 +1576,13 @@ func _host_craft(recipe_id: String, peer: int) -> void:
 			_add_stock(item, left) ## a full bag: the rest goes to the stock
 	_sync_stock()
 	_tell(peer, "%s GEFERTIGT" % String(recipe.name), true)
+	if player.quests != null: ## story hook: the quest steps ask for "crafted_<recipe>" (solo / host player owns the quests)
+		player.quests.set_flag("crafted_" + recipe_id)
+		if recipe_id == "pickaxe_basic" and not player.quests.has_flag("crafted_pickaxe"):
+			player.quests.set_flag("crafted_pickaxe")
+			var box: Node = get_tree().get_first_node_in_group("speech_box")
+			if box != null and box.has_method("play"):
+				box.call("play", "pickaxe_made") ## Gustav's remark at the first pickaxe
 
 
 # ---------- the name ----------

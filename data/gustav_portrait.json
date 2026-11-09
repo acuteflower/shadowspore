@@ -1,0 +1,17 @@
+{
+ "sheet": "res://assets/ui/portrait_gustav_talk.png",
+ "frame": [
+  103,
+  153
+ ],
+ "visemes": 5,
+ "rows": [
+  "open",
+  "closed"
+ ],
+ "viseme_hold": 0.07,
+ "blink": {
+  "interval": 3.4,
+  "length": 0.13
+ }
+}

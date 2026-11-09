@@ -51,6 +51,15 @@ var _fall_dir: Vector2 = Vector2.DOWN
 var _chunks: Array[Dictionary] = []
 var _rubble: Node2D
 var _light: NightLight
+var _fury: float = 0.0 ## 0..1: the vein of light has turned into pink-violet fire (Mornath's last phase), see `ignite`
+var _fury_goal: float = 0.0
+var _fury_speed: float = 1.0
+var _fury_material: ShaderMaterial
+var _flames: PixelFlames
+var _base_material: ShaderMaterial ## the lit picture with its turquoise recoloured
+var _teal_glow: Sprite2D ## the picture again, only its turquoise, burning (additive, unshaded)
+var _teal_material: ShaderMaterial
+var _marker: PillarMarker ## "smash me": ring, chevrons and a leaf of text while the pillar is armed
 
 
 ## Height of the perch above the foot, in px.
@@ -102,6 +111,10 @@ func _ready() -> void:
 	hit_shape.position = Vector2(0, -12)
 	_hurtbox.add_child(hit_shape)
 	add_child(_hurtbox)
+	_marker = PillarMarker.new()
+	_marker.name = "Marker"
+	add_child(_marker)
+	_marker.setup(self)
 	_time = fmod(position.x * 0.37 + position.y * 0.11, 6.0)
 	_make_cracks()
 
@@ -137,6 +150,7 @@ func _process(delta: float) -> void:
 	if _armed or not _chips.is_empty() or _collapse >= 0.0 or _shake > 0.0:
 		_fx.queue_redraw()
 		_fx_glow.queue_redraw()
+	_step_fury(delta)
 	_check -= delta
 	if _check > 0.0:
 		return
@@ -156,6 +170,107 @@ func _process(delta: float) -> void:
 	_fade.tween_property(_sprite, "modulate:a", FADE_ALPHA if _covering else 1.0, 0.18)
 
 
+# --- the fire of the last phase ------------------------------------------------------------------------------------
+
+
+## The vein of light turns into pink-violet fire over `seconds` (0 = at once), flames stand on it and the pool of light round the pillar turns pink.
+func ignite(seconds: float) -> void:
+	if broken:
+		return
+	if _fury_material == null:
+		_fury_material = ShaderMaterial.new()
+		_fury_material.shader = load("res://assets/shaders/fury_glow.gdshader") as Shader
+	_glow.material = _fury_material
+	if _base_material == null:
+		_base_material = ShaderMaterial.new()
+		_base_material.shader = load("res://assets/shaders/fury_ground.gdshader") as Shader
+		_teal_material = ShaderMaterial.new()
+		_teal_material.shader = load("res://assets/shaders/fury_teal_glow.gdshader") as Shader
+		_teal_material.set_shader_parameter("strength", 0.9)
+		_teal_glow = Sprite2D.new()
+		_teal_glow.name = "TealFire"
+		_teal_glow.texture = ART
+		_teal_glow.hframes = _sprite.hframes
+		_teal_glow.frame = _sprite.frame
+		_teal_glow.offset = _sprite.offset
+		_teal_glow.material = _teal_material
+		add_child(_teal_glow)
+	_sprite.material = _base_material
+	if _flames == null:
+		_flames = PixelFlames.new()
+		_flames.name = "Flames"
+		_flames.z_index = 2
+		add_child(_flames)
+		_flames.build(_flame_spots(), 5.0, 11.0, index + 7)
+	_fury_goal = 1.0
+	_fury_speed = 1.0 / maxf(seconds, 0.001)
+	if seconds <= 0.0:
+		_fury = 1.0
+	_apply_fury()
+
+
+func extinguish(seconds: float) -> void:
+	_fury_goal = 0.0
+	_fury_speed = 1.0 / maxf(seconds, 0.001)
+	if seconds <= 0.0:
+		_fury = 0.0
+		_apply_fury()
+
+
+func fury() -> float:
+	return _fury
+
+
+## Pixels of the glowing vein (in the pillar's own frame) where flames can stand.
+func _flame_spots() -> PackedVector2Array:
+	var spots: PackedVector2Array = PackedVector2Array()
+	var image: Image = GLOW.get_image()
+	image.convert(Image.FORMAT_RGBA8)
+	var x0: int = variant * FRAME.x
+	for y: int in range(8, CUT_ROW + 6, 4):
+		for x: int in range(0, FRAME.x, 2):
+			var c: Color = image.get_pixel(x0 + x, y)
+			if c.a > 0.5 and (c.r + c.g + c.b) / 3.0 > 0.35 and float(hash(Vector2i(x, y)) % 1000) / 1000.0 < 0.3:
+				spots.append(Vector2(x - FRAME.x / 2, y - FEET))
+	return spots
+
+
+func _step_fury(delta: float) -> void:
+	if _fury == _fury_goal and _fury <= 0.0:
+		return
+	if broken and _fury_goal > 0.0:
+		_fury_goal = 0.0
+		_fury_speed = 2.0
+	if _fury != _fury_goal:
+		_fury = move_toward(_fury, _fury_goal, delta * _fury_speed)
+	_apply_fury()
+	if _fury <= 0.0 and _fury_goal <= 0.0:
+		_glow.material = Unlit.material() ## the fire is out
+		_sprite.material = null
+		if _teal_glow != null:
+			_teal_glow.visible = false
+		_light.glow_color = Color("9468ee")
+		_light.base_energy = 0.45 if not broken else 0.15
+
+
+func _apply_fury() -> void:
+	if _fury_material != null:
+		_fury_material.set_shader_parameter("fury", _fury)
+		_fury_material.set_shader_parameter("time", _time)
+		_base_material.set_shader_parameter("fury", _fury)
+		_teal_material.set_shader_parameter("fury", _fury)
+		_teal_material.set_shader_parameter("time", _time)
+		_teal_glow.visible = _fury > 0.0 and not broken
+		_teal_glow.position = _sprite.position
+		_teal_glow.modulate.a = _sprite.modulate.a
+	if _fury > 0.0:
+		_glow.modulate.a = maxf(_glow.modulate.a, 0.9 * _fury)
+		_light.glow_color = Color("9468ee").lerp(Color("ff5ad8"), _fury)
+		_light.base_energy = lerpf(0.45, 0.85, _fury) if not broken else 0.15
+	if _flames != null:
+		_flames.amount = _fury
+
+
 # --- being worn down -----------------------------------------------------------------------------------------------
 
 
@@ -166,6 +281,7 @@ func set_armed(on: bool, hp: float = 60.0) -> void:
 	_armed = on
 	_hurtbox.set_deferred("collision_layer", 1 << 4 if on else 0)
 	if on:
+		_marker.urgency = 0.0
 		max_integrity = hp
 		integrity = hp
 	else:
@@ -175,6 +291,11 @@ func set_armed(on: bool, hp: float = 60.0) -> void:
 
 func is_armed() -> bool:
 	return _armed and not broken
+
+
+## The judgement's clock for the marker (0 calm .. 1 out of time): the leaf over the pillar turns magenta and stutters.
+func set_marker_urgency(value: float) -> void:
+	_marker.urgency = clampf(value, 0.0, 1.0)
 
 
 ## Host (the weapon hit scan): a blow wears the pillar down.
@@ -461,4 +582,13 @@ func restore() -> void:
 		sprite.offset = Vector2(0, -(FEET - FRAME.y / 2.0))
 		sprite.position = Vector2.ZERO
 	_light.base_energy = 0.45
+	_light.glow_color = Color("9468ee")
+	_fury = 0.0
+	_fury_goal = 0.0
+	_glow.material = Unlit.material()
+	_sprite.material = null
+	if _teal_glow != null:
+		_teal_glow.visible = false
+	if _flames != null:
+		_flames.amount = 0.0
 	_chips.clear()

@@ -71,7 +71,7 @@ func _run() -> void:
 	_check(box != null and box.is_active(), "the dialogue opens")
 	box._end()
 	await _frames(5)
-	_check(quests.has_flag("town_intro_done") and player.inventory.has_item("sickle_basic") and player.inventory.has_item("pickaxe_basic"), "Valdric hands over the sickle and the pickaxe")
+	_check(quests.has_flag("town_intro_done") and not player.inventory.has_item("sickle_basic") and not player.inventory.has_item("pickaxe_basic"), "Valdric hands over no tools any more (Gustav gives the sickle, the pickaxe is made at his bench)")
 	_check(_step(player) == "build_lamp" and String(quests.current().hint) == "build", "next: a lamp post, with the build lesson (%s)" % _step(player))
 	player.request_teleport(hut.position + Vector2(0, 120))
 	await _frames(90)
@@ -83,30 +83,33 @@ func _run() -> void:
 	town.request_place("lamp_post", lamp, false)
 	await _frames(240)
 	_check(town.has_built("lamp_post") and quests.has_flag("built_lamp_post"), "the lamp post is built")
-	_check(_step(player) == "build_workshop", "next: the workshop (%s)" % _step(player))
+	_check(quests.is_finished("town_start") and _step(player) in ["rescue_valdric", "rescue_call"], "the lamp post hands over to Gustav's rescue (%s)" % _step(player))
+	box = get_tree().get_first_node_in_group("dialogue") as DialogueBox
+	if box != null and box.is_active():
+		box._end() ## Valdric stands by: he sends her east at once
+		await _frames(5)
+	## Gustav's own story has its test (test_gustav_quest); here she starts at the workshop's list.
+	quests.import_data({"active": {"town_workshop": 1}, "active_steps": {"town_workshop": "ws_build"}, "done": ["find_help", "lumberjack", "rebuild_hut", "town_start", "gustav_rescue"], "flags": {"rebuild_done": true, "knows_adventurer": true, "hud_unlocked": true, "gustav_joined": true, "built_lamp_post": true}})
+	_check(not town.is_unlocked("workshop"), "the workshop waits for Gustav")
+	town.add_story_resident("gustav", false) ## the rescue brought him home
+	await _frames(10)
 	var shop: Vector2 = _site(town, "workshop", hut.position + Vector2(0, 130))
 	player.request_teleport(shop + Vector2(0, 40))
 	await _frames(40)
 	town.request_place("workshop", shop, false)
 	await _frames(240)
 	_check(town.has_built("workshop") and quests.has_flag("built_workshop"), "the workshop is built")
-	_check(_step(player) == "meet_stranger", "and a stranger is on his way (%s)" % _step(player))
+	_check(_step(player) == "ws_movein", "Gustav moves to the new bench (%s)" % _step(player))
 	for i: int in 900:
 		await get_tree().process_frame
 		if town.residents.has("gustav"):
 			break
-	_check(town.residents.has("gustav"), "Gustav walks into the light")
-	var gustav: Settler = town.settler_node("gustav")
-	_check(gustav != null and quests.current().target == gustav.global_position, "the marker follows him")
-	player.request_teleport(gustav.global_position + Vector2(24, 10))
-	await _frames(30)
-	_check(_step(player) == "gustav_hello" or box.is_active(), "meeting him starts the conversation (%s)" % _step(player))
+	_check(town.residents.has("gustav"), "Gustav is a resident")
 	box = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	_check(box != null and box.is_active(), "the dialogue opens")
-	box._end()
-	await _frames(5)
-	_check(quests.has_flag("gustav_joined") and quests.is_finished("town_start"), "he moves in and the quest is done")
-	_check(town.trust_of("gustav") == 10, "the first talk counts as the day's talk")
+	if box != null and box.is_active():
+		box._end() ## Gustav's remark at the new bench
+		await _frames(5)
+	_check(quests.has_flag("workshop_done") and _step(player) == "ws_pickaxe", "the bench talk leads to the pickaxe (%s)" % _step(player))
 	_check(town.level() >= 1, "the town has grown to a hamlet (worth %s)" % town.worth())
 	_check(valdric.plan_at(0.3).spot == "door" and valdric.plan_at(0.45).spot == "repair" and valdric.plan_at(0.6).spot == "practice" and valdric.plan_at(0.95).spot == "night" and valdric.plan_at(0.1).spot == "night", "Valdric has a day: door, repairs, fire, sword practice, guard, fire, night")
 	_check(valdric.visible and valdric.prompt() == "ANSPRECHEN", "he can always be talked to")

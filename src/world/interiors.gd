@@ -270,7 +270,7 @@ func apply_view(player: Player) -> void:
 
 func _cover_to(amount: float, seconds: float) -> void:
 	_wipe_layer.visible = true
-	var tween: Tween = create_tween().set_ignore_time_scale(true)
+	var tween: Tween = create_tween().set_ignore_time_scale(true).set_pause_mode(Tween.TWEEN_PAUSE_PROCESS) ## the dark must open even if something paused the game
 	tween.tween_method(func(v: float) -> void: _set_cover(v), _cover, amount, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	await tween.finished
 	if amount <= 0.0:
@@ -295,6 +295,11 @@ func _sound(id: String, volume_db: float) -> void:
 	player.finished.connect(player.queue_free)
 	add_child(player)
 	player.play()
+
+
+## True while a door or a transit is moving her (the dark is closed or closing).
+func is_busy() -> bool:
+	return _busy
 
 
 ## E at a door (local player): the door swings, the dark closes in, she is moved, the dark opens in the other place.

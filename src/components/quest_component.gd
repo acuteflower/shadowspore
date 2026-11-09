@@ -87,8 +87,12 @@ var _task_signature: String = ""
 func _physics_process(delta: float) -> void:
 	if _player == null:
 		return
+	var doors: Interiors = get_tree().get_first_node_in_group("interiors") as Interiors
+	var in_transit: bool = doors != null and doors.is_busy() ## under a door's dark nothing may start: a talk would pause the game with the screen still black
 	for quest_id: String in _active.keys():
 		var step: Dictionary = _step(quest_id)
+		if in_transit:
+			break
 		if String(step.get("type", "")) == "reach" and _player.global_position.distance_to(_target(step)) <= float(step.get("radius", 4)) * 16.0:
 			_advance(quest_id)
 	_task_clock -= delta
@@ -111,6 +115,17 @@ func task_states(step: Dictionary) -> Array[Dictionary]:
 			done = has_flag(String(task.get("flag", "")))
 			var player_d: Player = _player as Player
 			have = need if done else (mini(player_d.inventory.count_item(String(task.item)), need) if player_d != null else 0)
+		elif String(task.get("kind", "flag")) == "stock": ## the town's stock plus the bag counts (what a build would draw on)
+			need = int(task.get("count", 1))
+			var player_s: Player = _player as Player
+			var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
+			var owned: int = 0
+			if town != null:
+				owned = int(town.stock.get(String(task.item), 0))
+			if player_s != null:
+				owned += player_s.inventory.count_item(String(task.item))
+			have = mini(owned, need)
+			done = has_flag(String(task.get("flag", ""))) if task.has("flag") else have >= need
 		elif String(task.get("kind", "flag")) == "item":
 			need = int(task.get("count", 1))
 			var player: Player = _player as Player
@@ -119,7 +134,7 @@ func task_states(step: Dictionary) -> Array[Dictionary]:
 		else:
 			done = has_flag(String(task.get("flag", "")))
 			have = 1 if done else 0
-		out.append({"text": String(task.text), "done": done, "have": have, "need": need, "counter": String(task.get("kind", "flag")) in ["item", "deliver"]})
+		out.append({"text": String(task.text), "done": done, "have": have, "need": need, "counter": String(task.get("kind", "flag")) in ["item", "deliver", "stock"]})
 	return out
 
 
@@ -203,4 +218,32 @@ func import_data(data: Dictionary) -> void:
 	for quest_id: Variant in data.get("done", []) as Array:
 		_done.append(String(quest_id))
 	_flags = (data.get("flags", {}) as Dictionary).duplicate()
+	_migrate_town_start(data)
 	changed.emit()
+
+
+## Saves from before the Gustav quest line: `town_start` used to end with "build a workshop", "a stranger comes", "talk to him". The first of those hands over to the new rescue
+## quest (WorldLevel.resume_story starts the follow-up of every finished quest); the later two mean Gustav already lives in the town: the rescue counts as done and the workshop
+## quest waits at the pickaxe (or is done when it was made).
+func _migrate_town_start(data: Dictionary) -> void:
+	var old_step: String = String((data.get("active_steps", {}) as Dictionary).get("town_start", ""))
+	if not _active.has("town_start") or not old_step in ["build_workshop", "meet_stranger", "gustav_hello"]:
+		return
+	_active.erase("town_start")
+	if not _done.has("town_start"):
+		_done.append("town_start")
+	_flags["built_lamp_post"] = true
+	if old_step == "build_workshop":
+		return
+	for flag: String in ["built_workshop", "gustav_call_done", "wagon_seen", "wagon_spider_dead", "wagon_opened", "knows_gustav", "gustav_packed", "gustav_at_light", "gustav_joined", "workshop_done"]:
+		_flags[flag] = true
+	if not _done.has("gustav_rescue"):
+		_done.append("gustav_rescue")
+	if bool(_flags.get("crafted_pickaxe", false)):
+		if not _done.has("town_workshop"):
+			_done.append("town_workshop")
+	else:
+		var steps: Array = (_quests["town_workshop"] as Dictionary).steps as Array
+		for i: int in steps.size():
+			if String((steps[i] as Dictionary).get("id", "")) == "ws_pickaxe":
+				_active["town_workshop"] = i

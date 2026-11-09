@@ -10,7 +10,7 @@ extends Node2D
 signal wing_beat(strong: bool)
 signal bead_dropped(ground_point: Vector2)
 
-enum Pose { PERCHED, TAKEOFF, FLYING, HOVER, LANDING, STAGGER, CRASHED, DEAD, SPENT, DOWNED, JUDGE }
+enum Pose { PERCHED, TAKEOFF, FLYING, HOVER, LANDING, STAGGER, CRASHED, DEAD, SPENT, DOWNED, JUDGE, STOOP }
 
 ## Everything a pose can ask for; poses fill a target array, the rig blends towards it.
 enum Q {
@@ -128,12 +128,14 @@ const TD_ANCHOR: Array[Vector3] = [Vector3(6.0, 2.5, -6.5), Vector3(6.0, -2.5, -
 const TD_LEN: Array[float] = [14.0, 16.0, 20.0, 18.0, 13.0, 15.0, 18.0, 19.0, 15.0, 16.0]
 const EYES: int = 8 ## six slits at the sides of the skull, two more on the brow in phase 2
 const LIGHT_BLADES: Array[int] = [1, 3] ## primaries that turn into blades of light
-const SPL_A: Array[float] = [25.0, 21.0, 28.0, 19.0, 26.0, 23.0]
-const SPL_B: Array[float] = [15.0, 18.0, 12.0, 16.0, 17.0, 13.0]
-const SPL_TILT: Array[float] = [0.5, -0.4, 0.9, -0.8, 0.2, 1.2]
-const SPL_Z: Array[float] = [4.0, -1.0, 8.0, 2.0, 11.0, 6.0]
-const SPL_W: Array[float] = [0.7, -0.55, 0.9, -0.8, 0.6, -0.65]
-const SPL_LEN: Array[float] = [4.0, 3.0, 5.0, 3.0, 4.0, 5.0]
+const FURY_LIGHT: Array[int] = [0, 2, 4, 7, 9] ## in phase 3 these turn into blades of light as well, and every blade grows
+const FURY_PINK: Color = Color("ff5ad8")
+const SPL_A: Array[float] = [25.0, 21.0, 28.0, 19.0, 26.0, 23.0, 30.0, 27.0, 33.0, 24.0, 31.0, 28.0, 35.0, 26.0] ## the first six circle him from phase 2 on, the next eight (bigger fragments) in phase 3
+const SPL_B: Array[float] = [15.0, 18.0, 12.0, 16.0, 17.0, 13.0, 20.0, 14.0, 22.0, 17.0, 12.0, 21.0, 16.0, 19.0]
+const SPL_TILT: Array[float] = [0.5, -0.4, 0.9, -0.8, 0.2, 1.2, -1.0, 0.7, -0.3, 1.1, -1.2, 0.4, 0.95, -0.6]
+const SPL_Z: Array[float] = [4.0, -1.0, 8.0, 2.0, 11.0, 6.0, 14.0, 3.0, 17.0, 9.0, 12.0, -2.0, 19.0, 7.0]
+const SPL_W: Array[float] = [0.7, -0.55, 0.9, -0.8, 0.6, -0.65, 0.5, -0.45, 0.65, -0.6, 0.4, -0.7, 0.55, -0.5]
+const SPL_LEN: Array[float] = [4.0, 3.0, 5.0, 3.0, 4.0, 5.0, 7.0, 9.0, 6.0, 10.0, 8.0, 7.0, 9.0, 6.0]
 const HALO_PHI: Array[float] = [0.4, 1.95, 3.5, 5.0]
 const HALO_SPAN: Array[float] = [0.5, 0.36, 0.62, 0.3]
 const HALO_W: Array[float] = [0.16, -0.11, 0.09, -0.2]
@@ -162,6 +164,9 @@ var stat_draw_us: int = 0
 ## Phase 2 (the fight sets these): 0 = the look of phase one, 1 = the corrupted look (eight eyes, ten tendrils, blades of light, cracks, broken halo, splinters).
 var corruption: float = 0.0
 var lift: float = 0.0 ## 0..1: the tendrils pull taut upwards, as if they lifted him
+var dive: float = 0.0 ## 0..1 in `Pose.STOOP`: 0 = leaning forward on the pillar, aiming; 1 = in the dive, nose down, wings swept back
+## Phase 3: 0 = as before, 1 = burning in pink-violet fire, wings a sixth longer with seven of eleven blades of light, fourteen fragments circling him.
+var fury: float = 0.0
 
 var _pose: Pose = Pose.PERCHED
 var _elapsed: float = 0.0
@@ -245,6 +250,8 @@ var _life_wing: Array[float] = [1.0, 1.0]
 var _life_core: float = 1.0
 var _life_eye: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
 
+var _fury: float = 0.0 ## the smoothed fury actually drawn
+var _fire: Array[Dictionary] = [] ## flames standing on him this build: {pos, w, h, salt}
 var _corr: float = 0.0 ## the smoothed corruption actually drawn
 var _corr_init: bool = false
 var _lb: float = 0.0 ## 0..1: how far the light blades have turned from basalt to light
@@ -256,7 +263,7 @@ var _crack_flash: float = 0.0
 var _judge_k: float = 0.0
 var _orn_alive: float = 1.0
 var _bits: Array[Dictionary] = []
-var _orb: PackedFloat32Array = PackedFloat32Array([0.0, 1.1, 2.3, 3.4, 4.5, 5.6])
+var _orb: PackedFloat32Array = PackedFloat32Array([0.0, 1.1, 2.3, 3.4, 4.5, 5.6, 0.7, 1.9, 2.8, 3.9, 5.1, 6.0, 1.5, 4.2])
 var _orb_rate: float = 1.0
 var _td_scale: PackedFloat32Array = PackedFloat32Array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])
 var _bounds: Rect2 = Rect2()
@@ -380,6 +387,12 @@ func set_corruption_now(value: float) -> void:
 	_pop_age = 2.0 if _corr >= 0.5 else -1.0
 
 
+## Sets the fury at once (a checkpoint that starts in the last phase).
+func set_fury_now(value: float) -> void:
+	fury = clampf(value, 0.0, 1.0)
+	_fury = fury
+
+
 ## The core crack and all eight eyes flare white for a quarter of a second (the scream).
 func crack_flash() -> void:
 	_crack_flash = 1.0
@@ -389,7 +402,10 @@ func crack_flash() -> void:
 func burst_blades() -> void:
 	_light_age = 0.0
 	for wing: Wing in _wings:
-		for idx: int in LIGHT_BLADES:
+		var shattering: Array[int] = LIGHT_BLADES.duplicate()
+		if fury > 0.5:
+			shattering.append_array(FURY_LIGHT)
+		for idx: int in shattering:
 			var blade: Blade = wing.blades[idx]
 			for n: int in 4:
 				var at: int = clampi(2 + n, 1, blade.center.size() - 1)
@@ -401,7 +417,7 @@ func burst_blades() -> void:
 					"life": _rng.randf_range(0.6, 1.0),
 					"size": _rng.randi_range(1, 3),
 				})
-	while _bits.size() > 24:
+	while _bits.size() > (40 if fury > 0.5 else 24):
 		_bits.remove_at(0)
 
 
@@ -477,7 +493,18 @@ func _ik(root: Vector3, target: Vector3, upper: float, lower: float, pole: Vecto
 
 
 func _tint(color: Color, alpha: float = 1.0) -> Color:
-	return Color(color.lerp(Color.WHITE, _flash * 0.8), _alpha * alpha)
+	var c: Color = color.lerp(Color.WHITE, _flash * 0.8)
+	if _fury > 0.01: ## phase 3: the cold violet of the rims and edges turns towards magenta
+		var k: float = _fury * 0.5
+		c = Color(minf(c.r + (c.b - c.r) * k * 0.55 + k * 0.04, 1.0), c.g * (1.0 - 0.3 * k), c.b * (1.0 - 0.1 * k), c.a)
+	return Color(c, _alpha * alpha)
+
+
+## A glow colour in the fire of phase 3: violet and white move towards pink.
+func _hot(color: Color) -> Color:
+	if _fury < 0.01:
+		return color
+	return color.lerp(Color(FURY_PINK, color.a), 0.55 * _fury)
 
 
 func _update_corruption(dt: float) -> void:
@@ -493,6 +520,7 @@ func _update_corruption(dt: float) -> void:
 		_pop_age = -1.0
 	if _pop_age >= 0.0:
 		_pop_age = minf(_pop_age + dt, 9.0)
+	_fury = move_toward(_fury, fury, dt * 0.8)
 	_lb = smoothstep(0.35, 0.85, _corr)
 	_light_age = minf(_light_age + dt, 99.0)
 	var regrow: float = clampf((_light_age - 0.3) / 1.4, 0.0, 1.0)
@@ -714,7 +742,7 @@ func _seg(canvas: Node2D, from: Vector2, to: Vector2, width_from: float, width_t
 
 
 func _halo(canvas: Node2D, point: Vector2, color: Color, strength: float, bloom: float = 0.5) -> void:
-	VoidGlow.halo(canvas, point, color, strength * _alpha, bloom)
+	VoidGlow.halo(canvas, point, _hot(color), strength * _alpha, bloom)
 
 
 func _beat(phase: float) -> float:
@@ -861,6 +889,8 @@ func _pose_target(t: float, dt: float) -> void:
 			_pose_downed(breath)
 		Pose.JUDGE:
 			_pose_judge(breath)
+		Pose.STOOP:
+			_pose_stoop(breath)
 	_apply_action()
 	_tq[Q.HEAD_Y] += _head_follow
 
@@ -1089,6 +1119,30 @@ func _pose_downed(breath: float) -> void:
 ## The judge: upright on the pillar and not tired at all. Chest out, wings flung up and out like the arches of a cathedral (they stay
 ## raised in the bird's own frame whatever the body does) and fanned wide, shivering a little, head thrown back, the beak open on the scream
 ## with the throat lit, talons gripping, the tail spread. The fight adds `charge` (kind 3, cold white) on top.
+## The stoop of the dive (phase 3): on the pillar he leans forward, head low, the claws still gripping, shivering, wings folded tight; in the dive he lets go,
+## nose down, wings swept back along the body, tail spread to steer.
+func _pose_stoop(breath: float) -> void:
+	var aim: float = 1.0 - dive
+	_tq[Q.CZ] = 16.0 - 3.2 * aim + 4.0 * dive + breath * 0.3
+	_tq[Q.PITCH] = lerpf(0.5, -0.55, dive)
+	_tq[Q.HEAD_P] = lerpf(-0.55, 0.2, dive)
+	_tq[Q.HEAD_Y] = 0.0
+	_tq[Q.GAPE] = 0.6 * dive
+	_tq[Q.NX] = lerpf(10.5, 11.5, dive)
+	_tq[Q.NZ] = lerpf(-1.4, 0.4, dive)
+	_tq[Q.WF] = 1.0
+	_tq[Q.LEN] = 1.0
+	_tq[Q.TAIL_S] = lerpf(0.45, 0.95, dive)
+	_tq[Q.TAIL_P] = lerpf(0.6, 0.15, dive)
+	_tq[Q.GRIP] = 1.0 - smoothstep(0.0, 0.2, dive)
+	_tq[Q.FOOT_X] = lerpf(0.0, -7.5, dive)
+	_tq[Q.FOOT_Z] = lerpf(-5.5, -5.0, dive)
+	_tq[Q.TOES] = 1.0
+	_tq[Q.TREM] = 0.16 * aim + 0.06 * dive
+	_tq[Q.VEIN] = 1.0 + 0.9 * aim + 0.6 * dive
+	_tq[Q.EYE] = 1.0 + 0.8 * aim + 0.6 * dive
+
+
 func _pose_judge(breath: float) -> void:
 	_tq[Q.CZ] = 18.4 + breath * 0.4
 	_tq[Q.PITCH] = 0.55 + breath * 0.012
@@ -1286,6 +1340,7 @@ func _build(dt: float, t: float) -> void:
 	if _corr > 0.03 and _orn_alive > 0.02:
 		_build_splinters(dt)
 		_build_halo()
+	_build_fire()
 	_bf_ready = true
 	_td_floor = 0.4 if _pose in [Pose.PERCHED, Pose.DEAD, Pose.CRASHED, Pose.SPENT, Pose.DOWNED, Pose.JUDGE] or (_pose == Pose.LANDING and t > 0.8) else -1000.0
 
@@ -1794,7 +1849,7 @@ func _build_wing(si: int, dt: float) -> Wing:
 	var o: int = Q.RU_Y if si == 0 else Q.LU_Y
 	var raised: float = raise_r if si == 0 else raise_l
 	var wf: float = maxf(_q[Q.WF], clampf(raised * 1.6, 0.0, 1.0)) ## a raised wing stands up in the bird's own frame, whatever the body does
-	var len_k: float = _q[Q.LEN]
+	var len_k: float = _q[Q.LEN] * (1.0 + 0.16 * _fury) ## phase 3: the wings are a sixth longer
 	var trem: float = _q[Q.TREM]
 	var jit: float = trem * 0.07
 	var ph: float = 0.0 if si == 0 else 1.9
@@ -1857,18 +1912,21 @@ func _build_wing(si: int, dt: float) -> Wing:
 	var tip_mid: Vector3 = Vector3.ZERO
 	for k: int in count:
 		var is_light: bool = k in LIGHT_BLADES
+		var fury_light: bool = _fury > 0.02 and k in FURY_LIGHT
 		var blade_len: float = lens[k]
 		var hide: bool = false
 		if is_light and _lb > 0.0:
 			blade_len *= maxf(lerpf(1.0, _light_grow, _lb), 0.05)
 			hide = _lb > 0.5 and _light_grow < 0.04
+		elif fury_light:
+			blade_len *= 1.0 + 0.25 * _fury
 		var blade: Blade = _make_blade(bases[k], raw[k], filt[k], norms[k], blade_len, widths[k])
 		blade.vein_start = starts[k]
 		blade.idx = k
 		blade.salt = float(si * 11 + k)
-		blade.light = _lb if is_light else 0.0
+		blade.light = _lb if is_light else (_lb * smoothstep(0.1, 0.9, _fury) if fury_light else 0.0)
 		blade.hidden = hide
-		blade.cracked = (not is_light) and _noise(si * 16 + k, 3.1) > 0.6
+		blade.cracked = (not is_light) and not fury_light and _noise(si * 16 + k, 3.1) > 0.6 - 0.3 * _fury
 		wing.blades.append(blade)
 		tip_mid += bases[k] + filt[k] * lens[k] * 0.5
 	tip_mid /= float(count)
@@ -2071,6 +2129,8 @@ func _vein_line(pts: PackedVector2Array, rank: int, strength: float, start: floa
 
 ## Like `_paint`, but only the pixels no later part (in front of this one) covers: the glow canvas lies over the whole body, so a translucent fill must cut its own holes.
 func _paint_visible(canvas: Node2D, sp: Span, color: Color, rank: int) -> void:
+	if canvas == _glow:
+		color = _hot(color)
 	var rows: int = sp.lo.size()
 	var cuts: Array[Vector2i] = []
 	for r: int in rows:
@@ -2105,6 +2165,8 @@ func _paint_visible(canvas: Node2D, sp: Span, color: Color, rank: int) -> void:
 
 ## A one pixel line along a screen polyline, skipping what is hidden by parts in front of `rank`.
 func _line_visible(canvas: Node2D, pts: PackedVector2Array, color: Color, rank: int) -> void:
+	if canvas == _glow:
+		color = _hot(color)
 	var last: Vector2i = Vector2i(1 << 20, 1 << 20)
 	for i: int in pts.size() - 1:
 		var a: Vector2 = pts[i]
@@ -2429,12 +2491,14 @@ func _splinter_pos(i: int, th: float) -> Vector3:
 
 ## Six small basalt splinters of his old feathers circle the body on slowly tilted ellipses, quicker as he charges; each is sorted on its own depth.
 func _build_splinters(dt: float) -> void:
-	var speed: float = 1.0 + 2.2 * charge + 1.2 * _judge_k
+	var speed: float = 1.0 + 2.2 * charge + 1.2 * _judge_k + 0.9 * _fury
 	_orb_rate = lerpf(_orb_rate, speed, 1.0 - exp(-4.0 * dt)) if dt > 0.0 else speed
-	for i: int in 6:
+	for i: int in SPL_A.size():
 		if dt > 0.0:
 			_orb[i] += dt * SPL_W[i] * _orb_rate
 		var vis: float = smoothstep(0.28 + 0.07 * float(i), 0.6 + 0.07 * float(i), _corr) * _orn_alive
+		if i >= 6: ## the fragments of the last phase
+			vis = smoothstep(0.04 + 0.05 * float(i - 6), 0.45 + 0.05 * float(i - 6), _fury) * _orn_alive
 		if vis < 0.03:
 			continue
 		var th: float = _orb[i]
@@ -2531,6 +2595,35 @@ func _draw_bits() -> void:
 		_body.draw_rect(Rect2(pos, Vector2(size, maxi(1, size - 1))), _tint(ROCK2, fade))
 
 
+## Where he burns (phase 3): flames on the tips of some blades, on the crest of the head and rising off his back. Only partly: every flame has its own beat.
+func _build_fire() -> void:
+	_fire.clear()
+	if _fury < 0.03 or _orn_alive < 0.02:
+		return
+	for si: int in _wings.size():
+		var wing: Wing = _wings[si]
+		for k: int in [0, 2, 4, 6, 8, 10]:
+			var blade: Blade = wing.blades[k]
+			if blade.hidden:
+				continue
+			_fire.append({"pos": blade.center[blade.center.size() - 3], "w": 5.0, "h": 11.0, "salt": float(si * 11 + k)})
+	_fire.append({"pos": _p(_head_c) + Vector2(0.0, -7.0), "w": 6.0, "h": 13.0, "salt": 41.0})
+	_fire.append({"pos": _p(_bp(Vector3(-3.0, 0.0, 6.5))), "w": 10.0, "h": 18.0, "salt": 43.0})
+	_fire.append({"pos": _p(_bp(Vector3(3.5, 2.5, 6.0))), "w": 7.0, "h": 13.0, "salt": 47.0})
+	_fire.append({"pos": _p(_bp(Vector3(3.5, -2.5, 6.0))), "w": 7.0, "h": 13.0, "salt": 53.0})
+
+
+func _draw_fire() -> void:
+	for f: Dictionary in _fire:
+		var salt: float = float(f["salt"])
+		var period: float = 2.4 + 3.0 * PixelFlames._n(salt * 0.77)
+		var c: float = fposmod(_gt / period + PixelFlames._n(salt * 1.3), 1.0)
+		var k: float = smoothstep(0.0, 0.1, c) * (1.0 - smoothstep(0.55, 0.72, c)) ## burns for about two thirds of its beat
+		if k <= 0.03:
+			continue
+		PixelFlames.flame(_glow, f["pos"] as Vector2, float(f["w"]) * (0.7 + 0.3 * k), float(f["h"]) * k, _time, salt, _fury * k * _alpha)
+
+
 func _draw_bits_glow() -> void:
 	for bit: Dictionary in _bits:
 		var fade: float = 1.0 - float(bit.age) / float(bit.life)
@@ -2576,4 +2669,5 @@ func _draw_glow() -> void:
 		if part.glow.is_valid():
 			part.glow.call(part)
 	_draw_bits_glow()
+	_draw_fire()
 	stat_draw_us += Time.get_ticks_usec() - t0

@@ -5,14 +5,16 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.3.2 Beta
+## 🚀 Aktuelle Version: V0.4.0 Beta
 
 > Vollständige Versionshistorie und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.3.2 Beta:
-* **Mornath Boss-Kartenmarker:** Eigener pulsierender Boss-Marker auf der Weltkarte für das Mornath-Hologramm mit Entfernungs- und Status-Tooltip.
-* **Arena-Instandsetzung & Replay-Fix:** Nach Besiegen des Bosses startet ein erneuter Kampf garantiert bei Phase 1 mit vollen 100 % HP und komplett instandgesetzten Arenasäulen.
-* **Pause- & Dev-Menü Polishing:** Aufgeräumte Menü-Navigation für Story- und Boss-Sprungpunkte.
+### Highlights von V0.4.0 Beta:
+* **Atmosphärisches Hauptmenü & Launcher:** Komplettes Hauptmenü mit lebendiger Live-Kulisse (`menu_world.gd`), Tag-Nacht-Licht, Einzelspieler, Host/Join-Koop mit direkter IP-Eingabe, Optionen und Speicherstand-Verwaltung.
+* **5-Stufen-Schwertkombo & Finisher:** Erweiterung der Grundkombo um freischaltbaren *Aufwärtshieb* (Schlag 4, 1,25x Schaden) und verheerende *Wirbelklinge* (Schlag 5, 1,8x Schaden, 330°-Rundumschlag) mit eigenem Animationssheet (`player_combo.png`).
+* **Schleiergeflecht & Fähigkeitenbaum-Rework:** Rankendes Fertigkeitennetzwerk für Kampf, Bewegung und Schatten mit handgepixelten Icons, Leuchteffekten und neuem *Schleichen*-Skill.
+* **Talisman-System & Tragbarer Schmuck:** Halsketten, Armbänder und Ohrringe mit spürbaren Boni (z. B. Silberkette, Wuchtreif, Schweigtropfen). Angelegter Schmuck wird sichtbar auf der Spielfigur gerendert.
+* **Modulare Kisten & Truhen:** Neues Kisten-System (`ItemBox` & `BoxWindow`) für komfortables Verstauen mit Shift-Klick, Schnell-Stapeln (`Quick Stack`) und Sortierung.
 
 ---
 

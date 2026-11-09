@@ -4,6 +4,89 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.4.0 Beta] – 2026-11-09
+### 🌟 Das Große Meilenstein-Update: Lebendiges Hauptmenü, 5-Stufen-Schwertkombo, Schleiergeflecht-Fähigkeiten, Talisman-System mit sichtbarem Schmuck & Kistentruhen
+
+### 🌟 Neuerungen & Verbesserungen
+
+#### 1. Atmosphärisches Hauptmenü & Spiel-Launcher (`src/ui/main_menu*.gd`, `src/world/game_launcher.gd`, `assets/shaders/menu_dark.gdshader`)
+* **Lebendiges Hauptmenü:** Ersetzt den bisherigen Direktstart durch ein voll ausgebautes, stimmungsvolles Hauptmenü.
+* **Prozedurale Live-Kulisse (`src/ui/menu_world.gd`):** Im Hintergrund läuft eine lebendige Spielwelt mit dynamischem Tag-Nacht-Licht, schwebenden Leere-Sporen und sanft im Wind wiegenden Bäumen.
+* **Vollständige Menüführung:**
+  * **Neues Spiel:** Startet eine neue Welt mit dem lokalen Helden.
+  * **Weiter:** Reibungsloses Fortsetzen vorhandener Spielstände (wird dynamisch ausgeblendet, falls noch kein Spielstand existiert).
+  * **Mehrspieler-Lobby:** Hosten eigener Sessions oder Beitreten via IP und Port (`IP:Port`-Eingabefeld mit direkter Tastatureingabe).
+  * **Einstellungen:** Konfiguration von Audio-Lautstärken, Tastenbelegung und Anzeigemodi.
+  * **Mitwirkende & Beenden.**
+* **Modularer GameLauncher (`src/world/game_launcher.gd`):** Saubere Trennung von Argument-Parsing (`--new`, `--join`, `--host`), Szenenwechseln und Netzwerk-Peer-Initialisierung.
+
+#### 2. Kampffähigkeiten, 5-Stufen-Schwertkombo & Finisher (`docs/faehigkeiten_kampf_konzept.md`, `src/components/skill_tree_component.gd`, `data/weapon_classes.json`)
+* **Erweiterte Schwertkombo (bis zu 5 Schläge):**
+  * **Schlag 1 (Vorhand):** 1,0x Schaden, 120° Bogen, schneller Auftakthieb.
+  * **Schlag 2 (Rückhand):** 1,0x Schaden, 120° Bogen.
+  * **Schlag 3 (Stoß):** 1,6x Schaden, 40° Bogen, 2,0x Knockback.
+  * **Schlag 4 – Aufwärtshieb (`combo_four`):** Freischaltbar ab Stufe 5 im Fähigkeitenbaum. Steiler Hieb von unten nach oben mit 1,25x Schaden, 150° Trefferwinkel und 1,3x Knockback.
+  * **Schlag 5 – Wirbelklinge (`combo_five`):** Freischaltbar ab Stufe 15. Verheerender Rundumschlag mit 1,8x Schaden, 330° Trefferbogen, 2,2x Knockback und kraftvollem Bildschirmschütteln.
+* **Neue Charakter-Sprites & Bluteffekte:**
+  * Spezielles Komboblatt `assets/characters/player_combo.png` (8 Richtungen für alle Kombo-Schritte).
+  * Dynamische Blutmaske `assets/characters/player_combo_blood.png` für viszerales Treffer-Feedback.
+
+#### 3. Rework Schleiergeflecht & Fähigkeitenbaum (`src/ui/skill_tree_window.gd`, `src/ui/skill_icons.gd`, `data/skills.json`)
+* **Vollbild-Fähigkeitenbaum (Taste K):** Organisch rankendes Astgeflecht für die Disziplinen **KAMPF**, **BEWEGUNG** und **SCHATTEN**.
+* **Eigene Pixel-Art-Icons (`tools/art_skill_icons.py`, `docs/img/skill_icons.png`):**
+  * Dedizierte 16x16 / 32x32 handgepixelte Glyphen und Icons mit Kantenbloom und Zweigfarben (`#e6c468` Kampf-Gold, `#78f4e6` Bewegungs-Cyan, `#b06bff` Schatten-Violett).
+* **Neue Bewegungsskillung „Schleichen“ (`sneak`):**
+  * Ermöglicht leises Pirschen; reduziert den Sicht- und Hörradius der Schattenkreaturen drastisch.
+* **Skillpunkte-Berechnung:** Exakt `Fähigkeitspunkte = Spielerstufe - 1 - ausgegebene Punkte`.
+* **Audio-Feedback:** Neuer atmosphärischer Lernsound beim Aktivieren von Fähigkeiten (`assets/audio/skills/learn.wav`).
+
+#### 4. Talisman-System & Amorphe Schmuckstücke (`docs/talisman_konzept.md`, `src/components/talisman_component.gd`, `src/systems/talisman_rules.gd`, `data/talismans.json`)
+* **3 Schmuckgattungen & Domänen:**
+  * **Kette (`necklace` / Domäne KÖRPER):** z. B. `silver_chain` (+12 Max-HP, +2 Rüstung).
+  * **Armband (`bracelet` / Domäne ANGRIFF):** z. B. `wuchtreif` (+8 % Gesamtschaden, +15 % Wuchtschlag-Schaden, +25 % Lade-Tempo).
+  * **Ohrringe (`earrings` / Domäne LEERE):** z. B. `schweigtropfen` (-50 % Alarmradius für Monster, schluckt 25 % allen Schadens).
+* **Plätze nach Stufen-Fortschritt:**
+  * Vor Stufe 5 versiegelt.
+  * Slot 1 ab Stufe 5 freigeschaltet.
+  * Slot 2 ab Stufe 15 freigeschaltet.
+  * Slot 3 ab Stufe 25 freigeschaltet.
+* **Regeln & Begrenzungen:** Maximal ein Schmuckstück jeder Gattung anlegbar; intelligentes Tauschen per Rechtsklick oder Drag & Drop; sofortige Werteverrechnung ohne illegale Selbstheilungs-Exploits.
+
+#### 5. Sichtbarer Schmuck auf dem Heldenkörper (`src/fx/talisman_art.gd`, `src/fx/talisman_layer.gd`, `tools/art_hero_jewelry.py`)
+* **Visuelle Schmuckdarstellung:** Angelegte Talismane werden pixelgenau und richtungsabhängig auf dem Sprite des Spielers gerendert (Silberkette um den Hals, Goldreif am Schwertarm, schwebende Leeretropfen an den Ohren).
+* **Reaktive Effekte:** Geschluckter Schaden bringt die Ohrringe durch Lichtimpulse zum Leuchten (`absorb`).
+* **Sound-Design (`assets/audio/talisman/`):** Eigene Sounds für das Anlegen von Gold-, Silber- und Leerenstahl-Schmuck (`equip_gold.wav`, `equip_silver.wav`, `equip_voidsteel.wav`, `absorb.wav`, `off.wav`).
+
+#### 6. Kisten-, Truhen- & Lagersystem (`src/systems/item_box.gd`, `src/ui/box_window.gd`, `src/town/town_manager.gd`)
+* **Modulares Lagerbox-System (`ItemBox`):** Platzierbare Truhen in der Welt und im Dorf mit frei konfigurierbarer Slotgröße.
+* **Truhen-UI (`BoxWindow`):**
+  * Schneller Itemtransfer per Shift-Klick zwischen Rucksack und Truhe.
+  * Sortierfunktion und Schnell-Stapeln (`Quick Stack`) gleicher Gegenstände.
+  * Volle Synchronisation im Host-Authoritativen Mehrspielermodus.
+
+---
+
+### ⚖️ Veränderungen & Parameter (Vorher &rarr; Nachher)
+
+| Bereich / Parameter | Vorher (`V0.3.2`) | Jetzt (`V0.4.0`) | Bedeutung |
+|---|---|---|---|
+| **Schwertkombo-Schlagzahl** | 3 Schläge (fest) | **Bis zu 5 Schläge** | Durch Upgrades Aufwärtshieb (`combo_four`) und Wirbelklinge (`combo_five`) |
+| **Maximaler Kombo-Einzelschaden** | 1,6x (3. Schlag / Stoß) | **1,8x (5. Schlag / Wirbelklinge)** | Enormer Finisher-Schaden gegen Horden |
+| **Kombo-Trefferwinkel Finisher** | 40° (Stoß) | **330° (Wirbelklinge)** | Trifft nahezu die gesamte Umgebung im Nahkampf |
+| **Wuchtschlag-Aufladezeit (mit Wuchtreif)** | 1,00 s (Standard) | **0,80 s (-20 % Zeit / +25 % Tempo)** | Deutlich schnellere Einsatzbereitschaft des Wuchtschlags |
+| **Wuchtschlag-Schaden (mit Wuchtreif)** | 3,40x Basis | **3,91x (3,40 * 1,15)** | +15 % Bonus-Schaden auf voll geladene Wuchtschläge |
+| **Allgemeiner Waffenschaden (mit Wuchtreif)** | 1,00x | **1,08x (+8 %)** | Dauerhafter Bonus auf alle regulären Angriffe |
+| **Max-HP Bonus (mit Silberkette)** | 0 | **+12 Max-Gesundheit** | Höherer Lebenspool (ohne Gratis-Heilung beim Anlegen) |
+| **Rüstungs-Bonus (mit Silberkette)** | 0 | **+2 Rüstung** | Reduziert erlittenen physischen Schaden |
+| **Erlittener Schaden (mit Schweigtropfen)** | 100 % (Standard) | **75 % (25 % geschluckt)** | Schützt auch vor Schaden über Zeit (DoT) |
+| **Monster-Wahrnehmung (mit Schweigtropfen)** | 100 % Radius | **50 % Radius (-50 % Alarm)** | Schattenspinnen, Lauscher & Brecher bemerken den Helden erst auf halbe Distanz |
+| **Talisman-Plätze Stufe 1–4** | Keine | **0 (versiegelt)** | Plätze müssen durch Stufenaufstiege verdient werden |
+| **Talisman-Plätze Stufe 5 / 15 / 25** | Keine | **1 / 2 / 3 Plätze** | Erweitert die tragbaren Schmuckstücke mit dem Spielfortschritt |
+| **Spielstart** | Direktstart in die Welt | **Hauptmenü mit Live-Hintergrundwelt** | Volle Menünavigation für Solo, Host, Join & Optionen |
+| **Truhen & Kisten** | Nur statisches Dorflager | **Modulare Truhen mit Shift-Klick & Sortierung** | Bequemes Einlagern und Sortieren von Beute |
+
+---
+
 ## [V0.3.2 Beta] – 2026-11-09
 ### 🗺️ Boss-Kartenmarker, Mornath-Replay-Fix & Menü-Polishing
 

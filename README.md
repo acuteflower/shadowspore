@@ -5,15 +5,14 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.3.1 Beta
+## 🚀 Aktuelle Version: V0.3.2 Beta
 
 > Vollständige Versionshistorie und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.3.1 Beta:
-* **Schwerer Angriff (Wuchtschlag - RMB / L2):** Zweistufig aufladbarer Rundumhieb (bis zu 3,4x Schaden und 3,0x Knockback) mit Schockwelle, Vorwärtsdrang und eigenen Charakter-Animationen (`player_heavy.png`).
-* **Level-Fortschrittsfenster (Taste P):** Vollbild-Fortschrittsbaum über 4 Epochen mit entfaltenden Pixel-Blüten (`BloomOrb`), Meilenstein-Belohnungen, Rüstungswerten und Talisman-Slot-Freischaltungen.
-* **Nacht-Director & Monster-Spawning Rework:** Taktische Monster-Wellen (Späher, Überfälle, Sammler, Letzter Ansturm), Mondphasen-Einfluss (Neumond +30 % Spawns) und akustische Spuren-Wahrnehmung.
-* **Mornath-Arena Story & Hologramm:** Gefallener Arena-Ritter und holografische Projektion vor der Säulenebene zur narrativen Einstimmung.
+### Highlights von V0.3.2 Beta:
+* **Mornath Boss-Kartenmarker:** Eigener pulsierender Boss-Marker auf der Weltkarte für das Mornath-Hologramm mit Entfernungs- und Status-Tooltip.
+* **Arena-Instandsetzung & Replay-Fix:** Nach Besiegen des Bosses startet ein erneuter Kampf garantiert bei Phase 1 mit vollen 100 % HP und komplett instandgesetzten Arenasäulen.
+* **Pause- & Dev-Menü Polishing:** Aufgeräumte Menü-Navigation für Story- und Boss-Sprungpunkte.
 
 ---
 

@@ -576,15 +576,6 @@ func _halo(canvas: CanvasItem, at: Vector2, radius: float, tone: Color, strength
 	canvas.draw_texture(_halos[r] as Texture2D, (at - Vector2(r, r)).round(), Color(tone, minf(strength * 0.5, 0.9)))
 
 
-## One dark translucent globe with layered depth, light from the upper left. Used by orbs, pendants and the action bud.
-func _globe(canvas: CanvasItem, at: Vector2, radius: float, tone: Color, alpha: float, life: float, breath: float, rim: float = 0.0) -> void:
-	canvas.draw_circle(at + Vector2(0, 2), radius + 2.0, Color(INK, alpha * 0.65))
-	canvas.draw_circle(at, radius, Color(tone.darkened(0.93), alpha))
-	canvas.draw_circle(at + Vector2(-1, -1), radius * 0.74, Color(tone.darkened(0.79), alpha * (0.48 + breath * 0.14)))
-	canvas.draw_circle(at + Vector2(-2, -3), radius * 0.4, Color(tone, alpha * 0.055 * life))
-	VineStyle.ring(canvas, at, int(radius), Color(tone, alpha * (0.22 + breath * 0.1 + rim * 0.16)), 0.8)
-
-
 ## 0..1: how far the selected placeholder's exploration has charged (a pending host answer counts as full).
 func _charge(id: String) -> float:
 	if id == _pending:
@@ -648,8 +639,7 @@ func _draw_action_vine(void_level: float) -> void:
 	for row: int in range(int(float(course.call(slot.x))) + 1, int(slot.y) - 10):
 		_chrome.draw_rect(Rect2(slot.x, row, 1, 1), VineStyle.BARK_LIGHT if row % 2 == 0 else VineStyle.BARK)
 	_halo(_chrome, slot, 20.0, color, (0.55 + charge * 0.9) if active else 0.25)
-	_globe(_chrome, slot, 10.0, color, 1.0 if active else 0.55, 1.0 if active else 0.4, breath, charge)
-	_chrome.draw_circle(slot + Vector2(sin(_time * 0.9), cos(_time * 0.7)).round(), 2.0 + charge, Color(color, (0.5 + charge * 0.5) if active else 0.3))
+	BloomOrb.draw(_chrome, slot, 13.0, color, 1.0 if active else 0.6, (0.4 + charge * 0.6) if active else 0.3, 1.0 if active else 0.5, breath, _time, 91, charge, 8)
 	if charge > 0.0:
 		var pulse: float = 0.6 + 0.4 * sin(_time * 14.0) if _pending == _selected else 1.0
 		_chrome.draw_arc(slot, 13.0, -PI * 0.5, -PI * 0.5 + TAU * charge, 48, Color(color, pulse), 2.0)
@@ -749,7 +739,7 @@ func _draw_web() -> void:
 
 
 func _orb_radius(id: String) -> float:
-	return roundf((13.0 if _skills.is_awake(id) else 9.0) * sqrt(_zoom))
+	return roundf((14.0 if _skills.is_awake(id) else 10.0) * sqrt(_zoom))
 
 
 func _draw_orbs() -> void:
@@ -776,20 +766,15 @@ func _draw_orbs() -> void:
 		heartbeat = maxf(heartbeat, awakening)
 		var life: float = 1.0 if explored else 0.38
 		_halo(_orbs, at, radius + 20.0, tone, alpha * (0.7 + breath * 0.35 + heartbeat * 0.9 + interest * 0.5 + charge * 0.9) * life)
-		_globe(_orbs, at, radius, tone, alpha, life, breath, interest)
-		# Broken shell highlights drift independently of the inner currents.
-		for part: int in 3:
-			var angle: float = phase + _time * (0.17 if part % 2 == 0 else -0.12) + part * TAU / 3.0
-			_orbs.draw_arc(at, radius + 1.0, angle, angle + 0.45 + part * 0.08, 10, Color(tone.lightened(0.15), alpha * life * (0.28 + breath * 0.2)), 1.0)
-		for current: int in 2:
-			var angle: float = _time * (0.6 if current == 0 else -0.43) + phase + current * PI
-			_orbs.draw_arc(at + Vector2(sin(angle), cos(angle)).round(), radius * (0.42 + current * 0.16), angle, angle + 1.45, 14, Color(tone, alpha * life * (0.16 + heartbeat * 0.2 + charge * 0.3)), 1.0)
-		var core: Vector2 = at + Vector2(sin(_time * 0.9 + phase), cos(_time * 0.7 + phase)).round()
-		_orbs.draw_circle(core, 2.0 + heartbeat * 1.0 + charge * 1.5, Color(tone, alpha * life * (0.42 + heartbeat * 0.3 + charge * 0.3)))
+		# A flower: a closed bud while the place is unexplored, opening petal by petal once explored, in full bloom for a learned skill.
+		var open: float = 1.0 if awake else (0.7 if explored else 0.12)
+		open = clampf(open + interest * 0.12 + charge * 0.4 + heartbeat * 0.08, 0.0, 1.0)
+		if _reveal.has(id) and not awake:
+			open = maxf(0.12, lerpf(0.12, open, smoothstep(0.0, 1.1, float(_reveal[id]))))
+		BloomOrb.draw(_orbs, at, radius * 1.22, tone, alpha, open, life, breath, _time, id.hash() & 0xffff, interest + charge, 10 if awake else 7)
 		if awake:
+			_orbs.draw_circle(at, 6.5, Color(INK, alpha * 0.82))
 			_draw_glyph(at, String((_skills.definitions()[id] as Dictionary).icon), Color(tone.lightened(0.45), alpha * 0.95))
-		else:
-			_orbs.draw_rect(Rect2(core, Vector2.ONE), Color(tone.lightened(0.6), alpha * (0.85 if explored else 0.35)))
 		# Tiny orbiting seeds bind the globe to the drifting veil, rather than a flat button.
 		for mote: int in (4 if awake else 2):
 			var orbit: float = phase + _time * (0.35 + mote * 0.07) + mote * 2.4

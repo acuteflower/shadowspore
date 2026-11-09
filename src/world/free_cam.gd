@@ -75,7 +75,7 @@ func _set_zoom(value: float) -> void:
 func _can_enter() -> bool:
 	if _player == null or not _player.is_multiplayer_authority():
 		return false
-	if InputManager.map_open or InputManager.skills_open or InputManager.build_open:
+	if InputManager.map_open or (InputManager.skills_open or InputManager.progress_open) or InputManager.build_open:
 		return false
 	var health: HealthComponent = _player.get("health") as HealthComponent
 	if health == null or health.current <= 0.0:

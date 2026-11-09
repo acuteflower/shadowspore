@@ -1,0 +1,13 @@
+{
+	"_doc": "Was die Stufen bringen (src/systems/level_rewards.gd). Stufe 1 ist der Start. Jede Stufe gibt per_level; alle 5 Stufen kommt ein Meilenstein dazu. Die Belohnung wird im Fortschritt-Fenster (P) eingesammelt: die Werte gelten erst ab der eingesammelten Stufe (ProgressComponent.claimed).",
+	"base": {"health": 100, "stamina": 100, "armor": 0, "overheal": 0.10, "talismans": 0},
+	"per_level": {"health": 3, "stamina": 2},
+	"milestones": {
+		"5": {"name": "ERSTE WURZEL", "health": 8, "armor": 1, "talisman": 1, "note": "DER ERSTE TALISMAN FINDET HALT."},
+		"10": {"name": "ZWEITER ATEM", "health": 8, "stamina": 8, "overheal": 0.05, "note": "WUNDEN SCHLIESSEN SICH ÜBER DAS MASS HINAUS."},
+		"15": {"name": "DÄMMERWACHE", "health": 8, "armor": 1, "talisman": 1, "note": "EIN ZWEITER TALISMAN ERWACHT."},
+		"20": {"name": "FESTER STAND", "health": 8, "stamina": 8, "overheal": 0.05, "note": "DER KÖRPER HÄLT, WAS DIE NACHT BRINGT."},
+		"25": {"name": "SCHATTENKUNDIG", "health": 8, "armor": 1, "talisman": 1, "note": "DER DRITTE TALISMAN ERWACHT."},
+		"30": {"name": "VOLLENDUNG", "health": 12, "stamina": 10, "armor": 2, "overheal": 0.05, "note": "DAS LICHT TRÄGT DICH WEITER."}
+	}
+}

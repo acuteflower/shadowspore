@@ -149,7 +149,7 @@ func _sense() -> void:
 				alert_range *= float(_spec["sprint_alert_multiplier"])
 				flee_range *= float(_spec["sprint_flee_multiplier"])
 				noisy = true
-			if player.attack.is_swinging() and global_position.distance_to(player.global_position) < float(_spec["swing_scare_range"]):
+			if player.attack.is_swinging() and global_position.distance_to(player.global_position) < float(_spec["swing_scare_range"]) * player.attack.noise_scale():
 				noisy = true
 				flee_now = true
 		else:

@@ -439,5 +439,13 @@
     "flag": "left_personalraum"
    }
   ]
- }
+ },
+ "mornath": {
+  "title": "DER HIMMELSSPALTER",
+  "steps": [
+   {"id": "go_arena", "text": "STEIGE ZUR SÄULENEBENE AUF", "type": "reach", "tile": [508, 257], "radius": 13},
+   {"id": "inspect", "text": "UNTERSUCHE DEN TOTEN RITTER", "type": "flag", "flag": "mornath_inspected", "tile": [508, 258]},
+   {"id": "fight", "text": "BESIEGE MORNATH", "type": "flag", "flag": "mornath_defeated", "tile": [499, 258]}
+  ]
+}
 }

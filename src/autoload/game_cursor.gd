@@ -46,7 +46,7 @@ const GOLD: Color = Color("e6c468")
 
 enum Look {
 	HIDDEN, ARROW, ARROW_HOT, GRAB, GRABBING, DEAD,
-	AIM, SNEAK, BUSY, ENEMY, HARVEST,
+	AIM, SNEAK, BUSY, ENEMY, HARVEST, CHARGE,
 	BUILD, BUILD_BAD, DEMOLISH,
 	FISH_AIM, FISH_BAD, FISH_CAST, FISH_DRIFT, FISH_NIBBLE, FISH_BITE, FISH_DRILL,
 	TINY,
@@ -288,10 +288,10 @@ func _resolve() -> Look:
 		_wounded = bool(player.wounded)
 	var view: Viewport = get_viewport()
 	var over: Look = _control_look(view.gui_get_hovered_control(), kind)
-	if InputManager.ui_blocking or InputManager.menu_open or InputManager.map_open or InputManager.skills_open:
+	if InputManager.ui_blocking or InputManager.menu_open or InputManager.map_open or (InputManager.skills_open or InputManager.progress_open):
 		if view.gui_is_dragging() or _holds_stack(player):
 			return Look.GRABBING
-		if InputManager.map_open or InputManager.skills_open: ## both are dragged around
+		if InputManager.map_open or (InputManager.skills_open or InputManager.progress_open): ## both are dragged around
 			if over == Look.ARROW_HOT:
 				return over
 			return Look.GRABBING if Input.is_action_pressed("action_primary") else Look.GRAB
@@ -326,6 +326,8 @@ func _resolve() -> Look:
 		return Look.FISH_AIM if bool(fishing.aim_valid) else Look.FISH_BAD
 	if bool(player.story_lock) or player.intro != null or bool(player.fainting) or bool(player.stumbling):
 		return Look.HIDDEN if _idle > 1.5 else Look.AIM ## a scene plays: the cursor tucks itself away
+	if bool(player.attack.is_charging()): ## the right mouse button holds a heavy blow
+		return Look.CHARGE
 	if bool(player.is_busy()):
 		return Look.BUSY
 	_probe_wanted = true
@@ -526,6 +528,25 @@ func _paint() -> void:
 				var a: float = _time * 5.0 + float(k) * TAU / 3.0
 				_dot(_pos + Vector2(cos(a), sin(a)) * 8.0, _a(VineStyle.PETAL))
 				_dot(_pos + Vector2(cos(a - 0.4), sin(a - 0.4)) * 8.0, _a(tone, 0.6))
+		Look.CHARGE: ## the bloom folds as the blade is drawn, a ring closes in, gold when the blow is worth letting go
+			var player_node: Node = _local_player()
+			var amount: float = 0.0
+			var draw: float = 0.0
+			var armed: bool = false
+			if player_node != null:
+				amount = float(player_node.attack.charge_amount())
+				draw = float(player_node.attack.charge_draw())
+				armed = bool(player_node.attack.charge_ready())
+			var ring_tone: Color = GOLD if armed else tone
+			var full: bool = amount >= 0.98
+			var throb: float = 0.5 + 0.5 * sin(_time * 22.0) if full else 1.0
+			_glow(_pos, 10.0 + 4.0 * amount, ring_tone, (0.3 + 0.5 * amount) * throb)
+			_blit(&"bloom_3" if draw > 0.4 else &"bloom_4", &"", _pos, 0.8 + 0.2 * throb)
+			VineStyle.ring(_canvas, _pos, int(lerpf(15.0, 8.0, draw)), _a(ring_tone, 0.35 + 0.5 * draw), 0.75)
+			if armed:
+				for k: int in 4: ## four sparks sit on the ring: it is ready
+					var a: float = float(k) * TAU / 4.0 + _time * (1.5 + 4.0 * amount)
+					_dot(_pos + Vector2(cos(a), sin(a)) * lerpf(9.0, 7.0, amount), _a(GOLD, 0.6 + 0.4 * throb))
 		Look.ENEMY:
 			var shut: bool = _swinging or _click_age < 0.12
 			_glow(_pos, 10.0, DANGER, 0.5 + 0.3 * sin(_time * 9.0))

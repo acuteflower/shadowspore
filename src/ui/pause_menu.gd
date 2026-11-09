@@ -195,6 +195,7 @@ func _build_items() -> void:
 			_add(0, "toggle", "VSYNC", "vsync")
 			_add(0, "slider", "SCHÜTTELN", "shake")
 			_add(0, "button", "FÄHIGKEITEN (%s)" % _key_of("skills"), "", {"action": "skills"}) ## the skill graph: the same view as F / Start
+			_add(0, "button", "FORTSCHRITT (%s)" % _key_of("progress"), "", {"action": "progress"}) ## the road of levels: the same view as P
 			_add(1, "heading", "SPIEL")
 			_add(1, "toggle", "SCHADENSZAHLEN", "numbers")
 			_add(1, "toggle", "POSITION", "position")
@@ -217,6 +218,9 @@ func _build_items() -> void:
 			if multiplayer.is_server() and _player is Player:
 				_add(0, "button", "GODMODE: %s" % ("AN" if (_player as Player).health.god_mode else "AUS"), "", {"action": "godmode"})
 			_add(0, "button", "AUF 5 HP SETZEN", "", {"action": "hurt5"})
+			if multiplayer.is_server() and _player is Player:
+				_add(0, "button", "+100 XP", "", {"action": "xp_100"})
+				_add(0, "button", "+1 STUFE", "", {"action": "level_up"})
 			if multiplayer.is_server():
 				_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
 			if multiplayer.is_server():
@@ -230,6 +234,10 @@ func _build_items() -> void:
 				_add(0, "button", "ZURÜCK MIT DER AXT", "", {"action": "return_home"})
 				_add(0, "button", "FERTIGE STADT", "", {"action": "town_jump"})
 				_add(0, "button", "GUSTAV GERETTET", "", {"action": "gustav_jump"})
+			if story_world != null and _player != null and story_world.has_arena_story():
+				_add(0, "heading", "BOSS-QUEST")
+				_add(0, "button", "MORNATH-QUEST STARTEN", "", {"action": "mornath_quest"})
+				_add(0, "button", "ZUR SÄULENEBENE", "", {"action": "mornath_arena"})
 			if story_world != null and multiplayer.is_server() and multiplayer.get_peers().is_empty():
 				_add(0, "heading", "MINE")
 				for lvl: int in [1, 5, 10, 20]:
@@ -438,6 +446,22 @@ func _run_action(action: String) -> void:
 			if not skills._opening:
 				_set_open(true)
 				_failed_flash = 2.5
+		"progress":
+			var road: ProgressWindow = get_parent().get_node("ProgressWindow") as ProgressWindow
+			_set_open(false)
+			road._set_open(true)
+			if not road._opening:
+				_set_open(true)
+				_failed_flash = 2.5
+		"xp_100", "level_up": ## dev: XP through the normal path (host); the reward still has to be collected in the Fortschritt window
+			var earner: Player = _player as Player
+			if earner == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			var amount: int = 100
+			if action == "level_up":
+				amount = maxi(Levels.xp_at(earner.progress.level + 1) - earner.progress.xp, 1)
+			earner.progress.award(0, amount)
 		"town_build", "town_demolish":
 			var town: TownManager = _town()
 			var builder: BuildMode = town.build_mode() if town != null else null
@@ -491,6 +515,15 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			gustav_world.debug_jump_gustav()
+		"mornath_quest", "mornath_arena":
+			var boss_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+			if boss_world == null or _player == null or not boss_world.has_arena_story():
+				_failed_flash = 2.5
+				return
+			_set_open(false)
+			_open_t = 0.0
+			visible = false
+			boss_world.debug_mornath(_player as Player, action == "mornath_arena")
 		"return_home":
 			var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if world == null or not world.debug_can_return_home():
@@ -600,6 +633,7 @@ func _reset_and_restart() -> void:
 	InputManager.build_open = false
 	InputManager.map_open = false
 	InputManager.skills_open = false
+	InputManager.progress_open = false
 	Terrain.relief = null
 	if not (multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.is_server() and multiplayer.get_peers().is_empty()):
 		NetworkManager.leave()

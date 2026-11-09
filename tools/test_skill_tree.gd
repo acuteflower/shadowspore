@@ -23,7 +23,11 @@ func capture(label: String) -> void:
 		return
 	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png("/tmp/shadowspore-skills-" + label + ".png")
+	var dir: String = "/tmp"
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--capture="):
+			dir = arg.trim_prefix("--capture=")
+	get_viewport().get_texture().get_image().save_png(dir + "/shadowspore-skills-" + label + ".png")
 
 
 func key(code: Key, pressed: bool) -> void:

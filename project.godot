@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 EventBus="*res://src/autoload/event_bus.gd"
 DataRegistry="*res://src/autoload/data_registry.gd"
+Jobs="*res://src/autoload/jobs.gd"
 NetworkManager="*res://src/autoload/network_manager.gd"
 TimeManager="*res://src/autoload/time_manager.gd"
 InputManager="*res://src/autoload/input_manager.gd"
@@ -109,6 +110,11 @@ skills={
 "deadzone": 0.2,
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":70,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 , Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":6,"pressure":0.0,"pressed":false,"script":null)
+]
+}
+progress={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":80,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
 skills_center={
@@ -334,32 +340,26 @@ g_town_wear_rect={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
-
 g_day_cover={
 "type": "sampler2D",
 "value": "res://assets/world/town_wear_empty.png"
 }
-
 g_day_rect={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
-
 g_day_clock={
 "type": "float",
 "value": 0.0
 }
-
 g_day_strength={
 "type": "float",
 "value": 0.0
 }
-
 g_day_gold={
 "type": "float",
 "value": 0.0
 }
-
 g_day_sway={
 "type": "vec2",
 "value": Vector2(0, 0)

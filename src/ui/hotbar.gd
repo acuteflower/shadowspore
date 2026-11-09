@@ -44,6 +44,9 @@ var _surge: float = 0.0 ## 1 -> 0 after a gain
 var _burst: float = 0.0 ## 1 -> 0 after a level-up
 var _gain: int = 0
 var _gain_age: float = 9.0
+var _badge: Control ## the LV label is a button: it opens the Fortschritt window
+var _badge_hover: bool = false
+var _ready_pulse: float = 0.0 ## rewards waiting: the bud beats
 
 
 ## The vine's height at `x`: it sags in the middle and meets the sap vines at both ends.
@@ -85,6 +88,24 @@ func bind_progress(progress: ProgressComponent) -> void:
 	_display_level = progress.level
 	_shown = Levels.fraction(progress.xp)
 	progress.gained.connect(_on_gained)
+	progress.leveled.connect(func(_level: int) -> void: _ready_pulse = 1.0)
+	_badge = Control.new()
+	_badge.position = Vector2(W / 2.0 - 34.0, roundf(vine_y(W / 2.0)) - 20.0)
+	_badge.size = Vector2(68, 14)
+	_badge.mouse_filter = Control.MOUSE_FILTER_STOP
+	_badge.mouse_entered.connect(func() -> void: _badge_hover = true)
+	_badge.mouse_exited.connect(func() -> void:
+		_badge_hover = false
+		GameCursor.set_hint(_badge, &""))
+	_badge.gui_input.connect(_on_badge_input)
+	add_child(_badge)
+
+
+func _on_badge_input(event: InputEvent) -> void:
+	var mouse: InputEventMouseButton = event as InputEventMouseButton
+	if mouse != null and mouse.pressed and mouse.button_index == MOUSE_BUTTON_LEFT:
+		get_tree().call_group("progress_window", "open_window")
+		_badge.accept_event()
 
 
 func _on_gained(amount: int) -> void:
@@ -95,6 +116,11 @@ func _on_gained(amount: int) -> void:
 
 
 func _update_xp(delta: float) -> void:
+	_ready_pulse = maxf(_ready_pulse - delta * 0.8, 0.0)
+	if _badge != null:
+		_badge.visible = visible and not InputManager.ui_blocking
+		if _badge_hover and _badge.visible:
+			GameCursor.set_hint(_badge, &"click")
 	_surge = maxf(_surge - 1.6 * delta, 0.0)
 	_burst = maxf(_burst - delta / BURST_SECONDS, 0.0)
 	_gain_age += delta
@@ -336,6 +362,17 @@ func _draw_xp_label() -> void:
 	var x: int = roundi(center) - total / 2
 	PixelText.draw(_overlay, "LV", Vector2i(x, base_y), dim, VineStyle.OUTLINE)
 	PixelText.draw(_overlay, number, Vector2i(x + PixelText.width("LV") + 3, base_y), tone, VineStyle.OUTLINE)
+	if _badge_hover:
+		VineStyle.glow(_overlay, Vector2(center, base_y + 3), 22.0, tone, 0.35)
+	var waiting: int = _progress.claimable()
+	if waiting > 0: ## rewards are waiting in the Fortschritt window: a golden bud beats beside the level
+		var beat: float = 0.5 + 0.5 * sin(_time * 4.2)
+		var bud: Vector2 = Vector2(x + total + 7, base_y + 3)
+		VineStyle.glow(_overlay, bud, 8.0 + beat * 3.0 + _ready_pulse * 6.0, VineStyle.WARM_GLOW.lerp(VineStyle.VOID_GLOW, taken * 0.6), 0.55 + beat * 0.3 + _ready_pulse * 0.4)
+		_overlay.draw_rect(Rect2(bud - Vector2(1, 1), Vector2(3, 3)), VineStyle.OUTLINE)
+		_overlay.draw_rect(Rect2(bud, Vector2.ONE), VineStyle.PETAL)
+		var note: String = "BELOHNUNG" if waiting == 1 else "%d BELOHNUNGEN" % waiting
+		PixelText.draw(_overlay, note, Vector2i(roundi(center) - PixelText.width(note) / 2, base_y - 9), Color(VineStyle.WARM_GLOW, 0.55 + beat * 0.4), VineStyle.OUTLINE)
 	if _gain_age < 1.4: ## "+12" floats up from the bud
 		var head: float = XP_START + _shown * (XP_END - XP_START)
 		var text: String = "+%d" % _gain

@@ -104,6 +104,8 @@ for k, (dy, dz) in enumerate(((5, 1), (-3, -4), (2, 6), (-6, 3))):
     c = spine(X1) + V(1.5, dy, dz)
     limb(c, c + V(4.5 + k, 1.0, 0.5), 1.1, 0.25, BARK_D if k % 2 else RING)
 
+N_TREE = len(m.prims)  # the felled tree ends here (--pillar leaves it out)
+
 # ------------------------------------------------------------------ the knight (Ellie's proportions)
 LEAN = 0.30
 P = V(4.0, 3.7, 5.0)  # pelvis centre
@@ -183,6 +185,7 @@ ell(P + V(-9.6, 0.9, 19.8), (1.1, 1.0, 1.0), STEEL_D)
 limb(sw0, sw0 + V(-0.6, 4.2, -1.8), 0.85, 0.8, h.LEATHER)
 ell(sw0 + V(-0.7, 4.8, -2.0), (1.0, 1.0, 1.0), h.GOLD, kind="emit")
 ell(sw0 + V(-0.3, 2.3, -0.8), (2.9, 0.45, 0.6), STEEL)
+N_SH0 = len(m.prims)
 # a dented shield leaning against the trunk
 SHR = h.rot_x(-0.5)
 n_sh = SHR @ V(0, 0, 1)
@@ -192,6 +195,7 @@ ell(shc + n_sh * 0.6, (6.4, 6.4, 1.0), CLOTH, R=SHR)
 ell(shc + n_sh * 1.4, (1.9, 1.9, 1.0), STEEL, R=SHR)
 ell(shc + n_sh * 1.1 + SHR @ V(0, 3.4, 0), (1.3, 0.9, 0.8), h.GOLD, kind="emit", R=SHR)
 
+N_SH1 = len(m.prims)
 # ------------------------------------------------------------------ the void takes him
 def plate_point(px, py):
     """A point on the breastplate (Ellie coordinates: plate centre (0, 35, 0.9), radii 4.5 / 5.3 / 3.5), a little outside."""
@@ -258,6 +262,7 @@ for c, r in (((-9.0, 0.35, 12.0), (10.0, 0.5, 5.5)), ((9.0, 0.35, 15.5), (11.0, 
 tendril(P + V(-5.0, 0.8, 5.0), V(-26.0, 0.9, 16.0))
 tendril(P + V(9.0, 0.8, 4.0), V(34.0, 0.9, 12.0), 1.0, 0.3)
 tendril(V(-14.0, 0.9, 3.0), V(-33.0, 0.9, 4.0), 0.9, 0.3)
+N_TR0 = len(m.prims)
 # onto the trunk: black flesh on its lower side, veins climbing up
 for xx, ph, r in ((-12, 90, (3.6, 2.4, 2.2)), (-4, 78, (4.4, 3.0, 2.4)), (4, 88, (3.2, 2.2, 2.0)), (10, 70, (3.8, 2.6, 2.3)), (18, 84, (3.0, 2.0, 1.9))):
     ell(surf(xx, ph, 0.2) + V(0, 0, 0.3), r, VOID)
@@ -265,6 +270,7 @@ for xx, ph in ((-8, 70), (-1, 62), (7, 76), (14, 60)):
     pts = [surf(xx + 1.4 * k * rng.uniform(0.5, 1.2), ph - 10 * k, 0.5) for k in range(5)]
     for a, b in zip(pts, pts[1:]):
         limb(a, b, 0.42, 0.32, VGLOW, kind="emit")
+N_TR1 = len(m.prims)
 # a few void blooms in the pool
 for bx, bz in ((-14.0, 11.0), (13.0, 18.0), (-24.0, 12.0), (2.0, 24.0)):
     top = V(bx, 3.8 + rng.uniform(0, 1.4), bz)
@@ -275,6 +281,12 @@ for bx, bz in ((-14.0, 11.0), (13.0, 18.0), (-24.0, 12.0), (2.0, 24.0)):
 
 
 # ------------------------------------------------------------------ render
+PILLAR = "--pillar" in sys.argv  # the same dead knight without the tree and shield: he is propped against a boss arena pillar (assets/props/arena_knight*.png)
+if PILLAR:
+    sys.argv.remove("--pillar")
+    m.prims = m.prims[N_TREE:N_SH0] + m.prims[N_SH1:N_TR0] + m.prims[N_TR1:]
+
+
 def render():
     yaw = -0.3
     depth, code = h.render(m.transform(yaw, 0.0))
@@ -283,10 +295,11 @@ def render():
 
 def add_shadow(rows):
     cx, cy = FW / 2 - 2, h.GROUND_ROW - 7
+    rx = 30.0 if PILLAR else 46.0
     for y in range(FH):
         for x in range(FW):
             if rows[y][x][3] == 0:
-                ex, ey = (x + 0.5 - cx) / 46.0, (y + 0.5 - cy) / 10.5
+                ex, ey = (x + 0.5 - cx) / rx, (y + 0.5 - cy) / 10.5
                 if ex * ex + ey * ey <= 1.0:
                     rows[y][x] = (0, 0, 0, 70)
     return rows
@@ -331,9 +344,10 @@ def preview(rows, path, scale=6):
 
 if __name__ == "__main__":
     rows = add_shadow(render())
-    write_png(ROOT / "props" / "fallen_knight.png", FW, FH, rows)
-    write_png(ROOT / "props" / "fallen_knight_glow.png", FW, FH, glow_rows(rows))
+    name = "arena_knight" if PILLAR else "fallen_knight"
+    write_png(ROOT / "props" / (name + ".png"), FW, FH, rows)
+    write_png(ROOT / "props" / (name + "_glow.png"), FW, FH, glow_rows(rows))
     if len(sys.argv) > 1:
         import pathlib
         preview(rows, pathlib.Path(sys.argv[1]))
-    print("fallen_knight.png + fallen_knight_glow.png written")
+    print(name + ".png + " + name + "_glow.png written")

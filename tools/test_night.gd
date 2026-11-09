@@ -40,7 +40,28 @@ func _pure() -> void:
 	_check(_near(NightRules.progress(0.0), 0.5), "midnight is the middle of the window")
 	_check(NightRules.progress(0.5) < 0.0 and NightRules.progress(0.21) < 0.0, "no window by day")
 	_check(NightRules.spawning(0.5) and not NightRules.spawning(0.9) and not NightRules.spawning(-1.0), "spawning stops late in the night")
-	_check(_near(NightRules.released(0.0), 0.3) and _near(NightRules.released(0.35), 0.7) and _near(NightRules.released(0.7), 1.0) and NightRules.released(-1.0) == 0.0, "three waves release 30 / 70 / 100 % of the budget")
+	_check(_near(NightRules.released(0.0), 0.10) and _near(NightRules.released(0.12), 0.25) and _near(NightRules.released(0.36), 0.55) and _near(NightRules.released(0.43), 0.55) and _near(NightRules.released(0.9), 1.0) and NightRules.released(-1.0) == 0.0, "the release curve: slow start, a lull in the middle, everything by the peak")
+	_check(NightRules.released(0.24) > 0.25 and NightRules.released(0.24) < 0.55, "the release curve is joined by straight lines")
+	_check(NightRules.beat(0.05) == "scouts" and NightRules.beat(0.2) == "build" and NightRules.beat(0.4) == "lull" and NightRules.beat(0.6) == "call" and NightRules.beat(0.75) == "peak" and NightRules.beat(0.9) == "last_rush" and NightRules.beat(-1.0) == "", "the beats of the night")
+	# the moon: the new moon is darker, bolder and brings more; the full moon is milder
+	_check(_near(NightRules.moon_dark(0.0), 1.0) and _near(NightRules.moon_dark(0.5), 0.0), "moon darkness: 1 at the new moon, 0 at the full moon")
+	_check(NightRules.moon_budget(0.0) > 1.0 and NightRules.moon_budget(0.5) < 1.0 and NightRules.moon_courage(0.0) > NightRules.moon_courage(0.5), "new moon: more creatures and more courage than the full moon")
+	# the ladder of stages
+	_check(String(NightRules.stage_for(0).id) == "tasten" and String(NightRules.stage_for(2).id) == "tasten" and String(NightRules.stage_for(3).id) == "lauschen" and String(NightRules.stage_for(7).id) == "druck" and String(NightRules.stage_for(40).id) == "flut", "the stage follows the night number")
+	_check(not bool(NightRules.stage_for(0).raids) and bool(NightRules.stage_for(3).raids) and bool(NightRules.stage_for(7).memory) and bool(NightRules.stage_for(12).elite), "each rung opens something new")
+	var rung: RandomNumberGenerator = RandomNumberGenerator.new()
+	rung.seed = 11
+	var biggest: int = 0
+	for i: int in 60:
+		biggest = maxi(biggest, NightRules.pack_size(NightRules.stage_for(12), 9.0, rung))
+		_check(NightRules.pack_size(NightRules.stage_for(0), 9.0, rung) == 1, "the first nights send single creatures")
+	_check(biggest >= 3 and biggest <= 4, "late nights send packs of up to four (%d)" % biggest)
+	_check(NightRules.pack_size(NightRules.stage_for(12), 1.0, rung) == 1, "a pack is never bigger than the budget left")
+	_check(NightRules.sector_of(0.0, 24) == 0 and NightRules.sector_of(PI, 24) == 12 and NightRules.sector_of(-0.01, 24) == 23, "sectors round the town")
+	_check(NightRules.sector_of(NightRules.sector_angle(5, 24), 24) == 5, "the middle of a sector lies in it")
+	var spiders_only: Array[Dictionary] = NightRules.available(30.0, 9, 9, NightRules.stage_for(0))
+	var all_kinds: Array[Dictionary] = NightRules.available(30.0, 9, 9, NightRules.stage_for(8))
+	_check(spiders_only.size() == 1 and all_kinds.size() > spiders_only.size(), "the first rung allows only spiders, later ones more")
 	# budget and strength
 	_check(_near(NightRules.budget(1, 1, 1), 6.0), "level 1, day 1, alone: 6 (%s)" % NightRules.budget(1, 1, 1))
 	_check(NightRules.budget(10, 10, 4) > 38.0 and NightRules.budget(10, 10, 4) < 44.0, "level 10, day 10, four players: about 41 (%s)" % NightRules.budget(10, 10, 4))
@@ -147,14 +168,20 @@ func _world() -> void:
 	_check(atmosphere != null and atmosphere.fog < 0.01, "no fog at noon")
 	# strength and budget through the director
 	var members: Array[Player] = [player]
-	_check(_near(night.group_budget(members), 6.0), "director budget for a level 1 player (%s)" % night.group_budget(members))
-	_check(_near(night.group_budget(members, true), 3.6), "after a fall the budget is 60 %%")
+	TimeManager.day = 0
+	var mood: float = NightRules.moon_budget(TimeManager.moon_phase()) * float(NightRules.stage_for(0).budget) ## the moon and the rung of the ladder
+	_check(_near(night.group_budget(members), 6.0 * mood), "director budget for a level 1 player (%s, expected %s)" % [night.group_budget(members), 6.0 * mood])
+	_check(_near(night.group_budget(members, true), 3.6 * mood), "after a fall the budget is 60 %%")
 	night.special = "flood"
-	_check(_near(night.group_budget(members), 6.0 * 1.6), "a flood night brings more")
+	_check(_near(night.group_budget(members), 6.0 * 1.6 * mood), "a flood night brings more")
 	night.special = "silent"
-	_check(_near(night.group_budget(members), 6.0 * 0.4), "a silent night brings few")
+	_check(_near(night.group_budget(members), 6.0 * 0.4 * mood), "a silent night brings few")
 	night.special = "none"
+	TimeManager.day = 4
+	_check(_near(night.group_budget(members), NightRules.budget(1, 4, 1) * NightRules.moon_budget(0.5) * float(NightRules.stage_for(4).budget)), "day 4 (full moon, second rung) is weighed by the moon and the rung (%s)" % night.group_budget(members))
+	TimeManager.day = 0
 	_check(_near(night.group_strength(members), 1.0), "an empty-handed level 1 group meets base strength (%s)" % night.group_strength(members))
+	player.health.heal_full() ## the opening leaves her wounded, and a hurt group is spared by the night
 	player.request_teleport(centre + Vector2(0, 320))
 	await _frames(120)
 	# --- the night: creatures climb out within their budget
@@ -163,13 +190,13 @@ func _world() -> void:
 	_check(night.night_id() == 0, "a night began")
 	await _sim(world, 40)
 	var count: int = night.live_count(false)
-	_check(count >= 4 and count <= 7, "a level 1 night brings about six creatures, not more (%d)" % count)
+	_check(count >= 4 and count <= 8, "a level 1 night brings about six creatures, not more (%d)" % count)
 	var inside: int = 0
 	var too_close: int = 0
 	var listeners: int = 0
 	for entry: Dictionary in night.entries():
 		var node: Node2D = entry.node as Node2D
-		if town.light_depth(node.global_position) > 12.0:
+		if town.light_depth(node.global_position) > float((NightRules.config().courage as Dictionary).dim_px) + 12.0: ## the dim outer band may be probed by a bold one
 			inside += 1
 		if node.global_position.distance_to(player.global_position) < 22.0 * 16.0 - 40.0:
 			too_close += 1
@@ -199,6 +226,8 @@ func _world() -> void:
 			break
 	_check(start.is_finite(), "found free ground for the runner")
 	runner.global_position = start
+	runner_nb.courage = 0.0 ## a timid one: the dim band is not for it
+	runner_nb.courage_extra = -1.0
 	runner_nb.goal = player.global_position
 	runner_nb.queue.clear()
 	var deepest: float = -9999.0
@@ -228,6 +257,7 @@ func _world() -> void:
 	for i: int in 31:
 		night.tick()
 	_check(night.raid_state() == "attack", "after the warning they rush the base (%s)" % night.raid_state())
+	_check(town.fear_on, "the people run for cover while a raid is on")
 	var excited: int = 0
 	for entry: Dictionary in night._raid.members as Array:
 		if (entry.nb as NightBehavior).excited:
@@ -237,6 +267,39 @@ func _world() -> void:
 		night.tick()
 	_check(night.raid_state() == "idle", "the raid ends (%s)" % night.raid_state())
 	_check(night.lure <= 15.0 and night.lure > 5.0, "after a raid the lure falls back (%s)" % night.lure)
+	# --- evidence: noise leaves a trace that merges and fades
+	var evidence_before: int = night.evidence_count()
+	night._add_evidence(centre + Vector2(900, 900))
+	night._add_evidence(centre + Vector2(910, 905))
+	_check(night.evidence_count() == evidence_before + 1, "two noises close together are one trace")
+	night._evidence_tick([] as Array[Player])
+	for i: int in 70:
+		night._evidence_tick([] as Array[Player])
+	_check(night.evidence_count() == 0, "a trace fades after its time")
+	# --- courage: a bold creature may probe the dim band, a timid one may not
+	var bold: NightBehavior = NightBehavior.new()
+	bold.courage = 0.9
+	var timid: NightBehavior = NightBehavior.new()
+	timid.courage = 0.1
+	_check(bold.brave() and not timid.brave(), "only a bold creature dares the dim band")
+	timid.courage_extra = 0.6
+	_check(timid.brave(), "a new moon makes even the timid bolder")
+	# --- the night's memory is kept in the save and makes the weak side more attractive
+	TimeManager.day = 7
+	night._memory.clear()
+	var calm_weight: float = night.sector_weight(3)
+	night._remember(3, "b", 2.0)
+	_check(night.sector_weight(3) > calm_weight, "a side that gave way draws the dark")
+	night._remember(3, "d", 4.0)
+	_check(night.sector_weight(3) < calm_weight + 2.0 * float((NightRules.config().memory as Dictionary).breach_weight), "defenders' luck lowers it again")
+	var saved: Dictionary = night.export_state()
+	night._memory.clear()
+	night.import_state(JSON.parse_string(JSON.stringify(saved)) as Dictionary)
+	_check(night._memory.has(3) and _near(float((night._memory[3] as Dictionary).b), 2.0), "the memory survives a save")
+	night._decay_memory()
+	_check(float((night._memory[3] as Dictionary).b) < 2.0, "a new night forgets part of it")
+	night._memory.clear()
+	TimeManager.day = 0
 	# --- the morning: they turn for the dark and burn, and leave nothing behind
 	TimeManager.lock_at(0.225)
 	var drops: Node = get_tree().get_first_node_in_group("drops")
@@ -247,6 +310,9 @@ func _world() -> void:
 		if night.live_count(false) == 0:
 			break
 	_check(night.live_count(false) == 0, "the creatures of the night are gone by morning (%d left)" % night.live_count(false))
+	for i: int in 40:
+		night.tick()
+	_check(not town.fear_on, "when it is quiet again the people come out")
 	_check(drops.get_child_count() == drops_before, "what the sun took leaves no loot")
 	# --- the day: a weakened leftover in the shade
 	(NightRules.config().remnants as Dictionary)["interval"] = [1, 1]

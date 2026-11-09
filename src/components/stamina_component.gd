@@ -46,6 +46,13 @@ func drain(rate: float, delta: float) -> bool:
 	return current > 0.0
 
 
+## A new maximum (from the collected level); `grow` gives what was added right away.
+func set_max(value: float, grow: bool = false) -> void:
+	var added: float = value - max_stamina
+	max_stamina = value
+	_set_current(current + added if grow and added > 0.0 else current)
+
+
 func refill() -> void:
 	_set_current(max_stamina)
 

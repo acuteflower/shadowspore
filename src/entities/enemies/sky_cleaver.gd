@@ -573,6 +573,7 @@ func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
 
 func _on_died() -> void:
 	_set_hittable(false)
+	get_tree().call_group("arena_story", "boss_defeated", arena) ## the arena's story (quest, knight, hologram) on every peer
 	if multiplayer.is_server():
 		_rpc_ground_crash.rpc(global_position, _height, _velocity * 0.35 if state == State.FLYING else Vector2.ZERO)
 

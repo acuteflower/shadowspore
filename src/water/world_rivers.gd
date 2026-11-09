@@ -5,7 +5,7 @@ extends Node2D
 var _data: Dictionary
 var _spec: Dictionary
 var _queries: Dictionary = {}
-const QUERY_LIMIT: int = 64 ## the bake has 41 river chunks today; the cap only bounds a future, larger bake
+var _query_lock: Mutex = Mutex.new() ## chunk worker threads ask the fields too (Jobs)
 var _materials: Array[ShaderMaterial] = []
 var _falls: Array[Sprite2D] = []
 var _springs: Array[Sprite2D] = []
@@ -24,6 +24,7 @@ func _ready() -> void:
 	lake_image.convert(Image.FORMAT_L8)
 	_lake_bytes = lake_image.get_data()
 	_spec = DataRegistry.table("rivers")
+	_warm_queries()
 	y_sort_enabled = true
 	fauna = load("res://src/water/river_fauna.tscn").instantiate() as RiverFauna
 	add_child(fauna)
@@ -38,14 +39,24 @@ func lake_at(point: Vector2) -> bool:
 	var tile: Vector2i = Vector2i((point / 16.0).floor())
 	return tile.x >= 0 and tile.y >= 0 and tile.x < RegionMap.WORLD_TILES and tile.y < RegionMap.WORLD_TILES and _lake_bytes[tile.y * RegionMap.WORLD_TILES + tile.x] < 128
 
+## Loads the query fields on the main thread: a first `load()` inside a chunk worker would deadlock against the waiting main thread (Jobs.warm).
+func _warm_queries() -> void:
+	for key: String in (_data["chunks"] as Dictionary):
+		var cell: Vector2i = Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+		_queries[cell] = (load(String((_data["chunks"][key] as Dictionary)["query"])) as Texture2D).get_image()
+
 func _query(cell: Vector2i) -> Image:
 	var key: String = _key(cell)
 	if not (_data.get("chunks", {}) as Dictionary).has(key): return null
-	if not _queries.has(cell):
-		if _queries.size() >= QUERY_LIMIT: _queries.clear() ## images are immutable: a later query simply reads them again
-		var path: String = String((_data["chunks"][key] as Dictionary)["query"])
-		_queries[cell] = (load(path) as Texture2D).get_image()
-	return _queries[cell] as Image
+	_query_lock.lock()
+	var image: Image = _queries.get(cell) as Image
+	_query_lock.unlock()
+	if image == null: ## (only a chunk added after start; loads on the main thread)
+		image = (load(String((_data["chunks"][key] as Dictionary)["query"])) as Texture2D).get_image()
+		_query_lock.lock()
+		_queries[cell] = image
+		_query_lock.unlock()
+	return image
 
 func field_at(point: Vector2) -> Vector2:
 	var cell: Vector2i = Vector2i((point / 512.0).floor())

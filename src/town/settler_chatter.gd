@@ -42,7 +42,7 @@ func _topics(kind: String) -> Array:
 
 
 func _tick() -> void:
-	if _busy or town == null or not town.founded or town.local_player() == null or town.alert_on:
+	if _busy or town == null or not town.founded or town.local_player() == null or town.alert_on or town.fear_on:
 		return
 	var day: int = TimeManager.day
 	if _played.size() > 40:

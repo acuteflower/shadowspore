@@ -40,6 +40,7 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 			"health": player.health.current,
 			"copper": player.progress.copper,
 			"xp": player.progress.xp,
+			"claimed": player.progress.claimed, ## the level whose rewards were collected (Fortschritt window): health, stamina, armor, talisman slots follow it
 			"skill_tree": (player.get_node("SkillTreeComponent") as SkillTreeComponent).export_data(),
 			"slots": player.inventory.slots,
 			"equipment": player.inventory.equipment,
@@ -58,6 +59,9 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	var town: TownManager = tree.get_first_node_in_group("town") as TownManager
 	if town != null and town.founded:
 		data["town"] = town.export_state() ## the pieces, the stock, the ways, the residents (docs/town.md)
+	var night: NightDirector = tree.get_first_node_in_group("night_director") as NightDirector
+	if night != null:
+		data["night"] = night.export_state() ## where the base held and where it gave way (docs/nacht_monster_konzept.md)
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and waystones.awake_count() > 0:
 		data["waystones"] = waystones.export_state() ## the awakened goddess statues (docs/waystones.md)
@@ -84,6 +88,8 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	if pos.size() == 2:
 		player.position = Vector2(float(pos[0]), float(pos[1]))
 		(player.get_node("Camera2D") as Camera2D).reset_smoothing()
+	player.progress.xp = int(saved.get("xp", 0))
+	player.progress.restore_claimed(int(saved.get("claimed", 1))) ## before the health: the maximum depends on it
 	var health: float = float(saved.get("health", player.health.max_health))
 	player.health.current = health if health > 0.0 else player.health.max_health
 	player.sync_wound_visuals()
@@ -107,6 +113,9 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	var town: TownManager = tree.get_first_node_in_group("town") as TownManager
 	if town != null and data.has("town"):
 		town.import_state(data.town as Dictionary)
+	var night: NightDirector = tree.get_first_node_in_group("night_director") as NightDirector
+	if night != null and data.has("night"):
+		night.import_state(data.night as Dictionary)
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and data.has("waystones"):
 		waystones.import_state(data.waystones as Dictionary)

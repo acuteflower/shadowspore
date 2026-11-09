@@ -56,6 +56,7 @@ var _last_level: int = -1
 var chatter: SettlerChatter
 var alert_on: bool = false ## the dark gathers at the edge of the light (a raid is warned): Valdric keeps the watch, the edge of the light glows brighter
 var alert_angle: float = 0.0 ## from the middle of the town towards where it gathers
+var fear_on: bool = false ## the dark is near: the people run indoors and hide until it is quiet again (`Settler._fear_step`; Valdric keeps the watch instead)
 var _touch_msec: int = 0
 var _inside: bool = false ## the local player stands in the town
 var _entered_day: int = -1
@@ -381,6 +382,21 @@ func set_alert(on: bool, angle: float) -> void:
 func _rpc_alert(on: bool, angle: float) -> void:
 	alert_on = on
 	alert_angle = angle
+
+
+## Host: the people of the town are afraid (creatures at the edge of the light, a call, a raid) or calm again. Every peer's settlers follow.
+func set_fear(on: bool) -> void:
+	if multiplayer.is_server() and on != fear_on:
+		_rpc_fear.rpc(on)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_fear(on: bool) -> void:
+	fear_on = on
+	if on:
+		event.emit("fear", {})
+	else:
+		event.emit("fear_over", {})
 
 
 ## Host: a creature is turned back at the edge of the light at `pos`: sparks on every peer (at most four a second).
@@ -1858,6 +1874,7 @@ func export_state() -> Dictionary:
 	return {
 		"version": STATE_VERSION, "founded": founded, "name": name_index, "center": [center.x, center.y], "day": founded_day,
 		"next_id": next_id, "structures": out_structures, "stock": stock.duplicate(), "cleared": out_cleared, "residents": residents.duplicate(true), "paths": paths.duplicate(true), "orders": orders.duplicate(true),
+		"fear": fear_on,
 	}
 
 
@@ -1879,6 +1896,7 @@ func import_state(data: Dictionary) -> void:
 		(sprite as Sprite2D).queue_free()
 	_path_views.clear()
 	founded = bool(data.get("founded", false))
+	fear_on = bool(data.get("fear", false))
 	name_index = int(data.get("name", 0))
 	var middle: Array = data.get("center", [0, 0]) as Array
 	center = Vector2(float(middle[0]), float(middle[1]))

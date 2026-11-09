@@ -35,6 +35,7 @@ func _run() -> void:
 		await get_tree().process_frame
 	await _shot("0_before")
 	player.global_position = origin + Vector2(20, 30)
+	world.request_arena_boss(String(spec.id), player.global_position)
 	var boss: SkyCleaver
 	while boss == null:
 		await get_tree().physics_frame

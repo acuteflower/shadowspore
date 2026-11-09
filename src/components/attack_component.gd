@@ -8,6 +8,8 @@ signal combo_stage(weapon: String, stage: int) ## host-confirmed active swing, o
 
 signal lunged(impulse: Vector2) ## owner only: a small step into the swing
 signal hit_landed(shake: float) ## owner only: the swing connected
+signal charge_stage(stage: int) ## every peer: 0 charging started / dropped, 1 worth releasing, 2 fully charged
+signal heavy_struck(power: float) ## owner only: the heavy blow was let loose
 
 enum Phase { IDLE, WINDUP, ACTIVE, RECOVERY }
 
@@ -34,6 +36,17 @@ const ARM_CUFF: Color = Color("8a5cf0")
 const ROT_ANGLES: int = 48 ## the held sprite is pre-rotated (tools/art_weapons.py): 48 steps around the circle,
 const ROT_LENGTHS: Array[float] = [0.4, 0.52, 0.64, 0.76, 0.88, 1.0] ## and 6 foreshortenings along the shaft (rows)
 const OUT_OF_COMBAT: float = 10.0 ## seconds after the last swing until the weapon is put away
+const BLADE_PX: float = 22.0 ## grip to tip of the held blade on screen at full length (heavy trail, charge motes)
+const CHOP_PITCH_REST: float = deg_to_rad(32.0) ## the heavy blow: blade height above the horizon at rest ...
+const CHOP_PITCH_UP: float = deg_to_rad(104.0) ## ... lifted over the shoulder (above 90 = leaning back) ...
+const CHOP_PITCH_WIND: float = deg_to_rad(116.0) ## ... pulled a little further back in the instant before the blow ...
+const CHOP_PITCH_END: float = deg_to_rad(-28.0) ## ... and driven down past the target
+const CHOP_YAW_BACK: float = 0.6 ## radians toward her sword side while charging ...
+const CHOP_YAW_WIND: float = 0.72
+const CHOP_YAW_END: float = -0.35 ## ... and across to the other side at the end: a diagonal chop
+const HEAVY_BURST_LIFE: float = 0.38
+const HEAVY_TRAIL_LIFE: float = 0.22
+const HEAVY_SOUNDS: String = "res://assets/audio/heavy/"
 
 @export var inventory: InventoryComponent
 
@@ -76,6 +89,25 @@ var _combo_deadline_msec: int = 0
 var _server_combo_index: int = 0
 var _server_combo_until: int = 0
 var _server_ready_msec: int = 0
+var _charging: bool = false ## the secondary attack is being charged (every peer)
+var _charge_time: float = 0.0
+var _charge_cfg: Dictionary = {} ## the weapon class's `secondary` block of the charging weapon
+var _charge_chained: bool = false ## started right after a light hit (shorter minimum)
+var _charge_stage: int = 0
+var _charge_carry: float = 0.0
+var _release_key: float = 2.0 ## heavy-sheet key where the blow started
+var _release_pitch: float = CHOP_PITCH_UP
+var _release_yaw: float = CHOP_YAW_BACK
+var _freeze: float = 0.0 ## seconds the whole swing stands still (hit stop)
+var _server_charge_msec: int = 0
+var _blade_angle: float = 0.0
+var _blade_length: float = 1.0
+var _tips: Array[Dictionary] = [] ## the heavy blow's path: {mid (world), tip (world), age}
+var _burst_life: float = BURST_LIFE
+var _burst_heavy: bool = false
+var _flash: float = 0.0 ## the fully-charged flash at the tip (seconds left)
+var _sounds: Dictionary = {}
+var _stamina: StaminaComponent
 
 @onready var _hand: Node2D = $Hand ## its y decides if the sword is drawn in front of or behind the body
 @onready var _weapon: Sprite2D = $Hand/Weapon
@@ -89,13 +121,22 @@ func _ready() -> void:
 		inventory = get_node("../InventoryComponent") as InventoryComponent
 	_trail.draw.connect(_draw_trail)
 	_arm.draw.connect(_draw_arm)
+	_stamina = get_node_or_null("../StaminaComponent") as StaminaComponent
 	_refresh_weapon()
 
 
 func _process(delta: float) -> void:
-	_advance(delta)
+	if _freeze > 0.0:
+		_freeze -= delta ## hit stop: the swing stands still for a moment, the world runs on
+	else:
+		_advance(delta)
+		if _charging:
+			_charge_time += delta
+			_charge_effects(delta)
 	_update_pose(delta)
-	if _phase == Phase.ACTIVE:
+	_track_tips(delta)
+	_flash = maxf(_flash - delta, 0.0)
+	if _phase == Phase.ACTIVE and not bool(_step.get("heavy", false)):
 		_trail_age = 0.0
 	elif _trail_age < TRAIL_FADE:
 		_trail_age += delta
@@ -107,15 +148,65 @@ func is_swinging() -> bool:
 	return _phase != Phase.IDLE
 
 
+## True while the secondary attack is being charged.
+func is_charging() -> bool:
+	return _charging
+
+
+## 0..1 how strong the blow would be now (0 until it is worth releasing); the cursor and the effects read this.
+func charge_amount() -> float:
+	return HeavyRules.power(_charge_cfg, _charge_time, _charge_chained) if _charging else 0.0
+
+
+## 0..1 how far the draw-back is (shows before the blow is ready).
+func charge_draw() -> float:
+	return HeavyRules.draw_progress(_charge_cfg, _charge_time) if _charging else 0.0
+
+
+## Walking speed factor while the charge is held (1 when not charging).
+func charge_move_factor() -> float:
+	return float(_charge_cfg.get("move_factor", 0.4)) if _charging else 1.0
+
+
+func charge_ready() -> bool:
+	return _charging and HeavyRules.is_ready(_charge_cfg, _charge_time, _charge_chained)
+
+
+## True during a heavy blow (windup to recovery).
+func is_heavy_swing() -> bool:
+	return _phase != Phase.IDLE and bool(_step.get("heavy", false))
+
+
+## How much louder than a normal swing the blow is heard (1 = normal).
+func noise_scale() -> float:
+	return float(_step.get("noise", 1.0)) if is_heavy_swing() else 1.0
+
+
+## Key position on the heavy sheet for the body animation (0..HEAVY_KEYS - 1), or -1 when the heavy attack does not play.
+func heavy_key() -> float:
+	if _charging:
+		return HeavyRules.charge_key(_charge_cfg, _charge_time)
+	if not is_heavy_swing():
+		return -1.0
+	match _phase:
+		Phase.WINDUP:
+			return lerpf(_release_key, 4.0, clampf(_time / float(_step["windup"]), 0.0, 1.0))
+		Phase.ACTIVE:
+			return 4.0 + 2.0 * pow(clampf(_time / float(_step["active"]), 0.0, 1.0), 1.5)
+		_:
+			var t: float = clampf(_time / float(_step["recovery"]), 0.0, 1.0)
+			return 6.0 + t / 0.15 if t < 0.15 else 7.0 + 2.0 * (t - 0.15) / 0.85
+
+
 ## True while an attack animation is active or shortly after the last swing.
 func is_in_combat(timeout: float = 1.5) -> bool:
-	return _phase != Phase.IDLE or _since_swing < timeout
+	return _phase != Phase.IDLE or _charging or _since_swing < timeout
 
 
 ## For the body animation: x = which attack (0 forehand, 1 backhand, 2 thrust), y = keyframe position
 ## (-1..0 winding up into the first pose, 0..3 striking, 3..5 recovering). Zero when not swinging.
 func animation_state() -> Vector2:
-	if _phase == Phase.IDLE or _step.is_empty():
+	if _phase == Phase.IDLE or _step.is_empty() or bool(_step.get("heavy", false)):
 		return Vector2.ZERO
 	var block: float = 2.0 if String(_step["style"]) == "thrust" else (0.0 if float(_step["sweep"]) < 0.0 else 1.0)
 	var key: float = 0.0
@@ -131,7 +222,15 @@ func animation_state() -> Vector2:
 
 
 func can_attack() -> bool:
-	return _phase == Phase.IDLE and held_weapon != "" and not always_drawn
+	return _phase == Phase.IDLE and held_weapon != "" and not always_drawn and not _charging
+
+
+## The held weapon has a secondary attack and she has the strength to start it.
+func can_charge() -> bool:
+	if not can_attack():
+		return false
+	var cfg: Dictionary = HeavyRules.config(DataRegistry.get_entry("items", held_weapon))
+	return String(cfg.get("kind", "")) == HeavyRules.KIND_CHARGE and (_stamina == null or HeavyRules.can_start(cfg, _stamina.current))
 
 
 ## Where the far end of the held item is (world px): a rod's tip, where the line starts. `length_px` = grip to tip in the item picture.
@@ -159,6 +258,165 @@ func attack(dir: Vector2) -> void:
 		_rpc_server_swing.rpc_id(1, dir, step)
 
 
+## Owner only: right mouse button went down. Starts charging the weapon's secondary attack everywhere.
+func begin_charge(dir: Vector2) -> void:
+	if not can_charge():
+		return
+	var chained: bool = _combo_index > 0 and Time.get_ticks_msec() <= _combo_deadline_msec
+	aim_dir = dir.normalized() if dir != Vector2.ZERO else aim_dir
+	_charge_begin.rpc(held_weapon, chained)
+	if multiplayer.is_server():
+		_server_charge_msec = Time.get_ticks_msec()
+	else:
+		_rpc_server_charge.rpc_id(1)
+
+
+## Owner only, every frame while charging: keeps the aim and pays for holding too long. Returns false once the charge ended
+## (the blow was let loose or dropped).
+func charge_input(held: bool, ui_took_over: bool, dir: Vector2, delta: float) -> bool:
+	if not _charging:
+		return false
+	if dir != Vector2.ZERO:
+		aim_dir = dir.normalized()
+	if not held:
+		if ui_took_over:
+			cancel_charge()
+		else:
+			release_charge(aim_dir)
+		return false
+	if HeavyRules.overcharge(_charge_cfg, _charge_time) > 0.0 and _stamina != null: ## holding at full strength wears her out, but never below what the blow costs
+		var spare: float = _stamina.current - HeavyRules.stamina_cost(_charge_cfg)
+		if spare > 0.0:
+			_stamina.spend(minf(float(_charge_cfg.get("overcharge_drain", 8)) * delta, spare))
+	if HeavyRules.must_release(_charge_cfg, _charge_time):
+		release_charge(aim_dir)
+		return false
+	return true
+
+
+## Owner only: lets the blow go (or drops the charge when it is too short, or the stamina is gone). Strength comes from the time held.
+func release_charge(dir: Vector2) -> void:
+	if not _charging:
+		return
+	var cfg: Dictionary = _charge_cfg
+	var time: float = _charge_time
+	var chained: bool = _charge_chained
+	if not HeavyRules.is_ready(cfg, time, chained) or (_stamina != null and not _stamina.spend(HeavyRules.stamina_cost(cfg))):
+		cancel_charge()
+		return
+	dir = dir.normalized() if dir != Vector2.ZERO else aim_dir
+	_heavy_swing.rpc(dir, held_weapon, time, chained)
+	heavy_struck.emit(HeavyRules.power(cfg, time, chained))
+	if multiplayer.is_server():
+		_server_heavy(dir, time, chained)
+	else:
+		_rpc_server_heavy.rpc_id(1, dir, time, chained)
+
+
+## Owner only: she lowers the blade again (button let go too early, a dodge, a menu, a cutscene). Nothing is paid.
+func cancel_charge() -> void:
+	if _charging:
+		_charge_cancel.rpc()
+
+
+## Owner only: a hit while charging breaks it and costs a little stamina.
+func interrupt_charge() -> void:
+	if not _charging:
+		return
+	if _stamina != null:
+		_stamina.spend(minf(float(_charge_cfg.get("interrupt_cost", 10)), _stamina.current))
+	_charge_cancel.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _charge_begin(weapon_id: String, chained: bool) -> void:
+	var cfg: Dictionary = HeavyRules.config(DataRegistry.get_entry("items", weapon_id))
+	if cfg.is_empty():
+		return
+	_charge_cfg = cfg
+	_charging = true
+	_charge_time = 0.0
+	_charge_chained = chained
+	_charge_stage = 0
+	_charge_carry = 0.0
+	_play_sound("draw", -6.0)
+	charge_stage.emit(0)
+
+
+@rpc("authority", "call_local", "reliable")
+func _charge_cancel() -> void:
+	if _charging:
+		_charging = false
+		_charge_stage = 0
+		charge_stage.emit(0)
+		_play_sound("drop", -10.0)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_server_charge() -> void:
+	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+		_server_charge_msec = Time.get_ticks_msec()
+
+
+@rpc("authority", "call_local", "reliable")
+func _heavy_swing(dir: Vector2, weapon_id: String, charge_time: float, chained: bool) -> void:
+	var def: Dictionary = DataRegistry.get_entry("items", weapon_id)
+	var cfg: Dictionary = HeavyRules.config(def)
+	var step: Dictionary = HeavyRules.step(cfg, def, charge_time, chained)
+	if step.is_empty():
+		return
+	_release_key = HeavyRules.charge_key(cfg, charge_time)
+	var draw: float = HeavyRules.draw_progress(cfg, charge_time)
+	var ease_draw: float = draw * draw * (3.0 - 2.0 * draw)
+	_release_pitch = lerpf(CHOP_PITCH_REST, CHOP_PITCH_UP, ease_draw)
+	_release_yaw = lerpf(0.2, CHOP_YAW_BACK, ease_draw)
+	_charging = false
+	_charge_stage = 0
+	_step = step
+	_reach = float(def.get("stats", {}).get("reach", 22)) * float(step["reach"])
+	_combo_window = 0.5
+	_combo_index = 0
+	aim_dir = dir
+	_phase = Phase.WINDUP
+	_time = 0.0
+	_trail_age = TRAIL_FADE
+	_thrust_progress = 0.0
+	_burst_done = false
+	_tips.clear()
+	_play_sound("swing", -3.0, 0.92 + 0.16 * float(step["power"]))
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_server_heavy(dir: Vector2, charge_time: float, chained: bool) -> void:
+	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+		_server_heavy(dir, charge_time, chained)
+
+
+## Host: checks what the owner claims against its own clock, then scores the blow like a swing (after its wind-up).
+func _server_heavy(dir: Vector2, claimed: float, chained: bool) -> void:
+	var now: int = Time.get_ticks_msec()
+	var stack: Dictionary = inventory.active_stack()
+	if now < _server_ready_msec or stack.is_empty() or dir == Vector2.ZERO:
+		return
+	var def: Dictionary = Items.definition(stack)
+	var cfg: Dictionary = HeavyRules.config(def)
+	if cfg.is_empty():
+		return
+	var seen: float = float(now - _server_charge_msec) / 1000.0 if _server_charge_msec > 0 else 0.0
+	var time: float = HeavyRules.host_charge(claimed, seen, cfg)
+	if not HeavyRules.is_ready(cfg, time + 0.05, chained):
+		return
+	var step: Dictionary = HeavyRules.step(cfg, def, time, chained)
+	_server_charge_msec = 0
+	_server_combo_index = 0
+	_server_combo_until = 0
+	_server_ready_msec = now + int((float(step["windup"]) + float(step["active"]) + float(step["recovery"]) * 0.5) * 1000.0)
+	await get_tree().create_timer(float(step["windup"])).timeout
+	await get_tree().physics_frame
+	if is_inside_tree() and (get_parent() as Player).health.current > 0 and _phase != Phase.IDLE:
+		_hit_scan(dir.normalized(), step, def.get("stats", {}))
+
+
 @rpc("authority", "call_local", "reliable")
 func _swing(dir: Vector2, weapon_id: String, step_index: int) -> void:
 	var def: Dictionary = DataRegistry.get_entry("items", weapon_id)
@@ -168,6 +426,7 @@ func _swing(dir: Vector2, weapon_id: String, step_index: int) -> void:
 	_reach = float(def.get("stats", {}).get("reach", 22)) * float(_step["reach"])
 	_combo_window = float(DataRegistry.get_entry("weapon_classes", String(def.get("weapon_class", ""))).get("combo_window", 0.5))
 	aim_dir = dir
+	_charging = false
 	_phase = Phase.WINDUP
 	_time = 0.0
 	_trail_age = TRAIL_FADE
@@ -210,9 +469,11 @@ func _hit_scan(dir: Vector2, step: Dictionary, stats: Dictionary) -> void:
 	var knockback: float = float(stats.get("knockback", 0)) * float(step["knock"])
 	var targets: Array[HurtboxComponent] = HitScan.fan(self, origin, dir, float(stats.get("reach", 20)) * float(step["reach"]), float(step["arc"]), HURTBOX_MASK)
 	for target: HurtboxComponent in targets:
+		target.armor_floor = float(step.get("armor_floor", 0.0))
 		target.take_hit(damage, origin, knockback, get_multiplayer_authority())
+		target.armor_floor = 0.0
 	if not targets.is_empty():
-		_on_hit.rpc(_hit_point(targets[0]), dir, float(step["shake"]))
+		_on_hit.rpc(_hit_point(targets[0]), dir, float(step["shake"]), float(step.get("hit_stop", 0.0)))
 
 
 func _hit_point(target: HurtboxComponent) -> Vector2:
@@ -222,21 +483,24 @@ func _hit_point(target: HurtboxComponent) -> Vector2:
 
 ## Sparks fly back toward the attacker on every peer; the attacker's camera shakes.
 @rpc("any_peer", "call_local", "reliable")
-func _on_hit(point: Vector2, dir: Vector2, shake: float) -> void:
+func _on_hit(point: Vector2, dir: Vector2, shake: float, hit_stop: float = 0.0) -> void:
 	if multiplayer.get_remote_sender_id() > 1:
 		return
-	_spawn_sparks(point, dir)
+	_spawn_sparks(point, dir, hit_stop > 0.0)
+	if hit_stop > 0.0:
+		_freeze = maxf(_freeze, hit_stop) ## the heavy blow bites: the swing stands still for a moment (animation only)
+		_play_sound("hit", -2.0)
 	if is_multiplayer_authority():
 		hit_landed.emit(shake)
 
 
-func _spawn_sparks(point: Vector2, dir: Vector2) -> void:
+func _spawn_sparks(point: Vector2, dir: Vector2, heavy: bool = false) -> void:
 	var gradient: Gradient = Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
 	gradient.colors = PackedColorArray([Color("fff6dc"), Color("ffb347"), Color(1.0, 0.5, 0.2, 0.0)])
 	var sparks: CPUParticles2D = CPUParticles2D.new()
 	sparks.texture = SPARK_TEXTURE
-	sparks.amount = 10
+	sparks.amount = 24 if heavy else 10
 	sparks.lifetime = 0.28
 	sparks.one_shot = true
 	sparks.explosiveness = 1.0
@@ -244,7 +508,7 @@ func _spawn_sparks(point: Vector2, dir: Vector2) -> void:
 	sparks.spread = 75.0
 	sparks.gravity = Vector2.ZERO
 	sparks.initial_velocity_min = 50.0
-	sparks.initial_velocity_max = 140.0
+	sparks.initial_velocity_max = 200.0 if heavy else 140.0
 	sparks.damping_min = 160.0
 	sparks.damping_max = 230.0
 	sparks.scale_amount_min = 0.5
@@ -281,6 +545,92 @@ func _step_data(def: Dictionary, index: int) -> Dictionary:
 		"lunge": float(step.get("lunge", 0)),
 		"shake": float(step.get("shake", 1)),
 	}
+
+
+## While she holds the charge: motes gather at the blade's tip, a click when it is worth releasing, a flash at full strength.
+func _charge_effects(delta: float) -> void:
+	var power: float = charge_amount()
+	var stage: int = 0
+	if charge_ready():
+		stage = 2 if power >= 0.995 else 1
+	if stage != _charge_stage:
+		if stage > _charge_stage:
+			_play_sound("ready" if stage == 1 else "full", -6.0 if stage == 1 else -3.0)
+			if stage == 2:
+				_flash = 0.25
+		_charge_stage = stage
+		charge_stage.emit(stage)
+	if power <= 0.0:
+		return
+	_charge_carry += delta * (14.0 + 50.0 * power)
+	var tip: Vector2 = _weapon.global_position + Vector2.from_angle(_blade_angle) * _blade_length * BLADE_PX
+	while _charge_carry >= 1.0:
+		_charge_carry -= 1.0
+		var around: Vector2 = tip + Vector2.from_angle(randf() * TAU) * randf_range(7.0, 13.0)
+		var vel: Vector2 = (tip - around).normalized() * randf_range(18.0, 34.0) ## gathering inwards
+		_motes.append({"pos": around, "vel": vel, "age": 0.0, "life": randf_range(0.18, 0.3), "kind": 0 if randf() < 0.8 else 1, "color": MOTE_COLORS[1 + randi() % 3], "size": randf_range(0.8, 1.2)})
+	if _motes.size() > 260:
+		_motes = _motes.slice(_motes.size() - 260)
+
+
+## Remembers where the blade has been during a heavy blow, for the ribbon it leaves behind.
+func _track_tips(delta: float) -> void:
+	for i: int in range(_tips.size() - 1, -1, -1):
+		_tips[i]["age"] = float(_tips[i]["age"]) + delta
+		if float(_tips[i]["age"]) >= HEAVY_TRAIL_LIFE:
+			_tips.remove_at(i)
+	if is_heavy_swing() and _phase != Phase.WINDUP and _freeze <= 0.0:
+		var dir: Vector2 = Vector2.from_angle(_blade_angle)
+		var base: Vector2 = _weapon.global_position
+		_tips.append({"mid": base + dir * _blade_length * BLADE_PX * 0.45, "tip": base + dir * _blade_length * BLADE_PX, "age": 0.0})
+
+
+## Dust and chips where the blade bites the ground at the end of the blow.
+func _impact_dust() -> void:
+	var at: Vector2 = global_position + aim_dir.normalized() * minf(_reach * 0.8, 40.0)
+	var dust: CPUParticles2D = CPUParticles2D.new()
+	dust.texture = SPARK_TEXTURE
+	dust.amount = 14
+	dust.lifetime = 0.45
+	dust.one_shot = true
+	dust.explosiveness = 1.0
+	dust.direction = Vector2.UP
+	dust.spread = 80.0
+	dust.gravity = Vector2(0, 40)
+	dust.initial_velocity_min = 25.0
+	dust.initial_velocity_max = 75.0
+	dust.damping_min = 90.0
+	dust.damping_max = 140.0
+	dust.scale_amount_min = 0.7
+	dust.scale_amount_max = 1.3
+	var ramp: Gradient = Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 1.0])
+	ramp.colors = PackedColorArray([Color(0.72, 0.68, 0.62, 0.7), Color(0.55, 0.5, 0.48, 0.0)])
+	dust.color_ramp = ramp
+	dust.z_index = 2
+	get_tree().current_scene.add_child(dust)
+	dust.global_position = at
+	dust.emitting = true
+	get_tree().create_timer(0.8).timeout.connect(dust.queue_free)
+	_play_sound("thud", -4.0)
+
+
+func _play_sound(id: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
+	var path: String = HEAVY_SOUNDS + id + ".wav"
+	var stream: AudioStream = _sounds.get(id) as AudioStream
+	if stream == null:
+		if not ResourceLoader.exists(path):
+			return
+		stream = load(path) as AudioStream
+		_sounds[id] = stream
+	var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+	player.stream = stream
+	player.volume_db = volume_db
+	player.pitch_scale = pitch
+	player.max_distance = 360.0
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
 
 
 func _refresh_weapon() -> void:
@@ -333,7 +683,47 @@ func _update_pose(delta: float) -> void:
 	var angle: float = rest_angle
 	var length: float = _rest_length
 	var behind: bool = rest_dir.y < -0.35 or side.y < -0.35 ## the right hand is on the far side
-	if _has_weapon and _phase != Phase.IDLE and not _step.is_empty():
+	if _has_weapon and _charging:
+		var draw: float = HeavyRules.draw_progress(_charge_cfg, _charge_time)
+		var ease_draw: float = draw * draw * (3.0 - 2.0 * draw)
+		var power: float = charge_amount()
+		var blade: Vector2 = _chop_blade(lerpf(CHOP_PITCH_REST, CHOP_PITCH_UP, ease_draw), lerpf(0.2, CHOP_YAW_BACK, ease_draw))
+		var shiver: float = power * 0.05 * sin(_charge_time * 55.0) ## a held, straining blade trembles
+		angle = blade.angle() + shiver
+		length = lerpf(_rest_length, clampf(blade.length(), 0.4, 1.0), minf(ease_draw * 1.5, 1.0))
+		behind = aim_dir.y < -0.35
+	elif _has_weapon and _phase != Phase.IDLE and not _step.is_empty() and bool(_step.get("heavy", false)):
+		var aim_h: float = aim_dir.angle()
+		behind = aim_dir.y < -0.35
+		match _phase:
+			Phase.WINDUP:
+				var t: float = clampf(_time / float(_step["windup"]), 0.0, 1.0)
+				var pulled: Vector2 = _chop_blade(lerpf(_release_pitch, CHOP_PITCH_WIND, t), lerpf(_release_yaw, CHOP_YAW_WIND, t))
+				angle = pulled.angle()
+				length = clampf(pulled.length(), 0.4, 1.0)
+			Phase.ACTIVE:
+				var t: float = clampf(_time / float(_step["active"]), 0.0, 1.0)
+				var eased: float = pow(t, 1.5) ## a heavy blade starts slowly and arrives fast
+				var chop: Vector2 = _chop_blade(lerpf(CHOP_PITCH_WIND, CHOP_PITCH_END, eased), lerpf(CHOP_YAW_WIND, CHOP_YAW_END, eased))
+				angle = chop.angle()
+				length = clampf(chop.length(), 0.4, 1.0)
+				if t >= 0.85 and not _burst_done: ## the blow lands: a wide crescent and a puff of dust
+					_burst_done = true
+					_burst_age = 0.0
+					_burst_life = HEAVY_BURST_LIFE
+					_burst_heavy = true
+					_burst_thrust = false
+					_burst_angle = aim_h
+					_burst_center = global_position + BODY_CENTER
+					_impact_dust()
+				_emit_motes(angle, 1.0, false, delta)
+			Phase.RECOVERY:
+				var t: float = clampf(_time / float(_step["recovery"]), 0.0, 1.0)
+				var low: Vector2 = _chop_blade(CHOP_PITCH_END, CHOP_YAW_END)
+				var settle: float = t * t * (3.0 - 2.0 * t)
+				angle = lerp_angle(low.angle(), rest_angle, settle)
+				length = lerpf(clampf(low.length(), 0.4, 1.0), _rest_length, settle)
+	elif _has_weapon and _phase != Phase.IDLE and not _step.is_empty():
 		var aim: float = aim_dir.angle()
 		var half: float = float(_step["arc"]) / 2.0
 		var sweep: float = float(_step["sweep"])
@@ -352,6 +742,8 @@ func _update_pose(delta: float) -> void:
 				if t >= 0.9 and not _burst_done: ## the swing lands: a shock crescent (a ring for a thrust) flashes out
 					_burst_done = true
 					_burst_age = 0.0
+					_burst_life = BURST_LIFE
+					_burst_heavy = false
 					_burst_thrust = thrust
 					_burst_angle = aim if thrust else aim + sweep * lerpf(cocked, follow, eased)
 					_burst_center = global_position + BODY_CENTER
@@ -381,12 +773,23 @@ func _update_pose(delta: float) -> void:
 		if absf(ROT_LENGTHS[i] - length) < absf(ROT_LENGTHS[level] - length):
 			level = i
 	_weapon.frame = level * ROT_ANGLES + step
-	_since_swing = 0.0 if _phase != Phase.IDLE else _since_swing + delta
-	var hide: bool = (sheathed or (_since_swing > OUT_OF_COMBAT and not always_drawn)) and _phase == Phase.IDLE ## a swing always draws the weapon
-	_weapon_alpha = 1.0 if not hide and _phase != Phase.IDLE else move_toward(_weapon_alpha, 0.0 if hide else 1.0, 8.0 * delta)
+	_blade_angle = angle
+	_blade_length = length
+	var busy: bool = _phase != Phase.IDLE or _charging
+	_since_swing = 0.0 if busy else _since_swing + delta
+	var hide: bool = (sheathed or (_since_swing > OUT_OF_COMBAT and not always_drawn)) and not busy ## a swing always draws the weapon
+	_weapon_alpha = 1.0 if not hide and busy else move_toward(_weapon_alpha, 0.0 if hide else 1.0, 8.0 * delta)
 	_weapon.modulate.a = _weapon_alpha
 	_weapon.visible = _has_weapon and _weapon_alpha > 0.01
 	_arm.queue_redraw()
+
+
+## Where the blade points on screen when it stands `pitch` above the horizon (above 90 deg = leaning back) and `yaw` radians
+## from her aim toward her sword side, seen in the 3/4 perspective (same projection as the resting blade).
+func _chop_blade(pitch: float, yaw: float) -> Vector2:
+	var ground: Vector2 = aim_dir.normalized().rotated(yaw) * cos(pitch)
+	var lift: float = sin(pitch)
+	return Vector2(ground.x, ground.y * DEPTH_SQUASH - lift * 0.9)
 
 
 ## The rod as the fishing clip holds it: `rod_pose` = (forward, side, lift) in her own frame, seen in the 3/4 perspective.
@@ -447,13 +850,58 @@ func _elbow(shoulder: Vector2, hand: Vector2) -> Vector2:
 ## The blade's trail: a wedge that grows with the sweep, brightest at the blade, fading afterwards.
 func _draw_trail() -> void:
 	var alpha: float = 1.0 - _trail_age / TRAIL_FADE
-	if alpha > 0.0 and not _step.is_empty():
+	_draw_heavy_ribbon()
+	if alpha > 0.0 and not _step.is_empty() and not bool(_step.get("heavy", false)):
 		if String(_step["style"]) == "thrust":
 			_draw_thrust_trail(alpha)
 		else:
 			_draw_slash_trail(alpha)
 	_draw_burst()
 	_draw_motes()
+	_draw_charge_glint()
+
+
+## The heavy blow's ribbon: quads between the last positions of the blade's middle and tip, brightest at the newest.
+func _draw_heavy_ribbon() -> void:
+	if _tips.size() < 2:
+		return
+	for i: int in range(1, _tips.size()):
+		var a: Dictionary = _tips[i - 1]
+		var b: Dictionary = _tips[i]
+		var k: float = 1.0 - float(b["age"]) / HEAVY_TRAIL_LIFE
+		var color: Color = TRAIL_EDGE.lerp(TRAIL_CORE, k)
+		color.a = clampf(k, 0.0, 1.0) * 0.85
+		var a_mid: Vector2 = _trail.to_local(a["mid"] as Vector2)
+		var a_tip: Vector2 = _trail.to_local(a["tip"] as Vector2)
+		var b_tip: Vector2 = _trail.to_local(b["tip"] as Vector2)
+		var b_mid: Vector2 = _trail.to_local(b["mid"] as Vector2)
+		# Two triangles instead of one quad: a twisted (bow-tie) or flat quad cannot be triangulated.
+		_draw_ribbon_triangle(a_mid, a_tip, b_tip, color)
+		_draw_ribbon_triangle(a_mid, b_tip, b_mid, color)
+
+
+## Draws a triangle only when it has a real area (degenerate ones make the renderer log a triangulation error).
+func _draw_ribbon_triangle(p0: Vector2, p1: Vector2, p2: Vector2, color: Color) -> void:
+	var area2: float = (p1 - p0).cross(p2 - p0)
+	if absf(area2) < 0.05:
+		return
+	_trail.draw_colored_polygon(PackedVector2Array([p0, p1, p2]), color)
+
+
+## A tiny cross of light on the tip while the blow is charged, and a bigger flash the moment it is full.
+func _draw_charge_glint() -> void:
+	if not _charging or _blade_length <= 0.0:
+		return
+	var power: float = charge_amount()
+	if power <= 0.0 and _flash <= 0.0:
+		return
+	var tip: Vector2 = _trail.to_local(_weapon.global_position + Vector2.from_angle(_blade_angle) * _blade_length * BLADE_PX).round()
+	var color: Color = MOTE_COLORS[0]
+	color.a = 0.35 + 0.5 * power + 0.5 * (_flash / 0.25)
+	var arm: float = 2.0 + 2.0 * power + 4.0 * (_flash / 0.25)
+	_trail.draw_rect(Rect2(tip - Vector2(arm, 0), Vector2(arm * 2.0 + 1.0, 1)), color)
+	_trail.draw_rect(Rect2(tip - Vector2(0, arm), Vector2(1, arm * 2.0 + 1.0)), color)
+	_trail.draw_rect(Rect2(tip, Vector2(1, 1)), Color.WHITE)
 
 
 ## The blade sheds sparkles while it is in the air: they fly on along its path, rise a little and fade.
@@ -485,7 +933,7 @@ func _update_motes(delta: float) -> void:
 		var vel: Vector2 = (mote["vel"] as Vector2) * damping + Vector2(0.0, -16.0 * delta) ## drift up like embers
 		mote["vel"] = vel
 		mote["pos"] = (mote["pos"] as Vector2) + vel * delta
-	if _burst_age < BURST_LIFE:
+	if _burst_age < _burst_life:
 		_burst_age += delta
 
 
@@ -515,16 +963,20 @@ func _draw_motes() -> void:
 
 ## Where a swing ends: an expanding crescent of light (a ring for a thrust), two thin pixel layers.
 func _draw_burst() -> void:
-	if _burst_age >= BURST_LIFE:
+	if _burst_age >= _burst_life:
 		return
-	var k: float = _burst_age / BURST_LIFE
+	var k: float = _burst_age / _burst_life
 	var grow: float = 1.0 - pow(1.0 - k, 2.5)
 	var fade: float = pow(1.0 - k, 1.4)
 	var center: Vector2 = _trail.to_local(_burst_center)
-	for layer: int in 1:
-		var color: Color = MOTE_COLORS[1]
-		color.a = fade * 0.5
-		if _burst_thrust:
+	for layer: int in (2 if _burst_heavy else 1):
+		var color: Color = MOTE_COLORS[1 - layer] if _burst_heavy else MOTE_COLORS[1]
+		color.a = fade * (0.7 if _burst_heavy else 0.5)
+		if _burst_heavy:
+			var wide: float = _reach + 2.0 + 10.0 * grow - 2.0 * layer
+			var span: float = 1.0 - 0.3 * grow
+			_trail.draw_arc(center, wide, _burst_angle - span, _burst_angle + span, 24, color, 1.0 + float(1 - layer))
+		elif _burst_thrust:
 			var tip: Vector2 = center + Vector2.from_angle(_burst_angle) * _reach
 			_trail.draw_arc(tip, 2.0 + 5.0 * grow, 0.0, TAU, 16, color, 1.0)
 		else:

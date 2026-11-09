@@ -239,7 +239,7 @@ func _sense() -> void:
 		if moved:
 			radius = float(_def["hearing_sneak"] if player.stealth.sneaking else (_def["hearing_sprint"] if player.sprinting else _def["hearing_walk"]))
 		if player.attack.is_swinging():
-			radius = maxf(radius, float(_def["hearing_attack"]))
+			radius = maxf(radius, float(_def["hearing_attack"]) * player.attack.noise_scale())
 		var distance: float = global_position.distance_to(point)
 		var clear: bool = _line_clear(global_position, point)
 		if not clear:

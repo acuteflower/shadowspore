@@ -3,7 +3,15 @@
 		"start": 0.80,
 		"end": 0.20,
 		"spawn_end_progress": 0.85,
-		"waves": [[0.0, 0.3], [0.3, 0.7], [0.6, 1.0]]
+		"release": [[0.0, 0.10], [0.12, 0.25], [0.36, 0.55], [0.50, 0.55], [0.68, 1.0]],
+		"beats": [
+			{"id": "scouts", "from": 0.0, "to": 0.12},
+			{"id": "build", "from": 0.12, "to": 0.36},
+			{"id": "lull", "from": 0.36, "to": 0.50},
+			{"id": "call", "from": 0.50, "to": 0.68},
+			{"id": "peak", "from": 0.68, "to": 0.80},
+			{"id": "last_rush", "from": 0.80, "to": 1.0}
+		]
 	},
 	"budget": {
 		"base": 6.0,
@@ -31,7 +39,8 @@
 		"ring_tiles": [28, 46],
 		"keep_clear_tiles": 22,
 		"sources": {"dark": 0.65, "edge": 0.35},
-		"edge_tiles": 9
+		"edge_tiles": 9,
+		"pack_spread": [14.0, 34.0]
 	},
 	"protection": {
 		"light_margin": 24.0,
@@ -41,6 +50,16 @@
 		{"id": "shadow_spider", "cost": 1.0, "weight": 1.0, "min_budget": 0.0, "min_level": 1, "min_day": 0},
 		{"id": "void_listener", "cost": 1.5, "weight": 0.5, "min_budget": 9.0, "min_level": 3, "min_day": 1},
 		{"id": "void_crusher", "cost": 3.0, "weight": 0.3, "min_budget": 14.0, "min_level": 5, "min_day": 2}
+	],
+	"moon": {
+		"new": {"budget": 1.3, "courage": 0.18, "fog": 0.15},
+		"full": {"budget": 0.85, "courage": -0.08, "fog": 0.0}
+	},
+	"stages": [
+		{"id": "tasten", "from": 0, "budget": 0.8, "species": ["shadow_spider"], "packs": [1, 1], "raids": false, "scouts": false, "memory": false, "last_rush": false, "elite": false},
+		{"id": "lauschen", "from": 3, "budget": 1.0, "species": ["shadow_spider", "void_listener"], "packs": [1, 2], "raids": true, "scouts": true, "memory": false, "last_rush": false, "elite": false},
+		{"id": "druck", "from": 7, "budget": 1.0, "species": ["shadow_spider", "void_listener", "void_crusher"], "packs": [2, 3], "raids": true, "scouts": true, "memory": true, "last_rush": true, "elite": false},
+		{"id": "flut", "from": 12, "budget": 1.1, "species": ["shadow_spider", "void_listener", "void_crusher"], "packs": [2, 4], "raids": true, "scouts": true, "memory": true, "last_rush": true, "elite": true}
 	],
 	"behavior": {
 		"patrol_speed": 2.0,
@@ -53,6 +72,48 @@
 		"stuck_seconds": 3.0,
 		"trace_chance": 0.35,
 		"home_chance": 0.25
+	},
+	"courage": {
+		"base": [0.2, 0.62],
+		"pack_bonus": 0.07,
+		"enter": 0.55,
+		"dim_px": 34.0,
+		"dim_slow": 0.7,
+		"dim_seconds": 3.2,
+		"probe_cooldown": 7.0,
+		"lamp_penalty": 0.012,
+		"lamp_penalty_cap": 0.15,
+		"dark_gap_bonus": 0.12
+	},
+	"evidence": {
+		"ttl": 28.0,
+		"cell_px": 72.0,
+		"hear_tiles": 44,
+		"chance": 0.5,
+		"sprint": 0.7,
+		"swing": 1.4,
+		"building": 1.0,
+		"cap": 12,
+		"min_loud": 0.6
+	},
+	"ring_walk": {
+		"chance": 0.35,
+		"weak_pull": 0.6
+	},
+	"packs": {
+		"scout_retry": 60.0,
+		"scout_report_seconds": 5.0,
+		"scout_report_depth": -110.0,
+		"scout_cost_share": 1.0
+	},
+	"caller": {
+		"from_progress": 0.48,
+		"chance": 0.06,
+		"call_seconds": 3.2,
+		"delay": 10.0,
+		"members_min": 2,
+		"cooldown": 70.0,
+		"gather_tiles": 40
 	},
 	"lure": {
 		"zone_px": 150.0,
@@ -69,6 +130,52 @@
 		"members_min": 2,
 		"members_max": 6,
 		"gap_tries": 24
+	},
+	"last_rush": {
+		"from_progress": 0.80,
+		"warning_seconds": 6.0,
+		"raid_seconds": 18.0,
+		"members_max": 10,
+		"members_min": 3,
+		"notice": "HALTE BIS ZUR DÄMMERUNG"
+	},
+	"memory": {
+		"sectors": 24,
+		"weak_weight": 0.9,
+		"breach_weight": 0.7,
+		"defended_weight": 0.7,
+		"decay": 0.65,
+		"refresh": 20.0,
+		"max_probe_tiles": 22,
+		"defend_radius": 120.0
+	},
+	"stress": {
+		"low_health": 0.35,
+		"alive_soft": 9,
+		"alive_soft_per_player": 4,
+		"breather_seconds": 12.0
+	},
+	"omens": {
+		"from": 0.75,
+		"new_moon_dark": 0.85,
+		"new_moon_notice": "DER MOND BLEIBT AUS",
+		"stage_notice": {"lauschen": "ETWAS LAUSCHT IM DUNKELN", "druck": "DIE DUNKELHEIT WIRD DICHTER", "flut": "DIE LEERE STEIGT"}
+	},
+	"elite": {
+		"progress": 0.55,
+		"species": "void_crusher",
+		"health": 1.45,
+		"damage": 1.1,
+		"cost": 3.0,
+		"notice": "ETWAS GROSSES REGT SICH"
+	},
+	"fear": {
+		"near_px": 260.0,
+		"calm_seconds": 12.0,
+		"run_speed": 82.0,
+		"jitter": 2.2,
+		"say": ["Schnell hinein!", "Sie sind da draußen!", "Licht halten, Tür zu!"],
+		"relief": ["Ist es vorbei?", "Das war knapp."]
 	},
 	"remnants": {
 		"interval": [90, 170],

@@ -27,16 +27,76 @@ static func window_length() -> float:
 	return fposmod(float(window.end) - float(window.start), 1.0)
 
 
-## The share of the night's budget that may have been spawned by now (cumulative; waves are steps in data `window.waves`: [progress it begins, share it reaches]).
+## The share of the night's budget that may have been spawned by now (cumulative). The night is a curve, not three steps: data `window.release` lists
+## [progress, share] points that are joined by straight lines (a flat stretch is a lull, a steep one a push); before the first point the first share holds.
 static func released(progress_value: float) -> float:
 	if progress_value < 0.0:
 		return 0.0
-	var share: float = 0.0
-	for wave: Variant in _sect("window").waves as Array:
-		var entry: Array = wave as Array
-		if progress_value >= float(entry[0]):
-			share = float(entry[1])
-	return share
+	var points: Array = _sect("window").release as Array
+	var previous: Array = points[0] as Array
+	if progress_value <= float(previous[0]):
+		return float(previous[1])
+	for raw: Variant in points:
+		var point: Array = raw as Array
+		if progress_value <= float(point[0]):
+			return lerpf(float(previous[1]), float(point[1]), inverse_lerp(float(previous[0]), float(point[0]), progress_value))
+		previous = point
+	return float(previous[1])
+
+
+## The beat of the night ("scouts", "build", "lull", "call", "peak", "last_rush"; "" outside the window): the dramaturgy the director follows.
+static func beat(progress_value: float) -> String:
+	if progress_value < 0.0:
+		return ""
+	for raw: Variant in _sect("window").beats as Array:
+		var entry: Dictionary = raw as Dictionary
+		if progress_value >= float(entry.from) and progress_value < float(entry.to):
+			return String(entry.id)
+	return "last_rush"
+
+
+## 1 at the new moon, 0 at the full moon (`phase` as `TimeManager.moon_phase()`: 0 new .. 0.5 full).
+static func moon_dark(phase: float) -> float:
+	return 0.5 + 0.5 * cos(TAU * phase)
+
+
+## Budget factor of the moon: the new moon brings more, the full moon fewer.
+static func moon_budget(phase: float) -> float:
+	var moon: Dictionary = _sect("moon")
+	return lerpf(float((moon.full as Dictionary).budget), float((moon.new as Dictionary).budget), moon_dark(phase))
+
+
+## Courage the moon adds (or takes) for every creature of the night.
+static func moon_courage(phase: float) -> float:
+	var moon: Dictionary = _sect("moon")
+	return lerpf(float((moon.full as Dictionary).courage), float((moon.new as Dictionary).courage), moon_dark(phase))
+
+
+## The stage of the night ladder for night number `night_id` (data `stages`, the last one whose `from` has been reached): {id, budget, species, packs, raids, scouts, memory, last_rush, elite}.
+static func stage_for(night_id: int) -> Dictionary:
+	var best: Dictionary = (config().stages as Array)[0] as Dictionary
+	for raw: Variant in config().stages as Array:
+		var entry: Dictionary = raw as Dictionary
+		if night_id >= int(entry.from):
+			best = entry
+	return best
+
+
+## A pack size between the stage's limits, drawn with `rng` (and never more than the budget `left` can pay for at one point each).
+static func pack_size(stage: Dictionary, left: float, rng: RandomNumberGenerator) -> int:
+	var span: Array = stage.packs as Array
+	var size: int = rng.randi_range(int(span[0]), int(span[1]))
+	return clampi(size, 1, maxi(int(floor(left + 0.5)), 1))
+
+
+## Sector (0 .. count-1) of a direction angle round the town.
+static func sector_of(angle: float, count: int) -> int:
+	return posmod(int(floor(fposmod(angle, TAU) / TAU * float(count))), count)
+
+
+## Angle of the middle of a sector.
+static func sector_angle(sector: int, count: int) -> float:
+	return (float(sector) + 0.5) / float(count) * TAU
 
 
 ## Spawning stops late in the night (the morning is theirs to leave, not to arrive).
@@ -59,7 +119,7 @@ static func strength(level: int, power: float) -> float:
 	return 1.0 + float(s.per_level) * float(maxi(level - 1, 0)) + float(s.power_weight) * clampf(power, 0.0, 1.0)
 
 
-## Damage grows slower than health: a player always has 100 HP.
+## Damage grows slower than health: the player's own health grows only slowly with the collected levels (LevelRewards), so blows must not outrun it.
 static func damage_scale(strength_value: float) -> float:
 	return 1.0 + float(_sect("strength").damage_share) * (strength_value - 1.0)
 
@@ -80,10 +140,13 @@ static func power(weapon_damage: float, town_level: int, town_levels: int) -> fl
 
 
 ## Kinds that may appear for this group, with their cost and weight: [{id, cost, weight}].
-static func available(group_budget: float, level: int, day: int) -> Array[Dictionary]:
+## `stage` (a `stage_for` result, optional) narrows the kinds to those the ladder has opened by then.
+static func available(group_budget: float, level: int, day: int, stage: Dictionary = {}) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for entry: Variant in config().species as Array:
 		var s: Dictionary = entry as Dictionary
+		if not stage.is_empty() and not String(s.id) in (stage.species as Array):
+			continue
 		if group_budget >= float(s.min_budget) and level >= int(s.min_level) and day >= int(s.min_day):
 			out.append(s)
 	return out

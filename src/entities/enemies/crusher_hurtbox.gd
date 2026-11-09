@@ -7,5 +7,5 @@ extends HurtboxComponent
 func take_hit(damage: float, from: Vector2, knockback: float, source: int = 0) -> void:
 	var crusher: VoidCrusher = get_parent() as VoidCrusher
 	if crusher != null:
-		damage = maxf(1.0, roundf(damage * crusher.damage_factor(from)))
+		damage = maxf(1.0, roundf(damage * maxf(crusher.damage_factor(from), armor_floor))) ## a heavy blow presses through the front plates (armor_floor)
 	super(damage, from, knockback, source)

@@ -113,6 +113,7 @@ func _run() -> void:
 	for i: int in 120:
 		await get_tree().process_frame
 	_player.global_position = _origin + _at
+	world.request_arena_boss(String(spec.id), _player.global_position)
 	while _boss == null:
 		await get_tree().physics_frame
 		if not get_tree().get_nodes_in_group("bosses").is_empty():

@@ -46,6 +46,10 @@ var _alert_route: PackedVector2Array = PackedVector2Array()
 var _alert_d: float = 0.0
 var _alert_sector: int = 2
 const ALERT_SPEED: float = 52.0
+var _fear_mode: int = 0 ## 0 the plan, 1 running for cover, 2 hidden indoors, 3 coming out again (`TownManager.fear_on`, the director's call)
+var _fear_route: PackedVector2Array = PackedVector2Array()
+var _fear_d: float = 0.0
+var _fear_wait: float = 0.0
 
 
 func setup(owner_town: TownManager, settler_id: String, fresh: bool) -> void:
@@ -219,7 +223,11 @@ func _process(delta: float) -> void:
 	elif not _talking:
 		global_position = placed.pos as Vector2
 	_alert_step(delta, placed.pos as Vector2)
-	visible = _arrive_t >= 0.0 or not (_spot == "rest" and (bool(placed.done) or String(plan.prev) == "rest")) ## asleep inside once they have walked in
+	var asleep: bool = _spot == "rest" and (bool(placed.done) or String(plan.prev) == "rest")
+	_fear_step(delta, placed.pos as Vector2, asleep)
+	visible = _arrive_t >= 0.0 or not asleep ## asleep inside once they have walked in
+	if _fear_mode == 2:
+		visible = false ## hiding indoors
 	var step: Vector2 = global_position - _last_pos
 	_moving = step.length() > 0.02
 	var cfg: Dictionary = _spot_cfg()
@@ -238,6 +246,8 @@ func _process(delta: float) -> void:
 			_sector = Adventurer.sector_of(_vec(spec.get("face_fire", [1, 0])))
 	_last_pos = global_position
 	var wanted: String = "walk" if _moving else _spot_clip(cfg, delta)
+	if _fear_mode == 1 and _moving and _has_clip("run"):
+		wanted = "run" ## running for cover
 	if _alert_mode == 2 and not _moving: ## on watch at the edge of the light: standing, sword at his side, looking out
 		wanted = "idle" if _has_clip("idle") else wanted
 		_sector = _alert_sector
@@ -427,6 +437,71 @@ func _alert_step(delta: float, plan_pos: Vector2) -> void:
 			_alert_mode = 0
 		return
 	global_position = _along(_alert_route, _alert_d)
+
+
+## Fear (docs/nacht_monster_konzept.md "verängstigte Bewohner"): while the dark is near (`TownManager.fear_on`) everybody who is out runs for their bed, hides there, and comes
+## out again some seconds after it is quiet. Valdric (`alert_watch`) keeps the watch instead; nobody who is asleep or talking, or still walking in, is touched. Cosmetic like the rest of
+## their walking: every peer computes it from the same flag, with a jitter per person so they do not move as one.
+func _fear_unit(key: String) -> float:
+	return float(("%s|%d|%s" % [sid, TimeManager.day, key]).hash() % 1000) / 1000.0
+
+
+func _fear_start(mode: int, target: Vector2) -> void:
+	_fear_route = town.walk_route(global_position, target)
+	if _fear_route.size() < 2:
+		_fear_route = PackedVector2Array([global_position, target])
+	_fear_d = 0.0
+	_fear_mode = mode
+
+
+func _fear_say(list_key: String) -> void:
+	var lines: Array = (NightRules.config().fear as Dictionary).get(list_key, []) as Array
+	if not lines.is_empty() and visible:
+		say(String(lines[int(_fear_unit(list_key + "s") * 1000.0) % lines.size()]), 2.4)
+
+
+func _fear_step(delta: float, plan_pos: Vector2, asleep: bool) -> void:
+	if town == null:
+		return
+	var cfg: Dictionary = NightRules.config().fear as Dictionary
+	var afraid: bool = town.fear_on and not bool(spec.get("alert_watch", false)) and _arrive_t < 0.0 and not _talking and _alert_mode == 0
+	var shelter: Vector2 = town.stand_point(spot_position("rest"))
+	match _fear_mode:
+		0:
+			if afraid and not asleep:
+				_fear_wait += delta
+				if _fear_wait >= _fear_unit("run") * float(cfg.jitter):
+					_fear_say("say")
+					_fear_start(1, shelter)
+			else:
+				_fear_wait = 0.0
+		2:
+			if afraid:
+				_fear_wait = 0.0
+			else:
+				_fear_wait += delta
+				if _fear_wait >= 3.0 + _fear_unit("out") * float(cfg.jitter) * 2.0:
+					_fear_wait = 0.0
+					if asleep:
+						_fear_mode = 0 ## it is their bedtime anyway
+					else:
+						_fear_start(3, plan_pos)
+						_fear_say("relief")
+		3:
+			if afraid:
+				_fear_start(1, shelter)
+	if _fear_mode == 0:
+		return
+	if _fear_mode == 2:
+		global_position = shelter
+		return
+	_fear_d += (float(cfg.run_speed) if _fear_mode == 1 else WALK_SPEED * 1.3) * delta
+	if _fear_d >= _length(_fear_route):
+		global_position = _fear_route[_fear_route.size() - 1]
+		_fear_mode = 2 if _fear_mode == 1 else 0
+		_fear_wait = 0.0
+		return
+	global_position = _along(_fear_route, _fear_d)
 
 
 # ---------- talking ----------

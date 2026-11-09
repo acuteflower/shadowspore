@@ -190,7 +190,7 @@ func _sense() -> void:
 			if player.sprinting:
 				alert *= float(_spec["sprint_multiplier"])
 				flee *= float(_spec["sprint_multiplier"])
-			noisy = player.attack.is_swinging() and global_position.distance_to(actor.global_position) < float(_spec["swing_range"])
+			noisy = player.attack.is_swinging() and global_position.distance_to(actor.global_position) < float(_spec["swing_range"]) * player.attack.noise_scale()
 		elif node.is_in_group("wildlife_hunters"):
 			alert = 95.0 if is_fawn() else 65.0
 			flee = 55.0 if is_fawn() else 25.0

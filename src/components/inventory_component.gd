@@ -267,7 +267,17 @@ func _accepts(kind: String, ref: Variant, stack: Dictionary) -> bool:
 		return true
 	if kind == "inv":
 		return _fits(int(ref), stack)
-	return int(stack["count"]) == 1 and Items.fits_slot(String(ref), stack)
+	return int(stack["count"]) == 1 and slot_open(String(ref)) and Items.fits_slot(String(ref), stack)
+
+
+## Talisman slots wake up with the milestones (LevelRewards): talisman_1 .. talisman_N are open once N slots are collected. Every other slot is always open.
+func slot_open(slot_name: String) -> bool:
+	if not slot_name.begins_with("talisman_"):
+		return true
+	var progress: ProgressComponent = get_parent().get_node_or_null("ProgressComponent") as ProgressComponent
+	if progress == null:
+		return true
+	return slot_name.trim_prefix("talisman_").to_int() <= int(LevelRewards.stats_at(progress.claimed)["talismans"])
 
 
 ## Left click: take the whole stack; with a full hand put it down (an empty slot), top up a stack of the same item (the rest stays in the
@@ -509,7 +519,7 @@ func _equip(from: int, slot_name: String) -> bool:
 	var stack: Dictionary = slots[from]
 	if slot_name == "":
 		slot_name = _slot_for(stack)
-	if not equipment.has(slot_name) or not Items.fits_slot(slot_name, stack):
+	if not equipment.has(slot_name) or not slot_open(slot_name) or not Items.fits_slot(slot_name, stack):
 		return false
 	var worn: Dictionary = equipment[slot_name]
 	if not _fits(from, worn):
@@ -542,7 +552,7 @@ func _unequip(slot_name: String, to: int) -> bool:
 func _slot_for(stack: Dictionary) -> String:
 	var fallback: String = ""
 	for slot_name: String in equipment:
-		if Items.fits_slot(slot_name, stack):
+		if slot_open(slot_name) and Items.fits_slot(slot_name, stack):
 			if equipment[slot_name].is_empty():
 				return slot_name
 			if fallback == "":

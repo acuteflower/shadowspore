@@ -35,8 +35,29 @@ func start(quest_id: String) -> void:
 	_check_flag(quest_id)
 
 
+## Dev: starts a quest again from its first step (also one that is running or finished): its step flags are forgotten.
+func restart(quest_id: String) -> void:
+	if not _quests.has(quest_id):
+		return
+	_active.erase(quest_id)
+	_done.erase(quest_id)
+	for raw: Variant in (_quests[quest_id] as Dictionary).steps as Array:
+		var flag: String = String((raw as Dictionary).get("flag", ""))
+		if flag != "":
+			_flags.erase(flag)
+	for flag_name: String in _flags.keys(): ## and whatever the story keeps for it under its name (`<quest>_...`)
+		if flag_name.begins_with(quest_id + "_"):
+			_flags.erase(flag_name)
+	start(quest_id)
+
+
 func is_active(quest_id: String) -> bool:
 	return _active.has(quest_id)
+
+
+## The id of the step a running quest is at ("" when it is not running).
+func active_step_id(quest_id: String) -> String:
+	return String(_step(quest_id).get("id", "")) if _active.has(quest_id) else ""
 
 
 func is_finished(quest_id: String) -> bool:

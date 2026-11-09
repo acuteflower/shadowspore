@@ -69,7 +69,7 @@ func _process(delta: float) -> void:
 		_wait = float(_config.get("canopy_tick", 0.33))
 
 static func air_blocked() -> bool:
-	return (is_instance_valid(current) and current._story_blocked) or InputManager.ui_blocking or InputManager.inventory_open or InputManager.menu_open or InputManager.map_open or InputManager.skills_open
+	return (is_instance_valid(current) and current._story_blocked) or InputManager.ui_blocking or InputManager.inventory_open or InputManager.menu_open or InputManager.map_open or (InputManager.skills_open or InputManager.progress_open)
 
 func view_rect() -> Rect2:
 	return get_viewport().get_canvas_transform().affine_inverse() * get_viewport_rect()

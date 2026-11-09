@@ -197,7 +197,7 @@ func _sense() -> void:
 			if player.sprinting:
 				alert *= float(_spec["sprint_multiplier"])
 				flee *= float(_spec["sprint_multiplier"])
-			noisy = player.attack.is_swinging() and global_position.distance_to(player.global_position) < float(_spec["swing_range"])
+			noisy = player.attack.is_swinging() and global_position.distance_to(player.global_position) < float(_spec["swing_range"]) * player.attack.noise_scale()
 		else:
 			var health: HealthComponent = actor.get_node_or_null("HealthComponent") as HealthComponent
 			if health != null and health.current <= 0.0:

@@ -27,6 +27,10 @@ const ATTACK_SHEET: Texture2D = preload("res://assets/characters/player_attack.p
 const ATTACK_FRAMES: int = 6
 const ATTACK_LEGS: int = 7
 const ATTACK_COLS: int = 3 * ATTACK_LEGS * ATTACK_FRAMES
+const HEAVY_SHEET: Texture2D = preload("res://assets/characters/player_heavy.png") ## tools/art_hero_heavy.py: the sword's heavy blow (charge, chop, recover)
+const HEAVY_BLOOD: Texture2D = preload("res://assets/characters/player_heavy_blood.png")
+const HEAVY_KEYS: int = 10
+const HEAVY_COLS: int = HEAVY_KEYS * ATTACK_LEGS ## per sector row: 7 leg variants x 10 keys
 const PICK_SHEET: Texture2D = preload("res://assets/characters/player_pick.png")
 const EAT_SHEET: Texture2D = preload("res://assets/characters/player_eat.png")
 const TOUCH_SHEET: Texture2D = preload("res://assets/characters/player_touch.png") ## tools/art_hero3d.py touchonly: both palms on a waystone statue
@@ -95,6 +99,8 @@ var _standby_last: int = -1
 var _standby_time: float = 0.0
 var _rig_standby_shoulder: PackedVector2Array
 var _rig_standby_hand: PackedVector2Array
+var _rig_heavy_shoulder: PackedVector2Array
+var _rig_heavy_hand: PackedVector2Array
 var _rig_shoulder: PackedVector2Array ## per sheet frame, relative to the feet (data/hero_rig.json)
 var _rig_hand: PackedVector2Array
 var _rig_attack_shoulder: PackedVector2Array ## the same for the attack sheet
@@ -423,6 +429,8 @@ func _on_inventory_changed() -> void:
 func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
 	_busy = false ## a hit interrupts picking
 	_cancel_standby()
+	if is_multiplayer_authority():
+		attack.interrupt_charge() ## ... and the charge of a heavy blow
 	var away: Vector2 = (global_position - from).normalized()
 	var flash: ShaderMaterial = _sprite.material as ShaderMaterial
 	flash.set_shader_parameter("flash", 1.0)
@@ -529,9 +537,12 @@ func _move(delta: float) -> void:
 		velocity = velocity.move_toward(Vector2.ZERO, friction * 2.0 * delta)
 		move_and_slide()
 		return
+	var charging: bool = _update_charge()
 	var dir: Vector2 = InputManager.move_vector()
+	if attack.is_heavy_swing():
+		dir = Vector2.ZERO ## the heavy blow is struck planted
 	var can_sprint: bool = bool(_surface.get("allow_sprint", true)) and not wounded ## wounded: no sprinting
-	var want_sprint: bool = InputManager.sprint_held() and can_sprint and dir != Vector2.ZERO and not attack.is_swinging() and not _busy
+	var want_sprint: bool = InputManager.sprint_held() and can_sprint and dir != Vector2.ZERO and not attack.is_swinging() and not _busy and not charging
 	if want_sprint and stamina.current > 0.0:
 		sprinting = stamina.drain(sprint_cost_per_sec, delta)
 	else:
@@ -540,18 +551,21 @@ func _move(delta: float) -> void:
 	if InputManager.blink_pressed() and blink.is_ready() and not _busy and bool(_surface.get("allow_blink", true)):
 		_try_blink()
 
-	stealth.sneaking = InputManager.sneak_held() and not sprinting and not _busy
+	stealth.sneaking = InputManager.sneak_held() and not sprinting and not _busy and not charging
 
 	if dir == Vector2.ZERO:
 		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
 	else:
 		var base_speed: float = sprint_speed if sprinting else (sneak_speed if stealth.sneaking else max_speed)
-		var speed: float = base_speed * float(_surface.get("speed", 1.0)) * _slow_factor() * (WOUND_SPEED if wounded else 1.0)
+		var speed: float = base_speed * float(_surface.get("speed", 1.0)) * _slow_factor() * (WOUND_SPEED if wounded else 1.0) * attack.charge_move_factor()
 		velocity = velocity.move_toward(dir * speed, acceleration * delta)
 	move_and_slide()
 
 	if attack.is_swinging():
 		facing = attack.aim_dir ## locked toward the swing
+		return
+	if charging:
+		facing = attack.aim_dir ## follows the cursor while the blow is charged
 		return
 	var in_combat: bool = attack.is_in_combat(1.5)
 	if in_combat and InputManager.using_mouse:
@@ -569,9 +583,30 @@ func _move(delta: float) -> void:
 		attack.attack(facing)
 
 
+## Owner, every physics frame: the right mouse button charges the weapon's secondary attack (the sword's heavy blow) and
+## lets it go on release. A menu taking the input, a dodge, a cutscene or a fall drops the charge. True while charging.
+func _update_charge() -> bool:
+	if not is_multiplayer_authority():
+		return false
+	var blocked: bool = _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0
+	if attack.is_charging():
+		if blocked or InputManager.blink_pressed():
+			attack.cancel_charge()
+			return false
+		var aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER) if InputManager.using_mouse else Vector2.ZERO
+		var still: bool = attack.charge_input(InputManager.secondary_held(), InputManager.secondary_down(), aim, get_physics_process_delta_time())
+		return still and attack.is_charging()
+	if blocked or not InputManager.secondary_pressed() or not attack.can_charge():
+		return false
+	var start_aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER) if InputManager.using_mouse else facing
+	sprinting = false ## the charge drops a sprint into a walk
+	attack.begin_charge(start_aim)
+	return attack.is_charging()
+
+
 ## Something owns her: a cutscene, an action, a fall (the rod cannot be cast then).
 func is_busy() -> bool:
-	return _busy or stumbling or fainting or intro != null or story_lock or attack.is_swinging()
+	return _busy or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging()
 
 
 ## Local player: picks toward `dir` (about a second, she stands still, the weapon is put away);
@@ -605,7 +640,7 @@ func _play_release_touch() -> void:
 ## Local player: eats what is in hotbar slot `slot` (a consumable), if that would do anything. The
 ## berry is used up when it reaches her mouth (EAT_USE_TIME); being hit before that stops it.
 func use_slot(slot: int) -> void:
-	if _busy or stumbling or attack.is_swinging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
+	if _busy or stumbling or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
 		return
 	var stack: Dictionary = inventory.slots[slot]
 	var def: Dictionary = Items.definition(stack)
@@ -620,7 +655,7 @@ func use_slot(slot: int) -> void:
 
 
 func _begin_action(kind: String, dir: Vector2, on_moment: Callable, moment_time: float) -> void:
-	if _busy or attack.is_swinging() or not is_multiplayer_authority():
+	if _busy or attack.is_swinging() or attack.is_charging() or not is_multiplayer_authority():
 		return
 	_set_focus(null)
 	_play_action.rpc(kind, dir)
@@ -744,6 +779,10 @@ func _load_rig() -> void:
 		_rig_attack_shoulder.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("attack_hand", []):
 		_rig_attack_hand.append(Vector2(float(point[0]), float(point[1])))
+	for point: Array in rig.get("heavy_shoulder", []):
+		_rig_heavy_shoulder.append(Vector2(float(point[0]), float(point[1])))
+	for point: Array in rig.get("heavy_hand", []):
+		_rig_heavy_hand.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("pick_shoulder", []):
 		_rig_pick_shoulder.append(Vector2(float(point[0]), float(point[1])))
 	for point: Array in rig.get("pick_hand", []):
@@ -795,7 +834,7 @@ func _cancel_standby() -> void:
 
 func _update_standby(delta: float, moving: bool) -> void:
 	var blocked: bool = moving or (fishing != null and fishing.anim != "") or health.current <= 0.0 or stealth.sneaking or _busy or story_lock or intro != null or fainting or stumbling or _is_submerged() or attack.is_in_combat(AttackComponent.OUT_OF_COMBAT)
-	if is_multiplayer_authority() and (InputManager.ui_blocking or InputManager.map_open or InputManager.skills_open or InputManager.move_vector() != Vector2.ZERO):
+	if is_multiplayer_authority() and (InputManager.ui_blocking or InputManager.map_open or (InputManager.skills_open or InputManager.progress_open) or InputManager.move_vector() != Vector2.ZERO):
 		blocked = true
 	if blocked:
 		_cancel_standby()
@@ -897,6 +936,17 @@ func _animate(delta: float) -> void:
 		if eating:
 			var mouth: Vector2 = _rig_eat_mouth[base + i].lerp(_rig_eat_mouth[base + i + 1], f)
 			_eat_fx.show_state(_busy_time, hand + Vector2(0.0, _sink), mouth + Vector2(0.0, _sink))
+	elif attack.heavy_key() >= 0.0 and not _rig_heavy_hand.is_empty():
+		## The heavy blow (charge, chop, recover) has its own sheet: 10 keys, legs planted or following the walk cycle.
+		var heavy: float = clampf(attack.heavy_key(), 0.0, float(HEAVY_KEYS - 1) - 0.001)
+		var hi: int = int(heavy)
+		var hf: float = heavy - float(hi)
+		var heavy_legs: int = 1 + clampi(int(_walk_time), 0, WALK_FRAMES - 1) if moving and not attack.is_heavy_swing() else 0
+		var heavy_base: int = _sector * HEAVY_COLS + heavy_legs * HEAVY_KEYS
+		_use_sheet(11)
+		_sprite.frame = heavy_base + (hi + 1 if hf >= 0.5 else hi)
+		hand = _rig_heavy_hand[heavy_base + hi].lerp(_rig_heavy_hand[heavy_base + hi + 1], hf)
+		shoulder = _rig_heavy_shoulder[heavy_base + hi].lerp(_rig_heavy_shoulder[heavy_base + hi + 1], hf)
 	elif attack.is_swinging() and not _rig_attack_hand.is_empty():
 		## The swing has its own sheet: upper body from the keyframe, legs planted while she stands and
 		## following the walk cycle while she moves.
@@ -968,7 +1018,7 @@ func show_emerge_frame(texture: Texture2D, frames: int, frame: int, at: Vector2,
 ## She trips (the story's footpath, `StumbleGuide`): the foot catches, the knee gives, she lands on her hands and knees, stays there a moment,
 ## pushes up and walks on. Owner only; every peer plays it (`_play_stumble`). Not while she is busy, in a cutscene or hurt to death.
 func begin_stumble() -> bool:
-	if stumbling or intro != null or story_lock or fainting or _busy or attack.is_swinging() or health.current <= 0.0 or not is_multiplayer_authority():
+	if stumbling or intro != null or story_lock or fainting or _busy or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or not is_multiplayer_authority():
 		return false
 	_play_stumble.rpc(_sector)
 	return true
@@ -1273,7 +1323,7 @@ func _use_sheet(sheet: int) -> void:
 	if sheet == _sheet:
 		return
 	_sheet = sheet
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null))))
 	match sheet:
 		1:
 			_sprite.texture = ATTACK_SHEET
@@ -1282,6 +1332,10 @@ func _use_sheet(sheet: int) -> void:
 		2, 3, 4, 5:
 			_sprite.texture = PICK_SHEET if sheet == 2 else (EAT_SHEET if sheet == 3 else (TOUCH_SHEET if sheet == 5 else PULL_SHEET))
 			_sprite.hframes = PICK_FRAMES * (EAT_VARIANTS if sheet == 3 else 1)
+			_sprite.vframes = 8
+		11:
+			_sprite.texture = HEAVY_SHEET
+			_sprite.hframes = HEAVY_COLS
 			_sprite.vframes = 8
 		10:
 			_sprite.texture = FISH_SHEET

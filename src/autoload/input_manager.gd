@@ -22,6 +22,9 @@ var map_open: bool = false
 ## Full-screen skill graph; kept true through its closing animation.
 var skills_open: bool = false
 
+## Full-screen progress window (levels and their rewards, P); kept true through its closing animation.
+var progress_open: bool = false
+
 ## True while the mouse was the last aiming device used; false once a gamepad takes over.
 var using_mouse: bool = true
 
@@ -36,11 +39,15 @@ func _input(event: InputEvent) -> void:
 
 
 func move_vector() -> Vector2:
-	return Vector2.ZERO if map_open or skills_open or freecam_open else map_pan_vector()
+	return Vector2.ZERO if map_open or (skills_open or progress_open) or freecam_open else map_pan_vector()
 
 
 func skills_pressed() -> bool:
 	return Input.is_action_just_pressed("skills")
+
+
+func progress_pressed() -> bool:
+	return Input.is_action_just_pressed("progress")
 
 
 func skills_center_pressed() -> bool:
@@ -71,15 +78,29 @@ func map_center_pressed() -> bool:
 
 
 func sprint_pressed() -> bool:
-	return not skills_open and Input.is_action_just_pressed("sprint")
+	return not (skills_open or progress_open) and Input.is_action_just_pressed("sprint")
 
 
 func sprint_held() -> bool:
-	return not skills_open and Input.is_action_pressed("sprint")
+	return not (skills_open or progress_open) and Input.is_action_pressed("sprint")
 
 
 func attack_pressed() -> bool:
 	return not ui_blocking and not build_open and not freecam_open and Input.is_action_pressed("action_primary")
+
+
+## Right mouse button / pad button: the weapon's secondary attack (the sword's heavy blow: hold to charge, let go to strike).
+func secondary_pressed() -> bool:
+	return not ui_blocking and not build_open and not map_open and not freecam_open and Input.is_action_just_pressed("action_secondary")
+
+
+func secondary_held() -> bool:
+	return not ui_blocking and not build_open and not map_open and not freecam_open and Input.is_action_pressed("action_secondary")
+
+
+## The raw button, also while a menu owns the input (the charge of a heavy blow is dropped then, not released).
+func secondary_down() -> bool:
+	return Input.is_action_pressed("action_secondary")
 
 
 ## Dev key: spawn an enemy at the cursor.
@@ -127,7 +148,7 @@ const HOTBAR_ACTIONS: Array[StringName] = [
 
 ## Number key 1-8 pressed this frame -> 0-7, else -1.
 func hotbar_pick() -> int:
-	if skills_open or build_open or freecam_open or item_keys_claimed:
+	if (skills_open or progress_open) or build_open or freecam_open or item_keys_claimed:
 		return -1
 	for i: int in 8:
 		if Input.is_action_just_pressed(HOTBAR_ACTIONS[i]):
@@ -147,11 +168,11 @@ func hotbar_step() -> int:
 
 
 func sneak_held() -> bool:
-	return not skills_open and not freecam_open and Input.is_action_pressed("sneak")
+	return not (skills_open or progress_open) and not freecam_open and Input.is_action_pressed("sneak")
 
 
 func blink_pressed() -> bool:
-	return not skills_open and not freecam_open and Input.is_action_just_pressed("blink")
+	return not (skills_open or progress_open) and not freecam_open and Input.is_action_just_pressed("blink")
 
 
 func aim_world_position() -> Vector2:

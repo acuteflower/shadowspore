@@ -1456,6 +1456,7 @@
    "tile": [499, 258],
    "level": 3,
    "clear_margin": 20,
+   "story": {"quest": "mornath", "knight_pillar": 1, "knight_offset": [2, 17], "hologram": [26, -44]},
    "boss": {"species": "boss_sky_cleaver", "pillar": 0, "barriers": [
     {"id": "south", "solid": [14, 8], "feathers": [[-38, 99], [-32, 96], [-26, 99], [-20, 96], [-14, 99], [-8, 96], [-2, 99], [4, 96]]},
     {"id": "west", "solid": [12, 10], "feathers": [[-148, -150], [-146, -144], [-148, -138], [-146, -132], [-148, -126], [-146, -120], [-148, -114], [-146, -108]]}

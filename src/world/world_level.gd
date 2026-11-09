@@ -11,6 +11,8 @@ const SKY_CLEAVER_SCENE: PackedScene = preload("res://src/entities/enemies/sky_c
 const CHUNK: int = 32 ## tiles per chunk side
 const STREAM_BUDGET_USEC: int = 2000 ## cooperative CPU preparation per frame
 const DETAIL_BUCKET: float = 64.0
+const GEN_PHASES: int = 5 ## phases 0-4 only read static inputs and build detached nodes: they run as one job on a worker thread
+const PREFETCH: int = 4 ## chunks whose worker job is started ahead (nearest first)
 const LOAD_RADIUS: int = 1 ## chunks around every player that are kept painted
 const UNLOAD_RADIUS: int = 2 ## farther chunks are dropped (the gap stops flicker at the border)
 const BORDER_WARP: float = 5.0 ## tiles; jitter that roughens the 4-tile lookup grid of the map
@@ -51,7 +53,6 @@ var _harvest_nodes: Dictionary = {} ## the same keys -> the CloverField / Fallen
 var _sdf: PackedByteArray ## baked coast: one byte per tile, 128 = coast, above = land
 var _outer_sdf: PackedByteArray ## exterior coast only: inland lakes carry no void rim/light
 var _rivers: WorldRivers
-var _arena_zones: Array[Dictionary] = [] ## boss arenas nobody has entered yet: {spec, poly}
 var _arena_phase: Dictionary = {} ## arena id -> the phase its boss fight restarts from after a wipe (set by `SkyCleaver.checkpoint_reached`, not saved)
 var _relief: Relief ## baked height levels (walls, ramps, stairs)
 var _start: Vector2i
@@ -62,6 +63,8 @@ var _stone_cells: Dictionary = {} ## tiles lying on the old flagstones: no trees
 var opening_over: bool = false
 var _cover_at: Vector2 = Vector2.ZERO ## the manhole cover (world px), where the story starts; zero = none baked
 var _building: ChunkBuild
+var _gen_pool: Array[PropGenerator] = [] ## forks of `_generator` for the worker jobs (each has its own cluster cache)
+var _gen_lock: Mutex = Mutex.new()
 var _paused_builds: Dictionary = {} ## Vector2i -> ChunkBuild: half-prepared chunks the stream moved away from; kept while still wanted
 var _pending_commit: ChunkBuild ## committed ground waiting one frame for its props (see `_finish_commit`)
 var night: NightDirector ## host: spawns and steers the creatures of the night
@@ -110,6 +113,11 @@ class ChunkBuild:
 	var clover_count: int = 0
 	var commit_index: int = 0 ## props of `chunk.things` already added to the tree by `_finish_commit`
 	var patches_seen: Array[Node] = [] ## Terrain.patches as this chunk last saw them (compared per candidate)
+	var job: Jobs.Job ## phases 0-4 (generator, ground, cliffs, prop nodes) run on a worker thread (Jobs); null = not started / sliced on the main thread
+	var beds_pending: Array[Dictionary] = [] ## forest beds that passed the worker checks; the surface patches decide on the main thread
+	var gen_ready: bool = false ## the job delivered: phases 0-4 are done, the build is the main thread's again
+	var filtered: bool = false ## the prepared props were checked against the live world (`_filter_prepared`)
+	var young: Dictionary = {} ## cell -> sapling record, applied to `_young` by `_filter_prepared`
 
 
 func _fill_ground() -> void:
@@ -174,6 +182,11 @@ func _fill_ground() -> void:
 	_generator.water_dist = func(at: Vector2) -> float: return _rivers.field_at(at).x
 	_generator.tree_free_cells = _stone_cells
 	_generator.berry_free_cells = _berry_free
+	var scenes: Array[String] = []
+	for plant: Variant in DataRegistry.table("plants").values(): ## the worker jobs instantiate these: load them (and their scripts) here first, see Jobs.warm
+		var path: String = String((plant as Dictionary).get("scene", ""))
+		if not path.is_empty() and not scenes.has(path): scenes.append(path)
+	Jobs.warm(scenes)
 	var wind: WorldWind = WorldWind.new()
 	wind.name = "WorldWind"
 	wind.setup(self)
@@ -196,7 +209,6 @@ func _fill_ground() -> void:
 	fallen_knight.position = Vector2(float(knight_tile[0]), float(knight_tile[1])) * 16 + Vector2(8,8)
 	add_child(fallen_knight)
 	_spawn_guards.call_deferred()
-	_watch_arenas.call_deferred()
 	if multiplayer.is_server() and not opening_over:
 		TimeManager.lock_at(0.0) ## day 1, 00:00: the opening is at night, the clock stands still until she reaches the town
 	TimeManager.day_started.connect(_age_young) ## every peer counts the days itself
@@ -362,44 +374,47 @@ func _add_arenas(clear: Dictionary) -> void:
 			prop["pos"] = [0, 0]
 			yard.setup([prop], "res://assets/props/arena/")
 			add_child(yard)
+		if spec.has("story"): ## the quest, the dead knight at the pillar and the hologram (ArenaStory)
+			var story: ArenaStory = ArenaStory.new()
+			story.name = "ArenaStory_%s" % String(spec.id)
+			add_child(story)
+			story.setup(self, spec, origin)
 
 
-## The boss of every arena that names one (data/ground.json "arenas[].boss" {species, pillar}) is not there until somebody steps onto the arena's floor
-## (the drawn polygon): the host watches for that four times a second and then summons it once (`_summon_arena_boss`). Not saved, so a fresh start of
-## the game hides it again.
-func _watch_arenas() -> void:
-	if not multiplayer.is_server():
+## The boss of an arena is not there on its own: the story calls it (`ArenaStory`: the knight at the pillar was inspected, or the hologram in the middle was
+## touched). Any peer asks, the host summons it once (`_summon_arena_boss`); while a boss of that arena exists nothing happens. Not saved.
+func request_arena_boss(arena_id: String, from: Vector2) -> void:
+	if multiplayer.is_server():
+		_host_summon_arena(arena_id, from)
+	else:
+		_rpc_request_arena_boss.rpc_id(1, arena_id, from)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_request_arena_boss(arena_id: String, from: Vector2) -> void:
+	if multiplayer.is_server():
+		_host_summon_arena(arena_id, from)
+
+
+func arena_boss_present(arena_id: String) -> bool:
+	for node: Node in get_tree().get_nodes_in_group("bosses"):
+		if node is SkyCleaver and (node as SkyCleaver).arena == arena_id and not node.is_queued_for_deletion():
+			return true
+	return false
+
+
+func _host_summon_arena(arena_id: String, from: Vector2) -> void:
+	if arena_boss_present(arena_id):
 		return
 	for spec: Dictionary in DataRegistry.table("ground").get("arenas", []) as Array:
-		if (spec.get("boss", {}) as Dictionary).is_empty():
-			continue
-		var origin: Vector2 = _arena_origin(spec)
-		var poly: PackedVector2Array = PackedVector2Array()
-		for point: Array in spec.poly as Array:
-			poly.append(origin + Vector2(float(point[0]), float(point[1])))
-		_arena_zones.append({"spec": spec, "poly": poly})
-	if _arena_zones.is_empty():
-		return
-	var timer: Timer = Timer.new()
-	timer.name = "ArenaWatch"
-	timer.wait_time = 0.25
-	timer.timeout.connect(_check_arenas)
-	add_child(timer)
-	timer.start()
+		if String(spec.id) == arena_id and not (spec.get("boss", {}) as Dictionary).is_empty():
+			_summon_arena_boss(spec, from)
+			return
 
 
 func _arena_origin(spec: Dictionary) -> Vector2:
 	var tile: Array = spec.tile as Array
 	return Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8)
-
-
-func _check_arenas() -> void:
-	for zone: Dictionary in _arena_zones.duplicate():
-		for player: Player in Player.all:
-			if player.health.current > 0.0 and Geometry2D.is_point_in_polygon(player.global_position, zone.poly as PackedVector2Array):
-				_arena_zones.erase(zone)
-				_summon_arena_boss(zone.spec as Dictionary, player.global_position)
-				break
 
 
 ## The boss flies in from beyond the screen: it spawns `arrival.distance` px past its pillar (seen from the one who stepped in, and farther if need be
@@ -439,15 +454,10 @@ func _summon_arena_boss(spec: Dictionary, trigger_at: Vector2) -> void:
 	node.checkpoint_reached.connect(func(p: int) -> void: _arena_phase[String(spec.id)] = maxi(p, int(_arena_phase.get(String(spec.id), 0))))
 
 
-## Nobody is left in the fight (everyone fell or left): the boss and its feathers go, the pillars stand again, and the next one to step onto the floor wakes it anew.
-func _reset_arena_boss(node: SkyCleaver, spec: Dictionary) -> void:
+## Nobody is left in the fight (everyone fell or left): the boss and its feathers go, the pillars stand again; the hologram in the middle (`ArenaStory`) calls it anew.
+func _reset_arena_boss(node: SkyCleaver, _spec: Dictionary) -> void:
 	if is_instance_valid(node):
 		node.queue_free()
-	var origin: Vector2 = _arena_origin(spec)
-	var poly: PackedVector2Array = PackedVector2Array()
-	for point: Array in spec.poly as Array:
-		poly.append(origin + Vector2(float(point[0]), float(point[1])))
-	_arena_zones.append({"spec": spec, "poly": poly})
 
 
 ## The opening (intro, spider gate, knight, crossroads, rescue) ends when she wakes up in the hut and the town begins: the story calls
@@ -500,6 +510,38 @@ func start_knight_meet(player: Player) -> void:
 	scene.name = "KnightMeetScene"
 	player.add_child(scene)
 	scene.start(player, quarry)
+
+
+func has_arena_story() -> bool:
+	for child: Node in get_children():
+		if child is ArenaStory:
+			return true
+	return false
+
+
+## Developer: starts the boss quest `mornath` again from its first step (the knight lies at the pillar, the hologram is gone), or with `jump` only puts her on the arena
+## floor in front of the east pillar. The quest is not part of the story yet: this is the only way to start it.
+func debug_mornath(player: Player, jump: bool) -> void:
+	if player == null or player.quests == null or not player.is_multiplayer_authority():
+		return
+	for child: Node in get_children():
+		if child is ArenaStory:
+			var story: ArenaStory = child as ArenaStory
+			if jump:
+				player.request_teleport(story.foot_point())
+			else:
+				player.quests.restart(story.quest_id)
+			return
+
+
+## She inspects the dead knight at the arena's pillar: the walk up, the search, the dialogue and the boss's entrance (MornathInspectScene). Local player only.
+func start_mornath_inspect(player: Player, story: ArenaStory) -> void:
+	if not player.is_multiplayer_authority() or player.get_node_or_null("MornathInspectScene") != null:
+		return
+	var scene: MornathInspectScene = MornathInspectScene.new()
+	scene.name = "MornathInspectScene"
+	player.add_child(scene)
+	scene.start(player, story)
 
 
 ## The meeting is over: the knight walks back to the hut and she follows (KnightWalkScene). A save that stopped there starts it again.
@@ -995,6 +1037,7 @@ func _stream(all: bool) -> void:
 	var best: Vector2i = Vector2i(-1, -1)
 	var best_d: int = 1 << 30
 	var wanted: Dictionary = {} ## the chunks round the players (loaded ones too); used to keep or drop paused builds
+	var missing: Array[Vector3i] = [] ## (squared distance, x, y) of every wanted chunk that is not loaded, for the worker prefetch
 	for center: Vector2i in centers:
 		var radius: int = LOAD_RADIUS
 		if is_instance_valid(editor_camera) and center == Vector2i(editor_camera.position / (16.0 * CHUNK)):
@@ -1005,11 +1048,16 @@ func _stream(all: bool) -> void:
 				wanted[c] = true ## (loaded ones too: the prune only looks at unloaded builds)
 				if _chunks.has(c) or c.x < 0 or c.y < 0 or c.x * CHUNK >= RegionMap.WORLD_TILES or c.y * CHUNK >= RegionMap.WORLD_TILES:
 					continue
-				if all:
-					_load_chunk(c)
-				elif dx * dx + dy * dy < best_d:
+				missing.append(Vector3i(dx * dx + dy * dy, c.x, c.y))
+				if not all and dx * dx + dy * dy < best_d:
 					best_d = dx * dx + dy * dy
 					best = c
+	if all:
+		if Jobs.threaded: ## the whole ring at once: all chunk jobs run in parallel, the loop below only collects them
+			for entry: Vector3i in missing:
+				_prefetch(Vector2i(entry.y, entry.z))
+		for entry: Vector3i in missing:
+			_load_chunk(Vector2i(entry.y, entry.z))
 	if not all:
 		# Builds nobody wants any more are dropped; a build the nearest target has overtaken waits in `_paused_builds` with its progress.
 		for paused: Vector2i in _paused_builds.keys():
@@ -1022,6 +1070,10 @@ func _stream(all: bool) -> void:
 		if best.x >= 0 and (_building == null or _building.cell != best):
 			if _building != null: _paused_builds[_building.cell] = _building
 			_building = _take_build(best)
+		if Jobs.threaded and not missing.is_empty(): ## the next few chunks are prepared by the workers while the nearest one is finished here
+			missing.sort()
+			for i: int in mini(PREFETCH, missing.size()):
+				_prefetch(Vector2i(missing[i].y, missing[i].z))
 		if _building != null and _pending_commit == null:
 			# Only the player's own chunk while it is not loaded at all (startup, teleport) is built at once; every other chunk, in view or not, uses the budget.
 			var deadline: int = 0 if best_d == 0 else frame_deadline
@@ -1100,6 +1152,15 @@ func _take_build(c: Vector2i) -> ChunkBuild:
 	return _begin_chunk(c)
 
 
+## Starts the worker job of chunk `c` (if it has no build yet): the build waits in `_paused_builds` with its job running.
+func _prefetch(c: Vector2i) -> void:
+	if _chunks.has(c) or _paused_builds.has(c) or (_building != null and _building.cell == c) or (_pending_commit != null and _pending_commit.cell == c):
+		return
+	var build: ChunkBuild = _begin_chunk(c)
+	_start_gen(build)
+	_paused_builds[c] = build
+
+
 func _begin_chunk(c: Vector2i) -> ChunkBuild:
 	var build: ChunkBuild = ChunkBuild.new()
 	build.cell = c
@@ -1109,18 +1170,93 @@ func _begin_chunk(c: Vector2i) -> ChunkBuild:
 	build.body = StaticBody2D.new()
 	build.chunk.node.add_child(build.body)
 	build.rng.seed = hash(Vector3i(c.x, c.y, _map.world_seed))
-	build.query = _generator.begin_chunk(Rect2i(c * CHUNK, Vector2i(CHUNK, CHUNK)))
 	build.custom_keys = edits.props.keys()
 	build.chunk.water_near = _rivers.near_water(c)
 	build.density = DataRegistry.get_entry("wind", "detail_density")
 	return build
 
 
+## Phases 0-4 (generator query, ground, cliffs, prop nodes) are one worker job; the main thread continues from phase 5.
+## `deadline` 0 waits for the job (or runs it right here when no worker has started it); without threads the old slicing is used.
 func _advance_chunk(build: ChunkBuild, deadline: int = 0) -> bool:
-	while build.phase < 10:
+	if build.phase < GEN_PHASES:
+		if build.job != null or Jobs.threaded:
+			_start_gen(build)
+			if deadline == 0:
+				Jobs.wait(build.job)
+			if not build.gen_ready:
+				return false
+		elif not _advance_to(build, deadline, GEN_PHASES):
+			return false
+	if not build.filtered:
+		_filter_prepared(build)
+	return _advance_to(build, deadline, 10)
+
+
+func _start_gen(build: ChunkBuild) -> void:
+	if build.job != null or build.phase >= GEN_PHASES:
+		return
+	build.job = Jobs.run(_gen_work.bind(build), _gen_done.bind(build), Jobs.Prio.NORMAL, _gen_discard.bind(build), build.cell)
+
+
+## (worker thread) Reads only what no one changes while chunks load and builds detached nodes.
+func _gen_work(build: ChunkBuild) -> Variant:
+	var generator: PropGenerator = _acquire_generator()
+	build.query = generator.begin_chunk(Rect2i(build.cell * CHUNK, Vector2i(CHUNK, CHUNK)))
+	_advance_to(build, 0, GEN_PHASES)
+	_release_generator(generator)
+	return build
+
+
+func _gen_done(_result: Variant, build: ChunkBuild) -> void:
+	build.gen_ready = true
+
+
+## (main thread) The chunk was dropped while its job was running or waiting for delivery.
+func _gen_discard(_result: Variant, build: ChunkBuild) -> void:
+	_free_build_nodes(build)
+
+
+func _acquire_generator() -> PropGenerator:
+	_gen_lock.lock()
+	var generator: PropGenerator = _gen_pool.pop_back() if not _gen_pool.is_empty() else null
+	_gen_lock.unlock()
+	if generator == null:
+		return _generator.fork()
+	generator.sync_inputs(_generator)
+	return generator
+
+
+func _release_generator(generator: PropGenerator) -> void:
+	_gen_lock.lock()
+	_gen_pool.append(generator)
+	_gen_lock.unlock()
+
+
+## (main thread, once the worker part is done) What needs the live world: a prop something else stands on or the town cleared in the
+## meantime is dropped, generated saplings are recorded, forest beds look at the surface patches.
+func _filter_prepared(build: ChunkBuild) -> void:
+	build.filtered = true
+	var kept: Array[WorldProp] = []
+	for thing: WorldProp in build.chunk.things:
+		if _things.has(thing.cell) or (_town_node != null and _town_node.cleared.has(thing.cell)):
+			thing.free()
+			continue
+		if build.young.has(thing.cell):
+			_young[thing.cell] = build.young[thing.cell]
+		kept.append(thing)
+	build.chunk.things = kept
+	for bed: Dictionary in build.beds_pending:
+		_add_forest_bed(build.chunk.node, bed.pos as Vector2, int(bed.variant), true)
+
+
+func _advance_to(build: ChunkBuild, deadline: int, last_phase: int) -> bool:
+	while build.phase < last_phase:
 		if deadline > 0 and Time.get_ticks_usec() >= deadline: return false
 		match build.phase:
 			0:
+				if build.query == null:
+					build.query = _generator.begin_chunk(Rect2i(build.cell * CHUNK, Vector2i(CHUNK, CHUNK)))
 				if not build.query.advance(deadline): return false
 				build.obstacles = build.query.outer.duplicate()
 				build.phase = 1
@@ -1153,7 +1289,8 @@ func _advance_chunk(build: ChunkBuild, deadline: int = 0) -> bool:
 				if String(spec.kind) == "stonebed":
 					_add_stone_bed(build.chunk.node, spec.pos as Vector2, int(spec.variant))
 				elif String(spec.kind) == "forestbed":
-					_add_forest_bed(build.chunk.node, spec.pos as Vector2, int(spec.variant))
+					if _forest_bed_ok(spec.pos as Vector2, int(spec.variant), false): ## (the surface patches are asked on the main thread, `_filter_prepared`)
+						build.beds_pending.append({"pos": spec.pos, "variant": spec.variant})
 				elif not edits.props.has(WorldEdits.key(spec.cell as Vector2i)):
 					_prepare_thing(build, spec.cell, String(spec.kind), int(spec.variant), spec)
 			4:
@@ -1241,8 +1378,7 @@ func _build_ground_row(build: ChunkBuild) -> void:
 
 
 func _prepare_thing(build: ChunkBuild, cell: Vector2i, kind: String, variant: int, extra: Dictionary = {}) -> void:
-	if _things.has(cell) or build.reserved.has(cell): return
-	if _town_node != null and _town_node.cleared.has(cell): return ## a foundation of the town removed it
+	if build.reserved.has(cell): return ## (what the live world holds there is checked by `_filter_prepared`)
 	var plant: Dictionary = DataRegistry.get_entry("plants", kind)
 	var radius: float = _generator._foot(plant, kind, variant) * float(extra.get("scale", 1.0))
 	var authored: Dictionary = edits.props.get(WorldEdits.key(cell), {})
@@ -1251,7 +1387,7 @@ func _prepare_thing(build: ChunkBuild, cell: Vector2i, kind: String, variant: in
 	if not _rivers.clear_for_prop(Vector2(float(offset[0]), float(offset[1])), radius * float(authored.get("scale", 1.0))): return
 	build.reserved[cell] = true
 	if extra.has("young"):
-		_young[cell] = {"age": int(extra.young), "variant": variant}
+		build.young[cell] = {"age": int(extra.young), "variant": variant}
 	build.chunk.things.append(_create_thing(cell, kind, variant, extra))
 
 
@@ -1309,6 +1445,12 @@ func _finish_commit(deadline: int = 0) -> void:
 
 ## Frees a build that never became live (its things and logs are not in the tree; a committed node is queued).
 func _free_build(build: ChunkBuild) -> void:
+	if build.job != null and Jobs.cancel(build.job):
+		return ## a worker is (or was) busy with it: the discard hook frees it once the worker has let go
+	_free_build_nodes(build)
+
+
+func _free_build_nodes(build: ChunkBuild) -> void:
 	for thing: WorldProp in build.chunk.things: thing.free()
 	for log_node: FallenLog in build.chunk.fallen_logs: log_node.free()
 	for field: CloverField in build.chunk.clover: field.free()
@@ -1324,6 +1466,7 @@ func _discard_chunk_build() -> void:
 	for paused: ChunkBuild in _paused_builds.values():
 		_free_build(paused)
 	_paused_builds.clear()
+	Jobs.drain() ## no worker may still read the relief or the edits when they change
 
 
 func _exit_tree() -> void:
@@ -1608,7 +1751,7 @@ func _add_stone_bed(parent: Node2D, at: Vector2, variant: int) -> void:
 
 
 ## True where a litter patch of this size may lie: on land, dry, level, off the old stones and the footpath.
-func _forest_bed_ok(at: Vector2, variant: int) -> bool:
+func _forest_bed_ok(at: Vector2, variant: int, check_patches: bool = true) -> bool:
 	var rx: float = PropGenerator.FOREST_BED_RX[variant]
 	if not _rivers.clear_for_prop(at, rx * 0.8) or not _relief.flat_around(at, rx * 0.55):
 		return false
@@ -1617,6 +1760,10 @@ func _forest_bed_ok(at: Vector2, variant: int) -> bool:
 		var cell: Vector2i = Vector2i((edge / 16.0).floor())
 		if not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
 			return false
+	return not check_patches or _forest_bed_patches_ok(at)
+
+
+func _forest_bed_patches_ok(at: Vector2) -> bool:
 	for patch_node: Node in Terrain.patches:
 		if String(patch_node.call("surface_at", at)) != "":
 			return false
@@ -1624,8 +1771,10 @@ func _forest_bed_ok(at: Vector2, variant: int) -> bool:
 
 
 ## The forest floor under a tree of a wood: litter, humus and moss, a decal on the ground below everything that stands on it.
-func _add_forest_bed(parent: Node2D, at: Vector2, variant: int) -> void:
-	if not _forest_bed_ok(at, variant): return
+func _add_forest_bed(parent: Node2D, at: Vector2, variant: int, checked: bool = false) -> void:
+	if checked:
+		if not _forest_bed_patches_ok(at): return
+	elif not _forest_bed_ok(at, variant): return
 	var bed: Sprite2D = Sprite2D.new()
 	bed.texture = FOREST_BED
 	bed.region_enabled = true

@@ -26,8 +26,9 @@ var _prepared: Array[Dictionary] = [] ## {node, material, children: [[child, mat
 ## Full-screen menus cover the quest branch and tutorial card.
 func _process(delta: float) -> void:
 	var skills: SkillTreeWindow = get_node_or_null("SkillTreeWindow") as SkillTreeWindow
+	var progress: ProgressWindow = get_node_or_null("ProgressWindow") as ProgressWindow
 	var pause: CanvasItem = get_node_or_null("PauseMenu") as CanvasItem
-	var covered: bool = $InventoryWindow.visible or $MapWindow.visible or (skills != null and skills.visible) or (pause != null and pause.visible) ## the Escape menu too
+	var covered: bool = $InventoryWindow.visible or $MapWindow.visible or (skills != null and skills.visible) or (progress != null and progress.visible) or (pause != null and pause.visible) ## the Escape menu too
 	var boss: BossBar = get_node_or_null("BossBar") as BossBar
 	if boss != null:
 		boss.set_covered(covered)
@@ -63,6 +64,7 @@ func bind(player: Node) -> void:
 	$InventoryWindow.bind(player.inventory, $Hotbar)
 	$MapWindow.bind(player)
 	$SkillTreeWindow.bind(player)
+	$ProgressWindow.bind(player)
 	var tags: StatusTags = StatusTags.new() ## burning and the like, above the left end of the health vine
 	tags.name = "StatusTags"
 	tags.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -189,6 +191,9 @@ func begin_intro() -> void:
 	var skills: SkillTreeWindow = get_node_or_null("SkillTreeWindow") as SkillTreeWindow
 	if skills != null and skills._owns_input:
 		skills._finish_close()
+	var progress: ProgressWindow = get_node_or_null("ProgressWindow") as ProgressWindow
+	if progress != null and progress._owns_input:
+		progress._finish_close()
 	_intro_active = true
 	_intro_parts.clear()
 	for child: Node in get_children():

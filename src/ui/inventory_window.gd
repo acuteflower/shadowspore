@@ -106,7 +106,7 @@ func _on_inventory_changed() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	if InputManager.inventory_pressed() and not InputManager.menu_open and not InputManager.map_open and not InputManager.skills_open and get_tree().get_first_node_in_group("board_window") == null:
+	if InputManager.inventory_pressed() and not InputManager.menu_open and not InputManager.map_open and not (InputManager.skills_open or InputManager.progress_open) and get_tree().get_first_node_in_group("board_window") == null:
 		_set_open(not _opening) ## (not while a town window hangs on the screen)
 	_open_t = move_toward(_open_t, 1.0 if _opening else 0.0, delta / (OPEN_SECONDS if _opening else CLOSE_SECONDS))
 	visible = _open_t > 0.0
@@ -332,7 +332,15 @@ func _draw_pendant(i: int, held: Dictionary, void_level: float) -> void:
 		strength += 0.4
 	VineStyle.glow(self, c, 17.0 if hovered else 12.0, glow_color, strength * p * (0.85 + 0.15 * sin(_time * 2.5 + i)))
 
-	if slot.kind == "equip": ## equipment: a rune ring, the slot name inside while empty
+	if slot.kind == "equip" and not _inventory.slot_open(String(slot.ref)): ## a talisman slot that has not woken yet: a sealed bud and the level that opens it
+		var need: int = LevelRewards.talisman_level(String(slot.ref).trim_prefix("talisman_").to_int())
+		VineStyle.ring(self, c, 12, Color(VineStyle.BARK_LIGHT, 0.55 * p), 0.4)
+		draw_circle(c, 5.0, Color(VineStyle.OUTLINE, 0.9 * p))
+		draw_circle(c + Vector2(0, -1), 3.0, Color(VineStyle.BARK_VOID_LIGHT.lerp(VineStyle.BARK_LIGHT, 0.4 - taken * 0.4), p))
+		draw_rect(Rect2(c.x, c.y - 1, 1, 1), Color(VineStyle.VOID_GLOW, (0.4 + 0.3 * sin(_time * 1.8 + i)) * p))
+		var seal: String = "STUFE %d" % need
+		PixelText.draw(self, seal, Vector2i(roundi(c.x) - PixelText.width(seal) / 2, roundi(c.y) + 16), Color(UiStyle.TEXT_DIM, 0.8 * p))
+	elif slot.kind == "equip": ## equipment: a rune ring, the slot name inside while empty
 		VineStyle.ring(self, c, 12, Color(glow_color, (0.9 if has_item else 0.45) * p), 1.0 if has_item else 0.5 + 0.2 * sin(_time * 2.0 + i))
 		if not has_item:
 			var short: String = String(DataRegistry.get_entry("equipment_slots", String(slot.ref)).get("short", ""))

@@ -178,7 +178,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_time += delta
 	_input_guard = maxf(0.0, _input_guard - delta)
-	if _input_guard <= 0.0 and _player.is_multiplayer_authority() and not InputManager.ui_blocking and not InputManager.menu_open and not InputManager.map_open and not InputManager.skills_open:
+	if _input_guard <= 0.0 and _player.is_multiplayer_authority() and not InputManager.ui_blocking and not InputManager.menu_open and not InputManager.map_open and not (InputManager.skills_open or InputManager.progress_open):
 		if InputManager.interact_pressed() or InputManager.move_vector().length() > 0.1:
 			request_stand()
 	if state == State.FREE: return

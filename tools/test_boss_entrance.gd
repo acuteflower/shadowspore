@@ -29,9 +29,14 @@ func _run() -> void:
 		await get_tree().physics_frame
 	if not get_tree().get_nodes_in_group("bosses").is_empty():
 		return _fail("a boss appeared outside the arena")
-	# onto the floor
+	# onto the floor: stepping in alone no longer wakes him, only the story does (knight / hologram -> request_arena_boss)
 	var inside: Vector2 = origin + Vector2(20, -40)
 	player.global_position = inside
+	for i: int in 60:
+		await get_tree().physics_frame
+	if not get_tree().get_nodes_in_group("bosses").is_empty():
+		return _fail("a boss appeared just because somebody stood on the floor")
+	world.request_arena_boss(String(spec.id), inside)
 	var boss: SkyCleaver
 	for i: int in 60:
 		await get_tree().physics_frame

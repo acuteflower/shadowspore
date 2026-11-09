@@ -81,6 +81,24 @@ func _init(zone: FastNoiseLite, sdf: PackedByteArray, relief: Relief, exclude: R
 	_plants = DataRegistry.table("plants")
 
 
+## A second generator with the same world inputs but its own cluster cache and random generator, for a worker thread
+## (`_cache` and `_cluster_rng` are scratch state of one query at a time). Every fork answers exactly like the original.
+func fork() -> PropGenerator:
+	var copy: PropGenerator = PropGenerator.new(_zone, _sdf, _relief, _exclude, _seed)
+	copy.sync_inputs(self)
+	return copy
+
+
+## Takes over the world inputs the level set on `source` (references: they are read-only while queries run).
+func sync_inputs(source: PropGenerator) -> void:
+	water_clear = source.water_clear
+	water_dist = source.water_dist
+	blocked_cells = source.blocked_cells
+	extra_props = source.extra_props
+	berry_free_cells = source.berry_free_cells
+	tree_free_cells = source.tree_free_cells
+
+
 ## Where a prop in `cell` stands (px, at its feet): a little off the middle so rows never look ruled.
 static func position_of(cell: Vector2i) -> Vector2:
 	var h: int = absi(hash(Vector2i(cell.x, cell.y * 7 + 3)))

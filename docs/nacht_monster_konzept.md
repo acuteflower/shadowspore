@@ -144,3 +144,22 @@ Stärke = 1 + 0.06 · (Gruppenlevel − 1) + 0.15 · Gesamtstärke
 ## 12. Änderung: keine festen Risse mehr (2026-11-05)
 
 Die festen, sichtbaren Nachtrisse (§4 Quelle 1, `NightCracks`, `CrackField`, `CrackSite`) sind entfernt. Stattdessen nutzen die Wesen ihre **eigene Geburtsanimation**: Die Spinne steigt mit `ShadowBirth` aus dem Boden (`emerge_on_spawn`), Lauscher und Brecher blenden mit einem Schattenfleck ein. Spawnpunkte sind zufällige freie, dunkle Punkte im Ring von 22–46 Tiles um die Spieler (65 %) oder nahe der Küste (35 %). Sperrzone und alles andere bleiben. Folgen: Patrouillen kehren manchmal zum Geburtsort zurück (`home_chance`), und beim Morgengrauen fliehen die Wesen von den Spielern weg in die Dunkelheit. Die Spawn-Quelle „Riss“ in den Abschnitten oben (§3, §4, §8, §11) ist damit überholt; „Land zurückgewinnen durch Versiegeln“ entfällt.
+
+
+## 13. Das lebendige System (2026-11-09)
+
+Die Nacht wird erzählt, nicht gewürfelt. Alles datengetrieben in `data/night.json`, rein host-seitig (`NightDirector`, reine Regeln in `NightRules`, Verhalten in `NightBehavior`). **Entscheidungen des Users:** kein Brennstoff-Verbrauch und nichts wird der Stadt genommen; verängstigte Bewohner, die sich verstecken, sind ausdrücklich gewollt; das Spielerlevel bleibt vorerst in der Nachtstärke (das Level-System wird danach überarbeitet).
+
+| Paket | Inhalt | Stelle |
+|---|---|---|
+| **A Mondrhythmus** | `moon`: Neumond = 1.3× Budget, mutigere Wesen, mehr Nebel; Vollmond = 0.85×, ängstlicher. `NightRules.moon_budget/moon_courage/moon_dark` aus `TimeManager.moon_phase()`. | `night_rules.gd` |
+| **B Vorzeichen** | Abends (ab 0.75) genau ein Banner: Sondernacht, sonst neue Stufe der Leiter, sonst Neumond. `omens`. | `_dusk_notice` |
+| **C Reizfeld / Spuren** | Sprinten, Schwingen, Bauen hinterlassen hörbare Spuren (`evidence`, 28 s, verschmelzen); Wesen im Hörradius laufen hin, mutige tasten sich ins Dämmerband. Ringlauf um die Basis, an der dünnen Seite länger (`ring_walk`). | `_evidence_tick`, `_pick_goal` |
+| **D Mut + Lichtverlauf** | Der äußere Rand (`dim_px` 34) jedes Lichtkreises ist ein Dämmerband: ein mutiges Wesen (eigenes Temperament + Rudel + Mond + dunkle Lücken − viele Lampen) betritt es gebremst, spürt 3,2 s und zieht sich zurück (`probe_cooldown`). Der Kern bleibt schmerzhaft. | `NightBehavior.limit/brave` |
+| **E Rudel, Späher, Rufer, Brecher** | Rudelgrößen laut Stufe; ein Späher schaut zuerst die Basis an (Berichtsdauer `scout_report_seconds`) und öffnet damit die Vorstöße; ein Lauscher kann mitten in der Nacht **rufen** (steht still, nach `delay` Vorstoß; stirbt er, bricht der Ruf ab); der Brecher rennt die schwächste Seite an. | `_try_call`, `_begin_attack` |
+| **F Gedächtnis der Basis** | 24 Sektoren um die Stadtmitte; Durchbrüche (+) und gehaltene Seiten (−) lenken Lücken-Wahl, Brecher und Ringlauf. Wird pro Nacht um `decay` vergessen und **gespeichert** (`"night"` in `SaveGame`). | `_memory`, `export_state` |
+| **G verängstigte Bewohner** | `TownManager.fear_on` (RPC + Join-Snapshot): bei Vorstoß, Wesen im Dämmerband oder ≥3 am Rand rennen die Bewohner zur Ruhestelle und verstecken sich, danach kommen sie vorsichtig heraus (`calm_seconds`). Valdric hält Wache, Geplauder schweigt. | `Settler`, `_fear_tick` |
+| **H Dramaturgie** | Beats `scouts`/`build`/`lull`/`call`/`peak`/`last_rush`; die Freigabekurve hat eine Flaute; Atempause, wenn Spieler unter 35 % Leben sind oder zu viele Wesen leben; letzter Ansturm kurz vor dem Morgen. | `window.release`, `stress`, `last_rush` |
+| **I Stufenleiter** | Nachtnummer = Tag: **Tasten** 0–2 (nur Spinnen, einzeln, keine Vorstöße), **Lauschen** 3–6 (+Lauscher, Späher, Vorstöße), **Druck** 7–11 (alle Arten, Rudel 2–3, Gedächtnis, letzter Ansturm), **Flut** 12+ (Rudel 2–4, bei Neumond ein Elite-Brecher). | `stages` |
+
+**Platzhalter:** alle Texte (Banner, Sprechblasen, `fear.say/relief`, Elite-/Neumond-Hinweise). Noch nicht gebaut: Reaktionen der Tiere auf Vorzeichen, Nebel/Augenpaare am Dämmerband, Valdrics Vorzeichen-Zeilen. Bewusst nicht gebaut: Brennstoffverbrauch, Zerstörung. Test: `tools/test_night.tscn --fixed-fps 60 --headless`.

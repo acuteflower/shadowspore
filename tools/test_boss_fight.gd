@@ -64,6 +64,7 @@ func _run() -> void:
 	for i: int in 30:
 		await get_tree().physics_frame
 	_player.global_position = _origin + Vector2(20, -40)
+	_world.request_arena_boss(String(spec.id), _player.global_position) ## the story (knight / hologram) calls him; stepping onto the floor no longer does
 	if not await _until(func() -> bool: return not get_tree().get_nodes_in_group("bosses").is_empty(), 120):
 		return _fail("no boss")
 	_boss = get_tree().get_nodes_in_group("bosses")[0] as SkyCleaver
@@ -217,6 +218,7 @@ func _run() -> void:
 	_player.health.heal_full()
 	await _wait(5)
 	_player.global_position = _origin + Vector2(20, -40)
+	_world.request_arena_boss(String(spec.id), _player.global_position)
 	if not await _until(func() -> bool: return not get_tree().get_nodes_in_group("bosses").is_empty(), 60 * 3):
 		return _fail("the arena did not wake again")
 	var again: SkyCleaver = get_tree().get_nodes_in_group("bosses")[0] as SkyCleaver

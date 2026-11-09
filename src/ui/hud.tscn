@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://src/ui/clock_vine.gd" id="14_clock"]
 [ext_resource type="Script" path="res://src/ui/map_window.gd" id="15_map"]
 [ext_resource type="Script" path="res://src/ui/skill_tree_window.gd" id="16_skills"]
+[ext_resource type="Script" path="res://src/ui/progress_window.gd" id="17_progress"]
 [ext_resource type="Shader" path="res://assets/shaders/damage_vignette.gdshader" id="11_dshader"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_dvig"]
@@ -83,6 +84,17 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("16_skills")
+
+[node name="ProgressWindow" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("17_progress")
 
 [node name="PauseMenu" type="Control" parent="."]
 visible = false

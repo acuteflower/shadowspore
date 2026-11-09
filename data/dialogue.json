@@ -1400,5 +1400,99 @@
     "text": "Mein Kopf sagt: Finger weg. Mein Bauch sagt: leg die Hände drauf. Wann hat mein Bauch zuletzt recht gehabt?"
    }
   ]
+ },
+ "mornath_inspect": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Noch ein Ritter. Dieselbe Rüstung wie bei Valdric, dasselbe Weinrot. Und wieder die schwarzen Adern."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Er hat sich an die Säule gelehnt, als wollte er nur kurz ausruhen. Die Hand liegt noch am Schwertgriff."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Das Pflaster hier ist zerkratzt, tiefe Rillen, als hätte etwas darüber gekratzt. Und die Federn in den Fugen... so groß wie mein Arm."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Was immer ihn erwischt hat, kam von oben."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Ich schau nur, ob er etwas bei sich trägt. Verzeih mir, Fremder."
+   }
+  ]
+ },
+ "mornath_again": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Das Bild in der Mitte ist wieder da, flackernd, mit Rissen im Licht. Als hätte der Platz sich an ihn erinnert."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Wenn ich die Hand darauf lege, ruft es ihn wohl noch einmal. Bereit sein sollte ich dafür."
+   }
+  ]
+ },
+ "mornath_end": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Er ist fort. Nur Federn und Staub... und es ist still."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Der Ritter löst sich auf. Das Schwarz in ihm löst sich auch. Er sieht jetzt friedlich aus."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Ich hab ihn nicht gekannt. Aber ich hoffe, du hörst mich: Er kommt nicht wieder."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Und in der Mitte flackert etwas, ein Abbild von ihm. Wer weiß, vielleicht brauche ich es noch."
+   }
+  ]
+ },
+ "mornath_cry": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Was war das für ein Schrei?!"
+   }
+  ]
+ },
+ "mornath_echo": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Nicht schon wieder von oben..."
+   }
+  ]
  }
 }

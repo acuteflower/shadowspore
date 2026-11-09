@@ -311,10 +311,322 @@ func _judgement_success(pillar: ArenaPillar) -> bool:
 	if not await _until(func() -> bool: return _fight.phase == 2, 60 * 6):
 		_fail("the finisher did not lead to the third phase (mode %d)" % _fight.mode)
 		return false
-	if not await _until(func() -> bool: return _boss.health_now() < 0.32 * _boss.max_health(), 60 * 4):
-		_fail("the finisher left the health at %f" % _boss.health_now())
+	print("judgement: broken in time after ", hits, " hits, third phase next")
+	return await _third_phase()
+
+
+## The start of the third phase: he flies to the middle, the wave throws everybody to the end of the floor and takes a quarter of the health (never the last point),
+## the scream turns the look and sets the floor and the last pillar on fire.
+func _third_phase() -> bool:
+	# a blow that cannot kill
+	_player.health.set_health(10.0)
+	_player.health.take_survivable(25.0, _origin, 0.0)
+	await _wait(3)
+	if not _check(absf(_player.health.current - 1.0) < 0.01, "a survivable blow left %f of 10 health" % _player.health.current):
 		return false
-	print("judgement: broken in time after ", hits, " hits, third phase next, health ", _boss.health_now())
+	_player.health.take_survivable(25.0, _origin, 0.0)
+	await _wait(3)
+	if not _check(absf(_player.health.current - 1.0) < 0.01, "a survivable blow killed or changed health %f" % _player.health.current):
+		return false
+	_player.health.heal_full()
+	if not await _until(func() -> bool: return _fight.mode == MornathFight.Mode.TRANSITION and _fight._final, 60 * 4):
+		_fail("the third phase's transition never began (mode %d)" % _fight.mode)
+		return false
+	_player.global_position = _boss.arena_middle() + Vector2(30, 14)
+	_player.health.heal_full()
+	await _wait(2)
+	var before: float = _player.global_position.distance_to(_boss.arena_middle())
+	if not await _until(func() -> bool: return _fight._t > 2.05, 60 * 4):
+		_fail("the transition's clock did not run")
+		return false
+	if not _check(_boss.puppet_pos.distance_to(_boss.arena_middle()) < 4.0, "he is not in the middle of the arena: %s" % _boss.puppet_pos):
+		return false
+	await _wait(60)
+	var after: float = _player.global_position.distance_to(_boss.arena_middle())
+	if not _check(after > before + 60.0, "the wave did not throw her to the end of the floor (%f -> %f)" % [before, after]):
+		return false
+	var left: float = _player.health.current
+	if not _check(absf(left - 75.0) < 0.6 and left >= 1.0, "a quarter of the health should be gone: %f" % left):
+		return false
+	print("third phase: pushed ", snappedf(before, 0.1), " -> ", snappedf(after, 0.1), " px, health ", left)
+	if not await _until(func() -> bool: return _fight._t > _fight._t3_scream + 1.7, 60 * 8):
+		_fail("the scream never came")
+		return false
+	if not _check(_boss.fury() > 0.99, "the look did not turn: fury %f" % _boss.fury()):
+		return false
+	var last: ArenaPillar = _boss.pillar(2)
+	if not _check(last != null and not last.broken and last.fury() > 0.99, "the last pillar does not burn"):
+		return false
+	var burning: int = 0
+	for node: Node in get_tree().get_nodes_in_group("ground_glow"):
+		var decal: GroundDecal = node as GroundDecal
+		if decal != null and decal.decal_id == _boss.arena + "_arena" and decal.fury() > 0.99:
+			burning += 1
+	if not _check(burning == 1, "the floor does not burn (%d decals)" % burning):
+		return false
+	if not await _until(func() -> bool: return _fight.mode != MornathFight.Mode.TRANSITION, 60 * 8):
+		_fail("the transition never ended")
+		return false
+	if not await _until(func() -> bool: return _boss.health_now() < 0.32 * _boss.max_health(), 60 * 2): ## cut when the card ends
+		_fail("the transition left the health at %f" % _boss.health_now())
+		return false
+	if not _check(_boss.health_now() < 0.32 * _boss.max_health(), "health after the card: %f" % _boss.health_now()):
+		return false
+	print("third phase: the fire burns (floor, last pillar, look), health ", _boss.health_now())
+	return await _third_phase_attacks()
+
+
+## The attacks of phase 3: the long rain (seven waves, each covering a part of the floor), burning, the dive that finds a player who stands still and the dive that
+## finds nobody (he is left open for longer).
+func _third_phase_attacks() -> bool:
+	var waves: Array = _fight._rain_waves_final()
+	if not _check(waves.size() == 7, "the long rain has %d waves" % waves.size()):
+		return false
+	var kinds: PackedStringArray = PackedStringArray()
+	for wave: Array in waves:
+		var cover: float = _fight.wave_coverage(String(wave[0]), int(wave[1]), float(wave[2]), wave[3] as Vector2)
+		kinds.append("%s %.2f" % [wave[0], cover])
+		if not _check(cover > 0.3 and cover < 0.8, "wave %s covers %f of the floor" % [wave[0], cover]):
+			return false
+	print("long rain: ", ", ".join(kinds))
+	# burning: a tick of damage every half second, nothing else happens to her, it can be put out
+	if not await _until(_idle, 60 * 30):
+		_fail("not idle before burning")
+		return false
+	_player.health.heal_full()
+	await _wait(3)
+	_player.effects.apply("burn", 0.0, 1.0, 0)
+	await _wait(6)
+	if not _check(_player.effects.has("burn"), "burn did not start"):
+		return false
+	var before: float = _player.health.current
+	await _wait(75)
+	if not _check(_player.health.current <= before - 3.0, "burning did not hurt: %f -> %f" % [before, _player.health.current]):
+		return false
+	_player.effects.clear("burn")
+	await _wait(4)
+	if not _check(not _player.effects.has("burn"), "burn could not be put out"):
+		return false
+	print("burn: ", before, " -> ", _player.health.current, " in 1.25 s")
+	# the dive finds a player who stands still: damage and fire
+	for round_name: String in ["hit", "miss"]:
+		if not await _until(_idle, 60 * 30):
+			_fail("not idle before the %s dive" % round_name)
+			return false
+		_player.health.heal_full()
+		_player.effects.clear("burn")
+		_player.global_position = _boss.arena_middle() + Vector2(70, 10)
+		await _wait(10)
+		_hurt = 0
+		_force(MornathFight.Act.DIVE, _player.global_position, Vector2.ZERO, int(_player.name))
+		var flags: Dictionary = {"burned": false}
+		if round_name == "miss":
+			if not await _until(func() -> bool: return bool(_fight._dive.get("committed", false)), 60 * 8):
+				_fail("the dive never reached her")
+				return false
+			_player.global_position += Vector2(0, -120) ## a blink out of the grab
+		var finished: bool = await _until(func() -> bool:
+			if _player.effects.has("burn"):
+				flags["burned"] = true
+			return _fight.mode == MornathFight.Mode.IDLE and _boss.state == SkyCleaver.State.PERCHED and _fight.act == MornathFight.Act.NONE, 60 * 30)
+		if not _check(finished, "the %s dive never ended (mode %d)" % [round_name, _fight.mode]):
+			return false
+		if round_name == "hit":
+			if not _check(_hurt >= 1 and bool(flags["burned"]), "the grab did not hurt and burn her (hurt %d, burned %s)" % [_hurt, flags["burned"]]):
+				return false
+			if not _check(not bool(_fight._dive["whiff"]), "a grab that hit counted as a miss"):
+				return false
+		else:
+			if not _check(_hurt == 0 and not bool(flags["burned"]), "the grab hit although she had gone (hurt %d)" % _hurt):
+				return false
+			if not _check(bool(_fight._dive["whiff"]), "a grab that found nobody did not leave him open"):
+				return false
+		print("dive ", round_name, ": hurt ", _hurt, ", burned ", flags["burned"])
+	# the long rain itself
+	if not await _until(_idle, 60 * 30):
+		_fail("not idle before the long rain")
+		return false
+	_player.health.heal_full()
+	_player.global_position = _boss.arena_middle() + Vector2(10, 10)
+	await _wait(10)
+	_hurt = 0
+	_force(MornathFight.Act.RAIN, Vector2.ZERO, Vector2.ZERO, 0)
+	if not await _until(func() -> bool: return _fight.mode == MornathFight.Mode.IDLE and _fight.act == MornathFight.Act.NONE and _boss.state == SkyCleaver.State.PERCHED, 60 * 40):
+		_fail("the long rain never ended")
+		return false
+	if not _check(_hurt >= 1, "the long rain did not hurt somebody who stood still"):
+		return false
+	print("long rain: hurt ", _hurt, " times")
+	return await _third_phase_new()
+
+
+## One act of phase 3 against a player who stands at `at`; `watch` is called every frame and the act ends when he is idle again.
+func _run_act(kind: int, at: Vector2, watch: Callable) -> bool:
+	if not await _until(_idle, 60 * 40):
+		_fail("not idle before act %d (mode %d)" % [kind, _fight.mode])
+		return false
+	_fight._gap = 99.0 ## (he must not choose an act of his own while she gets into place)
+	_fight.blaze.clear_all()
+	_player.health.heal_full()
+	_player.effects.clear("burn")
+	_player.global_position = at
+	await _wait(70) ## (the trail needs a second of her standing there)
+	_hurt = 0
+	_force(kind, _player.global_position, Vector2.ZERO, int(_player.name))
+	var done: bool = await _until(func() -> bool:
+		watch.call()
+		return _fight.mode == MornathFight.Mode.IDLE and _fight.act == MornathFight.Act.NONE and _boss.state == SkyCleaver.State.PERCHED, 60 * 40)
+	if not done:
+		_fail("act %d never ended (mode %d act %d)" % [kind, _fight.mode, _fight.act])
+	return done
+
+
+## The three new attacks (fire feathers, sky splinters, the brand mark), the burning rim and the last judgement.
+func _third_phase_new() -> bool:
+	var middle: Vector2 = _boss.arena_middle()
+	var flags: Dictionary = {"fires": 0, "burned": false, "marked": false, "locked": false}
+	# Glutfeld: three fields, the floor round the feather catches fire and sets her alight
+	var glut_watch: Callable = func() -> void:
+		flags["fires"] = maxi(int(flags["fires"]), _fight.blaze._fires.size())
+		if _player.effects.has("burn"):
+			flags["burned"] = true
+	if not await _run_act(MornathFight.Act.GLUT, middle + Vector2(55, 10), glut_watch):
+		return false
+	if not _check(int(flags["fires"]) >= 3 and bool(flags["burned"]), "fire feathers: %d fields, burned %s" % [flags["fires"], flags["burned"]]):
+		return false
+	print("glut: ", flags["fires"], " fields, she burned: ", flags["burned"])
+	# Himmelssplitter: five columns, a player who stands still is hit, the floor burns for a moment
+	flags["fires"] = 0
+	var split_watch: Callable = func() -> void:
+		flags["fires"] = maxi(int(flags["fires"]), _fight.blaze._fires.size())
+	if not await _run_act(MornathFight.Act.SPLITTER, middle + Vector2(-50, 30), split_watch):
+		return false
+	if not _check(_hurt >= 1 and int(flags["fires"]) >= 1, "sky splinters: hurt %d, fires %d" % [_hurt, flags["fires"]]):
+		return false
+	print("splitter: hurt ", _hurt, ", embers ", flags["fires"])
+	# Brandmal: she stands still and is hit by the burst; the second time she leaves the ring after the lock and is not
+	for round_name: String in ["stays", "runs"]:
+		flags["marked"] = false
+		flags["locked"] = false
+		flags["burned"] = false
+		var mark_watch: Callable = func() -> void:
+			if _player.effects.has("brandmark"):
+				flags["marked"] = true
+			if _player.effects.has("burn"):
+				flags["burned"] = true
+			if round_name == "runs" and not bool(flags["locked"]) and (_fight._mark.get("point", Vector2.INF) as Vector2).is_finite():
+				flags["locked"] = true
+				var away: Vector2 = Vector2(0, -140)
+				if not _boss.field.on_floor(_player.global_position + away):
+					away = Vector2(0, 140)
+				_player.global_position += away
+		if not await _run_act(MornathFight.Act.MARK, middle + Vector2(0, 40), mark_watch):
+			return false
+		if not _check(bool(flags["marked"]), "the brand mark never showed as an effect"):
+			return false
+		if round_name == "stays":
+			if not _check(_hurt >= 1 and bool(flags["burned"]), "the burst did not hurt and burn her (hurt %d)" % _hurt):
+				return false
+		else:
+			if not _check(bool(flags["locked"]) and _hurt == 0, "she left the ring and was hurt anyway (hurt %d, locked %s)" % [_hurt, flags["locked"]]):
+				return false
+		if not _check(not _player.effects.has("brandmark"), "the mark was not taken off"):
+			return false
+		print("mark ", round_name, ": hurt ", _hurt)
+	# the rim of the arena burns in the last fifth of his health
+	_fight._gap = 99.0 ## (no acts of his own: their fire would burn in the middle)
+	_fight.blaze.clear_all()
+	_player.effects.clear("burn")
+	_boss._health.set_health(_boss.max_health() * 0.15)
+	if not await _until(func() -> bool: return _fight._edge_lit, 60 * 3):
+		_fail("the rim did not catch fire at 15 % health")
+		return false
+	await _wait(60 * 2)
+	var rect: Rect2 = _boss.field.floor_rect()
+	var rim: Vector2 = Vector2.INF
+	var inner: Vector2 = Vector2.INF
+	var y: float = rect.position.y
+	while y < rect.end.y:
+		var x: float = rect.position.x
+		while x < rect.end.x:
+			var q: Vector2 = Vector2(x, y)
+			if _boss.field.on_floor(q):
+				if _fight.blaze.in_edge_band(q):
+					if not rim.is_finite() or q.distance_to(middle) < rim.distance_to(middle):
+						rim = q
+				elif not inner.is_finite() or q.distance_to(middle) < inner.distance_to(middle):
+					inner = q
+			x += 6.0
+		y += 6.0
+	if not _check(rim.is_finite() and inner.is_finite(), "no rim or inner point found"):
+		return false
+	_player.global_position = rim
+	await _wait(60 * 2)
+	if not _check(_player.effects.has("burn"), "standing on the burning rim did not set her alight (edge %f host %s at %s, player %s, band %s)" % [_fight.blaze._edge, _fight.blaze.host, rim, _player.global_position, _fight.blaze.in_edge_band(_player.global_position)]):
+		return false
+	_player.effects.clear("burn")
+	_player.global_position = inner
+	await _wait(60 * 3)
+	if not _check(not _player.effects.has("burn"), "she burns in the middle of the arena (at %s, band %s, edge %f, floor %f, fields %d, cold %d, left %f)" % [_player.global_position, _fight.blaze.in_edge_band(_player.global_position), _fight.blaze._edge, _fight.blaze._floor, _fight.blaze._fires.size(), _fight.blaze._cold.size(), _player.effects.left("burn")]):
+		return false
+	print("rim: burns at ", rim, ", not at ", inner)
+	# the last judgement
+	if not await _until(_idle, 60 * 40):
+		_fail("not idle before the last judgement")
+		return false
+	_player.health.heal_full()
+	_boss._health.take_damage(100000.0, _player.global_position, 0.0, int(_player.name))
+	if not await _until(func() -> bool: return _fight.mode == MornathFight.Mode.JUDGEMENT, 60 * 14):
+		_fail("the last judgement never began (mode %d)" % _fight.mode)
+		return false
+	var pillar: ArenaPillar = _boss.pillar(_fight._break_pillar)
+	if not _check(pillar != null and pillar.is_armed() and _fight._break_pillar == 2, "the last judgement is not on the last pillar"):
+		return false
+	if not _check(absf(pillar.max_integrity - 420.0) < 1.0 and absf(_fight.judge_total() - 22.0) < 0.01, "judgement II: pillar %f, time %f" % [pillar.max_integrity, _fight.judge_total()]):
+		return false
+	if not _check(_fight.blaze.floor_on() and _fight.blaze.edge_on(), "the floor does not burn in the last judgement"):
+		return false
+	await _wait(60 * 3)
+	var islands: Array = _fight.blaze._cold
+	if not _check(islands.size() >= 2, "only %d cold islands" % islands.size()):
+		return false
+	var island: Vector2 = (islands[0] as Dictionary)["c"] as Vector2
+	var hot_spot: Vector2 = middle + Vector2(0, 8)
+	if _fight.blaze.cold_at(hot_spot):
+		hot_spot = middle + Vector2(40, 8)
+	_player.global_position = hot_spot
+	_player.health.heal_full()
+	var burned_floor: bool = await _until(func() -> bool: return _player.effects.has("burn"), 60 * 3)
+	if not _check(burned_floor, "the burning floor did not set her alight in the last judgement"):
+		return false
+	_player.global_position = island
+	var put_out: bool = await _until(func() -> bool: return not _player.effects.has("burn"), 60 * 2)
+	if not _check(put_out and _fight.blaze.cold_at(island), "a cold island did not put the burning out"):
+		return false
+	print("judgement II: pillar ", pillar.max_integrity, ", time ", _fight.judge_total(), ", floor burns, ", islands.size(), " cold islands")
+	var hits: int = 0
+	while not pillar.broken and hits < 120:
+		pillar.take_hit(9.0, _player.global_position)
+		_player.health.heal_full()
+		hits += 1
+		await _wait(4)
+	if not _check(pillar.broken and not _fight.judge_failed, "the last pillar did not break (hits %d)" % hits):
+		return false
+	if not await _until(func() -> bool: return _fight.mode == MornathFight.Mode.DOWNED, 60 * 5):
+		_fail("he never fell after the last judgement (mode %d)" % _fight.mode)
+		return false
+	if not _check(_fight._last_stand and not _fight.blaze.floor_on() and _boss.health_floor() < 1.0, "the last stand is not set"):
+		return false
+	await _wait(60)
+	_boss._hurtbox.take_hit(40.0, _player.global_position, 0.0, int(_player.name))
+	await _wait(10)
+	if not _check(_fight.mode == MornathFight.Mode.DOWNED, "a blow on the last stand started a finisher (mode %d)" % _fight.mode):
+		return false
+	_boss._health.take_damage(100000.0, _player.global_position, 0.0, int(_player.name))
+	if not await _until(func() -> bool: return _boss._health.current <= 0.0, 60 * 2):
+		_fail("he could not be killed in the last stand")
+		return false
+	print("last stand: he fell and died")
 	print("BOSS FIGHT: ok (success)")
 	get_tree().quit(0)
 	return false

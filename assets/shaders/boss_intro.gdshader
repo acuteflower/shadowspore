@@ -27,6 +27,7 @@ uniform float shock = 0.0;
 uniform float ring = 0.0; // 0..1 how far the ring has run
 uniform float ring_on = 0.0;
 uniform float edge_heat = 0.0; // 0 violet .. 1 hot magenta-white lip on the bars
+uniform float hot = 0.0; // 0 cold violet .. 1 the card burns pink-violet (the last phase)
 
 #include "res://assets/shaders/map_veil.gdshaderinc"
 
@@ -130,5 +131,7 @@ void fragment() {
 		}
 	}
 
+	// the last phase: everything violet burns towards magenta-pink
+	col = mix(col, vec3(col.r * 1.12 + col.b * 0.22, col.g * 0.72, col.b * 0.9 + col.r * 0.18), hot);
 	COLOR = vec4(col, 1.0);
 }

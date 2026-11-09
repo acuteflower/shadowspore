@@ -111,6 +111,7 @@ var _rig_eat_hand: PackedVector2Array
 var _rig_eat_mouth: PackedVector2Array
 var _eat_fx: EatEffect
 var fishing: FishingComponent ## the rod (docs/fishing.md)
+var effects: StatusEffects ## burning and the like (data/status_effects.json)
 var _main_sheet: Texture2D
 var _sheet: int = 0 ## which sheet the sprite shows: 0 main, 1 sword swing, 2 picking, 3 eating, 4 pulling a root
 var _busy_kind: String = "pick" ## which one-second action runs while `_busy`
@@ -190,11 +191,16 @@ func _ready() -> void:
 	fishing.name = "FishingComponent"
 	fishing.set_multiplayer_authority(get_multiplayer_authority()) ## a child made in _ready does not inherit the owner (its own _ready needs it)
 	add_child(fishing)
+	effects = StatusEffects.new()
+	effects.name = "Effects"
+	effects.set_multiplayer_authority(get_multiplayer_authority())
+	add_child(effects)
 	_eat_fx = EatEffect.new()
 	add_child(_eat_fx)
 	_main_sheet = _sprite.texture
 	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", BLOOD_MAPS[0])
 	health.damaged.connect(_on_damaged)
+	health.ticked.connect(_on_ticked)
 	health.changed.connect(_update_wounded)
 	var world: Node = get_tree().get_first_node_in_group("world")
 	if world != null and world.has_method("starting_health_ratio"):
@@ -229,7 +235,15 @@ func _ready() -> void:
 			elif event_name == "finale:hut" and story_world is WorldLevel:
 				(story_world as WorldLevel).start_hut_finale(self)
 			elif event_name == "cabin:fight" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_cabin_spider(self))
+				(story_world as WorldLevel).start_cabin_spider(self)
+			elif event_name == "wagon:fight" and story_world is WorldLevel:
+				(story_world as WorldLevel).start_gustav_rescue(self, "fight")
+			elif event_name == "wagon:meet" and story_world is WorldLevel:
+				(story_world as WorldLevel).start_gustav_rescue(self, "meet")
+			elif event_name == "escort:gustav" and story_world is WorldLevel:
+				(story_world as WorldLevel).start_gustav_escort(self)
+			elif event_name == "welcome:gustav" and story_world is WorldLevel:
+				(story_world as WorldLevel).start_gustav_welcome(self))
 		var hud: Node = HUD_SCENE.instantiate()
 		_hud = hud
 		add_child(hud)
@@ -278,6 +292,9 @@ func _physics_process(delta: float) -> void:
 	attack.visible = not down and intro == null and not fainting and not stumbling
 	if down:
 		velocity = Vector2.ZERO
+		_set_focus(null)
+	elif launch_left > 0.0 and is_multiplayer_authority():
+		_step_launch(delta)
 		_set_focus(null)
 	elif intro != null or story_lock:
 		velocity = Vector2.ZERO ## the intro owns her: it places her and shows the frames
@@ -348,6 +365,40 @@ func request_teleport(to: Vector2) -> void:
 	_camera.reset_smoothing()
 
 
+## A boss throws her across the floor: she slides from where she stands to `target` in `seconds` (fast at first, slowing down, stopped by anything solid on
+## the way); she cannot act meanwhile. Sent to the one who owns her (`launch`), who moves her.
+var launch_left: float = 0.0
+var launch_total: float = 1.0
+var launch_from: Vector2 = Vector2.ZERO
+var launch_to: Vector2 = Vector2.ZERO
+
+
+func launch(target: Vector2, seconds: float) -> void:
+	_rpc_launch.rpc_id(get_multiplayer_authority(), target, seconds)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _rpc_launch(target: Vector2, seconds: float) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	_busy = false
+	_cancel_standby()
+	launch_from = global_position
+	launch_to = target
+	launch_total = maxf(seconds, 0.05)
+	launch_left = launch_total
+
+
+func _step_launch(delta: float) -> void:
+	launch_left = maxf(launch_left - delta, 0.0)
+	var k: float = clampf(1.0 - launch_left / launch_total, 0.0, 1.0)
+	var want: Vector2 = launch_from.lerp(launch_to, 1.0 - pow(1.0 - k, 3.0))
+	velocity = (want - global_position) / maxf(delta, 0.0001)
+	move_and_slide()
+	if launch_left <= 0.0:
+		velocity = Vector2.ZERO
+
+
 ## Cheat menu: full health (the host decides, so a client asks) and full stamina.
 func request_heal() -> void:
 	stamina.refill()
@@ -379,6 +430,11 @@ func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
 	if is_multiplayer_authority():
 		velocity += away * knockback
 		_shake = maxf(_shake, 3.0)
+
+
+## Everyone sees a small number in the colour of the burning (a tick of damage over time).
+func _on_ticked(amount: float) -> void:
+	DamageNumber.spawn_text(get_tree().current_scene, global_position + Vector2(randf_range(-6.0, 6.0), -46), str(roundi(amount)), Color("ff6ad8"))
 
 
 ## Everyone sees the green number.

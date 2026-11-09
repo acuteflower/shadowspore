@@ -1,5 +1,5 @@
 extends Node
-## The developer checkpoint "FERTIGE STADT" (`WorldLevel.debug_jump_town`): the town stands finished, Gustav is at his bench, the quest waits for the meeting. Run with `--fixed-fps 60`.
+## The developer checkpoint "FERTIGE STADT" (`WorldLevel.debug_jump_town`): the town stands finished, Gustav is at his bench, the quest waits at the pickaxe. Run with `--fixed-fps 60`.
 
 var _ok: bool = true
 
@@ -34,13 +34,8 @@ func _run() -> void:
 		_check(town.has_built(piece), "%s stands finished" % piece)
 	_check(town.built_ids("lamp_post").size() >= 2, "two lamp posts")
 	_check(town.residents.has("gustav") and town.settler_node("gustav") != null, "Gustav is there")
-	_check(String(quests.current().get("step_id", "")) == "meet_stranger", "the quest waits at the meeting (%s)" % String(quests.current().get("step_id", "")))
-	_check(quests.is_finished("rebuild_hut") and quests.is_finished("lumberjack") and quests.has_flag("built_workshop"), "the chapters before are done")
-	_check(player.inventory.has_item("sickle_basic") and player.inventory.has_item("pickaxe_basic") and player.inventory.has_item("axe_basic"), "the tools are in the bag")
-	var gustav: Settler = town.settler_node("gustav")
-	player.request_teleport(gustav.global_position + Vector2(24, 10))
-	await _frames(40)
-	var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	_check(box != null and box.is_active() or quests.has_flag("gustav_joined") or String(quests.current().get("step_id", "")) == "gustav_hello", "walking up to him starts the talk (%s)" % String(quests.current().get("step_id", "")))
+	_check(String(quests.current().get("step_id", "")) == "ws_pickaxe", "the quest waits at the pickaxe (%s)" % String(quests.current().get("step_id", "")))
+	_check(quests.is_finished("rebuild_hut") and quests.is_finished("lumberjack") and quests.is_finished("gustav_rescue") and quests.has_flag("built_workshop"), "the chapters before are done")
+	_check(player.inventory.has_item("sickle_basic") and player.inventory.has_item("axe_basic") and not player.inventory.has_item("pickaxe_basic"), "sickle and axe are in the bag, the pickaxe is still to be made")
 	print("TOWN JUMP: ", "ok" if _ok else "FAILED")
 	get_tree().quit(0 if _ok else 1)

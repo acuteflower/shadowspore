@@ -1,0 +1,21 @@
+{
+ "burn": {
+  "name": "VERBRENNEN",
+  "seconds": 4.0,
+  "tick": 0.5,
+  "damage_ratio": 0.02,
+  "min_damage": 2,
+  "extinguish": "water",
+  "color": "ff6ad8",
+  "hot": "ffd0f2"
+ },
+ "brandmark": {
+  "name": "BRANDMAL",
+  "seconds": 4.0,
+  "tick": 99.0,
+  "damage_ratio": 0.0,
+  "min_damage": 0,
+  "color": "ff4fd8",
+  "hot": "fff0fb"
+ }
+}

@@ -52,8 +52,12 @@ func _process(delta: float) -> void:
 # ---------------------------------------------------------------------------------- questions
 
 ## Nights only start once the town stands (the opening is told by the story, in daylight terms and at its own pace).
+## A story scene that spawns its own creatures (Gustav's escort) holds the director back: it stays silent while this is true.
+var story_hold: bool = false
+
+
 func active() -> bool:
-	if not multiplayer.is_server() or not bool(_world.opening_over):
+	if story_hold or not multiplayer.is_server() or not bool(_world.opening_over):
 		return false
 	var town: TownManager = _world.town()
 	return town != null and town.founded

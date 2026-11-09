@@ -25,6 +25,13 @@ const LATE_PORTRAITS: Dictionary = {
 	"FREMDER": "res://assets/ui/portrait_gustav.png",
 	"MAREN": "res://assets/ui/portrait_maren.png",
 }
+## Speakers with a baked speaking portrait: name plate text -> sheet description (`SpeechPortrait`, made by tools/art_gustav_portrait.py). They share one
+## instance per sheet, so the stranger and Gustav blink and talk the same. Each also stays in LATE_PORTRAITS as the still fallback.
+const TALKING_PORTRAITS: Dictionary = {
+	"GUSTAV": "res://data/gustav_portrait.json",
+	"FREMDER": "res://data/gustav_portrait.json",
+}
+var _talkers: Dictionary = {}
 const UNKNOWN_SHADER: Shader = preload("res://assets/shaders/unknown_portrait.gdshader")
 var _npc: TextureRect
 var _npc_ink: ShaderMaterial
@@ -185,6 +192,12 @@ func _process(delta: float) -> void:
 	_portrait.advance(delta)
 	var speaker: String = String((_lines[_page] as Dictionary).get("speaker", "ELLIE")).to_upper()
 	var art: Texture2D = _portrait_for(speaker)
+	var talker: SpeechPortrait = _talker_for(speaker)
+	if talker != null:
+		talker.speaking = _open >= 0.9 and _typed < float(String((_lines[_page] as Dictionary).text).length()) and not _closing
+		talker.talk_char = _portrait.talk_char
+		talker.advance(delta)
+		art = talker.frame()
 	_npc.visible = art != null
 	_portrait.visible = not _npc.visible and not LATE_PORTRAITS.has(speaker)
 	if _npc.visible:
@@ -194,6 +207,16 @@ func _process(delta: float) -> void:
 		_npc.size = DialogueArt.DISPLAY_SIZE
 		_npc.position = _portrait.position + Vector2(0, roundf(sin(_time * 1.6) * 0.6) * DialogueArt.PIXEL_SCALE)
 	queue_redraw()
+
+
+## Speakers with a baked speech sheet (mouth shapes and blinks): their frame is chosen from the letter being typed, like Ellie's.
+func _talker_for(speaker: String) -> SpeechPortrait:
+	if not TALKING_PORTRAITS.has(speaker):
+		return null
+	var key: String = String(TALKING_PORTRAITS[speaker])
+	if not _talkers.has(key):
+		_talkers[key] = SpeechPortrait.create(key)
+	return _talkers[key] as SpeechPortrait
 
 
 func _portrait_for(speaker: String) -> Texture2D:

@@ -502,7 +502,8 @@
    "reset": {"radius": 460, "after": 8.0},
    "phases": [
     {"break_at": 0.6667, "pillar": 1, "to": 0.64},
-    {"break_at": 0.3333, "pillar": 0, "to": 0.31, "judgement": true}
+    {"break_at": 0.3333, "pillar": 0, "to": 0.31, "judgement": true},
+    {"break_at": 0.1, "pillar": 2, "to": 0.0, "judgement": true}
    ],
    "barrier": {"delay": 0.9, "first": 0.7, "between": 1.0, "fly": 0.6, "stagger": 0.1, "damage": 20, "radius": 12, "lift": 30, "end": 3.9},
    "rain": {"lift": 26, "rise": 0.45, "waves": 3, "first_warn": 0.7, "wave_gap": 1.3, "warn": 1.2, "strip_step": 0.045, "strip": 24, "damage": 24, "knock": 90, "droop": 2.6},
@@ -513,6 +514,7 @@
    "rest": {"fall_time": 0.7, "pillar_hp": 70},
    "finisher": {"to": 0.64, "react": 1.1, "rise": 0.9, "rise_height": 30},
    "transition": {"lift": 64, "burst_at": 0.55, "corrupt_at": 0.95, "scream_at": 1.75, "rift_at": 2.05, "rift_time": 0.95, "title_at": 2.35, "cut_at": 3.75, "leave_at": 3.85, "end": 4.5, "push_radius": 200, "push_knock": 270, "push_damage": 2, "text": "DER HIMMEL REISST"},
+   "transition3": {"fly_time": 1.7, "hover_height": 64, "push_at": 1.9, "push_radius": 560, "push_fraction": 0.25, "push_seconds": 0.75, "push_margin": 10, "spread_at": 3.0, "screen_at": 3.3, "ignite_seconds": 1.4, "text": "DER HIMMEL BRENNT", "screen": {"scream_at": 1.5, "title_at": 1.8, "leave_at": 4.0, "end": 4.7, "hot": 1.0}},
    "rift": {"half_width": 4.5, "hurt_range": 11.5, "damage": 10, "knock": 200, "tick": 0.5, "breath_first": 15.0, "breath_min": 25.0, "breath_max": 30.0, "gap_warn": 1.1, "gap_open": 4.0, "gap_len": 78.0},
    "p2": {
     "gap": [0.9, 1.5],
@@ -531,7 +533,21 @@
     "cage": {"charge": 0.65, "lock_before": 0.25, "fall": 0.3, "close_after": 0.6, "close_time": 1.6, "outer": 92, "inner": 30, "gap": 40, "wall_half": 5, "damage": 30, "knock": 170, "burst_damage": 30, "burst_after": 0.2, "recover": 0.8},
     "blast": {"trigger_range": 62, "trigger_time": 0.8, "cooldown": 5.0, "radius": 84, "warn": 0.65, "damage": 20, "knock": 240, "recover": 0.75, "outer_inner": 92, "outer_radius": 152, "outer_after": 0.55, "outer_damage": 18}
    },
-   "judgement": {"time": 28.0, "pillar_hp": 240, "hp_per_extra": 0.7, "ring_radius": 150, "pulse_first": 3.0, "pulse_every": 5.0, "pulse_radius": 90, "pulse_warn": 1.0, "pulse_damage": 24, "pulse_knock": 220, "wreath_inner": 112, "wreath_outer": 140, "wreath_after": 0.5, "wreath_damage": 21, "fail_after": 1.4, "success_flash": 1.0, "dark": 0.5}
+   "p3": {
+    "gap": [0.55, 0.95],
+    "rotation": ["dive", "rain", "glut", "splitter", "dive", "mark", "rain", "glut", "dive", "splitter", "mark", "rain"],
+    "haste_below": 0.2,
+    "haste": 1.08,
+    "armour": {"shot": 0.7, "droop": 1.5, "grounded": 1.8},
+    "rain": {"lift": 26, "rise": 0.35, "waves": 7, "first_warn": 0.5, "wave_gap": 0.95, "warn": 0.9, "strip_step": 0.035, "strip": 24, "period": 84, "damage": 28, "knock": 100, "droop": 2.0, "puddle_damage": 4, "puddle_ticks": 4, "puddle_half": 17, "origins": [[0, 0], [-85, 40], [80, -60]]},
+    "dive": {"aim": 0.95, "speed0": 150, "speed": 400, "accel": 700, "turn": 3.4, "descend": 0.5, "grab_height": 16, "stand_height": 30, "catch": 34, "max_time": 2.6, "rise": 0.32, "zone_radius": 34, "damage": 36, "knock": 160, "burn": 5.0, "recover": 1.3, "whiff_recover": 2.4, "armour_hit": 1.5, "armour_whiff": 2.0},
+    "glut": {"charge": 0.7, "lock_before": 0.3, "throw_gap": 0.22, "count": 3, "per_extra": 1, "max": 5, "speed": 300, "radius": 26, "ignite": 0.9, "burn_seconds": 6.0, "scale": 0.6, "spread_min": 38, "spread_max": 92, "recover": 1.0},
+    "splitter": {"lift": 30, "rise": 0.4, "first": 0.8, "count": 5, "per_extra": 1, "max": 8, "step": 0.5, "warn": 0.9, "lag": 1.0, "radius": 30, "damage": 30, "knock": 140, "ember": 3.0, "ember_scale": 0.6, "droop": 1.8},
+    "mark": {"charge": 0.8, "total": 4.0, "lock_before": 1.2, "radius": 70, "damage": 34, "knock": 160, "burn": 5.0, "recover": 1.6},
+    "floor": {"edge_below": 0.2, "edge_width": 22, "edge_seconds": 1.6, "scale": 0.5, "burn_seconds": 1.6}
+   },
+   "judgement": {"time": 28.0, "pillar_hp": 240, "hp_per_extra": 0.7, "ring_radius": 150, "pulse_first": 3.0, "pulse_every": 5.0, "pulse_radius": 90, "pulse_warn": 1.0, "pulse_damage": 24, "pulse_knock": 220, "wreath_inner": 112, "wreath_outer": 140, "wreath_after": 0.5, "wreath_damage": 21, "fail_after": 1.4, "success_flash": 1.0, "dark": 0.5},
+   "judgement2": {"time": 22.0, "pillar_hp": 420, "hp_per_extra": 0.6, "ring_radius": 150, "pulse_first": 2.5, "pulse_every": 4.0, "pulse_radius": 90, "pulse_warn": 1.0, "pulse_damage": 26, "pulse_knock": 220, "wreath_inner": 112, "wreath_outer": 140, "wreath_after": 0.5, "wreath_damage": 23, "burn": 4.0, "fail_after": 1.4, "success_flash": 1.0, "dark": 0.58, "floor_seconds": 2.0, "downed_armour": 2.0, "scream_after": 14.0, "scream_radius": 120, "scream_damage": 24, "cold": {"count": 3, "distance": 185, "radius": 36, "shrink_every": 6.0, "shrink": 0.16, "min": 0.3}}
   },
   "bar_range": 300,
   "shake_radius": 240,

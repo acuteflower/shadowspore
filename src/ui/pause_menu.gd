@@ -214,6 +214,8 @@ func _build_items() -> void:
 			_add(0, "heading", "SPIELER")
 			_add(0, "button", "TITELKARTE ZEIGEN", "", {"action": "title_card"})
 			_add(0, "button", "HEILEN", "", {"action": "heal"})
+			if multiplayer.is_server() and _player is Player:
+				_add(0, "button", "GODMODE: %s" % ("AN" if (_player as Player).health.god_mode else "AUS"), "", {"action": "godmode"})
 			_add(0, "button", "AUF 5 HP SETZEN", "", {"action": "hurt5"})
 			if multiplayer.is_server():
 				_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
@@ -227,6 +229,7 @@ func _build_items() -> void:
 				_add(0, "heading", "STORY-SPRUNG")
 				_add(0, "button", "ZURÜCK MIT DER AXT", "", {"action": "return_home"})
 				_add(0, "button", "FERTIGE STADT", "", {"action": "town_jump"})
+				_add(0, "button", "GUSTAV GERETTET", "", {"action": "gustav_jump"})
 			if story_world != null and multiplayer.is_server() and multiplayer.get_peers().is_empty():
 				_add(0, "heading", "MINE")
 				for lvl: int in [1, 5, 10, 20]:
@@ -479,6 +482,15 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			town_world.debug_jump_town()
+		"gustav_jump":
+			var gustav_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+			if gustav_world == null or not gustav_world.debug_can_return_home():
+				_failed_flash = 2.5
+				return
+			_set_open(false)
+			_open_t = 0.0
+			visible = false
+			gustav_world.debug_jump_gustav()
 		"return_home":
 			var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if world == null or not world.debug_can_return_home():
@@ -526,6 +538,16 @@ func _run_action(action: String) -> void:
 		"heal":
 			if _player != null:
 				_player.call("request_heal")
+		"godmode": ## host only: damage, burn and kills do nothing to the local player
+			var god: Player = _player as Player
+			if god == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			god.health.god_mode = not god.health.god_mode
+			var keep_focus: int = _focus
+			_build_items()
+			if keep_focus >= 0 and keep_focus < _items.size() and _interactive(_items[keep_focus]):
+				_focus = keep_focus
 		"hurt5":
 			if _player != null:
 				_player.call("request_set_health", 5.0)

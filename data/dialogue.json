@@ -874,16 +874,6 @@
  },
  "town_intro": {
   "flag": "town_intro_done",
-  "give": [
-   {
-    "item": "sickle_basic",
-    "count": 1
-   },
-   {
-    "item": "pickaxe_basic",
-    "count": 1
-   }
-  ],
   "lines": [
    {
     "speaker": "ELLIE",
@@ -943,7 +933,7 @@
     "known_name": "VALDRIC",
     "mood": "",
     "title": "",
-    "text": "Und nimm das hier: eine Sichel für Fasern, eine Spitzhacke für Stein. Die Axt hast du ja schon."
+    "text": "Gestern Abend, weit im Osten: Holz, das splittert. Dann Klopfen. Dann nichts mehr. Vielleicht war es nur der Wind. Merk dir die Richtung."
    },
    {
     "speaker": "ELLIE",
@@ -961,55 +951,353 @@
    }
   ]
  },
- "gustav_hello": {
-  "flag": "gustav_joined",
-  "town_talk": "gustav",
+ "gustav_call": {
+  "flag": "gustav_call_done",
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Dein Licht brennt. Und da: hörst du das? Ganz leise, aus Osten."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Klopfen. Dreimal, dann Pause. Genau wie ich an den Deckel geklopft habe."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Jemand ist in Not. Ich kann hier nicht weg: Das Licht ist neu, und der Rand ist mein Posten. Jemand muss es halten, bis es sich selbst hält."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Du schaffst das. Du hast ein Schwert, eine Axt und einen Kampf in einer Holzfällerhütte überlebt. Geh nach Osten und hör auf das Klopfen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Und wenn es eine Falle ist?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Dann schleich. Und schlag zuerst. Komm zurück, bevor es dunkel wird."
+   }
+  ]
+ },
+ "gustav_rescue_a": {
+  "flag": "knows_gustav",
   "lines": [
    {
     "speaker": "FREMDER",
     "mood": "",
     "title": "",
-    "text": "Hoho! Ein Licht mitten im Nichts, und darunter ein Dach, das noch nach frischem Holz riecht! Wer hat das denn gebaut? Wo ist mein... Bleistift...",
-    "known_flag": "gustav_joined",
-    "known_name": "GUSTAV"
+    "text": "Ho! Der Himmel sei gelobt, ein Mensch! Und Beine hast du auch noch! Ist jemand verletzt? Du? Ich? Der Wagen? Meine Mädchen, die Räder?"
    },
    {
     "speaker": "ELLIE",
     "mood": "",
     "title": "",
-    "text": "Hinter deinem Ohr. Ich bin Ellie, und das ist meine Werkstatt. Also: unsere."
+    "text": "Alles gut. Du hast da was im Bart. Und hinterm Ohr."
    },
    {
     "speaker": "FREMDER",
     "mood": "",
     "title": "",
-    "text": "Hinterm Ohr! Natürlich! Gustav, Kleines, Zimmermann, Stellmacher, was du willst. Ich habe Scheunen gebaut, die stehen noch, wenn die Welt schon längst umgefallen ist.",
-    "known_flag": "gustav_joined",
-    "known_name": "GUSTAV"
-   },
+    "text": "Hinterm Ohr! Natürlich! Mein Bleistift! Du hast Augen wie ein Falke, Kleines. Gustav ist mein Name. Zimmermann, Stellmacher, was du willst."
+   }
+  ]
+ },
+ "gustav_rescue_b": {
+  "flag": "gustav_packed",
+  "lines": [
    {
     "speaker": "GUSTAV",
     "mood": "",
     "title": "",
-    "text": "Und das hier? Die Fuge hier hat jemand mit Liebe gesetzt. Nicht mit Verstand, aber mit Liebe. Das lässt sich lernen. Ich zeig es dir."
+    "text": "Seit Jahren ziehe ich von Dorf zu Dorf, und alle sind umgefallen. Dann hat mich dieses Ding erwischt, mitten auf dem Weg. Mein Rad ist hin, meine Achse auch."
    },
    {
     "speaker": "ELLIE",
     "mood": "",
     "title": "",
-    "text": "Du bleibst?"
+    "text": "Ich bin Ellie. Wir haben eine Hütte im Westen, ein Licht und einen Ritter, der dir die Hand schütteln wird. Vielleicht."
    },
    {
     "speaker": "GUSTAV",
     "mood": "",
     "title": "",
-    "text": "Mädel, ich bin seit Jahren von Dorf zu Dorf gezogen, und alle sind umgefallen. Ein Licht, ein Dach und jemand, der mich ansieht, als hätte ich eine Meinung: Ich bleibe!"
+    "text": "Ein Dach? Mit Fuge? Mädel, ich packe sofort. Nur das Nötigste: Hobel, Säge, Schlegel. Und die Kiste. Die Kiste kann ich nicht tragen. Ich trage sie trotzdem."
    },
    {
     "speaker": "GUSTAV",
     "mood": "",
     "title": "",
-    "text": "Such mich an der Werkbank, wenn du Bretter, Seil oder Werkzeug brauchst. Und setz dich ruhig kurz, du siehst aus wie drei Tage im Regen gestanden."
+    "text": "Der Wagen bleibt. Ein Stellmacher verlässt seinen Wagen nicht, aber der Wagen verlässt ihn. Lass uns gehen, bevor es dunkel wird."
+   }
+  ]
+ },
+ "gustav_welcome": {
+  "flag": "gustav_joined",
+  "give": [
+   {
+    "item": "sickle_basic",
+    "count": 1
+   }
+  ],
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Du bist zurück. Und du hast jemanden mitgebracht."
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Sag mal, schwitzt du da drin eigentlich nicht? Herr Blechmann, du brauchst einen Spund im Visier."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "..."
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Die Fuge hier hat jemand mit Liebe gesetzt. Nicht mit Verstand, aber mit Liebe. Das lässt sich lernen. Ein Dach, ein Licht und sonst nichts. Wo ist die Werkbank?"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Wir haben keine."
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Dann bauen wir eine. Ich brauche Holz, Steine und Fasern. Hier, meine Sichel, die schneidet Fasern aus dem Gras. Für Felsen brauchst du die Spitzhacke, die mache ich dir, sobald die Bank steht. Kiesel tun es für den Anfang."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ich richte dir eine Bettstatt am Feuer her. Willkommen, Gustav."
+   }
+  ]
+ },
+ "workshop_done": {
+  "flag": "workshop_done",
+  "town_talk": "gustav",
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Das Brett hast du schief genagelt, Kleines. Ich liebe es."
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Ab jetzt arbeite ich hier. Was du selbst kannst, stellst du an der Bank her: Bretter, Seil, Werkzeug. Was ich schmiede, dauert länger und braucht mehr Vertrauen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Und die Spitzhacke?"
+   },
+   {
+    "speaker": "GUSTAV",
+    "mood": "",
+    "title": "",
+    "text": "Zwei Holz und drei Stein. Probier die Bank aus. Und setz dich ruhig kurz, du siehst aus wie drei Tage im Regen gestanden."
+   }
+  ]
+ },
+ "pickaxe_made": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Gut gemacht, Wirbelwind."
+   }
+  ]
+ },
+ "knock_heard": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Da! Dreimal Holz auf Holz. Das kommt von Osten."
+   }
+  ]
+ },
+ "wagon_spotted": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Ein Wagen. Auf der Seite. Und was kratzt da dran?"
+   }
+  ]
+ },
+ "wagon_cheer_a": {
+  "lines": [
+   {
+    "speaker": "FREMDER",
+    "text": "Links, Kindchen, links!"
+   }
+  ]
+ },
+ "wagon_cheer_b": {
+  "lines": [
+   {
+    "speaker": "FREMDER",
+    "text": "Hinter dir!"
+   }
+  ]
+ },
+ "wagon_cheer_c": {
+  "lines": [
+   {
+    "speaker": "FREMDER",
+    "text": "Gib ihm eins für meine Räder!"
+   }
+  ]
+ },
+ "wagon_hurt": {
+  "lines": [
+   {
+    "speaker": "FREMDER",
+    "text": "Autsch, das war meiner Schulter nicht gesund!"
+   }
+  ]
+ },
+ "wagon_door": {
+  "lines": [
+   {
+    "speaker": "FREMDER",
+    "text": "Ho! Hoh! Die Tür bewegt sich!"
+   }
+  ]
+ },
+ "escort_start": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Zum Licht, Kleines. Immer zum Licht. Ich komme nach."
+   }
+  ]
+ },
+ "escort_wait_a": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Nicht so schnell! Die Kiste hat Gewicht!"
+   }
+  ]
+ },
+ "escort_wait_b": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Ich bin ein Zimmermann, kein Rennpferd!"
+   }
+  ]
+ },
+ "escort_wave_1": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Da vorne! Ich ducke mich. Du schaffst das."
+   }
+  ]
+ },
+ "escort_wave_2": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Von der Seite! Zwei!"
+   }
+  ]
+ },
+ "escort_rest": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Hier, Brot und Beeren. Iss, Kleines. Dann weiter."
+   }
+  ]
+ },
+ "escort_wave_3": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Das Licht! Da vorne ist das Licht! Lauf!"
+   }
+  ]
+ },
+ "escort_hit": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Aua! Mein Hintern!"
+   }
+  ]
+ },
+ "escort_hammer": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Nimm das!"
+   }
+  ]
+ },
+ "escort_arrive": {
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Das Licht. Ich zittere nicht, ich vibriere."
+   }
+  ]
+ },
+ "escort_dusk": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Es wird dunkel. Schneller."
+   }
+  ]
+ },
+ "escort_fell": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Zurück zu Gustav. Er wartet."
    }
   ]
  },

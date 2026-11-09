@@ -63,6 +63,15 @@ func bind(player: Node) -> void:
 	$InventoryWindow.bind(player.inventory, $Hotbar)
 	$MapWindow.bind(player)
 	$SkillTreeWindow.bind(player)
+	var tags: StatusTags = StatusTags.new() ## burning and the like, above the left end of the health vine
+	tags.name = "StatusTags"
+	tags.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	tags.offset_left = -198.0
+	tags.offset_right = -20.0
+	tags.offset_top = -72.0
+	tags.offset_bottom = -52.0
+	add_child(tags)
+	tags.bind(player.effects)
 	var boss_bar: BossBar = BossBar.new() ## the boss's health: `get_tree().call_group("boss_bar", "track", name, health)`
 	boss_bar.name = "BossBar"
 	add_child(boss_bar)

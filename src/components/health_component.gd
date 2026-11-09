@@ -6,6 +6,7 @@ extends Node
 signal changed(current: float, maximum: float)
 signal damaged(amount: float, from: Vector2, knockback: float)
 signal healed(amount: float) ## on every peer, for floating numbers
+signal ticked(amount: float) ## on every peer: damage over time (a status effect such as burn): no flash, no knock back, nothing interrupted
 signal died
 
 const OVERHEAL_SECONDS: float = 60.0 ## overheal stays this long after it was last topped up ...
@@ -21,6 +22,7 @@ var current: float = 0.0:
 		changed.emit(current, max_health)
 
 var floor_value: float = 0.0 ## the story can make a fight unkillable: damage never takes health below this
+var god_mode: bool = false ## dev cheat (host): no damage, no ticks, no kill
 var overheal_left: float = 0.0 ## seconds until overheal starts to drain (counted on every peer, set by heals)
 var last_attacker: int = 0 ## peer id of the player who hit last (host only), for credit on a kill
 var _invulnerable_until_msec: int = 0
@@ -36,7 +38,7 @@ func _ready() -> void:
 ## Host only.
 func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0) -> void:
 	var now: int = Time.get_ticks_msec()
-	if not multiplayer.is_server() or current <= 0.0 or now < _invulnerable_until_msec:
+	if not multiplayer.is_server() or god_mode or current <= 0.0 or now < _invulnerable_until_msec:
 		return
 	_invulnerable_until_msec = now + int(invulnerable_seconds * 1000.0)
 	if source != 0:
@@ -44,9 +46,30 @@ func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0
 	_notify.rpc(amount, from, knockback, maxf(current - amount, floor_value))
 
 
+## Host only: a blow that cannot kill (a story or boss moment): takes `amount`, but never more than all but one point, and ignores the grace period after a hit.
+## Whoever is already at one point is only knocked back.
+func take_survivable(amount: float, from: Vector2, knockback: float, source: int = 0) -> void:
+	if not multiplayer.is_server() or god_mode or current <= 0.0:
+		return
+	var taken: float = clampf(minf(amount, current - 1.0), 0.0, amount)
+	_invulnerable_until_msec = Time.get_ticks_msec() + int(invulnerable_seconds * 1000.0)
+	if source != 0:
+		last_attacker = source
+	_notify.rpc(taken, from, knockback, current - taken)
+
+
+## Host only: one tick of damage over time (`StatusEffects`): ignores the grace period, does not knock back, does not make her flinch (`ticked`, not `damaged`).
+func take_tick(amount: float, source: int = 0) -> void:
+	if not multiplayer.is_server() or god_mode or current <= 0.0 or amount <= 0.0:
+		return
+	if source != 0:
+		last_attacker = source
+	_notify_tick.rpc(amount, maxf(current - amount, floor_value))
+
+
 ## Host only: the end, whatever the invulnerability or the floor say (a judgement that falls on everybody).
 func kill(from: Vector2 = Vector2.ZERO, source: int = 0) -> void:
-	if not multiplayer.is_server() or current <= 0.0:
+	if not multiplayer.is_server() or god_mode or current <= 0.0:
 		return
 	if source != 0:
 		last_attacker = source
@@ -131,6 +154,16 @@ func _notify(amount: float, from: Vector2, knockback: float, new_value: float) -
 		return
 	current = new_value
 	damaged.emit(amount, from, knockback)
+	if new_value <= 0.0:
+		died.emit()
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _notify_tick(amount: float, new_value: float) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	current = new_value
+	ticked.emit(amount)
 	if new_value <= 0.0:
 		died.emit()
 

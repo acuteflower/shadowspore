@@ -79,6 +79,7 @@ var _arena_bounds: Rect2 = Rect2()
 var _rig_frozen: float = 0.0
 var _reset_asked: bool = false
 var _corruption: float = 0.0
+var _fury: float = 0.0
 
 @onready var _rig: SkyCleaverRig = $Rig
 @onready var _health: HealthComponent = $HealthComponent
@@ -656,6 +657,12 @@ func arena_rect() -> Rect2:
 	return _arena_bounds
 
 
+## The middle of the arena's floor: the sun sigil (data/ground.json arenas[].sigil, relative to the middle tile; the same default as tools/arena_design.py).
+func arena_middle() -> Vector2:
+	var at: Array = _arena_spec.get("sigil", [26, -48]) as Array
+	return arena_origin + Vector2(float(at[0]), float(at[1]))
+
+
 ## The feather barriers of the arena's ways down (data/ground.json arenas[].boss.barriers): [{id, solid [w, h], feathers [[x, y] relative to the middle tile]}].
 func barrier_spec() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -730,6 +737,22 @@ func set_corruption(value: float) -> void:
 
 func corruption() -> float:
 	return _corruption
+
+
+## 0..1: how far the look has turned to the third and last phase (pink-violet fire, bigger wings of light, many more floating fragments); the rig eases towards it.
+func set_fury(value: float) -> void:
+	_fury = value
+	_rig.fury = value
+
+
+func fury() -> float:
+	return _fury
+
+
+## A joining peer or a checkpoint: the last look at once.
+func set_fury_now(value: float) -> void:
+	_fury = value
+	_rig.set_fury_now(value)
 
 
 ## The fight takes over: from now on it is put at `pos` / `height` every frame.
@@ -824,7 +847,7 @@ func _play(player: AudioStreamPlayer2D, cue: String, volume_offset: float = 0.0,
 		_stream_cache[path] = load(path) as AudioStream
 	player.stream = _stream_cache[path] as AudioStream
 	player.volume_db = float((_def["audio"] as Dictionary)["volume_db"]) + volume_offset
-	player.pitch_scale = pitch * (lerpf(1.0, 0.8, _corruption) if player == _voice else 1.0) ## the voice of the second phase is deeper
+	player.pitch_scale = pitch * (lerpf(1.0, 0.8, _corruption) * lerpf(1.0, 0.86, _fury) if player == _voice else 1.0) ## the voice of the second phase is deeper, the third deeper still
 	player.play()
 
 

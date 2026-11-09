@@ -1,8 +1,7 @@
 class_name BossBar
 extends Control
 ## The health bar of a boss, top centre of the HUD. It is the big sibling of `VoidHealthBar`: the same crack of violet light
-## (here two pixels thick, longer, wilder), but unmistakably a boss: the name stands over it in gold at double size with
-## magenta eyes watching on both sides, thorned diamonds close the crack, a dotted rail with ticks runs beside it, and two
+## (here two pixels thick, longer, wilder), but unmistakably a boss: the name stands over it in gold in the game's pixel font (like the judgement's URTEIL), thorned diamonds close the crack, a dotted rail with ticks runs beside it, and two
 ## black fractures at one third and two thirds mark the phases. It tears open from the middle when a fight starts, jolts and
 ## flares when a phase falls, and shatters into shards when the boss dies.
 ## Use `get_tree().call_group("boss_bar", "track", "NAME", health_component)`; `release()` lets it fade without a death.
@@ -11,6 +10,9 @@ extends Control
 const W: int = 300 ## length of the whole crack in px
 const SIZE: Vector2 = Vector2(380, 52)
 const CRACK_Y: int = 34
+const TITLE_Y: int = 8 ## the name's top row (the pixel font at double size is 14 rows high, the crack lies below)
+const TITLE_SCALE: int = 2 ## the name is the pixel font at this scale (whole pixels)
+const TITLE_TRACK: int = 1 ## extra pixels (before scaling) between the letters
 const SMEAR: Color = Color("040109")
 const RAIL: Color = Color("4a2f9a")
 const GHOST: Color = Color("c0307f")
@@ -45,7 +47,6 @@ var _glow: Control
 var _fade: float = 1.0 ## 1 -> 0 while it withers
 var _cover: float = 1.0 ## the HUD dims it behind full-screen windows
 var _covered: bool = false
-var _title_node: VoidTitle ## the name in the black gooey face (docs/void_face.md)
 
 
 func _ready() -> void:
@@ -76,12 +77,6 @@ func track(title: String, health: HealthComponent) -> void:
 	_untrack()
 	_health = health
 	_title = title
-	if _title_node == null:
-		_title_node = VoidTitle.new()
-		add_child(_title_node)
-	_title_node.setup(title, "tiny", float(hash(title) % 7))
-	_title_node.set_ink(1.0)
-	_title_node.visible = false
 	_seed = int(hash(title) % 997)
 	_state = State.OPEN
 	_grow = 0.0
@@ -119,18 +114,6 @@ func _untrack() -> void:
 		if _health.died.is_connected(_on_died):
 			_health.died.disconnect(_on_died)
 	_health = null
-
-
-## The name condenses out of the smoke when the crack has torn open, stutters when a phase falls and crumbles upwards when the boss dies.
-## It stays small and well clear of the crack (its goo is held short so no drop reaches it).
-func _sync_title() -> void:
-	if _title_node == null:
-		return
-	_title_node.visible = _grow > 0.45 and _state != State.HIDDEN
-	var born: float = clampf((_grow - 0.45) / 0.4, 0.0, 1.0)
-	var dissolve: float = clampf(_dying * 1.1, 0.0, 1.0) if _state == State.DYING else 0.0
-	_title_node.set_look(born * 1.4, dissolve, clampf(_impact * 1.6, 0.0, 1.0), 0.45, 0.08)
-	_title_node.place(Vector2(roundf(SIZE.x * 0.5 - float(_title_node.ink_size.x) * 0.5), 3.0) + _shake())
 
 
 func _fraction() -> float:
@@ -229,7 +212,6 @@ func _process(delta: float) -> void:
 		s["pos"] = (s["pos"] as Vector2) + vel * delta
 	_cover = move_toward(_cover, 0.0 if _covered else 1.0, delta * 8.0)
 	modulate.a = _fade * _cover
-	_sync_title()
 	_shards = _shards.filter(func(s: Dictionary) -> bool: return float(s["life"]) > 0.0)
 	if modulate.a > 0.0 and visible:
 		if _rys.size() != W + 1:
@@ -328,7 +310,27 @@ func _shake() -> Vector2:
 
 func _title_pos(width_px: int) -> Vector2:
 	var glitch: float = float(int(hash(floori(_time * 20.0)) % 3) - 1) if _impact > 0.0 else 0.0
-	return Vector2(roundf(SIZE.x * 0.5 - width_px * 0.5 + glitch), 3.0)
+	return Vector2(roundf(SIZE.x * 0.5 - width_px * 0.5 + glitch), float(TITLE_Y))
+
+
+## The name in the game's own pixel font, gold like the judgement's word URTEIL: it fades in when the crack has torn open, flashes when a phase falls
+## (white-violet, with a jolt) and fades out when the boss dies.
+func _draw_title() -> void:
+	if _title == "" or _grow <= 0.45:
+		return
+	var born: float = clampf((_grow - 0.45) / 0.4, 0.0, 1.0)
+	var gone: float = clampf(_dying * 1.1, 0.0, 1.0) if _state == State.DYING else 0.0
+	var alpha: float = born * (1.0 - gone)
+	if alpha <= 0.0:
+		return
+	var tone: Color = GOLD.lerp(FLASH, clampf(_impact * 1.6, 0.0, 1.0))
+	var step: int = PixelText.ADVANCE + TITLE_TRACK
+	var width: int = maxi(_title.length() * step - TITLE_TRACK - 1, 0)
+	var at: Vector2 = _title_pos(width * TITLE_SCALE)
+	draw_set_transform(_shake(), 0.0, Vector2(TITLE_SCALE, TITLE_SCALE))
+	for i: int in _title.length(): ## letter by letter, so the spacing can be wider than the font's own
+		PixelText.draw(self, _title[i], Vector2i(int(at.x) / TITLE_SCALE + i * step, int(at.y) / TITLE_SCALE), Color(tone, alpha), Color(SMEAR, alpha))
+	draw_set_transform(_shake(), 0.0, Vector2.ONE)
 
 
 # --- drawing ------------------------------------------------------------------------------------------------
@@ -337,6 +339,7 @@ func _draw() -> void:
 	if modulate.a <= 0.0:
 		return
 	draw_set_transform(_shake(), 0.0, Vector2.ONE)
+	_draw_title()
 	var x0: int = _x0()
 	var y: int = CRACK_Y
 	var fill: int = _fill() if _state == State.OPEN else 0

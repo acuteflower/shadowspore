@@ -6,26 +6,94 @@
   "enabled": false,
   "role": "fisher",
   "home": "pier_wood",
-  "arrive": {"needs": "pier_wood", "delay": 10.0, "angle": 180.0, "distance": 300.0},
-  "spots": {
-   "work": {"of": "home", "at": [0, 8], "face": [0, 1], "clip": "work", "sound": "none"},
-   "fire": {"of": "center", "at": [-12, 80], "face": [1, 0], "clip": "idle"},
-   "rest": {"of": "home", "at": [0, 0]}
+  "arrive": {
+   "needs": "pier_wood",
+   "delay": 10.0,
+   "angle": 180.0,
+   "distance": 300.0
   },
-  "schedule": [[0.21, 0.55, "work"], [0.55, 0.62, "fire"], [0.62, 0.82, "work"], [0.82, 0.88, "fire"], [0.88, 0.21, "rest"]],
-  "chat": {"any": ["Das Wasser schläft nie. Hör genau hin.", "Lass der Schnur ihren Lauf. Der Strom zeigt dir, wann du ziehen musst.", "Solange die Wasseramsel taucht, ist das Ufer ruhig."]}
+  "spots": {
+   "work": {
+    "of": "home",
+    "at": [
+     0,
+     8
+    ],
+    "face": [
+     0,
+     1
+    ],
+    "clip": "work",
+    "sound": "none"
+   },
+   "fire": {
+    "of": "center",
+    "at": [
+     -12,
+     80
+    ],
+    "face": [
+     1,
+     0
+    ],
+    "clip": "idle"
+   },
+   "rest": {
+    "of": "home",
+    "at": [
+     0,
+     0
+    ]
+   }
+  },
+  "schedule": [
+   [
+    0.21,
+    0.55,
+    "work"
+   ],
+   [
+    0.55,
+    0.62,
+    "fire"
+   ],
+   [
+    0.62,
+    0.82,
+    "work"
+   ],
+   [
+    0.82,
+    0.88,
+    "fire"
+   ],
+   [
+    0.88,
+    0.21,
+    "rest"
+   ]
+  ],
+  "chat": {
+   "any": [
+    "Das Wasser schläft nie. Hör genau hin.",
+    "Lass der Schnur ihren Lauf. Der Strom zeigt dir, wann du ziehen musst.",
+    "Solange die Wasseramsel taucht, ist das Ufer ruhig."
+   ]
+  }
  },
  "gustav": {
   "name": "GUSTAV",
   "title": "ZIMMERMANN",
   "art": "gustav",
+  "takes_over": "story_gustav",
   "role": "craft",
   "home": "workshop",
   "arrive": {
    "needs": "workshop",
    "delay": 6.0,
    "angle": 38.0,
-   "distance": 240.0
+   "distance": 240.0,
+   "story": "gustav_joined"
   },
   "spots": {
    "work": {
@@ -78,6 +146,18 @@
     ],
     "clip": "sit",
     "fallback": "fire"
+   },
+   "camp": {
+    "of": "center",
+    "at": [
+     -20,
+     92
+    ],
+    "face": [
+     1,
+     0
+    ],
+    "clip": "idle"
    }
   },
   "schedule": [
@@ -172,8 +252,39 @@
    "bench": [
     "Fünf Minuten sitzen. Die Bank hast du gut gebaut.",
     "Siehst du das Licht an den Dächern? So soll es aussehen."
+   ],
+   "camp": [
+    "Ohne Bank wird kein Holz zu Brettern. Aber die Hände kribbeln schon.",
+    "Hier, setz dich zum Feuer. Plane macht man im Stehen, Brote im Sitzen."
    ]
-  }
+  },
+  "schedule_camp": [
+   [
+    0.29,
+    0.56,
+    "camp"
+   ],
+   [
+    0.56,
+    0.62,
+    "fire"
+   ],
+   [
+    0.62,
+    0.8,
+    "camp"
+   ],
+   [
+    0.8,
+    0.88,
+    "fire"
+   ],
+   [
+    0.88,
+    0.29,
+    "camp"
+   ]
+  ]
  },
  "valdric": {
   "name": "VALDRIC",
@@ -324,15 +435,38 @@
      "Ein Lichtpfosten. Das Licht trägt weiter, als man denkt.",
      "Stell ihn dahin, wo du abends gern stehst."
     ],
-    "build_workshop": [
-     "Eine Werkstatt ruft Handwerker. Man hört das Hämmern weit.",
-     "Bau sie gut, dann kommt jemand."
+    "rescue_valdric": [
+     "Hörst du es auch? Von Osten. Komm her."
     ],
-    "meet_stranger": [
-     "Siehst du den Fremden am Licht? Geh hin, er beißt nicht."
+    "rescue_call": [
+     "Geh nach Osten. Hör auf das Klopfen."
     ],
-    "gustav_hello": [
-     "Sprich mit ihm. Handwerker sind ehrliche Leute."
+    "follow_knocks": [
+     "Dreimal, dann Pause. Folge dem Klopfen."
+    ],
+    "kill_wagon_spider": [
+     "Schlag zuerst. Aber schleich dich erst heran."
+    ],
+    "free_gustav": [
+     "Wer eingesperrt ist, klopft nicht ohne Grund."
+    ],
+    "escort": [
+     "Bring ihn zum Licht. Ich warte am Feuer."
+    ],
+    "welcome": [
+     "Du bist zurück. Sprich mit uns beiden."
+    ],
+    "ws_gather": [
+     "Holz, Kiesel, Fasern. Die Sichel schneidet das Gras, das Holz kommt vom Baum."
+    ],
+    "ws_build": [
+     "Eine Werkstatt ruft Handwerker. Bau sie, wo das Licht hinreicht."
+    ],
+    "ws_movein": [
+     "Er wartet an der neuen Bank."
+    ],
+    "ws_pickaxe": [
+     "Probier die Werkbank. Gustav zeigt es dir."
     ]
    },
    "spot": {

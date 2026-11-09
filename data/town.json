@@ -588,6 +588,7 @@
   },
   "workshop": {
    "name": "WERKSTATT",
+   "needs_resident": "gustav",
    "category": "craft",
    "texture": "workshop",
    "frame": [

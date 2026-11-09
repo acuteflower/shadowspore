@@ -18,6 +18,8 @@ const WARM_BUDGET_USEC: int = 2200
 
 var host: bool = false
 var damage_scale: float = 1.0
+var hurt_total: int = 0 ## host: how many times a zone, a flight or a cage has hurt somebody (the fight asks whether a grab hit anyone)
+var blaze: FireArena ## the fire and light of the third phase (set by the fight); cleared with the field
 var time_scale: float = 1.0 ## the fight's haste: this node's clock runs this much faster than real time
 var _clock: float = 0.0
 var _zones: Array[Dictionary] = []
@@ -115,6 +117,11 @@ func now() -> float:
 	return _clock
 
 
+## The rectangle the floor mask covers.
+func floor_rect() -> Rect2:
+	return Rect2(_mask_origin, Vector2(float(_mask_w), float(_mask_h)))
+
+
 ## True where the stone floor of the arena is (what the warnings and the damage are cut to).
 func on_floor(point: Vector2) -> bool:
 	var x: int = int(floorf(point.x - _mask_origin.x))
@@ -128,21 +135,21 @@ func on_floor(point: Vector2) -> bool:
 
 
 ## A lane (a segment with a half width). `warn`/`hit` are on `now()`'s clock; `ticks` are further moments of damage (a lingering zone).
-func add_lane(a: Vector2, b: Vector2, half: float, warn: float, hit: float, damage: float, knock: float = 80.0, kind: int = 0, ticks: PackedFloat32Array = PackedFloat32Array(), patch: Vector2i = Vector2i.ZERO, hold: float = 0.16) -> void:
-	_add_zone(0, a, b, half, 0.0, warn, hit, damage, knock, kind, ticks, patch, hold)
+func add_lane(a: Vector2, b: Vector2, half: float, warn: float, hit: float, damage: float, knock: float = 80.0, kind: int = 0, ticks: PackedFloat32Array = PackedFloat32Array(), patch: Vector2i = Vector2i.ZERO, hold: float = 0.16, burn: float = 0.0) -> void:
+	_add_zone(0, a, b, half, 0.0, warn, hit, damage, knock, kind, ticks, patch, hold, burn)
 
 
 ## A disc or a ring (`inner` > 0) round `centre`.
-func add_ring(centre: Vector2, outer: float, inner: float, warn: float, hit: float, damage: float, knock: float = 80.0, kind: int = 0, ticks: PackedFloat32Array = PackedFloat32Array(), patch: Vector2i = Vector2i.ZERO, hold: float = 0.16) -> void:
-	_add_zone(1, centre, Vector2.ZERO, outer, inner, warn, hit, damage, knock, kind, ticks, patch, hold)
+func add_ring(centre: Vector2, outer: float, inner: float, warn: float, hit: float, damage: float, knock: float = 80.0, kind: int = 0, ticks: PackedFloat32Array = PackedFloat32Array(), patch: Vector2i = Vector2i.ZERO, hold: float = 0.16, burn: float = 0.0) -> void:
+	_add_zone(1, centre, Vector2.ZERO, outer, inner, warn, hit, damage, knock, kind, ticks, patch, hold, burn)
 
 
-func _add_zone(type: int, a: Vector2, b: Vector2, w: float, inner: float, warn: float, hit: float, damage: float, knock: float, kind: int, ticks: PackedFloat32Array, patch: Vector2i, hold: float) -> void:
+func _add_zone(type: int, a: Vector2, b: Vector2, w: float, inner: float, warn: float, hit: float, damage: float, knock: float, kind: int, ticks: PackedFloat32Array, patch: Vector2i, hold: float, burn: float = 0.0) -> void:
 	var hits: PackedFloat32Array = PackedFloat32Array([hit])
 	hits.append_array(ticks)
 	_zones.append({
 		"type": type, "a": a, "b": b, "w": w, "inner": inner, "warn": warn, "hits": hits, "next": 0,
-		"damage": damage, "knock": knock, "kind": kind, "patch": patch, "hold": hold, "end": hits[hits.size() - 1] + hold,
+		"damage": damage, "knock": knock, "kind": kind, "patch": patch, "hold": hold, "burn": burn, "end": hits[hits.size() - 1] + hold,
 		"seed": randf() * 100.0,
 	})
 
@@ -208,6 +215,8 @@ func clear_marks() -> void:
 
 ## Everything announced and still to come is dropped (the boss breaks off); what lies stuck in the ground crumbles at once.
 func clear() -> void:
+	if blaze != null:
+		blaze.clear_fields()
 	_zones.clear()
 	for i: int in range(_flights.size() - 1, -1, -1):
 		var f: Dictionary = _flights[i]
@@ -289,7 +298,10 @@ func _damage_zone(z: Dictionary) -> void:
 		if not on_floor(p) or not _inside(z, p):
 			continue
 		var from: Vector2 = (z["a"] as Vector2) if int(z["type"]) == 1 else _closest(p, z["a"] as Vector2, z["b"] as Vector2)
-		_hurt(player, float(z["damage"]), float(z["knock"]), from)
+		if float(z["damage"]) > 0.0: ## (a zone of 0 damage is a warning, or only sets alight)
+			_hurt(player, float(z["damage"]), float(z["knock"]), from)
+		if float(z.get("burn", 0.0)) > 0.0 and player.effects != null: ## the zone sets her alight (status effect `burn`)
+			player.effects.apply("burn", float(z["burn"]), damage_scale)
 
 
 func _inside(z: Dictionary, p: Vector2) -> bool:
@@ -308,6 +320,7 @@ static func _closest(p: Vector2, a: Vector2, b: Vector2) -> Vector2:
 func _hurt(player: Player, damage: float, knock: float, from: Vector2) -> void:
 	var box: HurtboxComponent = player.get_node_or_null("Hurtbox") as HurtboxComponent
 	if box != null:
+		hurt_total += 1
 		box.take_hit(roundf(damage * damage_scale), from, knock)
 
 

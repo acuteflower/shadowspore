@@ -86,6 +86,13 @@ static func step(cfg: Dictionary, item_def: Dictionary, charge_time: float, chai
 	}
 
 
+## The charge time a hold of `real` seconds reaches when the charge runs `rate` times as fast up to the full charge (a talisman's Aufladetempo); the extra
+## hold beyond it runs in real time, so the bracelet never shortens how long she may hold.
+static func scaled_time(real: float, cfg: Dictionary, rate: float) -> float:
+	var fast: float = float(cfg.get("charge_full", 1.0)) / maxf(rate, 0.01)
+	return real * rate if real <= fast else float(cfg.get("charge_full", 1.0)) + (real - fast)
+
+
 ## The host's idea of how long the owner really held: never more than the host saw, never less than what the owner claims minus a little jitter.
 static func host_charge(claimed: float, seen: float, cfg: Dictionary) -> float:
 	var cap: float = float(cfg.get("charge_full", 1.0)) + float(cfg.get("hold_extra", 1.0))

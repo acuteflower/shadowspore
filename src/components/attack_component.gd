@@ -111,6 +111,7 @@ var _burst_heavy: bool = false
 var _flash: float = 0.0 ## the fully-charged flash at the tip (seconds left)
 var _sounds: Dictionary = {}
 var _stamina: StaminaComponent
+var _talismans: TalismanComponent ## damage and charge speed of the worn jewellery
 
 @onready var _hand: Node2D = $Hand ## its y decides if the sword is drawn in front of or behind the body
 @onready var _weapon: Sprite2D = $Hand/Weapon
@@ -125,6 +126,7 @@ func _ready() -> void:
 	_trail.draw.connect(_draw_trail)
 	_arm.draw.connect(_draw_arm)
 	_stamina = get_node_or_null("../StaminaComponent") as StaminaComponent
+	_talismans = get_node_or_null("../TalismanComponent") as TalismanComponent
 	_refresh_weapon()
 
 
@@ -134,7 +136,7 @@ func _process(delta: float) -> void:
 	else:
 		_advance(delta)
 		if _charging:
-			_charge_time += delta
+			_charge_time += delta * _charge_rate()
 			_charge_effects(delta)
 	_update_pose(delta)
 	_track_tips(delta)
@@ -184,6 +186,13 @@ func is_heavy_swing() -> bool:
 ## How much louder than a normal swing the blow is heard (1 = normal).
 func noise_scale() -> float:
 	return float(_step.get("noise", 1.0)) if is_heavy_swing() else 1.0
+
+
+## How fast the heavy blow charges: a talisman's Aufladetempo up to the full charge, then in real time.
+func _charge_rate() -> float:
+	if _talismans == null or _charge_time >= float(_charge_cfg.get("charge_full", 1.0)):
+		return 1.0
+	return _talismans.charge_rate()
 
 
 ## Key position on the heavy sheet for the body animation (0..HEAVY_KEYS - 1), or -1 when the heavy attack does not play.
@@ -407,6 +416,8 @@ func _server_heavy(dir: Vector2, claimed: float, chained: bool) -> void:
 	if cfg.is_empty():
 		return
 	var seen: float = float(now - _server_charge_msec) / 1000.0 if _server_charge_msec > 0 else 0.0
+	if _talismans != null:
+		seen = HeavyRules.scaled_time(seen, cfg, _talismans.charge_rate()) ## the owner's clock ran faster up to the full charge
 	var time: float = HeavyRules.host_charge(claimed, seen, cfg)
 	if not HeavyRules.is_ready(cfg, time + 0.05, chained):
 		return
@@ -471,6 +482,8 @@ func _server_swing(dir: Vector2, step_index: int) -> void:
 func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 	var origin: Vector2 = global_position + BODY_CENTER
 	var damage: float = Items.stat(stack, "damage", 1.0) * float(step["damage"]) ## the stack's own stats: a refined weapon hits harder
+	if _talismans != null:
+		damage *= _talismans.damage_factor(bool(step.get("heavy", false))) ## Wuchtreif and the like (host: from its own copy of her bag)
 	var knockback: float = Items.stat(stack, "knockback", 0.0) * float(step["knock"])
 	var targets: Array[HurtboxComponent] = HitScan.fan(self, origin, dir, Items.stat(stack, "reach", 20.0) * float(step["reach"]), float(step["arc"]), HURTBOX_MASK)
 	for target: HurtboxComponent in targets:
@@ -838,6 +851,9 @@ func _draw_arm() -> void:
 	_pixel_line(shoulder, elbow, ARM_SLEEVE, ARM_SLEEVE_SHADE)
 	_pixel_line(elbow, hand, ARM_BRACER, ARM_BRACER_LIGHT)
 	_arm.draw_rect(Rect2(elbow.lerp(hand, 0.62) - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), ARM_CUFF)
+	var bracelet: String = _talismans.worn_id("bracelet") if _talismans != null else ""
+	if bracelet != "": ## the worn bracelet (Wuchtreif ...) takes the place of the cuff
+		TalismanArt.draw_bracelet(_arm, bracelet, elbow.lerp(hand, 0.62), hand - elbow, float(Time.get_ticks_msec()) / 1000.0)
 	_arm.draw_rect(Rect2(hand - Vector2(1.0, 1.0), Vector2(3.0, 3.0)), ARM_GLOVE)
 	_arm.draw_rect(Rect2(hand - Vector2(1.0, 1.0), Vector2(1.0, 1.0)), ARM_BRACER_LIGHT)
 

@@ -17,6 +17,7 @@
 [ext_resource type="Script" path="res://src/components/skill_tree_component.gd" id="18_skills"]
 [ext_resource type="Script" path="res://src/components/inventory_component.gd" id="11_inv"]
 [ext_resource type="Script" path="res://src/components/attack_component.gd" id="12_attack"]
+[ext_resource type="Script" path="res://src/components/talisman_component.gd" id="19_talisman"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flash"]
 resource_local_to_scene = true
@@ -61,6 +62,9 @@ properties/5/replication_mode = 2
 properties/6/path = NodePath("AttackComponent:held_refine")
 properties/6/spawn = true
 properties/6/replication_mode = 2
+properties/7/path = NodePath("TalismanComponent:worn")
+properties/7/spawn = true
+properties/7/replication_mode = 2
 
 [node name="Player" type="CharacterBody2D"]
 y_sort_enabled = true
@@ -190,6 +194,9 @@ script = ExtResource("10_overlay")
 
 [node name="InventoryComponent" type="Node" parent="."]
 script = ExtResource("11_inv")
+
+[node name="TalismanComponent" type="Node" parent="."]
+script = ExtResource("19_talisman")
 
 [node name="AttackComponent" type="Node2D" parent="."]
 y_sort_enabled = true

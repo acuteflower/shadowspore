@@ -5,6 +5,7 @@ extends Control
 
 signal hovered(slot: ItemSlot)
 signal unhovered
+signal refused(text: String) ## a piece of jewellery of a kind that is worn already was meant for this equipment slot
 
 const SIZE: int = 20 ## outline + rarity ring + 16px icon
 
@@ -57,6 +58,12 @@ func _gui_input(event: InputEvent) -> void:
 	if click == null or not click.pressed or inventory == null or not InputManager.inventory_open:
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT:
+		if kind == "equip" and not inventory.held.is_empty():
+			var why: String = inventory.refusal(String(ref), inventory.held)
+			if why != "":
+				refused.emit(why)
+				accept_event()
+				return
 		inventory.request("quick" if click.shift_pressed else "click", [kind, ref])
 		accept_event()
 	elif click.button_index == MOUSE_BUTTON_RIGHT:

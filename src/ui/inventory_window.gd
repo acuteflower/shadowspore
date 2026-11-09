@@ -44,6 +44,9 @@ var _opening: bool = false
 var _time: float = 0.0
 var _ritual_pulse: float = 0.0
 var _hero_sector: int = 2
+var _refuse_text: String = "" ## "SCHON EIN ARMBAND ANGELEGT": shown over the slot that said no
+var _refuse_slot: ItemSlot
+var _refuse_t: float = 0.0
 
 
 func _ready() -> void:
@@ -85,6 +88,7 @@ func _make_slot(kind: String, ref: Variant, tag: Dictionary) -> void:
 	slot.bare = true
 	slot.hovered.connect(func(s: ItemSlot) -> void: _hover = s; _on_slot_hovered(s))
 	slot.unhovered.connect(func() -> void: _hover = null; _tooltip.hide())
+	slot.refused.connect(func(text: String) -> void: _refuse_text = text; _refuse_slot = slot; _refuse_t = 2.2)
 	add_child(slot)
 	_slots.append(slot)
 	_tags.append(tag)
@@ -116,6 +120,7 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_ritual_pulse = maxf(_ritual_pulse - 0.9 * delta, 0.0)
+	_refuse_t = maxf(_refuse_t - delta, 0.0)
 	var ease_in: float = 1.0 - exp(-14.0 * delta)
 	for i: int in _slots.size():
 		_lift[i] = lerpf(_lift[i], 3.0 if _slots[i] == _hover else 0.0, ease_in)
@@ -295,6 +300,8 @@ func _draw_hero(fade: float, void_level: float) -> void:
 	var source: Rect2 = Rect2(frame * HERO_FRAME.x, _hero_sector * HERO_FRAME.y, HERO_FRAME.x, HERO_FRAME.y)
 	var top_left: Vector2 = HERO_FEET - HERO_FEET_IN_FRAME * 2.0 + Vector2(0, -roundf(sin(_time * 1.5) * 1.0) - (1.0 - p) * 24.0)
 	draw_texture_rect_region(HERO_SHEET, Rect2(top_left, Vector2(HERO_FRAME) * 2.0), source, Color(1, 1, 1, p * fade))
+	if p * fade > 0.6: ## her necklace and earrings (the bracelet sits on the sword arm, which the sheet does not hold)
+		TalismanArt.draw_worn(self, self, TalismanRules.worn_ids(_inventory.equipment), TalismanArt.frame_data(HERO_SHEET, _hero_sector * 16 + frame), top_left + HERO_FEET_IN_FRAME * 2.0, 2.0, _time, 0.6)
 
 
 func _draw_tag(text: String, at: Vector2, delay: float, _void_level: float) -> void:
@@ -343,8 +350,9 @@ func _draw_pendant(i: int, held: Dictionary, void_level: float) -> void:
 	elif slot.kind == "equip": ## equipment: a rune ring, the slot name inside while empty
 		VineStyle.ring(self, c, 12, Color(glow_color, (0.9 if has_item else 0.45) * p), 1.0 if has_item else 0.5 + 0.2 * sin(_time * 2.0 + i))
 		if not has_item:
-			var short: String = String(DataRegistry.get_entry("equipment_slots", String(slot.ref)).get("short", ""))
-			PixelText.draw(self, short, Vector2i(roundi(c.x) - PixelText.width(short) / 2, roundi(c.y) - 3), Color(UiStyle.TEXT_DIM, 0.8 * p))
+			if not _draw_missing_jewellery(String(slot.ref), c, p):
+				var short: String = String(DataRegistry.get_entry("equipment_slots", String(slot.ref)).get("short", ""))
+				PixelText.draw(self, short, Vector2i(roundi(c.x) - PixelText.width(short) / 2, roundi(c.y) - 3), Color(UiStyle.TEXT_DIM, 0.8 * p))
 		else:
 			for k: int in 3:
 				var angle: float = _time * 1.4 + k * TAU / 3.0
@@ -359,6 +367,40 @@ func _draw_pendant(i: int, held: Dictionary, void_level: float) -> void:
 
 	if not held.is_empty() and _inventory.can_place(slot.kind, slot.ref): ## the stack on the cursor: a ring where it would land
 		VineStyle.ring(self, c, 10, Color(UiStyle.ACCENT, (0.5 + 0.4 * sin(_time * 8.0)) * p), 1.0)
+	if slot == _refuse_slot and _refuse_t > 0.0: ## "no": a red ring and the reason over the slot
+		var fade: float = clampf(_refuse_t / 0.5, 0.0, 1.0)
+		VineStyle.ring(self, c, 12, Color("ff5a6a", 0.8 * fade * p), 1.0)
+		PixelText.draw(self, _refuse_text, Vector2i(roundi(c.x) - PixelText.width(_refuse_text) / 2, roundi(c.y) - 24), Color("ff8a96", fade * p), UiStyle.OUTLINE)
+
+
+## An empty talisman slot shows the kinds of jewellery that are not worn yet (small pictograms in their colours), so one sees what is missing. False for any
+## other slot, or when every kind is worn.
+func _draw_missing_jewellery(slot_name: String, c: Vector2, p: float) -> bool:
+	if not slot_name.begins_with(TalismanRules.SLOT_PREFIX):
+		return false
+	var types: Dictionary = TalismanRules.catalog().get("types", {}) as Dictionary
+	var missing: Array[String] = []
+	for type: String in types:
+		var worn: bool = false
+		for other: String in _inventory.equipment:
+			if TalismanRules.type_of(_inventory.equipment[other] as Dictionary) == type:
+				worn = true
+		if not worn:
+			missing.append(type)
+	if missing.is_empty():
+		return false
+	var span: int = missing.size() * 6 - 1
+	for k: int in missing.size():
+		var info: Dictionary = types[missing[k]] as Dictionary
+		var colour: Color = Color(String(info.get("color", "ffffff")), 0.8 * p)
+		var rows: Array = info.get("glyph", []) as Array
+		var origin: Vector2 = Vector2(roundf(c.x - span / 2.0) + k * 6, roundf(c.y - rows.size() / 2.0))
+		for y: int in rows.size():
+			var line: String = String(rows[y])
+			for x: int in line.length():
+				if line[x] == "#":
+					draw_rect(Rect2(origin + Vector2(x, y), Vector2.ONE), colour)
+	return true
 
 
 func _draw_overlay() -> void:
@@ -388,6 +430,11 @@ func _on_slot_hovered(slot: ItemSlot) -> void:
 	if item.is_empty() or not _opening:
 		return
 	var equippable: bool = slot.kind == "inv" and Items.definition(item).has("slot")
-	_tooltip.show_stack(item, equippable)
+	var replaces: Dictionary = {}
+	if slot.kind == "inv" and TalismanRules.is_talisman(item): ## jewellery of the same kind that is worn would be replaced
+		var same: String = TalismanRules.conflict(_inventory.equipment, "", item)
+		if same != "":
+			replaces = _inventory.equipment[same] as Dictionary
+	_tooltip.show_stack(item, equippable, replaces)
 	_tooltip.show()
 	_tooltip.move_to_front()

@@ -11,6 +11,11 @@ func _check(cond: bool, what: String) -> void:
 		print("TOWN FAILED: ", what)
 
 
+func _set_stock(town: TownManager, item: String, amount: int) -> void:
+	town._add_stock(item, amount - int(town.stock.get(item, 0)))
+	town._sync_stock()
+
+
 func _frames(n: int) -> void:
 	for i: int in n:
 		await get_tree().process_frame
@@ -206,27 +211,48 @@ func _run() -> void:
 	var window: StockWindow = StockWindow.open(get_tree(), player, town, town.center)
 	await _frames(2)
 	_check(window != null and player.story_lock and InputManager.ui_blocking, "the stock window opens and holds her")
-	await _frames(60)
-	_check(player.view_camera().zoom.x > 1.5 and player.view_shift != Vector2.ZERO, "the camera draws close and looks beside her (zoom %.2f)" % player.view_camera().zoom.x)
+	await _frames(40)
 	if window != null:
-		_check(window.tabs.size() == 2 and window.tab == 0 and not window.rows.is_empty(), "the stock tab lists what the town holds (%d kinds)" % window.rows.size())
-		var before_take: int = player.inventory.count_item("wood")
-		window.focus = 0
-		for i: int in window.rows.size():
-			if String(window.rows[i].item) == "wood":
-				window.focus = i
-		window._press("take", false)
+		var inv: InventoryComponent = player.inventory
+		_check(inv.box == town.box and window._slots.size() == town.box.size() + InventoryComponent.SIZE, "the box is open beside the bag (%d + %d slots)" % [town.box.size(), InventoryComponent.SIZE])
+		var wood_at: int = -1
+		for i: int in town.box.size():
+			if String((town.box.slots[i] as Dictionary).get("id", "")) == "wood":
+				wood_at = i
+		_check(wood_at >= 0, "the stock holds wood in a slot")
+		var before_take: int = inv.count_item("wood")
+		var box_wood: int = int(town.stock.get("wood", 0))
+		inv.request("click", ["box", wood_at]) ## take the stack onto the cursor
 		await _frames(3)
-		_check(player.inventory.count_item("wood") == before_take + 10, "E takes ten from the focused row")
-		window._set_tab(1)
-		_check(window.tab == 1 and not window.rows.is_empty(), "the rucksack tab lists what may be stowed")
-		for i: int in window.rows.size():
-			if String(window.rows[i].item) == "wood":
-				window.focus = i
-		var stowed_before: int = int(town.stock.get("wood", 0))
-		window._press("put", false)
+		_check(not inv.held.is_empty() and String(inv.held.id) == "wood" and int(town.stock.get("wood", 0)) < box_wood, "LMB takes the stack from the box onto the cursor")
+		var held_count: int = int(inv.held.count)
+		inv.request("rclick", ["box", wood_at]) ## put ONE back
 		await _frames(3)
-		_check(int(town.stock.get("wood", 0)) == stowed_before + 10, "and E stows ten")
+		_check(int(inv.held.count) == held_count - 1 and int((town.box.slots[wood_at] as Dictionary).get("count", 0)) == 1, "RMB puts one piece down in the box")
+		inv.request("stow", [0])
+		await _frames(3)
+		_check(inv.held.is_empty() and inv.count_item("wood") == before_take + held_count - 1, "the cursor stack goes into the bag")
+		var bag_at: int = -1
+		for i: int in InventoryComponent.SIZE:
+			if String((inv.slots[i] as Dictionary).get("id", "")) == "wood":
+				bag_at = i
+		var wood_total: int = int(town.stock.get("wood", 0)) + inv.count_item("wood")
+		inv.request("quick", ["inv", bag_at]) ## shift-click: into the box
+		await _frames(3)
+		_check(inv.count_item("wood") < before_take + held_count - 1 and int(town.stock.get("wood", 0)) + inv.count_item("wood") == wood_total, "shift-click sends a stack into the box, nothing is lost")
+		var in_box: int = 0
+		for i: int in town.box.size():
+			if String((town.box.slots[i] as Dictionary).get("id", "")) == "wood":
+				in_box = i
+		inv.request("quick", ["box", in_box]) ## and back
+		await _frames(3)
+		_check(int(town.stock.get("wood", 0)) + inv.count_item("wood") == wood_total, "shift-click on a box slot takes it into the bag")
+		player.request_teleport(town.center + Vector2(900, 900)) ## too far from the stockpile: the host refuses
+		await _frames(30)
+		var far_before: int = int(town.stock.get("wood", 0))
+		inv.request("click", ["box", in_box])
+		await _frames(3)
+		_check(inv.held.is_empty() and int(town.stock.get("wood", 0)) == far_before, "far from the stockpile a click on the box does nothing")
 		window._close()
 	_check(not player.story_lock and not InputManager.ui_blocking, "closing the window frees her at once")
 	await _frames(60)
@@ -373,8 +399,8 @@ func _run() -> void:
 			if String(shop.rows[i].get("recipe", "")) == "gustav_test_order":
 				sword_row = i
 		_check(sword_row >= 0 and String(shop.rows[sword_row].kind) == "order", "the sword is a commission")
-		town.stock["plank"] = 4
-		town.stock["stone"] = 8
+		_set_stock(town, "plank", 4)
+		_set_stock(town, "stone", 8)
 		player.inventory.give("sword_basic", 1)
 		player.inventory.give("void_splinter", 2)
 		(town.residents["gustav"] as Dictionary).trust = 30
@@ -442,8 +468,8 @@ func _run() -> void:
 	await _frames(40)
 	_check(not is_instance_valid(shop) or shop.is_queued_for_deletion(), "the shop window closes itself")
 	# --- production: Gustav saws planks from the stock's wood every hour
-	town.stock["wood"] = 8
-	town.stock.erase("plank")
+	_set_stock(town, "wood", 8)
+	_set_stock(town, "plank", 0)
 	TimeManager.time_of_day = 0.5
 	await _frames(3)
 	TimeManager.time_of_day = 0.5 + 1.0 / 24.0 + 0.001

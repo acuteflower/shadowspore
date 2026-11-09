@@ -693,5 +693,81 @@
   "hotbar": false,
   "icon": "res://assets/items/leaf_snail.png",
   "description": "Eine kleine Schnecke mit rosigem Haus. Zieht sich bei jedem Geräusch zurück."
+ },
+ "silver_chain": {
+  "name": "Schlichte Silberkette",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "necklace",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/silver_chain.png",
+  "bonus": {
+   "health": 12,
+   "armor": 2
+  },
+  "look": {
+   "metal": "silver",
+   "stones": 0,
+   "pendant": [
+    "lm",
+    "md",
+    ".d"
+   ]
+  },
+  "description": "Eine einfache Kette. Sie hat niemanden beschützt, der sie nicht brauchte."
+ },
+ "wuchtreif": {
+  "name": "Wuchtreif",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "bracelet",
+  "rarity": "rare",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/wuchtreif.png",
+  "bonus": {
+   "damage": 0.08,
+   "heavy_damage": 0.15,
+   "charge_speed": 0.25
+  },
+  "look": {
+   "metal": "gold",
+   "stone": "5aa8ff",
+   "stones": 1,
+   "glint": true
+  },
+  "description": "Ein Reif für Hände, die ausholen wollen."
+ },
+ "schweigtropfen": {
+  "name": "Schweigtropfen",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "earrings",
+  "rarity": "legendary",
+  "enchant_slots": 2,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/schweigtropfen.png",
+  "bonus": {
+   "alarm": -0.5,
+   "absorb": 0.25
+  },
+  "look": {
+   "metal": "voidsteel",
+   "stone": "9a6bff",
+   "stones": 2,
+   "pulse": true,
+   "glow": true,
+   "drop": [
+    "TS",
+    "WS",
+    ".s"
+   ]
+  },
+  "description": "Du hörst die Leere nicht mehr. Sie dich auch nicht."
  }
 }

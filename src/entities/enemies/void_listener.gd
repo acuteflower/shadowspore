@@ -185,17 +185,18 @@ func _sense() -> void:
 		var point: Vector2 = player.global_position
 		var moved: bool = point.distance_to(_positions.get(player.get_instance_id(), point)) > 0.75 or player.velocity.length() > 8.0
 		_positions[player.get_instance_id()] = point
+		var hear: float = player.stealth.alarm_scale() if player != _target else 1.0 ## talismans (Schweigtropfen): she is noticed only from a shorter distance, until she is chased
 		var radius: float = float(_def["personal_range"])
 		if moved:
-			radius = float(_def["hearing_sneak"] if player.stealth.sneaking else (_def["hearing_sprint"] if player.sprinting else _def["hearing_walk"]))
+			radius = float(_def["hearing_sneak"] if player.stealth.sneaking else (_def["hearing_sprint"] if player.sprinting else _def["hearing_walk"])) * hear
 		if player.attack.is_swinging():
-			radius = maxf(radius, float(_def["hearing_attack"]) * player.attack.noise_scale())
+			radius = maxf(radius, float(_def["hearing_attack"]) * player.attack.noise_scale() * hear)
 		var distance: float = global_position.distance_to(point)
 		var clear: bool = _line_clear(global_position, point)
 		if not clear:
 			radius *= float(_def["sound_occlusion"])
 		var forward: bool = Vector2.from_angle(heading).dot((point - global_position).normalized()) > (0.0 if player == _target else 0.35)
-		var visible: bool = clear and forward and distance < float(_def["sight_range"]) * (player.stealth.detection_multiplier() if player != _target else 1.0)
+		var visible: bool = clear and forward and distance < float(_def["sight_range"]) * (player.stealth.detection_multiplier() * hear if player != _target else 1.0)
 		if distance > radius and not visible:
 			continue
 		var strength: float = maxf(radius - distance, float(_def["sight_range"]) - distance if visible else -INF)

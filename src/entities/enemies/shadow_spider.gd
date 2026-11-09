@@ -554,7 +554,7 @@ func _find_target() -> Player:
 		if player.health.current <= 0.0:
 			continue
 		var distance: float = global_position.distance_to(player.global_position)
-		if distance < nearest and distance <= float(_def["sight_range"]) * player.stealth.detection_multiplier() and (_clear_path(global_position, player.global_position) or _sees_over_cliff(player.global_position)):
+		if distance < nearest and distance <= float(_def["sight_range"]) * player.stealth.detection_multiplier() * player.stealth.alarm_scale() and (_clear_path(global_position, player.global_position) or _sees_over_cliff(player.global_position)):
 			best = player
 			nearest = distance
 	return best

@@ -168,6 +168,7 @@ var bandaged: bool = false ## the rescuer dressed the wound: no blood, no red bo
 @onready var progress: ProgressComponent = $ProgressComponent
 @onready var inventory: InventoryComponent = $InventoryComponent
 @onready var attack: AttackComponent = $AttackComponent
+@onready var talismans: TalismanComponent = $TalismanComponent
 @onready var _camera: Camera2D = $Camera2D
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _dash_dust: CPUParticles2D = $DashDust
@@ -205,6 +206,7 @@ func _ready() -> void:
 	_eat_fx = EatEffect.new()
 	add_child(_eat_fx)
 	_main_sheet = _sprite.texture
+	_sprite.add_child(TalismanLayer.new()) ## the worn necklace and earrings
 	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", BLOOD_MAPS[0])
 	health.damaged.connect(_on_damaged)
 	health.ticked.connect(_on_ticked)

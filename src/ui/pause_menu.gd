@@ -225,6 +225,9 @@ func _build_items() -> void:
 				_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
 				for lvl: int in [0, 5, 10, 15]:
 					_add(0, "button", "WAFFE +%d" % lvl, "", {"action": "refine_%d" % lvl}) ## sets the refinement of the weapon in her hand
+				_add(0, "button", "TALISMANE ANLEGEN", "", {"action": "talismans_on"})
+				_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
+				_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
 			if multiplayer.is_server():
 				_add(0, "heading", "ANGELN")
 				_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
@@ -607,6 +610,32 @@ func _run_action(action: String) -> void:
 			var smith: Player = _player as Player
 			if smith == null or not multiplayer.is_server() or not smith.inventory.debug_set_refine(action.trim_prefix("refine_").to_int()):
 				_failed_flash = 2.5
+		"talismans_on", "talismans_off": ## the three first talismans on (given when missing) or off again; a slot opens only with its level (host)
+			var wearer: Player = _player as Player
+			if wearer == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			for slot_name: String in wearer.inventory.equipment:
+				if action == "talismans_off" and slot_name.begins_with(TalismanRules.SLOT_PREFIX):
+					wearer.inventory.request("unequip", [slot_name, -1])
+			if action == "talismans_on":
+				for id: String in ["silver_chain", "wuchtreif", "schweigtropfen"]:
+					if wearer.inventory.count_item(id) == 0 and not TalismanRules.worn_ids(wearer.inventory.equipment).has(id):
+						wearer.inventory.give(id, 1)
+					for i: int in wearer.inventory.slots.size():
+						if not wearer.inventory.slots[i].is_empty() and String(wearer.inventory.slots[i]["id"]) == id:
+							wearer.inventory.request("equip", [i, ""])
+							break
+		"talismans_all": ## one of every talisman there is into the bag (host); what she already has is not given twice
+			var collector: Player = _player as Player
+			if collector == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			var items: Dictionary = DataRegistry.table("items")
+			for id: String in items:
+				var def: Dictionary = items[id] as Dictionary
+				if String(def.get("kind", "")) == "talisman" and collector.inventory.count_item(id) == 0 and not TalismanRules.worn_ids(collector.inventory.equipment).has(id):
+					collector.inventory.give(id, 1)
 		"strong_sword": ## the void blade (30 damage) into the bag and into her hand (host)
 			var fighter: Player = _player as Player
 			if fighter == null or not multiplayer.is_server():

@@ -13,6 +13,7 @@ const LOADOUT: String = "default"
 var slots: Array = [] ## Dictionary stacks, index < HOTBAR_SIZE is the hotbar
 var equipment: Dictionary = {} ## slot name -> stack
 var held: Dictionary = {} ## the stack on the cursor while the inventory window is open (the host holds the truth, the owner sees it)
+var box: ItemBox ## the container this player has open (the town's stock, a chest): slot kind "box"; the host sets it with the "box_open" op after checking the reach
 var selected: int = 0 ## the hotbar slot in use (the owner's choice, told to the host with the "select" op)
 
 
@@ -51,7 +52,21 @@ func select(index: int) -> void:
 func stack_at(kind: String, ref: Variant) -> Dictionary:
 	if kind == "inv":
 		return slots[int(ref)]
+	if kind == "box":
+		return box.slots[int(ref)] if _exists("box", ref) else {}
 	return equipment.get(String(ref), {})
+
+
+## Opens a container for this player (the owner calls it on its own mirror, the host checks the reach and attaches it for real).
+func open_box(opened: ItemBox) -> void:
+	box = opened
+	request("box_open", [opened.id])
+
+
+func close_box() -> void:
+	if box != null:
+		box = null
+		request("box_close", [0])
 
 
 ## Asks for a change. ops (kind = "inv" with an index, or "equip" with a slot name):
@@ -59,7 +74,8 @@ func stack_at(kind: String, ref: Variant) -> Dictionary:
 ##   the cursor stack: "click" [kind, ref] (take the stack / put it down, top up or swap), "rclick" [kind, ref] (empty hand: take half,
 ##   a single piece of gear: equip; full hand: put down ONE), "quick" [kind, ref] (shift-click: gear to its slot, else hotbar <-> rucksack),
 ##   "hotkey" [kind or "held", ref, n] (number key: swap with hotbar slot n), "throw" [all] (throw the cursor stack or one piece into the world),
-##   "dropslot" [kind, ref, all] (throw from a slot: one piece or all), "sort" [0] (stack and sort the rucksack), "stow" [0] (cursor stack back into the bag).
+##   "dropslot" [kind, ref, all] (throw from a slot: one piece or all), "sort" [0] (stack and sort the rucksack), "stow" [0] (cursor stack back into the bag),
+##   "box_open" [box id] / "box_close" [0] (the container slots, kind "box" with an index, work in "click" / "rclick" / "quick" while a box is open and within reach).
 func request(op: String, args: Array) -> void:
 	if multiplayer.is_server():
 		_apply(op, args)
@@ -230,6 +246,8 @@ func _valid(index: int) -> bool:
 
 func _commit() -> void:
 	changed.emit()
+	if box != null and multiplayer.is_server():
+		box.touch() ## the box's owner syncs it to every peer
 	var owner_id: int = get_multiplayer_authority()
 	if owner_id != multiplayer.get_unique_id():
 		_rpc_state.rpc_id(owner_id, {"slots": slots, "equipment": equipment, "held": held})
@@ -267,6 +285,12 @@ func _apply(op: String, args: Array) -> void:
 		"select":
 			selected = clampi(int(args[0]), 0, HOTBAR_SIZE - 1)
 			ok = true
+		"box_open":
+			var wanted: ItemBox = ItemBox.find(String(args[0]))
+			box = wanted if wanted != null and wanted.may_use(get_parent() as Node2D) else null
+			ok = box != null
+		"box_close":
+			box = null
 	if ok:
 		_commit()
 
@@ -297,12 +321,16 @@ func _use(index: int) -> bool:
 
 # ---------------------------------------------------------------- the cursor stack
 func _exists(kind: String, ref: Variant) -> bool:
+	if kind == "box":
+		return box != null and int(ref) >= 0 and int(ref) < box.size() and box.may_use(get_parent() as Node2D)
 	return _valid(int(ref)) if kind == "inv" else (kind == "equip" and equipment.has(String(ref)))
 
 
 func _set_stack(kind: String, ref: Variant, stack: Dictionary) -> void:
 	if kind == "inv":
 		slots[int(ref)] = stack
+	elif kind == "box":
+		box.slots[int(ref)] = stack
 	else:
 		equipment[String(ref)] = stack
 
@@ -313,7 +341,14 @@ func _accepts(kind: String, ref: Variant, stack: Dictionary) -> bool:
 		return true
 	if kind == "inv":
 		return _fits(int(ref), stack)
-	return int(stack["count"]) == 1 and slot_open(String(ref)) and Items.fits_slot(String(ref), stack)
+	if kind == "box":
+		return true
+	return int(stack["count"]) == 1 and slot_open(String(ref)) and Items.fits_slot(String(ref), stack) and TalismanRules.conflict(equipment, String(ref), stack) == ""
+
+
+## Why a piece of jewellery cannot go into this equipment slot ("SCHON EIN ARMBAND ANGELEGT"), "" when it can: for the window's hint. Only one piece of each kind is worn.
+func refusal(slot_name: String, stack: Dictionary) -> String:
+	return TalismanRules.refusal(equipment, slot_name, stack)
 
 
 ## Talisman slots wake up with the milestones (LevelRewards): talisman_1 .. talisman_N are open once N slots are collected. Every other slot is always open.
@@ -344,7 +379,7 @@ func _click(kind: String, ref: Variant) -> bool:
 		_set_stack(kind, ref, held)
 		held = {}
 		return true
-	if kind == "inv" and String(current["id"]) == String(held["id"]) and Items.extras(current) == Items.extras(held) and Items.max_stack(held) > 1:
+	if kind != "equip" and String(current["id"]) == String(held["id"]) and Items.extras(current) == Items.extras(held) and Items.max_stack(held) > 1:
 		var room: int = Items.max_stack(held) - int(current["count"])
 		if room <= 0:
 			return false
@@ -373,7 +408,7 @@ func _rclick(kind: String, ref: Variant) -> bool:
 		if kind == "equip":
 			return _unequip(String(ref), -1)
 		if Items.max_stack(current) <= 1:
-			if Items.definition(current).has("slot") and _slot_for(current) != "":
+			if kind == "inv" and Items.definition(current).has("slot") and _slot_for(current) != "":
 				return _equip(int(ref), "")
 			held = current
 			_set_stack(kind, ref, {})
@@ -384,12 +419,12 @@ func _rclick(kind: String, ref: Variant) -> bool:
 		if int(current["count"]) <= 0:
 			_set_stack(kind, ref, {})
 		return true
-	if kind != "inv" or not _accepts(kind, ref, {"id": held["id"], "count": 1}):
+	if kind == "equip" or not _accepts(kind, ref, {"id": held["id"], "count": 1}):
 		return false
 	if current.is_empty():
 		var one: Dictionary = (held as Dictionary).duplicate() ## keeps the refinement of a single weapon
 		one["count"] = 1
-		slots[int(ref)] = one
+		_set_stack(kind, ref, one)
 	elif String(current["id"]) == String(held["id"]) and Items.extras(current) == Items.extras(held) and int(current["count"]) < Items.max_stack(current):
 		current["count"] = int(current["count"]) + 1
 	else:
@@ -409,6 +444,20 @@ func _quick(kind: String, ref: Variant) -> bool:
 		return false
 	if kind == "equip":
 		return _unequip(String(ref), -1)
+	if kind == "box": ## out of the container into the bag
+		var left: int = add_item(String(current["id"]), int(current["count"]), Items.extras(current))
+		var taken: bool = left < int(current["count"])
+		current["count"] = left
+		if left <= 0:
+			_set_stack(kind, ref, {})
+		return taken
+	if _exists("box", 0): ## a container is open: the stack goes into it
+		var left_over: int = box.add_item(String(current["id"]), int(current["count"]), Items.extras(current))
+		var stowed: bool = left_over < int(current["count"])
+		current["count"] = left_over
+		if left_over <= 0:
+			slots[int(ref)] = {}
+		return stowed
 	if Items.definition(current).has("slot") and _slot_for(current) != "":
 		return _equip(int(ref), "")
 	var from: int = int(ref)
@@ -441,7 +490,7 @@ func _hotkey(kind: String, ref: Variant, n: int) -> bool:
 		return false
 	if kind == "held":
 		return _click("inv", n)
-	if not _exists(kind, ref):
+	if kind == "box" or not _exists(kind, ref):
 		return false
 	if kind == "equip":
 		if stack_at("equip", ref).is_empty():
@@ -468,7 +517,7 @@ func _throw_held(all: bool) -> bool:
 
 ## Q over a slot: one piece of the stack (or the whole stack) is thrown into the world.
 func _drop_slot(kind: String, ref: Variant, all: bool) -> bool:
-	if not _exists(kind, ref):
+	if kind == "box" or not _exists(kind, ref):
 		return false
 	var current: Dictionary = stack_at(kind, ref)
 	if current.is_empty():
@@ -567,7 +616,7 @@ func _equip(from: int, slot_name: String) -> bool:
 	var stack: Dictionary = slots[from]
 	if slot_name == "":
 		slot_name = _slot_for(stack)
-	if not equipment.has(slot_name) or not slot_open(slot_name) or not Items.fits_slot(slot_name, stack):
+	if not equipment.has(slot_name) or not slot_open(slot_name) or not Items.fits_slot(slot_name, stack) or TalismanRules.conflict(equipment, slot_name, stack) != "":
 		return false
 	var worn: Dictionary = equipment[slot_name]
 	if not _fits(from, worn):
@@ -589,15 +638,19 @@ func _unequip(slot_name: String, to: int) -> bool:
 	if not _valid(to) or not _fits(to, stack):
 		return false
 	var other: Dictionary = slots[to]
-	if not other.is_empty() and not Items.fits_slot(slot_name, other):
+	if not other.is_empty() and (not Items.fits_slot(slot_name, other) or TalismanRules.conflict(equipment, slot_name, other) != ""):
 		return false
 	equipment[slot_name] = other
 	slots[to] = stack
 	return true
 
 
-## First free matching equipment slot, else the first matching one (which gets swapped).
+## First free matching equipment slot, else the first matching one (which gets swapped). A piece of jewellery goes where the same kind is worn already
+## (it replaces it), whether or not another talisman slot is free.
 func _slot_for(stack: Dictionary) -> String:
+	var same: String = TalismanRules.conflict(equipment, "", stack)
+	if same != "" and slot_open(same) and Items.fits_slot(same, stack):
+		return same
 	var fallback: String = ""
 	for slot_name: String in equipment:
 		if slot_open(slot_name) and Items.fits_slot(slot_name, stack):

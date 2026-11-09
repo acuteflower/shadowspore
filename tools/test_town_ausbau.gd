@@ -60,7 +60,7 @@ func _lamps(town: TownManager, player: Player) -> void:
 	player.request_teleport(at + Vector2(0.0, 14.0))
 	await _frames(30)
 	var caps: int = player.inventory.count_item("glow_cap")
-	town.stock.erase("glow_cap")
+	town._add_stock("glow_cap", -int(town.stock.get("glow_cap", 0)))
 	player.inventory.remove_item("glow_cap", caps)
 	town.request_lamp(id)
 	await _frames(5)

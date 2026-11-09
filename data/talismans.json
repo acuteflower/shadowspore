@@ -1,0 +1,17 @@
+{
+	"_doc": "Talismane (docs/talisman_konzept.md). types: die drei Schmuckgattungen (items.json `jewelry`), pro Gattung nur eines anlegbar. stats: der Katalog aller Bonuswerte (items.json `bonus`): unit flat = Zahl, percent = Anteil (0.08 = 8 %), min/max klemmen die Summe. `alarm` ist ein Faktor-Abzug (-0.5 = Schattenwesen bemerken sie nur auf die halbe Entfernung) und wird MULTIPLIZIERT, alles andere addiert.",
+	"types": {
+		"necklace": {"name": "Kette", "domain": "KÖRPER", "color": "6fe0c4", "glyph": ["..#..", ".###.", "#...#", "#...#", ".#.#.", "..#.."]},
+		"earrings": {"name": "Ohrringe", "domain": "LEERE", "color": "b47aff", "glyph": [".###.", "#...#", ".###.", "..#..", ".###.", "..#.."]},
+		"bracelet": {"name": "Armband", "domain": "ANGRIFF", "color": "ffb347", "glyph": [".###.", "#...#", "#.#.#", "#...#", ".###.", "....."]}
+	},
+	"stats": {
+		"health": {"label": "LEBEN", "unit": "flat", "min": 0, "max": 60},
+		"armor": {"label": "RÜSTUNG", "unit": "flat", "min": 0, "max": 12},
+		"damage": {"label": "SCHADEN", "unit": "percent", "min": 0, "max": 0.5},
+		"heavy_damage": {"label": "WUCHTSCHLAG", "unit": "percent", "min": 0, "max": 0.6},
+		"charge_speed": {"label": "AUFLADETEMPO", "unit": "percent", "min": 0, "max": 0.6},
+		"alarm": {"label": "ALARMREICHWEITE", "unit": "percent", "min": -0.75, "max": 0.5},
+		"absorb": {"label": "SCHADEN GESCHLUCKT", "unit": "percent", "min": 0, "max": 0.5}
+	}
+}

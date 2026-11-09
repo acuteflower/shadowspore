@@ -16,3 +16,9 @@ var sneaking: bool = false:
 
 func detection_multiplier() -> float:
 	return sneak_detection_multiplier if sneaking else 1.0
+
+
+## Talismans (Schweigtropfen): shadow creatures notice her only from this fraction of their usual distance (sight and hearing). 1 without them.
+func alarm_scale() -> float:
+	var talismans: TalismanComponent = get_node_or_null("../TalismanComponent") as TalismanComponent
+	return talismans.alarm_scale() if talismans != null else 1.0

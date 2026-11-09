@@ -16,6 +16,7 @@ signal event(kind: String, data: Dictionary) ## what happened to the town, on ev
 const SETTLERS_TABLE: String = "settlers"
 const PROGRESS_FULL: int = 1000
 const STATE_VERSION: int = 1
+const STOCK_SLOTS: int = 48 ## the stockpile: 8 x 6 slots
 
 var world: WorldLevel
 var founded: bool = false
@@ -24,7 +25,8 @@ var center: Vector2 = Vector2.ZERO ## the hut's feet: the heart of the town
 var founded_day: int = 0
 var critters: TownCritters
 var structures: Dictionary = {} ## int id -> {p, x, y, f, g}; id 0 is the house
-var stock: Dictionary = {} ## item id -> count
+var box: ItemBox = ItemBox.new("town_stock", STOCK_SLOTS) ## the stock as slots (`StockWindow`, same stacks and clicks as the inventory); the host holds the truth and syncs it
+var stock: Dictionary = {} ## item id -> count: the totals of `box`, refreshed with every change (what costs, recipes and quests read; never write to it, use `_add_stock`)
 var cleared: Dictionary = {} ## Vector2i prop cell -> true: soft props the foundations removed for good
 var residents: Dictionary = {} ## settler id -> {trust, talked}
 var next_id: int = 1
@@ -79,6 +81,14 @@ var _arrival_clock: float = 0.0
 var _last_hour: int = -1
 var _arrivals: Dictionary = {} ## host: settler id -> seconds the condition has held
 var _built_at: Dictionary = {} ## host: piece -> seconds since the first one was finished
+
+
+func _init() -> void:
+	box.reach_ok = func(who: Node2D) -> bool: return who is Player and _near_role(who as Player, "stock", 90.0)
+	box.changed.connect(func() -> void:
+		_refresh_stock()
+		if is_inside_tree() and multiplayer.is_server():
+			_sync_stock())
 
 
 func _ready() -> void:
@@ -825,22 +835,25 @@ func _pay(cost: Dictionary, player: Player) -> void:
 
 
 func _add_stock(item: String, amount: int) -> void:
-	var now: int = int(stock.get(item, 0)) + amount
-	if now <= 0:
-		stock.erase(item)
-	else:
-		stock[item] = now
+	if amount < 0:
+		box.remove_item(item, -amount)
+	elif box.add_item(item, amount) > 0:
+		push_warning("town stock is full: %s lost" % item) ## ponytail: STOCK_SLOTS is the ceiling, a bigger box (or a second stockpile) when it bites
+	_refresh_stock()
+
+
+func _refresh_stock() -> void:
+	stock = box.totals()
 
 
 func _sync_stock() -> void:
-	_rpc_stock_state.rpc(stock)
+	_rpc_stock_state.rpc(box.slots)
 
 
 @rpc("authority", "call_local", "reliable")
-func _rpc_stock_state(new_stock: Dictionary) -> void:
-	stock = new_stock.duplicate()
-	for item: Variant in stock.keys():
-		stock[item] = int(stock[item])
+func _rpc_stock_state(new_slots: Array) -> void:
+	box.import_slots(new_slots)
+	_refresh_stock()
 	changed.emit()
 
 
@@ -2023,14 +2036,14 @@ func export_state() -> Dictionary:
 		out_cleared.append([cell.x, cell.y])
 	return {
 		"version": STATE_VERSION, "founded": founded, "name": name_index, "center": [center.x, center.y], "day": founded_day,
-		"next_id": next_id, "structures": out_structures, "stock": stock.duplicate(), "cleared": out_cleared, "residents": residents.duplicate(true), "paths": paths.duplicate(true), "orders": orders.duplicate(true),
+		"next_id": next_id, "structures": out_structures, "stock_slots": box.slots.duplicate(true), "cleared": out_cleared, "residents": residents.duplicate(true), "paths": paths.duplicate(true), "orders": orders.duplicate(true),
 		"fear": fear_on,
 	}
 
 
 func import_state(data: Dictionary) -> void:
 	structures.clear()
-	stock.clear()
+	box.import_slots([])
 	cleared.clear()
 	residents.clear()
 	paths.clear()
@@ -2060,9 +2073,13 @@ func import_state(data: Dictionary) -> void:
 			(structures[int(key)] as Dictionary).u = {"f": int((entry.u as Dictionary).get("f", 0)), "l": int((entry.u as Dictionary).get("l", 0))}
 		if int((structures[int(key)] as Dictionary).g) < PROGRESS_FULL:
 			_progress[int(key)] = float((structures[int(key)] as Dictionary).g)
-	var items: Dictionary = data.get("stock", {}) as Dictionary
-	for item: String in items:
-		stock[item] = int(items[item])
+	if data.has("stock_slots"):
+		box.import_slots(data.get("stock_slots", []) as Array)
+	else: ## an older save: item -> count
+		var items: Dictionary = data.get("stock", {}) as Dictionary
+		for item: String in items:
+			box.add_item(item, int(items[item]))
+	_refresh_stock()
 	for cell: Variant in data.get("cleared", []) as Array:
 		cleared[Vector2i(int((cell as Array)[0]), int((cell as Array)[1]))] = true
 	for way: Variant in data.get("paths", []) as Array:

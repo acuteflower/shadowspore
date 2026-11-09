@@ -21,7 +21,8 @@ var current: float = 0.0:
 		current = value
 		changed.emit(current, max_health)
 
-var armor: float = 0.0 ## from the collected levels (and later gear): every blow is multiplied by LevelRewards.damage_factor(armor)
+var armor: float = 0.0 ## from the collected levels and the talismans: every blow is multiplied by LevelRewards.damage_factor(armor)
+var absorb: float = 0.0 ## the share of every hit and tick that is swallowed (talismans: Schweigtropfen), after the armor
 var floor_value: float = 0.0 ## the story can make a fight unkillable: damage never takes health below this
 var god_mode: bool = false ## dev cheat (host): no damage, no ticks, no kill
 var overheal_left: float = 0.0 ## seconds until overheal starts to drain (counted on every peer, set by heals)
@@ -46,6 +47,8 @@ func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0
 		last_attacker = source
 	if armor > 0.0:
 		amount = maxf(roundf(amount * LevelRewards.damage_factor(armor) * 10.0) / 10.0, 0.1)
+	if absorb > 0.0:
+		amount = maxf(roundf(amount * (1.0 - absorb) * 10.0) / 10.0, 0.1)
 	_notify.rpc(amount, from, knockback, maxf(current - amount, floor_value))
 
 
@@ -67,6 +70,8 @@ func take_tick(amount: float, source: int = 0) -> void:
 		return
 	if source != 0:
 		last_attacker = source
+	if absorb > 0.0:
+		amount = maxf(amount * (1.0 - absorb), 0.05)
 	_notify_tick.rpc(amount, maxf(current - amount, floor_value))
 
 
@@ -79,13 +84,21 @@ func kill(from: Vector2 = Vector2.ZERO, source: int = 0) -> void:
 	_notify.rpc(current, from, 0.0, 0.0)
 
 
-## Sets the maximum, armor and overheal allowance (on every peer, from the collected level). `grow`: the added maximum is healed at once.
-func apply_stats(new_max: float, new_armor: float, new_overheal: float, grow: bool) -> void:
+## Sets the maximum, armor and overheal allowance (on every peer, from the collected level and the talismans). `grow`: the added maximum is healed at once.
+## `gear`: the change comes from putting jewellery on or off: nothing is healed (else taking a necklace off and on again would heal), and a smaller
+## maximum cuts what stood above it.
+func apply_stats(new_max: float, new_armor: float, new_overheal: float, grow: bool, gear: bool = false) -> void:
 	var gained_max: float = new_max - max_health
 	var was_full: bool = current >= max_health - 0.01
 	max_health = new_max
 	armor = new_armor
 	overheal_ratio = new_overheal
+	if gear:
+		if current > ceiling():
+			current = ceiling()
+		else:
+			changed.emit(current, max_health)
+		return
 	if current > 0.0 and gained_max > 0.0 and (grow or was_full):
 		current += gained_max ## whoever was at full health stays at full health
 	else:

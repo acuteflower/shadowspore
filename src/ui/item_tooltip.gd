@@ -26,8 +26,9 @@ var _time: float = 0.0
 var _salt: int = 0
 
 
-## Fills the card for `stack`; `equip_hint` adds the right-click hint.
-func show_stack(stack: Dictionary, equip_hint: bool) -> void:
+## Fills the card for `stack`; `equip_hint` adds the right-click hint. `replaces`: the piece of jewellery of the same kind that is worn (a talisman card then
+## compares with it line by line and says that it would be replaced).
+func show_stack(stack: Dictionary, equip_hint: bool, replaces: Dictionary = {}) -> void:
 	var def: Dictionary = Items.definition(stack)
 	var rarity: Dictionary = DataRegistry.get_entry("rarities", String(def.get("rarity", "common")))
 	var weapon_class: Dictionary = DataRegistry.get_entry("weapon_classes", String(def.get("weapon_class", "")))
@@ -39,6 +40,11 @@ func show_stack(stack: Dictionary, equip_hint: bool) -> void:
 	_rows.clear()
 	var level: int = Items.refine(stack)
 	_rows.append({"type": "title", "text": String(def.get("name", "?")), "refine": level})
+	if TalismanRules.is_talisman(stack):
+		_talisman_rows(stack, def, rarity, equip_hint, replaces)
+		_measure()
+		queue_redraw()
+		return
 	_rows.append({"type": "sub", "text": "%s %s" % [rarity.get("name", ""), type_name]})
 	var stats: Dictionary = def.get("stats", {})
 	var refinable: bool = RefineRules.is_refinable(stack)
@@ -65,6 +71,33 @@ func show_stack(stack: Dictionary, equip_hint: bool) -> void:
 		_rows.append({"type": "hint", "text": "Rechtsklick: ausrüsten"})
 	_measure()
 	queue_redraw()
+
+
+## A talisman: its kind and field, one line per effect (coloured against the worn piece of the same kind), the story, the hint.
+func _talisman_rows(stack: Dictionary, def: Dictionary, rarity: Dictionary, equip_hint: bool, replaces: Dictionary) -> void:
+	var info: Dictionary = TalismanRules.type_info(TalismanRules.type_of(stack))
+	_rows.append({"type": "sub", "text": "%s %s - %s" % [rarity.get("name", ""), info.get("name", ""), String(info.get("domain", "")).capitalize()]})
+	_rows.append({"type": "rule"})
+	var bonus: Dictionary = TalismanRules.bonus_of(stack)
+	var other: Dictionary = TalismanRules.bonus_of(replaces)
+	for key: String in (TalismanRules.catalog().get("stats", {}) as Dictionary):
+		if bonus.has(key):
+			var tone: int = TalismanRules.better(key, float(bonus[key]), float(other.get(key, 0.0))) if not replaces.is_empty() else 0
+			_rows.append({"type": "bonus", "text": TalismanRules.line(key, float(bonus[key])), "tone": tone})
+	if not replaces.is_empty():
+		for key: String in other:
+			if not bonus.has(key):
+				var label: String = String(((TalismanRules.catalog().get("stats", {}) as Dictionary).get(key, {}) as Dictionary).get("label", key))
+				_rows.append({"type": "bonus", "text": "OHNE %s" % label, "tone": -1})
+	var description: Array[String] = _wrap(String(def.get("description", "")))
+	if not description.is_empty():
+		_rows.append({"type": "rule"})
+		for line: String in description:
+			_rows.append({"type": "desc", "text": line})
+	if not replaces.is_empty():
+		_rows.append({"type": "hint", "text": "Rechtsklick: ersetzt %s" % String(Items.definition(replaces).get("name", ""))})
+	elif equip_hint:
+		_rows.append({"type": "hint", "text": "Rechtsklick: anlegen"})
 
 
 func _measure() -> void:
@@ -97,6 +130,9 @@ func _measure() -> void:
 				width = _label_width + 8 + PEARLS * PEARL_STRIDE + 6 + PixelText.width(String(row["value"]))
 				if String(row.get("bonus", "")) != "":
 					width += 4 + PixelText.width(String(row["bonus"]))
+				height = 10
+			"bonus":
+				width += 8
 				height = 10
 			"hint":
 				width += 8
@@ -223,6 +259,13 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 			var bonus: String = String(row.get("bonus", ""))
 			if bonus != "": ## what the refinement adds, in the colour of the level
 				PixelText.draw(self, bonus, Vector2i(value_x - 4 - PixelText.width(bonus), y), Color(RefineStyle.color(int(row["level"])), p), shade)
+		"bonus": ## an effect of jewellery: a bud and the line, green when it beats the worn piece, red when it falls short
+			var tone: int = int(row.get("tone", 0))
+			var colour: Color = _rarity if tone == 0 else (Color("6fd08c") if tone > 0 else Color("ff5a6a"))
+			var bud: Vector2 = Vector2(PAD + 2.0, y + 4.0)
+			VineStyle.glow(self, bud, 4.0, colour, 0.4 * p)
+			draw_rect(Rect2(bud, Vector2.ONE), Color(VineStyle.PETAL, p))
+			PixelText.draw(self, text, Vector2i(PAD + 8, y), Color(colour.lerp(Color.WHITE, 0.25), p), shade)
 		"desc":
 			PixelText.draw(self, text, Vector2i(PAD, y), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, void_level * 0.4), p), shade)
 		"hint":

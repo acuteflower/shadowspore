@@ -141,6 +141,7 @@ class Model:
 # wound as she loses health, sit on the body (in model space: they turn with every facing), keep the shading of the cloth underneath and
 # never touch the outline. `python3 tools/art_hero3d.py blood` writes them.
 WANT_BLOOD = False
+POINTS_ONLY = False  # tools/art_hero_jewelry.py: frame() returns only the rig points (fast), no pixels
 LAST_BLOOD = None
 LAST_BAND = None  # the bandage mask of the last blood render (per supersample: 1 = a pixel of the bandage), see bandage_mask
 WOUND_AT = np.array([2.6, 28.2, 2.6])  # front left of the waist
@@ -761,6 +762,15 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
     m.ell(hc, (4.65, 5.1, 4.55), SKIN, kind="head", R=head_R)
     if pose:  # where food goes (for the game's eating effects), absolute like the other rig points
         m.rig["mouth"] = hc + head_R @ np.array([0.0, -1.7, 4.3]) + m.off
+    # --- where jewellery hangs (docs/talisman_konzept.md; `tools/art_hero_jewelry.py` exports them per frame): the ear lobes, both sides of the collar, the
+    # chest where a pendant hangs, and the directions the torso, the head, both ears and both collar points face (`m.facing`, for the game's visibility test)
+    hR = head_R if head_R is not None else np.eye(3)
+    m.rig["ear_a"] = hc + hR @ np.array([4.55, -1.4, -0.3]) + m.off
+    m.rig["ear_b"] = hc + hR @ np.array([-4.55, -1.4, -0.3]) + m.off
+    m.rig["neck_a"] = T((1.9, 39.9, 1.0)) + m.off
+    m.rig["neck_b"] = T((-1.9, 39.9, 1.0)) + m.off
+    m.rig["pendant"] = T((0.0, 35.2, 3.7)) + m.off
+    m.facing = [tor @ np.array([0.0, 0.0, 1.0]), hR @ np.array([0.0, 0.0, 1.0]), hR @ np.array([1.0, 0.0, 0.0]), hR @ np.array([-1.0, 0.0, 0.0]), tor @ np.array([1.0, 0.0, 0.0]), tor @ np.array([-1.0, 0.0, 0.0])]
     cap_c = hc + (head_R @ np.array([0.0, 0.45, -0.35]) if pose else np.array([0.0, 0.45, -0.35]))
     m.ell(cap_c, (5.05, 5.5, 4.95), HAIR, kind="hair", tag=3.0, clip=face_open, R=head_R)
     # --- hair: fringe, side locks, long back hair with a travelling wave
@@ -875,12 +885,17 @@ def frame(sector: int, t: float, mode: str, crouch: bool, pose=None):
     yaw = math.pi / 2 - sector * math.pi / 4
     model = build(t, mode, crouch, pose)
     global LAST_BLOOD
+    if POINTS_ONLY:  # jewellery export: only the rig points are wanted, no pixels
+        rig = {k: project(model, yaw, v) for k, v in model.rig.items()}
+        rig["jf"] = [round(float((rot_y(yaw) @ v) @ WHAT), 3) for v in getattr(model, "facing", [])]
+        return None, rig
     if WANT_BLOOD:
         depth, code, bl = render(model.transform(yaw, model.bob), yaw, model.bob)
         LAST_BLOOD = to_blood(bl, code, LAST_BAND)
     else:
         depth, code = render(model.transform(yaw, model.bob))
     rig = {k: project(model, yaw, v) for k, v in model.rig.items()}
+    rig["jf"] = [round(float((rot_y(yaw) @ v) @ WHAT), 3) for v in getattr(model, "facing", [])]  # how much each part faces the camera (1 = straight at it)
     return to_pixels(depth, code), rig
 
 

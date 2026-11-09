@@ -104,7 +104,6 @@ var _release_pitch: float = CHOP_PITCH_UP
 var _release_yaw: float = CHOP_YAW_BACK
 var _freeze: float = 0.0 ## seconds the whole swing stands still (hit stop)
 var _server_charge_msec: int = 0
-var _blade_angle: float = 0.0
 var _blade_length: float = 1.0
 var _tips: Array[Dictionary] = [] ## the heavy blow's path: {mid (world), tip (world), age}
 var _burst_life: float = BURST_LIFE

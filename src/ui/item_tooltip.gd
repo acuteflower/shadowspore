@@ -37,18 +37,26 @@ func show_stack(stack: Dictionary, equip_hint: bool) -> void:
 	_salt = hash(String(stack.get("id", ""))) % 997
 	_age = 0.0
 	_rows.clear()
-	_rows.append({"type": "title", "text": String(def.get("name", "?"))})
+	var level: int = Items.refine(stack)
+	_rows.append({"type": "title", "text": String(def.get("name", "?")), "refine": level})
 	_rows.append({"type": "sub", "text": "%s %s" % [rarity.get("name", ""), type_name]})
 	var stats: Dictionary = def.get("stats", {})
+	var refinable: bool = RefineRules.is_refinable(stack)
+	if refinable: ## the fifteen pearls: how far this weapon is refined and how far it can go
+		_rows.append({"type": "refine", "level": level, "cap": RefineRules.cap(stack), "text": "%d/%d" % [level, RefineRules.cap(stack)]})
 	var stat_rows: Array[Dictionary] = []
 	for entry: Array in STATS:
 		if stats.has(entry[0]):
-			var value: float = float(stats[entry[0]])
-			stat_rows.append({"type": "stat", "text": String(entry[1]), "value": _number(value), "fill": clampf(value / float(entry[2]), 0.0, 1.0)})
+			var base: float = float(stats[entry[0]])
+			var value: float = Items.stat(stack, String(entry[0])) ## with the refinement
+			var bonus: String = "+" + _number(value - base) if level > 0 and not is_equal_approx(value, base) else ""
+			stat_rows.append({"type": "stat", "text": String(entry[1]), "value": _number(value), "bonus": bonus, "level": level, "fill": clampf(value / float(entry[2]), 0.0, 1.0)})
 	var description: Array[String] = _wrap(String(def.get("description", "")))
 	if not stat_rows.is_empty():
 		_rows.append({"type": "rule"})
 		_rows.append_array(stat_rows)
+	if refinable:
+		_add_milestones(stack, level)
 	if not description.is_empty():
 		_rows.append({"type": "rule"})
 		for line: String in description:
@@ -73,6 +81,13 @@ func _measure() -> void:
 		match String(row["type"]):
 			"title":
 				height = 11
+				if int(row.get("refine", 0)) > 0:
+					width += 4 + PixelText.width("+%d" % int(row["refine"]))
+			"refine":
+				width = RefineStyle.pearls_width() + 6 + PixelText.width(String(row["text"]))
+				height = 10
+			"mile":
+				height = 9
 			"sub":
 				width += 10
 				height = 10
@@ -80,6 +95,8 @@ func _measure() -> void:
 				height = 6
 			"stat":
 				width = _label_width + 8 + PEARLS * PEARL_STRIDE + 6 + PixelText.width(String(row["value"]))
+				if String(row.get("bonus", "")) != "":
+					width += 4 + PixelText.width(String(row["bonus"]))
 				height = 10
 			"hint":
 				width += 8
@@ -167,6 +184,21 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 		"title":
 			VineStyle.glow(self, Vector2(PAD + PixelText.width(text) / 2.0, y + 5.0), 18.0, _rarity, 0.12 * p)
 			PixelText.draw(self, text, Vector2i(PAD, y), Color(_rarity, p), shade)
+			var level: int = int(row.get("refine", 0))
+			if level > 0: ## the "+7" after the name, in the colour of its tier
+				var tag: String = "+%d" % level
+				var tone: Color = RefineStyle.color(level)
+				if level >= RefineRules.max_level():
+					tone = tone.lightened(0.2 + 0.2 * sin(_time * 3.0))
+				PixelText.draw(self, tag, Vector2i(PAD + PixelText.width(text) + 4, y), Color(tone, p), shade)
+		"refine":
+			RefineStyle.draw_pearls(self, Vector2(PAD, y + 3), int(row["level"]), int(row["cap"]), p, _time)
+			var count: String = String(row["text"])
+			PixelText.draw(self, count, Vector2i(int(size.x) - PAD - PixelText.width(count), y), Color(RefineStyle.color(int(row["level"])), p), shade)
+		"mile":
+			var reached: bool = bool(row["on"])
+			var mark: Color = RefineStyle.color(int(row["at"])) if reached else UiStyle.TEXT_DIM
+			PixelText.draw(self, text, Vector2i(PAD, y), Color(mark, p * (1.0 if reached else 0.55)), shade)
 		"sub":
 			_draw_bloom(Vector2(PAD + 3.0, y + 5.0), p)
 			PixelText.draw(self, text, Vector2i(PAD + 10, y), Color(UiStyle.TEXT_DIM.lerp(_rarity, 0.3), p), shade)
@@ -186,7 +218,11 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 				if on:
 					draw_rect(Rect2(at, Vector2.ONE), Color(VineStyle.PETAL, p * 0.8))
 			var value: String = String(row["value"])
-			PixelText.draw(self, value, Vector2i(int(size.x) - PAD - PixelText.width(value), y), Color(UiStyle.TEXT, p), shade)
+			var value_x: int = int(size.x) - PAD - PixelText.width(value)
+			PixelText.draw(self, value, Vector2i(value_x, y), Color(UiStyle.TEXT, p), shade)
+			var bonus: String = String(row.get("bonus", ""))
+			if bonus != "": ## what the refinement adds, in the colour of the level
+				PixelText.draw(self, bonus, Vector2i(value_x - 4 - PixelText.width(bonus), y), Color(RefineStyle.color(int(row["level"])), p), shade)
 		"desc":
 			PixelText.draw(self, text, Vector2i(PAD, y), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, void_level * 0.4), p), shade)
 		"hint":
@@ -226,7 +262,32 @@ func _draw_vines(width: int, height: int, void_level: float) -> void:
 
 
 func _number(value: float) -> String:
-	return "%d" % value if is_equal_approx(value, roundf(value)) else "%.1f" % value
+	if is_equal_approx(value, roundf(value)):
+		return "%d" % value
+	return "%.1f" % value if absf(value * 10.0 - roundf(value * 10.0)) < 0.001 else "%.2f" % value
+
+
+## The milestones of the refinement up to the weapon's cap: reached ones in the colour of their level, the rest dim.
+func _add_milestones(stack: Dictionary, level: int) -> void:
+	var all: Dictionary = RefineRules.config().get("milestones", {}) as Dictionary
+	var keys: Array = all.keys()
+	keys.sort_custom(func(a: Variant, b: Variant) -> bool: return int(a) < int(b))
+	var first: bool = true
+	for key: Variant in keys:
+		var at: int = int(key)
+		if at > RefineRules.cap(stack):
+			continue
+		var entry: Dictionary = all[key] as Dictionary
+		var effects: Array[String] = []
+		if entry.has("reach"):
+			effects.append("REICHWEITE +%d" % int(entry["reach"]))
+		if entry.has("speed"):
+			effects.append("TEMPO +%d%%" % roundi(float(entry["speed"]) * 100.0))
+		if first:
+			_rows.append({"type": "rule"})
+			first = false
+		for line: String in _wrap("+%d %s: %s" % [at, String(entry.get("name", "")), " ".join(effects)]):
+			_rows.append({"type": "mile", "text": line, "on": level >= at, "at": at})
 
 
 func _wrap(text: String) -> Array[String]:

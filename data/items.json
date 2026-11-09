@@ -6,6 +6,7 @@
   "weapon_class": "sword_1h",
   "rarity": "common",
   "enchant_slots": 0,
+  "refinable": true,
   "max_stack": 1,
   "hotbar": false,
   "icon": "res://assets/items/sword_basic.png",
@@ -25,6 +26,7 @@
   "weapon_class": "sword_1h",
   "rarity": "uncommon",
   "enchant_slots": 1,
+  "refinable": true,
   "max_stack": 1,
   "hotbar": false,
   "icon": "res://assets/items/sword_iron.png",
@@ -44,6 +46,7 @@
   "weapon_class": "sword_1h",
   "rarity": "legendary",
   "enchant_slots": 2,
+  "refinable": true,
   "max_stack": 1,
   "hotbar": false,
   "icon": "res://assets/items/sword_void.png",
@@ -192,6 +195,36 @@
   "hotbar": false,
   "icon": "res://assets/items/stone.png",
   "description": "Grau mit einem Hauch Violett. Liegt überall herum, am meisten am Ufer."
+ },
+ "iron_ore": {
+  "name": "Eisenerz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/iron_ore.png",
+  "description": "Rostbraune Brocken im blauvioletten Gestein, mit einem Schimmer von rohem Stahl. Ohne Esse nur ein schwerer Stein."
+ },
+ "iron_ingot": {
+  "name": "Eisenbarren",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/iron_ingot.png",
+  "description": "Aus Erz geschmolzen und in Form gegossen. Dunkel, schwer und kalt, wie Eisen sein soll."
+ },
+ "iron_plate": {
+  "name": "Eisenplatte",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/iron_plate.png",
+  "description": "Flach geschlagen und vernietet. Hält Riegel, Tore und Schlimmeres zusammen."
  },
  "glow_cap": {
   "name": "Glimmkappe",

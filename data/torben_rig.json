@@ -1,0 +1,114 @@
+{
+  "frame": [
+    88,
+    104
+  ],
+  "feet": [
+    44,
+    88
+  ],
+  "frames": 100,
+  "rows": 8,
+  "height": 55,
+  "clips": {
+    "idle": {
+      "start": 0,
+      "count": 6,
+      "fps": 5
+    },
+    "walk": {
+      "start": 6,
+      "count": 8,
+      "fps": 8
+    },
+    "run": {
+      "start": 14,
+      "count": 6,
+      "fps": 10
+    },
+    "stand": {
+      "start": 20,
+      "count": 4,
+      "fps": 3
+    },
+    "work": {
+      "start": 24,
+      "count": 8,
+      "fps": 6,
+      "strike": 4
+    },
+    "sledge": {
+      "start": 32,
+      "count": 8,
+      "fps": 7,
+      "strike": 4
+    },
+    "swat": {
+      "start": 40,
+      "count": 5,
+      "fps": 12,
+      "loop": false
+    },
+    "sit_down": {
+      "start": 45,
+      "count": 6,
+      "fps": 8,
+      "loop": false
+    },
+    "sit": {
+      "start": 51,
+      "count": 4,
+      "fps": 3
+    },
+    "bellows": {
+      "start": 55,
+      "count": 6,
+      "fps": 5
+    },
+    "quench": {
+      "start": 61,
+      "count": 6,
+      "fps": 6
+    },
+    "lift": {
+      "start": 67,
+      "count": 6,
+      "fps": 10,
+      "loop": false
+    },
+    "carry": {
+      "start": 73,
+      "count": 4,
+      "fps": 6
+    },
+    "set_down": {
+      "start": 77,
+      "count": 4,
+      "fps": 8,
+      "loop": false
+    },
+    "shove": {
+      "start": 81,
+      "count": 5,
+      "fps": 10,
+      "loop": false
+    },
+    "grab_armor": {
+      "start": 86,
+      "count": 6,
+      "fps": 8
+    },
+    "nod": {
+      "start": 92,
+      "count": 4,
+      "fps": 6,
+      "loop": false
+    },
+    "snort": {
+      "start": 96,
+      "count": 4,
+      "fps": 6,
+      "loop": false
+    }
+  }
+}

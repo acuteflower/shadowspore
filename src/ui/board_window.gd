@@ -288,7 +288,7 @@ func _wrap(text: String, width: int) -> Array[String]:
 
 
 ## The item cell: outline, rarity ring, dark ground, the icon (like `ItemSlot`), optionally big and with a count.
-func draw_cell(at: Vector2, item: String, count: int, big: bool = false, dim: bool = false) -> void:
+func draw_cell(at: Vector2, item: String, count: int, big: bool = false, dim: bool = false, level: int = 0) -> void:
 	var cell: int = 36 if big else ItemSlot.SIZE
 	var stack: Dictionary = {"id": item, "count": count}
 	var ring: Color = Items.rarity_color(stack) if item != "" else UiStyle.RIM
@@ -305,6 +305,7 @@ func draw_cell(at: Vector2, item: String, count: int, big: bool = false, dim: bo
 	if count > 1:
 		var label: String = str(count)
 		_text(at + Vector2(cell - 2 - PixelText.width(label), cell - 9), label, TEXT)
+	RefineStyle.draw_badge(_canvas, level, int(at.x) + cell - 2, int(at.y) + cell - 2) ## a refined weapon's "+7"
 
 
 ## "3/2" chips: an item's icon with what is there and what is needed (red when short).
@@ -450,7 +451,7 @@ func _draw_list(card: Rect2) -> void:
 		if on:
 			_canvas.draw_rect(rect, Color(LIT, 0.12 + 0.05 * sin(_time * 4.0)))
 			_canvas.draw_rect(Rect2(rect.position, Vector2(2, rect.size.y)), LIT)
-		draw_cell(rect.position + Vector2(4, 0), String(row.get("item", "")), int(row.get("count", 1)), false, state != OK)
+		draw_cell(rect.position + Vector2(4, 0), String(row.get("item", "")), int(row.get("count", 1)), false, state != OK, int(row.get("level", 0)))
 		var name_color: Color = TEXT if state == OK else (DIM if on else Color(DIM, 0.75))
 		var sub: String = String(row.get("sub", ""))
 		_text(rect.position + Vector2(30, 4 if sub != "" else 7), String(row.get("name", "")), name_color)
@@ -536,9 +537,11 @@ func _update_tip(card: Rect2) -> void:
 	if item == "" or _closing or not (hovering or not InputManager.using_mouse):
 		_tip.hide()
 		return
-	if not _tip.visible or String(_tip.get_meta("item", "")) != item:
-		_tip.set_meta("item", item)
-		_tip.show_stack({"id": item, "count": 1}, false)
+	var shown: Dictionary = row.get("stack", {"id": item, "count": 1}) as Dictionary ## a refined weapon shows its own card
+	var tip_key: String = "%s:%d:%d" % [item, Items.refine(shown), RefineRules.pity(shown)]
+	if not _tip.visible or String(_tip.get_meta("item", "")) != tip_key:
+		_tip.set_meta("item", tip_key)
+		_tip.show_stack(shown, false)
 		_tip.show()
 	var y: float = card.position.y + LIST_Y + ROW_H * float(focus - scroll)
 	_tip.position = Vector2(card.position.x - _tip.size.x - 10.0, clampf(y, 24.0, 330.0 - _tip.size.y))

@@ -25,6 +25,12 @@ properties/4/replication_mode = 0
 properties/5/path = NodePath(".:story_owner")
 properties/5/spawn = true
 properties/5/replication_mode = 0
+properties/6/path = NodePath(".:refine")
+properties/6/spawn = true
+properties/6/replication_mode = 0
+properties/7/path = NodePath(".:refine_pity")
+properties/7/spawn = true
+properties/7/replication_mode = 0
 
 [node name="ItemDrop" type="Area2D"]
 collision_layer = 0

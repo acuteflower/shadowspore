@@ -43,6 +43,7 @@ func _draw() -> void:
 	var icon: Texture2D = Items.icon(item)
 	if icon:
 		draw_texture(icon, Vector2(2, 2))
+	RefineStyle.draw_badge(self, Items.refine(item), SIZE - 2, SIZE - 2) ## "+7" of a refined weapon
 	var count: int = int(item.get("count", 1))
 	if count > 1:
 		var label: String = str(count)

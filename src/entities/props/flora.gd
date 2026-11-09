@@ -46,6 +46,22 @@ func _wind_material(glow: bool) -> ShaderMaterial:
 	return material
 
 
+## The exact row/column displacement used by flora_wind.gdshaderinc. A resident
+## follows its painted leaf as well as Sprite's skew/scale (including blight).
+func critter_wind_offset(at: Vector2) -> Vector2:
+	var wind: WorldWind = WorldWind.current
+	if not is_instance_valid(wind): return Vector2.ZERO
+	var pixel: Vector2 = at - _sprite.offset
+	var row: float = floorf(pixel.y)
+	var column: float = pixel.x + float(_sprite.frame % _sprite.hframes) * 40.0
+	var height: float = maxf(30.0 - row, 0.0) / 16.0
+	var tick: float = floorf(wind.clock * 12.0) / 12.0
+	var phase: float = fposmod(global_position.x * 0.37 + global_position.y * 0.91, TAU)
+	var ripple: float = sin(tick * 2.4 + row * 0.11 + floorf(column / 5.0) * 1.9 + phase) * 0.35
+	var amount: float = float(_spec.get("sway", 0.02)) * 60.0
+	return Vector2(floorf((WorldWind.sample(global_position).x * amount + ripple) * pow(height, 1.3) + 0.5), 0.0)
+
+
 func _process(delta: float) -> void:
 	super(delta)
 	var tug: float = (Time.get_ticks_msec() / 1000.0 - _tug_from) / Player.PULL_GRAB_TIME

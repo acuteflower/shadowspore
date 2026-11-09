@@ -11,11 +11,6 @@
     "kind": "craft"
    },
    {
-    "id": "order",
-    "name": "BESTELLEN",
-    "kind": "order"
-   },
-   {
     "id": "buy",
     "name": "KAUFEN",
     "kind": "buy"
@@ -182,9 +177,6 @@
    "craft": [
     "DAS KANNST DU SELBST, ICH SCHAU ZU."
    ],
-   "order": [
-    "DAS MACH ICH. ABER NICHT IM HANDUMDREHEN."
-   ],
    "collect": [
     "BITTE SEHR. ORDENTLICHE ARBEIT."
    ],
@@ -202,6 +194,130 @@
    ],
    "missing": [
     "DA FEHLT NOCH WAS."
+   ]
+  },
+  "station": "workshop"
+ },
+ "torben_forge": {
+  "title": "SCHMIEDE",
+  "npc": "torben",
+  "role": "smith",
+  "station": "smithy",
+  "reach": 150.0,
+  "tabs": [
+   {
+    "id": "make",
+    "name": "FERTIGEN",
+    "kind": "craft"
+   },
+   {
+    "id": "order",
+    "name": "BESTELLEN",
+    "kind": "order"
+   },
+   {
+    "id": "buy",
+    "name": "KAUFEN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "VERKAUFEN",
+    "kind": "sell"
+   },
+   {
+    "id": "refine",
+    "name": "VERFEINERN",
+    "kind": "refine"
+   }
+  ],
+  "buy": [
+   {
+    "item": "iron_ingot",
+    "price": 40,
+    "trust": 0
+   },
+   {
+    "item": "iron_plate",
+    "price": 90,
+    "trust": 20
+   },
+   {
+    "item": "sword_basic",
+    "price": 150,
+    "trust": 0
+   }
+  ],
+  "sell": [
+   {
+    "item": "iron_ore",
+    "price": 8
+   },
+   {
+    "item": "iron_ingot",
+    "price": 24
+   },
+   {
+    "item": "iron_plate",
+    "price": 55
+   },
+   {
+    "item": "sword_basic",
+    "price": 30
+   },
+   {
+    "item": "void_slag",
+    "price": 18
+   },
+   {
+    "item": "stone",
+    "price": 3
+   }
+  ],
+  "lines": {
+   "open": [
+    "HM.",
+    "WAS.",
+    "ZEIG."
+   ],
+   "craft": [
+    "HÄLT."
+   ],
+   "order": [
+    "KOMM SPÄTER."
+   ],
+   "collect": [
+    "HIER."
+   ],
+   "buy": [
+    "NIMM."
+   ],
+   "sell": [
+    "GEHT."
+   ],
+   "no_trust": [
+    "NEIN."
+   ],
+   "busy": [
+    "ERST DAS."
+   ],
+   "missing": [
+    "ZU WENIG."
+   ],
+   "refine": [
+    "HM. LASS LIEGEN."
+   ],
+   "verdict_good": [
+    "HÄLT."
+   ],
+   "verdict_risky": [
+    "RISKANT."
+   ],
+   "verdict_bad": [
+    "SCHROTT."
+   ],
+   "verdict_last": [
+    "...JA. NOCH EINMAL."
    ]
   }
  }

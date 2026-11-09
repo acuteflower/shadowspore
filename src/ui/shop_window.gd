@@ -13,6 +13,7 @@ extends BoardWindow
 var shop_id: String = ""
 var def: Dictionary = {}
 var npc: String = ""
+var station: String = "workshop"
 var _craft_left: float = 0.0
 var _craft_total: float = 1.0
 var _craft_id: String = ""
@@ -32,15 +33,38 @@ func _setup_board() -> void:
 	add_to_group("shop_window")
 	def = town.shop(shop_id)
 	npc = String(def.get("npc", ""))
+	station = String(def.get("station", "workshop"))
 	title = String(def.get("title", "HANDEL"))
 	for entry: Variant in def.get("tabs", []) as Array:
 		tabs.append(entry as Dictionary)
 	var person: Settler = town.settler_node(npc)
 	speaker = person
 	focus_world = person.global_position if person != null else player.global_position
+	town.refine_done.connect(_on_refine_done)
 	player.inventory.changed.connect(_on_town_changed) ## the bag and the purse change what can be bought and sold
 	player.progress.changed.connect(_on_town_changed)
 	_say_line("open")
+
+
+## The weapon came back: the card of the answer plays over the window.
+func _on_refine_done(before: Dictionary, after: Dictionary, success: bool, refund: Dictionary) -> void:
+	RefineReveal.present(get_tree(), before, after, success, refund)
+
+
+func _exit_tree() -> void:
+	if town != null and town.refine_done.is_connected(_on_refine_done):
+		town.refine_done.disconnect(_on_refine_done)
+	super()
+
+
+## A one-off sound of the refinement set (assets/audio/refine/).
+func _play_refine(name: String) -> void:
+	var voice: AudioStreamPlayer = AudioStreamPlayer.new()
+	voice.stream = load("res://assets/audio/refine/%s.wav" % name) as AudioStream
+	voice.volume_db = -8.0
+	add_child(voice)
+	voice.finished.connect(voice.queue_free)
+	voice.play()
 
 
 func _say_line(kind: String) -> void:
@@ -70,7 +94,9 @@ func _header_right(right: float, y: float) -> void:
 
 
 func _empty_text() -> String:
-	return "HIER GIBT ES NICHTS" if _kind() != "sell" else "DU TRÄGST NICHTS, DAS GUSTAV WILL"
+	if _kind() == "refine":
+		return "DU TRÄGST KEINE WAFFE, DIE %s VERFEINERN KANN" % String(town.settler_spec(npc).get("name", npc))
+	return "HIER GIBT ES NICHTS" if _kind() != "sell" else "DU TRÄGST NICHTS, DAS %s WILL" % String(town.settler_spec(npc).get("name", npc))
 
 
 # ---------- rows ----------
@@ -110,11 +136,14 @@ func _rebuild() -> void:
 	match _kind():
 		"craft":
 			for id: String in town.recipes():
-				if String((town.recipes()[id] as Dictionary).get("by", "self")) == "self":
+				var made: Dictionary = town.recipes()[id] as Dictionary
+				if String(made.get("by", "self")) == "self" and String(made.get("station", "workshop")) == station:
 					rows.append(_recipe_row(id))
 		"order":
 			for i: int in town.orders.size():
 				var order: Dictionary = town.orders[i] as Dictionary
+				if town.maker_of(order) != npc or TownManager.is_refine(order):
+					continue
 				var recipe: Dictionary = town.recipes().get(String(order.r), {}) as Dictionary
 				var item: String = String((recipe.get("out", {}) as Dictionary).keys()[0])
 				var done: bool = bool(order.done)
@@ -124,8 +153,11 @@ func _rebuild() -> void:
 					"tag": "ABHOLEN" if done else duration_text(town.order_wait(i)), "tag_color": LIT if done else DIM,
 					"state": OK if done else MISSING, "why": "NOCH NICHT FERTIG", "bar": 1.0 - float(order.left) / maxf(float(order.total), 1.0)})
 			for id: String in town.recipes():
-				if String((town.recipes()[id] as Dictionary).get("by", "self")) == "npc":
+				var asked: Dictionary = town.recipes()[id] as Dictionary
+				if String(asked.get("by", "self")) == "npc" and String(asked.get("npc", "gustav")) == npc:
 					rows.append(_recipe_row(id))
+		"refine":
+			_rebuild_refine()
 		"buy":
 			for entry: Variant in def.get("buy", []) as Array:
 				var offer: Dictionary = entry as Dictionary
@@ -137,20 +169,60 @@ func _rebuild() -> void:
 		"sell":
 			for entry: Variant in def.get("sell", []) as Array:
 				var offer: Dictionary = entry as Dictionary
-				var have: int = player.inventory.count_item(String(offer.item))
+				var have: int = player.inventory.count_plain(String(offer.item))
 				rows.append({"kind": "sell", "item": String(offer.item), "count": have, "name": _item_name(String(offer.item)), "sub": "IM RUCKSACK" if have > 0 else "DU HAST KEINS",
 					"tag": Currency.short_text(int(offer.price)), "tag_color": GOLD, "state": OK if have > 0 else MISSING, "why": "DU HAST KEIN %s" % _item_name(String(offer.item)), "price": int(offer.price)})
 
 
+## The refine tab: the weapons on the anvil first (they wait, work or can be collected), then every refinable weapon she carries or wears.
+func _rebuild_refine() -> void:
+	for i: int in town.orders.size():
+		var order: Dictionary = town.orders[i] as Dictionary
+		if town.maker_of(order) != npc or not TownManager.is_refine(order):
+			continue
+		var weapon: Dictionary = order.w as Dictionary
+		var done: bool = bool(order.done)
+		var working: bool = not done and town.order_wait(i) <= float(order.left) + 0.01 and i == _first_open()
+		rows.append({"kind": "queue", "index": i, "recipe": "refine", "item": String(weapon.id), "count": 1, "level": Items.refine(weapon), "stack": weapon, "name": Items.title(weapon),
+			"sub": "FERTIG, LIEGT AUF DER BANK" if done else ("AUF +%d, %s ARBEITET DARAN" % [int(order.to), String(town.settler_spec(npc).get("name", npc))] if working else "AUF +%d, WARTET" % int(order.to)),
+			"tag": "ABHOLEN" if done else duration_text(town.order_wait(i)), "tag_color": LIT if done else DIM, "state": OK if done else MISSING, "why": "NOCH NICHT FERTIG",
+			"bar": 1.0 - float(order.left) / maxf(float(order.total), 1.0)})
+	var worn: Dictionary = player.inventory.equipment.get("main_hand", {}) as Dictionary
+	if RefineRules.is_refinable(worn):
+		rows.append(_weapon_row("equip", "main_hand", worn))
+	for i: int in InventoryComponent.SIZE:
+		var stack: Dictionary = player.inventory.slots[i] as Dictionary
+		if RefineRules.is_refinable(stack):
+			rows.append(_weapon_row("inv", i, stack))
+
+
+func _weapon_row(slot_kind: String, slot_ref: Variant, stack: Dictionary) -> Dictionary:
+	var level: int = Items.refine(stack)
+	var can: bool = RefineRules.can_refine(stack)
+	var why: String = town.refine_block(stack, player)
+	var state: int = OK if why == "" else (LOCKED if ("TRAUT" in why or "HÖHER" in why) else MISSING)
+	var odds: float = RefineRules.chance(stack)
+	var sub: String = "+%d > +%d" % [level, level + 1] if can else "HÖHER GEHT ES NICHT"
+	if slot_kind == "equip":
+		sub = "ANGELEGT  " + sub
+	return {"kind": "refine", "item": String(stack.id), "count": 1, "level": level, "stack": stack, "name": Items.title(stack), "sub": sub,
+		"tag": "%d %%" % roundi(odds * 100.0) if can else "", "tag_color": _odds_color(odds), "state": state, "why": why, "slot_kind": slot_kind, "slot_ref": slot_ref}
+
+
+## Colour of a chance: good (> 70 %), risky (30 .. 70 %), bad.
+func _odds_color(odds: float) -> Color:
+	return [LIT, GOLD, BAD][RefineRules.verdict(odds)] as Color
+
+
 func _first_open() -> int:
 	for i: int in town.orders.size():
-		if not bool((town.orders[i] as Dictionary).done):
+		if not bool((town.orders[i] as Dictionary).done) and town.maker_of(town.orders[i] as Dictionary) == npc:
 			return i
 	return -1
 
 
 func _tab_changed() -> void:
-	if _kind() == "order":
+	if _kind() in ["order", "refine"]:
 		_say_line("order")
 
 
@@ -159,7 +231,10 @@ func _tab_changed() -> void:
 func _detail(area: Rect2, row: Dictionary) -> void:
 	var kind: String = String(row.kind)
 	var item: String = String(row.item)
-	draw_cell(area.position + Vector2(0, 2), item, 1, true)
+	if kind == "refine":
+		_detail_refine(area, row)
+		return
+	draw_cell(area.position + Vector2(0, 2), item, 1, true, false, int(row.get("level", 0)))
 	var x: float = area.position.x + 46.0
 	_text(Vector2(x, area.position.y + 4.0), String(row.name), GOLD)
 	var definition: Dictionary = DataRegistry.get_entry("items", item)
@@ -179,8 +254,8 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 				cx += width
 			if kind == "order":
 				var wait: String = "%s BRAUCHT %s" % [String(town.settler_spec(npc).get("name", npc)), duration_text(float(recipe.get("work", 0.0)))]
-				if town.orders.size() > 0:
-					wait += "  NACH %d AUFTRAG" % town.orders.size()
+				if town.orders_of(npc) > 0:
+					wait += "  NACH %d AUFTRAG" % town.orders_of(npc)
 				_text(Vector2(area.position.x, area.position.y + 64.0), wait, DIM)
 		"queue":
 			_text(Vector2(area.position.x, area.position.y + 46.0), String(row.sub), LIT if bool((town.orders[int(row.index)] as Dictionary).done) else DIM)
@@ -193,6 +268,65 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 			_text(Vector2(area.position.x, area.position.y + 46.0), "%s %s DAS STÜCK" % [verb, Currency.short_text(int(row.price))], GOLD)
 			if kind == "sell":
 				_text(Vector2(area.position.x, area.position.y + 58.0), "SHIFT: ALLES  (%s)" % Currency.short_text(int(row.price) * int(row.count)), DIM)
+
+
+## The weapon big on the left with its fifteen pearls, what the next level gives, what it costs (material chips and copper), how long Torben needs and the chance as a bar
+## (the gold piece is the Glut of earlier failures), with Torben's verdict beside it.
+func _detail_refine(area: Rect2, row: Dictionary) -> void:
+	var stack: Dictionary = row.stack as Dictionary
+	var level: int = Items.refine(stack)
+	var cap: int = RefineRules.cap(stack)
+	draw_cell(area.position + Vector2(0, 2), String(row.item), 1, true, false, level)
+	var x: float = area.position.x + 46.0
+	_text(Vector2(x, area.position.y + 2.0), String(row.name), GOLD)
+	RefineStyle.draw_pearls(_canvas, Vector2(x, area.position.y + 14.0), level, cap, 1.0, _time)
+	_text(Vector2(x + float(RefineStyle.pearls_width()) + 6.0, area.position.y + 12.0), "%d/%d" % [level, cap], RefineStyle.color(level))
+	if not RefineRules.can_refine(stack):
+		_text(Vector2(x, area.position.y + 28.0), "HÖHER GEHT ES NICHT.", DIM)
+		return
+	var target: int = RefineRules.next_level(stack)
+	var after: Dictionary = RefineRules.result(stack, true)
+	var damage_now: float = Items.stat(stack, "damage")
+	var gains: String = "SCHADEN %s > %s" % [_num(damage_now), _num(Items.stat(after, "damage"))]
+	for m: Dictionary in RefineRules.milestones(target):
+		if int(m.level) == target:
+			gains += "   +%d %s" % [target, String(m.get("name", ""))]
+	_text(Vector2(x, area.position.y + 24.0), gains, LIT)
+	var cx: float = area.position.x
+	var cy: float = area.position.y + 36.0
+	var mats: Dictionary = RefineRules.materials(stack, target)
+	for need_item: String in mats:
+		cx += draw_chip(Vector2(cx, cy), need_item, town.available(need_item, player), int(mats[need_item]))
+	var price: int = RefineRules.copper(stack, target)
+	_text(Vector2(cx, cy + 6.0), Currency.short_text(price), GOLD if player.progress.copper >= price else BAD)
+	var right: float = area.end.x - 4.0
+	var wait: String = "%s BRAUCHT %s" % [String(town.settler_spec(npc).get("name", npc)), duration_text(RefineRules.work_seconds(stack, target))]
+	_text(Vector2(right - float(PixelText.width(wait)), area.position.y + 4.0), wait, DIM)
+	var odds: float = RefineRules.chance(stack)
+	var glut: float = RefineRules.pity_bonus(stack)
+	var tone: Color = _odds_color(odds)
+	var bar_y: float = area.position.y + 60.0
+	_canvas.draw_rect(Rect2(area.position.x, bar_y, 150.0, 6.0), UiStyle.OUTLINE)
+	_canvas.draw_rect(Rect2(area.position.x + 1.0, bar_y + 1.0, 148.0, 4.0), Color(0, 0, 0, 0.55))
+	_canvas.draw_rect(Rect2(area.position.x + 1.0, bar_y + 1.0, 148.0 * clampf(odds - glut, 0.0, 1.0), 4.0), tone)
+	if glut > 0.0:
+		_canvas.draw_rect(Rect2(area.position.x + 1.0 + 148.0 * (odds - glut), bar_y + 1.0, 148.0 * glut, 4.0), Color("fff0b0"))
+	var odds_text: String = "CHANCE %d %%" % roundi(odds * 100.0)
+	if glut > 0.0:
+		odds_text += "  GLUT +%d %%" % roundi(glut * 100.0)
+	_text(Vector2(area.position.x + 158.0, bar_y), odds_text, tone)
+	var lines: Dictionary = def.get("lines", {}) as Dictionary
+	var key: String = "verdict_last" if target >= RefineRules.max_level() else ["verdict_good", "verdict_risky", "verdict_bad"][RefineRules.verdict(odds)]
+	var verdicts: Array = lines.get(key, []) as Array
+	if not verdicts.is_empty():
+		var quote: String = String(verdicts[0])
+		_text(Vector2(right - float(PixelText.width(quote)), bar_y), quote, TEXT)
+	if String(row.slot_kind) == "equip":
+		_text(Vector2(right - float(PixelText.width("ANGELEGT, DANN HAST DU KEINE WAFFE")), area.position.y + 24.0), "ANGELEGT, DANN HAST DU KEINE WAFFE", Color(BAD, 0.8))
+
+
+func _num(value: float) -> String:
+	return "%d" % value if is_equal_approx(value, roundf(value)) else ("%.1f" % value if absf(value * 10.0 - roundf(value * 10.0)) < 0.001 else "%.2f" % value)
 
 
 # ---------- buttons and actions ----------
@@ -219,6 +353,8 @@ func _buttons() -> Array[Dictionary]:
 			return [{"id": "order", "label": "BESTELLEN", "ready": ready}]
 		"queue":
 			return [{"id": "collect", "label": "ABHOLEN", "ready": ready}]
+		"refine":
+			return [{"id": "refine", "label": "VERFEINERN", "ready": ready}]
 		"buy":
 			return [{"id": "buy", "label": "KAUFEN", "ready": ready}, {"id": "buy10", "label": "10 X", "ready": ready and player.progress.copper >= int(row.price) * 2}]
 		"sell":
@@ -242,6 +378,10 @@ func _press(id: String, bulk: bool) -> void:
 		"collect":
 			town.request_collect(int(row.index))
 			_say_line("collect")
+		"refine":
+			town.request_refine(String(row.slot_kind), row.slot_ref)
+			_say_line("refine")
+			_play_refine("hand_in")
 		"buy", "buy10":
 			town.request_trade(shop_id, "buy", String(row.item), 10 if (id == "buy10" or bulk) else 1)
 			_sound("coin")

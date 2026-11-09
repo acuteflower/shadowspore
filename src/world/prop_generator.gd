@@ -37,10 +37,12 @@ const LAYERS: Array[Dictionary] = [
 	{"id": 21, "name": "fairy_ring", "cell": 44, "reach": 9},
 	{"id": 22, "name": "water_edge", "cell": 4, "reach": 4},
 	{"id": 23, "name": "lone_snapper", "cell": 21, "reach": 3},
+	{"id": 24, "name": "lone_ore", "cell": 28, "reach": 4},
+	{"id": 25, "name": "ore_formation", "cell": 60, "reach": 10},
 ]
 const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail"] ## may grow at the water's edge
 const TREE_KINDS: Array[String] = ["tree", "willow", "blossom", "birch"] ## what has a trunk and a crown
-const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3} ## mushrooms give way to everything, so they never change what else stands where
+const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "iron_rock": 3.05, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3} ## mushrooms give way to everything, so they never change what else stands where
 const BED_RX: Array[float] = [40.0, 48.0, 56.0, 64.0, 72.0, 80.0] ## px, the gravel beds (assets/props/stonebed.png)
 const BED_FLATTEN: float = 0.64
 const GAP: float = 3.0 ## px kept free between footprints
@@ -53,6 +55,9 @@ const YOUNG_GROW_DAYS: float = 7.0 ## days a generated sapling needs to become a
 const BUCKET: float = 72.0 ## px, grid for the overlap search (bigger than any two footprints together)
 const SMALL_ROCKS: Array[int] = [0, 1, 4, 5, 6]
 const BIG_ROCKS: Array[int] = [1, 2, 3, 5, 6, 7]
+const ORE_VARIANT: Array[int] = [0, 1, 2, 3, 4, 3, 1, 5] ## the iron rock (data/plants.json "iron_rock", 6 variants) that stands in for each stone rock variant
+const ORE_IN_FORMATION: int = 6 ## percent of the small rocks of an ordinary rock formation that are iron ore instead (decided by position: no random draw, so the rest stays as it was)
+const ORE_IN_ORE_FORMATION: int = 45 ## the same inside an ore formation (its big rock is always ore)
 
 var water_clear: Callable
 var water_dist: Callable ## px from the nearest water's edge at a world position (INF when none is near), set by the world level
@@ -269,6 +274,13 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 					_add(found, rng, "rock", SMALL_ROCKS[rng.randi() % SMALL_ROCKS.size()], center)
 				else:
 					_add(found, rng, "pebble", _weighted(rng, "pebble"), center)
+		"lone_ore": ## single iron rocks: rarer than stone, more at the foot of cliffs and on the high ground, a little more in the wild
+			var tile: Vector2i = Vector2i(floori(center.x), floori(center.y))
+			if rng.randf() < 0.2 + 0.3 * (1.0 if _relief.wall_above(tile) else 0.0) + 0.08 * smoothstep(0.5, 2.0, _relief.level_at(center * 16.0)) + 0.08 * wild:
+				_add(found, rng, "iron_rock", _weighted(rng, "iron_rock"), center)
+		"ore_formation": ## a rock formation whose big rock is iron ore, with ore among the smaller ones
+			if rng.randf() < 0.3 + 0.25 * wild:
+				_formation(found, rng, center, true)
 		"lone_mushroom":
 			if rng.randf() < (0.1 + 0.5 * shade) * (0.5 + damp): ## they like the shade (and north slopes and cliff feet) and the damp
 				_add(found, rng, "mushroom", _weighted(rng, "mushroom"), center)
@@ -357,17 +369,26 @@ func _grove(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector
 
 ## A rock formation: a bed of gravel with one big rock, smaller ones around it and pebbles between.
 ## This is the only place stones lie in groups.
-func _formation(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2) -> void:
+func _formation(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2, ore: bool = false) -> void:
 	var idx: int = rng.randi_range(1, BED_RX.size() - 1)
 	var rx: float = BED_RX[idx] / 16.0 ## bed radius in tiles
 	found.append({"cell": Vector2i(floori(center.x), floori(center.y)), "kind": "stonebed", "variant": idx, "pos": Vector2(floori(center.x), floori(center.y)) * 16.0 + Vector2(8, 8), "foot": 0.0, "crown": 0.0, "prio": -1.0})
 	if not _bed_valid(center, rx):
 		found.clear()
 		return
-	_add(found, rng, "rock", BIG_ROCKS[rng.randi() % BIG_ROCKS.size()] if rng.randf() > 0.15 else 7, center)
-	for _i: int in rng.randi_range(2, 5):
+	var big: int = BIG_ROCKS[rng.randi() % BIG_ROCKS.size()] if rng.randf() > 0.15 else 7
+	if ore:
+		_add(found, rng, "iron_rock", ORE_VARIANT[big], center)
+	else:
+		_add(found, rng, "rock", big, center)
+	for i: int in rng.randi_range(2, 5):
 		var at: Vector2 = center + _on_bed(rng, rx, 0.45, 0.8)
-		_add(found, rng, "rock", SMALL_ROCKS[rng.randi() % SMALL_ROCKS.size()], at)
+		var small: int = SMALL_ROCKS[rng.randi() % SMALL_ROCKS.size()]
+		var percent: int = ORE_IN_ORE_FORMATION if ore else ORE_IN_FORMATION
+		if absi(hash(Vector3i(floori(center.x), floori(center.y), 91 + i))) % 100 < percent:
+			_add(found, rng, "iron_rock", ORE_VARIANT[small], at)
+		else:
+			_add(found, rng, "rock", small, at)
 	for _i: int in rng.randi_range(7, 18):
 		_add(found, rng, "pebble", _weighted(rng, "pebble"), center + _on_bed(rng, rx, 0.2, 0.95))
 
@@ -675,7 +696,7 @@ func _foot(plant: Dictionary, kind: String, variant: int) -> float:
 	match kind:
 		"tree", "willow", "blossom":
 			return maxf(float((plant.trunk_half_width as Array)[variant]) * 1.6 + 8.0, float((plant.crown_half_width as Array)[variant]) * 0.5)
-		"rock":
+		"rock", "iron_rock":
 			return float((plant.radius as Array)[variant]) * 0.9
 		"pebble":
 			return float((plant.radius as Array)[variant]) * 0.6

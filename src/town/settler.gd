@@ -317,6 +317,32 @@ func _work_sound(delta: float, cfg: Dictionary) -> void:
 		add_child(player)
 		player.finished.connect(player.queue_free)
 		player.play()
+		var heat: int = town.refine_heat(sid) if town != null else 0
+		if heat > 0: ## he works on a weapon that is being refined: the higher the level, the more and the brighter the sparks
+			_anvil_sparks(heat, cfg)
+
+
+## Sparks off the anvil when the hammer hits a refined weapon: more with every level, orange at first, in the colour of the level above +5.
+func _anvil_sparks(level: int, cfg: Dictionary) -> void:
+	var burst: CPUParticles2D = CPUParticles2D.new()
+	burst.one_shot = true
+	burst.amount = 5 + level * 2
+	burst.lifetime = 0.5
+	burst.explosiveness = 1.0
+	burst.direction = Vector2.UP
+	burst.spread = 80.0
+	burst.gravity = Vector2(0.0, 150.0)
+	burst.initial_velocity_min = 24.0
+	burst.initial_velocity_max = 48.0 + float(level) * 3.0
+	burst.scale_amount_min = 0.8
+	burst.scale_amount_max = 1.2
+	burst.color = Color("ff9a4a").lerp(RefineStyle.color(level), clampf(float(level - 5) / 10.0, 0.0, 1.0)).lightened(0.15)
+	burst.material = Unlit.material()
+	burst.position = _vec(cfg.get("face", [0, -1])) * 11.0 + Vector2(0.0, -9.0)
+	burst.z_index = 2
+	add_child(burst)
+	burst.emitting = true
+	get_tree().create_timer(1.0).timeout.connect(burst.queue_free)
 
 
 ## A few pale chips fly from the log on the splitting block when the mallet drives the wedge in (spot `chips`; the block is a step `reach` px in front of them).
@@ -459,11 +485,19 @@ func trust_tier() -> int:
 	return tier
 
 
+## Is a finished commission of this settler waiting on the bench?
+func _order_waits() -> bool:
+	for order: Variant in town.orders:
+		if bool((order as Dictionary).done) and town.maker_of(order as Dictionary) == sid:
+			return true
+	return false
+
+
 func interact(player: Player) -> void:
 	if _talking or not town.residents.has(sid):
 		return
-	if spec.has("chat"):
-		_chat(player)
+	if spec.has("chat") and not (spec.has("shop") and (is_working() or _order_waits())):
+		_chat(player) ## a talker with a shop (Torben) only chats while he is away from his bench
 		return
 	_talking = true
 	_sector = Adventurer.sector_of(player.global_position - global_position)
@@ -481,10 +515,7 @@ func interact(player: Player) -> void:
 		var speech: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
 		if speech != null and not barks.is_empty():
 			speech.speak(String(spec.name), String(barks[randi() % barks.size()]))
-	var ready_order: bool = false
-	for order: Variant in town.orders:
-		ready_order = ready_order or bool((order as Dictionary).done)
-	if (is_working() or (ready_order and visible)) and spec.has("shop"): ## at the bench, or on a break when a finished piece waits for you
+	if (is_working() or (_order_waits() and visible)) and spec.has("shop"): ## at the bench, or on a break when a finished piece waits for you
 		ShopWindow.open(get_tree(), player, town, String(spec.shop))
 	_talking = false
 

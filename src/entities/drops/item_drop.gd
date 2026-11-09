@@ -25,6 +25,8 @@ const BAYER: Array = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 
 @export var story_owner: int = 0
 @export var item_id: String = ""
 @export var count: int = 1
+@export var refine: int = 0 ## a thrown refined weapon keeps its level ...
+@export var refine_pity: int = 0 ## ... and its Glut
 @export var launch: Vector2 = Vector2.ZERO ## horizontal speed of the pop
 
 var _age: float = 0.0
@@ -46,8 +48,12 @@ var _pull_speed: float = 0.0
 func _ready() -> void:
 	material = Unlit.material() ## loot stays easy to spot at night
 	_stack = {"id": item_id, "count": count}
+	if refine > 0:
+		_stack[RefineRules.KEY_LEVEL] = refine
+	if refine_pity > 0:
+		_stack[RefineRules.KEY_PITY] = refine_pity
 	var def: Dictionary = Items.definition(_stack)
-	_label = String(def.get("name", "?"))
+	_label = Items.title(_stack)
 	_rarity_color = Items.rarity_color(_stack)
 	_rarity_index = DataRegistry.table("rarities").keys().find(String(def.get("rarity", "common")))
 	_velocity = launch
@@ -101,7 +107,7 @@ func _host_tick() -> void:
 
 ## Host: hands the stack to the player; a full bag leaves what does not fit lying there.
 func _collect(player: Player) -> void:
-	var left: int = player.inventory.give(item_id, count)
+	var left: int = player.inventory.give(item_id, count, Items.extras(_stack))
 	if left < count:
 		if story_id == "knight_sword":
 			var world: Node = get_tree().get_first_node_in_group("world")
@@ -141,7 +147,7 @@ func _player_by_id(player_id: int) -> Player:
 
 ## Host: folds this drop into a landed drop of the same item nearby, if the stack limit allows.
 func _try_merge() -> bool:
-	if story_id != "":
+	if story_id != "" or refine > 0 or refine_pity > 0:
 		return false
 	if _merged:
 		return true
@@ -150,6 +156,8 @@ func _try_merge() -> bool:
 		var other: ItemDrop = node as ItemDrop
 		if other == null or other.story_id != "" or other == self or other._merged or not other._landed or other.item_id != item_id:
 			continue
+		if other.refine != refine or other.refine_pity != refine_pity:
+			continue ## a refined weapon is its own piece
 		if other.position.distance_to(position) > MERGE_RADIUS or other.count + count > limit:
 			continue
 		_merged = true

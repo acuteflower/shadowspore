@@ -49,6 +49,10 @@ var held_weapon: String = "": ## item id shown in the hand, synced by the owner
 	set(value):
 		held_weapon = value
 		_refresh_weapon()
+var _blade_angle: float = 0.0 ## the blade's angle and length factor as the pose put them this frame (refinement glints run along it)
+var _blade_scale: float = 1.0
+var _edge_clock: float = 0.0
+var held_refine: int = 0 ## its refinement level (RefineRules), synced with it: every peer draws the same reach and tempo
 
 var _since_swing: float = OUT_OF_COMBAT + 1.0 ## seconds since the last swing; the weapon starts put away
 var _phase: Phase = Phase.IDLE
@@ -99,6 +103,7 @@ func _process(delta: float) -> void:
 		_trail_age = 0.0
 	elif _trail_age < TRAIL_FADE:
 		_trail_age += delta
+	_edge_glints(delta)
 	_update_motes(delta)
 	_trail.queue_redraw()
 
@@ -152,7 +157,7 @@ func attack(dir: Vector2) -> void:
 	var step: int = _combo_index
 	_combo_index += 1
 	dir = dir.normalized()
-	_swing.rpc(dir, held_weapon, step)
+	_swing.rpc(dir, held_weapon, step, held_refine)
 	if multiplayer.is_server():
 		_server_swing(dir, step)
 	else:
@@ -160,12 +165,13 @@ func attack(dir: Vector2) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _swing(dir: Vector2, weapon_id: String, step_index: int) -> void:
+func _swing(dir: Vector2, weapon_id: String, step_index: int, refine_level: int = 0) -> void:
 	var def: Dictionary = DataRegistry.get_entry("items", weapon_id)
-	_step = _step_data(def, step_index)
+	var stack: Dictionary = _stack_of(weapon_id, refine_level)
+	_step = _step_data(stack, step_index)
 	if _step.is_empty():
 		return
-	_reach = float(def.get("stats", {}).get("reach", 22)) * float(_step["reach"])
+	_reach = Items.stat(stack, "reach", 22.0) * float(_step["reach"])
 	_combo_window = float(DataRegistry.get_entry("weapon_classes", String(def.get("weapon_class", ""))).get("combo_window", 0.5))
 	aim_dir = dir
 	_phase = Phase.WINDUP
@@ -188,7 +194,7 @@ func _server_swing(dir: Vector2, step_index: int) -> void:
 	if now < _server_ready_msec or stack.is_empty() or dir == Vector2.ZERO:
 		return
 	var def: Dictionary = Items.definition(stack)
-	var step: Dictionary = _step_data(def, step_index)
+	var step: Dictionary = _step_data(stack, step_index)
 	if step.is_empty():
 		return
 	if step_index != 0 and (step_index != _server_combo_index or now > _server_combo_until): return
@@ -200,15 +206,15 @@ func _server_swing(dir: Vector2, step_index: int) -> void:
 	await get_tree().physics_frame
 	if is_inside_tree() and (get_parent() as Player).health.current > 0 and _phase != Phase.IDLE:
 		_confirm_stage.rpc_id(get_multiplayer_authority(), String(stack.id), step_index)
-		_hit_scan(dir.normalized(), step, def.get("stats", {}))
+		_hit_scan(dir.normalized(), step, stack)
 
 
 ## Hits every hurtbox inside the swing's fan once, then tells everyone where it connected.
-func _hit_scan(dir: Vector2, step: Dictionary, stats: Dictionary) -> void:
+func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 	var origin: Vector2 = global_position + BODY_CENTER
-	var damage: float = float(stats.get("damage", 1)) * float(step["damage"])
-	var knockback: float = float(stats.get("knockback", 0)) * float(step["knock"])
-	var targets: Array[HurtboxComponent] = HitScan.fan(self, origin, dir, float(stats.get("reach", 20)) * float(step["reach"]), float(step["arc"]), HURTBOX_MASK)
+	var damage: float = Items.stat(stack, "damage", 1.0) * float(step["damage"]) ## the stack's own stats: a refined weapon hits harder
+	var knockback: float = Items.stat(stack, "knockback", 0.0) * float(step["knock"])
+	var targets: Array[HurtboxComponent] = HitScan.fan(self, origin, dir, Items.stat(stack, "reach", 20.0) * float(step["reach"]), float(step["arc"]), HURTBOX_MASK)
 	for target: HurtboxComponent in targets:
 		target.take_hit(damage, origin, knockback, get_multiplayer_authority())
 	if not targets.is_empty():
@@ -262,12 +268,13 @@ func _combo_size(def: Dictionary) -> int:
 
 
 ## One combo step with its times scaled by the weapon's `speed` stat.
-func _step_data(def: Dictionary, index: int) -> Dictionary:
+func _step_data(stack: Dictionary, index: int) -> Dictionary:
+	var def: Dictionary = Items.definition(stack)
 	var combo: Array = DataRegistry.get_entry("weapon_classes", String(def.get("weapon_class", ""))).get("combo", [])
 	if combo.is_empty():
 		return {}
 	var step: Dictionary = combo[clampi(index, 0, combo.size() - 1)]
-	var speed: float = maxf(float(def.get("stats", {}).get("speed", 1.0)), 0.1)
+	var speed: float = maxf(Items.stat(stack, "speed", 1.0), 0.1)
 	return {
 		"style": String(step.get("style", "slash")),
 		"sweep": float(step.get("sweep", 1)),
@@ -281,6 +288,14 @@ func _step_data(def: Dictionary, index: int) -> Dictionary:
 		"lunge": float(step.get("lunge", 0)),
 		"shake": float(step.get("shake", 1)),
 	}
+
+
+## A stack as every peer knows it from the synced item id and refinement level.
+static func _stack_of(weapon_id: String, refine_level: int) -> Dictionary:
+	var stack: Dictionary = {"id": weapon_id, "count": 1}
+	if refine_level > 0:
+		stack[RefineRules.KEY_LEVEL] = refine_level
+	return stack
 
 
 func _refresh_weapon() -> void:
@@ -373,6 +388,8 @@ func _update_pose(delta: float) -> void:
 				length = lerpf(1.0, _rest_length, t)
 	pos = rig_shoulder + (pos - rig_shoulder).limit_length(ARM_UPPER + ARM_FORE - 0.6) ## the arm only reaches so far
 	_hand.position = Vector2(0, -HAND_SORT if behind else HAND_SORT)
+	_blade_angle = angle
+	_blade_scale = length
 	_grip = pos
 	_weapon.position = (pos - _hand.position).round() + Vector2(0.5, 0.5) ## the middle of the glove's pixel
 	var step: int = roundi(wrapf(angle, 0.0, TAU) / TAU * float(ROT_ANGLES)) % ROT_ANGLES
@@ -453,7 +470,42 @@ func _draw_trail() -> void:
 		else:
 			_draw_slash_trail(alpha)
 	_draw_burst()
+	_draw_edge_glow()
 	_draw_motes()
+
+
+## A refined blade glints: from +10 now and then a twinkle somewhere along the edge, at +15 many of them and a thin gold light along the whole blade.
+func _edge_glints(delta: float) -> void:
+	if held_refine < 10 or not _has_weapon or _weapon_alpha < 0.4 or always_drawn:
+		return
+	_edge_clock += delta
+	var every: float = 0.11 if held_refine >= RefineRules.max_level() else 0.5
+	if _edge_clock < every:
+		return
+	_edge_clock = 0.0
+	var blade: Vector2 = _blade_vector()
+	var colour: Color = RefineStyle.color(held_refine).lightened(0.25)
+	if held_refine >= RefineRules.max_level() and randf() < 0.3:
+		colour = Color("ff9ae6") ## a touch of the void's magenta in the perfect blade
+	_motes.append({"pos": _grip_world() + blade * randf_range(0.35, 1.0), "vel": Vector2(randf_range(-4.0, 4.0), randf_range(-12.0, -4.0)), "age": 0.0, "life": randf_range(0.3, 0.55), "kind": 1 if randf() < 0.6 else 0, "color": colour, "size": 1.0})
+
+
+## The blade from the hilt to the tip in world px as the pose shows it now (a reach-long blade, shortened by foreshortening).
+func _blade_vector() -> Vector2:
+	return Vector2.from_angle(_blade_angle) * Items.stat(_stack_of(held_weapon, held_refine), "reach", 24.0) * 0.8 * clampf(_blade_scale, 0.4, 1.0)
+
+
+func _grip_world() -> Vector2:
+	return _hand.global_position + _weapon.position
+
+
+func _draw_edge_glow() -> void:
+	if held_refine < RefineRules.max_level() or not _has_weapon or _weapon_alpha < 0.4 or always_drawn:
+		return
+	var from: Vector2 = _trail.to_local(_grip_world()).round()
+	var to: Vector2 = _trail.to_local(_grip_world() + _blade_vector()).round()
+	var pulse: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+	_trail.draw_line(from.lerp(to, 0.25), to, Color(RefineStyle.GOLD, (0.22 + 0.22 * pulse) * _weapon_alpha), 1.0)
 
 
 ## The blade sheds sparkles while it is in the air: they fly on along its path, rise a little and fade.

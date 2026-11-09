@@ -219,6 +219,8 @@ func _build_items() -> void:
 			_add(0, "button", "AUF 5 HP SETZEN", "", {"action": "hurt5"})
 			if multiplayer.is_server():
 				_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
+				for lvl: int in [0, 5, 10, 15]:
+					_add(0, "button", "WAFFE +%d" % lvl, "", {"action": "refine_%d" % lvl}) ## sets the refinement of the weapon in her hand
 			if multiplayer.is_server():
 				_add(0, "heading", "ANGELN")
 				_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
@@ -230,6 +232,7 @@ func _build_items() -> void:
 				_add(0, "button", "ZURÜCK MIT DER AXT", "", {"action": "return_home"})
 				_add(0, "button", "FERTIGE STADT", "", {"action": "town_jump"})
 				_add(0, "button", "GUSTAV GERETTET", "", {"action": "gustav_jump"})
+				_add(0, "button", "ALLES FERTIG + TORBEN", "", {"action": "all_jump"})
 			if story_world != null and multiplayer.is_server() and multiplayer.get_peers().is_empty():
 				_add(0, "heading", "MINE")
 				for lvl: int in [1, 5, 10, 20]:
@@ -482,6 +485,15 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			town_world.debug_jump_town()
+		"all_jump":
+			var all_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+			if all_world == null or not all_world.debug_can_return_home():
+				_failed_flash = 2.5
+				return
+			_set_open(false)
+			_open_t = 0.0
+			visible = false
+			all_world.debug_jump_town(true)
 		"gustav_jump":
 			var gustav_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if gustav_world == null or not gustav_world.debug_can_return_home():
@@ -551,6 +563,10 @@ func _run_action(action: String) -> void:
 		"hurt5":
 			if _player != null:
 				_player.call("request_set_health", 5.0)
+		"refine_0", "refine_5", "refine_10", "refine_15":
+			var smith: Player = _player as Player
+			if smith == null or not multiplayer.is_server() or not smith.inventory.debug_set_refine(action.trim_prefix("refine_").to_int()):
+				_failed_flash = 2.5
 		"strong_sword": ## the void blade (30 damage) into the bag and into her hand (host)
 			var fighter: Player = _player as Player
 			if fighter == null or not multiplayer.is_server():

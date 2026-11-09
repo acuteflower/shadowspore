@@ -9,6 +9,7 @@ signal changed ## anything: pieces, progress, stock, residents, name
 signal town_founded
 signal built(piece: String, id: int)
 signal resident_joined(settler: String)
+signal refine_done(before: Dictionary, after: Dictionary, success: bool, refund: Dictionary) ## the local player collected a refined weapon: the reveal card plays
 signal notice(text: String, good: bool) ## a short message for the local builder ("NICHT GENUG HOLZ")
 signal event(kind: String, data: Dictionary) ## what happened to the town, on every peer: "lamp_out", "level_up", "alert" (docs/town_ausbau.md; the settlers' chatter and the map listen)
 
@@ -34,7 +35,7 @@ var paths: Array = [] ## trampled ways {s: structure id, p: [[x, y], ...] from a
 var _path_root: Node2D
 const MAX_ORDERS: int = 3
 
-var orders: Array = [] ## what a settler is making on commission: {r recipe id, left work seconds, total, done}; they work only while at their bench, anyone collects
+var orders: Array = [] ## what a settler is making on commission: {r recipe id, left work seconds, total, done}; they work only while at their bench, anyone collects. A refinement is one too: {r "refine", k "refine", m maker, w the weapon as it was handed in, to the level it is meant to reach, ok the result (rolled when it was handed in), left, total, done}
 var _order_sync: float = 0.0
 var _walks: Dictionary = {} ## settlers' walks: "ax,ay>bx,by" -> PackedVector2Array (see `walk_route`)
 var _stands: Dictionary = {}
@@ -732,7 +733,7 @@ func _rpc_added(id: int, data: Dictionary, cells: Array) -> void:
 
 ## Developer checkpoint (Escape menu -> ENTWICKLER -> FERTIGE STADT): the town is founded, every piece of the catalogue stands finished round the hut (what is there already is kept) and
 ## every settler whose building stands is at home. Nothing is paid, nothing is asked. Solo / host only.
-func debug_build_all() -> void:
+func debug_build_all(with_torben: bool = false) -> void:
 	if not multiplayer.is_server() or world == null:
 		return
 	request_found()
@@ -777,11 +778,11 @@ func debug_build_all() -> void:
 		(structures[id] as Dictionary).b = TimeManager.day - 6 ## the checkpoint town has stood a while: its wear is already there
 	for sid: String in settler_ids():
 		var settler: Dictionary = settler_spec(sid)
-		if not bool(settler.get("enabled", true)):
+		if not bool(settler.get("enabled", true)) and not (with_torben and sid == "torben"):
 			continue
 		var arrive: Dictionary = settler.get("arrive", {}) as Dictionary
 		if not residents.has(sid) and has_built(String(arrive.get("needs", ""))):
-			_rpc_resident.rpc(sid, {"trust": 0, "talked": -1}, false) ## not freshly arrived: they are simply at home
+			_rpc_resident.rpc(sid, {"trust": 30 if with_torben else 0, "talked": -1}, false) ## not freshly arrived: they are simply at home (the full checkpoint also knows their trust)
 	_sync_stock()
 
 
@@ -1360,6 +1361,42 @@ func _give_outputs(recipe: Dictionary, player: Player) -> void:
 
 # ---------- commissions (what only a settler can make: it takes a while) ----------
 
+## The role of the building a recipe is made at (workshop: craft, smithy: smith).
+func _recipe_role(recipe: Dictionary) -> String:
+	return String(TownRules.piece(String(recipe.get("station", "workshop"))).get("role", "craft"))
+
+
+## Who works on / makes this commission.
+func maker_of(order: Dictionary) -> String:
+	if order.has("m"):
+		return String(order.m)
+	return String((recipes().get(String(order.r), {}) as Dictionary).get("npc", "gustav"))
+
+
+## A refinement is a commission of its own kind (the weapon waits on the anvil, the result is decided).
+static func is_refine(order: Dictionary) -> bool:
+	return String(order.get("k", "")) == "refine"
+
+
+## A commission as a clean dictionary (after a network hop or a JSON file).
+static func _clean_order(e: Dictionary) -> Dictionary:
+	var out: Dictionary = {"r": String(e.r), "left": float(e.left), "total": float(e.total), "done": bool(e.done)}
+	if is_refine(e):
+		out["k"] = "refine"
+		out["m"] = String(e.get("m", RefineRules.maker()))
+		out["w"] = SaveGame._stack(e.get("w", {}))
+		out["to"] = int(e.get("to", 1))
+		out["ok"] = bool(e.get("ok", false))
+	return out
+
+
+func orders_of(maker: String) -> int:
+	var n: int = 0
+	for order: Variant in orders:
+		n += 1 if maker_of(order as Dictionary) == maker else 0
+	return n
+
+
 ## What stops this commission right now ("" = nothing).
 func order_block(recipe_id: String, player: Player) -> String:
 	var recipe: Dictionary = recipes().get(recipe_id, {}) as Dictionary
@@ -1368,7 +1405,7 @@ func order_block(recipe_id: String, player: Player) -> String:
 	var reason: String = recipe_block(recipe_id, player)
 	if reason != "":
 		return reason
-	if orders.size() >= MAX_ORDERS:
+	if orders_of(String(recipe.get("npc", "gustav"))) >= MAX_ORDERS:
 		return "DIE WARTELISTE IST VOLL"
 	return ""
 
@@ -1376,8 +1413,9 @@ func order_block(recipe_id: String, player: Player) -> String:
 ## Seconds of work still ahead of an order (everything before it counts too), for the "ready in" text.
 func order_wait(index: int) -> float:
 	var total: float = 0.0
+	var maker: String = maker_of(orders[index] as Dictionary)
 	for i: int in mini(index + 1, orders.size()):
-		if not bool((orders[i] as Dictionary).done):
+		if not bool((orders[i] as Dictionary).done) and maker_of(orders[i] as Dictionary) == maker:
 			total += float((orders[i] as Dictionary).left)
 	return total
 
@@ -1397,7 +1435,7 @@ func _rpc_order(recipe_id: String) -> void:
 
 func _host_order(recipe_id: String, peer: int) -> void:
 	var player: Player = player_of(peer)
-	if player == null or not _near_role(player, "craft", 140.0):
+	if player == null or not _near_role(player, _recipe_role(recipes().get(recipe_id, {}) as Dictionary), 150.0):
 		_tell(peer, "ZU WEIT VON DER WERKBANK", false)
 		return
 	var reason: String = order_block(recipe_id, player)
@@ -1428,18 +1466,130 @@ func _rpc_collect(index: int) -> void:
 
 func _host_collect(index: int, peer: int) -> void:
 	var player: Player = player_of(peer)
-	if player == null or not _near_role(player, "craft", 140.0):
+	if index < 0 or index >= orders.size():
+		return
+	var made: Dictionary = recipes().get(String((orders[index] as Dictionary).r), {}) as Dictionary
+	if is_refine(orders[index] as Dictionary):
+		made = {"station": RefineRules.station()}
+	if player == null or not _near_role(player, _recipe_role(made), 150.0):
 		_tell(peer, "ZU WEIT VON DER WERKBANK", false)
 		return
-	if index < 0 or index >= orders.size() or not bool((orders[index] as Dictionary).done):
+	if not bool((orders[index] as Dictionary).done):
 		_tell(peer, "NOCH NICHT FERTIG", false)
 		return
 	var recipe: Dictionary = recipes().get(String((orders[index] as Dictionary).r), {}) as Dictionary
+	if is_refine(orders[index] as Dictionary):
+		_collect_refine(index, player, peer)
+		return
 	orders.remove_at(index)
 	_give_outputs(recipe, player)
 	_sync_stock()
 	_rpc_orders.rpc(orders.duplicate(true))
 	_tell(peer, "%s ABGEHOLT" % String(recipe.get("name", "?")), true)
+
+
+# ---------- refinement (docs/refinement_konzept.md): the weapon goes onto Torben's anvil, the result is rolled at once and kept ----------
+
+## What stops refining this weapon right now ("" = nothing).
+func refine_block(stack: Dictionary, player: Player) -> String:
+	if not RefineRules.is_refinable(stack):
+		return "DAS LÄSST SICH NICHT VERFEINERN"
+	if not RefineRules.can_refine(stack):
+		return "HÖHER GEHT ES NICHT"
+	var target: int = RefineRules.next_level(stack)
+	var maker: String = RefineRules.maker()
+	if trust_of(maker) < RefineRules.trust_needed(target):
+		return "%s TRAUT DIR NOCH NICHT" % String(settler_spec(maker).get("name", maker))
+	if orders_of(maker) >= MAX_ORDERS:
+		return "DIE WARTELISTE IST VOLL"
+	var missing: String = missing_text(RefineRules.materials(stack, target), player)
+	if missing != "":
+		return missing
+	if player.progress.copper < RefineRules.copper(stack, target):
+		return "ZU WENIG GELD"
+	return ""
+
+
+func request_refine(kind: String, ref: Variant) -> void:
+	if multiplayer.is_server():
+		_host_refine(kind, ref, multiplayer.get_unique_id())
+	else:
+		_rpc_refine.rpc_id(1, kind, ref)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_refine(kind: String, ref: Variant) -> void:
+	if multiplayer.is_server():
+		_host_refine(kind, ref, multiplayer.get_remote_sender_id())
+
+
+func _host_refine(kind: String, ref: Variant, peer: int) -> void:
+	var player: Player = player_of(peer)
+	if player == null or not _near_role(player, String(TownRules.piece(RefineRules.station()).get("role", "smith")), 150.0):
+		_tell(peer, "ZU WEIT VON DER SCHMIEDE", false)
+		return
+	var stack: Dictionary = player.inventory.stack_at(kind, ref) if kind in ["inv", "equip"] and player.inventory.slot_exists(kind, ref) else {}
+	if stack.is_empty():
+		return
+	var reason: String = refine_block(stack, player)
+	if reason != "":
+		_tell(peer, reason, false)
+		return
+	var target: int = RefineRules.next_level(stack)
+	_take_inputs({"in": RefineRules.materials(stack, target)}, player)
+	player.progress.award(-RefineRules.copper(stack, target), 0)
+	var weapon: Dictionary = player.inventory.take_stack(kind, ref)
+	var work: float = maxf(RefineRules.work_seconds(weapon, target), 1.0)
+	orders.append({"r": "refine", "k": "refine", "m": RefineRules.maker(), "w": weapon, "to": target, "ok": RefineRules.roll(weapon, target, randi()), "left": work, "total": work, "done": false})
+	_sync_stock()
+	_rpc_orders.rpc(orders.duplicate(true))
+	_tell(peer, "%s LIEGT AUF DEM AMBOSS" % Items.title(weapon).to_upper(), true)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_refine_done(before: Dictionary, after: Dictionary, success: bool, refund: Dictionary) -> void:
+	refine_done.emit(SaveGame._stack(before), SaveGame._stack(after), success, refund)
+
+
+## Level (1..15) the weapon on the anvil is meant to reach, 0 when `maker` has no refinement to work on: Torben's sparks fly the stronger the higher it is.
+func refine_heat(maker: String) -> int:
+	for entry: Variant in orders:
+		var order: Dictionary = entry as Dictionary
+		if is_refine(order) and maker_of(order) == maker and not bool(order.done):
+			return int(order.to)
+	return 0
+
+
+## Host: the finished piece goes back to its owner, with what a failed attempt returns. The notice tells how it went.
+func _collect_refine(index: int, player: Player, peer: int) -> void:
+	var order: Dictionary = orders[index] as Dictionary
+	var before: Dictionary = order.w as Dictionary
+	var success: bool = bool(order.ok)
+	var after: Dictionary = RefineRules.result(before, success)
+	orders.remove_at(index)
+	if player.inventory.give(String(after.id), 1, Items.extras(after)) > 0:
+		orders.insert(index, order) ## no room in the bag: the weapon stays on the anvil
+		_tell(peer, "KEIN PLATZ IM RUCKSACK", false)
+		return
+	if not success:
+		var back: Dictionary = RefineRules.refund(before, int(order.to))
+		for item: String in back:
+			var left: int = player.inventory.give(item, int(back[item]))
+			if left > 0:
+				_add_stock(item, left)
+	_sync_stock()
+	_rpc_orders.rpc(orders.duplicate(true))
+	var returned: Dictionary = {} if success else RefineRules.refund(before, int(order.to))
+	if peer == multiplayer.get_unique_id():
+		refine_done.emit(before, after, success, returned)
+	else:
+		_rpc_refine_done.rpc_id(peer, before, after, success, returned)
+	if success:
+		_tell(peer, Items.title(after).to_upper(), true)
+	else:
+		_tell(peer, "MISSLUNGEN, DIE GLUT STEIGT (%d)" % RefineRules.pity(after), false)
+	if player.quests != null:
+		player.quests.set_flag("refined_%s" % ("ok" if success else "failed"))
 
 
 @rpc("authority", "call_local", "reliable")
@@ -1448,7 +1598,7 @@ func _rpc_orders(list: Array) -> void:
 	orders.clear()
 	for entry: Variant in incoming:
 		var e: Dictionary = entry as Dictionary
-		orders.append({"r": String(e.r), "left": float(e.left), "total": float(e.total), "done": bool(e.done)})
+		orders.append(_clean_order(e))
 	changed.emit()
 
 
@@ -1468,7 +1618,7 @@ func _work_orders(delta: float) -> void:
 		for entry: Variant in orders:
 			var order: Dictionary = entry as Dictionary
 			var recipe: Dictionary = recipes().get(String(order.r), {}) as Dictionary
-			if bool(order.done) or String(recipe.get("npc", "gustav")) != sid:
+			if bool(order.done) or maker_of(order) != sid:
 				continue
 			order.left = float(order.left) - delta
 			moved = true
@@ -1476,7 +1626,7 @@ func _work_orders(delta: float) -> void:
 				order.left = 0.0
 				order.done = true
 				finished = true
-				_rpc_order_ready.rpc(String(recipe.get("name", "?")), sid)
+				_rpc_order_ready.rpc(Items.title(order.w as Dictionary) if is_refine(order) else String(recipe.get("name", "?")), sid)
 			break
 	_order_sync -= delta
 	if finished or (moved and _order_sync <= 0.0):
@@ -1535,7 +1685,7 @@ func _host_trade(shop_id: String, mode: String, item: String, amount: int, peer:
 		player.progress.award(-price * (wanted - left), 0)
 		_tell(peer, "%d X %s GEKAUFT" % [wanted - left, item_name], true)
 	else:
-		var sold: int = mini(amount, player.inventory.count_item(item))
+		var sold: int = mini(amount, player.inventory.count_plain(item)) ## a refined weapon is not sold by the piece
 		if sold <= 0:
 			_tell(peer, "DU HAST KEIN %s" % item_name, false)
 			return
@@ -1561,7 +1711,7 @@ func _rpc_craft(recipe_id: String) -> void:
 func _host_craft(recipe_id: String, peer: int) -> void:
 	var player: Player = player_of(peer)
 	var recipe: Dictionary = recipes().get(recipe_id, {}) as Dictionary
-	if player == null or recipe.is_empty() or not _near_role(player, "craft", 140.0):
+	if player == null or recipe.is_empty() or not _near_role(player, _recipe_role(recipe), 150.0):
 		_tell(peer, "ZU WEIT VON DER WERKBANK", false)
 		return
 	var reason: String = recipe_block(recipe_id, player)
@@ -1902,7 +2052,7 @@ func import_state(data: Dictionary) -> void:
 		paths.append({"s": int(entry.s), "p": (entry.p as Array).duplicate(true), "d": int(entry.get("d", 1)), "e": int(entry.get("e", 0))})
 	for entry: Variant in data.get("orders", []) as Array:
 		var e: Dictionary = entry as Dictionary
-		orders.append({"r": String(e.r), "left": float(e.left), "total": float(e.total), "done": bool(e.done)})
+		orders.append(_clean_order(e))
 	var people: Dictionary = data.get("residents", {}) as Dictionary
 	for sid: String in people:
 		var entry: Dictionary = people[sid] as Dictionary

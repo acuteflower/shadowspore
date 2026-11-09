@@ -786,6 +786,208 @@
     "margin": 18,
     "front": true
    }
+  },
+  "smithy": {
+   "name": "SCHMIEDE",
+   "needs_resident": "torben",
+   "category": "craft",
+   "texture": "smithy",
+   "frame": [
+    152,
+    140
+   ],
+   "feet": 126,
+   "foot": [
+    112,
+    38
+   ],
+   "snap": 8,
+   "pad": true,
+   "cost": {
+    "wood": 16,
+    "stone": 30,
+    "plank": 6,
+    "iron_ore": 8
+   },
+   "build_seconds": 40.0,
+   "reach": 64.0,
+   "worth": 18,
+   "role": "smith",
+   "glow": true,
+   "anim": {
+    "frames": 6,
+    "fps": 7
+   },
+   "light": {
+    "color": "ff8a3a",
+    "radius": 78,
+    "energy": 1.15,
+    "at": [
+     39,
+     -21
+    ],
+    "flicker": 0.4
+   },
+   "info": "ESSE, AMBOSS UND EISEN",
+   "paths": true,
+   "front": [
+    104,
+    26
+   ],
+   "smoke": {
+    "at": [
+     39,
+     -96
+    ]
+   },
+   "sparks": {
+    "at": [
+     39,
+     -19
+    ],
+    "color": "ffb25a"
+   },
+   "spill": {
+    "texture": "smithy_spill",
+    "forge": true,
+    "base": 0.9
+   },
+   "parts": [
+    {
+     "texture": "smithy_lantern_l",
+     "frame": [
+      5,
+      8
+     ],
+     "at": [
+      39,
+      98
+     ],
+     "window": [
+      0.75,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 1,
+      "fps": 1
+     }
+    },
+    {
+     "texture": "smithy_lantern_r",
+     "frame": [
+      6,
+      7
+     ],
+     "at": [
+      78,
+      99
+     ],
+     "window": [
+      0.75,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 1,
+      "fps": 1
+     }
+    },
+    {
+     "texture": "smithy_sign",
+     "frame": [
+      16,
+      9
+     ],
+     "at": [
+      87,
+      97
+     ],
+     "window": [
+      0.7,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.8,
+      "flutter": 0.4
+     }
+    },
+    {
+     "texture": "smithy_pennant",
+     "frame": [
+      10,
+      17
+     ],
+     "at": [
+      9,
+      92
+     ],
+     "window": [
+      0.8,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 3.2,
+      "flutter": 0.9
+     }
+    }
+   ],
+   "wear": [
+    {
+     "texture": "smithy_wear_a",
+     "days": 1
+    },
+    {
+     "texture": "smithy_wear_b",
+     "days": 3
+    },
+    {
+     "texture": "smithy_wear_c",
+     "days": 6
+    },
+    {
+     "texture": "smithy_moss_a",
+     "days": 5,
+     "track": "age"
+    },
+    {
+     "texture": "smithy_moss_b",
+     "days": 11,
+     "track": "age"
+    },
+    {
+     "texture": "smithy_neglect",
+     "days": 2,
+     "track": "neglect"
+    }
+   ],
+   "perches": [
+    [
+     -20,
+     -12,
+     49
+    ],
+    [
+     39,
+     -30,
+     66
+    ]
+   ],
+   "trample": {
+    "strength": 1.0,
+    "margin": 18,
+    "front": true
+   }
   }
  },
  "rest": {

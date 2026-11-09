@@ -37,5 +37,12 @@ func _run() -> void:
 	_check(String(quests.current().get("step_id", "")) == "ws_pickaxe", "the quest waits at the pickaxe (%s)" % String(quests.current().get("step_id", "")))
 	_check(quests.is_finished("rebuild_hut") and quests.is_finished("lumberjack") and quests.is_finished("gustav_rescue") and quests.has_flag("built_workshop"), "the chapters before are done")
 	_check(player.inventory.has_item("sickle_basic") and player.inventory.has_item("axe_basic") and not player.inventory.has_item("pickaxe_basic"), "sickle and axe are in the bag, the pickaxe is still to be made")
+	## the full checkpoint ALLES FERTIG + TORBEN: quest chain finished, Torben lives in the smithy
+	world.debug_jump_town(true)
+	await _frames(120)
+	_check(quests.is_finished("town_workshop") and quests.current().is_empty(), "the whole quest chain is finished (%s)" % String(quests.current().get("step_id", "")))
+	_check(player.inventory.has_item("pickaxe_basic"), "the pickaxe is in the bag")
+	_check(town.has_built("smithy"), "the smithy stands")
+	_check(town.residents.has("torben") and town.settler_node("torben") != null, "Torben is there")
 	print("TOWN JUMP: ", "ok" if _ok else "FAILED")
 	get_tree().quit(0 if _ok else 1)

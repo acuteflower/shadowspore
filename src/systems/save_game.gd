@@ -135,6 +135,9 @@ static func _stack(raw: Variant) -> Dictionary:
 		return {}
 	var clean: Dictionary = stack.duplicate()
 	clean["count"] = int(stack.get("count", 1))
+	for key: String in [RefineRules.KEY_LEVEL, RefineRules.KEY_PITY]:
+		if clean.has(key):
+			clean[key] = int(clean[key]) ## the refinement of a weapon, also back from JSON floats
 	return clean
 
 

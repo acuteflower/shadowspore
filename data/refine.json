@@ -1,0 +1,251 @@
+{
+ "max": 15,
+ "maker": "torben",
+ "station": "smithy",
+ "_note": "Verfeinern (docs/refinement_konzept.md). Alle Zahlen des Systems. RefineRules liest nur diese Datei; tools/sim_refine.py rechnet dieselben Formeln nach. Die Kurven laufen gerade: Chance, Kupfer, Arbeitszeit und Schaden steigen linear mit der Stufe, nur die Seltenheit macht Spruenge (gewoehnlich und ungewoehnlich liegen dicht beieinander, selten, episch und legendaer rutschen immer weiter ab).",
+ "base_chance": [
+  1,
+  1,
+  1,
+  1,
+  1,
+  0.85,
+  0.764,
+  0.679,
+  0.593,
+  0.508,
+  0.422,
+  0.337,
+  0.251,
+  0.166,
+  0.08
+ ],
+ "_base_chance_note": "bis +5 sicher, dann linear von 85 % bei +6 auf 8 % bei +15",
+ "chance_cap": 0.95,
+ "work": [
+  12,
+  24,
+  36,
+  48,
+  60,
+  72,
+  84,
+  96,
+  108,
+  120,
+  132,
+  144,
+  156,
+  168,
+  180
+ ],
+ "copper": {
+  "base": 5.5,
+  "exp": 1.0
+ },
+ "item_amount": {
+  "void_slag": 0.2
+ },
+ "_item_amount_note": "Menge je Material: Leerenschlacke ist die seltenste Beute (nur Brecher 10 %, Boss 30 %), darum 0,2 (mindestens 1 beim Hauptmaterial).",
+ "ladder": {
+  "_note": "Materialleiter je Seltenheit und Abschnitt (+1..+5, +6..+10, +11..+15): [Hauptmaterial, Nebenmaterial]. Je seltener die Waffe, desto seltener das Material. Gewoehnlich und ungewoehnlich teilen sich die Leiter, die ungewoehnliche geht nur weiter.",
+  "common": [
+   [
+    "iron_ingot",
+    ""
+   ],
+   [
+    "iron_plate",
+    "iron_ingot"
+   ],
+   [
+    "void_splinter",
+    "iron_plate"
+   ]
+  ],
+  "uncommon": [
+   [
+    "iron_ingot",
+    ""
+   ],
+   [
+    "iron_plate",
+    "void_splinter"
+   ],
+   [
+    "void_splinter",
+    "iron_plate"
+   ]
+  ],
+  "rare": [
+   [
+    "iron_plate",
+    "iron_ingot"
+   ],
+   [
+    "void_splinter",
+    "iron_plate"
+   ],
+   [
+    "shadow_core",
+    "void_splinter"
+   ]
+  ],
+  "epic": [
+   [
+    "void_splinter",
+    "iron_plate"
+   ],
+   [
+    "shadow_core",
+    "void_splinter"
+   ],
+   [
+    "shadow_core",
+    "void_slag"
+   ]
+  ],
+  "legendary": [
+   [
+    "shadow_core",
+    "void_splinter"
+   ],
+   [
+    "void_slag",
+    "shadow_core"
+   ],
+   [
+    "void_slag",
+    "shadow_core"
+   ]
+  ]
+ },
+ "tiers": [
+  {
+   "id": "anschmieden",
+   "name": "ANSCHMIEDEN",
+   "trust": 0,
+   "gain": 0.05,
+   "pity": 0.0,
+   "pity_cap": 0.0,
+   "refund": 0.0,
+   "primary": [
+    1,
+    1,
+    2,
+    2,
+    3
+   ],
+   "secondary": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "id": "haerten",
+   "name": "HÄRTEN",
+   "trust": 20,
+   "gain": 0.05,
+   "pity": 0.03,
+   "pity_cap": 0.15,
+   "refund": 0.5,
+   "primary": [
+    1,
+    1,
+    2,
+    2,
+    3
+   ],
+   "secondary": [
+    1,
+    1,
+    1,
+    2,
+    2
+   ]
+  },
+  {
+   "id": "leerenschmieden",
+   "name": "LEERENSCHMIEDEN",
+   "trust": 50,
+   "gain": 0.05,
+   "pity": 0.02,
+   "pity_cap": 0.12,
+   "refund": 0.0,
+   "primary": [
+    1,
+    1,
+    1,
+    2,
+    2
+   ],
+   "secondary": [
+    1,
+    1,
+    2,
+    2,
+    3
+   ]
+  }
+ ],
+ "rarity": {
+  "common": {
+   "cap": 5,
+   "cost": 1.0,
+   "chance": 1.0,
+   "work": 1.0,
+   "amount": 1.0
+  },
+  "uncommon": {
+   "cap": 10,
+   "cost": 1.15,
+   "chance": 0.97,
+   "work": 1.05,
+   "amount": 1.0
+  },
+  "rare": {
+   "cap": 15,
+   "cost": 1.7,
+   "chance": 0.9,
+   "work": 1.2,
+   "amount": 1.2
+  },
+  "epic": {
+   "cap": 15,
+   "cost": 3.2,
+   "chance": 0.78,
+   "work": 1.5,
+   "amount": 1.6
+  },
+  "legendary": {
+   "cap": 15,
+   "cost": 6.0,
+   "chance": 0.65,
+   "work": 1.9,
+   "amount": 2.2
+  }
+ },
+ "refund_items": [
+  "iron_ingot",
+  "iron_plate"
+ ],
+ "knockback_share": 0.5,
+ "milestones": {
+  "5": {
+   "name": "GEHÄRTET",
+   "reach": 1
+  },
+  "10": {
+   "name": "LEERENFEST",
+   "reach": 1
+  },
+  "15": {
+   "name": "VOLLENDET",
+   "reach": 1,
+   "speed": 0.05
+  }
+ }
+}

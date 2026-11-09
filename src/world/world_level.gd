@@ -714,8 +714,8 @@ func debug_return_home() -> void:
 
 
 ## Developer checkpoint: the finished town. Everything before it counts as done (the hut renewed, the first lessons), every piece of the catalogue stands finished, the craftsman is at his
-## bench and the town quest stands at "a stranger comes to the light". Solo only, no auto-save.
-func debug_jump_town() -> void:
+## bench and the town quest stands at "a stranger comes to the light". Solo only, no auto-save. `all_done`: the whole quest chain is finished and Torben lives in the smithy too.
+func debug_jump_town(all_done: bool = false) -> void:
 	if not debug_can_return_home() or _town_node == null:
 		return
 	debug_return_home()
@@ -723,15 +723,17 @@ func debug_jump_town() -> void:
 	var saved: Dictionary = player.quests.export_data()
 	var flags: Dictionary = saved.flags as Dictionary
 	for quest_id: String in ["rebuild_hut", "town_start", "gustav_rescue", "town_workshop"]:
-		var until: String = "ws_pickaxe" if quest_id == "town_workshop" else ""
+		var until: String = "ws_pickaxe" if quest_id == "town_workshop" and not all_done else ""
 		_quest_to_step(saved, quest_id, until)
 	for flag: String in ["rebuild_done", "lumberjack_reported", "rebuild_delivered", "rebuild_wood_delivered", "hut_mushrooms_removed", "hut_tree_felled", "knows_gustav", "gustav_packed", "gustav_joined", "built_workshop", "workshop_done"]:
 		flags[flag] = true
 	player.quests.import_data(saved)
 	if not player.inventory.has_item("sickle_basic"):
 		player.inventory.give("sickle_basic", 1) ## Gustav's gift; the pickaxe is made at his bench
+	if all_done and not player.inventory.has_item("pickaxe_basic"):
+		player.inventory.give("pickaxe_basic", 1)
 	resume_story(player) ## the hut mended, the knight at the door
-	_town_node.debug_build_all() ## she stands at the hut's door: the workshop and its craftsman are a short walk away
+	_town_node.debug_build_all(all_done) ## she stands at the hut's door: the workshop and its craftsman are a short walk away
 
 
 ## Marks `quest_id` in an exported quest state (QuestComponent.export_data) as done, or as running at step `until` with every earlier step's flags set.
@@ -1304,6 +1306,7 @@ func _finish_commit(deadline: int = 0) -> void:
 		_register_harvest(field)
 	_rivers.attach_chunk(chunk.node, build.cell)
 	_chunks[build.cell] = chunk
+	LeafCritter.settle_chunk(chunk.things)
 	_wildlife.chunk_loaded(build.cell)
 
 
@@ -1780,6 +1783,18 @@ func _rpc_catch(cell: Vector2i) -> void:
 		_host_catch(cell, multiplayer.get_remote_sender_id(), true)
 
 
+## A real foliage contact on the host scares a beetle away without dropping bait.
+## The saved daily absence also prevents a client joining later from seeing it return.
+func startle_critter(cell: Vector2i) -> void:
+	if not multiplayer.is_server(): return
+	var thing: WorldProp = _things.get(cell) as WorldProp
+	if thing == null or LeafCritter.today(thing) != "beetle" or not LeafCritter.can_catch(thing): return
+	var next: Dictionary = thing.state.duplicate()
+	next["c"] = TimeManager.day + 1
+	next["k"] = thing.kind
+	_rpc_thing_state.rpc(cell, next, "depart")
+
+
 ## Host: take (or scare off) the animal sitting on the bush at `cell`. By hand it is a sure catch, with the sickle 55 %; either way it is
 ## gone until tomorrow. A catch is an item (bait for the river).
 func _host_catch(cell: Vector2i, peer: int, by_hand: bool) -> void:
@@ -1790,7 +1805,7 @@ func _host_catch(cell: Vector2i, peer: int, by_hand: bool) -> void:
 	if by_hand and thing.reach_distance(player.global_position) > Interactable.INTERACT_RANGE + PICK_SLACK:
 		return ## (a sickle blow was already measured by the hit scan)
 	var animal: String = LeafCritter.today(thing)
-	if animal == "":
+	if animal == "" or not LeafCritter.can_catch(thing):
 		return
 	var caught: bool = by_hand or randf() < 0.55
 	if caught:
@@ -1811,7 +1826,7 @@ func harvest_hit(thing: WorldProp, source: int) -> void:
 	var tool_id: String = ""
 	if player != null:
 		tool_id = String(Items.definition(player.inventory.active_stack()).get("tool", ""))
-	if tool_id == "sickle" and thing.spec().has("critters") and LeafCritter.today(thing) != "":
+	if tool_id == "sickle" and thing.spec().has("critters") and LeafCritter.can_catch(thing):
 		_host_catch(thing.cell, source, false) ## the blow shakes the animal off (or it is caught)
 	if harvest.is_empty() and thing.spec().has("pickup") and not thing.spec().has("pull"): ## plants E picks: the sickle cuts them too
 		if tool_id == "sickle" and thing.prompt() != "":
@@ -2109,7 +2124,7 @@ func _town_soft(thing: WorldProp) -> bool:
 		return true
 	if thing.kind in PropGenerator.TREE_KINDS:
 		return thing.state.has("f") ## felled: stump and sapling have no collision (a young tree grows back by itself otherwise)
-	return thing.kind == "rock" and thing.is_depleted()
+	return (thing.kind == "rock" or thing.kind == "iron_rock") and thing.is_depleted()
 
 
 ## The loaded props a foundation on `rect` sweeps away (cells): bushes, grass, pebbles, mushrooms, stumps and spent rocks.

@@ -76,25 +76,6 @@
   "once": true,
   "by": "self"
  },
- "sword_iron": {
-  "name": "GESCHMIEDETES SCHWERT",
-  "station": "workshop",
-  "in": {
-   "sword_basic": 1,
-   "plank": 2,
-   "stone": 4,
-   "void_splinter": 2
-  },
-  "out": {
-   "sword_iron": 1
-  },
-  "seconds": 3.5,
-  "trust": 20,
-  "info": "GUSTAV SCHMIEDET, DAS DAUERT",
-  "by": "npc",
-  "npc": "gustav",
-  "work": 100.0
- },
  "rope_reed": {
   "name": "SCHILFSEIL",
   "station": "workshop",
@@ -124,5 +105,72 @@
   "info": "ESCHE UND FLACHS",
   "once": true,
   "by": "self"
+ },
+ "iron_ingot": {
+  "name": "EISENBARREN",
+  "station": "smithy",
+  "in": {
+   "iron_ore": 2,
+   "wood": 1
+  },
+  "out": {
+   "iron_ingot": 1
+  },
+  "seconds": 3.0,
+  "trust": 0,
+  "info": "ERZ SCHMELZEN UND IN FORM GIESSEN",
+  "by": "self",
+  "npc": "torben"
+ },
+ "sword_basic": {
+  "name": "EINFACHES SCHWERT",
+  "station": "smithy",
+  "in": {
+   "iron_ingot": 2,
+   "plank": 1
+  },
+  "out": {
+   "sword_basic": 1
+  },
+  "seconds": 4.0,
+  "trust": 0,
+  "info": "SCHLICHT UND SCHARF GENUG",
+  "by": "self",
+  "npc": "torben"
+ },
+ "iron_plate": {
+  "name": "EISENPLATTEN",
+  "station": "smithy",
+  "in": {
+   "iron_ingot": 3
+  },
+  "out": {
+   "iron_plate": 2
+  },
+  "seconds": 3.0,
+  "trust": 0,
+  "info": "TORBEN SCHLÄGT SIE FLACH UND NIETET SIE",
+  "by": "npc",
+  "npc": "torben",
+  "work": 60.0
+ },
+ "sword_iron": {
+  "name": "GESCHMIEDETES SCHWERT",
+  "station": "smithy",
+  "in": {
+   "sword_basic": 1,
+   "iron_plate": 2,
+   "iron_ingot": 2,
+   "void_splinter": 1
+  },
+  "out": {
+   "sword_iron": 1
+  },
+  "seconds": 3.5,
+  "trust": 20,
+  "info": "TORBEN SCHMIEDET, DAS DAUERT",
+  "by": "npc",
+  "npc": "torben",
+  "work": 120.0
  }
 }

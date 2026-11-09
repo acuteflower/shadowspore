@@ -87,7 +87,7 @@ func _setup_glow() -> void:
 ## Near the world's edge the Void eats the plants (docs/plant_life.md): small plants fade toward grey-violet and sag the closer they
 ## stand to the coast, and in moonlit nights they glimmer violet. Only a look (trees and rocks are left alone).
 func _setup_blight() -> void:
-	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "mine_rock", "mine_collapse"]:
+	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "iron_rock", "mine_rock", "mine_collapse"]:
 		return
 	blight = 1.0 - smoothstep(2.0, BLIGHT_REACH, level.coast_tiles(global_position))
 	if blight <= 0.02:

@@ -1,4 +1,6 @@
 shader_type canvas_item;
+#include "res://assets/shaders/daylight.gdshaderinc"
+varying vec2 daylight_position;
 // Flashes the sprite in `flash_color` (white by default). `flash` 1 = fully tinted, 0 = normal.
 // `wound` 0..1 is how much blood she has lost: the colours drain towards a cool grey (the skin goes pale) and blood spreads over her body
 // from a wound at the waist, following the baked `blood_map` of the current sheet. It starts gently and is strong at the end.
@@ -10,6 +12,7 @@ uniform float bandage : hint_range(0.0, 1.0) = 0.0; // 1 = draw the bandage (the
 uniform sampler2D blood_map : filter_nearest, hint_default_white; // baked blood thresholds, same layout as the colour sheet (tools/art_hero3d.py blood)
 
 void vertex() {
+	daylight_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 }
 
 void fragment() {
@@ -42,5 +45,6 @@ void fragment() {
 			COLOR.rgb = mix(cloth, COLOR.rgb, ink * 0.8);
 		}
 	}
+	COLOR.rgb = day_grade(COLOR.rgb, daylight_position, 1.0);
 	COLOR.rgb = mix(COLOR.rgb, flash_color.rgb, flash);
 }

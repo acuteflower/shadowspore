@@ -13,11 +13,28 @@ const SPLASH: Texture2D = preload("res://assets/interior/hut/splash.png")
 const DRIP_SOUND: AudioStream = preload("res://assets/audio/hut/drip.wav")
 const DARK: Shader = preload("res://assets/shaders/interior_dark.gdshader")
 const EDGE: Shader = preload("res://assets/shaders/interior_edge.gdshader")
+const VEIL: Shader = preload("res://assets/shaders/room_veil.gdshader")
+const VEIL_SOUND: AudioStream = preload("res://assets/audio/room_intro/veil_lift.wav")
+const VEIL_TIME: float = 2.8 ## s the shadow smoke takes to lift out of a veiled room
 
 var id: String = ""
 var spec: Dictionary = {}
 var size: Vector2 = Vector2(432, 312)
-var door: Doorway
+var door: Doorway ## the main door (the way out)
+var neighbors: Array[Interior] = [] ## rooms that lie right next to this one (data `adjacent`): they are seen from here, share the camera and the dark round them
+var veiled: bool = false ## data `veiled`: the room lies under shadow smoke until somebody steps in (`lift_veil`)
+var revealed: bool = true
+var lifting: bool = false
+var _veil: ColorRect
+var _veil_t: float = 0.0
+var _veil_origin: Vector2 = Vector2.ZERO
+var _veil_top: float = 0.0 ## the smoke reaches this far above the rect (hard edge) ...
+var _veil_off: Vector2 = Vector2.ZERO ## ... and this far beyond its left and top sides (together with the soft edges): the veil's picture starts at -_veil_off
+var _group_rect: Rect2 = Rect2()
+var _fading: Array[Sprite2D] = [] ## props that fade out while they hide a player standing behind them (data prop `fades`: the tall pillars)
+var _over_player: Array[Sprite2D] = [] ## wall pieces that lie over a player standing behind their foot (data `front` `over_player`)
+var _has_group: bool = false
+var _veil_sound: AudioStreamPlayer2D
 var props: Dictionary = {} ## prop id -> Sprite2D
 var _dir: String = ""
 var _rays: Array[Sprite2D] = []
@@ -33,6 +50,7 @@ var _fresh: bool = false ## the hut is renewed: every picture that has a counter
 var _mushrooms: Array[Vector2] = []
 var _moths: Node2D
 var _back: ColorRect
+var _smoke_back: bool = false
 var _edge: ColorRect
 var _time: float = 0.0
 
@@ -46,7 +64,7 @@ func setup(interior_id: String, data: Dictionary) -> void:
 	size = _vec(data.size)
 	_backdrop()
 	for item: Dictionary in data.shell as Array:
-		var sprite: Sprite2D = _sprite(String(item.tex), _vec(item.pos), int(item.get("z", 0)))
+		var sprite: Sprite2D = _sprite_sorted(String(item.tex), _vec(item.pos)) if bool(item.get("sorted", false)) else _sprite(String(item.tex), _vec(item.pos), int(item.get("z", 0)))
 		if bool(item.get("glow", false)):
 			var glow_name: String = String(item.tex).replace(".png", "_glow.png")
 			if ResourceLoader.exists(_dir + glow_name):
@@ -85,8 +103,18 @@ func setup(interior_id: String, data: Dictionary) -> void:
 	for ray: Dictionary in data.get("rays", []) as Array:
 		_ray(_vec(ray.pos), float(ray.get("scale", 1.0)), _rays.size())
 	_front()
-	_dust()
-	_make_moths()
+	for item: Dictionary in data.get("doors", []) as Array: ## more doors (the locked doors at the ends of the hall's aisles): a picture on the wall and a Doorway that only rattles
+		_door(item, "ÖFFNEN", false, false)
+	if data.has("front"): ## the front wall of a room without a doorway (the hallway); a list for several pieces (the corridor: its arch at the top and the lip of the rooms' wall at the bottom)
+		var walls_front: Array = data.front as Array if data.front is Array else [data.front]
+		for wall: Dictionary in walls_front:
+			var piece: Sprite2D = _sprite_sorted(String(wall.tex), _vec(wall.pos)) ## it sorts by its foot: she is behind its top edge when she stands at it
+			if bool(wall.get("over_player", false)): ## a wall she walks through (the arch): over her while she is behind its foot, behind her in front of it
+				_over_player.append(piece)
+	_make_veil()
+	if not bool(spec.get("fake", false)): ## a room that cannot be entered (only its shut door shows) has no dust and no moths
+		_dust()
+		_make_moths()
 	for item: Dictionary in data.get("crows", []) as Array: ## a crow on the window sill that flies out when somebody comes near
 		var crow: InteriorCrow = InteriorCrow.new()
 		crow.setup(_vec(item.perch), _vec(item.exit))
@@ -112,6 +140,47 @@ func setup(interior_id: String, data: Dictionary) -> void:
 				if world is WorldLevel:
 					(world as WorldLevel).start_sleep(player, rest)
 			add_child(spot)
+
+
+## The room together with the rooms next to it (global): what the camera frames and the dark and the creeping shadow go round.
+## No crow on the sill (a test asks; the crow of Ellie's window is the room's `crows`).
+func crows_none() -> bool:
+	return not spec.has("crows")
+
+
+func union_rect() -> Rect2:
+	if _has_group:
+		return _group_rect
+	var rect: Rect2 = Rect2(global_position, size)
+	for other: Interior in neighbors:
+		rect = rect.merge(Rect2(other.global_position, other.size))
+	return rect
+
+
+## `other` lies right next to this room (the hallway under it): both frame the same view and share the dark round them.
+## All the rooms that hang together (neighbours of neighbours) frame the same view: `Interiors` sets the rect of the whole group.
+func set_group_rect(rect: Rect2) -> void:
+	_group_rect = rect
+	_has_group = true
+	_fit_union()
+
+
+func join(other: Interior) -> void:
+	neighbors.append(other)
+	other.neighbors.append(self)
+	_fit_union()
+	other._fit_union()
+
+
+func _fit_union() -> void:
+	if _back == null:
+		return
+	var rect: Rect2 = union_rect()
+	var at: Vector2 = rect.position - global_position
+	(_back.material as ShaderMaterial).set_shader_parameter("room", Vector4(_back.size.x / 2.0 - size.x / 2.0 + at.x, _back.size.y / 2.0 - size.y / 2.0 + at.y, rect.size.x, rect.size.y))
+	_edge.position = at
+	_edge.size = rect.size
+	(_edge.material as ShaderMaterial).set_shader_parameter("rect_size", rect.size)
 
 
 func _vec(raw: Variant) -> Vector2:
@@ -143,19 +212,40 @@ func _sprite(file: String, at: Vector2, z: int, unlit: bool = false) -> Sprite2D
 	return sprite
 
 
+## A picture in the wall between two rooms: it sorts with the people by its bottom edge, so somebody standing below it is in front of it and somebody above it behind it.
+func _sprite_sorted(file: String, top_left: Vector2) -> Sprite2D:
+	var sprite: Sprite2D = Sprite2D.new()
+	sprite.texture = _tex(sprite, file)
+	sprite.centered = false
+	var height: float = float(sprite.texture.get_height())
+	sprite.offset = Vector2(0.0, -height)
+	sprite.position = top_left + Vector2(0.0, height)
+	add_child(sprite)
+	return sprite
+
+
 ## The dark behind the room (the world's void quads would show through otherwise): bigger than any view.
 func _backdrop() -> void:
+	if not bool(spec.get("backdrop", true)): ## a room next door lies in the dark of its neighbour
+		return
 	_back = ColorRect.new()
-	_back.size = Vector2(1200, 800)
+	_smoke_back = bool(spec.get("smoke_backdrop", false)) ## all the free space round the rooms in the veil's own smoke (the same world-space field, so it flows into every veil without a seam)
+	_back.size = Vector2(4600, 2800) if _smoke_back else Vector2(1200, 800) ## the smoke one is bigger than all the rooms next to each other (the hallway is a thousand px wide, the hall beyond the corridor lies far above)
 	_back.position = size / 2.0 - _back.size / 2.0
 	_back.z_index = -7
 	_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var material: ShaderMaterial = ShaderMaterial.new()
-	material.shader = DARK
+	var smoke: bool = _smoke_back
+	material.shader = VEIL if smoke else DARK
 	material.set_shader_parameter("rect_size", _back.size)
-	material.set_shader_parameter("room", Vector4(_back.size.x / 2.0 - size.x / 2.0, _back.size.y / 2.0 - size.y / 2.0, size.x, size.y))
+	if smoke:
+		material.set_shader_parameter("reveal", 0.0)
+	else:
+		material.set_shader_parameter("room", Vector4(_back.size.x / 2.0 - size.x / 2.0, _back.size.y / 2.0 - size.y / 2.0, size.x, size.y))
 	_back.material = material
 	add_child(_back)
+	if smoke:
+		material.set_shader_parameter("world", _back.global_position.round())
 	_edge = ColorRect.new() ## the shadow creeping in from the edges of the room, over everything
 	_edge.size = size
 	_edge.z_index = 5
@@ -201,11 +291,14 @@ func _prop(prop: Dictionary, body: StaticBody2D) -> void:
 	var sprite: Sprite2D = _standing(String(prop.tex), frames, int(prop.get("frame", 0)), feet, at)
 	sprite.name = String(prop.id)
 	props[String(prop.id)] = sprite
+	if bool(prop.get("fades", false)):
+		_fading.append(sprite)
 	if prop.has("glow"):
 		var glow: Sprite2D = Sprite2D.new()
 		glow.texture = _tex(glow, String(prop.glow))
 		glow.hframes = frames
 		glow.frame = sprite.frame
+		glow.offset = sprite.offset ## the glow sheet lies exactly on the picture (it is a child, which does not take the offset along)
 		glow.material = Unlit.material()
 		sprite.add_child(glow)
 		_glows[String(prop.id)] = glow
@@ -214,6 +307,12 @@ func _prop(prop: Dictionary, body: StaticBody2D) -> void:
 		_prop_lights[String(prop.id)] = _light(self, at + Vector2(0, -6), Color(String(spec_light.color)), int(spec_light.radius), 0.8, float(spec_light.energy), 0.12, false)
 		if String(prop.id).begins_with("mushrooms"):
 			_mushrooms.append(at + Vector2(0, -8))
+	for i: int in (prop.get("seats", []) as Array).size(): ## places to sit (the benches of the hallway)
+		var entry: Array = (prop.seats as Array)[i] as Array
+		var seat: HallSeat = HallSeat.new()
+		seat.name = "Seat_%s_%d" % [String(prop.id), i]
+		seat.setup(at + Vector2(float(entry[0]), float(entry[1])), int(entry[2]), Vector2(float(entry[3]), float(entry[4])))
+		add_child(seat)
 	if prop.has("solid"):
 		var s: Array = prop.solid as Array
 		_box(body, Rect2(at.x + float(s[2]), at.y + float(s[3]), float(s[0]), float(s[1])))
@@ -346,22 +445,121 @@ func _ray(at: Vector2, scale_k: float, index: int) -> void:
 	_rays.append(ray)
 
 
-## The front lip of the south wall with the doorway, and the door (E): the way out.
+## The front lip of the south wall with the doorway, and the door (E): the way out (a room without a lip has none: only `doors`).
 func _front() -> void:
-	_sprite("front.png", Vector2(0, float(spec.front_y)), 2)
+	if not spec.has("front_y"):
+		return
+	var exit_spec: Dictionary = spec.exit_door as Dictionary
+	var opens: bool = bool(exit_spec.get("opens", false))
+	if opens: ## a room lies behind this wall: it sorts by its foot with the people (she is in front of it in the hallway, behind it in the room)
+		_sprite_sorted("front.png", Vector2(0, float(spec.front_y)))
+	else:
+		_sprite("front.png", Vector2(0, float(spec.front_y)), 2)
 	if ResourceLoader.exists(_dir + "front_glow.png"):
 		_sprite("front_glow.png", Vector2(0, float(spec.front_y)), 3, true)
-	var exit_spec: Dictionary = spec.exit_door as Dictionary
-	var leaf: Sprite2D = _sprite("door.png", _vec(exit_spec.leaf), 3)
-	door = Doorway.new()
-	door.interior_id = id
-	door.leaving = true
-	door.label = "VERLASSEN"
-	door.leaf = leaf
-	door.reach_radius = 12.0
-	door.prompt_height = 34.0
-	door.position = _vec(exit_spec.pos)
-	add_child(door)
+	_door(exit_spec, "ÖFFNEN" if opens else "VERLASSEN", not opens)
+
+
+## A door of this room: its leaf (hinged on its left edge), what it needs (`needs`: a quest flag of the local player) and, with `opens`, that E only opens it (it stays open: the room next door is right behind it,
+## `solid` is the door's blocker that goes away when it opens) instead of leading out into the world.
+func _door(item: Dictionary, label: String, leaving: bool, main: bool = true) -> void:
+	var leaf: Sprite2D = _sprite_sorted(String(item.get("tex", "door.png")), _vec(item.leaf)) if bool(item.get("opens", false)) or bool(item.get("sorted", false)) else _sprite(String(item.get("tex", "door.png")), _vec(item.leaf), 3)
+	var way: Doorway = Doorway.new()
+	way.interior_id = id
+	way.leaving = leaving
+	way.opens = bool(item.get("opens", false))
+	way.needs = String(item.get("needs", ""))
+	way.locked_text = String(item.get("locked_text", ""))
+	way.label = label
+	way.leaf = leaf
+	way.reach_radius = 12.0
+	way.prompt_height = 34.0
+	way.position = _vec(item.pos)
+	if item.has("solid"):
+		var block: StaticBody2D = StaticBody2D.new()
+		block.name = "DoorBlock"
+		var box: Array = item.solid as Array
+		_box(block, Rect2(float(box[0]), float(box[1]), float(box[2]), float(box[3])))
+		add_child(block)
+		way.blocker = block.get_child(0) as CollisionShape2D
+	add_child(way)
+	if main:
+		door = way
+
+
+## A veiled room lies under shadow smoke (the same smoke as the dark round the rooms and the map's unexplored land) that fills it completely, with a few pairs of eyes in it, until somebody steps in:
+## `lift_veil` then pushes it back from where she stands, in a ragged front of burning dither (shader room_veil), and the eyes snap shut as the front reaches them.
+func _make_veil() -> void:
+	veiled = bool(spec.get("veiled", false))
+	revealed = not veiled
+	if not veiled:
+		return
+	_veil = ColorRect.new()
+	var soft: Array = spec.get("veil_soft", [0, 0, 0, 0]) as Array ## left, top, right, bottom: on a side where the smoke meets the normal, visible room (a wall, the hallway's floor) the smoke thins out this many px in a ragged, glowing, dithered edge instead of ending in a straight line
+	_veil_top = float(spec.get("veil_top", 0.0)) ## the smoke reaches this far above the room (the hallway: over the front walls of the rooms next to it)
+	_veil_off = Vector2(0.0, _veil_top)
+	var core: Vector2 = Vector2(size.x, float(spec.get("veil_height", size.y))) ## a room with its front wall at the bottom (`fake`): the smoke stops above the wall
+	var veil_size: Vector2 = core + _veil_off
+	_veil.size = veil_size
+	_veil.position = -_veil_off
+	_veil.z_index = int(spec.get("veil_z", 40)) ## over everything; a room next door lies under the lip of the wall between (z 2)
+	_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var material: ShaderMaterial = ShaderMaterial.new()
+	material.shader = VEIL
+	material.set_shader_parameter("rect_size", veil_size)
+	var eyes: PackedVector2Array = PackedVector2Array()
+	for eye: Variant in spec.get("veil_eyes", []) as Array:
+		eyes.append(_vec(eye) + _veil_off)
+	material.set_shader_parameter("eye_count", eyes.size())
+	while eyes.size() < 4:
+		eyes.append(Vector2(-100, -100))
+	material.set_shader_parameter("eyes", eyes)
+	material.set_shader_parameter("reveal", 0.0)
+	material.set_shader_parameter("origin", veil_size / 2.0)
+	material.set_shader_parameter("soft", Vector4(float(soft[0]), float(soft[1]), float(soft[2]), float(soft[3])))
+	if spec.has("veil_hole"): ## a piece of wall that belongs to the room next door (the corridor's arch) lies in this room's smoke: it stays free, with a ragged edge
+		var hole: Array = spec.veil_hole as Array
+		material.set_shader_parameter("hole", Vector4(float(hole[0]) + _veil_off.x, float(hole[1]) + _veil_off.y, float(hole[2]) + _veil_off.x, float(hole[3]) + _veil_off.y))
+		material.set_shader_parameter("hole_soft", float(spec.get("veil_hole_soft", 0.0)))
+	if spec.has("veil_cut"): ## the wall of the room next door lies over the first rows of this one: no smoke there (but in the doorway, once its door is open)
+		var cut: Dictionary = spec.veil_cut as Dictionary
+		material.set_shader_parameter("cut_y", float(cut.y) + _veil_off.y)
+		material.set_shader_parameter("cut_soft", float(cut.get("soft", 0.0))) ## the smoke thins out ragged round the free wall too
+		if cut.has("x"): ## the wall that stays free is only this wide (Ellie's room): the walls of the other rooms lie under the smoke too
+			material.set_shader_parameter("cut_x", _vec(cut.x) + Vector2(_veil_off.x, _veil_off.x))
+		material.set_shader_parameter("gap", _vec(cut.gap) + Vector2(_veil_off.x, _veil_off.x))
+	_veil.material = material
+	add_child(_veil)
+	material.set_shader_parameter("world", (_veil.global_position).round())
+
+
+## Somebody stepped in at `from` (global): the smoke lifts out of the room.
+func lift_veil(from: Vector2) -> void:
+	if revealed or lifting or _veil == null:
+		return
+	lifting = true
+	_veil_t = 0.0
+	_veil_origin = (from - global_position).clamp(Vector2.ZERO, size)
+	var far: float = maxf(_veil_origin.distance_to(Vector2.ZERO), maxf(_veil_origin.distance_to(Vector2(size.x, 0.0)), maxf(_veil_origin.distance_to(Vector2(0.0, size.y)), _veil_origin.distance_to(size))))
+	var material: ShaderMaterial = _veil.material as ShaderMaterial
+	material.set_shader_parameter("origin", _veil_origin + _veil_off)
+	material.set_shader_parameter("reach", far * 1.25 + 30.0)
+	_veil_sound = AudioStreamPlayer2D.new()
+	_veil_sound.stream = VEIL_SOUND
+	_veil_sound.volume_db = -4.0
+	_veil_sound.max_distance = 700.0
+	_veil_sound.position = _veil_origin
+	_veil_sound.finished.connect(_veil_sound.queue_free)
+	add_child(_veil_sound)
+	_veil_sound.play()
+
+
+## The room is open at once (a saved game that already saw it).
+func reveal_now() -> void:
+	revealed = true
+	lifting = false
+	if _veil != null:
+		_veil.visible = false
 
 
 func _dust() -> void:
@@ -410,15 +608,48 @@ func _draw_moths() -> void:
 const ANIMATE_RANGE: float = 900.0 ## px; rooms are up to ~260 px across
 
 func _near_player(radius: float) -> bool:
+	var near: Rect2 = Rect2(global_position, size).grow(radius) ## the room's rect, not its corner: the hallway is a thousand px wide
 	for player: Player in Player.all:
-		if is_instance_valid(player) and player.global_position.distance_squared_to(global_position) <= radius * radius: return true
+		if is_instance_valid(player) and near.has_point(player.global_position): return true
 	return false
 
 ## Rooms far from every player are not animated. `_time` keeps running, so anything read from it is right
 ## again on the first frame back; delta-driven states simply pause. No players at all: animate as before.
 func _process(delta: float) -> void:
 	_time += delta
+	if _back != null and not _smoke_back: ## the dark behind the hut or the cabin only lies there while somebody is in it (it would cover the smoke of the rooms next to its slot)
+		var manager: Interiors = get_parent() as Interiors
+		if manager != null and manager.local_player() != null:
+			_back.visible = manager.interior_at(manager.local_position()) == self
 	if not Player.all.is_empty() and not _near_player(ANIMATE_RANGE): return
+	if _veil != null and _veil.visible:
+		var veil_material: ShaderMaterial = _veil.material as ShaderMaterial
+		veil_material.set_shader_parameter("time", _time)
+		var gap_open: bool = false ## a door of a room next door stands open (the shut doors of the `fake` rooms never do)
+		for other: Interior in neighbors:
+			if other.door != null and other.door.is_open:
+				gap_open = true
+		veil_material.set_shader_parameter("gap_open", 1.0 if gap_open else 0.0)
+		if lifting:
+			_veil_t += delta
+			var k: float = clampf(_veil_t / VEIL_TIME, 0.0, 1.0)
+			veil_material.set_shader_parameter("reveal", k * k * (3.0 - 2.0 * k) * 0.35 + k * 0.65) ## starts gently, then the smoke is driven out at a steady speed
+			if _veil_t >= VEIL_TIME:
+				reveal_now()
+	for pillar: Sprite2D in _fading: ## a tall thing hides whoever stands behind it (north of its foot, within its width): it fades away, and comes back when she has stepped out from behind it
+		var hides: bool = false
+		for player: Player in Player.all:
+			if is_instance_valid(player) and player.global_position.y < pillar.global_position.y and absf(player.global_position.x - pillar.global_position.x) < float(pillar.texture.get_width()) * 0.5 + 8.0 and pillar.global_position.y - player.global_position.y < 420.0:
+				hides = true
+		pillar.modulate.a = move_toward(pillar.modulate.a, 0.18 if hides else 1.0, delta * 4.0)
+	for piece: Sprite2D in _over_player:
+		var over: bool = false
+		var foot: float = piece.global_position.y
+		var left: float = piece.global_position.x
+		for player: Player in Player.all:
+			if is_instance_valid(player) and player.global_position.y < foot and player.global_position.x >= left and player.global_position.x < left + float(piece.texture.get_width()):
+				over = true
+		piece.z_index = 1 if over else 0
 	var day: float = 1.0 - TimeManager.night_amount()
 	for ray: Sprite2D in _rays:
 		var seed_value: float = float(ray.get_meta("seed"))
@@ -503,8 +734,9 @@ func _splash(at: Vector2) -> void:
 
 ## The room as the camera shows it: at least a screen big, centred on the room, so a small room sits in the middle with dark around it.
 func view_rect(view: Vector2) -> Rect2:
-	var rect_size: Vector2 = Vector2(maxf(size.x, view.x), maxf(size.y, view.y))
-	return Rect2(global_position + size / 2.0 - rect_size / 2.0, rect_size)
+	var rect: Rect2 = union_rect()
+	var rect_size: Vector2 = Vector2(maxf(rect.size.x, view.x), maxf(rect.size.y, view.y))
+	return Rect2(rect.get_center() - rect_size / 2.0, rect_size)
 
 
 ## The tint of the world while you are in here (alpha 1 always): warm and dim by day, cold by night.

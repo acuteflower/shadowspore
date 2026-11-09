@@ -29,11 +29,12 @@ var _wipe_layer: CanvasLayer
 var _cover: float = 0.0
 var _busy: bool = false
 var _player: Player
-var _view_slot: int = -2
+var _view_key: String = "-"
 var _clock: float = 0.0
 var _ambient: AudioStreamPlayer
 var _step_clock: float = 0.0
 var _creaks: int = 0
+var _here_id: String = "" ## the room she stood in last frame
 
 
 func _ready() -> void:
@@ -42,12 +43,43 @@ func _ready() -> void:
 	name = "Interiors"
 	var table: Dictionary = DataRegistry.table("interiors")
 	for id: String in table:
+		var data: Dictionary = table[id] as Dictionary
 		var interior: Interior = Interior.new()
-		interior.position = Vector2(POCKET_X0 + _order.size() * SLOT, POCKET_Y0)
+		var next_to: Interior = null
+		if data.has("adjacent"): ## a room right next to another (the hallway under Ellie's room): no slot of its own
+			var adjacent: Dictionary = data.adjacent as Dictionary
+			next_to = _interiors.get(String(adjacent.to)) as Interior
+			var offset: Array = adjacent.offset as Array
+			interior.position = next_to.position + Vector2(float(offset[0]), float(offset[1]))
+		else:
+			interior.position = Vector2(POCKET_X0 + _order.size() * SLOT, POCKET_Y0)
+			_order.append(id)
 		add_child(interior)
-		interior.setup(id, table[id] as Dictionary)
+		interior.setup(id, data)
 		_interiors[id] = interior
-		_order.append(id)
+		if next_to != null:
+			next_to.join(interior)
+	for id: String in table: ## rooms that share the view with others they are not next to (the corridor leading up from the hallway)
+		for other_id: Variant in (table[id] as Dictionary).get("joins", []) as Array:
+			var other: Interior = _interiors.get(String(other_id)) as Interior
+			if other != null:
+				(_interiors[id] as Interior).join(other)
+	var seen: Array[Interior] = [] ## rooms that hang together (neighbours of neighbours) share one view and one dark round them
+	for start: Interior in _interiors.values():
+		if seen.has(start) or start.neighbors.is_empty():
+			continue
+		var group: Array[Interior] = [start]
+		var rect: Rect2 = Rect2(start.global_position, start.size)
+		var at: int = 0
+		while at < group.size():
+			for other: Interior in group[at].neighbors:
+				if not group.has(other):
+					group.append(other)
+					rect = rect.merge(Rect2(other.global_position, other.size))
+			at += 1
+		for member: Interior in group:
+			seen.append(member)
+			member.set_group_rect(rect)
 	Terrain.patches.append(self)
 	_wipe_layer = CanvasLayer.new()
 	_wipe_layer.layer = 80
@@ -75,9 +107,9 @@ func _exit_tree() -> void:
 
 ## The slot (index of the interior) a position lies in, -1 for the open world.
 static func slot_at(pos: Vector2) -> int:
-	if pos.x < POCKET_X0 - 400.0 or pos.y < POCKET_Y0 - 400.0 or pos.y > POCKET_Y0 + SLOT: ## the mine (MineManager) lies in a row below the rooms
+	if pos.x < POCKET_X0 - 1400.0 or pos.y < POCKET_Y0 - 400.0 or pos.y > POCKET_Y0 + SLOT: ## the mine (MineManager) lies in a row below the rooms
 		return -1
-	return clampi(int((pos.x - POCKET_X0 + 400.0) / SLOT), 0, 64)
+	return clampi(int((pos.x - POCKET_X0 + 1400.0) / SLOT), 0, 64)
 
 
 ## Where something stands as far as the open world is concerned: its own position, or the door of the building it is in.
@@ -92,6 +124,12 @@ static func outer(tree: SceneTree, pos: Vector2) -> Vector2:
 
 
 func interior_at(pos: Vector2) -> Interior:
+	var found: Interior = null
+	for room: Interior in _interiors.values():
+		if Rect2(room.global_position, room.size).has_point(pos) and (found == null or room.spec.has("adjacent")): ## a room next door wins where it overlaps the wall
+			found = room
+	if found != null:
+		return found
 	var slot: int = slot_at(pos)
 	return _interiors[_order[slot]] as Interior if slot >= 0 and slot < _order.size() else null
 
@@ -104,7 +142,7 @@ func world_position(pos: Vector2) -> Vector2:
 	var inside: Interior = interior_at(pos)
 	if inside == null:
 		return pos
-	var hut: Hut = _entrances.get(inside.id) as Hut
+	var hut: Hut = _entrances.get(String(inside.spec.adjacent.to) if inside.spec.has("adjacent") else inside.id) as Hut
 	return hut.exit_position if hut != null else Vector2.ZERO
 
 
@@ -134,6 +172,10 @@ func ambient_color() -> Color:
 	return inside.ambient() if inside != null else Color(0, 0, 0, 0)
 
 
+func local_player() -> Player:
+	return _player if _player != null and is_instance_valid(_player) else null
+
+
 func local_position() -> Vector2:
 	return _player.global_position if _player != null and is_instance_valid(_player) else Vector2.ZERO
 
@@ -154,9 +196,31 @@ func _process(delta: float) -> void:
 	if _player == null:
 		return
 	var slot: int = slot_at(_player.global_position)
-	if slot != _view_slot:
-		_view_slot = slot
+	if _view_key_at(_player.global_position) != _view_key:
 		apply_view(_player)
+	if slot >= 0 and not _busy:
+		var here: Interior = interior_at(_player.global_position)
+		var here_id: String = here.id if here != null else ""
+		if here_id != _here_id: ## from a room into the one next door (no door to wipe): the story notes where she has been
+			var before: Interior = interior(_here_id)
+			_here_id = here_id
+			if before != null and here != null and before.neighbors.has(here) and _player.quests != null:
+				_player.quests.set_flag("left_" + before.id)
+				_player.quests.set_flag("entered_" + here.id)
+		if _player.quests != null:
+			for room: Interior in _interiors.values(): ## a saved game: the door she opened stays open
+				if room.door != null and room.door.opens and not room.door.is_open and _player.quests.has_flag("door_open_" + room.id):
+					room.door.open_now(false)
+		if here != null and here.veiled and not here.revealed and not here.lifting: ## a veiled room lies under shadow smoke until somebody stands in it: the smoke lifts from where she stands
+			var flag: String = "revealed_" + here.id
+			if _player.quests != null and _player.quests.has_flag(flag):
+				here.reveal_now()
+			else:
+				if _player.quests != null:
+					_player.quests.set_flag(flag)
+				here.lift_veil(_player.global_position)
+	elif slot < 0:
+		_here_id = ""
 	# the room's ambience fades in and out with the door; the boards creak now and then under her feet
 	var want: float = -9.0 if slot >= 0 else -80.0
 	_ambient.volume_db = move_toward(_ambient.volume_db, want, 60.0 * delta)
@@ -174,6 +238,14 @@ func _process(delta: float) -> void:
 
 
 ## The camera stays on the room while she is in one; outside it is free again.
+## What the camera frames at a position: "" outside, else the rooms that share the view (the camera is set again when she comes in or goes out, not by slot: the long hallway runs through several).
+func _view_key_at(pos: Vector2) -> String:
+	if slot_at(pos) < 0:
+		return ""
+	var seen: Interior = interior_at(pos)
+	return str(seen.union_rect()) if seen != null else str(slot_at(pos))
+
+
 func apply_view(player: Player) -> void:
 	var camera: Camera2D = player.get("_camera") as Camera2D
 	if camera == null:
@@ -191,7 +263,7 @@ func apply_view(player: Player) -> void:
 		camera.limit_right = 10000000
 		camera.limit_bottom = 10000000
 	camera.reset_smoothing()
-	_view_slot = slot_at(player.global_position)
+	_view_key = _view_key_at(player.global_position)
 
 
 # ---------- doors ----------
@@ -210,6 +282,10 @@ func _set_cover(v: float) -> void:
 	_wipe_material.set_shader_parameter("cover", v)
 	_wipe_material.set_shader_parameter("time", _clock)
 	_wipe_material.set_shader_parameter("view_size", (_wipe_layer.get_meta("rect") as ColorRect).size)
+
+
+func door_sound(id: String, volume_db: float) -> void:
+	_sound(id, volume_db)
 
 
 func _sound(id: String, volume_db: float) -> void:

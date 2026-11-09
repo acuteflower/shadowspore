@@ -59,6 +59,8 @@ var _notifier: VisibleOnScreenNotifier2D
 
 func _setup_prop() -> void:
 	add_to_group("bird_perches")
+	add_to_group("day_canopies")
+	_crown.material = _day_material()
 	_tree_top = float((_spec.height as Array)[variant])
 	_tree_clear = float((_spec.clear as Array)[variant])
 	_tree_half = float((_spec.crown_half_width as Array)[variant])
@@ -493,3 +495,12 @@ func _finish_fall() -> void:
 	_fall = null
 	_falling = false
 	_show()
+
+
+## World-ground canopy projection; independent of the visibility fade for actors behind a crown.
+func day_canopy() -> Vector4:
+	if is_depleted() or _falling: return Vector4.ZERO
+	var half: float = _tree_half * absf(global_scale.x)
+	var height: float = _tree_top * absf(global_scale.y)
+	var center: Vector2 = global_position + Vector2(height * 0.22, height * 0.10)
+	return Vector4(center.x, center.y, maxf(8.0, half * 1.05), maxf(6.0, half * 0.62))

@@ -1,7 +1,12 @@
 [gd_scene format=3]
 
+[ext_resource type="Shader" path="res://assets/shaders/day_sprite.gdshader" id="daylight_shader"]
+
 [ext_resource type="Script" path="res://src/entities/wildlife/meadow_butterfly.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/wildlife/butterfly.png" id="2"]
+
+[sub_resource type="ShaderMaterial" id="daylight_material"]
+shader = ExtResource("daylight_shader")
 
 [sub_resource type="SceneReplicationConfig" id="Sync"]
 properties/0/path = NodePath(".:appearance")
@@ -18,6 +23,7 @@ properties/2/replication_mode = 0
 script = ExtResource("1")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
+material = SubResource("daylight_material")
 texture = ExtResource("2")
 hframes = 8
 vframes = 32

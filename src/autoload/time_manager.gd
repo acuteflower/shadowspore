@@ -23,7 +23,7 @@ const KEY_COLORS: Array[Color] = [
 	Color(1.00, 0.96, 0.90), ## morning
 	Color(1.00, 0.99, 0.95), ## noon (a touch warm; the brightness comes from the ground shader and SunGlow)
 	Color(1.00, 0.97, 0.90), ## afternoon
-	Color(1.00, 0.76, 0.52), ## golden hour
+	Color(0.98, 0.88, 0.82), ## golden hour: warmth is local, shadows retain violet
 	Color(0.76, 0.52, 0.68), ## dusk
 	Color(0.30, 0.29, 0.50), ## night
 ]

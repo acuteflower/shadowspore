@@ -34,39 +34,39 @@ CLIPS_AT = (-3.0, 20.0)  # model heights of the clips above the foot of the boar
 
 def _mount_back(top):
     m = h.Model()
-    slab(m, V(0, 4.0, 0), V(0, top, 0), 3.5, 1.0, PLANK_W, (0, 0, 1), step=1.3)  # the backboard
+    slab(m, V(0, 4.0, 0), V(0, top, 0), 2.7, 0.8, PLANK, (0, 0, 1), step=1.3)  # the backboard
     for y in (6.0, top - 2.0):  # two nail heads
         m.ell((0, y, 1.1), (0.5, 0.5, 0.4), IRON)
-    return grain(to_array(render(m, MOUNT_W, MOUNT_H, MOUNT_G)), 91, along=(0.0, 1.0), amount=0.5, mats=(PLANK_W, BARK))
+    return grain(to_array(render(m, MOUNT_W, MOUNT_H, MOUNT_G)), 91, along=(0.0, 1.0), amount=0.3, mats=(PLANK, BARK))
 
 
 def _mount_clips(heights):
     m = h.Model()
     for y in heights:
-        m.ell((0, y, 1.5), (3.2, 1.7, 2.3), BARK_D)  # the wooden band round the handle: a block with the handle sunk into it
-        m.ell((0, y + 0.5, 2.6), (2.5, 1.0, 1.4), BARK)
+        m.ell((0, y, 1.6), (2.9, 1.3, 2.2), BARK)  # the wooden band round the handle
+        m.ell((0, y + 0.6, 2.7), (2.3, 0.6, 1.2), PLANK_W)
     return grain(to_array(render(m, MOUNT_W, MOUNT_H, MOUNT_G)), 92, amount=0.4, mats=(BARK, BARK_D))
 
 
 def broom_mount():
-    return _mount_back(46.0), _mount_clips((16.0, 38.0))
+    return _mount_back(52.0), _mount_clips((22.0, 44.0))
 
 
 def broom_tool():
     """A plain fir handle and a bundle of straw bound with cord, hanging head down. Hangs on the plane of the wall, `z` in front of the backboard."""
     rng = rng_for(70)
     m = h.Model()
-    log(m, V(0, 12.0, 1.0), V(0, 52.0, 1.0), 1.3, PLANK_W, step=1.0)
-    m.ell(V(0, 52.4, 1.0), (1.4, 0.7, 1.4), BARK_D)
-    base = V(0, 14.0, 1.0)
-    for k in range(64):  # the bristles fan out from the binding to ragged tips
+    log(m, V(0, 13.0, 1.4), V(0, 56.0, 1.4), 1.15, PLANK_W, step=1.0)
+    m.ell(V(0, 56.4, 1.4), (1.3, 0.7, 1.3), BARK_D)
+    base = V(0, 16.0, 1.4)
+    for k in range(90):  # the bristles fan out from the binding to ragged tips
         u = rng.uniform(-1.0, 1.0)
-        tip = base + V(u * 5.5 + rng.uniform(-0.6, 0.6), -rng.uniform(10.0, 14.0) + abs(u) * 3.0, rng.uniform(-0.7, 1.4))
-        m.limb(base + V(rng.uniform(-0.8, 0.8), rng.uniform(-0.3, 0.6), rng.uniform(-0.5, 0.5)), tip, 0.62, 0.22, STRAW if rng.random() < 0.82 else BARK, step=0.8)
+        tip = base + V(u * 8.0 + rng.uniform(-0.6, 0.6), -rng.uniform(13.0, 19.0) + abs(u) * 4.5, rng.uniform(-0.7, 1.6))
+        m.limb(base + V(rng.uniform(-1.0, 1.0), rng.uniform(-0.3, 0.6), rng.uniform(-0.5, 0.5)), tip, 0.7, 0.25, STRAW if rng.random() < 0.5 else (BARK_D if rng.random() < 0.3 else PLANK_W), step=0.8)
     for dy in (0.0, -2.2):  # the cord that binds them
         for k in range(10):
             a = k / 10 * math.tau
-            m.ell(V(1.3 * math.cos(a), 12.8 + dy, 1.0 + 1.3 * math.sin(a)), (0.6, 0.6, 0.6), WAX if dy == 0 else BARK_D)
+            m.ell(V(1.3 * math.cos(a), 14.8 + dy, 1.4 + 1.3 * math.sin(a)), (0.6, 0.6, 0.6), WAX if dy == 0 else BARK_D)
     return grain(to_array(render(m, MOUNT_W, MOUNT_H, MOUNT_G)), 71, along=(0.0, 1.0), amount=0.4, mats=(PLANK_W, BARK_D, BARK))
 
 
@@ -77,13 +77,13 @@ def rake_mount():
 def rake_tool():
     """A hay rake: handle, a head-board and wooden teeth, hanging head up so the teeth are seen."""
     m = h.Model()
-    log(m, V(0, 6.0, 1.0), V(0, 44.0, 1.0), 1.3, PLANK_W, step=1.0)
-    slab(m, V(-9.5, 45.0, 1.0), V(9.5, 45.0, 1.0), 1.6, 1.5, BARK, (0, 0, 1), step=1.1)  # the head
+    log(m, V(0, 6.0, 1.4), V(0, 44.0, 1.4), 1.15, PLANK_W, step=1.0)
+    slab(m, V(-9.5, 45.0, 1.4), V(9.5, 45.0, 1.4), 1.6, 1.5, BARK, (0, 0, 1), step=1.1)  # the head
     for k in range(7):
         x = -8.4 + k * 2.8
-        log(m, V(x, 45.5, 1.2), V(x, 52.0 - (0.6 if k % 2 else 0.0), 1.2), 0.75, PLANK_W, step=0.9, taper=0.7)
+        log(m, V(x, 45.5, 1.5), V(x, 52.0 - (0.6 if k % 2 else 0.0), 1.5), 0.75, PLANK_W, step=0.9, taper=0.7)
     for x in (-3.4, 3.4):  # braces from the handle to the head
-        m.limb(V(0, 38.0, 1.0), V(x * 2.2, 45.0, 1.1), 0.65, 0.65, BARK_D)
+        m.limb(V(0, 38.0, 1.4), V(x * 2.2, 45.0, 1.5), 0.65, 0.65, BARK_D)
     return grain(to_array(render(m, MOUNT_W, MOUNT_H, MOUNT_G)), 73, along=(0.0, 1.0), amount=0.4, mats=(PLANK_W, BARK_D, BARK))
 
 
@@ -124,6 +124,11 @@ def paint_picture(arr, x0, y0, w, h_):
             k = y / max(1, h_ - 1) * 4.2
             k += (-0.35 if (x + y) % 2 else 0.35) * (0.5 if 0.2 < (k % 1) < 0.8 else 1.0)
             _px(arr, x0 + x, y0 + y, sky[max(0, min(5, int(k)))])
+    # A small, low sun and two strokes of distant cloud in the same warm sky.
+    for x, y in ((2, 4), (3, 4), (8, 2), (9, 2)):
+        _px(arr, x0 + x, y0 + y, sky[3])
+    for x, y in ((3, 5), (4, 5), (3, 6), (4, 6)):
+        _px(arr, x0 + x, y0 + y, sky[5])
     prof = [h_ * 0.64, h_ * 0.58, h_ * 0.55, h_ * 0.6, h_ * 0.66, h_ * 0.7, h_ * 0.64, h_ * 0.58][: w] + [h_ * 0.6] * w
     for x in range(w):
         for y in range(int(prof[x]), h_):
@@ -133,50 +138,61 @@ def paint_picture(arr, x0, y0, w, h_):
         for dx in range(-(dy // 2), dy // 2 + 1):
             _px(arr, tx + dx, y0 + int(h_ * 0.5) + dy, (0xa8, 0xc8, 0x9a) if dx <= 0 else (0x74, 0xa0, 0x82))
     _px(arr, tx, y0 + int(h_ * 0.5) + 4, (0x3a, 0x2a, 0x30))
+    # The painting starts at the frame's left edge in the rendered shelf.
+    # Restore its wooden stile and dark outline after painting the landscape.
+    wood = h.RAMPS[BARK]
+    for y in range(h_):
+        _px(arr, x0 - 1, y0 + y, (0x11, 0x0c, 0x17))
+        band = 3 if y in (1, 5, 10) else 2
+        _px(arr, x0, y0 + y, wood[band])
     return arr
 
 
 # ------------------------------------------------------------------ the bed
-def bed_arr(L2=31.0):
-    """Her bed: a narrow cot of the plum fir with a straw mattress in a grey linen cover, a wool blanket over the lower part, a flat pillow, a tall headboard at the wall (left), a low footboard."""
+BED_PITCH = 50.0  # steeper than the rest so a bed lying along the wall (head at the back wall) shows its length: the floor is drawn straight from above, the wall straight from the front
+
+
+def bed_arr(L2=30.0):
+    """Her bed: a narrow cot of the plum fir lying along the left wall, head at the back wall: a straw mattress in a grey linen cover, a wool blanket over the lower part with a hem hanging over the
+    room side, a flat pillow, a tall headboard, a low footboard. Returns (array, feet row of the foot end)."""
     rng = rng_for(60)
     m = h.Model()
     for sx in (-1, 1):
         for sz in (-1, 1):
-            tall = 27.0 if sx < 0 else 15.5
-            log(m, V(sx * L2, 0, sz * 12.0), V(sx * L2, tall, sz * 12.0), 2.1, BARK, step=1.2)
-            m.ell((sx * L2, tall + 0.9, sz * 12.0), (2.4, 2.1, 2.4), BARK)
-    for sz in (-1, 1):  # side rails
-        slab(m, V(-L2, 8.0, sz * 12.0), V(L2, 8.0, sz * 12.0), 1.8, 1.1, PLANK_W if sz > 0 else BARK, (0, 0, sz), step=1.3)
-    for k in range(6):  # the headboard: neat slats and a top rail
-        z = -9.5 + k * 3.8
-        slab(m, V(-L2, 11.0, z), V(-L2, 23.5, z), 1.5, 1.0, PLANK_W if k % 2 else BARK, (-1, 0, 0), step=1.2)
-    slab(m, V(-L2, 24.0, -12.0), V(-L2, 24.0, 12.0), 1.4, 1.5, BARK, (-1, 0, 0), step=1.3)
-    for z in (-6.0, 0.0, 6.0):  # the low footboard
-        slab(m, V(L2, 11.0, z), V(L2, 14.0, z), 1.6, 0.9, PLANK_W, (1, 0, 0), step=1.2)
-    m.ell((0, 10.4, 0), (L2 - 1.4, 2.6, 11.4), LINEN)  # the mattress
+            tall = 27.0 if sz < 0 else 15.5
+            log(m, V(sx * 11.0, 0, sz * L2), V(sx * 11.0, tall, sz * L2), 2.1, BARK, step=1.2)
+            m.ell((sx * 11.0, tall + 0.9, sz * L2), (2.4, 2.1, 2.4), BARK)
+    for sx in (-1, 1):  # side rails
+        slab(m, V(sx * 11.0, 8.0, -L2), V(sx * 11.0, 8.0, L2), 1.8, 1.1, PLANK_W if sx > 0 else BARK, (sx, 0, 0), step=1.3)
+    for y in (13.0, 18.0, 23.5):  # the headboard: three planks and a top rail
+        slab(m, V(-9.5, y, -L2), V(9.5, y, -L2), 2.0, 1.0, PLANK_W if y == 18.0 else BARK, (0, 0, -1), step=1.2)
+    slab(m, V(-11.0, 25.5, -L2), V(11.0, 25.5, -L2), 1.4, 1.5, BARK, (0, 1, 0), step=1.3)
+    for y in (12.0, 14.5):  # the low footboard
+        slab(m, V(-9.5, y, L2), V(9.5, y, L2), 1.4, 0.9, PLANK_W, (0, 0, 1), step=1.2)
+    m.ell((0, 10.4, 0), (10.4, 2.6, L2 - 1.4), LINEN)  # the mattress
     for _ in range(22):
-        m.ell((rng.uniform(-L2 + 4, L2 - 4), 12.6 + rng.uniform(-0.3, 0.4), rng.uniform(-9, 9)), (rng.uniform(3, 8), 0.9, rng.uniform(2, 4)), LINEN)
+        m.ell((rng.uniform(-8, 8), 12.6 + rng.uniform(-0.3, 0.4), rng.uniform(-L2 + 4, L2 - 4)), (rng.uniform(2, 4), 0.9, rng.uniform(3, 8)), LINEN)
     for k in range(4):  # a seam stitched across
-        m.ell((-12 + k * 12, 12.9, 0), (0.5, 0.35, 10.6), LINEN)
-    m.ell((-L2 + 9.0, 14.2, 0), (8.6, 2.7, 6.6), LINEN)  # the pillow
-    m.ell((-L2 + 9.0, 16.0, 0), (5.6, 0.7, 3.4), LINEN)
-    n = 26
-    for i in range(n):  # the blanket: spread over the lower two thirds, a hem hanging over the near side, the top edge turned down
+        m.ell((0, 12.9, -12 + k * 12), (9.6, 0.35, 0.5), LINEN)
+    m.ell((0, 14.4, -L2 + 8.0), (6.6, 2.7, 4.8), LINEN)  # the pillow
+    m.ell((0, 16.2, -L2 + 8.0), (3.4, 0.7, 3.0), LINEN)
+    n = 24
+    for i in range(n):  # the blanket: over the lower two thirds, a hem hanging over the room side (x +), the top edge turned down
         t = i / (n - 1.0)
-        x = -L2 + 20 + t * (2 * L2 - 22)
+        z = -L2 + 17.0 + t * (2 * L2 - 19.0)
         prof = 0.6 + 0.4 * math.sin(t * math.pi)
-        m.ell((x, 13.2 + 0.16 * math.sin(i * 0.9), 0.0), (1.9, 2.0 * prof, 12.3), WOOL)
+        m.ell((0, 13.2 + 0.16 * math.sin(i * 0.9), z), (11.3, 2.0 * prof, 1.9), WOOL)
         if i % 2 == 0:
-            m.ell((x, 10.8, 12.0), (1.9, 2.4 + 0.5 * math.sin(i * 1.3), 0.9), WOOL if i % 6 else CLAY)
+            m.ell((11.0, 10.8, z), (0.9, 2.4 + 0.5 * math.sin(i * 1.3), 1.9), WOOL if i % 6 else CLAY)
     for k in range(3):  # the folded-down edge, lighter
-        m.ell((-L2 + 17.5 + k * 0.6, 15.2, rng.uniform(-3, 3)), (2.0, 0.8, 11.3), LINEN)
-    for _ in range(8):
+        m.ell((rng.uniform(-3, 3), 15.2, -L2 + 15.0 + k * 0.6), (10.3, 0.8, 2.0), LINEN)
+    for _ in range(7):
         R = h.rot_x(rng.uniform(-0.4, 0.4)) @ h.rot_y(rng.uniform(-0.5, 0.5))
-        m.ell((rng.uniform(-L2 + 20, L2 - 4), 15.2, rng.uniform(-6, 6)), (rng.uniform(2, 4.5), 0.5, rng.uniform(2.5, 5)), WOOL, R=R)
-    arr = to_array(render(m, 92, 62, 50))
-    arr = grain(arr, 61, amount=0.5)
-    return _ground(arr, 50, 38, 6), 50
+        m.ell((rng.uniform(-6, 6), 15.2, rng.uniform(-L2 + 20, L2 - 4)), (rng.uniform(2.5, 5), 0.5, rng.uniform(2, 4.5)), WOOL, R=R)
+    arr = to_array(render(m, 40, 74, 44, pitch=BED_PITCH))
+    arr = grain(arr, 61, along=(0.0, 1.0), amount=0.5)
+    feet = 66  # the row of the front legs
+    return _ground(arr, feet, 15, 4), feet
 
 
 # ------------------------------------------------------------------ the little table by the bed with the candle
@@ -206,9 +222,14 @@ def nightstand_arr():
 
 
 # ------------------------------------------------------------------ the wardrobe
-def wardrobe_arr():
-    """A plain wardrobe of the plum fir: two framed doors with a raised panel each, iron pulls, a simple cornice, short feet, a keyhole plate. Stands against the back wall."""
-    rng = rng_for(80)
+WARDROBE_W, WARDROBE_H = 64, 96
+WARDROBE_GROUND = 74
+WARDROBE_STEPS = 11  # door frames: 0 = shut, then every 10 degrees to 100 (the right door swings out into the room)
+
+
+def _wardrobe_model(theta):
+    """A plain wardrobe of the plum fir: two framed doors with a raised panel each, iron pulls, a simple cornice, short feet. The right door swings out by `theta` (rad) on its outer hinges and
+    shows the inside: a rod with her spare dress, a coat and an apron, linen on a shelf."""
     m = h.Model()
     W2, Hh, D2 = 22.0, 74.0, 9.0
     for sx in (-1, 1):  # the sides
@@ -220,21 +241,71 @@ def wardrobe_arr():
     slab(m, V(-W2, Hh + 1.0, 1.0), V(W2, Hh + 1.0, 1.0), D2 + 1.5, 1.6, PLANK_W, (0, 1, 0), step=1.3)  # the top
     slab(m, V(-W2 - 1.2, Hh - 1.0, D2 + 1.0), V(W2 + 1.2, Hh - 1.0, D2 + 1.0), 2.4, 1.3, BARK, (0, 0, 1), step=1.3)  # the cornice (front board)
     slab(m, V(-W2 - 0.4, 4.0, D2 + 0.4), V(W2 + 0.4, 4.0, D2 + 0.4), 2.2, 1.2, BARK, (0, 0, 1), step=1.3)  # the plinth board
+    if theta > 0.05:  # the inside, seen through the open door: dark, a rod, clothes, a shelf of linen
+        m.ell((0, Hh * 0.5, -D2 + 1.6), (W2 - 1.5, Hh * 0.5 - 4, 0.6), GAP)
+        slab(m, V(-W2 + 1.5, 20.0, 0.0), V(W2 - 1.5, 20.0, 0.0), 1.0, D2 - 1.5, PLANK_W, (0, 1, 0), step=1.3)  # the shelf
+        for k in range(3):  # folded linen on it
+            m.ell((6.0 + k * 0.4, 21.4 + k * 2.1, -1.0), (7.0 - k * 0.5, 1.1, 5.0), LINEN)
+        m.limb(V(-W2 + 1.5, Hh - 9.0, -1.0), V(W2 - 1.5, Hh - 9.0, -1.0), 0.8, 0.8, IRON)  # the rod
+        for x, y1, mat, wdt in ((8.0, 30.0, WOOL, 3.8), (14.5, 36.0, LINEN, 3.0), (-3.0, 34.0, WOOL, 3.4)):  # hanging: a coat, an apron, a dress (the left of them behind the shut door)
+            m.limb(V(x, Hh - 9.0, -1.0), V(x, Hh - 11.5, -1.0), 0.4, 0.4, IRON)
+            m.ell((x, (Hh - 11.0 + y1) / 2 + 2.0, -1.0), (wdt, (Hh - 11.0 - y1) / 2, 1.6), mat)
+            m.ell((x, Hh - 12.5, -1.0), (wdt * 0.8, 1.6, 1.6), mat)
+    cs, sn = math.cos(theta), math.sin(theta)
+    Rd = h.rot_y(theta)
+
+    def to_leaf(p):  # a point of the closed right door -> where the swung door has it (hinge at x = W2, z = D2)
+        u, zo = W2 - p[0], p[2] - D2
+        return V(W2 - u * cs + zo * sn, p[1], D2 + u * sn + zo * cs)
+
     for sx in (-1, 1):  # the doors: a frame of stiles and rails round a raised panel
+        swing = sx > 0 and theta > 0.0
+
+        def dslab(a, b, w, t, mat, step=1.5):
+            if swing:
+                slab(m, to_leaf(a), to_leaf(b), w, t, mat, (sn, 0, cs), step=step)
+            else:
+                slab(m, a, b, w, t, mat, (0, 0, 1), step=step)
+
+        def dell(c, r, mat):
+            if swing:
+                m.ell(to_leaf(c), r, mat, R=Rd)
+            else:
+                m.ell(c, r, mat)
+
         cx = sx * (W2 / 2 + 0.2)
         for sx2 in (-1, 1):
-            slab(m, V(cx + sx2 * (W2 / 2 - 1.0), 6, D2), V(cx + sx2 * (W2 / 2 - 1.0), Hh - 3, D2), 1.4, 1.2, BARK, (0, 0, 1), step=1.5)
+            dslab(V(cx + sx2 * (W2 / 2 - 1.0), 6, D2), V(cx + sx2 * (W2 / 2 - 1.0), Hh - 3, D2), 1.4, 1.2, BARK)
         for y in (6.5, Hh - 3.5):
-            slab(m, V(cx - W2 / 2 + 1.5, y, D2), V(cx + W2 / 2 - 1.5, y, D2), 1.4, 1.2, BARK, (0, 0, 1), step=1.5)
-        slab(m, V(cx, 9.0, D2 - 0.2), V(cx, Hh - 6.0, D2 - 0.2), W2 / 2 - 2.4, 1.0, PLANK_W if sx < 0 else PLANK, (0, 0, 1), step=2.0)  # the panel behind
-        slab(m, V(cx, 12.0, D2 + 0.6), V(cx, Hh - 10.0, D2 + 0.6), W2 / 2 - 4.6, 0.7, PLANK_W if sx < 0 else PLANK, (0, 0, 1), step=2.0)  # the raised part
-        m.ell((sx * 2.8, Hh * 0.5, D2 + 2.0), (0.9, 2.6, 0.8), IRON)  # the iron pull
-        m.ell((sx * 2.8, Hh * 0.5 + 3.2, D2 + 1.6), (0.7, 0.7, 0.6), IRON)
-        m.ell((sx * 2.8, Hh * 0.5 - 3.2, D2 + 1.6), (0.7, 0.7, 0.6), IRON)
+            dslab(V(cx - W2 / 2 + 1.5, y, D2), V(cx + W2 / 2 - 1.5, y, D2), 1.4, 1.2, BARK)
+        dslab(V(cx, 9.0, D2 - 0.2), V(cx, Hh - 6.0, D2 - 0.2), W2 / 2 - 2.4, 1.0, PLANK_W if sx < 0 else PLANK, 2.0)  # the panel behind
+        dslab(V(cx, 12.0, D2 + 0.6), V(cx, Hh - 10.0, D2 + 0.6), W2 / 2 - 4.6, 0.7, PLANK_W if sx < 0 else PLANK, 2.0)  # the raised part
+        for y in (18.0, 37.0, 55.0):  # cross rails and a narrow inner moulding
+            dslab(V(cx - 7.0, y, D2 + 2.6), V(cx + 7.0, y, D2 + 2.6), 0.9, 0.8, BARK, 1.0)
+        for dx in (-6.8, 6.8):
+            dslab(V(cx + dx, 19.0, D2 + 2.5), V(cx + dx, 54.0, D2 + 2.5), 0.75, 0.75, BARK, 1.0)
+        for y in (10.0, Hh - 7.0):  # hinges
+            dell(V(sx * (W2 - 1.8), y, D2 + 1.8), (0.6, 0.7, 0.45), IRON)
+        dell(V(sx * 2.8, Hh * 0.5, D2 + 2.0), (0.9, 2.6, 0.8), IRON)  # the iron pull
+        dell(V(sx * 2.8, Hh * 0.5 + 3.2, D2 + 1.6), (0.7, 0.7, 0.6), IRON)
+        dell(V(sx * 2.8, Hh * 0.5 - 3.2, D2 + 1.6), (0.7, 0.7, 0.6), IRON)
     m.ell((0.0, Hh * 0.5 - 6.0, D2 + 1.8), (0.9, 1.2, 0.5), IRON)  # the keyhole plate
-    arr = to_array(render(m, 56, 82, 74))
-    arr = grain(arr, 81, amount=0.5, mats=(PLANK_W, PLANK, BARK, BARK_D))
-    return _ground(arr, 74, 22, 4), 74
+    return m
+
+
+def wardrobe_frames():
+    """The wardrobe with its right door at every angle: frame 0 shut, the last wide open. A list of arrays (WARDROBE_H, WARDROBE_W, 4)."""
+    out = []
+    for i in range(WARDROBE_STEPS):
+        arr = to_array(render(_wardrobe_model(math.radians(i * 10.0)), WARDROBE_W, WARDROBE_H, WARDROBE_GROUND))
+        arr = grain(arr, 81, amount=0.5, mats=(PLANK_W, PLANK, BARK, BARK_D))
+        out.append(_ground(arr, WARDROBE_GROUND, 22, 4))
+    return out
+
+
+def wardrobe_arr():
+    """The shut wardrobe (frame 0), for previews."""
+    return wardrobe_frames()[0], WARDROBE_GROUND
 
 
 # ------------------------------------------------------------------ small things
@@ -271,33 +342,36 @@ def boots_arr():
     return _ground(grain(arr, 83, amount=0.3, mats=(BARK_D,)), 14, 8, 2), 14
 
 
-def rug_arr(seed=72, W=70, H=34):
-    """A braided rag rug, oval, seen from above like the floor: rings of braid in dull linen, clay, slate and plum, every ring plaited (light/dark along it), a frayed edge, flat to the stones."""
+def rug_arr(seed=72, W=52, H=30):
+    """A woven rag rug beside the bed, seen from above like the floor: broad stripes of dull linen, clay, slate and plum, every stripe woven (alternating light/dark threads), fringe at both ends,
+    a darker worn edge, a few threads out of place."""
     rng = np.random.default_rng(seed)
     cols = [h.RAMPS[m_] for m_ in (LINEN, CLAY, WOOL, BARK)]
     out = np.zeros((H, W, 4), np.uint8)
-    cx, cy = W / 2 - 0.5, H / 2 - 0.5
-    ring_cols = [1, 2, 0, 3, 2, 1]
-    for y in range(H):
-        for x in range(W):
-            ang = math.atan2((y - cy) * (W / H), x - cx)
-            r = math.hypot((x - cx) / (W / 2), (y - cy) / (H / 2)) + (hut_lib.fbm(x * 0.15, y * 0.15, 5) - 0.5) * 0.05
-            if r > 1.0:
-                continue
-            ring = min(int((1.0 - r) * 6.0), 5)
-            within = ((1.0 - r) * 6.0) - ring
-            c = cols[ring_cols[ring]]
-            braid = math.sin(ang * (12 + ring * 3) + ring) * 0.5 + 0.5
-            shade = 1 + (1 if braid > 0.6 else 0) - (1 if braid < 0.25 else 0) - (1 if within > 0.85 else 0)
-            shade += 1 if (-(x - cx) - (y - cy)) / (W * 0.5) > 0.4 else 0
-            if r > 0.94:
-                shade -= 1
-            out[y, x] = (*c[max(0, min(3, shade))][:3], 255)
-    for _ in range(60):  # frayed ends and loose threads at the edge
-        a = rng.uniform(0, math.tau)
-        x, y = int(cx + math.cos(a) * (W / 2 - 0.5)), int(cy + math.sin(a) * (H / 2 - 0.5))
-        for k in range(int(rng.integers(1, 3))):
-            xx_, yy_ = x + int(round(math.cos(a) * (k + 1))), y + int(round(math.sin(a) * (k + 1)))
-            if 0 <= xx_ < W and 0 <= yy_ < H and out[yy_, xx_, 3] == 0:
-                out[yy_, xx_] = (*cols[ring_cols[0]][1][:3], 255)
+    fringe = 3
+    stripes = [(0, 2), (1, 5), (0, 1), (2, 6), (3, 2), (2, 4), (1, 1), (0, 5), (1, 3), (3, 2)]
+    y = 1
+    rows = []
+    for c, hgt in stripes:
+        rows += [c] * hgt
+    rows = (rows * 2)[: H - 2]
+    for yy in range(1, H - 1):
+        c = cols[rows[yy - 1]]
+        for xx in range(fringe, W - fringe):
+            weave = (xx + yy) % 2
+            shade = 1 + weave - (1 if yy == 1 or yy == H - 2 else 0)
+            shade += 1 if (xx - fringe) < 3 and yy < H // 2 else 0  # a lit corner, top left
+            shade -= 1 if hut_lib.hsh(xx, yy, seed) > 0.93 else 0
+            shade += 1 if hut_lib.hsh(xx, yy, seed + 1) > 0.95 else 0
+            out[yy, xx] = (*c[max(0, min(3, shade))][:3], 255)
+    for xx in range(fringe, W - fringe):  # the dark outline of the long edges
+        out[0, xx] = (*h.RAMPS[BARK][0][:3], 255)
+        out[H - 1, xx] = (*h.RAMPS[BARK][0][:3], 255)
+    for yy in range(1, H - 1):  # fringe: loose ends of the warp, uneven
+        c = cols[0]
+        for side in (0, 1):
+            for k in range(fringe):
+                if hut_lib.hsh(yy * 2 + side, k, seed + 2) < 0.8 - k * 0.2 and yy % 2 == 1:
+                    xx = k if side == 0 else W - 1 - k
+                    out[yy, xx] = (*c[1 + (k % 2)][:3], 255)
     return out

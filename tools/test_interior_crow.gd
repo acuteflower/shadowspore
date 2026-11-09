@@ -53,11 +53,11 @@ func _run() -> void:
 	if crow == null:
 		get_tree().quit(1)
 		return
-	player.global_position = room.room_to_global(Vector2(112, 150))
+	player.global_position = room.room_to_global(Vector2(104, 140))
 	await _frames(30)
 	_check(crow._state == InteriorCrow.State.PERCHED and crow.visible, "it sits while the player is far away")
 	await _shot(dir, "1_sitting")
-	player.global_position = room.room_to_global(Vector2(130, 90))
+	player.global_position = room.room_to_global(Vector2(120, 110))
 	await _frames(30)
 	_check(crow._state == InteriorCrow.State.ALERT or crow._state == InteriorCrow.State.LEAVING, "somebody near: it looks and takes off")
 	for i: int in 8:
@@ -70,11 +70,19 @@ func _run() -> void:
 	_check(crow._state == InteriorCrow.State.AWAY and not crow._sprite.visible, "it is gone")
 	await _frames(600)
 	_check(crow._state == InteriorCrow.State.AWAY, "it does not come back while the player stays near")
-	player.global_position = room.room_to_global(Vector2(30, 200))
+	player.global_position = room.room_to_global(Vector2(200, 170))
 	await _frames(620)
 	_check(crow._state == InteriorCrow.State.RETURNING or crow._state == InteriorCrow.State.PERCHED, "player away: it comes back")
 	await _frames(100)
 	_check(crow._state == InteriorCrow.State.PERCHED and crow.z_index == 0 and crow.position.is_equal_approx(crow._perch), "and sits on the sill again")
 	await _shot(dir, "3_back")
+	for tool: Array in [["broom", 40.0], ["rake", 66.0]]: ## she can walk up to the wall mounts: behind the nightstand strip, past the bed's head
+		player.global_position = room.room_to_global(Vector2(100, 84))
+		await _frames(2)
+		for i: int in 200:
+			if player.move_and_collide(Vector2(-0.5 if player.global_position.x > room.room_to_global(Vector2(float(tool[1]), 0)).x else 0.0, 0.0)) != null:
+				break
+		var from_tool: float = absf(player.global_position.x - room.room_to_global(Vector2(float(tool[1]), 0)).x)
+		_check(from_tool < 6.0, "she can stand at the %s (x offset %.1f)" % [tool[0], from_tool])
 	print("interior crow test: %d checks, %s" % [_checks, "OK" if _ok else "FAILED"])
 	get_tree().quit(0 if _ok else 1)

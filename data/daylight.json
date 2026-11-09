@@ -1,0 +1,8 @@
+{
+  "canopy_tick": 0.33,
+  "motes": 38,
+  "golden_strength": 0.85,
+  "shaft_limit": 4,
+  "shaft_noon": 0.035,
+  "shaft_golden": 0.095
+}

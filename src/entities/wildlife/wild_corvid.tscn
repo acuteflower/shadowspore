@@ -1,7 +1,12 @@
 [gd_scene format=3]
 
+[ext_resource type="Shader" path="res://assets/shaders/day_sprite.gdshader" id="daylight_shader"]
+
 [ext_resource type="Script" path="res://src/entities/wildlife/wild_corvid.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/wildlife/corvid.png" id="2"]
+
+[sub_resource type="ShaderMaterial" id="daylight_material"]
+shader = ExtResource("daylight_shader")
 
 [sub_resource type="CircleShape2D" id="Body"]
 radius = 3.0
@@ -33,6 +38,7 @@ motion_mode = 1
 script = ExtResource("1")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
+material = SubResource("daylight_material")
 texture = ExtResource("2")
 hframes = 50
 vframes = 48

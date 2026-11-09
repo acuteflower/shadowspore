@@ -13,6 +13,7 @@ var _night_sent_ms: int = -1000
 var _glow: ShaderMaterial
 var _ground: ShaderMaterial
 var _sun_glow: ShaderMaterial
+var _daylight: DaylightField
 var _ambience: DayAmbience
 var _atmosphere: NightAtmosphere
 var _interiors: Interiors
@@ -26,6 +27,8 @@ func _ready() -> void:
 	var ground: Node = get_parent().get_node_or_null("Ground")
 	if ground != null:
 		_ground = (ground as CanvasItem).material as ShaderMaterial
+	_daylight = DaylightField.new()
+	get_parent().add_child.call_deferred(_daylight)
 	_add_sun_glow()
 	_ambience = DayAmbience.new()
 	add_child(_ambience)
@@ -37,7 +40,7 @@ func _ready() -> void:
 	_update()
 
 
-## One additive, dithered quad under the HUD: warm light falling in from the top left.
+## Restrained flat fill; local sunlight and canopy shafts are world anchored in DaylightField.
 func _add_sun_glow() -> void:
 	var layer: CanvasLayer = CanvasLayer.new()
 	layer.layer = 0
@@ -76,6 +79,7 @@ func _update() -> void:
 		var wet: float = Moisture.wetness() ## a damp day or after a fog night: the world is a little cooler and darker
 		color = color.lerp(color * Color(0.9, 0.95, 1.0, 1.0), wet * 0.6)
 	var sun: float = 0.0 if indoors else TimeManager.sun_amount()
+	_daylight.follow(indoors, sun, TimeManager.golden_amount())
 	if _ground != null:
 		_ground.set_shader_parameter("sun", sun)
 		_ground.set_shader_parameter("golden", 0.0 if indoors else TimeManager.golden_amount())

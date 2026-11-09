@@ -1,6 +1,7 @@
 class_name InteriorPickup
 extends Interactable
-## Something in a room that can be taken away (the hut's glowing mushrooms; data/interiors.json props `pickup` {item, amounts [per picture frame], step, flag, all_flag}). It only
+## Something in a room that can be taken away (the hut's glowing mushrooms, Ellie's broom; data/interiors.json props `pickup` {item (optional), amounts [per picture frame], step, flag, all_flag,
+## verb (default "ENTFERNEN"), fx "spores" (default) | "dust", also [ids of further props that go with it: the broom's clips]}). It only
 ## speaks while the local player's quest step is `step`: E bends her down (the picking animation), at the grab the prop is gone (a puff of spores), the items go into her bag and the
 ## quest flag `flag` is set; when every pickup of the room is gone `all_flag` is set (the task "remove the mushrooms"). A saved game hides the taken ones (`WorldLevel.resume_story`).
 
@@ -27,7 +28,7 @@ func prompt() -> String:
 		return ""
 	if String(player.quests.current().get("step_id", "")) != String(spec.get("step", "")) or player.quests.has_flag(String(spec.flag)):
 		return ""
-	return "ENTFERNEN"
+	return String(spec.get("verb", "ENTFERNEN"))
 
 
 func reach_distance(from: Vector2) -> float:
@@ -53,17 +54,24 @@ func interact(player: Player) -> void:
 ## Already taken in a saved game: the prop is gone, nothing is given.
 func apply_gone() -> void:
 	gone = true
+	_hide()
+
+
+func _hide() -> void:
 	interior.hide_prop(prop_id)
+	for other: Variant in spec.get("also", []) as Array:
+		interior.hide_prop(String(other))
 
 
 func _take(player: Player) -> void:
 	if gone:
 		return
 	gone = true
-	interior.hide_prop(prop_id)
+	_hide()
 	ShockRing.burst(interior, position + Vector2(0, -6), 14.0, 0.2)
-	var spores: CPUParticles2D = CPUParticles2D.new() ## a puff of glowing spores
-	spores.position = position + Vector2(0, -8)
+	var dust: bool = String(spec.get("fx", "spores")) == "dust"
+	var spores: CPUParticles2D = CPUParticles2D.new() ## a puff of glowing spores (or, for a tool taken off the wall, of dust)
+	spores.position = position + Vector2(0, -26.0 if dust else -8.0)
 	spores.one_shot = true
 	spores.emitting = true
 	spores.amount = 14
@@ -71,15 +79,17 @@ func _take(player: Player) -> void:
 	spores.explosiveness = 0.9
 	spores.direction = Vector2(0, -1)
 	spores.spread = 70.0
-	spores.gravity = Vector2(0, -6)
+	spores.gravity = Vector2(0, 16) if dust else Vector2(0, -6)
 	spores.initial_velocity_min = 8.0
 	spores.initial_velocity_max = 22.0
-	spores.color = Color("78f4e6")
-	spores.material = Unlit.material()
+	spores.color = Color("b9aebf") if dust else Color("78f4e6")
+	if not dust:
+		spores.material = Unlit.material()
 	spores.z_index = 3
 	interior.add_child(spores)
 	get_tree().create_timer(1.6).timeout.connect(spores.queue_free)
-	player.inventory.give(String(spec.item), amount)
+	if spec.has("item"):
+		player.inventory.give(String(spec.item), amount)
 	if player.quests != null:
 		player.quests.set_flag(String(spec.flag))
 		var all: bool = true

@@ -5,6 +5,9 @@ extends Node2D
 ## has been away for a few seconds it flies back in and lands on the sill. Purely cosmetic: every peer runs its own, nothing is synced. Frames of the wild crow's sheet
 ## (tools/art_corvid.py): idle 0-3, preen 16-21, watch 22-25, call 26-29, flight 30-37, landing 38-43, takeoff 44-49; rows = build * 8 + facing (E SE S SW W NW N NE).
 
+signal landing ## the flight in has come to the landing frames (RoomIntro plays the wing beats)
+signal landed
+
 enum State { PERCHED, ALERT, LEAVING, AWAY, RETURNING }
 
 const SHEET: Texture2D = preload("res://assets/wildlife/corvid.png")
@@ -16,15 +19,19 @@ const ALERT_TIME: float = 0.4
 const FLIGHT_TIME: float = 1.5
 const SOUTH: int = 2
 const NORTH: int = 6
+const SIDE: int = 3 ## south-west: it sits on the sill with its head turned into the room, so the bill and the eye show (from the front it is only a dark oval)
 
+var scripted: bool = false ## a cutscene flies it (RoomIntro): it neither flees nor comes back by itself
+var _flight: float = FLIGHT_TIME
+var _announced: bool = false
 var _perch: Vector2 = Vector2.ZERO
 var _exit: Vector2 = Vector2.ZERO
 var _state: State = State.PERCHED
 var _t: float = 0.0
 var _wait: float = 0.0
 var _build: int = 0
-var _sector: int = SOUTH
-var _look: int = SOUTH
+var _sector: int = SIDE
+var _look: int = SIDE
 var _behaviour: int = 0 ## 0 sits, 1 looks about, 2 preens, 3 calls
 var _behaviour_left: float = 1.0
 var _threat: Vector2 = Vector2.INF
@@ -39,7 +46,7 @@ func setup(perch: Vector2, exit_point: Vector2) -> void:
 
 
 func _ready() -> void:
-	_build = randi() % 3
+	_build = 0 ## the same crow every time: the great one of the opening is drawn in its plumage
 	_sprite = Sprite2D.new()
 	_sprite.texture = SHEET
 	_sprite.hframes = 50
@@ -71,7 +78,7 @@ func _process(delta: float) -> void:
 		State.PERCHED:
 			_sit(delta, gap)
 		State.ALERT:
-			_look = 3 if _threat.x < _home().x - 6.0 else (1 if _threat.x > _home().x + 6.0 else SOUTH) ## towards whoever is coming
+			_look = 3 if _threat.x < _home().x - 6.0 else (1 if _threat.x > _home().x + 6.0 else SIDE) ## towards whoever is coming
 			_show(22 + int(_t * 6.0) % 4, _look)
 			if _t >= ALERT_TIME:
 				_voice.stream = CALLS[randi() % CALLS.size()]
@@ -79,7 +86,7 @@ func _process(delta: float) -> void:
 				_voice.play()
 				_go(State.LEAVING)
 		State.LEAVING:
-			var f: float = _t / FLIGHT_TIME
+			var f: float = _t / _flight
 			if f >= 1.0:
 				_go(State.AWAY)
 				_wait = randf_range(4.0, 9.0)
@@ -88,23 +95,45 @@ func _process(delta: float) -> void:
 			position = _perch.lerp(_exit, f * f)
 			_show(44 + mini(5, int(f / 0.2 * 6.0)) if f < 0.2 else 30 + int(_t * 10.0) % 8, NORTH)
 		State.AWAY:
-			if gap > CALM_RADIUS:
+			if not scripted and gap > CALM_RADIUS:
 				_wait -= delta
 				if _wait <= 0.0:
 					position = _exit
 					_sprite.visible = true
+					_announced = false
 					_go(State.RETURNING)
 		State.RETURNING:
-			var f: float = _t / FLIGHT_TIME
+			var f: float = _t / _flight
+			if f > 0.62 and not _announced:
+				_announced = true
+				landing.emit()
 			if f >= 1.0:
 				position = _perch
 				_go(State.PERCHED)
 				_behaviour_left = 1.0
+				_flight = FLIGHT_TIME
+				landed.emit()
 				return
 			position = _exit.lerp(_perch, 1.0 - (1.0 - f) * (1.0 - f))
-			_show(38 + mini(5, int((f - 0.62) / 0.38 * 6.0)) if f > 0.62 else 30 + int(_t * 10.0) % 8, SOUTH)
+			_show(38 + mini(5, int((f - 0.62) / 0.38 * 6.0)) if f > 0.62 else 30 + int(_t * 10.0) % 8, SIDE if f > 0.5 else SOUTH)
 	## in flight it is outside the wall's plane: behind the wall, seen only through the opening (wings wider than the window are cut by its frame); on the sill and at takeoff / landing it is in front
-	z_index = -6 if (_state == State.LEAVING and _t > 0.12) or (_state == State.RETURNING and _t < FLIGHT_TIME * 0.93) else 0
+	z_index = -6 if (_state == State.LEAVING and _t > 0.12) or (_state == State.RETURNING and _t < _flight * 0.93) else 0
+
+
+## The opening of the room: the crow is not on its sill yet (the great one has just flown past).
+func hide_for_intro() -> void:
+	scripted = true
+	_go(State.AWAY)
+	_sprite.visible = false
+
+
+## The small crow comes in through the window and lands on the sill in `seconds`.
+func fly_in(seconds: float) -> void:
+	_flight = seconds
+	_announced = false
+	position = _exit
+	_sprite.visible = true
+	_go(State.RETURNING)
 
 
 func _go(state: State) -> void:
@@ -132,7 +161,7 @@ func _nearest() -> Vector2:
 
 
 func _sit(delta: float, gap: float) -> void:
-	if gap < SCARE_RADIUS and _t > 0.6:
+	if gap < SCARE_RADIUS and _t > 0.6 and not scripted:
 		_go(State.ALERT)
 		return
 	_behaviour_left -= delta
@@ -141,11 +170,11 @@ func _sit(delta: float, gap: float) -> void:
 		_behaviour = 0 if roll < 0.45 else (1 if roll < 0.7 else (2 if roll < 0.9 else 3))
 		var spans: Array[float] = [randf_range(1.5, 3.5), randf_range(2.0, 4.0), randf_range(2.0, 3.5), 0.8]
 		_behaviour_left = spans[_behaviour]
-		var looks: Array[int] = [SOUTH]
+		var looks: Array[int] = [SIDE]
 		if _behaviour == 1:
-			looks = [3, SOUTH, 1, SOUTH]
+			looks = [3, 3, 1, SOUTH]
 		elif _behaviour == 2:
-			looks = [SOUTH, 1, 3]
+			looks = [SIDE, 1, 3]
 		_look = looks[randi() % looks.size()]
 		if _behaviour == 3 and randf() < 0.6:
 			_voice.stream = CALLS[randi() % CALLS.size()]
@@ -162,6 +191,6 @@ func _sit(delta: float, gap: float) -> void:
 	_show(col, _look)
 
 
-func _show(col: int, sector: int = SOUTH) -> void:
+func _show(col: int, sector: int = SIDE) -> void:
 	_sector = sector
 	_sprite.frame = (_build * 8 + sector) * 50 + col

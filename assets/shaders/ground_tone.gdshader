@@ -1,4 +1,5 @@
 shader_type canvas_item;
+#include "res://assets/shaders/daylight.gdshaderinc"
 // Lights the meadow over large areas so the tiles never read as a grid: sunlit and shaded
 // patches, and slow drifting mist shadows. The patches blend smoothly between the palette's
 // greens (they used to switch whole palette steps with a Bayer dither, which showed as hard,
@@ -101,6 +102,7 @@ void vertex() {
 void fragment() {
 	vec4 c = texture(TEXTURE, UV);
 	vec2 px = floor(world_px);
+	float effect_time = g_day_strength > 0.001 ? g_day_clock : TIME;
 	int idx = -1;
 	for (int i = 0; i < 6; i++) {
 		if (distance(c.rgb, RAMP[i]) < 0.015) {
@@ -117,8 +119,8 @@ void fragment() {
 			}
 		}
 		float macro = fbm(px / patch_size + vec2(3.7, 1.9));
-		float mist = fbm(px / mist_size + vec2(TIME * 0.016, TIME * 0.007) * mist_speed + vec2(11.0, 5.0));
-		float day = smoothstep(0.35, 0.65, sun); // fades the midday effects in (was a hard switch at sun 0.5)
+		float mist = fbm(px / mist_size + vec2(effect_time * 0.016, effect_time * 0.007) * mist_speed + vec2(11.0, 5.0));
+		float day = g_day_strength; // golden hour has its own light budget
 		float shift = 0.0; // in palette steps, now fractional
 		float spot = 0.0;
 		shift += smoothstep(0.62 - 0.08 * sun - SOFT, 0.62 - 0.08 * sun + SOFT, macro); // sunlit meadow (wider at midday)
@@ -128,14 +130,13 @@ void fragment() {
 		shift -= 1.0 - smoothstep(0.32 - SOFT, 0.32 + SOFT, mist); // a drifting shadow
 		if (day > 0.0) {
 			// small drifting flecks of full sun, and big slow cloud shadows: the contrast is what reads as bright
-			float fleck = fbm(px / 38.0 + vec2(TIME * 0.020, TIME * 0.012) + vec2(21.0, 8.0));
-			float cloud = fbm(px / 300.0 + vec2(TIME * 0.010, TIME * 0.004) + vec2(40.0, 17.0));
-			spot = smoothstep(0.63 - SOFT, 0.63 + SOFT, fleck) * day;
+			float fleck = fbm(px / 38.0 + vec2(effect_time * 0.020, effect_time * 0.012) + vec2(21.0, 8.0));
+			float cloud = day_cloud(px);
+			spot = smoothstep(0.63 - SOFT, 0.63 + SOFT, fleck) * day * day_local(px);
 			shift += spot;
-			shift -= (1.0 - smoothstep(0.33 - SOFT, 0.33 + SOFT, cloud)) * day;
+			shift -= (1.0 - cloud) * day * 0.65;
 			// dappled light: patches of sun that reach the shaded ground through the boughs, drifting with the wind
-			float dap = vnoise(px / 6.0 + vec2(TIME * 0.05, TIME * 0.03));
-			shift += smoothstep(0.72 - SOFT, 0.72 + SOFT, dap) * (1.0 - smoothstep(0.45 - SOFT, 0.45 + SOFT, macro)) * day;
+			shift += day_dapple(px) * day_cover(px) * day * 0.7;
 		}
 		float f = clamp(float(idx) + shift, 0.0, 5.0); // fractional ramp position: blend two neighbouring greens
 		int lo = int(floor(f));
@@ -160,16 +161,17 @@ void fragment() {
 			c.rgb = mix(c.rgb, vec3(luma * 1.08, luma * 0.78, luma * 1.38), 0.16 * g_night);
 		}
 		if (spot > 0.0) { // a spot of full sun: warm, near white highlight above the palette's top green
-			c.rgb = mix(c.rgb, mix(vec3(1.0, 0.98, 0.78), vec3(1.0, 0.80, 0.45), golden), 0.42 * sun * spot * smoothstep(3.0, 4.0, f));
+			c.rgb = mix(c.rgb, mix(vec3(1.0, 0.98, 0.78), vec3(1.0, 0.80, 0.45), golden), 0.20 * day * spot * smoothstep(3.0, 4.0, f));
 		}
 		if (shift < 0.0) {
 			c.rgb = mix(c.rgb, vec3(0.20, 0.22, 0.40), 0.16 * clamp(-shift, 0.0, 1.0)); // shade leans cool violet
 		}
 		if (tip == 3 && g_dew > 0.0 && hash(px + vec2(3301.0, 77.0)) > 0.5) {
 			// morning dew: a blade tip now and then catches a pale glint
-			float tw = step(0.6, fract(TIME * 0.25 + hash(px) * 9.0));
+			float tw = step(0.6, fract(effect_time * 0.25 + hash(px) * 9.0));
 			c.rgb = mix(c.rgb, vec3(0.93, 1.0, 0.93), 0.85 * g_dew * tw);
 		}
 	}
+	c.rgb = day_grade(c.rgb, px, 0.45);
 	COLOR = c;
 }

@@ -47,6 +47,7 @@ const EMERGE_BLOOD: Texture2D = preload("res://assets/characters/player_emerge_b
 const FAINT_SHEET: Texture2D = preload("res://assets/characters/player_faint.png") ## tools/art_hero_faint.py: she collapses (side view, facing east)
 const SIT_SHEET: Texture2D = preload("res://assets/characters/player_sit.png") ## tools/art_hero_sit.py: she sits down by the fire
 const SIT_BLOOD: Texture2D = preload("res://assets/characters/player_sit_blood.png")
+const WARDROBE_SHEET: Texture2D = preload("res://assets/characters/player_wardrobe.png") ## tools/art_hero_wardrobe.py: she shuts her wardrobe (north view), the opening of her room
 const CARRY_SHEET: Texture2D = preload("res://assets/characters/player_carry.png") ## tools/art_hero_carry.py: she carries a board (side view, facing east)
 const FAINT_BLOOD: Texture2D = preload("res://assets/characters/player_faint_blood.png")
 const STUMBLE_SHEET: Texture2D = preload("res://assets/characters/player_stumble.png") ## tools/art_hero_stumble.py: 8 views, she trips and gets up
@@ -1082,6 +1083,30 @@ func show_carry_frame(frame: int, flip: bool) -> void:
 	_sprite.frame_coords = Vector2i(frame, 1 if flip else 0)
 	_sprite.flip_h = false
 	_sprite.position.y = 0.0
+
+
+## One frame of the wardrobe clip (the opening of her room, RoomIntro): she stands at the wardrobe facing north.
+func show_wardrobe_frame(frame: int) -> void:
+	if _sheet != 11:
+		_sheet = 11
+		fainting = true
+		(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", null)
+		_sprite.texture = WARDROBE_SHEET
+		_sprite.hframes = int(WARDROBE_SHEET.get_width() / 72.0)
+		_sprite.vframes = 1
+		_sprite.offset = Vector2(0.0, -13.0)
+	_sprite.frame_coords = Vector2i(frame, 0)
+	_sprite.flip_h = false
+	_sprite.position.y = 0.0
+
+
+## The opening of her room is over: she stands at `at` facing north and the game is hers. No HUD and no quest here (RoomIntro starts the quest).
+func end_room_intro(at: Vector2) -> void:
+	global_position = at
+	intro = null
+	end_faint()
+	facing = Vector2.UP
+	_camera.reset_smoothing()
 
 
 ## Back to the normal sheet.

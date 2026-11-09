@@ -22,6 +22,7 @@ Bevor du auch nur eine einzige Zeile Text für eine Figur schreibst, **musst du 
 * **Valdric (`docs/characters/valdric.md`):** Anfang/Mitte 30, breiter, kampferprobter Ritter im weinroten Mantel. Gesicht stets hinter Helm/Visier verborgen (sein eiserner Kodex). Nach außen betont nonchalant, pragmatisch und beschützend. Nur bei Ellie lacht er herzlich. Hat panische Angst vor dem Verlust der neuen Gemeinschaft und vor unbegreiflichen Anomalien/Schattenwesen, die keinem Kodex folgen.
 * **Gustav (`docs/characters/gustav.md`):** Ende 40 / Anfang 50. Erster Siedler und Handwerker-Genie. Laut, polternd, unendlich herzlich und zuvorkommend. Vergisst ständig Werkzeuge oder verhaspelt sich, baut aber die stabilsten Häuser der Welt. Zieht Valdric wegen des "Blechpanzers" auf und behandelt Ellie wie eine geschätzte Nichte.
 * **Maren (`docs/characters/maren.md`):** Mitte 30. Stromhüterin, Fischerin und Räuchermeisterin. Sehnig, wettergegerbt, verkörpert die stoische Geduld des fließenden Wassers. Bildhafte Fluss- und Vogelmetaphern, bringt Ellie Ruhe bei, schiebt Gustav am Feuer Essen zu und mahnt Valdric mit kühler Strenge bei gefährlichen Nachtangel-Zügen.
+* **Torben (`docs/characters/torben.md`):** Anfang/Mitte 40. Der Schmied. Bärenhafter Koloss, wandelnder Amboss. Redet fast nie (Brüllen, Knurren, 2–3-Wort-Sätze), ist aber der ultimative „Man-Handler“: Hebt Ellie am Kragen aus der Funkenlinie, schiebt Gustav mit einer Hand beiseite und rüttelt an Valdrics Harnisch herum, um lockere Nieten einzuhämmern. Handlungen ersetzen bei ihm Worte.
 
 ---
 

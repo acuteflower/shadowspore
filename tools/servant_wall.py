@@ -283,6 +283,8 @@ def front_img(W=304, cap=14, face=22, gap=(208, 256), seed=45, wear=Wear()):
                             grime=lambda xx, yy: -np.clip((yy - (face - 7)) / 7.0, 0, 1) * 0.6 * wear.grime, wear=wear)
     out[cap:, :, :3] = rgb_f
     out[cap, :, :3] = PAL[0]
+    out[0, :, :3] = PAL[0]  # a dark line along the top edge: the wall stands out from the floor it meets (nothing melts into it)
+    out[1, :, :3] = PAL[1]
     out[..., 3] = 255
     out[:, gap[0]:gap[1], 3] = 0
     out[:, gap[0] - 1, :3] = PAL[0]  # left jamb faces east, away from the light: dark

@@ -6,6 +6,14 @@ extends Interactable
 ## props that are not loaded). It lives on the host and reaches every peer through `WorldLevel`,
 ## which also placed this prop. Subclasses show it (`apply_state`) and add what is special.
 
+static var _day_shared: ShaderMaterial
+
+static func _day_material() -> ShaderMaterial:
+	if _day_shared == null:
+		_day_shared = ShaderMaterial.new()
+		_day_shared.shader = preload("res://assets/shaders/day_sprite.gdshader")
+	return _day_shared
+
 const SPARKS: Texture2D = preload("res://assets/fx/dust.png")
 const GLOW_BY_DAY: float = 0.22 ## how visible the glowing parts are in daylight
 
@@ -54,6 +62,7 @@ func _ready() -> void:
 		_shape($Hurtbox/Shape, _radius * 0.85, Vector2(0, -_radius * 0.5))
 	_setup_glow()
 	_setup_prop()
+	if _sprite.material == null: _sprite.material = _day_material()
 	_setup_blight()
 	var saved: Dictionary = level.thing_state(cell) if level != null else {}
 	apply_state(saved if String(saved.get("k", kind)) == kind else {}, "") ## a state of another kind (an old save) is ignored

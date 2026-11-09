@@ -334,3 +334,33 @@ g_town_wear_rect={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
+
+g_day_cover={
+"type": "sampler2D",
+"value": "res://assets/world/town_wear_empty.png"
+}
+
+g_day_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+
+g_day_clock={
+"type": "float",
+"value": 0.0
+}
+
+g_day_strength={
+"type": "float",
+"value": 0.0
+}
+
+g_day_gold={
+"type": "float",
+"value": 0.0
+}
+
+g_day_sway={
+"type": "vec2",
+"value": Vector2(0, 0)
+}

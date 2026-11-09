@@ -1,4 +1,5 @@
 shader_type canvas_item;
+#include "res://assets/shaders/daylight.gdshaderinc"
 global uniform float g_sun; // 0..1 sun height (DayNight): sparks on crystal veins by day
 // The world's height levels, drawn per pixel on the 1:1 world grid.
 //  - `field` (assets/world/relief_field.png, 1 pixel per tile, linear filter): the smoothed masks "level >= 1, 2, 3"
@@ -530,4 +531,5 @@ void fragment() {
 			}
 		}
 	}
+	if (!glow_pass) { COLOR.rgb = day_grade(COLOR.rgb, p, 0.4); }
 }

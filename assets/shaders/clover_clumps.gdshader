@@ -1,4 +1,6 @@
 shader_type canvas_item;
+#include "res://assets/shaders/daylight.gdshaderinc"
+varying vec2 day_position;
 // The standing clumps of a clover field (CloverField), one instance each. The top of every clump slides sideways in whole art pixels: with
 // WorldWind's wind (the same gust pulse that rolls over the meadow, so the clover waves with the grass), a little flutter of its own, and
 // away from whoever is in or at the field (`actors`: xy = world position, z = how hard he moves). The foot stays rooted.
@@ -12,6 +14,7 @@ varying vec4 detail;
 varying vec4 tint;
 
 void vertex() {
+	day_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 	detail = INSTANCE_CUSTOM;
 	tint = COLOR;
 	vec2 foot = band_origin + vec2((INSTANCE_CUSTOM.a - 0.5) * 256.0, 0.0);
@@ -39,4 +42,5 @@ void fragment() {
 		float glint = pow(max(0.0, sin(g_wind_clock * 2.1 + detail.g * 6.283)), 12.0);
 		COLOR.rgb += glint * vec3(0.5, 0.45, 0.15) * step(0.6, COLOR.g);
 	}
+	COLOR.rgb = day_grade(COLOR.rgb, day_position, 0.65);
 }

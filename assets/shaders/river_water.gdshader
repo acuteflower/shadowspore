@@ -1,4 +1,5 @@
 shader_type canvas_item;
+#include "res://assets/shaders/daylight.gdshaderinc"
 #include "res://assets/shaders/river_noise.gdshaderinc"
 global uniform float g_night; // 0..1 night (DayNight): moon glints
 global uniform float g_sun; // 0..1 sun height (DayNight): sun glints and caustics
@@ -72,16 +73,19 @@ void fragment() {
             }
         }
         // Sunlight: rare glints that wink on the surface and a drifting net of light over the shallows.
-        if (g_sun > 0.3) {
+        float daylight = g_day_strength * day_local(pixel);
+        if (daylight > 0.05) {
             vec2 gc = floor(pixel / vec2(5.0, 3.0));
             float gh = hash21(gc + 51.0);
-            if (gh > 0.86 && fract(g_water_time * 0.22 + gh * 7.0) < 0.22 && mod(pixel.x, 5.0) >= 2.0 && mod(pixel.x, 5.0) < 4.0 && mod(pixel.y, 3.0) == 1.0) {
-                color = mix(color, vec3(1.0, 0.98, 0.88), g_sun);
+            float glint_phase = fract(g_water_time * 0.22 + gh * 7.0);
+            float glint_fade = smoothstep(0.0, 0.07, glint_phase) * (1.0 - smoothstep(0.15, 0.25, glint_phase));
+            if (gh > 0.90 && abs(local.y - wave) < 2.0 && span > 0.5 && mod(pixel.x, 5.0) >= 2.0 && mod(pixel.x, 5.0) < 4.0 && mod(pixel.y, 3.0) == 1.0) {
+                color = mix(color, mix(vec3(1.0, 0.98, 0.88), vec3(1.0, 0.81, 0.48), g_day_gold), daylight * glint_fade);
             }
             if (mask.g < 0.34) {
                 float c1 = sin(pixel.x * 0.45 + g_water_time * 0.8 + sin(pixel.y * 0.37 + g_water_time * 0.6) * 1.7);
                 float c2 = sin(pixel.y * 0.52 - g_water_time * 0.7 + sin(pixel.x * 0.33) * 1.5);
-                if (c1 + c2 > 1.4) { color = mix(color, vec3(0.70, 0.86, 0.66), 0.5 * g_sun); }
+                if (c1 + c2 > 1.4) { color = mix(color, vec3(0.70, 0.86, 0.66), 0.5 * daylight); }
             }
         }
         // Elliptical broken arcs and short, downstream foam trails around obstacles.
@@ -259,5 +263,6 @@ void fragment() {
         }
         if (paint) { out_color = vec4(col, alpha); }
     }
+    out_color.rgb = day_grade(out_color.rgb, pixel, 0.25);
     COLOR = out_color;
 }

@@ -1,4 +1,6 @@
 shader_type canvas_item;
+#include "res://assets/shaders/daylight.gdshaderinc"
+varying vec2 daylight_position;
 // Rows of a picture slide sideways in the wind, in whole art pixels, so a sprite sways without losing its pixel look: the farther a row is from the
 // pivot row, the more it moves. `dir` 1 = the rows below the pivot move (rags hung from a line), -1 = the rows above it (plants rooted at the pivot).
 // A little restless ripple is always there, in clumps of `cell_w` columns that are out of step with each other (each rag, each tuft on its own).
@@ -22,4 +24,7 @@ void fragment() {
 	float ripple = sin(time * speed + row * 0.11 + cell * 1.9) * flutter + sin(time * speed * 2.3 + cell * 3.1) * flutter * 0.45;
 	float shift = floor((wind * amount * (0.75 + 0.25 * sin(cell * 2.7 + time * 0.6)) + ripple) * d / 16.0 + 0.5);
 	COLOR = texture(TEXTURE, UV - vec2(shift / size.x, 0.0));
+	COLOR.rgb = day_grade(COLOR.rgb, daylight_position, 0.7);
 }
+
+void vertex() { daylight_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy; }

@@ -340,5 +340,22 @@
     "event": "story:gustav_hello"
    }
   ]
+ },
+ "take_broom": {
+  "title": "DER PERSONALRAUM",
+  "steps": [
+   {
+    "id": "take_broom",
+    "text": "NIMM DEN BESEN",
+    "type": "flag",
+    "flag": "broom_taken"
+   },
+   {
+    "id": "leave_room",
+    "text": "VERLASSE DEIN ZIMMER",
+    "type": "flag",
+    "flag": "left_personalraum"
+   }
+  ]
  }
 }

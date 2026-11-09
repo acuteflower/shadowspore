@@ -432,7 +432,7 @@ Ein Tag dauert **12 Minuten**: **8 Minuten Tag** (mit je einer Minute Morgen- un
 | 0,17 – 0,20 | Nacht → Morgengrauen | violett |
 | 0,20 – 0,28 | Sonnenaufgang | warmes Rosa, dann Gold |
 | 0,28 – 0,72 | Tag | fast neutral (Mittag minimal warm, `1,0 / 0,99 / 0,95`); das Leuchten kommt aus `ground_tone`-Sonnenflecken und `SunGlow`, nicht aus dem Tint |
-| 0,72 – 0,795 | Abend | Goldstunde, dann Rosa-Violett |
+| 0,72 – 0,795 | Abend | Goldstunde: Tint `0,98 / 0,88 / 0,82`, lokale honiggoldene Highlights vor kühlen Schatten; dann Rosa-Violett |
 | 0,83 – 0,17 | **Nacht** (4 min) | `0,38 / 0,41 / 0,68` über die ganze Welt |
 
 Die Farbstufen stehen in `TimeManager.KEY_COLORS`. Die Welt wird mit **einer Tönung** überzogen (`DayNight`, ein `CanvasModulate`); die Oberfläche (HUD) bleibt unberührt.
@@ -453,9 +453,9 @@ Die **Spielerin trägt kein Licht**; sie wird nur von den Quellen um sie herum a
 
 | Quelle | Wie |
 |---|---|
-| Sonnenflecken, Wolkenschatten, Lichtkringel im Schatten | `ground_tone.gdshader`, gedithert, wandern langsam |
-| Sonnenglanz und Lichtstrahlen | `SunGlow` (`sun_glow.gdshader`): additiver, gedithert gestufter Quad unter dem HUD, Goldstunden-Strahlen |
-| Lichtstaub | `DayMotes` (40 Pixel, nur im Bild, wie `Fireflies`) |
+| Sonnenflecken, Wolkenschatten, Lichtkringel im Schatten | Gemeinsames weltverankertes Feld (`daylight.gdshaderinc`, `DaylightField`), tatsächliche Baumkronen-Deckung, mit dem Wind bewegte Lücken |
+| Sonnenglanz und Lichtstrahlen | `SunGlow`: schwache konstante Füllung; maximal vier lokale `day_shafts` unter Figuren/Kronen, stärker zur Goldstunde |
+| Lichtstaub | `DayMotes`: 38 Körner (hartes Maximum 40), zoomkorrekte Sichtfläche, Aufleuchten im selben örtlichen Licht wie die Oberflächen |
 | Morgentau | blinkende Halmspitzen bis ca. 08:30 |
 | Wasserglitzern, Kaustik in Furten | `river_water.gdshader` |
 | Sonnenfunken auf Kristalladern, an der Leere-Kante, auf den Leuchtknospen | `relief`, `void_edge`, `glow_layer` |

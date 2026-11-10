@@ -82,6 +82,8 @@ func setup(interior_id: String, data: Dictionary) -> void:
 	add_child(body)
 	for wall: Array in data.get("walls", []) as Array:
 		_box(body, Rect2(float(wall[0]), float(wall[1]), float(wall[2]), float(wall[3])))
+	for outline: Array in data.get("outlines", []) as Array: ## walls that are not boxes (the round rooms of the witch's tower): a chain of points, room px
+		_chain(body, outline)
 	for prop: Dictionary in data.get("props", []) as Array:
 		_prop(prop, body)
 	for prop: Dictionary in data.get("props", []) as Array: ## what can be picked up or felled (story: renewing the hut)
@@ -103,6 +105,8 @@ func setup(interior_id: String, data: Dictionary) -> void:
 	for ray: Dictionary in data.get("rays", []) as Array:
 		_ray(_vec(ray.pos), float(ray.get("scale", 1.0)), _rays.size())
 	_front()
+	for item: Dictionary in data.get("passages", []) as Array: ## ways into another interior without a door leaf (the stair between the tower's shaft and the witch's room)
+		_passage(item)
 	for item: Dictionary in data.get("doors", []) as Array: ## more doors (the locked doors at the ends of the hall's aisles): a picture on the wall and a Doorway that only rattles
 		_door(item, "ÖFFNEN", false, false)
 	if data.has("front"): ## the front wall of a room without a doorway (the hallway); a list for several pieces (the corridor: its arch at the top and the lip of the rooms' wall at the bottom)
@@ -119,6 +123,10 @@ func setup(interior_id: String, data: Dictionary) -> void:
 		var crow: InteriorCrow = InteriorCrow.new()
 		crow.setup(_vec(item.perch), _vec(item.exit))
 		add_child(crow)
+	if data.has("resident"): ## somebody lives here (the witch in her tower room): data/settlers.json, `InteriorResident`
+		var person: InteriorResident = InteriorResident.new()
+		add_child(person)
+		person.setup(self, String(data.resident))
 	if data.has("body"): ## the dead lumberjack of the cabin and his axe (story: the search for the lumberjack's hut)
 		var corpse: LumberjackBody = LumberjackBody.new()
 		corpse.name = "Lumberjack"
@@ -242,6 +250,7 @@ func _backdrop() -> void:
 		material.set_shader_parameter("reveal", 0.0)
 	else:
 		material.set_shader_parameter("room", Vector4(_back.size.x / 2.0 - size.x / 2.0, _back.size.y / 2.0 - size.y / 2.0, size.x, size.y))
+		material.set_shader_parameter("corner", float(spec.get("corner", 0.0))) ## a round room (the witch's tower)
 	_back.material = material
 	add_child(_back)
 	if smoke:
@@ -257,7 +266,35 @@ func _backdrop() -> void:
 		var leaf: Array = (spec.exit_door as Dictionary).leaf as Array
 		edge_material.set_shader_parameter("door", Vector4(float(leaf[0]) - 4.0, float(leaf[1]), 60.0, size.y - float(leaf[1])))
 	_edge.material = edge_material
+	_edge.visible = not spec.has("corner") ## a round room has no straight edges for the shadow to creep in from
 	add_child(_edge)
+
+
+## A wall along a chain of points (segments, so it may bend any way).
+func _chain(body: StaticBody2D, points: Array) -> void:
+	var segments: PackedVector2Array = PackedVector2Array()
+	for i: int in points.size() - 1:
+		segments.append(_vec(points[i]))
+		segments.append(_vec(points[i + 1]))
+	var shape: CollisionShape2D = CollisionShape2D.new()
+	var chain: ConcavePolygonShape2D = ConcavePolygonShape2D.new()
+	chain.segments = segments
+	shape.shape = chain
+	body.add_child(shape)
+
+
+## A way into another interior (E): `to` the interior, `at` where she arrives there (its room px), `face` the way she looks then.
+func _passage(item: Dictionary) -> void:
+	var way: Doorway = Doorway.new()
+	way.interior_id = id
+	way.to_interior = String(item.to)
+	way.to_spot = _vec(item.at)
+	way.to_face = _vec(item.get("face", [0, 1]))
+	way.label = String(item.get("label", "WEITER"))
+	way.reach_radius = float(item.get("reach", 12.0))
+	way.prompt_height = 40.0
+	way.position = _vec(item.pos)
+	add_child(way)
 
 
 func _box(body: StaticBody2D, rect: Rect2) -> void:
@@ -410,7 +447,7 @@ func _anim(item: Dictionary) -> void:
 	var sprite: Sprite2D = _standing(String(item.tex), frames, 0, float(item.feet), _vec(item.pos))
 	if bool(item.get("unlit", false)):
 		sprite.material = Unlit.material()
-	sprite.z_index = 1
+	sprite.z_index = int(item.get("z", 1))
 	_anims.append({"sprite": sprite, "frames": frames, "fps": float(item.fps), "time": randf()})
 
 
@@ -451,10 +488,11 @@ func _front() -> void:
 		return
 	var exit_spec: Dictionary = spec.exit_door as Dictionary
 	var opens: bool = bool(exit_spec.get("opens", false))
+	var front_tex: String = String(spec.get("front_tex", "front.png"))
 	if opens: ## a room lies behind this wall: it sorts by its foot with the people (she is in front of it in the hallway, behind it in the room)
-		_sprite_sorted("front.png", Vector2(0, float(spec.front_y)))
+		_sprite_sorted(front_tex, Vector2(0, float(spec.front_y)))
 	else:
-		_sprite("front.png", Vector2(0, float(spec.front_y)), 2)
+		_sprite(front_tex, Vector2(0, float(spec.front_y)), 2)
 	if ResourceLoader.exists(_dir + "front_glow.png"):
 		_sprite("front_glow.png", Vector2(0, float(spec.front_y)), 3, true)
 	_door(exit_spec, "ÖFFNEN" if opens else "VERLASSEN", not opens)

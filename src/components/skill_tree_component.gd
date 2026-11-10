@@ -1,8 +1,7 @@
 class_name SkillTreeComponent
 extends Node
 ## Host-owned state of the skill graph (docs/skill_tree.md, docs/faehigkeiten_kampf_konzept.md).
-## Three kinds of node: roots (real abilities she has from the start), upgrades (bought with skill points once the
-## level is reached and the parent is learned) and placeholders (free to explore, no effect).
+## Roots are available from the start. Unlocks and upgrades cost points, and placeholders are free to explore.
 ## Skill points are `level - 1 - spent`; only the host decides what is learned, only the owner gets the answer.
 signal changed
 signal explored(id: String)
@@ -33,11 +32,15 @@ func is_upgrade(id: String) -> bool:
 	return bool(node(id).get("upgrade", false))
 
 
+func is_unlock(id: String) -> bool:
+	return bool(node(id).get("unlock", false))
+
+
 func is_learned(id: String) -> bool:
 	return id in _learned
 
 
-## A real ability she has: a root, or an upgrade she has learned.
+## A real ability she has: a root or a purchase.
 func is_awake(id: String) -> bool:
 	return is_root(id) or is_learned(id)
 
@@ -123,9 +126,9 @@ func learned_count(id: String) -> int:
 
 
 ## "learned", "ready" (can be bought right now), "short" (level reached, not enough points),
-## "blocked" (the upgrade before it is missing) or "locked" (level too low). "" for everything that is no upgrade.
-func upgrade_state(id: String) -> StringName:
-	if not is_upgrade(id):
+## "blocked" (the parent is missing) or "locked" (level too low). "" for other nodes.
+func learn_state(id: String) -> StringName:
+	if not is_upgrade(id) and not is_unlock(id):
 		return &""
 	if is_learned(id):
 		return &"learned"
@@ -137,8 +140,12 @@ func upgrade_state(id: String) -> StringName:
 	return &"ready" if points_free() >= cost(id) else &"short"
 
 
+func upgrade_state(id: String) -> StringName:
+	return learn_state(id) if is_upgrade(id) else &""
+
+
 func can_learn(id: String) -> bool:
-	return upgrade_state(id) == &"ready"
+	return learn_state(id) == &"ready"
 
 
 ## True when any upgrade of this skill could be bought right now (the flower shows it).

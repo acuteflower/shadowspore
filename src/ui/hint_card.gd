@@ -56,6 +56,15 @@ func notify_swim() -> void:
 	_event_left = 12.0
 
 
+## First breath of the Hexenwald's mist (flag mist_hint_seen, once per save).
+func notify_mist() -> void:
+	if _quests == null or _quests.has_flag("mist_hint_seen"):
+		return
+	_quests.set_flag("mist_hint_seen")
+	_hint = "mist"
+	_event_left = 12.0
+
+
 func _wanted() -> bool:
 	var now: Dictionary = _quests.current()
 	var hint: String = String(now.get("hint", ""))
@@ -108,6 +117,9 @@ func _draw() -> void:
 		return
 	if _hint == "swim":
 		_draw_swim_hint()
+		return
+	if _hint == "mist":
+		_draw_mist_hint()
 		return
 	if _hint == "craft":
 		_draw_craft_hint()
@@ -231,6 +243,23 @@ func _draw_swim_hint() -> void:
 	PixelText.draw(self, "KRAULEN: SCHNELL", Vector2i(at + Vector2(9 + cap_w + 6, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 	PixelText.draw(self, "DAS KOSTET AUSDAUER.", Vector2i(at + Vector2(9, 42)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 	PixelText.draw(self, "KEIN BLINK IM WASSER.", Vector2i(at + Vector2(9, 51)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+
+
+func _draw_mist_hint() -> void:
+	var g: float = _grow * _grow * (3 - 2 * _grow)
+	var void_level: float = VineStyle.void_amount()
+	var curve: Callable = func(x: float) -> float: return 6 + sin(x * 0.06) * 1.5
+	VineStyle.branch(self, 0, WIDTH - 12, curve, 4, void_level, 12, _time, g)
+	VineStyle.foliage(self, 0, WIDTH - 12, curve, 5, 130, void_level, 12, _time, g)
+	if g < 0.6:
+		return
+	var at: Vector2 = Vector2(10, roundf(22 - (1 - g) * 20))
+	var fade: float = clampf((g - 0.6) / 0.4, 0, 1)
+	VineStyle.paper(self, Rect2(at, Vector2(WIDTH - 22, HEIGHT - 26)), fade, void_level)
+	PixelText.draw(self, "HEXENNEBEL", Vector2i(at + Vector2(9, 8)), Color(Color("a8ff6a"), fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "DER NEBEL ZEIGT DIR DINGE.", Vector2i(at + Vector2(9, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "NICHT ALLES IST WAHR.", Vector2i(at + Vector2(9, 33)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "TRUG TUT DIR NICHTS.", Vector2i(at + Vector2(9, 47)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 
 
 func _draw_build_hint() -> void:

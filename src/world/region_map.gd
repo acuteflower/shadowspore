@@ -16,6 +16,7 @@ const COAST_WOBBLE: float = 0.1 ## noise added to the land field (about a tile o
 
 var world_seed: int
 var world_biome: String = "" ## optional shared biome; named areas remain independent
+var own_biomes: Array[String] = [] ## biomes that keep their own areas although `world_biome` is shared (data/world_map.json `own_biomes`: the Hexenwald)
 var editor_compatible_maps: Array[Dictionary] = []
 ## {id, center: Vector2 (tiles), scale, neighbors: Array[int], depth, area, super}
 var regions: Array[Dictionary] = []
@@ -71,6 +72,8 @@ func to_data() -> Dictionary:
 	var result: Dictionary = {"seed": world_seed, "cell": CELL, "world_tiles": WORLD_TILES, "start_region": start_region, "start": [start.x, start.y], "regions": out_regions, "supers": out_supers, "grid": runs}
 	if not world_biome.is_empty():
 		result["biome"] = world_biome
+	if not own_biomes.is_empty():
+		result["own_biomes"] = own_biomes.duplicate()
 	if not editor_compatible_maps.is_empty():
 		result["editor_compatible_maps"] = editor_compatible_maps.duplicate(true)
 	return result
@@ -80,6 +83,7 @@ func _from_data(d: Dictionary) -> void:
 	assert(int(d.cell) == CELL and int(d.world_tiles) == WORLD_TILES, "world_map.json was baked with other grid constants")
 	world_seed = int(d.seed)
 	world_biome = String(d.get("biome", ""))
+	own_biomes.assign(d.get("own_biomes", []))
 	editor_compatible_maps.assign(d.get("editor_compatible_maps", []))
 	start_region = int(d.start_region)
 	if d.has("start"):
@@ -180,13 +184,29 @@ func anchor(region: int) -> Vector2i:
 ## Biome id (data/biomes.json) of the super region the tile lies in; "" outside the world.
 func biome_at(tile: Vector2i) -> String:
 	var id: int = super_at(tile)
-	return "" if id < 0 else (world_biome if not world_biome.is_empty() else (supers[id] as Dictionary).biome as String)
+	if id < 0:
+		return ""
+	var own: String = (supers[id] as Dictionary).biome as String
+	return own if world_biome.is_empty() or own_biomes.has(own) else world_biome
+
+
+## One byte per map cell, 1 where the cell's biome has no props yet (`bare` in data/biomes.json); PropGenerator reads it.
+func bare_cells() -> PackedByteArray:
+	var biomes: Dictionary = DataRegistry.table("biomes")
+	var out: PackedByteArray = PackedByteArray()
+	out.resize(grid_size * grid_size)
+	for i: int in out.size():
+		var id: int = _grid[i]
+		if id >= 0:
+			out[i] = 1 if bool((biomes.get(biome_at(Vector2i(i % grid_size, i / grid_size) * CELL), {}) as Dictionary).get("bare", false)) else 0
+	return out
 
 
 ## The shared biome also applies to older baked materials and saved editor patches.
 static func active_biome(id: String) -> String:
-	var active: String = String(DataRegistry.table("world_map").get("biome", ""))
-	return id if active.is_empty() else active
+	var table: Dictionary = DataRegistry.table("world_map")
+	var active: String = String(table.get("biome", ""))
+	return id if active.is_empty() or (table.get("own_biomes", []) as Array).has(id) else active
 
 
 func area_name(id: int) -> String:

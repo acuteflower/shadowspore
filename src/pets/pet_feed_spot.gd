@@ -17,6 +17,19 @@ func _ready() -> void:
 	_bird = get_parent() as WildCorvid
 
 
+## While the tag shows, keep its words current: the cooldown counts down, and the prompt lights up again when the bird may eat.
+func _process(_delta: float) -> void:
+	if _prompt_node != null and _prompt_node.visible:
+		_prompt_node.show_text(prompt(), prompt_hint())
+
+
+func prompt_hint() -> String:
+	var me: Player = _local()
+	if me == null or _bird == null or prompt() != "FÜTTERN":
+		return ""
+	return PetRules.feed_block(get_tree(), _bird.pet_key, me.name.to_int())
+
+
 func prompt() -> String:
 	var me: Player = _local()
 	var registry: PetRegistry = PetRegistry.of(get_tree())
@@ -49,8 +62,8 @@ func interact(player: Player) -> void:
 			registry.ask("take", _bird.pet_key)
 		return
 	var item: String = _food(player)
-	if item == "" or _bird == null:
-		return
+	if item == "" or _bird == null or prompt_hint() != "":
+		return ## greyed out: it still chews, or it is full for today
 	var toward: Vector2 = (_bird.global_position - player.global_position).normalized()
 	player.begin_feed(toward, item, func() -> void:
 		if multiplayer.is_server():

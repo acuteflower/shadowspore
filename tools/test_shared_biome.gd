@@ -1,5 +1,5 @@
 extends Node
-## One biome, independent named territories; retain terrain physics and authored placements.
+## One shared biome for the five old territories (the Hexenwald is a biome of its own, see test_hexenwald), independent names; retain terrain physics and authored placements.
 const WORLD: PackedScene = preload("res://src/world/world_level.tscn")
 class EmptyWorld:
 	extends WorldLevel
@@ -24,8 +24,9 @@ func _run() -> void:
 	for area: Dictionary in map.supers:
 		names.append(map.area_name(int(area.id)))
 		for id: int in area.regions:
-			_check(map.biome_at(map.anchor(id)) == "meadow", "region %d uses meadow" % id)
-	_check(names.size() == 5 and names.has("Die Lichtung") and names.has("Nebelwald") and names.has("Glasklippen") and names.has("Versunkene Ruinen") and names.has("Das Leerenblühen"), "all five existing area names survive")
+			if int(area.id) < 5:
+				_check(map.biome_at(map.anchor(id)) == "meadow", "region %d uses meadow" % id)
+	_check(names.size() == 6 and names.has("Hexenwald") and names.has("Die Lichtung") and names.has("Nebelwald") and names.has("Glasklippen") and names.has("Versunkene Ruinen") and names.has("Das Leerenblühen"), "all five existing area names survive")
 	var roundtrip: RegionMap = RegionMap.new(0, map.to_data())
 	_check(roundtrip.to_data() == map.to_data(), "serialization preserves area names, topology and biome policy")
 	_check(map.biome_at(Vector2i.ZERO).is_empty(), "outside the island stays outside the biome")
@@ -38,9 +39,9 @@ func _run() -> void:
 	for i: int in range(0, old.size(), 4):
 		geometry = geometry and old[i] == relief._bytes[i] and (old[i+1] & 15) == (relief._bytes[i+1] & 15) and old[i+2] == relief._bytes[i+2] and (old[i+3] == 0) == (relief._bytes[i+3] == 0)
 		if old[i+3] != 0:
-			materials = materials and relief._bytes[i+3] == 200 and (relief._bytes[i+1] >> 4) < 2
+			materials = materials and (relief._bytes[i+3] == 200 and (relief._bytes[i+1] >> 4) < 2 or relief._bytes[i+3] == 205 and (relief._bytes[i+1] >> 4) == 5)
 	_check(geometry, "every height, connector kind, geometry byte and land flag is unchanged")
-	_check(materials, "all land uses meadow and natural grass/rock materials")
+	_check(materials, "old land uses meadow with grass/rock materials, the Hexenwald its slate")
 	var block: Image = Relief.BLOCK.get_image()
 	block.convert(Image.FORMAT_L8)
 	_check(relief._block == block.get_data(), "collision bake stays exact")
@@ -74,6 +75,8 @@ func _run() -> void:
 	world.get_node("Wildlife").process_mode = Node.PROCESS_MODE_DISABLED
 	for loaded: Vector2i in world._chunks.keys(): world._unload_chunk(loaded)
 	for area: Dictionary in map.supers:
+		if int(area.id) >= 5:
+			continue
 		var at: Vector2i = map.anchor(int((area.regions as Array)[0]))
 		_check(world._land_biome(at) == "meadow", "world habitat in " + map.area_name(int(area.id)))
 		var cell: Vector2i = at / WorldLevel.CHUNK
@@ -87,9 +90,9 @@ func _run() -> void:
 	add_child(window)
 	window._load_data()
 	_check(window._area_names == names, "map keeps territory names independently of its biome palette")
-	_check(window._area_colors.all(func(color: Color) -> bool: return color == Color(String(DataRegistry.get_entry("biomes", "meadow").color))), "map areas share one colour")
+	_check(window._area_colors.slice(0, 5).all(func(color: Color) -> bool: return color == Color(String(DataRegistry.get_entry("biomes", "meadow").color))), "the five old map areas share one colour")
 	var area_biomes: PackedInt32Array = window._material.get_shader_parameter("area_biomes")
-	_check(area_biomes == PackedInt32Array([0, 0, 0, 0, 0]), "all five shader territories use meadow symbols and palette")
+	_check(area_biomes == PackedInt32Array([0, 0, 0, 0, 0, 5]), "the five old shader territories use meadow symbols and palette, the Hexenwald its own")
 	var texture: Texture2D = window._material.get_shader_parameter("areas") as Texture2D
 	var area_image: Image = texture.get_image()
 	var borders: bool = true

@@ -10,6 +10,7 @@ signal town_founded
 signal built(piece: String, id: int)
 signal resident_joined(settler: String)
 signal refine_done(before: Dictionary, after: Dictionary, success: bool, refund: Dictionary) ## the local player collected a refined weapon: the reveal card plays
+signal brew_done(type: String, tier: int, count: int, moon: bool) ## the local player got potions from a brew (Esma): the brew card plays
 signal notice(text: String, good: bool) ## a short message for the local builder ("NICHT GENUG HOLZ")
 signal event(kind: String, data: Dictionary) ## what happened to the town, on every peer: "lamp_out", "level_up", "alert" (docs/town_ausbau.md; the settlers' chatter and the map listen)
 
@@ -38,8 +39,12 @@ var _path_root: Node2D
 const MAX_ORDERS: int = 3
 
 var debug_refine_seed: int = -1 ## tests: >= 0 fixes the dice of the next refinements
+var _outposts: Dictionary = {} ## role -> Vector2 (global): places away from the town where a trade is valid (`register_outpost`)
+var _persons: Dictionary = {} ## id -> Node2D: people who live elsewhere (`register_person`)
 var orders: Array = [] ## what a settler is making on commission: {r recipe id, left work seconds, total, done}; they work only while at their bench, anyone collects. A refinement is one too: {r "refine", k "refine", m maker, w the weapon as it was handed in, to the level it is meant to reach, ok the result (rolled when it was handed in), left, total, done}
 var _order_sync: float = 0.0
+var brewed: Dictionary = {} ## alchemy (docs/alchemie_konzept.md): "type:tier" -> how often it was brewed (shared: Esma learns, not one player); a tier needs the one below brewed once
+var alchemy_gift: bool = false ## Esma's first lesson gave her vials (once per world)
 var _walks: Dictionary = {} ## settlers' walks: "ax,ay>bx,by" -> PackedVector2Array (see `walk_route`)
 var _stands: Dictionary = {}
 var _walk_key: int = -1
@@ -1181,7 +1186,29 @@ func _rpc_stock_request(op: String, item: String, count: int) -> void:
 		_host_stock(op, item, count, multiplayer.get_remote_sender_id())
 
 
+## A place away from the town where a trade is valid too (the witch's room: `InteriorResident`), by the role its shop names.
+func register_outpost(role: String, at: Vector2) -> void:
+	if role != "":
+		_outposts[role] = at
+
+
+## Somebody who is no `Settler` of the town but can be traded with (the witch): the shop window frames them and lets them answer.
+func register_person(id: String, node: Node2D) -> void:
+	_persons[id] = node
+
+
+## The figure of a person: the town's settler, or somebody who lives elsewhere.
+func person_node(id: String) -> Node2D:
+	var settler: Settler = settler_node(id)
+	if settler != null:
+		return settler
+	var other: Variant = _persons.get(id)
+	return other as Node2D if other != null and is_instance_valid(other) else null
+
+
 func _near_role(player: Player, role: String, reach: float) -> bool:
+	if _outposts.has(role) and player.global_position.distance_to(_outposts[role] as Vector2) <= reach:
+		return true
 	for id: int in built_ids_of_role(role):
 		if rect_of(id).grow(reach).has_point(player.global_position):
 			return true
@@ -1291,7 +1318,7 @@ func _rpc_resident(sid: String, data: Dictionary, fresh: bool) -> void:
 
 
 func _ensure_settler(sid: String, fresh: bool) -> void:
-	if _settlers.has(sid) or not residents.has(sid):
+	if _settlers.has(sid) or not residents.has(sid) or bool(settler_spec(sid).get("away", false)): ## somebody `away` lives elsewhere (the witch in her tower): known and trusted, but no figure in the town
 		return
 	var settler: Settler = Settler.new()
 	settler.name = sid.capitalize()
@@ -1315,9 +1342,9 @@ func _rpc_talk(sid: String) -> void:
 
 
 func _host_talk(sid: String) -> void:
-	if not residents.has(sid):
+	if not residents.has(sid) and not bool(settler_spec(sid).get("away", false)): ## somebody who lives elsewhere is known from the first talk on
 		return
-	var data: Dictionary = (residents[sid] as Dictionary).duplicate()
+	var data: Dictionary = (residents.get(sid, {"trust": 0, "talked": -1}) as Dictionary).duplicate()
 	if int(data.talked) != TimeManager.day:
 		data.talked = TimeManager.day
 		data.trust = mini(int(data.trust) + 10, 100)
@@ -1393,6 +1420,8 @@ func _give_outputs(recipe: Dictionary, player: Player) -> void:
 
 ## The role of the building a recipe is made at (workshop: craft, smithy: smith).
 func _recipe_role(recipe: Dictionary) -> String:
+	if recipe.has("role"): ## a bench that is no piece of the town (the witch's jewellery bench)
+		return String(recipe.role)
 	return String(TownRules.piece(String(recipe.get("station", "workshop"))).get("role", "craft"))
 
 
@@ -1521,13 +1550,13 @@ func _host_collect(index: int, peer: int) -> void:
 # ---------- refinement (docs/refinement_konzept.md): the weapon goes onto Torben's anvil, the result is rolled at once and kept ----------
 
 ## What stops refining this weapon right now ("" = nothing).
-func refine_block(stack: Dictionary, player: Player) -> String:
+func refine_block(stack: Dictionary, player: Player, by: String = "") -> String:
 	if not RefineRules.is_refinable(stack):
 		return "DAS LÄSST SICH NICHT VERFEINERN"
 	if not RefineRules.can_refine(stack):
 		return "HÖHER GEHT ES NICHT"
 	var target: int = RefineRules.next_level(stack)
-	var maker: String = RefineRules.maker()
+	var maker: String = by if by != "" else RefineRules.maker()
 	if trust_of(maker) < RefineRules.trust_needed(target):
 		return "%s TRAUT DIR NOCH NICHT" % String(settler_spec(maker).get("name", maker))
 	var missing: String = missing_text(RefineRules.materials(stack, target), player)
@@ -1538,28 +1567,32 @@ func refine_block(stack: Dictionary, player: Player) -> String:
 	return ""
 
 
-func request_refine(kind: String, ref: Variant) -> void:
+## `shop_id`: whose shop it is asked at ("" = the smithy; the witch refines too).
+func request_refine(kind: String, ref: Variant, shop_id: String = "") -> void:
 	if multiplayer.is_server():
-		_host_refine(kind, ref, multiplayer.get_unique_id())
+		_host_refine(kind, ref, multiplayer.get_unique_id(), shop_id)
 	else:
-		_rpc_refine.rpc_id(1, kind, ref)
+		_rpc_refine.rpc_id(1, kind, ref, shop_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _rpc_refine(kind: String, ref: Variant) -> void:
+func _rpc_refine(kind: String, ref: Variant, shop_id: String = "") -> void:
 	if multiplayer.is_server():
-		_host_refine(kind, ref, multiplayer.get_remote_sender_id())
+		_host_refine(kind, ref, multiplayer.get_remote_sender_id(), shop_id)
 
 
-func _host_refine(kind: String, ref: Variant, peer: int) -> void:
+func _host_refine(kind: String, ref: Variant, peer: int, shop_id: String = "") -> void:
 	var player: Player = player_of(peer)
-	if player == null or not _near_role(player, String(TownRules.piece(RefineRules.station()).get("role", "smith")), 150.0):
+	var at: Dictionary = shop(shop_id) if shop_id != "" else {}
+	var by: String = String(at.get("npc", ""))
+	var role: String = String(at.get("role", TownRules.piece(RefineRules.station()).get("role", "smith")))
+	if player == null or not _near_role(player, role, float(at.get("reach", 150.0))):
 		_tell(peer, "ZU WEIT VON DER SCHMIEDE", false)
 		return
 	var stack: Dictionary = player.inventory.stack_at(kind, ref) if kind in ["inv", "equip"] and player.inventory.slot_exists(kind, ref) else {}
 	if stack.is_empty():
 		return
-	var reason: String = refine_block(stack, player)
+	var reason: String = refine_block(stack, player, by)
 	if reason != "":
 		_tell(peer, reason, false)
 		return
@@ -1665,6 +1698,111 @@ func _work_orders(delta: float) -> void:
 	if finished or (moved and _order_sync <= 0.0):
 		_order_sync = 1.0
 		_rpc_orders.rpc(orders.duplicate(true))
+
+
+# ---------- alchemy: Esma brews potions (docs/alchemie_konzept.md, AlchemyRules) ----------
+
+## What stops `player` from having this potion brewed by `maker` now ("" = nothing): the brewer's trust, the tier below, the ingredients in the bag.
+func brew_block(type: String, level: int, player: Player, maker: String) -> String:
+	var why: String = AlchemyRules.unlock_block(type, level, trust_of(maker), brewed, String(settler_spec(maker).get("name", maker)))
+	if why != "":
+		return why
+	var need: Dictionary = AlchemyRules.ingredients(type, level)
+	for item: String in need:
+		if player.inventory.count_item(item) < int(need[item]):
+			return "ES FEHLT %s" % String(DataRegistry.get_entry("items", item).get("name", item)).to_upper()
+	return ""
+
+
+## Potions one brew gives right now (the full moon at night adds some).
+func brew_yield(type: String, level: int) -> int:
+	return AlchemyRules.brew_yield(type, level, TimeManager.moon_phase(), TimeManager.night_amount())
+
+
+func request_brew(type: String, level: int, shop_id: String) -> void:
+	if multiplayer.is_server():
+		_host_brew(type, level, shop_id, multiplayer.get_unique_id())
+	else:
+		_rpc_brew.rpc_id(1, type, level, shop_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_brew(type: String, level: int, shop_id: String) -> void:
+	if multiplayer.is_server():
+		_host_brew(type, level, shop_id, multiplayer.get_remote_sender_id())
+
+
+## Host: brewing is instant like refining: the ingredients (from the bag only: she brings them to Esma) leave, the potions go into the bag
+## (what does not fit goes to the town's stock), the count of this tier rises.
+func _host_brew(type: String, level: int, shop_id: String, peer: int) -> void:
+	var player: Player = player_of(peer)
+	var at: Dictionary = shop(shop_id)
+	var maker: String = String(at.get("npc", ""))
+	if player == null or at.is_empty() or not _near_role(player, String(at.get("role", "witch")), float(at.get("reach", 150.0))):
+		_tell(peer, "ZU WEIT VOM KESSEL", false)
+		return
+	var reason: String = brew_block(type, level, player, maker)
+	if reason != "":
+		_tell(peer, reason, false)
+		return
+	var need: Dictionary = AlchemyRules.ingredients(type, level)
+	for item: String in need:
+		player.inventory.remove_item(item, int(need[item]))
+	var moon: bool = AlchemyRules.moon_extra(TimeManager.moon_phase(), TimeManager.night_amount()) > 0
+	var count: int = brew_yield(type, level)
+	var left: int = player.inventory.give(AlchemyRules.item_id(type, level), count)
+	player.inventory.changed.emit()
+	if left > 0:
+		_add_stock(AlchemyRules.item_id(type, level), left)
+		_sync_stock()
+	var brew_key: String = AlchemyRules.key(type, level)
+	brewed[brew_key] = int(brewed.get(brew_key, 0)) + 1
+	_rpc_brewed.rpc(brewed.duplicate())
+	if peer == multiplayer.get_unique_id():
+		brew_done.emit(type, level, count, moon)
+	else:
+		_rpc_brew_done.rpc_id(peer, type, level, count, moon)
+	if left > 0:
+		_tell(peer, "KEIN PLATZ: %d IM LAGER DER STADT" % left, false)
+	if player.quests != null:
+		player.quests.set_flag("brewed_%s" % type)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_brewed(counts: Dictionary) -> void:
+	brewed = counts.duplicate()
+	changed.emit()
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_brew_done(type: String, level: int, count: int, moon: bool) -> void:
+	brew_done.emit(type, level, count, moon)
+
+
+## Esma's first lesson: the asking player gets `vials` empty vials, once per world. True on the host when it was given.
+func request_alchemy_gift(vials: int = 5) -> void:
+	if multiplayer.is_server():
+		_host_alchemy_gift(vials, multiplayer.get_unique_id())
+	else:
+		_rpc_alchemy_gift.rpc_id(1, vials)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_alchemy_gift(vials: int) -> void:
+	if multiplayer.is_server():
+		_host_alchemy_gift(vials, multiplayer.get_remote_sender_id())
+
+
+func _host_alchemy_gift(vials: int, peer: int) -> void:
+	var player: Player = player_of(peer)
+	if player == null or alchemy_gift:
+		return
+	alchemy_gift = true
+	var left: int = player.inventory.give(String(AlchemyRules.data().get("vial", "vial_empty")), clampi(vials, 0, 10))
+	if left > 0:
+		_add_stock(String(AlchemyRules.data().get("vial", "vial_empty")), left)
+		_sync_stock()
+	_tell(peer, "%d LEERE PHIOLEN" % clampi(vials, 0, 10), true)
 
 
 # ---------- trade (a shop's buy and sell lists, data/shops.json) ----------
@@ -2041,7 +2179,7 @@ func export_state() -> Dictionary:
 	return {
 		"version": STATE_VERSION, "founded": founded, "name": name_index, "center": [center.x, center.y], "day": founded_day,
 		"next_id": next_id, "structures": out_structures, "stock_slots": box.slots.duplicate(true), "cleared": out_cleared, "residents": residents.duplicate(true), "paths": paths.duplicate(true), "orders": orders.duplicate(true),
-		"fear": fear_on,
+		"fear": fear_on, "brewed": brewed.duplicate(), "alchemy_gift": alchemy_gift,
 	}
 
 
@@ -2064,6 +2202,11 @@ func import_state(data: Dictionary) -> void:
 	_path_views.clear()
 	founded = bool(data.get("founded", false))
 	fear_on = bool(data.get("fear", false))
+	brewed.clear()
+	var counts: Dictionary = data.get("brewed", {}) as Dictionary
+	for brew_key: String in counts:
+		brewed[brew_key] = int(counts[brew_key])
+	alchemy_gift = bool(data.get("alchemy_gift", false))
 	name_index = int(data.get("name", 0))
 	var middle: Array = data.get("center", [0, 0]) as Array
 	center = Vector2(float(middle[0]), float(middle[1]))

@@ -1,5 +1,5 @@
 {
-  "_doc": "Schleiergeflecht (docs/skill_tree.md, docs/faehigkeiten_kampf_konzept.md). root = von Anfang an eine echte Fähigkeit; upgrade = kein eigener Orb, wächst an der Blume seiner Fähigkeit (Kette über parent), lernbar mit Fähigkeitspunkten (level = benötigte Stufe, cost = Punkte, Elternknoten muss erlernt sein); placeholder = kostenlos erkundbar, ohne Wirkung. Punkte = Stufe - 1 - ausgegeben.",
+  "_doc": "Schleiergeflecht (docs/skill_tree.md, docs/faehigkeiten_kampf_konzept.md). root = Startfähigkeit; unlock = lernbare Fähigkeit mit eigenem Orb; upgrade = lernbar an der Blume der Elternfähigkeit; placeholder = kostenlos erkundbar. Lernbare Knoten brauchen den Elternknoten, level und cost. Punkte = Stufe - 1 - ausgegeben.",
   "branches": {
     "combat": {"name": "KAMPF", "color": "e6c468"},
     "movement": {"name": "BEWEGUNG", "color": "78f4e6"},
@@ -12,6 +12,7 @@
     "combat_echo_b": {"name": "UNGEFORMTES ECHO", "branch": "combat", "pos": [-112, -76], "parent": "sword_combo", "placeholder": true},
     "sprint": {"name": "ANTRITT", "branch": "movement", "pos": [0, 76], "root": true, "icon": "stride", "description": "Sprinten mit einem Dash beim Loslaufen.", "detail": "BEWEGEN + SPRINT GEDRÜCKT HALTEN"},
     "sneak": {"name": "SCHLEICHEN", "branch": "movement", "pos": [-52, -6], "parent": "sprint", "root": true, "icon": "sneak", "description": "Leise gehen: Gegner sehen dich nur halb so weit.", "detail": "SCHLEICHEN GEDRÜCKT HALTEN"},
+    "wall_climb": {"name": "KLETTERN", "branch": "movement", "pos": [66, 51], "parent": "sprint", "unlock": true, "cost": 1, "icon": "climb", "description": "Zieh dich auf höhere Felsabsätze.", "detail": "AN DER WAND %s DRÜCKEN / NUR AUFWÄRTS"},
     "movement_echo_a": {"name": "UNGEFORMTES ECHO I", "branch": "movement", "pos": [52, -6], "parent": "sprint", "placeholder": true},
     "movement_echo_b": {"name": "UNGEFORMTES ECHO II", "branch": "movement", "pos": [0, -124], "parent": "movement_echo_a", "placeholder": true},
     "shadow_blink": {"name": "SCHATTENBLINK", "branch": "shadow", "pos": [150, 28], "root": true, "icon": "rift", "description": "Springe durch den Schatten in Blickrichtung.", "detail": "BESTEHENDE FÄHIGKEIT"},

@@ -4,8 +4,8 @@ extends RefCounted
 ## per tile; layout in that script). Heights are flat map data, not a third dimension: a plateau
 ## is a region at a higher level with a smooth contour (relief_field.png, the blurred level masks),
 ## the 3/4 camera sees a 32 px wall below its south contour, the other edges are thin walls, and
-## ramps, stairs and rock steps (`RAMP`, `STAIRS`, `STEPS`, whole tiles in relief.png) are the only
-## ways between two levels. The collision comes from relief_block.png (4 px cells, baked with the
+## ramps, stairs and rock steps (`RAMP`, `STAIRS`, `STEPS`, whole tiles in relief.png) connect
+## the levels on foot. The collision comes from relief_block.png (4 px cells, baked with the
 ## same rule the shader draws by). The picture is drawn by `ReliefLayer`; this class answers every
 ## question about the data (collision, props, footsteps). The per-tile `FACE` kind is only the
 ## tile-grid approximation of the wall that props are kept away from.
@@ -54,8 +54,12 @@ func _apply_world_biome() -> void:
 	var biome: int = DataRegistry.table("biomes").keys().find(active)
 	if biome < 0:
 		return
+	var own: Array = []
+	var ids: Array = DataRegistry.table("biomes").keys()
+	for id: Variant in DataRegistry.table("world_map").get("own_biomes", []): ## biomes of their own keep the bake's biome byte
+		own.append(200 + ids.find(String(id)))
 	for i: int in range(0, _bytes.size(), 4):
-		if _bytes[i + 3] == 0:
+		if _bytes[i + 3] == 0 or own.has(int(_bytes[i + 3])):
 			continue
 		_bytes[i + 3] = 200 + biome
 		if active == "meadow":
@@ -98,7 +102,7 @@ func has_glow_style(rect: Rect2i) -> bool:
 			var idx: int = row + x * 4
 			if _bytes[idx + 3] != 0: ## land
 				var st: int = _bytes[idx + 1] >> 4
-				if st >= 3:
+				if st == 3 or st == 4:
 					return true
 	return false
 
@@ -158,6 +162,11 @@ func flat_around(pos: Vector2, radius: float) -> bool:
 ## 1 when a wall face stands one or two tiles north of this tile (the foot of a cliff: rubble lies there).
 func wall_above(cell: Vector2i) -> bool:
 	return kind(cell.x, cell.y - 1) == FACE or kind(cell.x, cell.y - 2) == FACE
+
+
+func blocked_at(point: Vector2) -> bool:
+	var cell: Vector2i = Vector2i((point / (TILE / CELLS)).floor())
+	return cell.x >= 0 and cell.y >= 0 and cell.x < _block_side and cell.y < _block_side and _block[cell.y * _block_side + cell.x] != 0
 
 
 ## Solid rectangles (px) for the collision cells of `rect` (tiles): the walls and rims baked into

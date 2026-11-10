@@ -18,6 +18,33 @@ const GLYPH: Array[String] = [
 	".###.",
 ]
 
+const EYE: Array[String] = [
+	".....",
+	".###.",
+	"#.#.#",
+	"#.#.#",
+	".###.",
+	".....",
+]
+
+const SPARK: Array[String] = [
+	"..#..",
+	"#.#.#",
+	".###.",
+	"#####",
+	".###.",
+	"#.#.#",
+]
+
+const DROP: Array[String] = [
+	"..#..",
+	"..#..",
+	".###.",
+	"#####",
+	"#####",
+	".###.",
+]
+
 var _effects: StatusEffects
 var _time: float = 0.0
 var _shown: Dictionary = {} ## id -> 0..1 (how far its tag has dropped in)
@@ -42,15 +69,17 @@ func _process(delta: float) -> void:
 	var any: bool = false
 	var ids: Array[String] = _effects.active()
 	for id: String in ids:
+		if bool(StatusEffects.definition(id).get("hidden", false)):
+			continue ## shown elsewhere (the food pause is a ring on the hotbar)
 		var left: float = _effects.left(id)
-		if left > float(_last_left.get(id, 0.0)) + 0.2:
+		if left > float(_last_left.get(id, 0.0)) + 0.2 and not bool(StatusEffects.definition(id).get("permanent", false)): ## a lasting effect is refreshed all the time
 			_flare[id] = 1.0
 		_last_left[id] = left
 		_shown[id] = minf(float(_shown.get(id, 0.0)) + delta * 4.0, 1.0)
 		_flare[id] = maxf(float(_flare.get(id, 0.0)) - delta * 3.0, 0.0)
 		any = true
 	for id: String in _shown.keys():
-		if not ids.has(id):
+		if not ids.has(id) or bool(StatusEffects.definition(id).get("hidden", false)):
 			_shown[id] = float(_shown[id]) - delta * 5.0
 			if float(_shown[id]) <= 0.0:
 				_shown.erase(id)
@@ -78,6 +107,8 @@ func _draw() -> void:
 		var total: float = maxf(_effects.total(id), 0.01)
 		var left: float = _effects.left(id)
 		var frac: float = clampf(left / total, 0.0, 1.0) if _effects.has(id) else 0.0
+		if bool(def.get("permanent", false)) and _effects.has(id):
+			frac = 0.8 + 0.2 * sin(_time * 1.3) ## no countdown: it breathes
 		var flare: float = float(_flare.get(id, 0.0))
 		var urgent: bool = left < 1.0 and _effects.has(id)
 		var stutter: float = 1.0 if not urgent or fmod(_time * 13.0, 1.0) > 0.25 else 0.35
@@ -85,22 +116,36 @@ func _draw() -> void:
 		var y: int = int(roundf((1.0 - VineStyle.back_out(p)) * -8.0))
 		var a: float = minf(p * 1.5, 1.0)
 		_draw_paper(Rect2i(x, y, width, TAG_H), a, void_level, tone)
-		_draw_glyph(Vector2i(x + 4, y + 4), tone.lerp(hot, 0.4 + 0.5 * flare), a * stutter)
+		_draw_glyph(Vector2i(x + 4, y + 4), tone.lerp(hot, 0.4 + 0.5 * flare), a * stutter, _glyph_of(String(def.get("glyph", ""))))
 		PixelText.draw(self, label, Vector2i(x + 13, y + 3), Color(tone.lerp(UiStyle.TEXT, 0.35 + 0.4 * flare), a * stutter), Color(VineStyle.OUTLINE, a))
 		_draw_crack(x + 4, y + 12, width - 8, frac, tone, hot, a * stutter, flare)
 		VineStyle.leaf(self, Vector2(x + width - 2, y + 2), 1, -1, 3, Color(VineStyle.LEAF.lerp(VineStyle.LEAF_VOID, void_level), a), Color(VineStyle.LEAF_LIGHT.lerp(VineStyle.LEAF_VOID_LIGHT, void_level), a))
 		x += width + GAP
 
 
-func _draw_glyph(at: Vector2i, color: Color, a: float) -> void:
-	var wob: int = int(_time * 9.0) % 2
-	for row: int in GLYPH.size():
-		var line: String = GLYPH[row]
+func _glyph_of(glyph: String) -> Array[String]:
+	match glyph:
+		"eye":
+			return EYE
+		"spark":
+			return SPARK
+		"drop":
+			return DROP
+	return GLYPH
+
+
+func _draw_glyph(at: Vector2i, color: Color, a: float, shape: Array[String] = GLYPH) -> void:
+	var wob: int = int(_time * 9.0) % 2 if shape == GLYPH else 0
+	if shape == EYE and fmod(_time, 3.7) > 3.5: ## it blinks
+		draw_rect(Rect2(at.x, at.y + 3, 5, 1), Color(color, a))
+		return
+	for row: int in shape.size():
+		var line: String = shape[row]
 		for col: int in line.length():
 			if line[col] == "#":
 				var shift: int = wob if row < 2 and col % 2 == 0 else 0
 				draw_rect(Rect2(at.x + col, at.y + row - shift, 1, 1), Color(color, a * (1.0 - 0.1 * float(row))))
-	draw_rect(Rect2(at.x + 2, at.y + 4, 1, 2), Color(CORE_HOT, a * 0.8))
+	draw_rect(Rect2(at.x + 2, at.y + (2 if shape == EYE else 4), 1, 2), Color(CORE_HOT, a * 0.8))
 
 
 func _inset(x: int, bottom: bool, width: int, salt: int) -> int:

@@ -43,6 +43,8 @@ const FISH_BLOOD: Texture2D = preload("res://assets/characters/player_fish_blood
 const SWIM_SHEET: Texture2D = preload("res://assets/characters/player_swim.png") ## tools/art_hero_swim.py: above-water layer (64x72 frames, water line at row 46)
 const SWIM_UNDER: Texture2D = preload("res://assets/characters/player_swim_under.png") ## the same frames, only what is below the water line (drawn behind, tinted)
 const SWIM_OFFSET: Vector2 = Vector2(0.0, -10.0)
+const CLIMB_OFFSET: Vector2 = Vector2(0.0, -29.0) ## 68 px frames with the foot anchor on row 63
+const CLIMB_SHEET: int = 15
 const SWIM_LEVELS: Array[String] = ["tread", "breast", "crawl"]
 const SWIM_SOUNDS: Dictionary = { ## tools/audio_swim.py
 	"dive_big": preload("res://assets/audio/swim/dive_big.wav"), "dive_small": preload("res://assets/audio/swim/dive_small.wav"),
@@ -87,6 +89,12 @@ const FEED_REACH_TIME: float = 0.5 ## feeding: the hand is out and stays (frame 
 const FEED_HOLD_MAX: float = 5.0 ## and drops by itself after this long
 const PULL_GRAB_TIME: float = 0.52 ## pulling a root: it gives here and she is thrown back
 const EAT_USE_TIME: float = 0.48 ## eating: the berry reaches her mouth (EatEffect.BITE) and takes effect
+const DRINK_SHEET_ID: int = 16 ## `_use_sheet` number of the potion sheet (15 is the wall climb)
+const DRINK_SHEET: Texture2D = preload("res://assets/characters/player_drink.png") ## tools/art_hero3d.py drinkonly: a potion in one draught, 12 frames x 7 leg variants
+const DRINK_BLOOD: Texture2D = preload("res://assets/characters/player_drink_blood.png")
+const DRINK_SECONDS: float = 0.6 ## drinking is quick (docs/alchemie_konzept.md): the 12 frames play in 0.6 s
+const DRINK_USE_TIME: float = 0.30 ## the draught: the potion takes effect (DrinkEffect.EFFECT)
+const DRINK_BREAK_KNOCKBACK: float = 100.0 ## only a blow this heavy knocks the vial from her lips (the potion is kept)
 const IDLE_FPS: float = 3.5 ## idle frames per second (breathing, hair)
 const WOUND_ENTER: float = 0.10 ## wounded at this share of the maximum health or less ...
 const WOUND_LEAVE: float = 0.13 ## ... and recovered above this share (so regeneration does not flicker it)
@@ -162,6 +170,10 @@ var _rig_eat_shoulder: PackedVector2Array ## and for the eating sheet
 var _rig_eat_hand: PackedVector2Array
 var _rig_eat_mouth: PackedVector2Array
 var _eat_fx: EatEffect
+var _drink_fx: DrinkEffect ## the vial, the potion's light and the shattering vial (docs/alchemie_konzept.md)
+var _rig_drink_shoulder: PackedVector2Array ## the potion sheet's rig (like eating: 7 leg variants)
+var _rig_drink_hand: PackedVector2Array
+var _rig_drink_mouth: PackedVector2Array
 var fishing: FishingComponent ## the rod (docs/fishing.md)
 var effects: StatusEffects ## burning and the like (data/status_effects.json)
 var _main_sheet: Texture2D
@@ -217,6 +229,7 @@ var bandaged: bool = false ## the rescuer dressed the wound: no blood, no red bo
 @onready var inventory: InventoryComponent = $InventoryComponent
 @onready var attack: AttackComponent = $AttackComponent
 @onready var talismans: TalismanComponent = $TalismanComponent
+@onready var climb: WallClimb = $WallClimb
 @onready var _camera: Camera2D = $Camera2D
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _dash_dust: CPUParticles2D = $DashDust
@@ -257,6 +270,9 @@ func _ready() -> void:
 	add_child(effects)
 	_eat_fx = EatEffect.new()
 	add_child(_eat_fx)
+	_drink_fx = DrinkEffect.new()
+	_drink_fx.name = "DrinkEffect"
+	add_child(_drink_fx)
 	_feed_fx = FeedFx.new()
 	add_child(_feed_fx)
 	_main_sheet = _sprite.texture
@@ -352,13 +368,17 @@ func _physics_process(delta: float) -> void:
 		_surface = _last_surface_result
 	var down: bool = health.current <= 0.0
 	_sprite.self_modulate = Color(0.35, 0.25, 0.5, 0.55) if down else Color.WHITE.lerp(Color(1.5, 1.9, 1.55), _eat_glow())
-	attack.visible = not down and intro == null and not fainting and not stumbling
-	if down:
+	if climb.active():
+		climb.step(delta)
+		_set_focus(null)
+	elif down:
 		velocity = Vector2.ZERO
 		_set_focus(null)
+		climb.hide_prompt()
 	elif launch_left > 0.0 and is_multiplayer_authority():
 		_step_launch(delta)
 		_set_focus(null)
+		climb.hide_prompt()
 	elif intro != null or story_lock:
 		velocity = Vector2.ZERO ## the intro owns her: it places her and shows the frames
 		if story_lock and intro == null and auto_walk != Vector2.INF and is_multiplayer_authority():
@@ -368,17 +388,20 @@ func _physics_process(delta: float) -> void:
 				facing = to_goal.normalized()
 				move_and_slide()
 		_set_focus(null)
+		climb.hide_prompt()
 	elif stumbling:
 		velocity = velocity.move_toward(Vector2.ZERO, 260.0 * delta) ## she slides on a little
 		if is_multiplayer_authority():
 			move_and_slide()
 		_set_focus(null)
+		climb.hide_prompt()
 		_update_stumble(delta)
 	elif is_multiplayer_authority():
 		_move(delta)
 		_update_interact()
 	else:
 		position += velocity * delta ## remote player: the synchronizer sends at 20 Hz, so carry on with the synced velocity until the next packet
+	attack.visible = not down and intro == null and not fainting and not stumbling and not climb.active()
 	_wound = move_toward(_wound, _wound_target(), delta * 0.5)
 	(_sprite.material as ShaderMaterial).set_shader_parameter("wound", _wound)
 	attack.wound = _wound
@@ -424,6 +447,7 @@ func _try_blink() -> void:
 
 ## Dev menu: jumps to a place (the owner moves herself; the synchronizer tells the others).
 func request_teleport(to: Vector2) -> void:
+	climb.before_teleport()
 	if swimmer != null:
 		swimmer.reset() ## she lands on foot; the next step decides again
 		swim = SwimRules.NONE
@@ -441,6 +465,7 @@ var launch_to: Vector2 = Vector2.ZERO
 
 
 func launch(target: Vector2, seconds: float) -> void:
+	climb.interrupt()
 	_rpc_launch.rpc_id(get_multiplayer_authority(), target, seconds)
 
 
@@ -489,7 +514,9 @@ func _on_inventory_changed() -> void:
 
 ## Everyone sees the hit; the owner also gets knocked back and shaken.
 func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
-	_busy = false ## a hit interrupts picking
+	climb.interrupt()
+	if not (_drinking() and knockback < DRINK_BREAK_KNOCKBACK): ## only a heavy blow knocks the vial from her lips
+		_busy = false ## a hit interrupts picking
 	_cancel_standby()
 	if is_multiplayer_authority():
 		attack.interrupt_charge() ## ... and the charge of a heavy blow
@@ -669,7 +696,7 @@ func _update_run_dust() -> void:
 
 
 func _move(delta: float) -> void:
-	var eating: bool = _busy and _busy_kind == "eat" ## eating, unlike picking, goes on while she walks
+	var eating: bool = _busy and (_busy_kind == "eat" or _busy_kind.begins_with("drink")) ## eating and drinking, unlike picking, go on while she walks
 	if fishing != null and fishing.locks_movement(): ## a fish is on the line: she braces and stands still
 		velocity = velocity.move_toward(Vector2.ZERO, friction * 2.0 * delta)
 		move_and_slide()
@@ -689,7 +716,7 @@ func _move(delta: float) -> void:
 	if swimming > 0:
 		sprinting = swimming == SwimRules.CRAWL ## the crawl is the sprint of the water (it pays its own stamina)
 	elif want_sprint and stamina.current > 0.0:
-		sprinting = stamina.drain(sprint_cost_per_sec, delta)
+		sprinting = stamina.drain(sprint_cost_per_sec * stamina.sprint_scale(), delta)
 	else:
 		sprinting = false
 
@@ -770,7 +797,7 @@ func _update_alt() -> void:
 
 ## Something owns her: a cutscene, an action, a fall (the rod cannot be cast then).
 func is_busy() -> bool:
-	return _busy or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging() or swim > 0
+	return _busy or climb.active() or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging() or swim > 0
 
 
 ## Local player: picks toward `dir` (about a second, she stands still, the weapon is put away);
@@ -822,22 +849,39 @@ func _play_release_feed() -> void:
 ## Local player: eats what is in hotbar slot `slot` (a consumable), if that would do anything. The
 ## berry is used up when it reaches her mouth (EAT_USE_TIME); being hit before that stops it.
 func use_slot(slot: int) -> void:
-	if _busy or stumbling or swim > 0 or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
+	if _busy or climb.active() or stumbling or swim > 0 or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
 		return
 	var stack: Dictionary = inventory.slots[slot]
 	var def: Dictionary = Items.definition(stack)
-	if stack.is_empty() or String(def.get("kind", "")) != "consumable":
+	var kind: String = String(def.get("kind", ""))
+	if stack.is_empty() or (kind != "consumable" and kind != "potion"):
 		return
-	var stats: Dictionary = def.get("stats", {})
-	if float(stats.get("heal", 0)) + float(stats.get("regen", 0)) > 0.0 and not health.can_heal():
-		return ## nothing to heal: keep the berry
+	if not InventoryComponent.usable(self, def):
+		get_tree().call_group("hotbar", "deny", slot) ## nothing to heal, or the pause after the last berry / healing potion still runs: keep it
+		return
+	if kind == "potion":
+		var info: Dictionary = AlchemyRules.of(stack)
+		_begin_action("drink_%s_%d" % [String(info.get("type", "heal")), int(info.get("tier", 1))], Vector2.ZERO, func() -> void:
+			inventory.request("use", [slot, 0])
+			_shake = maxf(_shake, 0.8), DRINK_USE_TIME)
+		return
 	_begin_action("eat", Vector2.ZERO, func() -> void:
 		inventory.request("use", [slot, 0])
 		_shake = maxf(_shake, 1.2), EAT_USE_TIME)
 
 
+## True while she drinks a potion (busy kind "drink_<type>_<tier>").
+func _drinking() -> bool:
+	return _busy and _busy_kind.begins_with("drink")
+
+
+## How long the running action lasts: the one-second actions, a potion in 0.6 s.
+func _busy_length() -> float:
+	return DRINK_SECONDS if _busy_kind.begins_with("drink") else PICK_SECONDS
+
+
 func _begin_action(kind: String, dir: Vector2, on_moment: Callable, moment_time: float) -> void:
-	if _busy or swim > 0 or attack.is_swinging() or attack.is_charging() or not is_multiplayer_authority():
+	if _busy or climb.active() or swim > 0 or attack.is_swinging() or attack.is_charging() or not is_multiplayer_authority():
 		return
 	_set_focus(null)
 	_play_action.rpc(kind, dir)
@@ -857,7 +901,10 @@ func _play_action(kind: String, dir: Vector2) -> void:
 	sprinting = false
 	if dir != Vector2.ZERO:
 		facing = dir
-	if kind != "eat":
+	if kind.begins_with("drink"):
+		var parts: PackedStringArray = kind.split("_")
+		_drink_fx.begin(parts[1] if parts.size() > 1 else "heal", int(parts[2]) if parts.size() > 2 else 1)
+	elif kind != "eat":
 		_walk_time = 0.0
 
 
@@ -887,6 +934,8 @@ func _slow_factor() -> float:
 	var factor: float = 1.0
 	for value: float in _slows.values():
 		factor = minf(factor, value)
+	if effects != null and effects.has("hallucinated"):
+		factor *= 0.7 ## hallucinating: 30 % slower
 	return factor
 
 
@@ -894,19 +943,24 @@ func _slow_factor() -> float:
 ## candidate is only re-checked (still there, usable, in reach), and a press scans again first, so E always uses what is current.
 func _update_interact() -> void:
 	if _busy:
+		climb.hide_prompt()
 		return
+	var pressed: bool = InputManager.interact_pressed()
 	_scan_clock -= get_physics_process_delta_time()
-	if _scan_clock <= 0.0 or InputManager.interact_pressed():
+	if _scan_clock <= 0.0 or pressed:
 		_scan_clock = INTERACT_SCAN_SECONDS
 		_candidate = _scan_interact()
 	elif not is_instance_valid(_candidate) or not _candidate_usable(_candidate):
 		_candidate = null
 	_set_focus(_candidate)
-	if InputManager.interact_pressed():
-		if _focus != null:
+	if _focus != null:
+		climb.hide_prompt()
+		if pressed:
 			_focus.interact(self)
-		elif _hotbar != null: ## nothing to use here: E eats from the selected hotbar slot
-			use_slot(_hotbar.selected)
+		return
+	var direction: Vector2 = InputManager.move_vector()
+	if not climb.offer(facing if direction == Vector2.ZERO else direction, pressed) and pressed and _hotbar != null:
+		use_slot(_hotbar.selected) ## nothing to use here: E eats from the selected hotbar slot
 
 
 ## The full scan of the interactables group (what `_update_interact` picks up).
@@ -974,6 +1028,9 @@ func _load_rig() -> void:
 	_rig_eat_shoulder = _points(rig.get("eat_shoulder", []))
 	_rig_eat_hand = _points(rig.get("eat_hand", []))
 	_rig_eat_mouth = _points(rig.get("eat_mouth", []))
+	_rig_drink_shoulder = _points(rig.get("drink_shoulder", []))
+	_rig_drink_hand = _points(rig.get("drink_hand", []))
+	_rig_drink_mouth = _points(rig.get("drink_mouth", []))
 	var standby: Dictionary = rig.get("standby", {}) as Dictionary
 	_rig_standby_shoulder = _points(standby.get("shoulder", []))
 	_rig_standby_hand = _points(standby.get("hand", []))
@@ -1190,6 +1247,15 @@ func _swim_effects(delta: float, clips: Dictionary, idx: int, total: int) -> voi
 
 ## Picks the sheet frame: walk or sprint cycle while moving, idle loop while standing.
 func _animate(delta: float) -> void:
+	if climb.active():
+		_cancel_standby()
+		_use_sheet(CLIMB_SHEET)
+		_sprite.frame_coords = climb.frame()
+		_sprite.position = climb.sprite_offset()
+		_sprite.skew = 0.0
+		return
+	if _sheet == CLIMB_SHEET:
+		_sprite.position.x = 0.0
 	var angle: float = facing.angle() / (PI / 4.0)
 	if absf(wrapf(angle - float(_sector), -4.0, 4.0)) > 0.62: ## hysteresis: no flicker on sector borders
 		_sector = posmod(roundi(angle), 8)
@@ -1238,7 +1304,7 @@ func _animate(delta: float) -> void:
 				feed_hold = false
 		else:
 			_busy_time += delta
-		if _busy_time >= PICK_SECONDS:
+		if _busy_time >= _busy_length():
 			_busy = false
 	var fish_frame: Dictionary = fishing.body_frame(_sector, moving) if fishing != null and not _busy else {}
 	var fish_frame_ok: bool = not fish_frame.is_empty() and not attack.is_swinging()
@@ -1250,23 +1316,27 @@ func _animate(delta: float) -> void:
 		hand = Vector2(0.0, -22.0)
 	elif _busy and not _rig_pick_hand.is_empty() and not _rig_eat_hand.is_empty():
 		## Picking and eating have their own sheets too (legs planted); the right arm is drawn from the rig, weapon put away.
-		var position_in_sheet: float = _busy_time / PICK_SECONDS * float(PICK_FRAMES)
+		var position_in_sheet: float = _busy_time / _busy_length() * float(PICK_FRAMES)
 		var key: float = clampf(position_in_sheet - 0.5, 0.0, float(PICK_FRAMES - 1) - 0.001)
 		var i: int = int(key)
 		var f: float = key - float(i)
-		var eating: bool = _busy_kind == "eat"
+		var drinking: bool = _busy_kind.begins_with("drink") and not _rig_drink_hand.is_empty()
+		var eating: bool = _busy_kind == "eat" or drinking ## both have 7 leg variants
 		var legs: int = 1 + clampi(int(_walk_time), 0, WALK_FRAMES - 1) if moving and eating else 0 ## eating while walking keeps the walk cycle's legs
 		var base: int = _sector * PICK_FRAMES * (EAT_VARIANTS if eating else 1) + legs * PICK_FRAMES
 		var pulling: bool = _busy_kind == "pull" and not _rig_pull_hand.is_empty()
 		var touching: bool = _busy_kind == "touch" and not _rig_touch_hand.is_empty()
 		var feeding: bool = _busy_kind == "feed" and not _rig_feed_hand.is_empty()
-		var hands: PackedVector2Array = _rig_feed_hand if feeding else _rig_eat_hand if eating else (_rig_touch_hand if touching else (_rig_pull_hand if pulling else _rig_pick_hand))
-		var shoulders: PackedVector2Array = _rig_feed_shoulder if feeding else _rig_eat_shoulder if eating else (_rig_touch_shoulder if touching else (_rig_pull_shoulder if pulling else _rig_pick_shoulder))
-		_use_sheet(14 if feeding else 3 if eating else (5 if touching else (4 if pulling else 2)))
+		var hands: PackedVector2Array = _rig_drink_hand if drinking else _rig_feed_hand if feeding else _rig_eat_hand if eating else (_rig_touch_hand if touching else (_rig_pull_hand if pulling else _rig_pick_hand))
+		var shoulders: PackedVector2Array = _rig_drink_shoulder if drinking else _rig_feed_shoulder if feeding else _rig_eat_shoulder if eating else (_rig_touch_shoulder if touching else (_rig_pull_shoulder if pulling else _rig_pick_shoulder))
+		_use_sheet(DRINK_SHEET_ID if drinking else 14 if feeding else 3 if eating else (5 if touching else (4 if pulling else 2)))
 		_sprite.frame = base + clampi(int(position_in_sheet), 0, PICK_FRAMES - 1)
 		hand = hands[base + i].lerp(hands[base + i + 1], f)
 		shoulder = shoulders[base + i].lerp(shoulders[base + i + 1], f)
-		if eating:
+		if drinking:
+			var lips: Vector2 = _rig_drink_mouth[base + i].lerp(_rig_drink_mouth[base + i + 1], f)
+			_drink_fx.show_state(_busy_time, hand + Vector2(0.0, _sink), lips + Vector2(0.0, _sink), facing)
+		elif eating:
 			var mouth: Vector2 = _rig_eat_mouth[base + i].lerp(_rig_eat_mouth[base + i + 1], f)
 			_eat_fx.show_state(_busy_time, hand + Vector2(0.0, _sink), mouth + Vector2(0.0, _sink))
 		if feeding and _busy_time >= 0.22:
@@ -1323,6 +1393,8 @@ func _animate(delta: float) -> void:
 		_sprite.frame = main_frame
 	if not (_busy and _busy_kind == "eat"):
 		_eat_fx.clear()
+	if not _drinking():
+		_drink_fx.clear()
 	if not (_busy and _busy_kind == "feed"):
 		_feed_fx.clear()
 	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, _sink + _limp_dip)
@@ -1361,7 +1433,7 @@ func show_emerge_frame(texture: Texture2D, frames: int, frame: int, at: Vector2,
 ## She trips (the story's footpath, `StumbleGuide`): the foot catches, the knee gives, she lands on her hands and knees, stays there a moment,
 ## pushes up and walks on. Owner only; every peer plays it (`_play_stumble`). Not while she is busy, in a cutscene or hurt to death.
 func begin_stumble() -> bool:
-	if stumbling or intro != null or story_lock or fainting or _busy or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or not is_multiplayer_authority():
+	if stumbling or intro != null or story_lock or fainting or _busy or climb.active() or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or not is_multiplayer_authority():
 		return false
 	_play_stumble.rpc(_sector)
 	return true
@@ -1665,16 +1737,22 @@ func _rpc_set_health(value: float) -> void:
 func _use_sheet(sheet: int) -> void:
 	if sheet == _sheet:
 		return
-	var from_swim: bool = _sheet == 13
+	var restore_offset: bool = _sheet == 13 or _sheet == CLIMB_SHEET
 	_sheet = sheet
 	if sheet == 13:
 		_sprite.offset = SWIM_OFFSET
-	elif from_swim:
+	elif sheet == CLIMB_SHEET:
+		_sprite.offset = CLIMB_OFFSET
+	elif restore_offset:
 		_sprite.offset = Vector2(0.0, -23.0)
 	if _swim_under != null:
 		_swim_under.visible = sheet == 13
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
 	match sheet:
+		CLIMB_SHEET:
+			_sprite.texture = WallClimb.SHEET
+			_sprite.hframes = WallClimb.COLUMNS
+			_sprite.vframes = 8
 		13:
 			_sprite.texture = SWIM_SHEET
 			_sprite.hframes = int(_swim_rig.get("total", 86))
@@ -1698,6 +1776,10 @@ func _use_sheet(sheet: int) -> void:
 		1:
 			_sprite.texture = ATTACK_SHEET
 			_sprite.hframes = ATTACK_COLS
+			_sprite.vframes = 8
+		DRINK_SHEET_ID:
+			_sprite.texture = DRINK_SHEET
+			_sprite.hframes = PICK_FRAMES * EAT_VARIANTS
 			_sprite.vframes = 8
 		14:
 			_sprite.texture = FEED_SHEET

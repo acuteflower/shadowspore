@@ -2,7 +2,7 @@
 """Bakes the world's relief (height levels) into assets/world/relief.png, 1 pixel per tile:
   R = level 0..3 (what you stand on; a wall tile has the level of its foot),
   G = kind (low nibble: 0 floor, 1 wall face, 2 ramp, 3 stairs, 4 rock steps) | style << 4
-      (0 grass, 1 rock, 2 masonry, 3 crystal, 4 void),
+      (0 grass, 1 rock, 2 masonry, 3 crystal, 4 void, 5 Hexenwald slate),
   B = geometry: wall face: its row in the wall (0 top, 1 bottom: a wall is FACE_ROWS = 2 tiles, 32 px, tall);
       connector: row (bits 0-1, 0 = top, next to the plateau) | depth-1 << 2 | column << 4 (0 left .. 2 right),
   A = 0 void, else 200 + biome index.

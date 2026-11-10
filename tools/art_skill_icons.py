@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shadowspore skill icons (Schleiergeflecht, F): six 13x13 pixel icons, one per ability, in the ramp of their branch.
+"""Shadowspore skill icons (Schleiergeflecht, F): 13x13 pixel icons in the ramp of their branch.
 
     py -3 tools/art_skill_icons.py            # rewrite src/ui/skill_icon_art.gd + docs/img/skill_icons.png
     py -3 tools/art_skill_icons.py preview out.png
@@ -217,8 +217,27 @@ def icon_rift():
     return g
 
 
-ICONS = {"combo3": icon_combo3, "combo4": icon_combo4, "combo5": icon_combo5, "stride": icon_stride, "sneak": icon_sneak, "rift": icon_rift}
-BRANCH_OF = {"combo3": "combat", "combo4": "combat", "combo5": "combat", "stride": "movement", "sneak": "movement", "rift": "shadow"}
+def icon_climb():
+    # A pale upward arrow alongside a shaded rock face and three handholds.
+    return [list(row) for row in (
+        "..........+##",
+        "...w....+##oo",
+        "..w#w..+##oo-",
+        ".w#+#w.+ooo--",
+        "...+...#gG---",
+        "...+...+oo-==",
+        "...o...o--===",
+        "...o..+#go===",
+        "...-..+oo--==",
+        "......+o--===",
+        ".....+#go====",
+        ".....+oo--===",
+        ".....oo--====",
+    )]
+
+
+ICONS = {"combo3": icon_combo3, "combo4": icon_combo4, "combo5": icon_combo5, "stride": icon_stride, "sneak": icon_sneak, "rift": icon_rift, "climb": icon_climb}
+BRANCH_OF = {"combo3": "combat", "combo4": "combat", "combo5": "combat", "stride": "movement", "sneak": "movement", "rift": "shadow", "climb": "movement"}
 
 
 # ---------------------------------------------------------------- output

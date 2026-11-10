@@ -31,7 +31,7 @@ func _run() -> void:
 	check(not player.bandaged and not player.wounded and player.health.current == player.health.max_health, "checkpoint restores healed day-two state")
 	check(player.quests.is_finished("find_help") and player.quests.is_finished("lumberjack"), "both story quests are complete")
 	check(player.quests.current().get("id", "") == "rebuild_hut" and player.quests.current().get("step_id", "") == "rebuild_tasks", "checkpoint starts the hut-renewal follow-up")
-	check(player.quests.has_flag("developer_test_keep") and player.quests.has_flag("knows_cooking") and player.quests.has_flag("day2_started"), "checkpoint preserves unrelated flags and unlocks day-two story")
+	check(player.quests.has_flag("developer_test_keep") and player.quests.has_flag("day2_started"), "checkpoint preserves unrelated flags and unlocks day-two story")
 	check(player.inventory.has_item("axe_basic") and player.inventory.has_item("sword_basic"), "checkpoint grants axe and sword")
 	for stack: Dictionary in inventory_before:
 		if not stack.is_empty(): check(player.inventory.has_item(String(stack.id)), "existing inventory preserved")

@@ -5,6 +5,12 @@ extends Node
 ## No navigation bake to go stale when the world streams or a tree is felled.
 
 const NEIGHBORS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1)]
+const SHARED_USEC: int = 2400 ## all searching creatures together get at most this much A* time per physics frame
+const MIN_SHARE_USEC: int = 250 ## every searcher still gets a little, so nobody starves at the end of the tree order
+static var _frame: int = -1
+static var _frame_used: int = 0
+static var _searchers: int = 0 ## searchers seen in the current physics frame
+static var _searchers_last: int = 1 ## ... and in the previous one: the share is split between them
 var climb_target: Vector2 = Vector2.INF
 var searching: bool = false
 var path: Array[Dictionary] = []
@@ -86,6 +92,8 @@ func direction_to(goal: Vector2, delta: float) -> Vector2:
 		return Vector2.ZERO
 	_retry -= delta
 	_age += delta
+	if not searching and not path.is_empty() and _goal != Vector2.INF and _goal.distance_to(goal) > float(_spec["target_repath_distance"]) and _age < float(_spec["refresh_seconds"]):
+		_retarget(goal) ## the target moved: keep the route when its last leg still reaches the new goal
 	if _goal == Vector2.INF or (not searching and (_goal.distance_to(goal) > float(_spec["target_repath_distance"]) or _age >= float(_spec["refresh_seconds"]))):
 		_begin(goal)
 	if searching:
@@ -124,6 +132,18 @@ func direction_to(goal: Vector2, delta: float) -> Vector2:
 	return Vector2.ZERO
 
 
+## Moves the end of the current path to `goal` when the last ground leg can still sweep there (one cast instead of a new search).
+func _retarget(goal: Vector2) -> void:
+	var last: Dictionary = path[path.size() - 1]
+	if bool(last["climb"]):
+		return
+	var from: Vector2 = last["from"]
+	if from.distance_to(goal) > float(_spec["search_margin"]) or not segment_clear(from, goal):
+		return
+	last["point"] = goal
+	_goal = goal
+
+
 func _begin(goal: Vector2) -> void:
 	_origin = _actor.global_position
 	_goal = goal
@@ -157,9 +177,22 @@ func _cell_open(cell: Vector2i) -> bool:
 
 func _search() -> void:
 	var began: int = Time.get_ticks_usec()
+	var frame: int = Engine.get_physics_frames()
+	if frame != _frame:
+		_frame = frame
+		_frame_used = 0
+		_searchers_last = maxi(1, _searchers)
+		_searchers = 0
+	_searchers += 1
+	var share: int = maxi(MIN_SHARE_USEC, mini(int(_spec["usec_per_frame"]), mini(SHARED_USEC / _searchers_last, SHARED_USEC - _frame_used)))
+	_search_for(began, share)
+	_frame_used += Time.get_ticks_usec() - began
+
+
+func _search_for(began: int, share: int) -> void:
 	var budget: int = int(_spec["nodes_per_frame"])
 	while not _heap.is_empty() and budget > 0:
-		if Time.get_ticks_usec() - began >= int(_spec["usec_per_frame"]):
+		if Time.get_ticks_usec() - began >= share:
 			return
 		var cell: Vector2i = _pop()
 		if _closed.has(cell):

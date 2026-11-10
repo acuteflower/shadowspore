@@ -18,6 +18,11 @@ func prompt() -> String:
 	return ""
 
 
+## Why E does nothing right now although the prompt shows ("" = it works). A non-empty hint greys the prompt out and shows the reason.
+func prompt_hint() -> String:
+	return ""
+
+
 ## Distance the player's feet are from the object's edge.
 func reach_distance(_from: Vector2) -> float:
 	return INF
@@ -35,7 +40,7 @@ func set_focused(on: bool) -> void:
 		add_child(_prompt_node)
 	if _prompt_node != null:
 		_prompt_node.position = prompt_position()
-		_prompt_node.show_text(prompt() if on else "")
+		_prompt_node.show_text(prompt() if on else "", prompt_hint() if on else "")
 
 
 ## Where the prompt hovers, relative to the object.

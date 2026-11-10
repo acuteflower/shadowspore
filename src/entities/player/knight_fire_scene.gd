@@ -5,8 +5,8 @@ extends Node
 ##  1. she sits down (`Player.show_sit_frame`, with the actual fire-facing sector); he walks to the hut's door and goes in;
 ##  2. the camera swings to the door while the day runs on to the evening (`EVENING`); the door opens, he comes out with a mug of brew (clip `walk_mug`, steam), walks round the fire to her
 ##     and gives it to her (`give`; her `take`), then sits down at the other place (`sit_down`, `sit`);
-##  3. dialogue `fire_a`, she sips (the brew mends her: `HealthComponent.heal`, the bandage is off, she stops limping), `fire_b`, her sword is given back (equipped), `fire_c` (he says a fire
-##     is for cooking too: flag `knows_cooking`; the cooking itself is not built yet); she sets the mug down and gets up, the camera returns, his closing line `fire_end`;
+##  3. dialogue `fire_a`, she sips (the brew mends her: `HealthComponent.heal`, the bandage is off, she stops limping), `fire_b`, her sword is given back (equipped), `fire_c`;
+##     she sets the mug down and gets up, the camera returns, his closing line `fire_end`;
 ##  4. the flag `fire_seated` finishes the step; the next one is to go into the hut and sleep (`SleepScene`). He stays sitting at the fire.
 ## All texts are placeholders.
 
@@ -306,7 +306,6 @@ func _run() -> void:
 	await _dialogue("fire_b")
 	_give_sword()
 	await _dialogue("fire_c")
-	_player.quests.set_flag("knows_cooking")
 	await _wait(0.4)
 	await _get_up()
 	var box: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox

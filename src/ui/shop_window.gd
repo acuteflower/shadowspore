@@ -6,7 +6,8 @@ extends BoardWindow
 ##   order - things only the person can make (recipes with `by: "npc"`, `work` seconds): the material is handed over, the person works on it *while they are at their bench*
 ##           (so it stops at night and when they take a break), the finished piece waits on the bench until anybody collects it; the queue is the town's, not yours;
 ##   buy   - the person sells (`buy` list: item, price in copper, `trust`);
-##   sell  - the person buys from your bag (`sell` list).
+##   sell  - the person buys from your bag (`sell` list);
+##   brew  - the person brews potions from what you bring (data/alchemy.json, AlchemyRules; Esma): instant, the brew card plays (`BrewReveal`).
 ## The look and the staging are `BoardWindow`'s. `ShopWindow.open(tree, player, town, shop_id)`; the person answers from a bubble (lines in the data, placeholders for the
 ## dialogue writer). Everything with consequences is asked of the host (`TownManager.request_craft / request_order / request_collect / request_trade`).
 
@@ -17,6 +18,7 @@ var station: String = "workshop"
 var _craft_left: float = 0.0
 var _craft_total: float = 1.0
 var _craft_id: String = ""
+var _brew_tiers: Dictionary = {}
 
 
 static func open(tree: SceneTree, for_player: Player, for_town: TownManager, id: String = "gustav_bench") -> ShopWindow:
@@ -37,10 +39,11 @@ func _setup_board() -> void:
 	title = String(def.get("title", "HANDEL"))
 	for entry: Variant in def.get("tabs", []) as Array:
 		tabs.append(entry as Dictionary)
-	var person: Settler = town.settler_node(npc)
+	var person: Node2D = town.person_node(npc)
 	speaker = person
 	focus_world = person.global_position if person != null else player.global_position
 	town.refine_done.connect(_on_refine_done)
+	town.brew_done.connect(_on_brew_done)
 	player.inventory.changed.connect(_on_town_changed) ## the bag and the purse change what can be bought and sold
 	player.progress.changed.connect(_on_town_changed)
 	_say_line("open")
@@ -51,7 +54,15 @@ func _on_refine_done(before: Dictionary, after: Dictionary, success: bool, refun
 	RefineReveal.present(get_tree(), before, after, success, refund)
 
 
+## The potions came out of the cauldron: the brew card plays over the window.
+func _on_brew_done(type: String, level: int, count: int, moon: bool) -> void:
+	BrewReveal.present(get_tree(), type, level, count, moon)
+	_say_line("brew_moon" if moon else "brew_done")
+
+
 func _exit_tree() -> void:
+	if town != null and town.brew_done.is_connected(_on_brew_done):
+		town.brew_done.disconnect(_on_brew_done)
 	if town != null and town.refine_done.is_connected(_on_refine_done):
 		town.refine_done.disconnect(_on_refine_done)
 	super()
@@ -158,6 +169,8 @@ func _rebuild() -> void:
 					rows.append(_recipe_row(id))
 		"refine":
 			_rebuild_refine()
+		"brew":
+			_rebuild_brew()
 		"buy":
 			for entry: Variant in def.get("buy", []) as Array:
 				var offer: Dictionary = entry as Dictionary
@@ -172,6 +185,19 @@ func _rebuild() -> void:
 				var have: int = player.inventory.count_plain(String(offer.item))
 				rows.append({"kind": "sell", "item": String(offer.item), "count": have, "name": _item_name(String(offer.item)), "sub": "IM RUCKSACK" if have > 0 else "DU HAST KEINS",
 					"coins": int(offer.price),"state": OK if have > 0 else MISSING, "why": "DU HAST KEIN %s" % _item_name(String(offer.item)), "price": int(offer.price)})
+
+
+## The alchemy tab: every potion in its five tiers. A tier is locked until the brewer trusts her enough and has brewed the tier below once.
+func _rebuild_brew() -> void:
+	for type: String in AlchemyRules.TYPES:
+		var level: int = int(_brew_tiers.get(type, 1))
+		var why: String = town.brew_block(type, level, player, npc)
+		var locked: bool = "TRAUT" in why or "ERST STUFE" in why
+		rows.append({"kind": "brew", "type": type, "tier": level, "item": AlchemyRules.item_id(type, level), "count": town.brew_yield(type, level),
+			"name": "%s %s" % [String(AlchemyRules.potion(type).get("name", type)), AlchemyRules.roman(level)],
+			"sub": AlchemyRules.tier_name(level),
+			"tag": "", "tag_color": DIM,
+			"state": OK if why == "" else (LOCKED if locked else MISSING), "why": why})
 
 
 ## The refine tab: the weapons on the anvil first (they wait, work or can be collected), then every refinable weapon she carries or wears.
@@ -199,7 +225,7 @@ func _rebuild_refine() -> void:
 func _weapon_row(slot_kind: String, slot_ref: Variant, stack: Dictionary) -> Dictionary:
 	var level: int = Items.refine(stack)
 	var can: bool = RefineRules.can_refine(stack)
-	var why: String = town.refine_block(stack, player)
+	var why: String = town.refine_block(stack, player, npc)
 	var state: int = OK if why == "" else (LOCKED if ("TRAUT" in why or "HÖHER" in why) else MISSING)
 	var odds: float = RefineRules.chance(stack)
 	var sub: String = "+%d > +%d" % [level, level + 1] if can else "HÖHER GEHT ES NICHT"
@@ -224,6 +250,21 @@ func _first_open() -> int:
 func _tab_changed() -> void:
 	if _kind() in ["order", "refine"]:
 		_say_line("order")
+	if _kind() == "brew":
+		_first_lesson()
+
+
+## The first time she opens the alchemy tab Esma explains it and gives her a few empty vials (once per world, the host decides).
+func _first_lesson() -> void:
+	var lesson: Array = (def.get("lines", {}) as Dictionary).get("brew_intro", []) as Array
+	if player.quests != null and not player.quests.has_flag("alchemy_learned"):
+		player.quests.set_flag("alchemy_learned")
+		if not lesson.is_empty():
+			say(String(lesson[0]))
+		if not town.alchemy_gift:
+			town.request_alchemy_gift(5)
+		return
+	_say_line("brew")
 
 
 # ---------- detail ----------
@@ -233,6 +274,9 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 	var item: String = String(row.item)
 	if kind == "refine":
 		_detail_refine(area, row)
+		return
+	if kind == "brew":
+		_detail_brew(area, row)
 		return
 	draw_cell(area.position + Vector2(0, 2), item, 1, true, false, int(row.get("level", 0)))
 	var x: float = area.position.x + 46.0
@@ -331,6 +375,44 @@ func _detail_refine(area: Rect2, row: Dictionary) -> void:
 		_text(Vector2(right - float(PixelText.width("ANGELEGT, DANN HAST DU KEINE WAFFE")), area.position.y + 24.0), "ANGELEGT, DANN HAST DU KEINE WAFFE", Color(BAD, 0.8))
 
 
+## The potion big on the left with its five tier pips, what it does, the ingredients (have / need), how many come out and what stops it.
+func _detail_brew(area: Rect2, row: Dictionary) -> void:
+	var type: String = String(row.type)
+	var level: int = int(row.tier)
+	var tone: Color = AlchemyRules.color(type)
+	draw_cell(area.position + Vector2(0, 2), String(row.item), int(row.count), true, int(row.state) == LOCKED)
+	var x: float = area.position.x + 46.0
+	_text(Vector2(x, area.position.y + 2.0), String(row.name), GOLD)
+	for k: int in AlchemyRules.TIERS: ## the five tiers as drops: filled up to this one
+		var pip: Vector2 = Vector2(x + float(k) * 7.0, area.position.y + 13.0)
+		var lit: bool = k < level
+		_canvas.draw_rect(Rect2(pip, Vector2(5, 5)), UiStyle.OUTLINE)
+		_canvas.draw_rect(Rect2(pip + Vector2.ONE, Vector2(3, 3)), tone if lit else Color(0.1, 0.06, 0.16))
+		if lit:
+			_canvas.draw_rect(Rect2(pip + Vector2.ONE, Vector2.ONE), AlchemyRules.light(type))
+	_text(Vector2(x + 40.0, area.position.y + 12.0), AlchemyRules.tier_name(level), tone)
+	var definition: Dictionary = DataRegistry.get_entry("items", String(row.item))
+	var y: float = area.position.y + 22.0
+	for line: String in _wrap(String(definition.get("description", "")), int(area.size.x) - 52).slice(0, 2):
+		_text(Vector2(x, y), line, DIM)
+		y += 9.0
+	var cx: float = area.position.x
+	var cy: float = area.position.y + 42.0
+	var need: Dictionary = AlchemyRules.ingredients(type, level)
+	for item: String in need:
+		if cx > area.end.x - 40.0:
+			cx = area.position.x
+			cy += 14.0
+		cx += draw_chip(Vector2(cx, cy), item, player.inventory.count_item(item), int(need[item]))
+	var maker: String = String(town.settler_spec(npc).get("name", npc))
+	var out: String = "%s BRAUT %d %s SOFORT" % [maker, int(row.count), "TRANK" if int(row.count) == 1 else "TRÄNKE"]
+	if town.brew_yield(type, level) > AlchemyRules.base_yield(type, level):
+		out += "  VOLLMOND +%d" % (town.brew_yield(type, level) - AlchemyRules.base_yield(type, level))
+	_text(Vector2(area.position.x, cy + 18.0), out, LIT if int(row.state) == OK else DIM)
+	if String(row.why) != "":
+		_text(Vector2(area.position.x, cy + 28.0), String(row.why), BAD if int(row.state) == MISSING else DIM)
+
+
 func _num(value: float) -> String:
 	return "%d" % value if is_equal_approx(value, roundf(value)) else ("%.1f" % value if absf(value * 10.0 - roundf(value * 10.0)) < 0.001 else "%.2f" % value)
 
@@ -361,6 +443,8 @@ func _buttons() -> Array[Dictionary]:
 			return [{"id": "collect", "label": "ABHOLEN", "ready": ready}]
 		"refine":
 			return [{"id": "refine", "label": "VERFEINERN", "ready": ready}]
+		"brew":
+			return [{"id": "brew", "label": "BRAUEN LASSEN", "ready": ready}]
 		"buy":
 			return [{"id": "buy", "label": "KAUFEN", "ready": ready}, {"id": "buy10", "label": "10 X", "ready": ready and player.progress.copper >= int(row.price) * 2}]
 		"sell":
@@ -384,8 +468,11 @@ func _press(id: String, bulk: bool) -> void:
 		"collect":
 			town.request_collect(int(row.index))
 			_say_line("collect")
+		"brew":
+			town.request_brew(String(row.type), int(row.tier), shop_id)
+			_say_line("brew")
 		"refine":
-			town.request_refine(String(row.slot_kind), row.slot_ref)
+			town.request_refine(String(row.slot_kind), row.slot_ref, shop_id)
 			_say_line("refine")
 			_play_refine("hand_in")
 		"buy", "buy10":
@@ -396,3 +483,69 @@ func _press(id: String, bulk: bool) -> void:
 			town.request_trade(shop_id, "sell", String(row.item), int(row.count) if (id == "sell_all" or bulk) else 1)
 			_sound("coin")
 			_say_line("sell")
+
+
+# Compact brew families: one persistent selection per potion, including locked tiers.
+func _brew_tier_rect(rect: Rect2, level: int) -> Rect2:
+	return Rect2(rect.end.x - 126.0 + float(level - 1) * 24.0, rect.position.y + 1.0, 22.0, 19.0)
+
+
+func _draw_list(card: Rect2) -> void:
+	super(card)
+	if _kind() != "brew":
+		return
+	for v: int in VISIBLE_ROWS:
+		if scroll + v >= rows.size():
+			break
+		var row: Dictionary = rows[scroll + v]
+		for level: int in range(1, AlchemyRules.TIERS + 1):
+			var rect: Rect2 = _brew_tier_rect(_row_rect(v), level)
+			var item: String = AlchemyRules.item_id(String(row.type), level)
+			var why: String = town.brew_block(String(row.type), level, player, npc)
+			var locked: bool = "TRAUT" in why or "ERST STUFE" in why
+			var selected: bool = int(row.tier) == level
+			var tone: Color = Items.rarity_color({"id": item})
+			_canvas.draw_rect(rect, tone if selected else Color(tone, 0.4))
+			_canvas.draw_rect(rect.grow(-1), UiStyle.SLOT_BG)
+			if selected:
+				_canvas.draw_rect(rect.grow(-2), Color(tone, 0.25))
+			var label: String = AlchemyRules.roman(level)
+			_text(rect.position + Vector2((22.0 - PixelText.width(label)) / 2.0, 5), label, DIM if locked else TEXT)
+			_canvas.draw_rect(Rect2(rect.position + Vector2(5, 15), Vector2(12, 1)), DIM if locked else (LIT if why == "" else GOLD))
+
+
+func _choose_brew_tier(index: int, level: int) -> void:
+	focus = index
+	_brew_tiers[String(rows[index].type)] = clampi(level, 1, AlchemyRules.TIERS)
+	_rebuild()
+	_sound("tick")
+	_canvas.queue_redraw()
+
+
+func _on_gui_input(event: InputEvent) -> void:
+	var click: InputEventMouseButton = event as InputEventMouseButton
+	if not _closing and _kind() == "brew" and click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+		for v: int in VISIBLE_ROWS:
+			if scroll + v >= rows.size():
+				break
+			for level: int in range(1, AlchemyRules.TIERS + 1):
+				if _brew_tier_rect(_row_rect(v), level).has_point(click.position):
+					_choose_brew_tier(scroll + v, level)
+					_canvas.accept_event()
+					return
+	super(event)
+
+
+func _input(event: InputEvent) -> void:
+	if not _closing and _kind() == "brew" and not rows.is_empty():
+		var left: bool = event.is_action_pressed("ui_left") or event.is_action_pressed("move_left")
+		var right: bool = event.is_action_pressed("ui_right") or event.is_action_pressed("move_right")
+		if left or right:
+			_choose_brew_tier(focus, posmod(int(rows[focus].tier) - 1 + (-1 if left else 1), AlchemyRules.TIERS) + 1)
+			get_viewport().set_input_as_handled()
+			return
+	super(event)
+
+
+func _hint() -> String:
+	return "W S TRANK   A D STUFE   E BRAUEN   ESC ZURÜCK" if _kind() == "brew" else super()

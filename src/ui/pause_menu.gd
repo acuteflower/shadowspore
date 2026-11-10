@@ -236,9 +236,18 @@ func _build_items() -> void:
 				_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
 				_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
 				_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
+				_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
+				_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
 				_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
 				_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
 				_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
+			if multiplayer.is_server():
+				var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
+				_add(0, "heading", "KARTE")
+				if fog != null and fog.is_reveal_all():
+					_add(0, "button", "NEBEL ZURÜCKSETZEN", "", {"action": "map_reset"}) ## the fog from before the whole-map reveal comes back
+				else:
+					_add(0, "button", "GANZE KARTE AUFDECKEN", "", {"action": "map_reveal_all"}) ## every part of the world counts as seen (M shows all of it)
 			if multiplayer.is_server():
 				_add(0, "heading", "ANGELN")
 				_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
@@ -273,9 +282,6 @@ func _build_items() -> void:
 			else:
 				_add(1, "info", "NUR IN DER SOLO-WELT", "", {"text": ""})
 			_add(1, "info", "", "", {"text": "SOLO · OBJEKTE & TERRAIN"})
-			if multiplayer.is_server() and multiplayer.get_peers().is_empty():
-				_add(1, "heading", "KOCHPLATZ")
-				_add(1, "button", "LIES DEN KESSEL", "", {"action": "cook"})
 			_add(1, "heading", "SPIELSTAND")
 			_add(1, "button", "SPEICHERSTAND LÖSCHEN & START", "", {"action": "reset", "risky": true})
 	for col: int in 2:
@@ -406,6 +412,8 @@ func _build_town_page() -> void:
 		_add(1, "info", "NOCH NIEMAND", "", {"text": ""})
 	for sid: String in town.residents:
 		var spec: Dictionary = town.settler_spec(sid)
+		if bool(spec.get("away", false)): ## lives elsewhere (the witch)
+			continue
 		_add(1, "info", "%s  %s" % [String(spec.name), String(spec.title)], "", {"text": "VERTRAUEN %d" % town.trust_of(sid)})
 	_add(1, "heading", "BAUTEN")
 	shown = 0
@@ -593,24 +601,6 @@ func _run_action(action: String) -> void:
 			builder.set_active(true)
 			if builder.active and action == "town_demolish":
 				builder.demolish = true
-		"cook":
-			if _player==null or not multiplayer.is_server() or not multiplayer.get_peers().is_empty() or _player.get("intro")!=null or bool(_player.get("story_lock")):
-				_failed_flash = 2.5
-				return
-			var health: HealthComponent = _player.get_node_or_null("HealthComponent") as HealthComponent
-			if health==null or health.current<=0.0:
-				_failed_flash = 2.5
-				return
-			_set_open(false)
-			_open_t = 0.0
-			visible = false
-			var layer: CanvasLayer = CanvasLayer.new()
-			layer.name = "CookingLayer"
-			layer.layer = 40
-			var kitchen: CookingWindow = CookingWindow.new()
-			get_tree().root.add_child(layer)
-			layer.add_child(kitchen)
-			kitchen.start(_player)
 		"title_card":
 			_set_open(false)
 			_open_t = 0.0
@@ -749,6 +739,27 @@ func _run_action(action: String) -> void:
 				return
 			if keeper.inventory.count_item("rissfeder") == 0 and not TalismanRules.worn_ids(keeper.inventory.equipment).has("rissfeder"):
 				keeper.inventory.give("rissfeder", 1)
+		"clarity": ## the Ohrringe der Klarheit into the bag (host), not twice
+			var wearer: Player = _player as Player
+			if wearer == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if wearer.inventory.count_item("clarity_earrings") == 0 and not TalismanRules.worn_ids(wearer.inventory.equipment).has("clarity_earrings"):
+				wearer.inventory.give("clarity_earrings", 1)
+		"hexenwald": ## into the middle of the Hexenwald
+			if _player is Player:
+				(_player as Player).request_teleport(Vector2(826, 880) * 16.0)
+				_set_open(false)
+		"map_reveal_all", "map_reset": ## dev, host only: the whole map seen / the fog from before it back (kept in the save)
+			var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
+			if fog == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if action == "map_reveal_all":
+				fog.reveal_all()
+			else:
+				fog.reset_reveal()
+			_build_items()
 		"relics_reset": ## forget the boss kills of every player: the next kill of Mornath drops the Rissfeder for certain again (host)
 			var ledger: BossRelics = BossRelics.of(get_tree())
 			if ledger == null or not multiplayer.is_server():

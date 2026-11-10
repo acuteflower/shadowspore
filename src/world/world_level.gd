@@ -10,6 +10,9 @@ extends TestLevel
 const SKY_CLEAVER_SCENE: PackedScene = preload("res://src/entities/enemies/sky_cleaver.tscn")
 const CHUNK: int = 32 ## tiles per chunk side
 const STREAM_BUDGET_USEC: int = 2000 ## cooperative CPU preparation per frame
+const STREAM_URGENT_USEC: int = 5000 ## ... while the chunk being built touches a player's own ring (it may come into view soon)
+const LOOKAHEAD_SECONDS: float = 2.5 ## the ring round where a moving player will be this soon is loaded too (ahead of the camera)
+const LOOKAHEAD_MAX_SPEED: float = 420.0 ## px/s; faster jumps are teleports, not running
 const DETAIL_BUCKET: float = 64.0
 const GEN_PHASES: int = 5 ## phases 0-4 only read static inputs and build detached nodes: they run as one job on a worker thread
 const PREFETCH: int = 4 ## chunks whose worker job is started ahead (nearest first)
@@ -111,6 +114,8 @@ class ChunkBuild:
 	var density: Dictionary = {} ## the wind's detail densities, read once per chunk
 	var clover_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	var clover_count: int = 0
+	var clover_discs: Array[Vector3] = [] ## (x, y, rx) of the fields placed so far (read instead of the nodes, which a worker may still be painting)
+	var clover_jobs: Array[Jobs.Job] = [] ## each field paints its atlas on a worker (`CloverField.setup`); phase 9 waits for them
 	var commit_index: int = 0 ## props of `chunk.things` already added to the tree by `_finish_commit`
 	var patches_seen: Array[Node] = [] ## Terrain.patches as this chunk last saw them (compared per candidate)
 	var job: Jobs.Job ## phases 0-4 (generator, ground, cliffs, prop nodes) run on a worker thread (Jobs); null = not started / sliced on the main thread
@@ -173,12 +178,14 @@ func _fill_ground() -> void:
 	for id: String in biomes:
 		var active: String = RegionMap.active_biome(id)
 		if not _layers.has(active):
-			_layers[active] = _ground if active == "meadow" else _make_layer(active, Color((biomes[active] as Dictionary).color as String))
+			_layers[active] = _ground if active == "meadow" or (biomes[active] as Dictionary).has("gloom") else _make_layer(active, Color((biomes[active] as Dictionary).color as String)) ## a biome with `gloom` is painted by the ground shader itself (palette mixed by BiomeBlend), on the shared layer
 		_layers[id] = _layers[active]
 	_start = _map.start if _map.start.x >= 0 else _map.anchor(_map.start_region)
 	var cleared: Rect2i = Rect2i() ## nothing is cleared by area any more: the generator fills the start like everywhere else (only the footpath and the cover stay free)
 	_generator = PropGenerator.new(_zone, _sdf, _relief, cleared, _map.world_seed)
 	Moisture.world_seed = _map.world_seed
+	_generator.bare = _map.bare_cells()
+	BiomeBlend.install(_map)
 	_generator.blocked_cells = _add_ground_decals()
 	_generator.extra_props = _extra_props()
 	_rivers = WorldRivers.new()
@@ -269,6 +276,19 @@ func _add_ground_decals() -> Dictionary:
 		post.flag = String(sign_spec.get("flag", ""))
 		add_child(post)
 		_clear_around(clear, post.position, int(sign_spec.get("clear_radius", 3)))
+	var crow_site: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/crow_tree_site.json")) as Dictionary
+	var crow_tree: CrowTree = CrowTree.new()
+	crow_tree.name = "CrowTree"
+	crow_tree.position = Vector2(float(crow_site.tile[0]), float(crow_site.tile[1])) * 16.0 + Vector2(8, 8)
+	add_child(crow_tree)
+	_clear_around(clear, crow_tree.position, int(crow_site.clear_radius))
+	for tower_spec: Dictionary in DataRegistry.table("ground").get("towers", []) as Array: ## the Hexenwald's witch tower, origin = the foot of its gate
+		var tower: WitchTower = WitchTower.new()
+		var ttile: Array = tower_spec.tile as Array
+		tower.name = "Tower_" + String(tower_spec.id)
+		tower.position = Vector2(float(ttile[0]), float(ttile[1])) * 16.0 + Vector2(8, 8)
+		add_child(tower)
+		_clear_around(clear, tower.position + Vector2(0, -16), 9) ## the body and the yard stay free of generated plants
 	for stone_spec: Dictionary in DataRegistry.table("waystones").get("statues", []) as Array: ## the waystones, goddess statues on their plinths (WaystoneStatue)
 		var statue: WaystoneStatue = WaystoneStatue.new()
 		var wtile: Array = stone_spec.tile as Array
@@ -734,7 +754,7 @@ func debug_return_home() -> void:
 			(saved.done as Array).append(quest_id)
 		for step: Dictionary in DataRegistry.get_entry("quests", quest_id).steps as Array:
 			if step.has("flag"): flags[String(step.flag)] = true
-	for flag: String in ["rescued", "knight_dialogue_done", "hud_unlocked", "map_opened", "knows_adventurer", "knows_cooking", "day2_started", "cabin_board_moved", "left_cabin"]:
+	for flag: String in ["rescued", "knight_dialogue_done", "hud_unlocked", "map_opened", "knows_adventurer", "day2_started", "cabin_board_moved", "left_cabin"]:
 		flags[flag] = true
 	player.quests.import_data(saved)
 	if not player.inventory.has_item("sword_basic"):
@@ -966,6 +986,7 @@ var _wood_clock: float = 0.0
 var _wood_busy: bool = false
 var _stream_settled: bool = false ## the last `_stream(false)` left nothing to load or drop (see `_stream`)
 var _stream_centers: Array[Vector2i] = [] ## the chunk centres of that pass
+var _stream_motion: Dictionary = {} ## player instance id -> [last position, smoothed velocity] for the look-ahead ring
 
 
 func _process(delta: float) -> void:
@@ -1031,23 +1052,40 @@ func _stream(all: bool) -> void:
 	var frame_deadline: int = Time.get_ticks_usec() + STREAM_BUDGET_USEC ## one budget for adding last frame's props and preparing the next chunk
 	_finish_commit(frame_deadline) ## the ground committed last frame gets its props now (over several frames when it has many)
 	var centers: Array[Vector2i] = []
+	var ahead: Array[Vector2i] = [] ## look-ahead centres: loaded after the players' own rings, never built at once
 	if all:
 		centers.append(_start / CHUNK)
 		centers.append(Vector2i(_spawn_position(0) / (16.0 * CHUNK)))
 	else:
+		var delta: float = maxf(get_process_delta_time(), 0.001)
 		for player: Node in _players.get_children():
-			centers.append(Vector2i(Interiors.outer(get_tree(), (player as Node2D).position) / (16.0 * CHUNK)))
+			var at: Vector2 = Interiors.outer(get_tree(), (player as Node2D).position)
+			var own: Vector2i = Vector2i(at / (16.0 * CHUNK))
+			centers.append(own)
+			var motion: Array = _stream_motion.get(player.get_instance_id(), [at, Vector2.ZERO])
+			var step: Vector2 = (at - (motion[0] as Vector2)) / delta
+			var velocity: Vector2 = Vector2.ZERO if step.length() > LOOKAHEAD_MAX_SPEED else (motion[1] as Vector2).lerp(step, minf(1.0, delta * 4.0))
+			_stream_motion[player.get_instance_id()] = [at, velocity]
+			var forward: Vector2i = Vector2i((at + velocity * LOOKAHEAD_SECONDS) / (16.0 * CHUNK))
+			if forward != own and not ahead.has(forward):
+				ahead.append(forward)
 	if is_instance_valid(editor_camera):
 		centers.append(Vector2i(editor_camera.position / (16.0 * CHUNK)))
 	# Nothing changed since a pass that left nothing to load or drop: only a moved player, a pending build or the editor needs the loops.
-	if not all and _stream_settled and not is_instance_valid(editor_camera) and centers == _stream_centers:
+	var probe: Array[Vector2i] = centers + ahead
+	if not all and _stream_settled and not is_instance_valid(editor_camera) and probe == _stream_centers:
 		return
 	_stream_settled = false
 	var best: Vector2i = Vector2i(-1, -1)
 	var best_d: int = 1 << 30
 	var wanted: Dictionary = {} ## the chunks round the players (loaded ones too); used to keep or drop paused builds
 	var missing: Array[Vector3i] = [] ## (squared distance, x, y) of every wanted chunk that is not loaded, for the worker prefetch
-	for center: Vector2i in centers:
+	var own_count: int = centers.size()
+	if not all:
+		centers.append_array(ahead)
+	for center_index: int in centers.size():
+		var center: Vector2i = centers[center_index]
+		var penalty: int = 0 if center_index < own_count else 3 ## the look-ahead ring waits for the rings the players stand in
 		var radius: int = LOAD_RADIUS
 		if is_instance_valid(editor_camera) and center == Vector2i(editor_camera.position / (16.0 * CHUNK)):
 			radius = clampi(ceili(get_viewport_rect().size.x / editor_camera.zoom.x / (16.0 * CHUNK) * 0.5 + 0.5), 1, 4)
@@ -1057,9 +1095,9 @@ func _stream(all: bool) -> void:
 				wanted[c] = true ## (loaded ones too: the prune only looks at unloaded builds)
 				if _chunks.has(c) or c.x < 0 or c.y < 0 or c.x * CHUNK >= RegionMap.WORLD_TILES or c.y * CHUNK >= RegionMap.WORLD_TILES:
 					continue
-				missing.append(Vector3i(dx * dx + dy * dy, c.x, c.y))
-				if not all and dx * dx + dy * dy < best_d:
-					best_d = dx * dx + dy * dy
+				missing.append(Vector3i(dx * dx + dy * dy + penalty, c.x, c.y))
+				if not all and dx * dx + dy * dy + penalty < best_d:
+					best_d = dx * dx + dy * dy + penalty
 					best = c
 	if all:
 		if Jobs.threaded: ## the whole ring at once: all chunk jobs run in parallel, the loop below only collects them
@@ -1085,7 +1123,7 @@ func _stream(all: bool) -> void:
 				_prefetch(Vector2i(missing[i].y, missing[i].z))
 		if _building != null and _pending_commit == null:
 			# Only the player's own chunk while it is not loaded at all (startup, teleport) is built at once; every other chunk, in view or not, uses the budget.
-			var deadline: int = 0 if best_d == 0 else frame_deadline
+			var deadline: int = 0 if best_d == 0 else (frame_deadline - STREAM_BUDGET_USEC + STREAM_URGENT_USEC if best_d <= 2 else frame_deadline)
 			if _advance_chunk(_building, deadline):
 				var finished: ChunkBuild = _building
 				_building = null
@@ -1103,7 +1141,9 @@ func _stream(all: bool) -> void:
 				break
 		if not near:
 			_unload_chunk(c)
-	_stream_centers = centers
+	_stream_centers = probe
+	if _stream_motion.size() > _players.get_child_count() + 4:
+		_stream_motion.clear()
 	_stream_settled = best.x < 0 and _building == null and _paused_builds.is_empty() and _pending_commit == null
 
 
@@ -1116,7 +1156,7 @@ func _land_at(x: int, y: int) -> bool:
 ## The biome of a land tile. The lookup is bent by a little noise so borders are ragged at tile
 ## size; where the bent lookup falls in the sea the nearest land decides.
 func _land_biome(cell: Vector2i) -> String:
-	if not _map.world_biome.is_empty():
+	if not _map.world_biome.is_empty() and _map.own_biomes.is_empty():
 		return _map.world_biome
 	var authored: Dictionary = {} if edits.terrain.is_empty() else edits.terrain.get(WorldEdits.key(cell), {})
 	if authored.has("biome"):
@@ -1356,6 +1396,11 @@ func _advance_to(build: ChunkBuild, deadline: int, last_phase: int) -> bool:
 				else:
 					build.phase = 9
 			9:
+				for clover_job: Jobs.Job in build.clover_jobs:
+					if not clover_job.is_finished():
+						if deadline > 0: return false
+						Jobs.wait(clover_job)
+				build.clover_jobs.clear()
 				if not build.points.is_empty():
 					var details: MeadowDetails = MeadowDetails.new()
 					details.name = "MeadowDetails"
@@ -1461,6 +1506,10 @@ func _free_build(build: ChunkBuild) -> void:
 
 
 func _free_build_nodes(build: ChunkBuild) -> void:
+	for clover_job: Jobs.Job in build.clover_jobs: ## a worker may still paint a field: let it finish before the node goes
+		Jobs.cancel(clover_job)
+		Jobs.wait(clover_job)
+	build.clover_jobs.clear()
 	for thing: WorldProp in build.chunk.things: thing.free()
 	for log_node: FallenLog in build.chunk.fallen_logs: log_node.free()
 	for field: CloverField in build.chunk.clover: field.free()
@@ -1566,8 +1615,13 @@ func _paint(chunk: Chunk, cell: Vector2i, biome: String, rng: RandomNumberGenera
 	var authored: Dictionary = {} if edits.terrain.is_empty() else edits.terrain.get(WorldEdits.key(cell), {}) ## (no key string per tile without edits)
 	biome = RegionMap.active_biome(String(authored.get("biome", biome)))
 	var kind: String = "plain"
+	var ground: Dictionary = (DataRegistry.get_entry("biomes", biome).get("ground", {}) as Dictionary)
 	if biome == "meadow":
 		kind = _pick_tile_kind(_zone.get_noise_2d(cell.x, cell.y) * 0.5 + 0.5, rng)
+	elif not ground.is_empty(): ## a biome with its own ground: only the kinds it names (the Hexenwald: plain grass and low tufts)
+		var kinds: Array = ground.kinds as Array
+		if rng.randf() < float(ground.chance):
+			kind = String(kinds[rng.randi() % kinds.size()])
 	elif rng.randf() < PLACEHOLDER_CHANCE:
 		kind = COMMON_KINDS[rng.rand_weighted(COMMON_WEIGHTS)]
 	if _relief.kind(cell.x, cell.y) != Relief.FLOOR: ## walls, ramps and stairs are drawn over plain ground
@@ -1617,7 +1671,7 @@ func _unload_chunk(c: Vector2i) -> void:
 func _index_detail_obstacle(build: ChunkBuild, obstacle: Dictionary) -> void:
 	if String(obstacle.kind) == "forestbed": ## the forest floor does not block small plants, it changes which ones grow
 		if _forest_bed_ok(obstacle.pos as Vector2, int(obstacle.variant)):
-			build.beds.append({"pos": obstacle.pos, "rx": PropGenerator.FOREST_BED_RX[int(obstacle.variant)]})
+			build.beds.append({"pos": obstacle.pos, "rx": PropGenerator.FOREST_BED_RX[int(obstacle.variant) % PropGenerator.FOREST_BED_RX.size()]})
 		return
 	if not bool(obstacle.get("custom", false)) and obstacle.has("cell") and edits.props.has(WorldEdits.key(obstacle.cell as Vector2i)): return
 	var radius: float = 60.0
@@ -1672,7 +1726,7 @@ func _detail_candidate(build: ChunkBuild) -> void:
 		if pow(offset.x / rx, 2.0) + pow(offset.y / (rx * FOREST_BED_FLATTEN), 2.0) < 0.8:
 			in_bed = true
 			break
-	var kind: int = build.rng.randi_range(0,MeadowDetails.COUNT-3)
+	var kind: int = build.rng.randi_range(0,MeadowDetails.MEADOW_COUNT-3)
 	# Most new ground cover stays green; blossoms accent the open patches.
 	if build.rng.randf() < 0.35: kind = [0,1,2,3,9,10,11,12,13,14,18,19,20,21][build.rng.randi_range(0,13)]
 	if biome == "mist_forest" and build.rng.randf() < 0.55:
@@ -1680,7 +1734,7 @@ func _detail_candidate(build: ChunkBuild) -> void:
 	elif biome == "glass_cliffs":
 		kind = [0,2,5,7][build.rng.randi_range(0,3)]
 	if in_bed:
-		if build.rng.randf() < 0.45: return
+		if build.rng.randf() < (0.15 if biome == "witch_forest" else 0.45): return ## the Hexenwald's floor is its own ground cover: little is left bare
 		kind = [9,10,11,18,19,24,24,25,25,25][build.rng.randi_range(0,9)] ## ferns and shade moss
 	else:
 		var slope: float = _generator.aspect(pos / 16.0)
@@ -1694,8 +1748,16 @@ func _detail_candidate(build: ChunkBuild) -> void:
 				kind = [9,10,11,18,19,24,25][build.rng.randi_range(0,6)] ## wet ground: moss and ferns
 			elif damp < 0.18 and build.rng.randf() < 0.5:
 				kind = [22,23,0,2,22,23][build.rng.randi_range(0,5)] ## dry ground: straw and thin grass
+	if biome == "witch_forest": ## its own floor: dark grass, witch-hair moss, dead leaves, roots, tiny toadstools; on its forest beds no grass
+		if in_bed:
+			kind = [26, 26, 27, 27, 27, 28, 29, 25][build.rng.randi_range(0, 7)]
+		elif build.rng.randf() < 0.5:
+			kind = [0, 1, 2, 3, 12, 13, 13, 14][build.rng.randi_range(0, 7)]
+		else:
+			kind = [26, 26, 27, 28, 29, 24, 13][build.rng.randi_range(0, 6)]
 	var tint: Color = Color.WHITE
 	match biome:
+		"witch_forest": tint = Color.WHITE.lerp(Color(0.42, 0.5, 0.68) if kind < MeadowDetails.MEADOW_COUNT else Color(0.82, 0.84, 0.94), BiomeBlend.amount_at(pos)) ## grass as dark as the ground under it, its own kinds only a little
 		"mist_forest": tint = Color(0.79,0.95,0.94)
 		"glass_cliffs": tint = Color(0.88,0.85,1.0)
 		"sunken_ruins": tint = Color(0.94,0.88,0.73)
@@ -1714,14 +1776,14 @@ func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 	var center: Vector2 = Vector2(tile) * 16.0 + Vector2(8, 8)
 	var rx: float = float(field.rx)
 	var ry: float = float(field.ry)
-	for other: CloverField in build.chunk.clover: ## two fields never lie in each other
-		if other.position.distance_to(center) < other.radius.x + rx + 8.0:
+	for other: Vector3 in build.clover_discs: ## two fields never lie in each other
+		if Vector2(other.x, other.y).distance_to(center) < other.z + rx + 8.0:
 			return false
 	var ok: bool = _relief.flat_around(center, ry * 0.7) and _rivers.clear_for_prop(center, rx * 0.9)
 	for a: int in 8:
 		var edge: Vector2 = center + Vector2.from_angle(float(a) * TAU / 8.0) * Vector2(rx, ry) * 0.9
 		var cell: Vector2i = Vector2i((edge / 16.0).floor())
-		if not ok or not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
+		if not ok or not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell) or _generator.is_bare(cell):
 			ok = false
 			break
 	if ok:
@@ -1739,7 +1801,13 @@ func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 	if not ok:
 		return false
 	var node: CloverField = CloverField.new()
-	node.setup(field, center, self)
+	if Jobs.threaded: ## painting the atlas takes milliseconds: a worker does it while the chunk goes on
+		build.clover_jobs.append(Jobs.run(func() -> Variant:
+			node.setup(field, center, self)
+			return null, Callable(), Jobs.Prio.HIGH, Callable(), build.cell))
+	else:
+		node.setup(field, center, self)
+	build.clover_discs.append(Vector3(center.x, center.y, rx))
 	build.chunk.clover.append(node)
 	return true
 
@@ -1770,7 +1838,7 @@ func _add_stone_bed(parent: Node2D, at: Vector2, variant: int) -> void:
 
 ## True where a litter patch of this size may lie: on land, dry, level, off the old stones and the footpath.
 func _forest_bed_ok(at: Vector2, variant: int, check_patches: bool = true) -> bool:
-	var rx: float = PropGenerator.FOREST_BED_RX[variant]
+	var rx: float = PropGenerator.FOREST_BED_RX[variant % PropGenerator.FOREST_BED_RX.size()]
 	if not _rivers.clear_for_prop(at, rx * 0.8) or not _relief.flat_around(at, rx * 0.55):
 		return false
 	for angle: float in [0.0, PI * 0.5, PI, PI * 1.5]:
@@ -1796,7 +1864,8 @@ func _add_forest_bed(parent: Node2D, at: Vector2, variant: int, checked: bool = 
 	var bed: Sprite2D = Sprite2D.new()
 	bed.texture = FOREST_BED
 	bed.region_enabled = true
-	bed.region_rect = Rect2(variant * FOREST_BED_FRAME.x, 0, FOREST_BED_FRAME.x, FOREST_BED_FRAME.y)
+	var count: int = PropGenerator.FOREST_BED_RX.size() ## row 0 the meadow's litter, row 1 the Hexenwald's floor
+	bed.region_rect = Rect2((variant % count) * FOREST_BED_FRAME.x, (variant / count) * FOREST_BED_FRAME.y, FOREST_BED_FRAME.x, FOREST_BED_FRAME.y)
 	bed.position = at
 	bed.z_index = -9
 	parent.add_child(bed)
@@ -2288,7 +2357,7 @@ func _town_soft(thing: WorldProp) -> bool:
 		return true
 	if thing.kind in PropGenerator.TREE_KINDS:
 		return thing.state.has("f") ## felled: stump and sapling have no collision (a young tree grows back by itself otherwise)
-	return (thing.kind == "rock" or thing.kind == "iron_rock") and thing.is_depleted()
+	return (thing.kind == "rock" or thing.kind == "iron_rock" or thing.kind == "curse_rock") and thing.is_depleted()
 
 
 ## The loaded props a foundation on `rect` sweeps away (cells): bushes, grass, pebbles, mushrooms, stumps and spent rocks.

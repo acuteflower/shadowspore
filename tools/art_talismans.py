@@ -103,6 +103,23 @@ def schweigtropfen():
     return px
 
 
+def clarity_earrings():
+    """Ohrringe der Klarheit: two silver hooks tied with a witch's knot, each with a splinter of curse silver that glows witch green."""
+    px = canvas()
+    green = [hexc(c) for c in ("2e5c54", "4a9a3a", "a8ff6a", "eaffc4")]
+    for x, top in ((6, 2), (9, 4)):
+        put(px, x, top, SILVER[2])  # the hook
+        put(px, x, top + 1, SILVER[1])
+        put(px, x - 1, top + 2, SILVER[1])  # the knot
+        put(px, x, top + 2, SILVER[3])
+        put(px, x + 1, top + 2, SILVER[0])
+        for i, (y, offs) in enumerate([(top + 3, (-1, 0, 1)), (top + 4, (-1, 0, 1)), (top + 5, (-1, 0, 1)), (top + 6, (0, 1)), (top + 7, (0,))]):  # a jagged splinter
+            for o in offs:
+                put(px, x + o, y, green[2 if o < 0 else (1 if o == 0 else 0)])
+        put(px, x - 1, top + 3, green[3])  # the glint
+    return px
+
+
 def rissfeder():
     """A shallow chain bow and Mornath's black wing feather hanging from it, the spine cracked open by violet light (the pendant of the worn look, drawn larger)."""
     px = canvas()
@@ -130,7 +147,7 @@ def rissfeder():
     return px
 
 
-ICONS = {"silver_chain": silver_chain, "wuchtreif": wuchtreif, "schweigtropfen": schweigtropfen, "rissfeder": rissfeder}
+ICONS = {"silver_chain": silver_chain, "wuchtreif": wuchtreif, "schweigtropfen": schweigtropfen, "rissfeder": rissfeder, "clarity_earrings": clarity_earrings}
 
 
 def main():

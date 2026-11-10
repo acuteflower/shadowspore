@@ -30,13 +30,14 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	if player == null or not tree.root.multiplayer.is_server():
 		return false
 	player.inventory.stow_held() ## a stack on the cursor goes back into the bag first
+	var position: Vector2 = player.climb.save_position()
 	var data: Dictionary = {
 		"version": VERSION,
 		"saved_at": int(Time.get_unix_time_from_system()),
 		"time": TimeManager.time_of_day,
 		"day": TimeManager.day,
 		"player": {
-			"pos": [player.position.x, player.position.y],
+			"pos": [position.x, position.y],
 			"health": player.health.current,
 			"copper": player.progress.copper,
 			"xp": player.progress.xp,
@@ -76,6 +77,8 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
+		if discovery.is_reveal_all():
+			data["map_before"] = Marshalls.raw_to_base64(discovery.export_before()) ## the fog from before the developer's whole-map reveal
 	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		return false
@@ -144,6 +147,7 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null and data.has("map"):
 		discovery.import_saved(Marshalls.base64_to_raw(String(data["map"])))
+		discovery.import_before(Marshalls.base64_to_raw(String(data.get("map_before", "")))) ## empty = no whole-map reveal active
 	if world != null and world.has_method("resume_story"):
 		world.call_deferred("resume_story", player) ## a save that stopped in the middle of the wake-up plays it again
 	return true

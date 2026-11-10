@@ -50,6 +50,7 @@ var _sway: Vector2
 var _head_width: float = 5.0
 var _feet_ready: bool = false
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _clock: RigClock = RigClock.new()
 
 @onready var _back: Node2D = $Back
 @onready var _back_glow: Node2D = $BackGlow
@@ -99,6 +100,9 @@ func _project(forward: float, side: float, height: float = 0.0) -> Vector2:
 
 
 func update_rig(delta: float, velocity: Vector2, heading: float) -> void:
+	delta = _clock.step(self, delta, velocity.length()) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
+	if delta < 0.0:
+		return
 	_time += delta
 	_elapsed += delta
 	_heading = heading

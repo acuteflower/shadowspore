@@ -402,8 +402,10 @@ func _shown(id: String) -> bool:
 	return _skills.is_visible(id) and not _skills.is_upgrade(id)
 
 
-## The first upgrade of a skill that can be bought right now ("" = none).
+## A standalone unlock or the first upgrade that can be bought right now.
 func _next_ready(id: String) -> String:
+	if _skills.is_unlock(id) and _skills.can_learn(id):
+		return id
 	for upgrade_id: String in _skills.upgrade_chain(id):
 		if _skills.can_learn(upgrade_id):
 			return upgrade_id
@@ -659,10 +661,12 @@ func _points_word(count: int) -> String:
 func _requirement(id: String) -> String:
 	var def: Dictionary = _skills.node(id)
 	var cost: int = _skills.cost(id)
-	match _skills.upgrade_state(id):
+	match _skills.learn_state(id):
 		&"learned":
 			return "ERLERNT"
 		&"ready":
+			if _skills.is_unlock(id) and _skills.required_level(id) == 1:
+				return "%d %s / BEREIT" % [cost, _points_word(cost)]
 			return "STUFE %d / %d %s / BEREIT" % [_skills.required_level(id), cost, _points_word(cost)]
 		&"short":
 			return "BRAUCHT %d %s" % [cost, _points_word(cost)]
@@ -674,7 +678,7 @@ func _requirement(id: String) -> String:
 
 
 func _requirement_color(id: String, tone: Color) -> Color:
-	match _skills.upgrade_state(id):
+	match _skills.learn_state(id):
 		&"learned":
 			return tone
 		&"ready":
@@ -700,17 +704,20 @@ func _draw_details() -> void:
 	VineStyle.branch(_chrome, 0.0, 244.0, course, 4, void_level, 50.0, _time, reach)
 	VineStyle.foliage(_chrome, 0.0, 244.0, course, 9, 570, void_level, 50.0, _time, reach)
 	var upgrade: bool = _skills.is_upgrade(_selected)
+	var unlock: bool = _skills.is_unlock(_selected)
 	var kind: String = " / PLATZHALTER"
 	if _skills.is_awake(_selected):
 		kind = " / UPGRADE / ERLERNT" if upgrade else " / ERLERNT"
 	elif upgrade:
 		kind = " / UPGRADE"
+	elif unlock:
+		kind = " / LERNBAR"
 	_text(_chrome, String(branch.name) + kind, Vector2(12, y + 12), color)
 	_text(_chrome, String(node.name), Vector2(12, y + 25), TEXT, 2.0)
-	if _skills.is_awake(_selected) or upgrade:
+	if _skills.is_awake(_selected) or upgrade or unlock:
 		_text(_chrome, String(node.description), Vector2(12, y + 46), DIM)
 		_text(_chrome, _detail_line(_selected), Vector2(12, y + 59), color)
-		if upgrade:
+		if upgrade or unlock:
 			_text(_chrome, _requirement(_selected), Vector2(12, y + 70), _requirement_color(_selected, color))
 		else:
 			_draw_upgrade_rows(_selected, y + 70.0, color)
@@ -730,6 +737,8 @@ func _detail_line(id: String) -> String:
 		var stealth: StealthComponent = _player.get_node_or_null("StealthComponent") as StealthComponent
 		if stealth != null:
 			return "%s HALTEN / SICHTWEITE %d %%" % [VineStyle.key_name("sneak", "STRG"), roundi(stealth.sneak_detection_multiplier * 100.0)]
+	if id == "wall_climb":
+		return String(node.detail) % (VineStyle.key_name("interact", "E") if InputManager.using_mouse else InteractPrompt.GAMEPAD_KEY)
 	return String(node.get("detail", ""))
 
 
@@ -783,6 +792,9 @@ func _draw_action_vine(void_level: float) -> void:
 	elif _skills.can_explore(_selected):
 		label = "HALTEN ZUM ERKUNDEN"
 		status = "KOSTENLOS / PLATZHALTER"
+	elif _skills.is_unlock(_selected) and not _skills.is_learned(_selected):
+		label = "FÄHIGKEIT GESPERRT"
+		status = _requirement(_selected)
 	elif _skills.is_awake(_selected) and not open_id.is_empty():
 		label = "UPGRADE NOCH GESPERRT"
 		status = "%s %s" % [String(_skills.node(open_id).name), _requirement(open_id)]
@@ -903,8 +915,9 @@ func _draw_orbs() -> void:
 		var tone: Color = _color(id)
 		var phase: float = _phase(id)
 		var awake: bool = _skills.is_awake(id)
+		var unlock: bool = _skills.is_unlock(id)
 		var explored: bool = _skills.is_explored(id)
-		var ready: bool = awake and _skills.has_ready_upgrade(id)
+		var ready: bool = (unlock and _skills.can_learn(id)) or (awake and _skills.has_ready_upgrade(id))
 		var interest: float = float(_interest.get(id, 0.0))
 		var radius: float = _orb_radius(id) * lerpf(0.55, 1.0, VineStyle.back_out(clampf(appear, 0.0, 1.0)))
 		var charge: float = _charge(id)
@@ -928,9 +941,9 @@ func _draw_orbs() -> void:
 			petals = 10 + learned_upgrades * 2 ## every learned upgrade adds petals to the crown
 		BloomOrb.draw(_orbs, at, radius * 1.22, tone, alpha, open, life, breath, _time, id.hash() & 0xffff, interest + charge + ready_pulse * 0.4, petals)
 		var icon: String = String((_skills.definitions()[id] as Dictionary).get("icon", ""))
-		if awake and SkillIcons.has_icon(icon):
+		if (awake or unlock) and SkillIcons.has_icon(icon):
 			_orbs.draw_circle(at, 8.5, Color(INK, alpha * 0.86))
-			SkillIcons.draw(_orbs, icon, at, tone, alpha * 0.95)
+			SkillIcons.draw(_orbs, icon, at, tone, alpha * 0.95, 1, not awake and not ready)
 		if awake:
 			_draw_slots(id, at, radius, tone, alpha)
 		# Tiny orbiting seeds bind the globe to the drifting veil, rather than a flat button.
@@ -959,7 +972,7 @@ func _draw_orbs() -> void:
 				var angle: float = float(spark) / 12.0 * TAU + VineStyle.rand(spark) * 0.3
 				var pos: Vector2 = at + Vector2.from_angle(angle) * age * (25 + VineStyle.rand(spark + 3) * 25)
 				_orbs.draw_rect(Rect2(pos.round(), Vector2.ONE), Color(tone, maxf(0.0, 1.0 - age) * alpha))
-		if awake:
+		if awake or unlock:
 			var label: String = String((_skills.definitions()[id] as Dictionary).name)
 			var label_at: Vector2 = at + Vector2(-PixelText.width(label) * 0.5, radius + 11)
 			_text(_orbs, label, label_at, Color(tone, alpha * _ui_visibility(label_at)))

@@ -19,6 +19,7 @@ var label_y: float = BASE_Y + 6.0
 var fork_at: float = 0.0 ## 0 = no side shoot, else its position along the vine (0..1)
 var drips: bool = false ## sap swells at the tip and falls
 var ratio: float = 1.0
+var lie: float = -1.0 ## >= 0: shown instead of the real ratio (Hallucinations)
 var palette: Array[Color] = [Color.WHITE, Color.GRAY, Color.DIM_GRAY] ## highlight, main, shade
 var dim: float = 1.0
 var label: String = ""
@@ -37,6 +38,7 @@ var _drop_life: PackedFloat32Array = PackedFloat32Array()
 
 
 func _ready() -> void:
+	add_to_group("sap_vines")
 	custom_minimum_size = Vector2(length, HEIGHT)
 	size = Vector2(length, HEIGHT)
 
@@ -72,6 +74,9 @@ func _offset(_t: float) -> float:
 func _process(delta: float) -> void:
 	_time += delta
 	_update_state(delta)
+	if lie >= 0.0 and ratio > 0.01: ## a hallucination: the vine shows a value that is not true
+		label = str(ceili(float(label.to_int()) / ratio * lie))
+		ratio = lie
 	_shown = lerpf(_shown, ratio, 1.0 - exp(-14.0 * delta))
 	_trail = maxf(_shown, move_toward(_trail, ratio, TRAIL_DRAIN * delta)) if trail_color.a > 0.0 else _shown
 	_flash = maxf(_flash - 3.0 * delta, 0.0)

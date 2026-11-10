@@ -93,7 +93,8 @@
     "texture": "res://assets/wildlife/corvid.png",
     "biomes": [
       "meadow",
-      "mist_forest"
+      "mist_forest",
+      "witch_forest"
     ],
     "max_loaded": 8,
     "spawn_attempts": 14,
@@ -157,7 +158,30 @@
     "group_min": 2,
     "group_max": 3,
     "chunk_chance": 0.22,
-    "build_offset": 0
+    "build_offset": 0,
+    "witch_forest": {
+      "chunk_chance": 0.75,
+      "group_min": 6,
+      "group_max": 12,
+      "max_loaded": 22,
+      "spawn_attempts": 24,
+      "spacing": 12,
+      "personal_space": 10,
+      "flock_pull": 40,
+      "observe": {
+        "chance": 0.25,
+        "notice": 260,
+        "hops": [
+          3,
+          5
+        ],
+        "leash": 520,
+        "cooldown": [
+          40,
+          90
+        ]
+      }
+    }
   },
   "raven": {
     "scene": "res://src/entities/wildlife/wild_corvid.tscn",
@@ -165,7 +189,8 @@
     "texture": "res://assets/wildlife/corvid.png",
     "biomes": [
       "meadow",
-      "mist_forest"
+      "mist_forest",
+      "witch_forest"
     ],
     "max_loaded": 8,
     "spawn_attempts": 14,
@@ -229,7 +254,30 @@
     "group_min": 1,
     "group_max": 2,
     "chunk_chance": 0.09,
-    "build_offset": 3
+    "build_offset": 3,
+    "witch_forest": {
+      "chunk_chance": 0.45,
+      "group_min": 2,
+      "group_max": 4,
+      "max_loaded": 22,
+      "spawn_attempts": 24,
+      "spacing": 14,
+      "personal_space": 16,
+      "flock_pull": 50,
+      "observe": {
+        "chance": 0.12,
+        "notice": 240,
+        "hops": [
+          2,
+          3
+        ],
+        "leash": 480,
+        "cooldown": [
+          60,
+          120
+        ]
+      }
+    }
   },
   "owl": {
     "scene": "res://src/entities/wildlife/wild_meadow_bird.tscn",
@@ -782,7 +830,12 @@
     "flight_speed": 17,
     "flight_height": 7,
     "scatter_range": 22,
-    "night_only": true
+    "night_only": true,
+    "witch_forest": {
+      "chunk_chance": 0.9,
+      "group_min": 3,
+      "group_max": 5
+    }
   },
   "bear": {
     "scene": "res://src/entities/wildlife/wild_bear.tscn",
@@ -872,5 +925,61 @@
     "maternal_pursuit_seconds": 4,
     "follow_stop": 17,
     "follow_step": 42
+  },
+  "toad": {
+    "name": "Kr\u00f6te",
+    "biomes": [
+      "witch_forest"
+    ],
+    "body_radius": 2,
+    "max_loaded": 10,
+    "chunk_chance": 0.75,
+    "group_min": 1,
+    "group_max": 3,
+    "rest_seconds": [
+      3,
+      11
+    ],
+    "hop_seconds": [
+      0.34,
+      0.46
+    ],
+    "hop_distance": [
+      4,
+      9
+    ],
+    "bout": [
+      2,
+      5
+    ],
+    "home_radius": 60,
+    "scatter_range": 30,
+    "croak_seconds": [
+      9,
+      24
+    ],
+    "croak_volume_db": -21
+  },
+  "bat": {
+    "name": "Fledermaus",
+    "biomes": [
+      "witch_forest"
+    ],
+    "max_loaded": 10,
+    "chunk_chance": 0.6,
+    "group_min": 2,
+    "group_max": 4,
+    "rest_seconds": [
+      6,
+      16
+    ],
+    "flight_speed": 48,
+    "flight_height": [
+      26,
+      50
+    ],
+    "patch_radius": 140,
+    "scatter_range": 40,
+    "hang_chance": 0.3
   }
 }

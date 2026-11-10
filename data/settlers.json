@@ -666,5 +666,156 @@
    ]
   },
   "shop": "torben_forge"
+ },
+ "witch": {
+  "name": "ESMA",
+  "title": "NEBELHEXE",
+  "art": "witch",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "witch",
+  "_note": "Name ESMA fixed by the user; lines are PLACEHOLDERS for the dialogue writer (docs/prompts/dialogue_writer.md)",
+  "hub": [
+   98,
+   122
+  ],
+  "spots": {
+   "counter": {
+    "at": [
+     100,
+     136
+    ],
+    "face": [
+     0,
+     1
+    ],
+    "clip": "counter"
+   },
+   "bench": {
+    "at": [
+     70,
+     121
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "craft"
+   },
+   "cauldron": {
+    "at": [
+     116,
+     116
+    ],
+    "face": [
+     1,
+     0
+    ],
+    "clip": "stir"
+   },
+   "brew": {
+    "at": [
+     112,
+     116
+    ],
+    "face": [
+     1,
+     0
+    ],
+    "clip": "cast"
+   },
+   "shelf": {
+    "at": [
+     97,
+     94
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "idle",
+    "via_hub": true
+   }
+  },
+  "schedule": [
+   [
+    0.22,
+    0.34,
+    "counter"
+   ],
+   [
+    0.34,
+    0.46,
+    "bench"
+   ],
+   [
+    0.46,
+    0.58,
+    "counter"
+   ],
+   [
+    0.58,
+    0.7,
+    "cauldron"
+   ],
+   [
+    0.7,
+    0.8,
+    "counter"
+   ],
+   [
+    0.8,
+    0.9,
+    "brew"
+   ],
+   [
+    0.9,
+    0.02,
+    "cauldron"
+   ],
+   [
+    0.02,
+    0.12,
+    "bench"
+   ],
+   [
+    0.12,
+    0.22,
+    "shelf"
+   ]
+  ],
+  "chat": {
+   "spot": {
+    "counter": [
+     "Du riechst nach Wiese. Was brauchst du?",
+     "Leg es auf den Tresen. Ich beiße nicht."
+    ],
+    "bench": [
+     "Silber will Geduld. Sprich leise.",
+     "Ein Talisman merkt sich, wer ihn trägt."
+    ],
+    "cauldron": [
+     "Nicht hineinsehen. Er sieht zurück.",
+     "Noch drei Runden, dann ist er gut."
+    ],
+    "brew": [
+     "Tritt einen Schritt zurück."
+    ],
+    "shelf": [
+     "Irgendwo hier stand es doch."
+    ]
+   },
+   "night": [
+    "Der Wald ist wach. Bleib im Licht.",
+    "Nachts kocht es sich am besten."
+   ],
+   "any": [
+    "Der Nebel lügt. Ich nicht.",
+    "Du bist die Erste seit langem, die die Treppe hochkommt.",
+    "Fass nichts an, das leuchtet."
+   ]
+  },
+  "shop": "witch_counter"
  }
 }

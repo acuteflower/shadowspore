@@ -8,7 +8,9 @@ extends Bush
 ##  - `bloom: "night"`: Nebellilie is closed all day (sheet rows 0 open, 1 closed, 2 picked), opens at dusk, then sheds slow glinting
 ##    pollen and can be picked; by day it cannot;
 ##  - `puff`: Wispersaat lets go of seeds that drift away on the wind when someone brushes past (colours in the list); with
-##    `puff_rise` (Funkenmohn) they are embers that shoot up and burn out quickly.
+##    `puff_rise` (Funkenmohn) they are embers that shoot up and burn out quickly; with `puff_sink` (Krötenschirm) a heavy cloud of spores
+##    that sinks back to the ground; `puff_idle` [min, max] seconds lets it puff now and then by itself while on screen;
+##  - `flicker`: the glow of a flame (Totenkerze) flickers in small uneven steps, like a candle.
 
 const POSE_EVERY: float = 0.5
 const PUFF_COOLDOWN: float = 7.0
@@ -19,6 +21,9 @@ var _closed: bool = false ## sun flower at night, lily by day: nothing to pick
 var _pollen: CPUParticles2D
 var _puff_ready: float = 0.0
 var _tug_from: float = -10.0 ## local: when the player here began to pull (the trembling of the leaves)
+var _idle_puff: float = -1.0 ## seconds until the next puff of its own (`puff_idle`), < 0 = never
+var _flicker: bool = false
+var _flicker_wait: float = 0.0
 
 const SOIL_BURST: Array[Color] = [Color("5a4048"), Color("7a6068"), Color("3a2838")]
 
@@ -33,6 +38,9 @@ func _setup_prop() -> void:
 	_sprite.material = _wind_material(false)
 	if _glow != null:
 		_glow.material = _wind_material(true)
+	if _spec.has("puff_idle"):
+		_idle_puff = randf_range(float(_spec.puff_idle[0]), float(_spec.puff_idle[1]))
+	_flicker = bool(_spec.get("flicker", false)) and _glow != null
 
 
 ## One material per plant (cheap: the shader is shared): its own place and phase are uniforms, so the bend never depends on where the
@@ -69,11 +77,30 @@ func _process(delta: float) -> void:
 		_sprite.skew = sin(tug * 70.0) * 0.03 * smoothstep(0.2, 1.0, tug) + sin(tug * 23.0) * 0.015
 	if _pollen != null:
 		_pollen.emitting = _on_screen and _row == 0
+	if _idle_puff >= 0.0 and _on_screen:
+		_idle_puff -= delta
+		if _idle_puff < 0.0:
+			_idle_puff = randf_range(float(_spec.puff_idle[0]), float(_spec.puff_idle[1]))
+			if not bool(state.get("p", 0)):
+				_puff()
+	if _flicker and _on_screen: ## a candle: small uneven steps, now and then a deeper dip
+		_flicker_wait -= delta
+		if _flicker_wait <= 0.0:
+			_flicker_wait = randf_range(0.06, 0.16)
+			_glow.self_modulate.a = 0.55 if randf() < 0.08 else randf_range(0.8, 1.0)
 	if _spec.has("sun") or _spec.has("bloom"):
 		_pose_wait -= delta
 		if _pose_wait <= 0.0:
 			_pose_wait = POSE_EVERY
 			_pose()
+
+
+func _set_on_screen(on: bool) -> void:
+	super(on)
+	if _pollen != null and not on:
+		_pollen.emitting = false
+	if on:
+		_pose_wait = 0.0 ## the clock moved while nobody looked: turn to it at once
 
 
 func apply_state(new_state: Dictionary, fx: String) -> void:
@@ -176,15 +203,16 @@ func _puff() -> void:
 	seeds.one_shot = true
 	seeds.explosiveness = 0.5
 	var embers: bool = bool(_spec.get("puff_rise", false))
-	seeds.amount = 14 if embers else 8
-	seeds.lifetime = 1.5 if embers else 3.2
+	var sink: bool = bool(_spec.get("puff_sink", false))
+	seeds.amount = 14 if embers else (12 if sink else 8)
+	seeds.lifetime = 1.5 if embers else (4.2 if sink else 3.2)
 	seeds.direction = Vector2(0.3, -1.0) if embers else Vector2(0.5, -1.0)
-	seeds.spread = 40.0 if embers else 55.0
-	seeds.initial_velocity_min = 22.0 if embers else 8.0
-	seeds.initial_velocity_max = 48.0 if embers else 20.0
+	seeds.spread = 40.0 if embers else (80.0 if sink else 55.0)
+	seeds.initial_velocity_min = 22.0 if embers else (5.0 if sink else 8.0)
+	seeds.initial_velocity_max = 48.0 if embers else (13.0 if sink else 20.0)
 	seeds.damping_min = 1.5 if embers else 3.0
 	seeds.damping_max = 3.0 if embers else 5.0
-	seeds.gravity = Vector2(WorldWind.sample(global_position).x * 14.0 + 5.0, -14.0 if embers else -2.0)
+	seeds.gravity = Vector2(WorldWind.sample(global_position).x * (4.0 if sink else 14.0) + (1.0 if sink else 5.0), -14.0 if embers else (3.5 if sink else -2.0))
 	seeds.scale_amount_min = 0.35
 	seeds.scale_amount_max = 0.6
 	seeds.position = Vector2(0, -_height * 0.8)

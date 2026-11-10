@@ -632,6 +632,30 @@ def preview(items, path):
     save(path, np.kron(bg, np.ones((2, 2, 1), dtype=np.uint8)))
 
 
+def gloom_tone(img, top_left):
+    """Darkens a decal where the Hexenwald's ground is dark (python twin of src/world/biome_blend.gd: smoothstep over 48 tiles from the old land),
+    so a path that runs from the meadow into the dark wood does not glow against it. top_left = the decal's corner in world px."""
+    from PIL import Image
+    rel = np.asarray(Image.open(ROOT / "assets" / "world" / "relief.png").convert("RGBA"))
+    hexm = rel[..., 3] == 205
+    cur = (rel[..., 3] > 0) & ~hexm
+    dist = np.full(hexm.shape, 99.0)
+    dist[cur] = 0.0
+    for i in range(1, 49):
+        nxt = cur.copy()
+        nxt[1:] |= cur[:-1]; nxt[:-1] |= cur[1:]; nxt[:, 1:] |= cur[:, :-1]; nxt[:, :-1] |= cur[:, 1:]
+        dist[nxt & ~cur] = i
+        cur = nxt
+    t = np.clip(dist / 48.0, 0.0, 1.0)
+    gloom = np.where(hexm, t * t * (3 - 2 * t), 0.0)
+    h, w = img.shape[:2]
+    ty = np.clip((np.arange(h) + top_left[1]) // 16, 0, gloom.shape[0] - 1)
+    tx = np.clip((np.arange(w) + top_left[0]) // 16, 0, gloom.shape[1] - 1)
+    g = gloom[np.ix_(ty, tx)][..., None]
+    dark = np.array([0.48, 0.56, 0.62])
+    img[..., :3] = np.where(img[..., 3:4] > 0, img[..., :3] * (1.0 - g + g * dark), img[..., :3]).astype(np.uint8)
+
+
 def cut_under_stones(img, mask, offset, stones):
     """A path does not grow on flagstones: wherever a stone field lies over it (and one pixel around each stone, so no slivers of
     path peek out between them), the path is gone. It looks as if the stones lie over it and it comes out from under them."""
@@ -750,6 +774,20 @@ def main():
     sx, sy = world["start"]
     centre = (sx * 16 + 8, sy * 16 + 8)
     seed = int(data.get("seed", 1))
+    only_path = next((a[7:] for a in sys.argv[1:] if a.startswith("--path=")), "")  # bakes just that path (e.g. hexenwald_path) and merges it into data/ground_baked.json
+    if only_path:
+        i, spec = next((i, p) for i, p in enumerate(data["paths"]) if p["id"] == only_path)
+        img, mask, (ox, oy) = bake_path(spec, int(data.get("seed", 1)) + i * 101 + 7, centre)
+        if spec.get("gloom"):
+            gloom_tone(img, (centre[0] + ox, centre[1] + oy))
+        save(ROOT / "assets" / "world" / "ground" / (spec["id"] + ".png"), img)
+        save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_mask.png"), mask)
+        entry = {"id": spec["id"], "texture": "res://assets/world/ground/%s.png" % spec["id"], "mask": "res://assets/world/ground/%s_mask.png" % spec["id"], "x": centre[0] + ox, "y": centre[1] + oy}
+        out = json.load(open(ROOT / "data" / "ground_baked.json"))
+        out["decals"] = [d for d in out["decals"] if d["id"] != spec["id"]] + [entry]
+        json.dump(out, open(ROOT / "data" / "ground_baked.json", "w"), separators=(",", ":"))
+        print("baked", spec["id"], img.shape[1], "x", img.shape[0])
+        return
     only_yards = "--yards" in sys.argv  # quick rebuild of the hut yards alone: the rest of data/ground_baked.json stays as it is
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     baked, shown, yards = [], [], []
@@ -762,6 +800,8 @@ def main():
                 stones.append((img, mask, (ox, oy)))
             else:
                 cut_under_stones(img, mask, (ox, oy), stones)
+                if spec.get("gloom"):
+                    gloom_tone(img, (centre[0] + ox, centre[1] + oy))
             save(ROOT / "assets" / "world" / "ground" / (spec["id"] + ".png"), img)
             save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_mask.png"), mask)
             baked.append({"id": spec["id"], "texture": "res://assets/world/ground/%s.png" % spec["id"], "mask": "res://assets/world/ground/%s_mask.png" % spec["id"], "x": centre[0] + ox, "y": centre[1] + oy})

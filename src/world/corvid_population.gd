@@ -60,8 +60,9 @@ func _populate(cell: Vector2i) -> void:
 	_flocks[cell] = flock
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 6299))
+	var gloom: float = BiomeBlend.amount_at(Vector2(cell) * CHUNK_PIXELS + Vector2.ONE * CHUNK_PIXELS * 0.5) ## 0 on all old land: there the draws and numbers stay exactly as they were
 	for species: String in ["crow", "raven", "owl", "hoopoe"]:
-		var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
+		var spec: Dictionary = local_spec(species, gloom)
 		if rng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 			continue
 		var center: Vector2 = Vector2.ZERO
@@ -80,7 +81,9 @@ func _populate(cell: Vector2i) -> void:
 			if _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 				break
 			var point: Vector2 = center
-			if i > 0:
+			if i > 0 and spec.has("spacing"): ## a big flock of the Hexenwald: a tight crowd, bird beside bird (a sunflower spiral, jittered)
+				point += Vector2.from_angle(i * 2.39996 + rng.randf_range(-0.3, 0.3)) * float(spec["spacing"]) * sqrt(float(i))
+			elif i > 0:
 				point += Vector2.from_angle(i * TAU / count) * rng.randf_range(25.0, float(spec["group_radius"]))
 			if not _floor(point, species) or not _clear(point, 6.0) or not _player_clear(point, float(spec["alert_range"])):
 				continue
@@ -99,6 +102,7 @@ func _populate(cell: Vector2i) -> void:
 			bird.flock_id = id
 			bird.pet_key = key
 			bird.home = center
+			bird.witch = gloom >= 0.5
 			bird.position = point
 			bird.facing = rng.randf() * TAU
 			_birds.add_child(bird)
@@ -109,6 +113,22 @@ func _populate(cell: Vector2i) -> void:
 					continue
 				bird._finish.rpc(perch["position"], perch["height"], perch["path"])
 			flock.append(bird)
+
+
+## The species' numbers for a chunk with `gloom` (BiomeBlend): a `witch_forest` block in data/wildlife.json raises the chunk chance
+## with the gloom and, deep inside (gloom >= 0.5), replaces group size, spawn attempts and the shared cap: the Hexenwald is the corvids' own wood.
+static func local_spec(species: String, gloom: float) -> Dictionary:
+	var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
+	var witch: Dictionary = spec.get("witch_forest", {})
+	if witch.is_empty() or gloom <= 0.0:
+		return spec
+	var local: Dictionary = spec.duplicate()
+	local["chunk_chance"] = lerpf(float(spec["chunk_chance"]), float(witch.get("chunk_chance", spec["chunk_chance"])), clampf(gloom, 0.0, 1.0))
+	if gloom >= 0.5:
+		for key: String in witch:
+			if key != "chunk_chance":
+				local[key] = witch[key]
+	return local
 
 
 ## A visitor of the town (TownCritters): one bird of `species` at `point`, grounded, wanting a roof (`visit_roof`). Null when the caps, the ground or the people forbid it.
@@ -276,21 +296,59 @@ func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 		var distance: float = tree.global_position.distance_to(bird.global_position)
 		if distance > 340.0 or (danger.is_finite() and tree.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):
 			continue
-		var height: float = float(tree.spec()["height"][tree.variant])
-		var half: float = float(tree.spec()["crown_half_width"][tree.variant])
-		var slots: int = 1 if tree.variant == 0 else 3
-		for slot: int in slots:
+		for slot: int in _slot_count(tree):
 			var key: String = "%s:%d" % [tree.get_path(), slot]
 			var owner: Variant = _claims.get(key)
 			if is_instance_valid(owner) and owner != bird:
 				continue
-			var side: float = float(slot - 1) if slots == 3 else 0.0
-			var point: Vector2 = tree.global_position + Vector2(side * half * 0.45, 2.0 + slot * 0.5)
-			var value: float = distance + point.distance_to(bird.home) * 0.15
+			var seat: Dictionary = _slot(tree, slot)
+			var value: float = distance + (seat.position as Vector2).distance_to(bird.home) * 0.15
 			if value < score:
 				score = value
-				best = {"position": point, "height": height * (0.62 + 0.09 * slot), "path": String(tree.get_path()), "claim": key}
+				best = {"position": seat.position, "height": seat.height, "path": String(tree.get_path()), "claim": key}
 	if not best.is_empty():
+		_claims[String(best["claim"])] = bird
+	return best
+
+
+## Branches a tree offers: one on a small tree, three on the others; the bare boughs of a Bleichbaum hold a row of them (2-5), so a whole
+## flock of the Hexenwald can sit on one dead tree.
+func _slot_count(tree: FirTree) -> int:
+	if tree.kind == "bone_tree":
+		return 2 + tree.variant
+	return 1 if tree.variant == 0 else 3
+
+
+## Where branch `slot` of `tree` is: the point under it on the ground and its height (one and three slots: as they always were).
+func _slot(tree: FirTree, slot: int) -> Dictionary:
+	var slots: int = _slot_count(tree)
+	var height: float = float(tree.spec()["height"][tree.variant])
+	var half: float = float(tree.spec()["crown_half_width"][tree.variant])
+	var side: float = (float(slot) / float(slots - 1) * 2.0 - 1.0) if slots > 1 else 0.0
+	var rise: float = (0.62 + 0.09 * slot) if slots <= 3 else (0.6 + 0.07 * float((slot * 3) % slots)) ## a row of dead boughs: heights in a zigzag
+	return {"position": tree.global_position + Vector2(side * half * (0.45 if slots <= 3 else 0.6), 2.0 + slot * 0.5), "height": height * rise}
+
+
+## Host: a free branch on a tree within `radius` of `point` (an observing crow of the Hexenwald, see WildCorvid._observe), claimed; {} if none.
+func perch_near(bird: WildCorvid, point: Vector2, radius: float) -> Dictionary:
+	var best: Dictionary = {}
+	var score: float = INF
+	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+		var tree: FirTree = node as FirTree
+		if tree == null or tree.is_depleted() or tree._falling or tree.global_position.distance_to(point) > radius:
+			continue
+		for slot: int in _slot_count(tree):
+			var key: String = "%s:%d" % [tree.get_path(), slot]
+			var owner: Variant = _claims.get(key)
+			if is_instance_valid(owner) and owner != bird:
+				continue
+			var seat: Dictionary = _slot(tree, slot)
+			var value: float = (seat.position as Vector2).distance_to(point)
+			if value < score:
+				score = value
+				best = {"position": seat.position, "height": seat.height, "path": String(tree.get_path()), "claim": key}
+	if not best.is_empty():
+		release_perch(bird)
 		_claims[String(best["claim"])] = bird
 	return best
 

@@ -857,5 +857,285 @@
    }
   ],
   "description": "Aus der Feder, die der Himmel nicht halten konnte, in Torbens Esse zur Klinge geschlagen. Sie spaltet, was sie berührt, und die Luft gleich mit."
+ },
+ "hag_wood": {
+  "name": "Hexenholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/hag_wood.png",
+  "description": "Fast schwarzes, in sich verdrehtes Holz. Die Maserung läuft in Spiralen, als hätte der Baum sich im Wachsen umgesehen."
+ },
+ "bone_wood": {
+  "name": "Bleichholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/bone_wood.png",
+  "description": "Totes Holz, hell und glatt wie ein Knochen. Es ist leichter, als es sein dürfte."
+ },
+ "hex_thorn": {
+  "name": "Hexendorn",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/hex_thorn.png",
+  "description": "Ein fingerlanger, bleicher Dorn. Sticht auch, wenn man gut aufpasst."
+ },
+ "hex_berry": {
+  "name": "Hexenbeere",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/hex_berry.png",
+  "description": "Schwarzviolett und prall, mit einem giftgrünen Glanzpunkt. Niemand im Dorf würde sie essen."
+ },
+ "grave_candle": {
+  "name": "Totenkerze",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/grave_candle.png",
+  "description": "Eine wächserne Blüte, auf der eine kalte grüne Flamme steht. Sie wärmt nicht und geht im Wind nicht aus."
+ },
+ "witch_hat": {
+  "name": "Hexenhut",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/witch_hat.png",
+  "description": "Eine violette Blüte mit krummer Spitze und breiter Krempe. Unter der Krempe glimmt es grün."
+ },
+ "toad_cap": {
+  "name": "Krötenschirm",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/toad_cap.png",
+  "description": "Gedrungen, weinrot, mit bleichen Warzen, die nachts schwach leuchten. Kröten sitzen gern darunter."
+ },
+ "ghost_frond": {
+  "name": "Geisterwedel",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/ghost_frond.png",
+  "description": "Ein blasser, fast durchscheinender Farnwedel. Im Dunkeln sieht man ihn besser als bei Tag."
+ },
+ "mandrake": {
+  "name": "Alraune",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/items/mandrake.png",
+  "description": "Eine Wurzel mit Armen, Beinen und einem schlafenden Gesicht. Man sagt, sie schreit, wenn man sie weckt. Diese hier schweigt."
+ },
+ "curse_silver": {
+  "name": "Fluchsilber",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/curse_silver.png",
+  "description": "Dunkles Gestein, durchzogen von blassem Silber, das nachts giftgrün aufglimmt. Liegt kalt in der Hand, auch am Feuer."
+ },
+ "clarity_earrings": {
+  "name": "Ohrringe der Klarheit",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "earrings",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/clarity_earrings.png",
+  "bonus": {
+   "absorb": 0.04
+  },
+  "perks": [
+   "clear_sight"
+  ],
+  "look": {
+   "metal": "silver",
+   "stone": "a8ff6a",
+   "stones": 2,
+   "glow": true,
+   "drop": [
+    "m",
+    "S",
+    "T",
+    "s"
+   ]
+  },
+  "description": "Zwei Splitter Fluchsilber an einem Hexenknoten. Der Wald lügt weiter. Du hörst nur nicht mehr hin."
+ },
+ "potion_heal_1": {
+  "name": "Trüber Wundtau",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_1.png",
+  "potion": {
+   "type": "heal",
+   "tier": 1
+  },
+  "description": "Esmas Heiltrank, Stufe I. Heilt sofort 20 % deiner Gesundheit (mindestens 20). Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_2": {
+  "name": "Klarer Wundtau",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_2.png",
+  "potion": {
+   "type": "heal",
+   "tier": 2
+  },
+  "description": "Esmas Heiltrank, Stufe II. Heilt sofort 30 % deiner Gesundheit (mindestens 30). Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_3": {
+  "name": "Leuchtender Wundtau",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_3.png",
+  "potion": {
+   "type": "heal",
+   "tier": 3
+  },
+  "description": "Esmas Heiltrank, Stufe III. Heilt sofort 40 % deiner Gesundheit (mindestens 45). Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_4": {
+  "name": "Strahlender Wundtau",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_4.png",
+  "potion": {
+   "type": "heal",
+   "tier": 4
+  },
+  "description": "Esmas Heiltrank, Stufe IV. Heilt sofort 55 % deiner Gesundheit (mindestens 60). Löscht Verbrennen. Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_5": {
+  "name": "Wundtau-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_5.png",
+  "potion": {
+   "type": "heal",
+   "tier": 5
+  },
+  "description": "Esmas Heiltrank, Stufe V. Heilt sofort 70 % deiner Gesundheit (mindestens 80). Löscht Verbrennen, was zu viel ist, wird Überheilung. Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_stamina_1": {
+  "name": "Trüber Glutatem",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_1.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 1
+  },
+  "description": "Esmas Ausdauertrank, Stufe I. 30 Sekunden lang 3 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst."
+ },
+ "potion_stamina_2": {
+  "name": "Klarer Glutatem",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_2.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 2
+  },
+  "description": "Esmas Ausdauertrank, Stufe II. 30 Sekunden lang 5 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst."
+ },
+ "potion_stamina_3": {
+  "name": "Leuchtender Glutatem",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_3.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 3
+  },
+  "description": "Esmas Ausdauertrank, Stufe III. 30 Sekunden lang 7 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst."
+ },
+ "potion_stamina_4": {
+  "name": "Strahlender Glutatem",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_4.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 4
+  },
+  "description": "Esmas Ausdauertrank, Stufe IV. 30 Sekunden lang 9 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst. Die Pause vor dem Nachladen ist um ein Viertel kürzer."
+ },
+ "potion_stamina_5": {
+  "name": "Glutatem-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_5.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 5
+  },
+  "description": "Esmas Ausdauertrank, Stufe V. 30 Sekunden lang 12 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst. Die Pause vor dem Nachladen ist halb so lang, Sprinten kostet weniger."
+ },
+ "vial_empty": {
+  "name": "Leere Phiole",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 20,
+  "hotbar": false,
+  "icon": "res://assets/items/vial_empty.png",
+  "description": "Dünnes Glas mit einem Korken. Esma füllt jeden Trank in eine davon."
  }
 }

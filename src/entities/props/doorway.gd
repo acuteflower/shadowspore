@@ -14,6 +14,9 @@ var opens: bool = false ## a door to the room next door: E only opens it (and it
 var is_open: bool = false
 var blocker: CollisionShape2D ## what keeps the shut door shut
 var locked_text: String = "" ## a door that cannot be opened (a room that is only there for the looks): E rattles it and she says this
+var to_interior: String = "" ## a passage (the stair inside the witch's tower): E takes her into this interior ...
+var to_spot: Vector2 = Vector2.ZERO ## ... to this place in it (room px) ...
+var to_face: Vector2 = Vector2.DOWN ## ... looking this way
 var needs: String = "" ## a quest flag of the local player that has to be set before the door answers (Ellie's door: the broom is taken)
 
 
@@ -48,7 +51,9 @@ func interact(player: Player) -> void:
 			player.quests.set_flag("door_open_" + interior_id) ## a saved game opens it again (Interiors)
 		return
 	var manager: Interiors = get_tree().get_first_node_in_group("interiors") as Interiors
-	if manager != null:
+	if manager != null and to_interior != "":
+		manager.use_passage(player, self)
+	elif manager != null:
 		manager.use_door(player, self)
 
 

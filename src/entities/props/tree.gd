@@ -50,6 +50,13 @@ var _crown_dome_height: float = 0.0
 var _fades_crown: bool = true
 var _on_screen: bool = true
 var _notifier: VisibleOnScreenNotifier2D
+var _vines: Sprite2D ## plants.json `vines`: ropes hanging from the crown that breathe (vine_breathe.gdshader), with their buds' light as a child
+var _vine_glow: Sprite2D
+var _twitches: bool = false ## plants.json `twitch`
+var _twitch_wait: float = 0.0 ## seconds until the dead tree next jerks and creaks
+var _creak: AudioStreamPlayer2D
+static var _vine_material: ShaderMaterial
+static var _vine_glow_material: ShaderMaterial
 
 @onready var _crown: Sprite2D = $Crown
 @onready var _trunk_glow: Sprite2D = $Sprite/Glow
@@ -94,10 +101,80 @@ func _setup_prop() -> void:
 		add_child(_light)
 	if bool(_spec.get("fireflies", false)):
 		add_to_group("flora_glow") ## the fireflies gather here (see Fireflies)
+	if _spec.has("vines"):
+		_make_vines()
+	_twitches = _spec.has("twitch")
+	if _twitches:
+		_twitch_wait = _twitch_delay() * randf_range(0.3, 1.0)
 	if _spec.has("petals"):
 		_make_petals()
 	add_to_group("night_lights") ## DayNight tells every night light and this tree how dark it is
 	set_night(TimeManager.night_amount())
+
+
+## Hexenulme: ropes of ivy hang from the hem of the crown and sway slowly with a breath of their own (children of the crown, so they
+## fade and fall with it); the buds at some of their tips glow on an unlit child, dim by day like the other glow.
+func _make_vines() -> void:
+	if _vine_material == null:
+		_vine_material = ShaderMaterial.new()
+		_vine_material.shader = load("res://assets/shaders/vine_breathe.gdshader") as Shader
+		_vine_glow_material = ShaderMaterial.new()
+		_vine_glow_material.shader = load("res://assets/shaders/vine_breathe_glow.gdshader") as Shader
+		_vine_glow_material.set_shader_parameter("mask_rows", -1.0 / 3.0)
+	var sheet: Texture2D = load(String(_spec.vines)) as Texture2D
+	_vines = Sprite2D.new()
+	_vines.centered = false
+	_vines.offset = _crown.offset
+	_vines.texture = sheet
+	_vines.hframes = int(_spec.columns)
+	_vines.vframes = 3
+	_vines.frame = variant
+	_vines.material = _vine_material
+	_crown.add_child(_vines)
+	_vine_glow = Sprite2D.new()
+	_vine_glow.centered = false
+	_vine_glow.offset = _crown.offset
+	_vine_glow.texture = sheet
+	_vine_glow.hframes = int(_spec.columns)
+	_vine_glow.vframes = 3
+	_vine_glow.frame = variant + 2 * int(_spec.columns)
+	_vine_glow.material = _vine_glow_material
+	_vines.add_child(_vine_glow)
+
+
+func _twitch_delay() -> float:
+	var every: Array = (_spec.twitch as Dictionary).get("every", [8.0, 22.0])
+	return randf_range(float(every[0]), float(every[1]))
+
+
+## Bleichbaum: now and then the dead tree jerks as if something moved inside it, and creaks (only heard close by; purely local, every peer
+## on its own clock: nothing depends on it).
+func _twitch(delta: float) -> void:
+	_twitch_wait -= delta
+	if _twitch_wait > 0.0:
+		return
+	_twitch_wait = _twitch_delay()
+	if is_depleted() or not _on_screen:
+		return
+	var twitch: Dictionary = _spec.twitch
+	_wobble = maxf(_wobble, float(twitch.get("amount", 0.3)))
+	_wobble_time = 0.0
+	_wobble_dir = 1.0 if randf() < 0.5 else -1.0
+	var sounds: Array = twitch.get("sounds", [])
+	if sounds.is_empty():
+		return
+	if _creak == null:
+		_creak = AudioStreamPlayer2D.new()
+		_creak.max_distance = 320.0
+		_creak.position = Vector2(0, -_tree_clear)
+		add_child(_creak)
+	_creak.stream = load(String(sounds[randi() % sounds.size()])) as AudioStream
+	var volume: float = float(GameSettings.get_value("sfx")) / 100.0 ## the effects volume, like the birds' calls
+	if volume <= 0.001:
+		return
+	_creak.volume_db = float(twitch.get("volume_db", -16.0)) + linear_to_db(volume)
+	_creak.pitch_scale = randf_range(0.85, 1.12)
+	_creak.play()
 
 
 ## Blossom trees: a few petals drift down from the crown all the time (unshaded, so they stay bright at night).
@@ -143,6 +220,8 @@ func set_night(amount: float) -> void:
 	var alpha: float = lerpf(GLOW_BY_DAY, 1.0, amount)
 	_trunk_glow.modulate.a = alpha
 	_crown_glow.modulate.a = alpha
+	if _vine_glow != null:
+		_vine_glow.modulate.a = alpha
 
 
 ## A felled tree and its regrowth cannot be chopped again until it is whole.
@@ -201,6 +280,8 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 func _process(delta: float) -> void:
 	if _falling:
 		return
+	if _twitches:
+		_twitch(delta)
 	if not _on_screen and _wobble <= 0.002 and not _covering:
 		return
 	_sway(delta)

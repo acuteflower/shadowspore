@@ -1,6 +1,8 @@
 class_name StaminaComponent
 extends Node
 ## Stamina pool. After any use, regeneration pauses for `regen_delay` seconds, then runs continuously.
+## Glutatem (a potion, status effect `glutatem` on the sibling `Effects`, its scale = the tier) adds a pulse of stamina every second
+## that also comes during the pause, and from tier IV shortens the pause (AlchemyRules.stamina_spec). Every peer counts it itself, like the rest of the pool.
 
 signal changed(current: float, maximum: float)
 
@@ -44,6 +46,13 @@ func drain(rate: float, delta: float) -> bool:
 		return false
 	_use(rate * delta)
 	return current > 0.0
+
+
+## The active Glutatem tier can reduce the cost of sprinting.
+func sprint_scale() -> float:
+	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	var tier: int = int(effects.scale_of("glutatem")) if effects != null else 0
+	return float(AlchemyRules.stamina_spec(tier)["sprint_scale"]) if tier > 0 else 1.0
 
 
 ## A new maximum (from the collected level); `grow` gives what was added right away.

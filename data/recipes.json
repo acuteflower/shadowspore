@@ -192,5 +192,79 @@
   "by": "npc",
   "npc": "torben",
   "work": 300.0
+ },
+ "silver_chain": {
+  "station": "witch_bench",
+  "role": "witch",
+  "npc": "witch",
+  "by": "self",
+  "name": "SILBERKETTE",
+  "in": {
+   "curse_silver": 3,
+   "bone_wood": 2
+  },
+  "out": {
+   "silver_chain": 1
+  },
+  "seconds": 2.5,
+  "trust": 0,
+  "info": "FLUCHSILBER, GEZOGEN UND GEFLOCHTEN"
+ },
+ "clarity_earrings": {
+  "station": "witch_bench",
+  "role": "witch",
+  "npc": "witch",
+  "by": "self",
+  "name": "OHRRINGE DER KLARHEIT",
+  "in": {
+   "curse_silver": 4,
+   "ghost_frond": 6,
+   "grave_candle": 3
+  },
+  "out": {
+   "clarity_earrings": 1
+  },
+  "seconds": 3.0,
+  "trust": 10,
+  "info": "WER SIE TRÄGT, DEN BELÜGT DER NEBEL NICHT"
+ },
+ "wuchtreif": {
+  "station": "witch_bench",
+  "role": "witch",
+  "npc": "witch",
+  "by": "self",
+  "name": "WUCHTREIF",
+  "in": {
+   "curse_silver": 6,
+   "iron_plate": 2,
+   "mandrake": 1,
+   "shadow_core": 1
+  },
+  "out": {
+   "wuchtreif": 1
+  },
+  "seconds": 3.5,
+  "trust": 30,
+  "info": "EIN SCHWERER REIF FÜR DEN SCHWERTARM"
+ },
+ "schweigtropfen": {
+  "station": "witch_bench",
+  "role": "witch",
+  "npc": "witch",
+  "by": "self",
+  "name": "SCHWEIGTROPFEN",
+  "in": {
+   "curse_silver": 10,
+   "mandrake": 3,
+   "toad_cap": 4,
+   "shadow_core": 3,
+   "void_slag": 2
+  },
+  "out": {
+   "schweigtropfen": 1
+  },
+  "seconds": 4.5,
+  "trust": 60,
+  "info": "ZWEI TROPFEN STILLE, IN SILBER GEFASST"
  }
 }

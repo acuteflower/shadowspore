@@ -4,6 +4,100 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.6.1 Beta] – 2026-11-10
+### 🧙‍♀️ Hexenwald & Alchemie: Esma die Nebelhexe, Trankbrauen, Kletterranken, Dauerdämmer & der Wahn des Nebels
+
+![Der Hexenturm und die Nebelhexe](docs/img/witch_tower_site.png)
+
+*„Südlich der vertrauten Wiesen sinkt der Tag in ein bleiernes Halbdunkel. Wo das Gras fahl wird und uralte Schieferklippen aufragen, kriecht ein giftgrüner Dunst zwischen knorrigen Ulmen hervor. Ein gewundener Pfad führt tief in das Herz des Waldes – dorthin, wo eine einsame Hexe im Schatten ihres Turms den Kessel rührt und der Nebel den Verstand der Wanderer prüft...“*
+
+---
+
+### 🌟 Die Großen Highlights
+
+#### 1. 🌲 Das neue Biom: Der Hexenwald (Region 31, Überregion 5)
+Ein völlig neues, eigenständiges Gebiet setzt die Küste südlich der Stadt nahtlos fort – ohne Ladezeiten oder künstliche Barrieren (über 38.000 neue Tiles!).
+* **Weicher Übergang:** Die Weltmaske dunkelt den Boden über 48 Tiles sanft ab; die Grasnarbe wechselt stufenlos in die kühle, dunkle Hexenwald-Palette (`BiomeBlend`).
+* **Schiefer-Gelände & Klippen:** Dunkles Schiefer-Relief (Stil 5) mit 33 Rampen und Felsstufen.
+* **Dauerdämmer:** Das Tageslicht wird im Wald spürbar gedämpft (Sonnenflecken und Lichtschäfte erlöschen, kühler Dunstschatten). Leuchtpflanzen glimmen mit mindestens 45 % Nachtstärke – auch zur Mittagszeit.
+* **Der gewundene Pfad:** Ein geschwungener Stein- und Trampelpfad (`hexenwald_path`) führt von der Küstenwiese direkt zum Hexenturm im Waldzentrum.
+
+---
+
+#### 2. 🧪 Alchemie & Trankbrauen (Ablösung des Kochen-Systems)
+Das bisherige Kochen wurde vollständig durch ein stimmungsvolles, tief integriertes **Alchemie-System** bei Esma der Nebelhexe ersetzt.
+
+![Alchemie-Icons und Trankstufen](docs/img/alchemy_icons.png)
+
+* **Kräuter & Pflanzen erhalten ihren Zweck:** Wundblätter, Alraunen, Glutbeeren, Geisterfarne und Mondglocken werden zu mächtigen Essenzen verarbeitet.
+* **Zwei Tranklinien in 5 Leuchtstufen (I Trüb bis V Meistersud):**
+  * **Heiltrank („Wundtau“):** Sofortige prozentuale Heilung der Maximalgesundheit (20 % bis 70 %) mit verlässlichem Mindestwert. Ab Stufe IV wird der Effekt *Verbrennen* sofort gelöscht; Stufe V wandelt Heilüberschüsse in schützende Überheilung um (10 s Wundpause zwischen Einnahmen).
+  * **Ausdauertrank („Glutatem“):** Schenkt 30 Sekunden lang jede Sekunde frische Ausdauer (3 bis 12 Ausdauer/s) – und wirkt **auch während der Ausdauer-Regenerationspause**, beim Sprinten und im Angriff! Stufe IV/V verkürzen die Nachladepause drastisch; Stufe V senkt die Ausdauerkosten beim Sprinten um 15 %.
+* **Viszerales Trinken:** Eigene Trink-Animation im Laufen und Kampf mit Soundkulisse (Korkenploppen, Gluckern, Heilen).
+* **Brau-Enthüllung:** Animiertes Kesselfenster (`BrewReveal`) beim Entdecken und Brauen neuer Rezepturen.
+
+---
+
+#### 3. 🌫️ Giftgrüner Nebel, der Effekt HALLUZINIERT & die Phantom-Spinne
+Der Hexenwald ist kein Ort, den man mit roher Waffengewalt bezwingt – er ist ein Ort, dem man nicht trauen kann.
+* **Fortschreitender Trug (0..1):** Je länger man im Nebel verweilt, desto tiefer sinkt man in den Wahn:
+  * **Stufe 1 (Flüstern):** Hexengrüne Augen glimmen im Dickicht, Schritte hallen hinter Ellie wider, Ulmen-Gesichter beobachten jede Bewegung.
+  * **Stufe 2 (Trug):** Falsche Glitzer-Items lösen sich beim Aufheben in Rauch auf, falsche Silhouetten täuschen Wanderer, die Minimap-Aufdeckung wird blockiert, und das HUD zuckt mit Schein-Schaden.
+  * **Stufe 3 (Wahn – Die Phantom-Spinne):** Täuschend echte Schattenspinnen brechen aus dem Boden hervor, pirschen heran und setzen zum Biss mit rotem Warnbereich an – **zerfallen aber im Moment des Einschlags spurlos zu Rauch!** Doch Vorsicht: Im Dauerdämmer pirschen vereinzelt auch echte Schattenwesen...
+* **Schutz-Talisman – Klarglas-Ohrringe:** Trägerinnen erhalten den Perk *Klarer Blick* (`clear_sight`), der vor dem Effekt schützt und den Nebel um Ellie lichtet.
+
+---
+
+#### 4. 🏰 Der Hexenturm, Esma & der Krähenbaum
+* **Der Hexenturm:** Ein monumentales Gebäude am Ende des Pfades mit Portal, Hof und animiertem Erkerfenster.
+* **Esma, die Nebelhexe:** Vollständig animierte Bewohnerin mit eigener Kleidung, Gesten, Tag-Nacht-Rhythmus und Hexenkessel.
+
+![Esmas Gesten und Animationen](docs/img/esma_gestures.png)
+
+* **Der monumentale Krähenbaum:** Ein gigantischer Nistbaum im Wald (`crow_tree`), der als Zuflucht und Futterplatz für befreundete Krähen und Raben dient.
+
+![Der Krähenbaum im Hexenwald](docs/img/crow_tree.png)
+
+---
+
+#### 5. 🧗‍♀️ Kletterranken & Schieferwände (Wall Climb)
+* Steile Felswände sind kein Hindernis mehr: An rankenden Kletterpflanzen kann Ellie nun Felsstufen und Schieferklippen geschmeidig empor- und hinabklettern.
+* Vollständiges Kletter-Animationsset (8 Richtungen, Hände am Fels, Verwundbarkeitsmasken).
+
+---
+
+#### 6. 🌿 Flora des Hexenwalds & Fluchsilber
+
+![Flora und Rohstoffe des Hexenwalds](docs/img/hexenwald_flora.png)
+
+* **Neue Bäume:** Knorrige Hexenulmen (`hag_tree`) und geisterhafte Bleichbäume (`bone_tree`).
+* **Neue Pflanzenwelt:** Dornenhecken, Geisterfarne, Totenkerzen, Krötenkappen, Hexenhut-Pilze und ziehbare Alraunen-Wurzeln.
+* **Neues Erz:** Fluchsilber-Felsen (`curse_rock`) mit grün glimmenden Erzadern und seltenem Fluchsilber-Erz.
+
+---
+
+### ⚖️ Balance & Spielwerte auf einen Blick
+
+| Status | Bereich / Parameter | Vorher | Jetzt (V0.6.1) | Auswirkung im Spiel |
+|---|---|---|---|---|
+| 🟣 `NEU` | **Biom: Hexenwald** | Nicht vorhanden | **38.158 Tiles (Region 31)** | Neues zusammenhängendes Landgebiet mit Schieferklippen |
+| 🟣 `NEU` | **Alchemie statt Kochen** | Altes Kochsystem | **Vollständiges Trankbrauen** | Nutzt Wundblätter, Alraunen & Beeren für Tränke I bis V |
+| 🟣 `NEU` | **Heiltrank (Wundtau I–V)** | – | **20 % bis 70 % Max-HP** | Sofortheilung, Verbrennen-Löschung & Überheilung |
+| 🟣 `NEU` | **Ausdauertrank (Glutatem I–V)**| – | **+3 bis +12 Stamina/s** | Regeneriert auch beim Sprinten; Stufe V senkt Sprintkosten um 15 % |
+| 🟣 `NEU` | **Nebel & Halluzination** | – | **Statuseffekt `hallucinated`** | Progressive Trugbilder, Schein-Items & Phantom-Spinnen |
+| 🟣 `NEU` | **Klettersystem (Wall Climb)** | Nur Rampen | **Kletterranken an Klippen** | Erklimmen von Felswänden via Ranken |
+| 🟣 `NEU` | **Schutz-Talisman: Klarglas-Ohrringe** | – | **Perk `clear_sight`** | Immunität gegen Halluzinationen & lichtet den Nebel |
+| 🟣 `NEU` | **Esma & Hexenturm** | – | **Voll begehbares Turminneres** | Neue Residentin mit Kessel, Möbeln und Alchemie-Brauen |
+| 🟣 `NEU` | **Krähenbaum** | – | **Großer Raben- & Krähenhort** | Zentraler Anlaufpunkt für gefiederte Gefährten |
+| 🟢 `FIX` | **Sprint-Skalierung (6.0.1)** | Statische Kosten | **Glutatem V: 0.85x Sprintkosten** | Saubere StaminaComponent-Skalierung bei aktivem Glutatem |
+
+---
+
+### 🔮 Sneak Peek: Was brodelt in V0.7?
+*„Mit dem klaren Blick der Klarglas-Ohrringe und den Essenzen aus Esmas Kessel weichen die Lügen des Nebels – doch in den Tiefen unter dem Schiefergestein hallen alte Echos wider. Verlorene Minengänge, uralte Verliese und vergessene Ruinen warten darauf, wiederentdeckt zu werden...“*
+
+---
+
 ## [V0.5.0 Beta] – 2026-11-10
 ### 🦅 Schwingen & Tiefen: Oberflächenschwimmen, der Lichtfischer, Gefiederte Begleiter & die Himmelsriss-Klinge
 

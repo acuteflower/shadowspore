@@ -582,6 +582,52 @@ def write_feed():
     write_png(ROOT / "characters" / "player_feed_blood.png", PICK_FRAMES * FW, 8 * FH, paste(brows, PICK_FRAMES, 8))
 
 
+# Drinking a potion (docs/alchemie_konzept.md): quick enough for a fight, 0.6 s in the game (the same 12 frames as the one-second actions, played faster).
+# The right hand pulls the vial from the belt, brings it up (the cork is flicked off with the thumb at about 0.18), she tips her head back and drinks
+# in one draught (the potion takes effect at 0.5 = 0.30 s), lowers it, tosses the empty vial back over her shoulder and wipes her mouth with the
+# back of her left hand. Seven leg variants like eating, so she can walk while she drinks. The game draws the vial (DrinkEffect) at the rig hand.
+# `python3 tools/art_hero3d.py drinkonly` writes player_drink.png, player_drink_blood.png and the "drink" entries of data/hero_rig.json;
+# `drink out.png <sector>` is a contact sheet.
+DRINK_KEYS = [
+    (0.00, P(0.0, 0.02, 0.0, STAND, REST_R, REST_L, (0.0, 0.0, 0.0))),
+    (0.12, P(0.10, 0.06, 0.2, STAND, (-6.0, 22.5, 1.0), (4.8, 26.0, 1.5), (0.3, 0.1, 0.1))),
+    (0.24, P(0.04, 0.06, 0.2, STAND, (-2.6, 35.5, 6.5), (5.0, 27.5, 2.5), (0.6, 0.2, 0.3))),
+    (0.36, P(0.0, -0.20, -0.4, STAND, (-1.2, 44.5, 5.2), (6.0, 29.0, 2.5), (-1.3, -0.4, -1.0), 0.05)),
+    (0.50, P(0.0, -0.26, -0.5, STAND, (-0.9, 45.5, 4.6), (6.2, 29.5, 2.5), (-1.7, -0.5, -1.3), 0.06)),
+    (0.62, P(0.04, -0.04, 0.0, STAND, (-3.2, 37.5, 6.0), (5.2, 28.0, 2.5), (-0.6, -0.2, -0.4))),
+    (0.74, P(-0.30, 0.02, 0.0, STAND, (-8.0, 37.0, -3.5), (5.0, 27.5, 2.5), (0.8, 0.3, 0.4), 0.04)),
+    (0.86, P(0.08, 0.04, 0.1, STAND, (-5.2, 27.0, 2.0), (1.6, 42.5, 5.2), (0.4, 0.2, 0.2))),
+    (1.00, P(0.0, 0.02, 0.0, STAND, REST_R, REST_L, (0.0, 0.0, 0.0))),
+]
+
+
+def write_drink():
+    """Only the drinking animation: colour sheet, blood thresholds and rig entries (7 leg variants like eating)."""
+    import json
+    global WANT_BLOOD, frame
+    rows, shoulders, hands, mouths = pick_sheet(DRINK_KEYS, ATTACK_LEGS)
+    cols = PICK_FRAMES * ATTACK_LEGS
+    write_png(ROOT / "characters" / "player_drink.png", cols * FW, 8 * FH, paste(rows, cols, 8))
+    rig_path = ROOT.parent / "data" / "hero_rig.json"
+    rig = json.loads(rig_path.read_text())
+    rig.update({"drink_cols": PICK_FRAMES, "drink_variants": ATTACK_LEGS, "drink_shoulder": shoulders, "drink_hand": hands, "drink_mouth": mouths})
+    rig_path.write_text(json.dumps(rig, separators=(",", ":")) + "\n")
+    WANT_BLOOD = True
+    real_frame, collected = frame, []
+
+    def collecting(*args, **kwargs):
+        result = real_frame(*args, **kwargs)
+        collected.append(LAST_BLOOD)
+        return result
+
+    frame = collecting
+    pick_sheet(DRINK_KEYS, ATTACK_LEGS)
+    frame = real_frame
+    WANT_BLOOD = False
+    brows = [collected[r * cols:(r + 1) * cols] for r in range(8)]
+    write_png(ROOT / "characters" / "player_drink_blood.png", cols * FW, 8 * FH, paste(brows, cols, 8))
+
+
 def write_touch():
     """Only the touch animation: colour sheet, blood thresholds and rig entries."""
     import json
@@ -663,7 +709,14 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         ankle = knee + 10.0 * np.array([0.0, -math.cos(shank), math.sin(shank)])
         return hip, knee, ankle, thigh, shank
 
-    if pose and pose.get("leg_angles"):  # crawling and climbing: the legs are posed by angles (thigh, flex) per leg, not planted
+    if pose and pose.get("ankles"):
+        drop, bob = float(pose["dy"]), 0.0
+        legs = []
+        for side, target in zip((1, -1), pose["ankles"]):
+            hip = np.array([side * 2.5, 24.0 + drop, 0.2 + pose["pz"]])
+            knee, ankle = ik2(hip, target, 11.5, 10.0, (side * 0.4, 0.0, 1.0))
+            legs.append((hip, knee, ankle, 0.0, 0.0))
+    elif pose and pose.get("leg_angles"):  # crawling: the legs are posed by angles (thigh, flex) per leg
         legs = []
         for side, (thigh, flex) in zip((1, -1), pose["leg_angles"]):
             hip = np.array([side * 2.5, 24.0, 0.2])
@@ -1074,6 +1127,8 @@ if __name__ == "__main__":
         write_pull()
     elif len(sys.argv) > 1 and sys.argv[1] == "feedonly":
         write_feed()
+    elif len(sys.argv) > 1 and sys.argv[1] == "drinkonly":
+        write_drink()
     elif len(sys.argv) > 1 and sys.argv[1] == "touchonly":
         write_touch()
     elif len(sys.argv) > 1 and sys.argv[1] == "jog":
@@ -1089,12 +1144,12 @@ if __name__ == "__main__":
             for y in range(FH):
                 sheet[r * FH + y][c * FW: (c + 1) * FW] = fr[y]
         write_png(Path(sys.argv[2]), ATTACK_FRAMES * FW, ATTACK_STEPS * FH, sheet)
-    elif len(sys.argv) > 1 and sys.argv[1] in ("pick", "eat", "pull", "feed", "animonly"):
+    elif len(sys.argv) > 1 and sys.argv[1] in ("pick", "eat", "pull", "feed", "drink", "animonly"):
         # pick|eat <out.png> <sector>: contact sheet of that one-second animation; animonly: rewrite only
         # assets/characters/player_pick.png / player_eat.png and their entries in data/hero_rig.json
         from pathlib import Path
-        if sys.argv[1] in ("pick", "eat", "pull", "feed"):
-            keys = {"pick": PICK_KEYS, "eat": EAT_KEYS, "pull": PULL_KEYS, "feed": FEED_KEYS}[sys.argv[1]]
+        if sys.argv[1] in ("pick", "eat", "pull", "feed", "drink"):
+            keys = {"pick": PICK_KEYS, "eat": EAT_KEYS, "pull": PULL_KEYS, "feed": FEED_KEYS, "drink": DRINK_KEYS}[sys.argv[1]]
             sector = int(sys.argv[3]) if len(sys.argv) > 3 else 0
             cells = [frame(sector, 0.0, "attack", False, timeline_pose(keys, (i + 0.5) / PICK_FRAMES))[0] for i in range(PICK_FRAMES)]
             sheet = [[CLEAR] * (6 * FW) for _ in range(2 * FH)]

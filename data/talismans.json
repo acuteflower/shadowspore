@@ -35,6 +35,10 @@
 			"percent": ["damage"],
 			"window": 3.0,
 			"damage": 0.4
+		},
+		"clear_sight": {
+			"name": "KLARSICHT",
+			"text": "Der Nebel des Hexenwalds weicht vor dir zurück. Du halluzinierst nicht, und die Karte zeigt wieder, wo du gehst."
 		}
 	}
 }

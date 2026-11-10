@@ -350,6 +350,14 @@ g_town_wear_rect={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
+g_gloom={
+"type": "sampler2D",
+"value": "res://assets/world/town_wear_empty.png"
+}
+g_gloom_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
 g_day_cover={
 "type": "sampler2D",
 "value": "res://assets/world/town_wear_empty.png"

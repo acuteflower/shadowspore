@@ -83,5 +83,32 @@
 				0.55
 			]
 		}
+	},
+	"witch_forest": {
+		"name": "Hexenwald",
+		"tier": 6,
+		"mood": "dunkel, kalt, Hexenwerk",
+		"color": "#4d5f72",
+		"bare": true,
+		"gloom": 1.0,
+		"fade": 48.0,
+		"ground": {
+			"kinds": [
+				"plain",
+				"tuft"
+			],
+			"chance": 0.1
+		},
+		"relief": {
+			"gain": 1.0,
+			"bias": -0.1,
+			"styles": [
+				1,
+				0,
+				0,
+				0,
+				0
+			]
+		}
 	}
 }

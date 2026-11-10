@@ -94,6 +94,8 @@ var _impact_time: float = -10.0
 var _ready_geo: bool = false
 var _parts: Array[Dictionary] = []
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _clock: RigClock = RigClock.new()
+static var _MASKS: Dictionary = {} ## shape key -> [ImageTexture, offset]: blob and oval masks shared by every crusher (kept referenced here)
 
 @onready var _body: Node2D = $Body
 @onready var _glow: Node2D = $Glow
@@ -180,6 +182,9 @@ func _ik(root: Vector3, target: Vector3, upper: float, lower: float, pole: Vecto
 
 
 func update_rig(delta: float, velocity: Vector2, heading: float, aim: float) -> void:
+	delta = _clock.step(self, delta, velocity.length()) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
+	if delta < 0.0:
+		return
 	_time += delta
 	_elapsed += delta
 	_heading = heading
@@ -491,22 +496,81 @@ func _fill(canvas: Node2D, points: PackedVector2Array, color: Color) -> void:
 			canvas.draw_rect(Rect2(from_x, float(y), maxf(1.0, roundf(right) - from_x), 1.0), color)
 
 
+## A blob is drawn as one cached white mask (its pixel rows, made once per shape and quarter-pixel offset) tinted by `color`:
+## the same pixels as filling the row spans, but one draw call instead of twenty (hundreds of blobs per rebuild).
 func _blob(canvas: Node2D, center: Vector2, rx: float, ry: float, seed_value: int, color: Color) -> void:
-	var points: PackedVector2Array = PackedVector2Array()
-	for k: int in 9:
-		var angle: float = TAU * float(k) / 9.0 + 0.4
-		var jitter: float = 0.86 + 0.2 * fposmod(sin(float(seed_value * 17 + k) * 12.9898) * 43758.5453, 1.0)
-		points.append(center + Vector2(cos(angle) * rx * jitter, sin(angle) * ry * jitter))
-	_fill(canvas, points, color)
+	var base: Vector2 = center.floor()
+	var frac: Vector2i = Vector2i(((center - base) * 4.0).round())
+	var key: String = "b%d:%d:%d:%d:%d" % [roundi(rx * 32.0), roundi(ry * 32.0), seed_value, frac.x, frac.y]
+	var mask: Array = _MASKS.get(key, [])
+	if mask.is_empty():
+		var local: Vector2 = Vector2(frac) * 0.25
+		var points: PackedVector2Array = PackedVector2Array()
+		for k: int in 9:
+			var angle: float = TAU * float(k) / 9.0 + 0.4
+			var jitter: float = 0.86 + 0.2 * fposmod(sin(float(seed_value * 17 + k) * 12.9898) * 43758.5453, 1.0)
+			points.append(local + Vector2(cos(angle) * rx * jitter, sin(angle) * ry * jitter))
+		mask = _mask(_spans(points))
+		_MASKS[key] = mask
+	if mask[0] != null:
+		canvas.draw_texture(mask[0] as Texture2D, base + Vector2(mask[1] as Vector2i), color)
 
 
 func _oval(canvas: Node2D, center: Vector2, radius: Vector2, color: Color) -> void:
-	for y: int in range(-ceili(radius.y), ceili(radius.y) + 1):
-		var q: float = float(y) / maxf(radius.y, 0.01)
-		if absf(q) > 1.0:
-			continue
-		var w: int = floori(sqrt(1.0 - q * q) * radius.x)
-		canvas.draw_rect(Rect2((center + Vector2(-w, y)).round(), Vector2(w * 2 + 1, 1)), color)
+	var key: String = "o%d:%d" % [roundi(radius.x * 32.0), roundi(radius.y * 32.0)]
+	var mask: Array = _MASKS.get(key, [])
+	if mask.is_empty():
+		var rows: Array[Vector3i] = []
+		for y: int in range(-ceili(radius.y), ceili(radius.y) + 1):
+			var q: float = float(y) / maxf(radius.y, 0.01)
+			if absf(q) > 1.0:
+				continue
+			var w: int = floori(sqrt(1.0 - q * q) * radius.x)
+			rows.append(Vector3i(-w, y, w * 2 + 1))
+		mask = _mask(rows)
+		_MASKS[key] = mask
+	if mask[0] != null:
+		canvas.draw_texture(mask[0] as Texture2D, center.round() + Vector2(mask[1] as Vector2i), color)
+
+
+## The pixel rows (x, y, width) `_fill` would draw for `points` (relative coordinates).
+static func _spans(points: PackedVector2Array) -> Array[Vector3i]:
+	var rows: Array[Vector3i] = []
+	var low: float = INF
+	var high: float = -INF
+	for point: Vector2 in points:
+		low = minf(low, point.y)
+		high = maxf(high, point.y)
+	for y: int in range(floori(low), ceili(high) + 1):
+		var scan: float = float(y) + 0.5
+		var left: float = INF
+		var right: float = -INF
+		for k: int in points.size():
+			var a: Vector2 = points[k]
+			var b: Vector2 = points[(k + 1) % points.size()]
+			if (a.y <= scan and b.y > scan) or (b.y <= scan and a.y > scan):
+				var x: float = a.x + (scan - a.y) / (b.y - a.y) * (b.x - a.x)
+				left = minf(left, x)
+				right = maxf(right, x)
+		if left <= right:
+			var from_x: float = roundf(left)
+			rows.append(Vector3i(int(from_x), y, int(maxf(1.0, roundf(right) - from_x))))
+	return rows
+
+
+## [white mask texture (null when empty), its top-left offset] for rows (x, y, width).
+static func _mask(rows: Array[Vector3i]) -> Array:
+	if rows.is_empty():
+		return [null, Vector2i.ZERO]
+	var lo: Vector2i = Vector2i(rows[0].x, rows[0].y)
+	var hi: Vector2i = lo
+	for row: Vector3i in rows:
+		lo = Vector2i(mini(lo.x, row.x), mini(lo.y, row.y))
+		hi = Vector2i(maxi(hi.x, row.x + row.z), maxi(hi.y, row.y + 1))
+	var image: Image = Image.create(hi.x - lo.x, hi.y - lo.y, false, Image.FORMAT_RGBA8)
+	for row: Vector3i in rows:
+		image.fill_rect(Rect2i(row.x - lo.x, row.y - lo.y, row.z, 1), Color.WHITE)
+	return [ImageTexture.create_from_image(image), lo]
 
 
 func _seg(canvas: Node2D, from: Vector2, to: Vector2, width_from: float, width_to: float, color: Color) -> void:

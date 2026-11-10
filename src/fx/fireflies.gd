@@ -8,6 +8,8 @@ const COUNT: int = 56
 const MARGIN: float = 40.0 ## px outside the screen where a firefly may still live
 const NEAR_FLORA: float = 0.7 ## share that hovers around a glowing plant
 const COLORS: Array[Color] = [Color("a4fff0"), Color("d6ffe6"), Color("a4fff0"), Color("f6dc8c")]
+const WITCH_COLORS: Array[Color] = [Color("a8ff6a"), Color("eaffc4"), Color("a8ff6a"), Color("c690ec")] ## in the Hexenwald: witch green, now and then violet
+const WITCH_DUSK: float = 0.45 ## the Hexenwald never gets light: its flies keep this much of the night by day (BiomeBlend at the view's middle)
 const NEIGHBORS: Array[Vector2] = [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]
 const DIAGONALS: Array[Vector2] = [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]
 
@@ -52,7 +54,7 @@ func _process(delta: float) -> void:
 	visible = (interiors == null or not interiors.local_inside()) and (mines == null or not mines.local_inside())
 	if not visible:
 		return
-	var night: float = TimeManager.night_amount()
+	var night: float = _night_here()
 	visible = night > 0.02
 	if not visible:
 		return
@@ -66,6 +68,10 @@ func _process(delta: float) -> void:
 		if not rect.grow(MARGIN).has_point(fly.home):
 			_respawn(fly, rect)
 	queue_redraw()
+
+
+func _night_here() -> float:
+	return maxf(TimeManager.night_amount(), WITCH_DUSK * BiomeBlend.amount_at(_view_rect().get_center()))
 
 
 func _view_rect() -> Rect2:
@@ -87,10 +93,13 @@ func _respawn(fly: Fly, rect: Rect2) -> void:
 		fly.home = _flora[randi() % _flora.size()] + Vector2(randf_range(-12.0, 12.0), randf_range(-10.0, 4.0))
 	else:
 		fly.home = rect.position + Vector2(randf() * rect.size.x, randf() * rect.size.y)
+	var witch: bool = BiomeBlend.amount_at(fly.home) > 0.5
+	if witch != WITCH_COLORS.has(fly.color):
+		fly.color = (WITCH_COLORS if witch else COLORS)[randi() % 4]
 
 
 func _draw() -> void:
-	var night: float = TimeManager.night_amount()
+	var night: float = _night_here()
 	for fly: Fly in _flies:
 		if fly.home.x == INF:
 			continue

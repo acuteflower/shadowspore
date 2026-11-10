@@ -6,6 +6,9 @@ extends Node2D
 ## behind diagonal/slanted trunks along their entire length.
 const TEXTURE: Texture2D = preload("res://assets/props/fallen_logs.png")
 const GLOW: Texture2D = preload("res://assets/props/fallen_logs_glow.png")
+const BONE_TEXTURE: Texture2D = preload("res://assets/props/fallen_logs_bone.png") ## frames 24-47: the same trunks as dead Bleichbaum wood (the Hexenwald)
+const BONE_GLOW: Texture2D = preload("res://assets/props/fallen_logs_bone_glow.png")
+const FRAMES: int = 24 ## per sheet
 const FRAME_W: int = 112
 const FRAME_H: int = 80
 const BAND_H: int = 1
@@ -32,16 +35,16 @@ func setup(at: Vector2, index: int, world: WorldLevel = null) -> void:
 	frame = index
 	level = world
 	key = "l:%d,%d" % [roundi(at.x), roundi(at.y)]
-	_spec = (DataRegistry.table("fallen_logs").frames as Array)[index]
+	_spec = (DataRegistry.table("fallen_logs").frames as Array)[index % FRAMES]
 
 static func _get_or_create_bands(idx: int) -> Array[Dictionary]:
 	if _bands_cache.has(idx):
 		return _bands_cache[idx] as Array[Dictionary]
 	var result: Array[Dictionary] = []
 	var col: int = idx % 8
-	var row: int = idx / 8
-	var img: Image = TEXTURE.get_image()
-	var glow_img: Image = GLOW.get_image()
+	var row: int = (idx % FRAMES) / 8
+	var img: Image = (BONE_TEXTURE if idx >= FRAMES else TEXTURE).get_image()
+	var glow_img: Image = (BONE_GLOW if idx >= FRAMES else GLOW).get_image()
 	for y: int in range(0, FRAME_H, BAND_H):
 		var h: int = mini(BAND_H, FRAME_H - y)
 		var has_pixels: bool = false
@@ -81,7 +84,8 @@ func _ready() -> void:
 	_shadow.queue_redraw()
 
 	var col: int = frame % 8
-	var row: int = frame / 8
+	var row: int = (frame % FRAMES) / 8
+	var bones: bool = frame >= FRAMES
 	var bands: Array[Dictionary] = _get_or_create_bands(frame)
 	for band_info: Dictionary in bands:
 		var y: int = int(band_info.y)
@@ -92,7 +96,7 @@ func _ready() -> void:
 		band.position = Vector2(0.0, band_bottom)
 
 		var sprite: Sprite2D = Sprite2D.new()
-		sprite.texture = TEXTURE
+		sprite.texture = BONE_TEXTURE if bones else TEXTURE
 		sprite.region_enabled = true
 		sprite.region_rect = Rect2(col * FRAME_W, row * FRAME_H + y, FRAME_W, h)
 		sprite.centered = false
@@ -101,7 +105,7 @@ func _ready() -> void:
 
 		if bool(band_info.glow):
 			var emission: Sprite2D = Sprite2D.new()
-			emission.texture = GLOW
+			emission.texture = BONE_GLOW if bones else GLOW
 			emission.region_enabled = true
 			emission.region_rect = sprite.region_rect
 			emission.centered = false
@@ -151,9 +155,10 @@ func _draw_shadow() -> void:
 	var b: Vector2 = Vector2(float(_spec.b[0]), float(_spec.b[1]))
 	_shadow.draw_line(a, b, Color(0.025, 0.018, 0.04, 0.25), 10.0)
 
-## Harvest rules (data/harvest.json "fallen_log"): the axe chops it up, then it is gone for good (logs do not grow back).
+## Harvest rules (data/harvest.json "fallen_log", the Hexenwald's bleached trunks "fallen_bone_log"): the axe chops it up, then it is gone
+## for good (logs do not grow back).
 func spec() -> Dictionary:
-	return DataRegistry.table("harvest").get("fallen_log", {}) as Dictionary
+	return DataRegistry.table("harvest").get("fallen_bone_log" if frame >= FRAMES else "fallen_log", {}) as Dictionary
 
 
 func is_depleted() -> bool:

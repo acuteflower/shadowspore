@@ -47,6 +47,10 @@ var _ring: Sprite2D ## the leg ring of a registered bird (tools/art_pet_marks.py
 var rider: int = 0 ## peer of the player whose shoulder it sits on (0 = none), set by `_ride` on every peer
 var companion_peer: int = 0 ## host: the player this bird is the companion of: it does not flee from anyone
 var territory: Vector2 = Vector2.INF ## host: the place of a registered bird right now (PetSchedule): its walks lean towards it
+var witch: bool = false ## host: it lives in the Hexenwald (set by CorvidPopulation): sits closer to its flock, and one bird of a flock now and then shadows a walker
+var _observe_peer: int = 0 ## host: the player this bird is shadowing (0 = none), see `_observe`
+var _observe_hops: int = 0
+var _observe_cool: float = 0.0
 var _calls: Array[AudioStream] = []
 
 @onready var _sprite: Sprite2D = $Sprite2D
@@ -129,6 +133,7 @@ func _physics_process(delta: float) -> void:
 	_call_pose = maxf(0.0, _call_pose - delta)
 	_caution_left = maxf(0.0, _caution_left - delta)
 	if multiplayer.is_server():
+		_observe_cool = maxf(0.0, _observe_cool - delta)
 		_sense_left -= delta
 		if _sense_left <= 0.0:
 			_sense_left = float(_spec["sense_interval"])
@@ -337,7 +342,7 @@ func _sense() -> void:
 func _think() -> void:
 	if _panic_delay >= 0.0:
 		return
-	if _danger or _caution_left > 0.0:
+	if _danger or (_caution_left > 0.0 and (_pet == null or not _pet.trusting())):
 		if _elapsed >= _duration and state != State.WATCH:
 			_set_mood(State.WATCH, _range("watch_seconds"))
 		return
@@ -353,6 +358,8 @@ func _think() -> void:
 			return
 		_set_mood(State.ROOST, _range("roost_seconds"))
 		return
+	if witch and _observe():
+		return
 	if not _perch_path.is_empty():
 		if _rng.randf() < 0.6:
 			_set_mood(State.PREEN if _rng.randf() < 0.45 else State.WATCH, _range("preen_seconds"))
@@ -362,7 +369,7 @@ func _think() -> void:
 	var neighbours: Array[Node] = get_tree().get_nodes_in_group("corvids")
 	for node: Node in neighbours:
 		var other: WildCorvid = node as WildCorvid
-		if other != self and other.state != State.FLY and other._height < 1.0 and global_position.distance_to(other.global_position) < float(_spec["personal_space"]):
+		if other != self and other.state != State.FLY and other._height < 1.0 and global_position.distance_to(other.global_position) < float(_witch_value("personal_space", _spec["personal_space"])):
 			if other.species == "raven" or species == "crow":
 				_walk((global_position - other.global_position).normalized())
 				return
@@ -372,12 +379,94 @@ func _think() -> void:
 			return
 	if roll < 0.45:
 		var center: Vector2 = _flock_center()
-		var direction: Vector2 = (center - global_position).normalized() if global_position.distance_to(center) > 80.0 else Vector2.from_angle(_rng.randf() * TAU)
+		var direction: Vector2 = (center - global_position).normalized() if global_position.distance_to(center) > float(_witch_value("flock_pull", 80.0)) else Vector2.from_angle(_rng.randf() * TAU)
 		_walk(direction)
 	elif roll < 0.45 + float(_spec["social_chance"]) and _socialise(neighbours):
 		return
 	else:
 		_set_mood(State.PECK if _rng.randf() < 0.72 else State.PREEN, _range("peck_seconds"))
+
+
+## A number of the species' `witch_forest` block (data/wildlife.json) while this bird lives in the Hexenwald, else `fallback`.
+func _witch_value(key: String, fallback: Variant) -> Variant:
+	if witch:
+		return (_spec.get("witch_forest", {}) as Dictionary).get(key, fallback)
+	return fallback
+
+
+## Host, Hexenwald only: the crows there watch whoever walks through their wood. One bird of a flock picks a walker who comes near and
+## flies ahead of her in hops, lands on a branch or the ground in front of her (never closer than it dares) and watches her pass; after a
+## few hops, or when she is far from its home, it flies back to its flock and rests from it a while. Spec: `witch_forest.observe`.
+func _observe() -> bool:
+	var cfg: Dictionary = _witch_value("observe", {}) as Dictionary
+	if cfg.is_empty() or companion_peer != 0 or rider != 0 or offered_peer != 0:
+		return false
+	if _observe_peer == 0:
+		if _observe_cool > 0.0 or _rng.randf() > float(cfg.get("chance", 0.2)):
+			return false
+		for node: Node in get_tree().get_nodes_in_group("corvids"):
+			var other: WildCorvid = node as WildCorvid
+			if other != self and other.flock_id == flock_id and other._observe_peer != 0:
+				return false ## one shadow per flock
+		var walker: Player = null
+		for player: Player in Player.all:
+			var d: float = player.global_position.distance_to(global_position)
+			if player.health.current > 0.0 and player.velocity.length() > 10.0 and d < float(cfg.get("notice", 260.0)) and (walker == null or d < walker.global_position.distance_to(global_position)):
+				walker = player
+		if walker == null:
+			return false
+		var hops: Array = cfg.get("hops", [3, 5])
+		_observe_peer = walker.name.to_int()
+		_observe_hops = _rng.randi_range(int(hops[0]), int(hops[1]))
+	var target: Player = null
+	for player: Player in Player.all:
+		if player.name.to_int() == _observe_peer:
+			target = player
+	if target == null or target.health.current <= 0.0 or _observe_hops <= 0 or target.global_position.distance_to(home) > float(cfg.get("leash", 520.0)):
+		var cool: Array = cfg.get("cooldown", [40, 90])
+		_observe_peer = 0
+		_observe_cool = _rng.randf_range(float(cool[0]), float(cool[1]))
+		return _fly_to_spot({"position": _flock_center() + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(10.0, 26.0), "height": 0.0, "path": ""})
+	var from_her: Vector2 = global_position - target.global_position
+	var safe: float = float(_spec["flee_range"]) + 30.0
+	var still: bool = target.velocity.length() < 8.0
+	var ahead: Vector2 = from_her.normalized() if still else target.velocity.normalized()
+	if still or (from_her.dot(ahead) > 30.0 and from_her.length() < 210.0 and from_her.length() > safe):
+		facing = (target.global_position - global_position).angle() ## in front of her, or she stands: it just watches
+		_set_mood(State.WATCH, _range("watch_seconds") * 0.6)
+		return true
+	for attempt: int in 10:
+		var point: Vector2 = target.global_position + ahead * _rng.randf_range(115.0, 170.0) + ahead.orthogonal() * _rng.randf_range(-60.0, 60.0)
+		if point.distance_to(target.global_position) < safe:
+			continue
+		var spot: Dictionary = _population.call("perch_near", self, point, 46.0) if _population.has_method("perch_near") else {}
+		if spot.is_empty() and _can_land(point):
+			spot = {"position": point, "height": 0.0, "path": ""}
+		if not spot.is_empty():
+			_observe_hops -= 1
+			return _fly_to_spot(spot)
+	return false
+
+
+## Host: a flight to a chosen spot (a branch with its `path` and `height`, or the ground), with the usual curve and clearance.
+func _fly_to_spot(destination: Dictionary) -> bool:
+	if state == State.FLY:
+		return false
+	var goal: Vector2 = destination["position"]
+	var dist: float = global_position.distance_to(goal)
+	if dist < 6.0:
+		return false
+	if String(destination["path"]).is_empty() and _population.has_method("release_perch"):
+		_population.call("release_perch", self) ## (a branch from perch_near is already claimed for this bird)
+	var bend: Vector2 = (goal - global_position).orthogonal().normalized() * _rng.randf_range(-1.0, 1.0) * minf(60.0, dist * 0.2)
+	if _population.has_method("route_bend"):
+		bend = _population.call("route_bend", global_position, goal, bend)
+	var cruise: float = maxf(float(_spec["flight_height"]), maxf(_height, float(destination["height"])) + float(_spec["flight_clearance"]))
+	if _population.has_method("flight_clearance"):
+		cruise = maxf(cruise, float(_population.call("flight_clearance", global_position, goal, bend)))
+	var duration: float = maxf(float(_spec["flight_seconds_min"]), (dist + bend.length() * 0.7) / float(_spec["flight_speed"]))
+	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, float(destination["height"]), cruise, String(destination["path"]), 0.0)
+	return true
 
 
 func _flock_center() -> Vector2:

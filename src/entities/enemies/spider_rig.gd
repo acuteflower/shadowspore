@@ -103,6 +103,7 @@ var _body_offset: Vector2 = Vector2(0, -BODY_HEIGHT)
 var _climb_start: Vector2
 var _climb_end: Vector2
 var _climb_grip: Vector2
+var _clock: RigClock = RigClock.new()
 
 @onready var _back: Node2D = $Back
 @onready var _body: Sprite2D = $Body
@@ -168,6 +169,9 @@ func hit_flash() -> void:
 
 ## Call every frame on every peer.
 func update_rig(delta: float, velocity: Vector2, heading: float) -> void:
+	delta = _clock.step(self, delta, velocity.length()) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
+	if delta < 0.0:
+		return
 	_time += delta
 	_heading = heading
 	_yaw = _noise.get_noise_2d(_time * 0.6, 3.0) * 0.12

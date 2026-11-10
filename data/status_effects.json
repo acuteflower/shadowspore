@@ -17,5 +17,68 @@
   "min_damage": 0,
   "color": "ff4fd8",
   "hot": "fff0fb"
+ },
+ "hallucinated": {
+  "name": "HALLUZINIERT",
+  "seconds": 8.0,
+  "tick": 99.0,
+  "damage_ratio": 0.0,
+  "min_damage": 0,
+  "color": "a8ff6a",
+  "hot": "eaffc4",
+  "permanent": true,
+  "glyph": "eye",
+  "min_gloom": 0.35,
+  "trug_seconds": 45.0,
+  "eyes": [
+   3.0,
+   8.0
+  ],
+  "whisper": [
+   6.0,
+   15.0
+  ],
+  "decoy": [
+   14.0,
+   32.0
+  ],
+  "lie": [
+   12.0,
+   28.0
+  ],
+  "phantom": [
+   7.0,
+   18.0
+  ]
+ },
+ "glutatem": {
+  "name": "GLUTATEM",
+  "seconds": 30.0,
+  "tick": 99.0,
+  "damage_ratio": 0.0,
+  "min_damage": 0,
+  "color": "ffb347",
+  "hot": "fff0b0",
+  "glyph": "spark"
+ },
+ "wound_pause": {
+  "name": "WUNDPAUSE",
+  "seconds": 10.0,
+  "tick": 99.0,
+  "damage_ratio": 0.0,
+  "min_damage": 0,
+  "color": "ff6f8e",
+  "hot": "ffd0dc",
+  "glyph": "drop"
+ },
+ "food_pause": {
+  "name": "ESSPAUSE",
+  "seconds": 3.0,
+  "tick": 99.0,
+  "damage_ratio": 0.0,
+  "min_damage": 0,
+  "color": "8ad48a",
+  "hot": "e0ffe0",
+  "hidden": true
  }
 }

@@ -72,6 +72,7 @@ var _rings: Array[Dictionary] = [] ## {p: world, age, life, power}
 var _drops: Array[Dictionary] = [] ## {p: world, h, vh, v, age, life}
 var _ring_clock: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _clock: RigClock = RigClock.new()
 
 @onready var _under_canvas: Node2D = $Under
 @onready var _ring_canvas: Node2D = $Ring
@@ -180,6 +181,9 @@ func add_ring(world_point: Vector2, power: float = 1.0, life: float = 0.9) -> vo
 ## Called every frame by the creature: `velocity` for the wake, `heading` the facing, `lure_vec` the ground vector from the body to where the lantern wants to hang,
 ## `light` 0..1 (the night), `aware` 0..1 (how awake the eyes are), `over_water` whether the lantern hangs above the water (it has a reflection then).
 func update_rig(delta: float, velocity: Vector2, heading: float, lure_vec: Vector2, light: float, aware: float, over_water: bool) -> void:
+	delta = _clock.step(self, delta, velocity.length()) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
+	if delta < 0.0:
+		return
 	_time += delta
 	_elapsed += delta
 	_heading = heading

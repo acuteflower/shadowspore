@@ -3,7 +3,8 @@ extends MultiMeshInstance2D
 ## Tiny decorative ground cover. One batched draw per streamed chunk, no physics,
 ## interaction, loot, individual processing or persistent state.
 const SIZE: Vector2i = Vector2i(16, 20)
-const COUNT: int = 26 ## 0-23 grass, flowers, ferns, straw; 24-25 shade moss (forest floors, north slopes, cliff feet)
+const COUNT: int = 30 ## 0-23 grass, flowers, ferns, straw; 24-25 shade moss (forest floors, north slopes, cliff feet); 26-29 the Hexenwald's floor (witch-hair moss, dead leaves, a root arch, bone-white toadstools)
+const MEADOW_COUNT: int = 26 ## what the meadow draws from (the Hexenwald's kinds are chosen on purpose, see WorldLevel._detail_candidate)
 const WIND: Shader = preload("res://assets/shaders/meadow_details.gdshader")
 static var _atlas: ImageTexture
 var _wind: ShaderMaterial
@@ -233,6 +234,8 @@ static func _extra_plant(im: Image,v: int,dark: Color,stem: Color,leaf: Color,ti
 			if v==23:
 				_pixel(im,v,x-1,y-1,Color("6f6269"))
 				_pixel(im,v,x,y-2,Color("9c927a"))
+	elif v >= 26:
+		_witch_floor(im, v)
 	else: # shade moss: 24 low cushions in dark teal-green lit from the top left, 25 a flat mat with thin spore stalks
 		var moss: Array[Color] = [Color("1d3d34"),Color("28503f"),Color("346b49"),Color("55985f"),Color("86bc7a")]
 		if v == 24:
@@ -251,3 +254,44 @@ static func _extra_plant(im: Image,v: int,dark: Color,stem: Color,leaf: Color,ti
 				_line(im,v,Vector2i(stalk.x,17),stalk,moss[2])
 				_pixel(im,v,stalk.x,stalk.y-1,Color("c4cc9a"))
 
+
+## The Hexenwald's ground cover (docs/hexenwald_leben_konzept.md), in its own cold colours (WorldLevel tints them only a little):
+## 26 a cushion of grey witch-hair moss with violet shade, 27 a drift of dead leaves (wine, rust, umber), 28 a black root arching out of
+## the ground, 29 three tiny bone-white toadstools.
+static func _witch_floor(im: Image, v: int) -> void:
+	match v:
+		26:
+			var moss: Array[Color] = [Color("26124a"), Color("1e3038"), Color("34504e"), Color("557468"), Color("86a08a")]
+			for mound: Vector2i in [Vector2i(5,17),Vector2i(10,16),Vector2i(8,18)]:
+				for dy: int in range(-3,2):
+					for dx: int in range(-4,5):
+						if pow(dx/4.4,2.0)+pow(dy/2.6,2.0) > 1.0: continue
+						var lit: float = -0.5*dx-0.9*dy+float((dx*7+dy*3+mound.x)%3)*0.4
+						_pixel(im,v,mound.x+dx,mound.y+dy,moss[0 if lit < -1.8 else (4 if lit > 3.0 else (3 if lit > 1.2 else (2 if lit > -0.6 else 1)))])
+			for strand: Vector2i in [Vector2i(3,15),Vector2i(12,14)]: ## a few hairs stand up from it
+				_line(im,v,Vector2i(strand.x,strand.y+2),strand,Color("557468"))
+		27:
+			var leaves: Array[Color] = [Color("5a2430"), Color("8e3a3a"), Color("6a4e42"), Color("927460"), Color("5a4a6a")]
+			for i: int in 9:
+				var at: Vector2i = Vector2i(2 + (i * 5) % 12, 15 + (i * 3) % 4)
+				var c: Color = leaves[(i * 2 + 1) % leaves.size()]
+				_pixel(im,v,at.x,at.y,c)
+				_pixel(im,v,at.x+1,at.y,c.darkened(0.25))
+				_pixel(im,v,at.x,at.y-1,c.lightened(0.18))
+			_line(im,v,Vector2i(4,18),Vector2i(9,16),Color("2c2236")) ## a twig
+		28:
+			var root: Array[Color] = [Color("0c0812"), Color("1a1322"), Color("2c2236"), Color("44344c")]
+			for x: int in range(2, 15):
+				var t: float = float(x - 2) / 12.0
+				var y: int = 18 - int(round(sin(t * PI) * 5.0))
+				_pixel(im,v,x,y,root[2] if t < 0.5 else root[1])
+				_pixel(im,v,x,y+1,root[0])
+				if t > 0.2 and t < 0.6:
+					_pixel(im,v,x,y-1,root[3])
+			_pixel(im,v,8,13,Color("7a9488")) ## lichen on its back
+		29:
+			for cap: Vector3i in [Vector3i(5,14,2),Vector3i(9,12,3),Vector3i(12,15,2)]:
+				_line(im,v,Vector2i(cap.x,18),Vector2i(cap.x,cap.y+1),Color("b8b4b8"))
+				for dx: int in range(-cap.z/2, cap.z/2+1):
+					_pixel(im,v,cap.x+dx,cap.y,Color("dedacc") if dx <= 0 else Color("8a8698"))
+				_pixel(im,v,cap.x,cap.y-1,Color("f6f2e0"))

@@ -27,6 +27,24 @@ const EYE: Array[String] = [
 	".....",
 ]
 
+const SPARK: Array[String] = [
+	"..#..",
+	"#.#.#",
+	".###.",
+	"#####",
+	".###.",
+	"#.#.#",
+]
+
+const DROP: Array[String] = [
+	"..#..",
+	"..#..",
+	".###.",
+	"#####",
+	"#####",
+	".###.",
+]
+
 var _effects: StatusEffects
 var _time: float = 0.0
 var _shown: Dictionary = {} ## id -> 0..1 (how far its tag has dropped in)
@@ -51,6 +69,8 @@ func _process(delta: float) -> void:
 	var any: bool = false
 	var ids: Array[String] = _effects.active()
 	for id: String in ids:
+		if bool(StatusEffects.definition(id).get("hidden", false)):
+			continue ## shown elsewhere (the food pause is a ring on the hotbar)
 		var left: float = _effects.left(id)
 		if left > float(_last_left.get(id, 0.0)) + 0.2 and not bool(StatusEffects.definition(id).get("permanent", false)): ## a lasting effect is refreshed all the time
 			_flare[id] = 1.0
@@ -59,7 +79,7 @@ func _process(delta: float) -> void:
 		_flare[id] = maxf(float(_flare.get(id, 0.0)) - delta * 3.0, 0.0)
 		any = true
 	for id: String in _shown.keys():
-		if not ids.has(id):
+		if not ids.has(id) or bool(StatusEffects.definition(id).get("hidden", false)):
 			_shown[id] = float(_shown[id]) - delta * 5.0
 			if float(_shown[id]) <= 0.0:
 				_shown.erase(id)
@@ -96,11 +116,22 @@ func _draw() -> void:
 		var y: int = int(roundf((1.0 - VineStyle.back_out(p)) * -8.0))
 		var a: float = minf(p * 1.5, 1.0)
 		_draw_paper(Rect2i(x, y, width, TAG_H), a, void_level, tone)
-		_draw_glyph(Vector2i(x + 4, y + 4), tone.lerp(hot, 0.4 + 0.5 * flare), a * stutter, EYE if String(def.get("glyph", "")) == "eye" else GLYPH)
+		_draw_glyph(Vector2i(x + 4, y + 4), tone.lerp(hot, 0.4 + 0.5 * flare), a * stutter, _glyph_of(String(def.get("glyph", ""))))
 		PixelText.draw(self, label, Vector2i(x + 13, y + 3), Color(tone.lerp(UiStyle.TEXT, 0.35 + 0.4 * flare), a * stutter), Color(VineStyle.OUTLINE, a))
 		_draw_crack(x + 4, y + 12, width - 8, frac, tone, hot, a * stutter, flare)
 		VineStyle.leaf(self, Vector2(x + width - 2, y + 2), 1, -1, 3, Color(VineStyle.LEAF.lerp(VineStyle.LEAF_VOID, void_level), a), Color(VineStyle.LEAF_LIGHT.lerp(VineStyle.LEAF_VOID_LIGHT, void_level), a))
 		x += width + GAP
+
+
+func _glyph_of(glyph: String) -> Array[String]:
+	match glyph:
+		"eye":
+			return EYE
+		"spark":
+			return SPARK
+		"drop":
+			return DROP
+	return GLYPH
 
 
 func _draw_glyph(at: Vector2i, color: Color, a: float, shape: Array[String] = GLYPH) -> void:

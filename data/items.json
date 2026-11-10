@@ -987,5 +987,155 @@
    ]
   },
   "description": "Zwei Splitter Fluchsilber an einem Hexenknoten. Der Wald lügt weiter. Du hörst nur nicht mehr hin."
+ },
+ "potion_heal_1": {
+  "name": "Trüber Wundtau",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_1.png",
+  "potion": {
+   "type": "heal",
+   "tier": 1
+  },
+  "description": "Esmas Heiltrank, Stufe I. Heilt sofort 20 % deiner Gesundheit (mindestens 20). Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_2": {
+  "name": "Klarer Wundtau",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_2.png",
+  "potion": {
+   "type": "heal",
+   "tier": 2
+  },
+  "description": "Esmas Heiltrank, Stufe II. Heilt sofort 30 % deiner Gesundheit (mindestens 30). Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_3": {
+  "name": "Leuchtender Wundtau",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_3.png",
+  "potion": {
+   "type": "heal",
+   "tier": 3
+  },
+  "description": "Esmas Heiltrank, Stufe III. Heilt sofort 40 % deiner Gesundheit (mindestens 45). Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_4": {
+  "name": "Strahlender Wundtau",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_4.png",
+  "potion": {
+   "type": "heal",
+   "tier": 4
+  },
+  "description": "Esmas Heiltrank, Stufe IV. Heilt sofort 55 % deiner Gesundheit (mindestens 60). Löscht Verbrennen. Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_heal_5": {
+  "name": "Wundtau-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_heal_5.png",
+  "potion": {
+   "type": "heal",
+   "tier": 5
+  },
+  "description": "Esmas Heiltrank, Stufe V. Heilt sofort 70 % deiner Gesundheit (mindestens 80). Löscht Verbrennen, was zu viel ist, wird Überheilung. Danach wirkt 10 Sekunden lang kein weiterer Heiltrank."
+ },
+ "potion_stamina_1": {
+  "name": "Trüber Glutatem",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_1.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 1
+  },
+  "description": "Esmas Ausdauertrank, Stufe I. 30 Sekunden lang 3 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst."
+ },
+ "potion_stamina_2": {
+  "name": "Klarer Glutatem",
+  "kind": "potion",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_2.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 2
+  },
+  "description": "Esmas Ausdauertrank, Stufe II. 30 Sekunden lang 5 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst."
+ },
+ "potion_stamina_3": {
+  "name": "Leuchtender Glutatem",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_3.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 3
+  },
+  "description": "Esmas Ausdauertrank, Stufe III. 30 Sekunden lang 7 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst."
+ },
+ "potion_stamina_4": {
+  "name": "Strahlender Glutatem",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_4.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 4
+  },
+  "description": "Esmas Ausdauertrank, Stufe IV. 30 Sekunden lang 9 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst. Die Pause vor dem Nachladen ist um ein Viertel kürzer."
+ },
+ "potion_stamina_5": {
+  "name": "Glutatem-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_stamina_5.png",
+  "potion": {
+   "type": "stamina",
+   "tier": 5
+  },
+  "description": "Esmas Ausdauertrank, Stufe V. 30 Sekunden lang 12 Ausdauer jede Sekunde, auch während du rennst oder zuschlägst. Die Pause vor dem Nachladen ist halb so lang, Sprinten kostet weniger."
+ },
+ "vial_empty": {
+  "name": "Leere Phiole",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 20,
+  "hotbar": false,
+  "icon": "res://assets/items/vial_empty.png",
+  "description": "Dünnes Glas mit einem Korken. Esma füllt jeden Trank in eine davon."
  }
 }

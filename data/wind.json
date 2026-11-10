@@ -3,5 +3,5 @@
  "air_budget": 8,
  "air_spawn_gap": [1.8, 4.6],
  "exposure": {"meadow": 1.0, "mist_forest": 0.56, "glass_cliffs": 1.15, "sunken_ruins": 0.72, "void_bloom": 0.65, "witch_forest": 0.5},
- "detail_density": {"meadow": 0.63, "mist_forest": 0.54, "glass_cliffs": 0.16, "sunken_ruins": 0.30, "void_bloom": 0.23, "witch_forest": 0.3}
+ "detail_density": {"meadow": 0.63, "mist_forest": 0.54, "glass_cliffs": 0.16, "sunken_ruins": 0.30, "void_bloom": 0.23, "witch_forest": 0.95}
 }

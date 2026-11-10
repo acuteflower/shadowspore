@@ -1,9 +1,12 @@
 """Fallen trunks rendered with the game's existing tree/knight/hut pixel renderer.
 Three models in eight baked facings, no rotated/filtered sprites at runtime.
 python3 tools/art_fallen_logs.py -> fallen_logs.png, _glow.png, fallen_logs.json
+python3 tools/art_fallen_logs.py bone -> fallen_logs_bone.png, _glow.png: the same three models as dead Bleichbaum trunks of the Hexenwald
+  (bone-white wood, violet-black fissures, grey witch-hair moss, violet shelf fungi with a witch-green rim; FallenLog frames 24-47).
 """
 import json
 import math
+import sys
 import numpy as np
 import art_hero3d as h
 from gen_art import ROOT, CLEAR, hexc, write_png
@@ -19,6 +22,19 @@ h.RAMPS += [[hexc(c) for c in row] for row in [
  ['150f0e','2a1f1a','42332a','685344'],
  ['34283c','55435a','85697a','b09690'],
  ['1a4a52','2f8a8c','6ae0d2','9af0dc']]]
+RIM_GLOW = h.TEAL
+BONE_LOGS = len(sys.argv) > 1 and sys.argv[1] == 'bone'
+if BONE_LOGS:  # the Hexenwald's palette (tools/art_hexenwald.py BONE, HAIR, HOOD, witch green) on the same models
+    h.RAMPS[BARK:BARK+7] = [[hexc(c) for c in row] for row in [
+     ['56506c','8a8698','b8b4b8','dedacc'],
+     ['120c1c','2e2a44','44344c','56506c'],
+     ['8a7480','b8a4a4','dedacc','f6f2e0'],
+     ['1e3038','34504e','557468','86a08a'],
+     ['16121e','1e1828','2a2234','3a2e40'],
+     ['8a8698','b8b4b8','dedacc','f6f2e0'],
+     ['4a2a7a','9458cc','c690ec','ecdcff']]]
+    h.RAMPS.append([hexc(c) for c in ['2a5a2a','4a9a3a','a8ff6a','eaffc4']])
+    RIM_GLOW = len(h.RAMPS) - 1
 V=lambda *p: np.array(p,float)
 
 def build(variant):
@@ -155,14 +171,14 @@ def build(variant):
         a=surf(x,70,.7)
         m.ell(a+V(0,-.5,0),(2.4,.8,1.65),GROOVE)
         m.ell(a+V(0,.1,.6),(2.8,.55,1.9),SHELF,kind='emit')
-        m.ell(a+V(.2,.35,.8),(2.4,.25,1.5),h.TEAL,kind='emit')
+        m.ell(a+V(.2,.35,.8),(2.4,.25,1.5),RIM_GLOW,kind='emit')
         m.ell(a+V(.9,-1.65,1.1),(1.8,.4,1.35),SHELF,kind='emit')
     return m,half
 
 sheet=[[CLEAR]*(112*8) for _ in range(80*3)]
 glow=[[CLEAR]*(112*8) for _ in range(80*3)]
 metadata=[]
-glow_colors={hexc(c) for mat in [h.TEAL,h.VIOLET,SHELF] for c in ['%02x%02x%02x'%tuple(p[:3]) for p in h.RAMPS[mat]]}
+glow_colors={hexc(c) for mat in [RIM_GLOW,h.VIOLET,SHELF] for c in ['%02x%02x%02x'%tuple(p[:3]) for p in h.RAMPS[mat]]}
 for variant in range(3):
     model,half=build(variant)
     for facing in range(8):
@@ -180,6 +196,11 @@ for variant in range(3):
                 sheet[variant*80+y][facing*112+x]=c
                 if c in glow_colors: glow[variant*80+y][facing*112+x]=c
         print('log',variant,'facing',facing,flush=True)
+if BONE_LOGS:
+    write_png(ROOT/'props'/'fallen_logs_bone.png',896,240,sheet)
+    write_png(ROOT/'props'/'fallen_logs_bone_glow.png',896,240,glow)
+    print('FALLEN LOGS: 24 bleached frames')
+    sys.exit(0)
 write_png(ROOT/'props'/'fallen_logs.png',896,240,sheet)
 write_png(ROOT/'props'/'fallen_logs_glow.png',896,240,glow)
 (ROOT.parent/'data'/'fallen_logs.json').write_text(json.dumps({'frames':metadata,'cell':8,'chance':.42},separators=(',',':'))+'\n')

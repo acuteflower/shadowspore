@@ -117,6 +117,8 @@ func _announce(pet_key: String, peer: int, data: Dictionary, gain: float, up: bo
 func _rpc_bond(pet_key: String, peer: int, bp: float, day: int, fed: int, total: int, gain: float, up: bool) -> void:
 	var table: Dictionary = _bonds.get_or_add(pet_key, {}) as Dictionary
 	table[str(peer)] = {"bp": bp, "day": day, "fed": fed, "total": total}
+	if gain > 0.0: ## a feeding: the client counts the cooldown too (the greyed-out prompt shows it)
+		_cooldown["%s|%d" % [pet_key, peer]] = Time.get_ticks_msec() + int(float((PetRules.table()["feed"] as Dictionary)["cooldown"]) * 1000.0)
 	bond_changed.emit(pet_key, peer, gain, up)
 
 

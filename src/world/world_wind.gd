@@ -119,6 +119,9 @@ func _advance_air(delta: float) -> void:
 			continue
 		var vel: Vector2 = sample(particle.pos as Vector2)* (40.0 if int(particle.kind)==3 else 20.0)
 		vel.y += sin(clock*1.6+float(particle.phase))*3.0-1.0
+		if int(particle.kind) >= 4: ## the Hexenwald: a dead leaf tumbles down from the crowns, ash sinks slowly, both rock from side to side
+			var leaf: bool = int(particle.kind) == 4
+			vel = sample(particle.pos as Vector2) * (8.0 if leaf else 12.0) + Vector2(sin(clock * (2.2 if leaf else 1.1) + float(particle.phase)) * (9.0 if leaf else 4.0), 8.0 if leaf else 3.5)
 		particle.pos = (particle.pos as Vector2)+vel*delta
 	_air_timer -= delta
 	if _air_timer > 0.0: return
@@ -140,6 +143,10 @@ func _advance_air(delta: float) -> void:
 			plant_kind = detail.source_kinds[index]
 			break
 	if not source.is_finite(): return
+	if plant_kind >= MeadowDetails.MEADOW_COUNT or BiomeBlend.amount_at(source) > 0.5: ## the Hexenwald's air: dead leaves from the crowns, now and then ash
+		var leaf: bool = _rng.randf() < 0.7
+		_air.append({"pos":source-Vector2(_rng.randf_range(-12,12),_rng.randf_range(38,80)) if leaf else source-Vector2(0,_rng.randf_range(20,40)),"origin":source,"age":0.0,"life":_rng.randf_range(5.0,8.0),"kind":4 if leaf else 5,"phase":_rng.randf()*TAU,"petal_tint":[Color("5a2430"),Color("8e3a3a"),Color("6a4e42"),Color("927460")][_rng.randi_range(0,3)]})
+		return
 	var kind: int = 0
 	if plant_kind < 4 or plant_kind in [12,13,14,22,23]: kind = 1
 	elif plant_kind in [4,5,6,7,8,15,16,17]: kind = 2
@@ -167,6 +174,15 @@ func _draw() -> void:
 				if i%4==0: continue
 				var p: Vector2 = at-direction*float(i)*1.6+Vector2(0,sin(i*0.35)*2.0)
 				draw_rect(Rect2(p.round(),Vector2.ONE),Color(0.78,0.84,0.76,0.09*alpha))
+		elif kind == 4: ## a tumbling leaf: flat, then on edge, then flat again
+			var leaf_color: Color = particle.get("petal_tint",Color("6a4e42")) as Color
+			leaf_color.a = alpha*0.85
+			var flat: bool = sin(clock*4.0+float(particle.phase)) > -0.3
+			draw_rect(Rect2(at,Vector2(2,1) if flat else Vector2(1,1)),leaf_color)
+			if flat: draw_rect(Rect2(at+Vector2(0,-1),Vector2.ONE),Color(leaf_color.lightened(0.2),alpha*0.6))
+		elif kind == 5: ## ash: a grey flake, once in a while a violet ember in it
+			var ember: bool = sin(clock*1.3+float(particle.phase)*5.0) > 0.92
+			draw_rect(Rect2(at,Vector2.ONE),Color(Color("c690ec") if ember else Color("8a8698"),alpha*(0.9 if ember else 0.55)))
 		else:
 			var color: Color = [Color("8aa772"),Color("bfbc92"),Color("bc9daf")][kind]
 			if kind == 2: color = particle.get("petal_tint",color) as Color

@@ -320,5 +320,195 @@
     "...JA. NOCH EINMAL."
    ]
   }
+ },
+ "witch_counter": {
+  "title": "HEXENSTUBE",
+  "npc": "witch",
+  "role": "witch",
+  "station": "witch_bench",
+  "reach": 170.0,
+  "tabs": [
+   {
+    "id": "buy",
+    "name": "KAUFEN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "VERKAUFEN",
+    "kind": "sell"
+   },
+   {
+    "id": "brew",
+    "name": "ALCHEMIE",
+    "kind": "brew"
+   },
+   {
+    "id": "make",
+    "name": "SCHMIEDEN",
+    "kind": "craft"
+   },
+   {
+    "id": "refine",
+    "name": "VERFEINERN",
+    "kind": "refine"
+   }
+  ],
+  "buy": [
+   {
+    "item": "vial_empty",
+    "price": 4,
+    "trust": 0
+   },
+   {
+    "item": "grave_candle",
+    "price": 12,
+    "trust": 0
+   },
+   {
+    "item": "night_beet",
+    "price": 40,
+    "trust": 0
+   },
+   {
+    "item": "ember_carrot",
+    "price": 30,
+    "trust": 0
+   },
+   {
+    "item": "toad_cap",
+    "price": 30,
+    "trust": 10
+   },
+   {
+    "item": "curse_silver",
+    "price": 60,
+    "trust": 20
+   },
+   {
+    "item": "mandrake",
+    "price": 180,
+    "trust": 40
+   }
+  ],
+  "sell": [
+   {
+    "item": "hag_wood",
+    "price": 4
+   },
+   {
+    "item": "bone_wood",
+    "price": 5
+   },
+   {
+    "item": "hex_thorn",
+    "price": 3
+   },
+   {
+    "item": "hex_berry",
+    "price": 4
+   },
+   {
+    "item": "grave_candle",
+    "price": 5
+   },
+   {
+    "item": "witch_hat",
+    "price": 5
+   },
+   {
+    "item": "ghost_frond",
+    "price": 4
+   },
+   {
+    "item": "toad_cap",
+    "price": 12
+   },
+   {
+    "item": "curse_silver",
+    "price": 25
+   },
+   {
+    "item": "mandrake",
+    "price": 60
+   },
+   {
+    "item": "glow_cap",
+    "price": 6
+   },
+   {
+    "item": "void_bloom",
+    "price": 12
+   },
+   {
+    "item": "void_splinter",
+    "price": 8
+   },
+   {
+    "item": "void_slag",
+    "price": 20
+   },
+   {
+    "item": "shadow_core",
+    "price": 45
+   }
+  ],
+  "lines": {
+   "_note": "PLACEHOLDER name and lines for the dialogue writer (docs/prompts/dialogue_writer.md)",
+   "open": [
+    "WAS DARF ES SEIN?",
+    "KOMM NÄHER.",
+    "ZEIG, WAS DU HAST."
+   ],
+   "craft": [
+    "SCHÖN. ES SUMMT SCHON."
+   ],
+   "order": [
+    "LEG ES HIN."
+   ],
+   "buy": [
+    "GUT GEWÄHLT.",
+    "PASS DARAUF AUF."
+   ],
+   "sell": [
+    "DAS KANN ICH BRAUCHEN.",
+    "HM. NIMM DAS DAFÜR."
+   ],
+   "no_trust": [
+    "NOCH NICHT."
+   ],
+   "missing": [
+    "DA FEHLT ETWAS."
+   ],
+   "refine": [
+    "HALT STILL. NICHT DU, DIE KLINGE."
+   ],
+   "verdict_good": [
+    "DAS WIRD."
+   ],
+   "verdict_risky": [
+    "VIELLEICHT."
+   ],
+   "verdict_bad": [
+    "DAS BEISST."
+   ],
+   "verdict_last": [
+    "EIN LETZTES MAL."
+   ],
+   "brew": [
+    "ES BRODELT. WARTE.",
+    "GUTE BLÄTTER. DAS WIRD."
+   ],
+   "brew_done": [
+    "HIER. NICHT ALLES AUF EINMAL.",
+    "TRINK ES, WENN ES BRENNT."
+   ],
+   "brew_moon": [
+    "DER MOND HAT MITGERÜHRT."
+   ],
+   "brew_intro": [
+    "DU WILLST TRÄNKE? BRING MIR KRAUT UND GLAS, DEN REST MACHE ICH. HIER, FÜNF PHIOLEN FÜR DEN ANFANG."
+   ]
+  }
  }
 }

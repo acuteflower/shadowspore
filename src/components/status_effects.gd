@@ -61,6 +61,11 @@ func total(id: String) -> float:
 	return float((_effects[id] as Dictionary)["total"]) if _effects.has(id) else 0.0
 
 
+## The `scale` it was set with (for a potion: its tier), 0 when it is not on.
+func scale_of(id: String) -> float:
+	return float((_effects[id] as Dictionary)["scale"]) if _effects.has(id) else 0.0
+
+
 func active() -> Array[String]:
 	var out: Array[String] = []
 	for id: String in _effects.keys():
@@ -103,6 +108,8 @@ func _breathe_mist() -> void:
 	var worn: Variant = player.get("talismans")
 	if worn != null and (worn.get("perks") as Dictionary).has("clear_sight"):
 		clear("hallucinated") ## put on: her head clears at once
+	elif Interiors.slot_at(player.global_position) >= 0 or MineManager.in_mine(player.global_position):
+		clear("hallucinated") ## under a roof (the witch's tower) there is no mist: nothing false follows her inside
 	elif BiomeBlend.amount_at(player.global_position) > float(def.get("min_gloom", 0.35)):
 		apply("hallucinated")
 
@@ -126,6 +133,8 @@ func _physics_process(delta: float) -> void:
 		if is_host and health != null and health.current > 0.0:
 			entry["acc"] = float(entry["acc"]) + delta
 			var tick: float = float(def.get("tick", 0.5))
+			if float(def.get("damage_ratio", 0.02)) <= 0.0 and float(def.get("min_damage", 1.0)) <= 0.0:
+				tick = INF ## a harmless effect (a pause, a potion) never ticks damage
 			while float(entry["acc"]) >= tick:
 				entry["acc"] = float(entry["acc"]) - tick
 				var least: float = float(def.get("min_damage", 1.0))

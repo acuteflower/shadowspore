@@ -307,20 +307,69 @@ func _use(index: int) -> bool:
 	var stack: Dictionary = slots[index]
 	var def: Dictionary = Items.definition(stack)
 	var player: Player = get_parent() as Player
-	if stack.is_empty() or String(def.get("kind", "")) != "consumable" or player == null:
+	if stack.is_empty() or player == null:
 		return false
-	var stats: Dictionary = def.get("stats", {})
-	var heals: bool = float(stats.get("heal", 0)) + float(stats.get("regen", 0)) > 0.0
-	if heals and not player.health.can_heal():
+	if not usable(player, def):
 		return false
-	if float(stats.get("heal", 0)) > 0.0:
-		player.health.heal(float(stats.heal))
-	if stats.has("regen"):
-		player.health.regen(float(stats.regen), float(stats.get("regen_seconds", 5)))
+	var kind: String = String(def.get("kind", ""))
+	if kind == "consumable":
+		var stats: Dictionary = def.get("stats", {})
+		if float(stats.get("heal", 0)) > 0.0:
+			player.health.heal(float(stats.heal))
+		if stats.has("regen"):
+			player.health.regen(float(stats.regen), float(stats.get("regen_seconds", 5)))
+	elif kind == "potion":
+		_drink(player, AlchemyRules.of(stack))
+	else:
+		return false
+	var pause: String = AlchemyRules.pause_effect(def)
+	if pause != "" and player.effects != null:
+		player.effects.apply(pause, AlchemyRules.pause("heal" if pause == "wound_pause" else "food"))
 	stack["count"] = int(stack["count"]) - 1
 	if int(stack["count"]) <= 0:
 		slots[index] = {}
 	return true
+
+
+## True while `player` may use an item of this definition now: something to heal (healing items are kept at full health), no pause running.
+## The owner asks it before the animation starts, the host again before anything is taken.
+static func usable(player: Player, def: Dictionary) -> bool:
+	var kind: String = String(def.get("kind", ""))
+	if kind != "consumable" and kind != "potion":
+		return false
+	var pause: String = AlchemyRules.pause_effect(def)
+	if pause != "" and player.effects != null and player.effects.has(pause):
+		return false
+	if kind == "consumable":
+		var stats: Dictionary = def.get("stats", {})
+		return not (float(stats.get("heal", 0)) + float(stats.get("regen", 0)) > 0.0 and not player.health.can_heal())
+	var info: Dictionary = def.get("potion", {}) as Dictionary
+	if String(info.get("type", "")) == "heal":
+		var level: int = int(info.get("tier", 1))
+		var burning: bool = false
+		for effect: Variant in AlchemyRules.cleanses("heal", level):
+			burning = burning or (player.effects != null and player.effects.has(String(effect)))
+		var room: bool = player.health.can_heal() if AlchemyRules.overheals(level) else (player.health.current > 0.0 and player.health.current < player.health.max_health - 0.01)
+		return room or burning
+	return player.health.current > 0.0
+
+
+## Host: a potion takes effect (Wundtau heals at once and may put out burning, Glutatem starts its 30 seconds).
+func _drink(player: Player, info: Dictionary) -> void:
+	var level: int = int(info.get("tier", 1))
+	match String(info.get("type", "")):
+		"heal":
+			for effect: Variant in AlchemyRules.cleanses("heal", level):
+				if player.effects != null:
+					player.effects.clear(String(effect))
+			var amount: float = AlchemyRules.heal_amount(level, player.health.max_health)
+			if not AlchemyRules.overheals(level):
+				amount = minf(amount, maxf(player.health.max_health - player.health.current, 0.0)) ## only Wundtau V spills over into overheal
+			if amount > 0.0:
+				player.health.heal(amount)
+		"stamina":
+			if player.effects != null:
+				player.effects.apply("glutatem", AlchemyRules.stamina_spec(level).seconds, float(level))
 
 
 # ---------------------------------------------------------------- the cursor stack

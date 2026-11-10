@@ -6,6 +6,7 @@ render_mode unshaded;
 
 uniform vec2 rect_size = vec2(1200.0, 800.0);
 uniform vec4 room = vec4(384.0, 244.0, 432.0, 312.0); // x, y, w, h of the room inside this rectangle
+uniform float corner = 0.0; // > 0: the room's corners are rounded by this many px (half its width: a round room, the witch's tower)
 uniform float time = 0.0;
 uniform float night = 0.0;
 
@@ -58,8 +59,8 @@ void fragment() {
 	vec2 p = floor(UV * rect_size);
 	vec2 P = p + 0.5;
 	vec2 centre = room.xy + room.zw * 0.5;
-	vec2 q = abs(P - centre) - room.zw * 0.5;
-	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0); // > 0 outside the room
+	vec2 q = abs(P - centre) - room.zw * 0.5 + corner;
+	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - corner; // > 0 outside the room
 	vec2 dir = P - centre;
 
 	// the smoke: big slow shapes, domain-warped, drifting

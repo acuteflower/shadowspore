@@ -28,7 +28,7 @@ var _time: float = 0.0
 func _ready() -> void:
 	_def = StatusEffects.definition("hallucinated")
 	for kind: String in STAGE:
-		_wait[kind] = _pause(kind) * 0.5
+		_wait[kind] = _pause(kind) * 0.25 ## the first ones come soon after she breathes the mist
 	_eyes = AmbushEyes.new()
 	_eyes.modulate = Color(0.72, 2.6, 0.45) ## the eyes of the ambush, in the wood's green
 	add_child(_eyes)
@@ -47,6 +47,8 @@ func _process(delta: float) -> void:
 	_time += delta
 	trug = minf(trug + delta / float(_def.get("trug_seconds", 90.0)), 1.0)
 	_tend(player, delta)
+	if Interiors.slot_at(player.global_position) >= 0: ## inside a room (the tower): the host clears the effect within a second, nothing new until then
+		return
 	if InputManager.ui_blocking or player.story_lock or player.intro != null or player.health.current <= 0.0:
 		return ## nothing new while a scene, a window or death owns her
 	for kind: String in STAGE:

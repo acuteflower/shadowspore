@@ -97,12 +97,14 @@ func _run() -> void:
 					would += 1
 	_check(would > 200, "without the rule the area would grow props (%d), so the check means something" % would)
 	print("HEXENWALD props: %d in the sampled chunks, per kind %s" % [props, kinds])
-	_check(props > 300 and kinds.size() == PropGenerator.WITCH_KINDS.size() + 1, "the Hexenwald grows every kind of its own plant world and the meadow bush (%d props, %d kinds)" % [props, kinds.size()])
+	_check(props > 300 and kinds.size() >= PropGenerator.WITCH_KINDS.size(), "the Hexenwald grows every kind of its own plant world (%d props, %d kinds)" % [props, kinds.size()])
+	_check(int(kinds.get("bush", 0)) * 6 < int(kinds.get("hex_shrub", 0)) + int(kinds.get("witch_broom", 0)), "its own bushes outnumber the meadow bush, which only lines the fringe (%s)" % str(kinds))
 	_check(foreign == 0, "no meadow plant in the Hexenwald and none of its plants outside (%d)" % foreign)
 	_check(meadow_props > 0, "the meadow around it still grows its props (%d)" % meadow_props)
 	# ground and details of real chunks
 	var tuft: int = 0
 	var plain: int = 0
+	var small: Dictionary = {}
 	for c: Vector2i in [Vector2i(25, 27), Vector2i(26, 28)]:
 		world._load_chunk(c)
 		for _frame: int in 8:
@@ -121,16 +123,83 @@ func _run() -> void:
 					if world._land_at(cell.x, cell.y) and map.biome_at(cell) == "witch_forest":
 						if plain_set.has(world._ground.get_cell_atlas_coords(cell)): plain += 1
 						else: tuft += 1
+			# its own floor (docs/hexenwald_leben_konzept.md): litter beds of row 1, ground cover 26-29, toads and bats among its plants
+			var beds: int = 0
+			for node: Node in (chunk.node as Node).get_children():
+				if node is Sprite2D and (node as Sprite2D).texture == WorldLevel.FOREST_BED and (node as Sprite2D).region_rect.position.y > 0.0:
+					beds += 1
+			var own_cover: int = 0
+			var all_cover: int = 0
+			for details: Node in get_tree().get_nodes_in_group("meadow_details"):
+				for k: int in (details as MeadowDetails).source_kinds:
+					all_cover += 1
+					if k >= MeadowDetails.MEADOW_COUNT: own_cover += 1
+			print("HEXENWALD chunk %s: %d bits of ground cover, %d of its own" % [str(c), all_cover, own_cover])
+			_check(beds > 0 and own_cover > 20 and own_cover * 3 > all_cover, "chunk %s lays the Hexenwald's floor (%d beds, %d bits of its own ground cover)" % [str(c), beds, own_cover])
+			var tiny: TinyPopulation = world.get_node("Wildlife/SmallResidents") as TinyPopulation
+			tiny._active[c] = true
+			tiny._populate(c)
+			for animal: Node in tiny.get_node("Animals").get_children():
+				small[String((animal as TinyWildlife).species)] = int(small.get(String((animal as TinyWildlife).species), 0)) + 1
 		world._unload_chunk(c)
+	print("HEXENWALD small animals: %s" % str(small))
+	_check(int(small.get("toad", 0)) > 0 and int(small.get("bat", 0)) > 0 and int(small.get("moth", 0)) > 0, "toads by the toadstools, bats under the crowns, moths at the candles (%s)" % str(small))
 	var logs: int = 0
+	var wrong_logs: int = 0
 	for cy: int in range(24, 33):
 		for cx: int in range(21, 31):
 			for index: int in 16:
 				var spec: Dictionary = FallenLogScatter.candidate(world, Vector2i(cx, cy), index, [] as Array[Dictionary])
-				if not spec.is_empty() and world._generator.is_bare(Vector2i((spec.pos as Vector2) / 16.0)):
-					logs += 1
-	_check(logs == 0, "no fallen trunk is placed in the Hexenwald (%d)" % logs)
+				if spec.is_empty():
+					continue
+				var in_wood: bool = world._generator.is_bare(Vector2i((spec.pos as Vector2) / 16.0))
+				if in_wood: logs += 1
+				if in_wood != (int(spec.frame) >= FallenLog.FRAMES): wrong_logs += 1
+	_check(logs > 0 and wrong_logs == 0, "the Hexenwald's fallen trunks are bleached ones, the meadow's stay as they were (%d, %d wrong)" % [logs, wrong_logs])
 	_check(plain + tuft > 500 and float(tuft) / float(maxi(plain + tuft, 1)) < 0.2, "mostly plain grass tiles with a few tufts (%d plain, %d other)" % [plain, tuft])
+	# crows and ravens (docs/hexenwald_leben_konzept.md): they live there, and more of them than on the meadow
+	var crow_base: Dictionary = CorvidPopulation.local_spec("crow", 0.0)
+	var crow_deep: Dictionary = CorvidPopulation.local_spec("crow", 1.0)
+	_check(crow_base == DataRegistry.get_entry("wildlife", "crow"), "outside the Hexenwald the crow keeps its numbers")
+	_check(float(crow_deep["chunk_chance"]) > float(crow_base["chunk_chance"]) * 2.0 and int(crow_deep["group_max"]) > int(crow_base["group_max"]) and int(crow_deep["max_loaded"]) > int(crow_base["max_loaded"]), "deep inside: higher chance, bigger flocks, higher cap")
+	_check(float(CorvidPopulation.local_spec("raven", 1.0)["chunk_chance"]) > float(DataRegistry.get_entry("wildlife", "raven")["chunk_chance"]) * 2.0, "ravens too")
+	var floor_point: Vector2 = Vector2(CENTRE) * 16.0 + Vector2(8, 8)
+	_check(world._bird_habitat(floor_point, "crow") and world._bird_habitat(floor_point, "raven"), "the Hexenwald floor is a crow and raven habitat")
+	_check(not world._bird_habitat(floor_point, "owl") and not world._bird_habitat(floor_point, "hoopoe"), "owls and hoopoes stay out for now")
+	var corvids: CorvidPopulation = world.get_node("Wildlife/Corvids") as CorvidPopulation
+	var witch_birds: Dictionary = {}
+	var flocks: int = 0
+	var tried: int = 0
+	var biggest: int = 0
+	for cy: int in range(25, 31):
+		for cx: int in range(22, 29):
+			var c: Vector2i = Vector2i(cx, cy)
+			if BiomeBlend.amount_at(Vector2(c) * 512.0 + Vector2(256, 256)) < 0.5:
+				continue
+			tried += 1
+			for bird: Node in corvids.get_node("Birds").get_children():
+				bird.free()
+			corvids._flocks.clear()
+			corvids._active[c] = true
+			corvids._populate(c)
+			if corvids.get_node("Birds").get_child_count() > 0:
+				flocks += 1
+			var crows_here: int = 0
+			for bird: Node in corvids.get_node("Birds").get_children():
+				if (bird as WildCorvid).species == "crow": crows_here += 1
+				_check((bird as WildCorvid).witch, "a bird of the Hexenwald knows it lives there")
+			biggest = maxi(biggest, crows_here)
+			for bird: Node in corvids.get_node("Birds").get_children():
+				var sp: String = String((bird as WildCorvid).species)
+				witch_birds[sp] = int(witch_birds.get(sp, 0)) + 1
+				_check(world._land_biome(Vector2i(((bird as Node2D).position / 16.0).floor())) == "witch_forest", "a bird of chunk %s stands in the Hexenwald" % str(c))
+			corvids._active.erase(c)
+	for bird: Node in corvids.get_node("Birds").get_children():
+		bird.free()
+	corvids._flocks.clear()
+	print("HEXENWALD corvids: %d of %d deep chunks carry birds, %s" % [flocks, tried, witch_birds])
+	_check(tried >= 6 and float(flocks) / float(tried) > 0.4 and witch_birds.has("crow") and witch_birds.has("raven"), "crows and ravens settle in most deep chunks (%d / %d)" % [flocks, tried])
+	_check(biggest >= 8, "big crowds of crows, bird beside bird (largest %d)" % biggest)
 	# the map
 	var window: MapWindow = MapWindow.new()
 	add_child(window)

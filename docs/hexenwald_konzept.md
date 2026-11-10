@@ -58,6 +58,9 @@ Das erste **neue** Gebiet der Karte: ein eigenes Biom, nicht aus Bestehendem umg
 - Der Turm selbst (Art `tools/art_witch_tower.py`, Node `WitchTower`) war schon fertig und wurde nur noch eingebaut: `data/ground.json` `towers` (`hexenwald_tower`, Tile (830, 892) = Fuß des Tors), von `WorldLevel._add_ground_decals` gesetzt, 9 Tiles um Körper und Hof frei von erzeugten Pflanzen.
 - `tools/bake_hexenwald_path.py` sucht den Standort selbst: nächstes Rechteck von 17 x 10 Tiles aus lauter flachem, freiem Boden zur Mitte des Gebiets (Körper hinter dem Tor, Hof davor). Der Weg ist jetzt auf das Tor ausgerichtet (Ziel 3 Tiles südlich des Fußes, der Turmkörper ist für das A* gesperrt, der Weg läuft also um ihn herum bis vors Tor; `taper_out` 24). Nach Änderungen: `bake_hexenwald_path.py`, `bake_ground.py --path=hexenwald_path`. Der Innenraum, die Hexe und der gebannte Ring folgen später (`docs/hexenwald_nebel_konzept.md` Abschnitt 8).
 
+### Tiere (2026-11-10)
+- Krähen und Raben leben im Hexenwald, häufiger und in größeren Schwärmen als auf der Wiese (`wildlife.json` Block `witch_forest`, `CorvidPopulation.local_spec`). Befund zur Pflanzenwelt, weitere Tiere und Reihenfolge: `docs/hexenwald_leben_konzept.md`.
+
 ### Nicht gebaut (Absicht)
 Bäume (siehe Hinweis oben), Pflanzen, Tiere, Gewässer, Orte, Quests, Geräusche, Nebel-Stimmung, Gegnerauswahl, Waystone, Dialoge.
 

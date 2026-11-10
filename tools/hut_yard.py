@@ -98,12 +98,12 @@ def pit_arr():
 
 
 # ------------------------------------------------------------------ flames
-def campfire_frames(W=34, H=34, N=8):
+def campfire_frames(W=34, H=34, N=8, palette=None):
     """The pit's fire, N looping frames of W x H, base row H - 7: a bed of embers, a dozen flame tongues of different height and sway (each loops on its own
     whole number of beats), teardrop-shaped, rounded and soft at the foot (no flat cut), frayed at the tips, a pale-yellow core, flying sparks. Unlit."""
     out = np.zeros((H, W * N, 4), np.uint8)
     base = H - 7
-    cols = h.RAMPS[FIRE]
+    cols = h.RAMPS[FIRE] if palette is None else palette
     tongues = []
     for i in range(7):  # x offset, width, height, beats, phase
         u = (i - 3) / 3.0

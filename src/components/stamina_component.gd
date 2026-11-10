@@ -1,6 +1,8 @@
 class_name StaminaComponent
 extends Node
 ## Stamina pool. After any use, regeneration pauses for `regen_delay` seconds, then runs continuously.
+## Glutatem (a potion, status effect `glutatem` on the sibling `Effects`, its scale = the tier) adds a pulse of stamina every second
+## that also comes during the pause, and from tier IV shortens the pause (AlchemyRules.stamina_spec). Every peer counts it itself, like the rest of the pool.
 
 signal changed(current: float, maximum: float)
 

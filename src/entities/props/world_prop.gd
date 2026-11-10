@@ -61,6 +61,8 @@ func _ready() -> void:
 		_hurtbox.owner_prop = self
 		_shape($Hurtbox/Shape, _radius * 0.85, Vector2(0, -_radius * 0.5))
 	_setup_glow()
+	if _spec.has("group"):
+		add_to_group(StringName(_spec.group)) ## plants.json `group`: e.g. the toadstools the Hexenwald's toads live by (TinyPopulation)
 	_setup_prop()
 	if _sprite.material == null: _sprite.material = _day_material()
 	_setup_blight()

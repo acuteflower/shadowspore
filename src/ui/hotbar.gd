@@ -47,6 +47,7 @@ var _gain_age: float = 9.0
 var _badge: Control ## the LV label is a button: it opens the Fortschritt window
 var _badge_hover: bool = false
 var _ready_pulse: float = 0.0 ## rewards waiting: the bud beats
+var _deny: Array[float] = [] ## 1 -> 0: the slot shook its head (nothing to heal, a pause runs)
 
 
 ## The vine's height at `x`: it sags in the middle and meets the sap vines at both ends.
@@ -57,6 +58,7 @@ static func vine_y(x: float) -> float:
 
 func bind(inventory: InventoryComponent) -> void:
 	_inventory = inventory
+	add_to_group("hotbar")
 	for i: int in InventoryComponent.HOTBAR_SIZE:
 		var slot: ItemSlot = ItemSlot.new()
 		slot.inventory = inventory
@@ -174,6 +176,8 @@ func _process(delta: float) -> void:
 	for i: int in _slots.size():
 		_lift[i] = lerpf(_lift[i], LIFT if i == selected else (2.0 if _drag_ok[i] else 0.0), ease_in)
 		_pop[i] = maxf(_pop[i] - 3.0 * delta, 0.0)
+		if i < _deny.size():
+			_deny[i] = maxf(_deny[i] - 3.5 * delta, 0.0)
 	_cursor_x = lerpf(_cursor_x, _center_x(selected), 1.0 - exp(-20.0 * delta))
 	_place_slots()
 	queue_redraw()
@@ -197,6 +201,26 @@ func _select(index: int) -> void:
 		_inventory.select(index) ## a tool in this slot now replaces the weapon in her hand
 
 
+## The item in slot `i` cannot be used now: the pendant shakes its head.
+func deny(i: int) -> void:
+	while _deny.size() < InventoryComponent.HOTBAR_SIZE:
+		_deny.append(0.0)
+	if i >= 0 and i < _deny.size():
+		_deny[i] = 1.0
+
+
+## 0..1 left of the pause that blocks the item in slot `i` (the food pause after eating, the wound pause after a healing potion), 0 = none.
+func _pause_left(i: int) -> float:
+	var effects: StatusEffects = _inventory.get_parent().get_node_or_null("Effects") as StatusEffects if _inventory != null else null ## no Player type here: the player scene preloads the HUD
+	var stack: Dictionary = _inventory.stack_at("inv", i) if _inventory != null else {}
+	if effects == null or stack.is_empty():
+		return 0.0
+	var effect: String = AlchemyRules.pause_effect(Items.definition(stack))
+	if effect == "" or not effects.has(effect):
+		return 0.0
+	return clampf(effects.left(effect) / maxf(effects.total(effect), 0.01), 0.0, 1.0)
+
+
 func _sway(i: int) -> float:
 	return sin(_time * 1.1 + i * 1.7)
 
@@ -209,7 +233,8 @@ func _anchor(i: int) -> Vector2:
 func _slot_center(i: int) -> Vector2:
 	var a: Vector2 = _anchor(i)
 	var y: float = a.y + _thread_len(i) - _lift[i] - sin(_pop[i] * PI) * POP + ItemSlot.SIZE / 2.0
-	return Vector2(roundf(a.x + _sway(i) * 1.2), roundf(y))
+	var shake: float = sin(_deny[i] * 40.0) * 2.0 * _deny[i] if i < _deny.size() else 0.0
+	return Vector2(roundf(a.x + _sway(i) * 1.2 + shake), roundf(y))
 
 
 func _place_slots() -> void:
@@ -392,6 +417,19 @@ func _draw_overlay() -> void:
 			PixelText.draw(_overlay, str(i + 1), Vector2i(roundi(c.x) - 10, roundi(c.y) - 11), color, VineStyle.OUTLINE)
 		else:
 			PixelText.draw(_overlay, str(i + 1), Vector2i(roundi(c.x) - 1, roundi(c.y) + 3), Color(color, 0.7), VineStyle.OUTLINE)
+	for i: int in _slots.size(): ## a pause blocks this item: a dim ring runs out around it (the part still to wait)
+		var left: float = _pause_left(i)
+		if left <= 0.0:
+			continue
+		var spot: Vector2 = _slot_center(i)
+		var steps: int = 28
+		for k: int in steps:
+			var along: float = float(k) / float(steps)
+			if along > left:
+				break
+			var angle: float = -PI / 2.0 + along * TAU
+			_overlay.draw_rect(Rect2((spot + Vector2(cos(angle) * 10.0, sin(angle) * 10.0)).round(), Vector2.ONE), Color(VineStyle.PETAL, 0.75))
+		_overlay.draw_rect(Rect2(spot - Vector2(7, 7), Vector2(14, 14)), Color(0.05, 0.02, 0.1, 0.35 * left))
 	if _dragging and not _drag_any: ## the hotbar only takes tools: show that nothing fits
 		for i: int in _slots.size():
 			var spot: Vector2 = _slot_center(i)

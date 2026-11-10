@@ -23,7 +23,7 @@ const WIPE: Shader = preload("res://assets/shaders/door_wipe.gdshader")
 
 var _interiors: Dictionary = {} ## id -> Interior
 var _order: Array[String] = []
-var _entrances: Dictionary = {} ## interior id -> Hut (the building outside)
+var _entrances: Dictionary = {} ## interior id -> the building outside (a Hut, the WitchTower): a Node2D with `exit_position` and `doorway`
 var _wipe_material: ShaderMaterial = ShaderMaterial.new()
 var _wipe_layer: CanvasLayer
 var _cover: float = 0.0
@@ -142,11 +142,11 @@ func world_position(pos: Vector2) -> Vector2:
 	var inside: Interior = interior_at(pos)
 	if inside == null:
 		return pos
-	var hut: Hut = _entrances.get(String(inside.spec.adjacent.to) if inside.spec.has("adjacent") else inside.id) as Hut
-	return hut.exit_position if hut != null else Vector2.ZERO
+	var hut: Node2D = _entrances.get(String(inside.spec.adjacent.to) if inside.spec.has("adjacent") else inside.id) as Node2D
+	return hut.get("exit_position") as Vector2 if hut != null else Vector2.ZERO
 
 
-func register_entrance(id: String, hut: Hut) -> void:
+func register_entrance(id: String, hut: Node2D) -> void:
 	_entrances[id] = hut
 
 
@@ -316,8 +316,8 @@ func use_door(player: Player, door: Doorway) -> void:
 	var spot: Vector2
 	var facing: Vector2
 	if door.leaving:
-		var hut: Hut = _entrances.get(door.interior_id) as Hut
-		spot = hut.exit_position if hut != null else player.global_position
+		var hut: Node2D = _entrances.get(door.interior_id) as Node2D
+		spot = hut.get("exit_position") as Vector2 if hut != null else player.global_position
 		facing = Vector2.DOWN
 	else:
 		spot = interior(door.interior_id).entry_position()
@@ -328,8 +328,8 @@ func use_door(player: Player, door: Doorway) -> void:
 	door.set_open(0.0)
 	var other: Doorway = null
 	if door.leaving:
-		var outside: Hut = _entrances.get(door.interior_id) as Hut
-		other = outside.doorway if outside != null else null
+		var outside: Node2D = _entrances.get(door.interior_id) as Node2D
+		other = outside.get("doorway") as Doorway if outside != null else null
 	else:
 		other = interior(door.interior_id).door
 	if other != null:
@@ -350,6 +350,20 @@ func use_door(player: Player, door: Doorway) -> void:
 		player.quests.set_flag("left_" + door.interior_id)
 		if player.quests.has_flag("day2_started"): ## the second morning: the knight greets her and sends her to the lumberjack's hut
 			player.quests.start("lumberjack")
+
+
+## E at a passage inside (the stair of the witch's tower): the dark closes in, she stands in the other room, the dark opens.
+func use_passage(player: Player, way: Doorway) -> void:
+	var target: Interior = interior(way.to_interior)
+	if target == null or _busy or player.story_lock:
+		return
+	_sound("creak_b", -12.0)
+	await transit(player, func() -> void:
+		player.request_teleport(target.room_to_global(way.to_spot))
+		player.facing = way.to_face
+		apply_view(player))
+	if player.quests != null:
+		player.quests.set_flag("entered_" + way.to_interior)
 
 
 ## A change of place without a door (the mine's stairs and lift): the dark closes in as an iris, `move` runs (it moves the player), the dark opens.

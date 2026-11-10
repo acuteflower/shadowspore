@@ -48,6 +48,8 @@ RIM = ramp("1c5a6a", "3a9aa8")
 BARK = ramp("0c0812", "1a1322", "2c2236", "44344c", "625064", "8c7880")  # almost black, violet in the shade
 BONE = ramp("2e2a44", "56506c", "8a8698", "b8b4b8", "dedacc", "f6f2e0")  # bleached wood, violet shade
 HEX_DIM, HEX, HEX_HOT = hexc("4a9a3a"), hexc("a8ff6a"), hexc("eaffc4")  # the wood's own light: witch green
+VIO_DIM, VIO, VIO_HOT = hexc("6434a6"), hexc("c690ec"), hexc("ecdcff")  # its second light: a cold violet (lichen on the dead wood, fungi, buds)
+LICHEN = ramp("2e3a40", "4c6060", "7a9488", "a8c4b0")  # pale crust lichen on bark and bone
 VIO, VIO_L = hexc("8a4dff"), hexc("d9c8ff")
 WINE = ramp("2a0612", "5a0a1e", "8e1430", "c43044", "ee6a6a")
 HAIR = ramp("1e3038", "34504e", "557468", "86a08a")  # witch-hair moss: grey-green
@@ -151,16 +153,34 @@ def trunk_body(g, glow, lights, spec, rng, seed, wood, extras, face):
         for k in range(-e, e + 1):
             tput(g, cx + k - 1, y + 6 + (1 if k % 2 else 0) + abs(k) // 3, wood[0])
         tput(g, cx - 1, y + 8, wood[0])
-    for v in range(spec.get("veins", 0)):  # a crack with the wood's light in it
-        y = FEET_Y - int(spec["trunk"] * rng.uniform(0.08, 0.3))
-        off = rng.uniform(-0.5, 0.3)
-        for k in range(int(spec["trunk"] * rng.uniform(0.2, 0.34))):
+    dim_c, mid_c, hot_c = (HEX_DIM, HEX, HEX_HOT) if wood is BARK else (VIO_DIM, VIO, VIO_HOT)
+    for v in range(spec.get("veins", 0)):  # a short crack with the wood's light in it: it wanders, forks once, and breaks off
+        y = FEET_Y - int(spec["trunk"] * (rng.uniform(0.1, 0.55) if wood is BARK else rng.uniform(0.4, 0.85)))  # the dead wood cracks high up
+        off = rng.uniform(-0.55, 0.25)
+        drift = 0.0
+        for k in range(int(spec["trunk"] * rng.uniform(0.05, 0.1)) + 3):
             if y - k not in centers:
                 break
             cx, hw = centers[y - k]
-            xx = cx + int(round(off * hw + 1.3 * math.sin(k * 0.5 + v * 2.0)))
-            if abs(xx - cx) < hw - 0.5 and k % 4 != 3:
-                lights.pixel(g, xx, y - k, HEX_DIM if wood is BARK else hexc("7ab868"), HEX if k % 3 else HEX_HOT, 1)
+            drift += rng.choice((-1, 0, 0, 1)) * 0.45
+            xx = cx + int(round(off * hw + drift))
+            if abs(xx - cx) < hw - 0.5 and rng.random() > 0.18:
+                lights.pixel(g, xx, y - k, dim_c, mid_c if rng.random() < 0.6 else dim_c, 0)
+                if k == 3 and rng.random() < 0.6:  # one short fork
+                    for j in range(1, 4):
+                        lights.pixel(g, xx + j * (1 if off < 0 else -1), y - k - j // 2, dim_c, mid_c, 0)
+    for _ in range(spec.get("lichen", 0)):  # crusts of pale lichen on the lit side, a few of their dots glowing
+        y = FEET_Y - int(spec["trunk"] * rng.uniform(0.12, 0.92))
+        if y not in centers:
+            continue
+        cx, hw = centers[y]
+        x0 = cx - int(hw * rng.uniform(0.0, 0.7))
+        for _k in range(rng.randrange(4, 9)):
+            xx, yy = x0 + rng.randrange(-2, 3), y + rng.randrange(-2, 3)
+            if yy in centers and abs(xx - centers[yy][0]) < centers[yy][1] - 0.5:
+                tput(g, xx, yy, LICHEN[rng.randrange(1, 4)])
+        if rng.random() < 0.7:
+            lights.pixel(g, x0, y, LICHEN[3], (mid_c if rng.random() < 0.5 else (HEX if wood is BARK else VIO)), 1)
     for f in range(spec.get("fungi", 0)):  # pale shelf fungi, wine red underneath
         y = FEET_Y - int(spec["trunk"] * rng.uniform(0.15, 0.85))
         if y not in centers:
@@ -171,7 +191,9 @@ def trunk_body(g, glow, lights, spec, rng, seed, wood, extras, face):
             x = cx + side * (int(hw) + i)
             tput(g, x, y + (1 if i > 2 else 0), BONE[4 if i < 3 else 3])
             tput(g, x, y + 1 + (1 if i > 2 else 0), WINE[2 if i < 2 else 1])
-        lights.pixel(g, cx + side * (int(hw) + 1), y - 1, BONE[5], HEX_HOT, 1)
+        lights.pixel(g, cx + side * (int(hw) + 1), y - 1, BONE[5], VIO_HOT if wood is BARK else HEX_HOT, 1)
+        for i in range(1, 3):  # the gills underneath breathe light
+            lights.pixel(g, cx + side * (int(hw) + i), y + 2 + (1 if i > 2 else 0), WINE[1], VIO if wood is BARK else HEX, 0)
     return centers
 
 
@@ -207,10 +229,10 @@ def charm(g, lights, x, y, kind, rng, extras):
 
 
 HAGS = [
-    dict(height=80, w=58, h=46, trunk_hw=4.4, twist=2.0, masses=3, hair=5, charms=1, veins=0, fungi=0),
-    dict(height=114, w=78, h=60, trunk_hw=6.0, twist=3.2, masses=4, hair=9, charms=2, veins=1, fungi=1),
-    dict(height=148, w=96, h=74, trunk_hw=7.8, twist=4.4, masses=5, hair=14, charms=4, veins=1, fungi=2),
-    dict(height=178, w=106, h=86, trunk_hw=9.2, twist=5.4, masses=6, hair=18, charms=5, veins=2, fungi=3),
+    dict(height=80, w=58, h=46, trunk_hw=4.4, twist=2.0, masses=3, hair=5, charms=1, veins=0, fungi=1, lichen=2, vines=2),
+    dict(height=114, w=78, h=60, trunk_hw=6.0, twist=3.2, masses=4, hair=9, charms=2, veins=1, fungi=2, lichen=3, vines=5),
+    dict(height=148, w=96, h=74, trunk_hw=7.8, twist=4.4, masses=5, hair=14, charms=4, veins=1, fungi=3, lichen=4, vines=7),
+    dict(height=178, w=106, h=86, trunk_hw=9.2, twist=5.4, masses=6, hair=18, charms=5, veins=1, fungi=4, lichen=6, vines=8),
 ]
 HAG_SAPLING = dict(height=38, w=24, h=20, trunk_hw=1.6, twist=0.8, masses=1, hair=0, charms=0, veins=0, fungi=0)
 HAG_YOUNG = dict(height=70, w=44, h=36, trunk_hw=3.2, twist=1.6, masses=3, hair=2, charms=0, veins=0, fungi=0)
@@ -300,8 +322,8 @@ def hag_tree(spec, seed, extras=True):
             for k in range(length):
                 xx = x + int(round(math.sin(k * 0.35 + x) * min(k / 8.0, 1.0)))
                 tput(crown, xx, y + 1 + k, HAIR[1 if k < length * 0.4 else (2 if k < length - 2 else 3)], over=False)
-            if rng.random() < 0.35:
-                lights_c.pixel(crown, x + int(round(math.sin((length - 1) * 0.35 + x) * min((length - 1) / 8.0, 1.0))), y + length, HAIR[3], HEX, 1)
+            if rng.random() < 0.4:
+                lights_c.pixel(crown, x + int(round(math.sin((length - 1) * 0.35 + x) * min((length - 1) / 8.0, 1.0))), y + length, HAIR[3], VIO if rng.random() < 0.34 else HEX, 0)
         for i in range(spec["charms"]):
             x, y = hem[rng.randrange(len(hem))]
             charm(crown, lights_c, x, y, ("twig", "bone", "wisp", "twig", "rag")[i % 5], rng, extras)
@@ -309,16 +331,75 @@ def hag_tree(spec, seed, extras=True):
             x, y = pixels[rng.randrange(len(pixels))]
             if crown[y][x] in LEAF[:3]:
                 lights_c.pixel(crown, x, y, HEX_DIM, HEX, 1)
+    vines, vine_mask, vine_glow = hang_vines(hem if extras else [], spec, h, rng, seed)
     lights_c.halos()
     lights_t.halos()
-    return {"trunk": trunk, "crown": crown, "glow_crown": glow_c, "glow_trunk": glow_t}
+    return {"trunk": trunk, "crown": crown, "glow_crown": glow_c, "glow_trunk": glow_t, "vines": vines, "vine_mask": vine_mask, "vine_glow": vine_glow}
+
+
+def hang_vines(hem, spec, h, rng, seed):
+    """Ivy ropes hanging from the crown's hem: a dark rope with leaves in pairs and a curled tip, some with a bud of light. They live on
+    their own layer (tools: hag_tree_vines.png) and breathe in the game (vine_breathe.gdshader), so the mask holds for every pixel how
+    far down its rope it hangs (0 at the hem .. 1 at the tip, red channel): the further down, the further it sways."""
+    art, mask, glow = grid(), grid(), grid()
+    lights = Emitters(glow)
+    if not hem:
+        return art, mask, glow
+    picks = sorted(hem, key=lambda p: noise(p[0], p[1], seed + 21))
+    used = []
+    for x, y in picks:
+        if len(used) >= spec.get("vines", 0):
+            break
+        if any(abs(x - a) < 5 for a, _ in used) or y > CH - 40:
+            continue
+        used.append((x, y))
+        length = rng.randrange(12, 16 + int(h * 0.42))
+        phase = rng.uniform(0, 6.3)
+        side = 1 if rng.random() < 0.5 else -1
+        last = (x, y)
+        for k in range(length):
+            w = (k + 1) / length
+            xx = x + int(round(1.6 * math.sin(k * 0.21 + phase) * min(k / 6.0, 1.0)))
+            yy = y + 1 + k
+            put_m = lambda px_, py_, c, ww=w: (tput(art, px_, py_, c), tput(mask, px_, py_, (int(ww * 255), 0, 0, 255)))  # noqa: E731
+            put_m(xx, yy, LEAF[2] if (k // 2) % 2 else LEAF[1])
+            if k > 2 and k % 4 == 1 and k < length - 2:  # a pair of small leaves, alternating sides, lit on the upper left
+                side = -side
+                put_m(xx + side, yy, LEAF[3] if side < 0 else LEAF[2])
+                put_m(xx + side * 2, yy - 1, LEAF[4] if side < 0 else LEAF[3])
+                if rng.random() < 0.4:
+                    put_m(xx + side * 2, yy, LEAF[2])
+            last = (xx, yy)
+        lx, ly = last  # the curled tip: a little heart of leaves
+        for dx, dy, c in ((-1, 1, 3), (0, 1, 2), (1, 1, 2), (0, 2, 1), (-1, 0, 4)):
+            tput(art, lx + dx, ly + dy, LEAF[c])
+            tput(mask, lx + dx, ly + dy, (255, 0, 0, 255))
+        if rng.random() < 0.3:
+            lights.pixel(art, lx, ly + 2, VIO_DIM, VIO if rng.random() < 0.6 else HEX, 0)
+            tput(mask, lx, ly + 2, (255, 0, 0, 255))
+    lights.halos()
+    for y in range(CH):  # the halo pixels sway with the bud they belong to
+        for x in range(CW):
+            if glow[y][x] is not None and mask[y][x] is None:
+                mask[y][x] = (255, 0, 0, 255)
+    src = [row[:] for row in art]  # ink outline round ropes and leaves
+    for y in range(CH):
+        for x in range(CW):
+            if src[y][x] is not None:
+                continue
+            for a, b in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= a < CW and 0 <= b < CH and src[b][a] is not None:
+                    art[y][x] = art_tree.OUT
+                    mask[y][x] = mask[b][a]
+                    break
+    return art, mask, glow
 
 
 BONES = [
-    dict(height=72, w=50, trunk=30, trunk_hw=3.4, twist=1.6, depth=2, charms=1, rags=1, veins=0, fungi=0),
-    dict(height=102, w=66, trunk=42, trunk_hw=4.6, twist=2.6, depth=3, charms=2, rags=2, veins=1, fungi=1),
-    dict(height=134, w=84, trunk=56, trunk_hw=6.0, twist=3.6, depth=4, charms=4, rags=3, veins=1, fungi=2),
-    dict(height=162, w=96, trunk=70, trunk_hw=7.0, twist=4.4, depth=4, charms=5, rags=4, veins=2, fungi=2),
+    dict(height=72, w=50, trunk=30, trunk_hw=3.4, twist=1.6, depth=2, charms=1, rags=1, veins=1, fungi=0, lichen=2),
+    dict(height=102, w=66, trunk=42, trunk_hw=4.6, twist=2.6, depth=3, charms=2, rags=2, veins=1, fungi=1, lichen=3),
+    dict(height=134, w=84, trunk=56, trunk_hw=6.0, twist=3.6, depth=4, charms=4, rags=3, veins=2, fungi=2, lichen=4),
+    dict(height=162, w=96, trunk=70, trunk_hw=7.0, twist=4.4, depth=4, charms=5, rags=4, veins=2, fungi=2, lichen=5),
 ]
 BONE_SAPLING = dict(height=36, w=20, trunk=16, trunk_hw=1.2, twist=0.6, depth=1, charms=0, rags=0, veins=0, fungi=0)
 BONE_YOUNG = dict(height=64, w=40, trunk=26, trunk_hw=2.6, twist=1.2, depth=2, charms=0, rags=0, veins=0, fungi=0)
@@ -390,6 +471,8 @@ def tree_files(name, make, variants, sapling, young, seed, wood, cut):
         t, c = art_tree.finish(p["trunk"], p["crown"], spec["w"] / 2.6 + 2)
         frames.append([[c[y][x] if c[y][x][3] else t[y][x] for x in range(CW)] for y in range(CH)])
     write_png(ROOT / "props" / (name + "_growth.png"), CW * 4, CH, tree_sheet([frames]))
+    if "vines" in parts[0]:  # row 0 the ropes, row 1 their sway mask, row 2 the buds' light (see hang_vines)
+        write_png(ROOT / "props" / (name + "_vines.png"), CW * 4, CH * 3, tree_sheet([[art_tree.to_pixels(p[k]) for p in parts] for k in ("vines", "vine_mask", "vine_glow")]))
     return lit, parts
 
 
@@ -505,6 +588,108 @@ def make_hedge(spec, seed, berries=True, stripped=False):
             hex_berry(px, glow, xi, yi + 2)
             placed.append((xi, yi))
     return finish(px, spec["spread"], seed), glow.done()
+
+
+# ---- Dämmerstrauch and Besenginster: the Hexenwald's own plain bushes (nothing to pick, the sickle takes fibre and sticks)
+SHRUBS = [
+    {"spread": 9, "height": 12, "lobes": 5},
+    {"spread": 12, "height": 16, "lobes": 7},
+    {"spread": 14, "height": 19, "lobes": 9},
+]
+BROOMS = [
+    {"rods": 13, "spread": 8, "height": 18},
+    {"rods": 17, "spread": 11, "height": 23},
+    {"rods": 21, "spread": 14, "height": 26},
+]
+BROOM = ramp("0e161c", "1a2a2e", "2a403e", "426052", "68866c")  # rods: dark sea green, lighter where the light catches them
+
+
+def make_shrub(spec, seed, stripped=False):
+    """Dämmerstrauch: a low, dense cushion of small blue-black leaves, violet in its deepest shade, a few twigs poking out and a
+    handful of pale dusk leaves; at night two or three drops of violet dew."""
+    rng = random.Random(seed)
+    px, glow = blank(FW, FH), Glow()
+    sp, ht = spec["spread"], spec["height"]
+    if stripped:
+        for i in range(5 + sp // 3):
+            x0 = 20 + rng.uniform(-sp * 0.6, sp * 0.6)
+            lean = (x0 - 20) / max(sp, 1) * 0.8 + rng.uniform(-0.2, 0.2)
+            for k in range(rng.randrange(3, 4 + ht // 3)):
+                put(px, int(round(x0 + lean * k)), GROUND - k, BARK[3 if k % 3 else 4])
+        foot(px, rng, sp * 0.7, 5, 3)
+        return finish(px, sp, seed), glow.done()
+    for i in range(3 + sp // 4):  # twigs under and through the cushion
+        x0 = 20 + rng.uniform(-sp * 0.5, sp * 0.5)
+        lean = (x0 - 20) / max(sp, 1) * 1.1
+        for k in range(int(ht * rng.uniform(0.7, 1.05))):
+            put(px, int(round(x0 + lean * k * 0.6)), GROUND - k, BARK[2 if k % 2 else 3])
+    lobes = []
+    for i in range(spec["lobes"]):
+        t = i / max(spec["lobes"] - 1, 1)
+        x = 20 + (t - 0.5) * sp * 1.5 + rng.uniform(-1.5, 1.5)
+        top = 1.0 - abs(t - 0.5) * 1.3
+        r = rng.uniform(3.2, 4.6) * (0.8 + 0.3 * top)
+        lobes.append((x, GROUND - 2 - ht * 0.55 * top - rng.uniform(0, 2.5), r, r * 0.8, rng.random()))
+    lobes.append((20, GROUND - ht * 0.72, sp * 0.42, ht * 0.32, 0.5))  # the crown of the cushion
+    lobes.append((20, GROUND - 3.2, sp * 0.95, 3.6, 0.0))  # its skirt sits on the ground: no stems show
+    for x, y, rx, ry, _z in sorted(lobes, key=lambda l: l[1]):
+        F.blob(px, x, y, rx, ry, [LEAF[1], LEAF[2], LEAF[3], LEAF[4]])
+    for y in range(FH):  # leaf scallops, violet in the deepest shade, lit rim on top
+        for x in range(FW):
+            c = px[y][x]
+            if c not in LEAF:
+                continue
+            k = LEAF.index(c)
+            if (x + (y // 2) * 3) % 4 == 0 and y % 2 == 0 and k > 1:
+                px[y][x] = LEAF[k - 1]
+            if k <= 1 and noise(x, y, seed + 5) > 175:
+                px[y][x] = HOOD[1]
+            if y > 0 and px[y - 1][x][3] == 0 and k < 5:
+                px[y][x] = LEAF[min(k + 2, 5)]
+    pale = [(x, y) for y in range(FH) for x in range(FW) if px[y][x] in LEAF[2:5] and px[y - 1][x] in LEAF]
+    rng.shuffle(pale)
+    for x, y in pale[: 2 + sp // 5]:  # pale dusk leaves
+        put(px, x, y, BONE[3])
+        put(px, x + 1, y, BONE[2])
+    for x, y in pale[6: 6 + 1 + sp // 6]:  # violet dew
+        glow.emit(px, x, y - 1, VIO_DIM, VIO, 1)
+    for k in range(int(sp * 1.6)):  # dead leaves under the skirt
+        x = int(20 + rng.uniform(-sp, sp))
+        if px[GROUND][x][3] == 0:
+            put(px, x, GROUND, (ROOT_C[1], LEAF[1], HOOD[1])[k % 3])
+    return finish(px, sp, seed), glow.done()
+
+
+def make_broom(spec, seed, stripped=False):
+    """Besenginster, the witches' broom bush: a fan of thin upright rods out of one root, scale-leaved, a few rods ending in a
+    tiny pale bud; stripped, only a crown of cut stubs."""
+    rng = random.Random(seed)
+    px, glow = blank(FW, FH), Glow()
+    sp, ht = spec["spread"], spec["height"]
+    n = spec["rods"]
+    for i in range(n):
+        t = (i + 0.5) / n
+        ang = (t - 0.5) * 1.9 + rng.uniform(-0.12, 0.12)  # out of one root, fanning wider towards the sides
+        length = ht * (1.0 - abs(t - 0.5) * 0.7) * rng.uniform(0.6, 1.08) * (0.3 if stripped else 1.0)
+        bend = (t - 0.5) * 1.2 + rng.uniform(-0.2, 0.2)  # the rods arch outwards at their tips, like a fountain
+        x0 = 20 + (t - 0.5) * 3
+        for k in range(int(length)):
+            u = k / max(length, 1)
+            x = x0 + math.sin(ang) * k * 0.95 * (sp / ht) * 1.6 + bend * u * u * 6
+            y = GROUND - k * math.cos(ang * 0.6)
+            lit = 3 if (ang < 0) and k % 4 else 2
+            put(px, int(round(x)), int(round(y)), BROOM[lit if u > 0.2 else 1])
+            if not stripped and k > 4 and k % 4 == 0 and rng.random() < 0.3:  # sparse scale leaves
+                put(px, int(round(x)) + (1 if ang > 0 else -1), int(round(y)), BROOM[4 if ang < 0 else 3])
+        if stripped:
+            put(px, int(round(x0 + math.sin(ang) * length * 0.95 * (sp / ht) * 1.6)), int(round(GROUND - length)), BONE[3])
+        elif rng.random() < 0.35:
+            tx = int(round(x0 + math.sin(ang) * (length - 1) * 0.95 * (sp / ht) * 1.6 + bend * 6))
+            ty = int(round(GROUND - (length - 1) * math.cos(ang * 0.6))) - 1
+            put(px, tx, ty, HOOD[4])
+            put(px, tx, ty + 1, HOOD[2])
+    foot(px, rng, sp * 0.4, 3, 3)
+    return finish(px, sp, seed), glow.done()
 
 
 # ---- Totenkerze
@@ -872,6 +1057,8 @@ def main():
     bones = tree_files("bone_tree", bone_tree, BONES, BONE_SAPLING, BONE_YOUNG, 23, BONE, BONE[2:6])
     sheets = {
         "thorn_hedge": [make_hedge(s, 2100 + i * 23, berries=r) for r in (True, False) for i, s in enumerate(HEDGES)],
+        "hex_shrub": [make_shrub(s, 2700 + i * 31) for i, s in enumerate(SHRUBS)],
+        "witch_broom": [make_broom(s, 2800 + i * 37) for i, s in enumerate(BROOMS)],
         "grave_candle": [make_candle(s, 2200 + i * 17, picked=r) for r in (False, True) for i, s in enumerate(CANDLES)],
         "witch_hat": [make_hat(s, 2300 + i * 13, picked=r) for r in (False, True) for i, s in enumerate(HATS)],
         "toad_cap": [make_toad(s, 2400 + i * 11, picked=r) for r in (False, True) for i, s in enumerate(TOADS)],
@@ -881,11 +1068,14 @@ def main():
     for name, frames in sheets.items():
         for i, (base, glow) in enumerate(frames):
             F.fit(name, i, base)
-        lit, glow = frames_sheet(frames, 3, 2)
-        write_png(props / (name + ".png"), FW * 3, FH * 2, lit)
-        write_png(props / (name + "_glow.png"), FW * 3, FH * 2, glow)
+        rows = len(frames) // 3
+        lit, glow = frames_sheet(frames, 3, rows)
+        write_png(props / (name + ".png"), FW * 3, FH * rows, lit)
+        write_png(props / (name + "_glow.png"), FW * 3, FH * rows, glow)
     assert not F.CUT, "cut off at the frame edge:\n" + "\n".join(F.CUT)
     write_png(props / "thorn_hedge_stripped.png", FW * 3, FH, sheet([make_hedge(s, 2150 + i, stripped=True)[0] for i, s in enumerate(HEDGES)], 3, 1))
+    write_png(props / "hex_shrub_stripped.png", FW * 3, FH, sheet([make_shrub(s, 2700 + i * 31, stripped=True)[0] for i, s in enumerate(SHRUBS)], 3, 1))
+    write_png(props / "witch_broom_stripped.png", FW * 3, FH, sheet([make_broom(s, 2800 + i * 37, stripped=True)[0] for i, s in enumerate(BROOMS)], 3, 1))
     write_png(props / "ghost_fern_stripped.png", FW * 3, FH, sheet([make_ghost(s, 2500 + i * 7, stripped=True)[0] for i, s in enumerate(F.FERNS)], 3, 1))
     rocks, ore_icon = curse_rocks()
     n = len(I.IRON_ROCKS)
@@ -904,7 +1094,7 @@ def main():
 def preview(hags, bones, sheets, rocks, icons):
     """docs/img/hexenwald_flora.png: everything at 2x on the Hexenwald's ground, by day (top) and by night with the glow (bottom)."""
     z = 2
-    w = CW * 8
+    w = max(CW * 8, FW * 3 * len(sheets))
     h1 = CH + FH * 2 + S.RH + 24
     img = [[(27, 44, 45, 255) if (y // z) < h1 else (10, 15, 24, 255) for _ in range(w * z)] for y in range(h1 * 2 * z)]
 
@@ -928,6 +1118,10 @@ def preview(hags, bones, sheets, rocks, icons):
             for i, (t, c) in enumerate(lit):
                 paste(t, (j * 4 + i) * CW, oy, dim)
                 paste(c, (j * 4 + i) * CW, oy, dim)
+                if "vines" in parts[i]:
+                    paste(art_tree.to_pixels(parts[i]["vines"]), (j * 4 + i) * CW, oy, dim)
+                    if night:
+                        paste(art_tree.to_pixels(parts[i]["vine_glow"]), (j * 4 + i) * CW, oy)
                 if night:
                     paste(parts[i]["glow_trunk"], (j * 4 + i) * CW, oy)
                     paste(parts[i]["glow_crown"], (j * 4 + i) * CW, oy)

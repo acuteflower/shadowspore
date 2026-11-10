@@ -9,24 +9,34 @@ Die Story-Welt führt sie zusammen mit dem freigeschalteten HUD ein (`hud_unlock
 
 ## Bestehende Fähigkeiten und Platzhalter
 
-Drei größere Start-Orbs stehen für bereits bestehende Mechaniken:
+Vier Start-Orbs stehen für bereits bestehende Mechaniken.
 
 - Kampf: Dreiklang – die dreiteilige Schwertkombo.
 - Bewegung: Antritt – Sprinten einschließlich des Dashs beim Loslaufen.
+- Schleichen (Bewegung) – langsamer gehen und später von Gegnern entdeckt werden.
 - Schatten: Schattenblink – der bestehende Blink; Reichweite und Abklingzeit werden direkt aus
   dem vorhandenen BlinkComponent angezeigt.
 
-Alle neun weiteren Knoten sind ausdrücklich **Platzhalter ohne Spielwirkung**. Namen,
-Positionen, Elternverbindungen, Beschreibung und Farben stehen in `data/skills.json`, geladen
-durch DataRegistry. Es gibt keine neuen Angriffe, Bewegungsfähigkeiten, Upgrades oder Buffs.
-Die angezeigten Punkte für später sind `Level - 1` aus dem vorhandenen XP-System; Erkundung
-kostet nichts und schreibt weder XP noch eine neue Punktewährung.
+Die sechs **Platzhalter** lassen sich kostenlos erkunden. Daneben gibt es lernbare Fähigkeiten
+und Kampf-Upgrades. Der vorhandene XP-Fortschritt vergibt einen Fähigkeitspunkt pro Stufe nach
+Stufe 1. Namen, Positionen, Kosten und Verbindungen stehen in `data/skills.json`.
 
 Nur Start-Orbs und direkte Nachbarn erkundeter Orbs sind sichtbar. Einen sichtbaren Platzhalter
 oder die Schaltfläche SCHLEIER ERKUNDEN 0,7 Sekunden halten, um ihn kostenlos zu erkunden.
 Enter / Leertaste / Controller A funktionieren ebenfalls. Frühes Loslassen, Wechsel der Auswahl,
 Verlassen der Schaltfläche bzw. des Orbs und Fokusverlust brechen den Vorgang ab.
 Die Markierung bleibt PLATZHALTER; ein erkundeter Knoten wird nie zu einer erlernten Fähigkeit.
+
+## Klettern
+
+Unter **Bewegung** den Knoten **Klettern** halten, um ihn für einen Fähigkeitspunkt zu lernen.
+Mit Ellie an eine Felswand heranlaufen und beim Hinweis **E KLETTERN** drücken (Controller **Y**).
+Ellie zieht sich eine Geländestufe nach oben, wenn sie auf dem Absatz Platz hat. Ein Treffer oder
+ein Hindernis während des Aufstiegs bringt sie zum Ausgangspunkt zurück. Beim Speichern während
+des Aufstiegs gilt der Ausgangspunkt als sichere Position.
+
+`python tools/art_hero_climb.py` rendert den Aufstieg und die Verletzungsmaske in acht Richtungen.
+`tools/test_wall_climb.tscn` prüft den Aufstieg an einer Felswand der Weltkarte.
 
 ## Ansicht und Animation
 

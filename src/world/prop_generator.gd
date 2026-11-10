@@ -45,17 +45,19 @@ const LAYERS: Array[Dictionary] = [
 	{"id": 29, "name": "witch_patch", "cell": 10, "reach": 5},
 	{"id": 30, "name": "witch_ore", "cell": 22, "reach": 4},
 ]
-const WITCH_KINDS: Array[String] = ["hag_tree", "bone_tree", "thorn_hedge", "grave_candle", "witch_hat", "toad_cap", "ghost_fern", "mandrake", "curse_rock"] ## the Hexenwald's own plant world (tools/art_hexenwald.py): grows only where the biome is `bare` of the meadow's
+const WITCH_KINDS: Array[String] = ["hag_tree", "bone_tree", "thorn_hedge", "grave_candle", "witch_hat", "toad_cap", "ghost_fern", "mandrake", "curse_rock", "hex_shrub", "witch_broom"] ## the Hexenwald's own plant world (tools/art_hexenwald.py): grows only where the biome is `bare` of the meadow's
 const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail"] ## may grow at the water's edge
 const TREE_KINDS: Array[String] = ["tree", "willow", "blossom", "birch", "hag_tree", "bone_tree"] ## what has a trunk and a crown
-const WITCH_SHARED: Array[String] = ["bush"] ## meadow plants the Hexenwald shares: the plain, unpickable bushes (more of them there, see `_witch`)
-const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "iron_rock": 3.05, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3, "hag_tree": 4.0, "bone_tree": 3.6, "curse_rock": 3.05, "thorn_hedge": 2.0, "ghost_fern": 0.3, "grave_candle": 0.25, "witch_hat": 0.25, "toad_cap": 0.1, "mandrake": 0.2} ## mushrooms give way to everything, so they never change what else stands where
+const WITCH_SHARED: Array[String] = ["bush"] ## meadow plants the Hexenwald shares: only along its fringe, deeper in every "bush" becomes one of its own (`_hex_bush`)
+const WITCH_CLEARING: int = 15 ## percent of the witch_wood cells that are a clearing with a witches' ring instead of a wood (`_in_clearing`)
+const WITCH_CLEARING_R: float = 7.5 ## tiles: no tree or bush grows that close to a clearing's middle
+const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "iron_rock": 3.05, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3, "hag_tree": 4.0, "bone_tree": 3.6, "curse_rock": 3.05, "thorn_hedge": 2.0, "ghost_fern": 0.3, "grave_candle": 0.25, "witch_hat": 0.25, "toad_cap": 0.1, "mandrake": 0.2, "hex_shrub": 1.9, "witch_broom": 1.8} ## mushrooms give way to everything, so they never change what else stands where
 const BED_RX: Array[float] = [40.0, 48.0, 56.0, 64.0, 72.0, 80.0] ## px, the gravel beds (assets/props/stonebed.png)
 const BED_FLATTEN: float = 0.64
 const GAP: float = 3.0 ## px kept free between footprints
 const CROWN_OVERLAP: float = 0.8 ## crowns may just touch (x their half widths): the minimum distance of two trees is this x the sum of their crown half widths
 const DENSE_CROWN_OVERLAP: float = 0.6 ## the same for two trees of a grove or a wood: their crowns reach into each other and close into one canopy (a smaller factor lets them stand closer)
-const FOREST_BED_RX: Array[float] = [28.0, 36.0, 44.0, 52.0, 60.0, 70.0] ## px, the forest floor under every tree of a wood (assets/props/forestbed.png, tools/art_forestbed.py)
+const FOREST_BED_RX: Array[float] = [28.0, 36.0, 44.0, 52.0, 60.0, 70.0] ## px, the forest floor under every tree of a wood (assets/props/forestbed.png, tools/art_forestbed.py); variants 6-11 are the same sizes in the Hexenwald's floor (row 1)
 const KRUMMHOLZ_LEVEL: float = 1.6 ## relief level (0..3, smooth) from which trees and bushes are stunted by wind and cold
 const BUSH_KINDS: Array[String] = ["bush", "berry_bush", "ember_bush"]
 const YOUNG_GROW_DAYS: float = 7.0 ## days a generated sapling needs to become a fir (WorldLevel counts them from day 1)
@@ -655,12 +657,58 @@ func _flora_patch(found: Array[Dictionary], rng: RandomNumberGenerator, center: 
 
 
 ## Tiles from the coast (negative never happens on land).
+## A meadow bush that falls into the Hexenwald: along the fringe (BiomeBlend below 0.45) some stay meadow bushes, so the border is a seam and
+## not a line; deeper in it is always one of the wood's own: three Dämmersträucher to two Besenginster. Decided by position, no random draw.
+func _hex_bush(cell: Vector2i) -> String:
+	var roll: int = absi(hash(Vector2i(cell.x * 7, cell.y * 13))) % 100
+	if float(roll) / 100.0 > BiomeBlend.amount_at(Vector2(cell) * 16.0 + Vector2(8, 8)) / 0.45:
+		return "bush"
+	return "hex_shrub" if roll % 5 < 3 else "witch_broom"
+
+
+## True within a clearing of the Hexenwald: some witch_wood cells carry no wood but a ring (see `_witch`); their middle is a pure function of
+## the cell, so every layer can ask (trees and bushes keep out, flowers may grow there).
+func _in_clearing(at: Vector2) -> bool:
+	var size: float = 22.0
+	var cc: Vector2i = Vector2i(floori(at.x / size), floori(at.y / size))
+	for dy: int in range(-1, 2):
+		for dx: int in range(-1, 2):
+			var middle: Vector2 = _clearing_middle(cc + Vector2i(dx, dy))
+			if middle.is_finite() and at.distance_to(middle) < WITCH_CLEARING_R:
+				return true
+	return false
+
+
+## The middle of the clearing in witch_wood cell `cc`, INF when that cell is a wood.
+func _clearing_middle(cc: Vector2i) -> Vector2:
+	var h: int = absi(hash(Vector3i(cc.x, cc.y, _seed + 4421)))
+	if h % 100 >= WITCH_CLEARING:
+		return Vector2.INF
+	return (Vector2(cc) + Vector2(0.3 + float(h / 100 % 40) / 100.0, 0.3 + float(h / 4000 % 40) / 100.0)) * 22.0
+
+
 ## The Hexenwald's plant world (data/plants.json WITCH_KINDS): close, dark woods of Hexenulmen with a Bleichbaum or two at
 ## their edge and thorn hedges, ghost ferns and toadstools between the trunks; lone trees; flowers in the gaps (grave candles
 ## and witch hats in the open, toadstools and ferns in the shade, a rare mandrake); rings and drifts of one kind; cursed silver.
 func _witch(layer: String, found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2, wild: float) -> void:
 	match layer:
 		"witch_wood":
+			var cc: Vector2i = Vector2i(floori(center.x / 22.0), floori(center.y / 22.0))
+			var middle: Vector2 = _clearing_middle(cc)
+			if middle.is_finite(): ## a clearing: grass, a witches' ring, flowers at its rim, a mandrake in the middle now and then
+				var ring_kind: String = ["toad_cap", "grave_candle", "witch_hat", "toad_cap"][rng.randi() % 4]
+				var count: int = rng.randi_range(7, 10)
+				var start: float = rng.randf() * TAU
+				var r: float = rng.randf_range(2.6, 3.6)
+				for i: int in count:
+					_add(found, rng, ring_kind, 0, middle + Vector2.from_angle(start + TAU * float(i) / float(count)) * Vector2(r, r * 0.8))
+				if rng.randf() < 0.55:
+					_add(found, rng, "mandrake", _weighted(rng, "mandrake"), middle)
+				for _i: int in rng.randi_range(6, 11): ## flowers and ferns where the wood begins
+					var at: Vector2 = middle + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(5.0, 7.5)
+					var rim: String = ["witch_hat", "grave_candle", "ghost_fern", "ghost_fern", "toad_cap"][rng.randi() % 5]
+					_add(found, rng, rim, _weighted(rng, rim), at)
+				return
 			if rng.randf() > 0.86 + 0.3 * wild: ## nearly every cell carries a wood (was 0.68 + 0.3 * wild): the Hexenwald is full
 				return
 			var radius: float = rng.randf_range(6.0, 11.0)
@@ -676,11 +724,12 @@ func _witch(layer: String, found: Array[Dictionary], rng: RandomNumberGenerator,
 				var before: int = found.size()
 				_add(found, rng, kind, _weighted(rng, kind) if dead else (3 if t < 0.25 and rng.randf() < 0.5 else (2 if t < 0.5 else (1 if t < 0.8 else 0))), at, 0.0, true)
 				if found.size() > before:
-					found[-1].erase("bed") ## no meadow litter under them: this ground is its own
+					if found[-1].has("bed"): ## the Hexenwald's own floor under them (row 1 of forestbed.png: variants 6-11)
+						found[-1]["bed"] = int(found[-1].bed) % FOREST_BED_RX.size() + FOREST_BED_RX.size()
 					trees += 1
-			for _i: int in rng.randi_range(7, 14):
+			for _i: int in rng.randi_range(10, 17):
 				var at: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * radius * rng.randf_range(0.2, 1.2)
-				var under: String = ["thorn_hedge", "ghost_fern", "ghost_fern", "toad_cap", "bush", "bush"][rng.randi() % 6]
+				var under: String = ["thorn_hedge", "ghost_fern", "ghost_fern", "toad_cap", "bush", "bush", "witch_hat", "grave_candle", "ghost_fern"][rng.randi() % 9]
 				_add(found, rng, under, _weighted(rng, under), at)
 		"witch_tree":
 			if rng.randf() < 0.6 + 0.2 * wild:
@@ -689,8 +738,11 @@ func _witch(layer: String, found: Array[Dictionary], rng: RandomNumberGenerator,
 		"witch_flora":
 			if rng.randf() < 0.85:
 				var roll: float = rng.randf()
-				var kind: String = "mandrake" if roll < 0.04 else ("bush" if roll < 0.24 else "thorn_hedge" if roll < 0.34 else (["ghost_fern", "toad_cap"][rng.randi() % 2] if rng.randf() < 0.25 + 0.6 * wild else ["grave_candle", "witch_hat"][rng.randi() % 2]))
+				var kind: String = "mandrake" if roll < 0.04 else ("bush" if roll < 0.2 else "thorn_hedge" if roll < 0.28 else (["ghost_fern", "toad_cap"][rng.randi() % 2] if rng.randf() < 0.25 + 0.6 * wild else ["grave_candle", "witch_hat"][rng.randi() % 2]))
 				_add(found, rng, kind, _weighted(rng, kind), center)
+				if kind != "bush" and kind != "thorn_hedge" and rng.randf() < 0.5: ## small plants come in twos and threes
+					for _i: int in rng.randi_range(1, 2):
+						_add(found, rng, kind, _weighted(rng, kind), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.0, 1.8))
 		"witch_patch":
 			if rng.randf() < 0.75:
 				var kind: String = ["grave_candle", "witch_hat", "toad_cap", "ghost_fern", "thorn_hedge", "bush"][rng.randi() % 6]
@@ -741,6 +793,12 @@ func _add(found: Array[Dictionary], rng: RandomNumberGenerator, kind: String, va
 	var cell: Vector2i = Vector2i(floori(at.x), floori(at.y))
 	if (kind == "berry_bush" or kind == "ember_bush") and berry_free_cells.has(cell):
 		kind = "bush"
+	if kind == "bush" and is_bare(cell):
+		kind = _hex_bush(cell)
+		if kind != "bush":
+			variant = [0, 0, 0, 1, 1, 1, 2, 2][absi(hash(Vector2i(cell.x * 3, cell.y * 17))) % 8]
+	if (TREE_KINDS.has(kind) or kind == "thorn_hedge" or kind == "hex_shrub" or kind == "witch_broom" or kind == "bush") and is_bare(cell) and _in_clearing(at):
+		return
 	var plant: Dictionary = _plants[kind]
 	var tile: int = RegionMap.WORLD_TILES
 	var prio: float = float(PRIORITY[kind]) + rng.randf() * 0.9 + bias ## the random part breaks ties the same way everywhere; `bias` < 0 makes the newer woods give way to what stood before

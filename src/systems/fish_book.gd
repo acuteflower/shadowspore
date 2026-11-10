@@ -1,7 +1,7 @@
 class_name FishBook
 extends RefCounted
 ## The river book: what this player has caught, per species (count, best length, first day). Local to the
-## player's machine, saved atomically beside the character save (like the CookingBook), never in save.json.
+## player's machine, saved atomically beside the character save , never in save.json.
 
 var path: String
 var species: Dictionary = {} ## id -> {"caught": int, "best": int, "first_day": int}

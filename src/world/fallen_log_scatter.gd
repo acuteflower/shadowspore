@@ -11,13 +11,15 @@ static func candidate(world: Variant,c: Vector2i,index: int,obstacles: Array[Dic
 	rng.seed = hash(Vector3i(c.x*4+x,c.y*4+y,world._map.world_seed+12409))
 	var pos: Vector2 = Vector2(c*32)*16+Vector2(x*128+64,y*128+64)+Vector2(rng.randf_range(-20,20),rng.randf_range(-20,20)).round()
 	var tile: Vector2i = Vector2i(pos/16.0)
-	if not world._land_at(tile.x,tile.y) or world._generator.is_bare(tile): return {}
+	if not world._land_at(tile.x,tile.y): return {}
+	var bones: bool = world._generator.is_bare(tile) ## the Hexenwald: bleached Bleichbaum trunks (FallenLog frames 24-47)
 	var trees: int = _trees_near(pos, obstacles, grid)
 	var chance: float = float(DataRegistry.table("fallen_logs").get("chance",0.42))
 	chance *= 0.12 if trees == 0 else 1.0 + 0.15 * float(mini(trees, 4)) ## a trunk lies in or at a wood, rarely out in the open
 	var biome: String = world._land_biome(tile)
 	if biome == "glass_cliffs": chance *= 0.2
 	elif biome == "mist_forest": chance *= 1.35
+	elif bones: chance *= 1.25
 	if rng.randf() > chance: return {}
 	var frame: int = rng.randi_range(0,23)
 	var spec: Dictionary = (DataRegistry.table("fallen_logs").frames as Array)[frame]
@@ -44,7 +46,7 @@ static func candidate(world: Variant,c: Vector2i,index: int,obstacles: Array[Dic
 			var plant: Dictionary = DataRegistry.get_entry("plants",String(obstacle.kind))
 			radius = float((plant.radius as Array)[int(obstacle.variant)])*float(obstacle.get("scale",1.0))
 		if point.distance_to(Geometry2D.get_closest_point_to_segment(point,a,b)) < radius+14.0: return {}
-	return {"pos":pos,"frame":frame}
+	return {"pos":pos,"frame":frame + (FallenLog.FRAMES if bones else 0)}
 
 
 ## How many trees stand within five tiles of `pos` (the obstacles of the chunk and its neighbours).

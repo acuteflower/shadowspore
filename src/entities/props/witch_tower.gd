@@ -9,6 +9,10 @@ const GREEN: Color = Color("a8ff6a")
 const HOT: Color = Color("eaffc4")
 const EYE_LOOK: Array[int] = [0, 0, 0, 1, 2, 2, 3, 0, 0, 4, 5, 5, 6, 0, 7, 0] ## frames of the eye strip, half a second each
 
+const INTERIOR: String = "witch_stairs" ## the shaft with the spiral stair; the witch's room above it is reached from there (data/interiors.json, tools/art_witch_tower_inside.py)
+
+var doorway: Doorway ## the gate (E): into the shaft
+var exit_position: Vector2 ## where she stands when she comes out again
 var _info: Dictionary = {}
 var _origin: Vector2 = Vector2.ZERO ## the frame's top left, from the feet
 var _glows: Array[CanvasItem] = []
@@ -66,6 +70,18 @@ func _ready() -> void:
 	shape.position = Vector2(0, -24)
 	body_shape.add_child(shape)
 	add_child(body_shape)
+	doorway = Doorway.new()
+	doorway.name = "Gate"
+	doorway.interior_id = INTERIOR
+	doorway.reach_radius = 10.0
+	doorway.prompt_height = 44.0
+	doorway.position = Vector2(0, 1)
+	add_child(doorway)
+	exit_position = global_position + Vector2(0, 20)
+	var interiors: Interiors = get_tree().get_first_node_in_group("interiors") as Interiors
+	if interiors != null:
+		for room: String in [INTERIOR, "witch_room"]: ## both lie behind this gate as far as the open world is concerned
+			interiors.register_entrance(room, self)
 	add_to_group("night_lights")
 	set_night(TimeManager.night_amount())
 

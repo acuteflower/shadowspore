@@ -107,6 +107,20 @@ static func gain(reaction_kind: String, fed_today: int, traits: Array[String]) -
 	return base * daily_factor(fed_today) * hungry * _trait_factor(traits, "gain")
 
 
+## Why this player cannot feed the bird `key` right now ("" = she can): "NOCH N S" while it still chews (cooldown), "SATT FÜR HEUTE"
+## after `full_after` feedings today. Asked by the host (the lure) and by every peer (the greyed-out prompt).
+static func feed_block(tree: SceneTree, key: String, peer: int) -> String:
+	var registry: PetRegistry = PetRegistry.of(tree)
+	if registry == null:
+		return ""
+	if registry.fed_today(key, peer) >= int((table()["feed"] as Dictionary)["full_after"]):
+		return "SATT FÜR HEUTE"
+	var wait: float = registry.cooldown_left(key, peer)
+	if wait > 0.0:
+		return "NOCH %d S" % ceili(wait)
+	return ""
+
+
 ## The distance (px) within which a bird starts to trust a still, sneaking Ellie with food in her hand.
 static func lure_range(species: String, stage: int, calm: float, traits: Array[String]) -> float:
 	var lure: Dictionary = table()["lure"] as Dictionary

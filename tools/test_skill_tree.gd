@@ -184,17 +184,19 @@ func _run() -> void:
 	var skills: SkillTreeComponent = player.get_node("SkillTreeComponent") as SkillTreeComponent
 	var window: SkillTreeWindow = player._hud.get_node("SkillTreeWindow") as SkillTreeWindow
 	var nodes: Dictionary = skills.definitions()
-	check(nodes.size() == 12, "four roots (sneak included), two upgrades and six placeholders")
+	check(nodes.size() == 13, "four roots, one unlock, two upgrades and six placeholders")
 	var roots: int = 0
 	var visible_count: int = 0
 	for id: String in nodes:
 		if skills.is_awake(id): roots += 1
 		if skills.is_visible(id): visible_count += 1
-		check(skills.is_awake(id) or skills.is_upgrade(id) or bool((nodes[id] as Dictionary).get("placeholder", false)), "every non-root is an upgrade or explicitly cosmetic")
-	check(roots == 4 and visible_count == 10, "four starters, both upgrades and the direct placeholder neighbours initially visible")
+		check(skills.is_awake(id) or skills.is_upgrade(id) or skills.is_unlock(id) or bool((nodes[id] as Dictionary).get("placeholder", false)), "every non-root has a defined node type")
+	check(roots == 4 and visible_count == 11, "the unlock is visible alongside the starters, upgrades and direct neighbours")
 	check(skills.is_root("sneak") and skills.upgrades_of("sneak").is_empty() and skills.upgrades_of("sprint").is_empty(), "sprint and sneak have no upgrades")
 	check(not skills.can_explore("movement_echo_b"), "hidden descendants cannot be explored")
 	check(skills.points_free() == 0 and skills.upgrade_state("combo_four") == &"locked", "level 1: no points, the first upgrade is locked")
+	skills.request_learn(WallClimb.SKILL)
+	check(window._shown(WallClimb.SKILL) and not skills.is_awake(WallClimb.SKILL) and not skills.can_explore(WallClimb.SKILL), "climbing is a visible purchase and needs a point")
 	skills.request_explore("movement_echo_b")
 	skills.request_explore("unknown")
 	skills.request_explore("sword_combo")
@@ -313,11 +315,18 @@ func _run() -> void:
 	skills.request_explore("movement_echo_a")
 	check(skills.export_data() == before, "duplicate exploration is idempotent")
 	await check_upgrades(player, window, skills)
+	var free: int = skills.points_free()
+	window._select(WallClimb.SKILL)
+	await capture("climb-ready")
+	await hold_learn(window, skills, WallClimb.SKILL, WallClimb.SKILL)
+	check(skills.is_awake(WallClimb.SKILL) and skills.points_free() == free - 1, "holding on Klettern buys it for exactly one point")
+	await capture("climb-learned")
 	check(SaveGame.save(get_tree(), SAVE), "isolated save writes discovery")
 	skills.import_data({})
 	check(not skills.is_explored("movement_echo_a"), "old saves start with roots only")
 	check(SaveGame.load_into(get_tree(), SAVE) and skills.is_explored("movement_echo_a"), "save round trip restores discovery")
 	check(skills.is_learned("combo_four") and not skills.is_learned("combo_five") and player.attack._combo_size({"weapon_class": "sword_1h"}) == 4, "SaveGame restores learned upgrades")
+	check(skills.is_learned(WallClimb.SKILL) and skills.points_free() == free - 1, "SaveGame restores climbing and its point cost")
 	skills.import_data({"discovered": ["movement_echo_b", "unknown", "sword_combo", "movement_echo_a", "movement_echo_a"]})
 	check((skills.export_data().discovered as Array).size() == 2 and skills.is_explored("movement_echo_b"), "unordered saves restore connected nodes and discard duplicates and unknown IDs")
 	skills.import_data({"discovered": ["movement_echo_b"]})

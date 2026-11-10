@@ -1,0 +1,68 @@
+{
+  "frame": [
+    320,
+    360
+  ],
+  "feet": [
+    160,
+    340
+  ],
+  "layers": [
+    "pad",
+    "trunk",
+    "crown",
+    "moss",
+    "charms",
+    "glow"
+  ],
+  "collision": {
+    "shape": "ellipse",
+    "center": [
+      160,
+      324
+    ],
+    "radii": [
+      31,
+      14
+    ]
+  },
+  "perches": [
+    [
+      55,
+      141
+    ],
+    [
+      78,
+      117
+    ],
+    [
+      105,
+      73
+    ],
+    [
+      217,
+      60
+    ],
+    [
+      237,
+      99
+    ],
+    [
+      263,
+      135
+    ],
+    [
+      242,
+      169
+    ],
+    [
+      67,
+      164
+    ],
+    [
+      232,
+      150
+    ]
+  ],
+  "perch_coordinates": "frame pixels, feet at y=340; offsets = perch - feet"
+}

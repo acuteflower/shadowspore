@@ -37,6 +37,11 @@ func chunk_unloaded(cell: Vector2i) -> void:
 			animal.queue_free()
 
 
+## The chunk lies in the Hexenwald (its middle deep in BiomeBlend's field).
+func _witch(cell: Vector2i) -> bool:
+	return BiomeBlend.amount_at(Vector2(cell) * 512.0 + Vector2(256, 256)) >= 0.5
+
+
 func _cell(point: Vector2) -> Vector2i:
 	return Vector2i(floori(point.x / 512), floori(point.y / 512))
 
@@ -67,10 +72,11 @@ func _process(_delta: float) -> void:
 				_pending.append(cell)
 		if not _night:
 			for node: Node in _animals.get_children():
-				if (node as TinyWildlife).species == "moth":
+				if (node as TinyWildlife).species == "moth" and not _witch(_cell((node as TinyWildlife).home)):
 					node.queue_free()
 			for cell: Vector2i in _settled:
-				(_settled[cell] as Dictionary).erase("moth")
+				if not _witch(cell): ## the Hexenwald's moths stay: it is always dusk there
+					(_settled[cell] as Dictionary).erase("moth")
 	if not _pending.is_empty():
 		var cell: Vector2i = _pending.pop_front()
 		if _active.has(cell):
@@ -81,11 +87,15 @@ func _populate(cell: Vector2i) -> void:
 	if not _settled.has(cell):
 		_settled[cell] = {}
 	var settled: Dictionary = _settled[cell]
-	for species: String in ["snail", "bee", "ladybug", "moth"]:
-		if settled.has(species) or (species == "moth" and not TimeManager.is_night()):
+	var witch: bool = _witch(cell)
+	for species: String in ["snail", "bee", "ladybug", "moth", "toad", "bat"]:
+		if settled.has(species) or (species == "moth" and not TimeManager.is_night() and not witch) or (species in ["toad", "bat"] and not witch):
 			continue
 		settled[species] = true
 		var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
+		if witch and spec.has("witch_forest"):
+			spec = spec.duplicate()
+			spec.merge(spec["witch_forest"] as Dictionary, true)
 		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 		rng.seed = hash(Vector3i(cell.x, cell.y, _seed + hash(species)))
 		if rng.randf() > float(spec["chunk_chance"]):
@@ -98,12 +108,30 @@ func _populate(cell: Vector2i) -> void:
 				patch.append(point)
 			if species == "moth":
 				var lights: Array[Vector2] = []
+				var candles: Array[Vector2] = [] ## in the Hexenwald they keep to the grave candles' flames
 				for node: Node in get_tree().get_nodes_in_group("flora_glow"):
 					if node is Node2D and _cell((node as Node2D).global_position) == cell:
 						lights.append((node as Node2D).global_position)
-				if lights.size() >= 3:
+						if node is WorldProp and (node as WorldProp).kind == "grave_candle":
+							candles.append((node as Node2D).global_position + Vector2(0, -8))
+				if candles.size() >= 3:
+					patch = candles
+				elif lights.size() >= 3:
 					patch = lights
 			if patch.size() < 3:
+				continue
+		if species == "toad": ## its home is a toadstool
+			for node: Node in get_tree().get_nodes_in_group("toad_spots"):
+				if node is Node2D and _cell((node as Node2D).global_position) == cell:
+					patch.append((node as Node2D).global_position)
+			if patch.is_empty():
+				continue
+		elif species == "bat": ## its home is a stand of the wood's trees, which it hangs under
+			for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+				var trunk: FirTree = node as FirTree
+				if trunk != null and _cell(trunk.global_position) == cell and (trunk.kind == "hag_tree" or trunk.kind == "bone_tree") and trunk.variant >= 1:
+					patch.append(trunk.global_position)
+			if patch.size() < 2:
 				continue
 		var count: int = rng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
 		for i: int in count:
@@ -117,6 +145,12 @@ func _populate(cell: Vector2i) -> void:
 			var tree: FirTree
 			if species in ["bee", "ladybug", "moth"]:
 				at = patch[rng.randi_range(0, patch.size() - 1)]
+			elif species == "toad":
+				at = (patch[rng.randi_range(0, patch.size() - 1)] + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(7.0, 13.0)).round()
+				if not can_crawl(at, at, species):
+					continue
+			elif species == "bat":
+				at = patch[rng.randi_range(0, patch.size() - 1)] + Vector2(rng.randf_range(-30.0, 30.0), rng.randf_range(-20.0, 20.0))
 			elif species == "snail" and rng.randf() < float(spec["tree_chance"]):
 				for node: Node in get_tree().get_nodes_in_group("bird_perches"):
 					var candidate: FirTree = node as FirTree

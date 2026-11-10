@@ -18,6 +18,7 @@
 [ext_resource type="Script" path="res://src/components/inventory_component.gd" id="11_inv"]
 [ext_resource type="Script" path="res://src/components/attack_component.gd" id="12_attack"]
 [ext_resource type="Script" path="res://src/components/talisman_component.gd" id="19_talisman"]
+[ext_resource type="Script" path="res://src/components/wall_climb.gd" id="20_climb"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flash"]
 resource_local_to_scene = true
@@ -78,6 +79,9 @@ script = ExtResource("1_script")
 
 [node name="SkillTreeComponent" type="Node" parent="."]
 script = ExtResource("18_skills")
+
+[node name="WallClimb" type="Node" parent="."]
+script = ExtResource("20_climb")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 material = SubResource("ShaderMaterial_flash")

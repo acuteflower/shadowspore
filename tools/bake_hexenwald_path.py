@@ -72,7 +72,7 @@ def main():
         if ya < 0 or xa < 0 or yb >= W or xb >= W:
             continue
         if integ[yb, xb] - integ[ya, xb] - integ[yb, xa] + integ[ya, xa] == (yb - ya) * (xb - xa):
-            d = (x - CENTRE[0]) ** 2 + (y - CENTRE[1]) ** 2
+            d = -((x - src[0]) ** 2 + (y - src[1]) ** 2)  # the farthest fitting place from the way in (the tower lies deep in the forest)
             if best is None or d < best[0]:
                 best = (d, x, y)
     assert best, "no flat place for the tower"

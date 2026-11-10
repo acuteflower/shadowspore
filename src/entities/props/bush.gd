@@ -27,9 +27,10 @@ func _setup_prop() -> void:
 	_foliage.body_exited.connect(_on_exit)
 	_notifier = VisibleOnScreenNotifier2D.new()
 	_notifier.rect = Rect2(-_radius - 8.0, -_height - 8.0, (_radius + 8.0) * 2.0, _height + 16.0)
-	_notifier.screen_entered.connect(func() -> void: _on_screen = true)
-	_notifier.screen_exited.connect(func() -> void: _on_screen = false)
+	_notifier.screen_entered.connect(_set_on_screen.bind(true))
+	_notifier.screen_exited.connect(_set_on_screen.bind(false))
 	add_child(_notifier)
+	_settle_on_screen.call_deferred()
 	if _spec.has("critters"):
 		_critter = LeafCritter.new()
 		_critter.setup(self)
@@ -41,6 +42,22 @@ func _process(_delta: float) -> void:
 		return
 	if _tween == null or not _tween.is_running(): ## a rustle has the sprite for a moment, else it sways in the wind
 		_sprite.skew = WorldWind.sample(global_position).x * _sway_rate
+
+
+## Off screen a bush does nothing per frame (hundreds of them are loaded): processing follows the notifier.
+func _set_on_screen(on: bool) -> void:
+	_on_screen = on
+	set_process(on)
+
+
+## The notifier only reports changes, so a bush that was never seen is told once it has been drawn (two frames in).
+func _settle_on_screen() -> void:
+	for i: int in 2:
+		if not is_inside_tree():
+			return
+		await get_tree().process_frame
+	if is_instance_valid(_notifier) and is_inside_tree():
+		_set_on_screen(_notifier.is_on_screen())
 
 
 func _exit_tree() -> void:

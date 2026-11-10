@@ -2249,7 +2249,9 @@
      "max": 1
     }
    ]
-  }
+  },
+  "fireflies": true,
+  "vines": "res://assets/props/hag_tree_vines.png"
  },
  "bone_tree": {
   "name": "Bleichbaum",
@@ -2307,8 +2309,8 @@
    68
   ],
   "crown_shape": "dome",
-  "sway": 0.006,
-  "light_color": "#a8ff6a",
+  "sway": 0.012,
+  "light_color": "#b48ae0",
   "light_from": 1,
   "light_energy": 0.26,
   "rain_colors": [
@@ -2352,6 +2354,19 @@
      "min": 1,
      "max": 2
     }
+   ]
+  },
+  "twitch": {
+   "every": [
+    9.0,
+    26.0
+   ],
+   "amount": 0.32,
+   "volume_db": -15.0,
+   "sounds": [
+    "res://assets/audio/hexenwald/creak_a.wav",
+    "res://assets/audio/hexenwald/creak_b.wav",
+    "res://assets/audio/hexenwald/creak_c.wav"
    ]
   }
  },
@@ -2402,14 +2417,15 @@
   "slow": 0.9,
   "scene": "res://src/entities/props/flora.tscn",
   "edge_margin": 3,
-  "fireflies": true
+  "fireflies": true,
+  "flicker": true
  },
  "witch_hat": {
   "name": "Hexenhut",
   "texture": "res://assets/props/witch_hat.png",
   "glow": "res://assets/props/witch_hat_glow.png",
   "light": {
-   "color": "#a8ff6a",
+   "color": "#c690ec",
    "radius": 12,
    "energy": 0.16
   },
@@ -2498,7 +2514,18 @@
   ],
   "slow": 0.92,
   "scene": "res://src/entities/props/flora.tscn",
-  "edge_margin": 3
+  "edge_margin": 3,
+  "puff": [
+   "#eaffc4",
+   "#a8ff6a",
+   "#4a6a3a"
+  ],
+  "puff_sink": true,
+  "puff_idle": [
+   9.0,
+   26.0
+  ],
+  "group": "toad_spots"
  },
  "mandrake": {
   "name": "Alraune",
@@ -2781,5 +2808,135 @@
    "3a425c",
    "262a42"
   ]
+ },
+ "hex_shrub": {
+  "name": "Dämmerstrauch",
+  "texture": "res://assets/props/hex_shrub.png",
+  "glow": "res://assets/props/hex_shrub_glow.png",
+  "stripped": "res://assets/props/hex_shrub_stripped.png",
+  "columns": 3,
+  "rows": 1,
+  "weights": [
+   3,
+   3,
+   2
+  ],
+  "radius": [
+   9,
+   12,
+   14
+  ],
+  "height": [
+   15,
+   20,
+   23
+  ],
+  "slow": 0.7,
+  "sway": 0.02,
+  "leaf_colors": [
+   "#15303a",
+   "#1d4a48",
+   "#40207a"
+  ],
+  "harvest": {
+   "tool": "sickle",
+   "hits": 3,
+   "drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.12,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.6,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.35,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "scene": "res://src/entities/props/bush.tscn",
+  "edge_margin": 4
+ },
+ "witch_broom": {
+  "name": "Besenginster",
+  "texture": "res://assets/props/witch_broom.png",
+  "glow": "res://assets/props/witch_broom_glow.png",
+  "stripped": "res://assets/props/witch_broom_stripped.png",
+  "columns": 3,
+  "rows": 1,
+  "weights": [
+   3,
+   3,
+   2
+  ],
+  "radius": [
+   7,
+   10,
+   12
+  ],
+  "height": [
+   20,
+   25,
+   28
+  ],
+  "slow": 0.8,
+  "sway": 0.035,
+  "leaf_colors": [
+   "#2a403e",
+   "#426052",
+   "#6434a6"
+  ],
+  "harvest": {
+   "tool": "sickle",
+   "hits": 3,
+   "drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.25,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.12,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "plant_fiber",
+     "chance": 0.6,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.35,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "scene": "res://src/entities/props/bush.tscn",
+  "edge_margin": 4
  }
 }

@@ -30,21 +30,25 @@ from gen_art import hexc  # noqa: E402
 
 OUT = ROOT / "props" / "witch_tower"
 BASE = len(h.RAMPS)
-(CSTONE, CSTONE_L, HAG, HAG_L, HEXG, LEAF, WINE, BONE, HAIRM, SILVER, HOODM, BREW) = range(BASE, BASE + 12)
+(CSTONE, CSTONE_L, HAG, HAG_L, HEXG, LEAF, WINE, BONE, HAIRM, SILVER, HOODM, BREW, WOODP, WOODP_L) = range(BASE, BASE + 14)
 h.RAMPS += [[hexc(c) for c in row] for row in [
-    ["0e1220", "1c2638", "313f52", "4c6070"],  # curse-silver stone: cold blue-green, dark
-    ["1c2638", "313f52", "4c6070", "7890a0"],  # the same, lit (arches, string courses, caps)
+    ["0c0e18", "181d2b", "272d3d", "3b4354"],  # curse-silver stone: the Hexenwald's slate, dusky violet-grey like its cliffs (not a blue of its own)
+    ["181d2b", "272d3d", "3b4354", "545c6c"],  # the same, lit (arches, string courses, caps)
     ["0c0812", "1a1322", "2c2236", "44344c"],  # hag elm bark: almost black, violet in the shade
     ["1a1322", "2c2236", "44344c", "625064"],  # its lit ridges
     ["2e6a2a", "4a9a3a", "a8ff6a", "eaffc4"],  # witch green: every light of the wood
     ["0a0e20", "15303a", "1d4a48", "2d6a58"],  # the elm's leaves: blue-black .. dull sea green
-    ["2a0612", "5a0a1e", "8e1430", "c43044"],  # wine red: toad caps, rags, the hat's band
+    ["24081a", "481026", "701a34", "983044"],  # wine red, dusky: toad caps, rags, the hat's band
     ["56506c", "8a8698", "b8b4b8", "dedacc"],  # bone wood
     ["1e3038", "34504e", "557468", "86a08a"],  # witch-hair moss
     ["4a5670", "8a98b4", "c8d4e8", "f4f8ff"],  # silver: the moon on the hat, the buckle
-    ["120a26", "26124a", "40207a", "6434a6"],  # the dormer's and the turret's violet
+    ["100b1e", "1e1536", "30234e", "483666"],  # the dormer's and the turret's violet
     ["123a2a", "1e6a3a", "4ac85a", "c8ffa0"],  # the brew
+    ["120c18", "21182a", "33283c", "4a3e50"],  # the chamber's planks: the hag elm's own wood, sawn
+    ["1a1322", "2b2236", "41364a", "5a4e60"],  # the same, weathered
 ]]
+PLANK, PLANK_W = WOODP, WOODP_L  # no warm timber in this wood
+MOSS, MOSS_L = LEAF, HAIRM  # growth on the stone has the colours of the elm's leaves and the witch-hair moss
 LIT = (HEXG, BREW)
 GRAINED = (BARK, BARK_D, PLANK, PLANK_W, MOSS, MOSS_L, CSTONE, CSTONE_L, HAG, HAG_L, IRON, BONE, LEAF, HAIRM)
 STONES = (CSTONE, CSTONE, CSTONE_L)
@@ -580,9 +584,9 @@ def model(rng, with_crown=False):
 
 
 HAT_TONES = (
-    [hexc(c) for c in ("120a26", "26124a", "40207a", "6434a6")],  # witch violet
-    [hexc(c) for c in ("140e24", "2a1c3e", "45305c", "66487e")],  # dusty plum
-    [hexc(c) for c in ("0e1020", "1c2038", "303a5a", "4c5c80")],  # cold slate, damp
+    [hexc(c) for c in ("100b1e", "1e1536", "30234e", "483666")],  # witch violet, dusky like the wood's shade
+    [hexc(c) for c in ("120e1e", "231a32", "382b48", "524060")],  # dusty plum
+    [hexc(c) for c in ("0d0f1a", "191d2e", "292f44", "3e465c")],  # cold slate, damp
 )
 
 
@@ -603,29 +607,38 @@ def part(name, m, seed, glow=True):
 
 
 def pad():
-    """The ground under the tower: dark trodden earth and old flagstones, moss between them, dithered into the grass."""
+    """The ground under the tower: quiet trodden earth in the Hexenwald's own ground tones (big soft zones, ordered dither, no speckle) that thins out into the grass,
+    and a forecourt of worn flagstones of the keep's slate fanning out from the gate, with a tuft of moss where one is missing."""
     w, hh = 190, 96
     arr = np.zeros((hh, w, 4), np.uint8)
-    earth = [hexc(c)[:3] for c in ("0c1016", "141c22", "1f2a2e", "2d3c3c")]
-    stone = [hexc(c)[:3] for c in ("161e2c", "1c2638", "283446")]
+    earth = [hexc(c)[:3] for c in ("10161f", "141d26", "19252d")]  # trodden middle .. the rim, one step under the dark grass
+    flags = [hexc(c)[:3] for c in ("1c2231", "232a3a", "2b3344")]
+    joint, moss = hexc("0e131b")[:3], hexc("243a36")[:3]
+    gx, gy = w / 2, 53.0  # the middle of the forecourt, a little in front of the gate's foot
     for y in range(hh):
         for x in range(w):
             dx, dy = (x + 0.5 - w / 2) / (w / 2), (y + 0.5 - hh / 2) / (hh / 2)
-            r = (abs(dx) ** 2.6 + abs(dy) ** 2.6) ** (1 / 2.6) + (fbm(x * 0.16, y * 0.2, 4) - 0.5) * 0.45
-            if r > 1.0 - 0.12 * bayer(x, y):
+            r = (abs(dx) ** 2.3 + abs(dy) ** 2.3) ** (1 / 2.3) + (fbm(x * 0.045, y * 0.06, 4) - 0.5) * 0.3
+            b = bayer(x, y)
+            if r > 0.74 + 0.26 * b:  # a wide dithered rim
                 continue
-            tone = 1 + (fbm(x * 0.3, y * 0.4, 9) > 0.52) + (r < 0.55 and fbm(x * 0.5, y * 0.6, 12) > 0.62)
-            if r > 0.82:
-                tone = 0 if bayer(x, y) < 0.5 else 1
-            arr[y, x] = (*earth[min(tone, 3)], 255)
-            cellx, celly = (x + (y // 9 % 2) * 6) // 13, y // 9  # flagstones towards the gate (the lower middle)
-            flag = hsh(cellx, celly, 21) < 0.45 and abs(dx) < 0.42 and -0.1 < dy < 0.7 and r < 0.75 and hsh(x, y, 4) > 0.12
-            if flag:
-                edge = (x + (y // 9 % 2) * 6) % 13 in (0,) or y % 9 == 0
-                arr[y, x, :3] = earth[0] if edge else stone[int(hsh(cellx, celly, 5) * 2.4) + (1 if hsh(x, y, 8) > 0.9 else 0) if hsh(cellx, celly, 5) * 2.4 < 2 else 2]
-            n = hsh(x, y, 2)
-            if n > 0.975 and r < 0.9:
-                arr[y, x, :3] = (58, 117, 80)  # moss
+            t = 1.0 - r + (fbm(x * 0.05, y * 0.07, 9) - 0.5) * 0.25 + (b - 0.5) * 0.12
+            arr[y, x] = (*earth[0 if t > 0.6 else (1 if t > 0.32 else 2)], 255)
+            d = math.hypot((x - gx) / 52.0, (y - gy) / 25.0) + (fbm(x * 0.07, y * 0.09, 12) - 0.5) * 0.25
+            row = (y - 30) // 7
+            xo = x + (row % 2) * 5 + int(hsh(row, 0, 3) * 4)
+            col, lx, ly = xo // 11, xo % 11, (y - 30) % 7
+            if y < 30 or d > 1.0 or r > 0.7:
+                continue
+            if hsh(col, row, 21) < 1.25 - d * 1.1:  # a flagstone: whole in the middle, fewer towards the rim
+                corner = lx in (1, 10) and ly in (1, 6)
+                if lx == 0 or ly == 0 or corner:
+                    arr[y, x, :3] = joint
+                else:
+                    k = int(hsh(col, row, 5) * 2)
+                    arr[y, x, :3] = flags[k + (1 if ly == 1 and 2 <= lx <= 8 else 0)]
+            elif hsh(col, row, 33) < 0.3 and (lx, ly) in ((5, 3), (6, 3), (5, 4), (4, 4), (7, 4)):
+                arr[y, x, :3] = moss
     save(OUT / "tower_pad.png", arr)
 
 
@@ -748,7 +761,7 @@ def main():
     rng = rng_for(613)
     m, arms, ccx, segs, masses = model(rng)
     raw = to_array(hut_lib.render(m, FW, FH, GROUND))
-    arr = hut_lib.roof_pass(raw, 613, rowh=4, wid=6, moss=0.22, shadow=7)
+    arr = hut_lib.roof_pass(raw, 613, rowh=4, wid=6, moss=0.1, shadow=7)
     arr = veil(arr)
     arr = grain(arr, 613, amount=0.5, mats=GRAINED)
     arr = hut_lib.soft_shadow(arr, FW / 2 - 2, GROUND + 2, 84, 13, alpha=90)

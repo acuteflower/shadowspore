@@ -5,16 +5,16 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.4.0 Beta
+## 🚀 Aktuelle Version: V0.5.0 Beta – „Schwingen & Tiefen“
 
-> Vollständige Versionshistorie und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.4.0 Beta:
-* **Atmosphärisches Hauptmenü & Launcher:** Komplettes Hauptmenü mit lebendiger Live-Kulisse (`menu_world.gd`), Tag-Nacht-Licht, Einzelspieler, Host/Join-Koop mit direkter IP-Eingabe, Optionen und Speicherstand-Verwaltung.
-* **5-Stufen-Schwertkombo & Finisher:** Erweiterung der Grundkombo um freischaltbaren *Aufwärtshieb* (Schlag 4, 1,25x Schaden) und verheerende *Wirbelklinge* (Schlag 5, 1,8x Schaden, 330°-Rundumschlag) mit eigenem Animationssheet (`player_combo.png`).
-* **Schleiergeflecht & Fähigkeitenbaum-Rework:** Rankendes Fertigkeitennetzwerk für Kampf, Bewegung und Schatten mit handgepixelten Icons, Leuchteffekten und neuem *Schleichen*-Skill.
-* **Talisman-System & Tragbarer Schmuck:** Halsketten, Armbänder und Ohrringe mit spürbaren Boni (z. B. Silberkette, Wuchtreif, Schweigtropfen). Angelegter Schmuck wird sichtbar auf der Spielfigur gerendert.
-* **Modulare Kisten & Truhen:** Neues Kisten-System (`ItemBox` & `BoxWindow`) für komfortables Verstauen mit Shift-Klick, Schnell-Stapeln (`Quick Stack`) und Sortierung.
+### Highlights von V0.5.0 Beta:
+* **Oberflächenschwimmen & Gewässer:** Flüsse und Bergseen sind voll durchschwimmbar (Brustschwimmen, Kraulen mit Ausdauer, Wassertreten und Kopfsprung aus dem Sprint). Tiefes Wasser dient als sicherer Zufluchtsort vor Landmonstern.
+* **Neues Wassermonster – Der Lichtfischer:** Schwimmt nachts in tiefen Gewässern und lockt Wanderer mit einer trügerischen Laterne an. Tödlicher Schnapp-Biss, Blendlicht und explosive Irrlichter.
+* **Gefiederte Gefährten (Pet-System):** Zähmt wilde Krähen und Raben durch geduldiges Füttern! 6 Bindungsstufen, individuelle Charaktereigenschaften, Geschenke, Schultersitz und Warnrufe vor Nachtmonstern.
+* **Legendäre Reliktwaffe – Himmelsriss:** Aus Mornaths Feder geschmiedete Klinge mit schnellem Doppelhieb (Rissschnitt & Himmelskreuz), fliegenden Projektilfedern und Leerenbahn-Spitzenriss.
+* **Legendärer Talisman – Die Rissfeder:** Garantierter persönlicher Drop von Boss Mornath. Verhindert den Tod durch *Letzter Flügelschlag* (Überleben mit 30 % HP + Schockwelle) und verleiht *Sturzflug* (+40 % Schaden nach Schattensprüngen).
 
 ---
 

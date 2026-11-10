@@ -4,6 +4,99 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.5.0 Beta] – 2026-11-10
+### 🦅 Schwingen & Tiefen: Oberflächenschwimmen, der Lichtfischer, Gefiederte Begleiter & die Himmelsriss-Klinge
+
+![Der Lichtfischer der Nacht](docs/img/fisher_poses.png)
+
+*„Die Schatten vor den Toren des Dorfes werden dichter, Wanderer. Während Torben die Klingen im Schmiedefeuer härtet und die Krähen über den Dächern kreisen, regt sich tief unter der Wasseroberfläche etwas Uraltes – angelockt vom kalten Glanz einer trügerischen Laterne...“*
+
+---
+
+### 🌟 Die Großen Highlights
+
+#### 1. 🏊‍♀️ Flüsse & Seen bezwingen: Das neue Schwimmsystem
+Tiefes Wasser ist ab sofort keine unüberwindbare Barriere mehr! Ellie kann sich nun frei über die Flüsse und Bergseen der Welt bewegen.
+
+![Nacht an den stillen Bergseen](docs/img/lake_night.png)
+
+* **Ruhiges Brustschwimmen (Standard):** Gleichmäßiger, energiesparender Schwimmstil (34 px/s), um neue Ufer und geheime Buchten abseits der bekannten Furten zu erreichen.
+* **Dynamisches Kraulen (Sprint-Schwimmen):** Verbraucht Ausdauer, treibt Ellie dafür aber mit kraftvollen Armzügen (58 px/s) zügig durch starke Wasserströmungen.
+* **Kopfsprung & Eintauchen:** Wer im vollen Sprint auf eine tiefe Wasserstelle zurennt, springt mit einem eleganten Kopfsprung direkt kopfüber in die Fluten.
+* **Wasser als Zuflucht:** Landgestützte Schattenkreaturen wie Spinnen und Brecher können nicht schwimmen – das tiefe Wasser dient nun als lebensrettender Rückzugsort vor Nahkämpfern.
+* 💭 **Developer Insight:** *„Bisher war tiefes Wasser eine unsichtbare Mauer in der Landschaft. Wir wollten, dass die Gewässer lebendig werden und Erkundung belohnen, ohne dass man die ständige Angst vor dem Ertrinken im Nacken hat. Wasser bestraft Unachtsamkeit nicht mit sofortigem Tod, sondern mit taktischer Langsamkeit.“*
+* 🔊 **Game Feel:** Speziell abgemischte Audiokulisse mit Eintauch-Plätschern, rhythmischen Schwimmzügen, Auftauchen und dem Abschütteln von Wassertropfen am Ufer.
+
+---
+
+#### 2. 🏮 Schrecken aus der Tiefe: Der Lichtfischer
+Nachts ist das Wasser nicht mehr einsam. Mit dem **Lichtfischer** betritt die erste aquatische Schattenkreatur die Welt von Shadowspore.
+
+* **Trügerisches Locklicht:** Im tiefen Wasser treibt nachts eine sanft schaukelnde, bläulich-türkise Laterne an einem langen Stängel. Sie wirkt wie eine harmlose Dorflaterne oder eine leuchtende Wasserpflanze – doch wer neugierig herantritt, weckt das Monster darunter.
+* **Tödliche Angriffsmuster:**
+  * **Schnapp-Angriff:** Mit weit aufgerissenem Doppelkiefer aus Nadelglas bricht der Fischer hervor, rammt seine Beute und zerrt sie gnadenlos ins kalte Wasser.
+  * **Blendlicht:** Die Laterne schwillt an und detoniert in einem blendenden Lichtring, der den Bildschirm in schneeweißes Flackern und falsche Trugbilder hüllt.
+  * **Irrlichter:** Entsendet drei zielsuchende Leuchtsporen, die nach einer Flugbahn um das Ziel herum explodieren.
+* **Gezielte Schwachstellen:** Die empfindliche Laterne nimmt 1,5x Schaden und bricht vorbereitete Angriffe sofort ab. Nach dem Zuschnappen verharrt das weit geöffnete Maul für einen Gegenangriff (1,6x Bonusschaden).
+
+---
+
+#### 3. 🦅 Gefiederte Gefährten: Das Raben- & Krähen-Bindungssystem
+Wilde Krähen und Raben bevölkern nicht länger nur dekorativ die Wiesen und Zäune – ihr könnt nun eine echte persönliche Bindung zu einzelnen Vögeln aufbauen!
+
+![Wilde Krähen und Raben](docs/img/corvids.png)
+
+* **Geduld & Fütterung:** Nähert euch im Schleichen mit passendem Futter in der Hand (Dunkelbeeren, Glutbeeren, Pflanzensamen, Insekten oder gefangenen kleinen Fischen) und bietet es geduldig an.
+* **Vom Wildtier zum treuen Gefährten (6 Bindungsstufen):**
+  * `Fremd ➔ Beäugt ➔ Bekannt ➔ Vertraut ➔ Freund ➔ Gefährte`
+* **Einzigartige Persönlichkeiten:** Jeder Vogel besitzt eigene Charaktereigenschaften (z. B. *Neugierig*, *Scheu*, *Mutig*, *Glitzerliebhaber*, *Nachtschwärmer*), eine individuelle Stimmhöhe und einen eigenen farbigen Fußring.
+* **Wertvoller Begleiter:** Ein befreundeter Vogel lässt sich benennen, wird auf der Weltkarte markiert, begleitet euch auf Pfiff, sitzt auf eurer Schulter und bringt glitzernde Geschenke mit. Bei Nacht warnt er euch vor herannahenden Schattenwesen!
+
+---
+
+#### 4. 🗡️ Legendäre Reliktwaffe: Der Himmelsriss (Rissklinge)
+Aus einer bezwungenen Boss-Feder von Mornath und reinem Eisen härtet Schmied Torben eine Klinge von unvergleichlicher Zerstörungskraft.
+
+* **Rechtsklick-Doppelhieb (Rissschnitt & Himmelskreuz):** Kein langes Aufladen nötig! Ein schneller Klick entfesselt einen diagonalen Abwärtshieb mit 150 % Schaden und 5 fliegenden Rissfedern. Ein zweiter Klick innerhalb von 0,6 s setzt den Gegenhieb an: 200 % Schaden und ein Fächer aus 7 glühenden Rissfedern (zusammen ein verheerendes X am Ziel).
+* **Spitzenriss-Kombo:** Der 3. Stoß der normalen Schwertkombo reißt eine 72 Pixel lange Leerenbahn durch die Luft, die allen Gegnern in der Schneise schweren Flächenschaden zufügt.
+
+---
+
+#### 5. 🪶 Legendärer Talisman: Die Rissfeder
+Ein uraltes Relikt des Himmelsspalters Mornath – mit 100 % garantierter persönlicher Beute beim ersten Sieg für jede siegreiche Spielerin im Koop!
+
+![Talisman-Schmuckstücke und Karten](docs/img/talisman_cards.png)
+
+* **Mächtige Passivwerte:** +20 Max-Gesundheit, +3 Rüstung, 30 % schnellere Blinzel-Abklingzeit und 70 % weniger Scheu bei wilden Krähen.
+* **Perk: Letzter Flügelschlag:** Schützt vor dem sicheren Tod! Ein tödlicher Treffer wird abgefangen – Ellie verbleibt mit 30 % Gesundheit, erhält 2,5 Sekunden Unverwundbarkeit und schleudert Feinde in einer gewaltigen Federn-Druckwelle zurück (240 s Abklingzeit).
+* **Perk: Sturzflug:** Nach jedem Schattensprung trifft der nächste Waffenschlag innerhalb von 3 Sekunden mit gewaltigen **+40 % Bonusschaden**.
+* **Federbund-Synergie:** Tragt ihr Klinge und Feder zusammen, verkürzt jeder Treffer des Himmelskreuzes die Abklingzeit des Letzten Flügelschlags um bis zu 32 Sekunden!
+
+---
+
+### ⚖️ Balance & Spielwerte auf einen Blick
+
+| Status | Bereich / Parameter | Vorher | Jetzt (V0.5.0) | Auswirkung im Spiel |
+|---|---|---|---|---|
+| 🟣 `NEU` | **Wasser-Passierbarkeit** | Unpassierbare Wand | **Voll durchschwimmbar** | Flüsse und Bergseen öffnen neue Erkundungswege |
+| 🟣 `NEU` | **Schwimmtempo (Brust / Kraul)** | – | **34 px/s / 58 px/s** | Ausdauerbestimmtes Fortbewegen im Wasser |
+| 🟣 `NEU` | **Kopfsprung ins Wasser** | – | **Aktiv aus dem Sprint** | Flüssiger, schneller Übergang von Land in Fluten |
+| 🟣 `NEU` | **Nachtmonster: Lichtfischer** | – | **Aktiv in tiefen Gewässern** | Neue Bedrohung bei Nacht mit Schnapp- & Blendangriffen |
+| 🟣 `NEU` | **Vogel-Bindungssystem** | Nur scheue Wildvögel | **6 Bindungsstufen (bis Gefährte)** | Zähmen, Füttern, Rufen & Geschenke sammeln |
+| 🟣 `NEU` | **Mornath Bossbeute (1. Sieg)** | Regulärer Drop | **100 % persönliche Rissfeder** | Jede Mitspielerin erhält garantiert ihr Bossrelikt |
+| 🟢 `BUFF` | **Schattensprung-Cooldown** | Standard | **-30 % Zeit (mit Rissfeder)** | Häufigeres Blinzeln im Gefecht |
+| 🟢 `BUFF` | **Angriff nach Blinzeln** | Standard-Schaden | **+40 % Schaden (Sturzflug)** | Belohnt aggressives Vorstoßen aus dem Schatten |
+| 🟢 `BUFF` | **Krähen-Vertrauen** | 100 % Fluchtradius | **30 % Fluchtradius (-70 % Scheu)** | Erleichtert Füttern und Zähmen enorm |
+| 🟣 `NEU` | **Himmelsriss Grundschaden** | 30 (Leerenklinge) | **40 (Legendäre Himmelsklinge)** | Höchster Grundschaden aller einhändigen Klingen |
+| 🟣 `NEU` | **Himmelsriss Doppel-Hieb** | Wuchtschlag | **150 % + 200 % + 12 Projektil-Federn** | Schnelle Schrot-Hiebe für enorme Nahkampfkontrolle |
+
+---
+
+### 🔮 Sneak Peek: Was brodelt in V0.6?
+*„Während die Dämmerung über den Flüssen aufzieht, dringt ein herber, süßlicher Geruch aus den Hütten des Dorfes. Kräuter werden gebündelt, alte Tiegel gereinigt und fremdartige Essenzen über offenem Feuer erhitzt... In **V0.6** erwarten euch Alchemie, geheimnisvolle Kessel und seltsame Gebräue der Nacht. Haltet eure Phiolen bereit!“*
+
+---
+
 ## [V0.4.0 Beta] – 2026-11-09
 ### 🌟 Das Große Meilenstein-Update: Lebendiges Hauptmenü, 5-Stufen-Schwertkombo, Schleiergeflecht-Fähigkeiten, Talisman-System mit sichtbarem Schmuck & Kistentruhen
 

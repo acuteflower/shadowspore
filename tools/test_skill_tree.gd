@@ -170,6 +170,33 @@ func check_upgrades(player: Player, window: SkillTreeWindow, skills: SkillTreeCo
 	skills.import_data({"discovered": discovered, "learned": ["combo_four"]}) ## what the real save below must bring back
 
 
+func check_sprint(player: Player) -> void:
+	await get_tree().physics_frame
+	var start: Vector2 = player.position
+	var duration: float = 30.0 / Engine.physics_ticks_per_second
+	Input.action_press("move_right")
+	Input.action_press("sprint")
+	for frame: int in 30:
+		await get_tree().physics_frame
+	check(player.sprinting and player.position.x > start.x and player.velocity.x > player.max_speed, "sprint input moves Ellie at sprint speed")
+	check(is_equal_approx(player.stamina.max_stamina - player.stamina.current, player.sprint_cost_per_sec * duration), "sprinting spends the normal stamina cost")
+	player.stamina.refill()
+	player.effects.apply("glutatem", 30.0, 5.0)
+	for frame: int in 30:
+		await get_tree().physics_frame
+	check(player.sprinting and is_equal_approx(player.stamina.max_stamina - player.stamina.current, player.sprint_cost_per_sec * duration * 0.85), "Glutatem V reduces sprint cost")
+	player.effects.clear("glutatem")
+	player.stamina.spend(player.stamina.current)
+	start = player.position
+	for frame: int in 30:
+		await get_tree().physics_frame
+	check(not player.sprinting and player.position.x > start.x and is_equal_approx(player.velocity.x, player.max_speed), "empty stamina falls back to walking")
+	Input.action_release("move_right")
+	Input.action_release("sprint")
+	player.request_teleport(Vector2.ZERO)
+	player.stamina.refill()
+
+
 func _run() -> void:
 	# The headless server cannot translate physical keyboard layouts for existing HUD labels.
 	if DisplayServer.get_name() == "headless":
@@ -181,6 +208,7 @@ func _run() -> void:
 	player.name = "1"
 	add_child(player)
 	await get_tree().process_frame
+	await check_sprint(player)
 	var skills: SkillTreeComponent = player.get_node("SkillTreeComponent") as SkillTreeComponent
 	var window: SkillTreeWindow = player._hud.get_node("SkillTreeWindow") as SkillTreeWindow
 	var nodes: Dictionary = skills.definitions()

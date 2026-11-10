@@ -48,6 +48,13 @@ func drain(rate: float, delta: float) -> bool:
 	return current > 0.0
 
 
+## The active Glutatem tier can reduce the cost of sprinting.
+func sprint_scale() -> float:
+	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	var tier: int = int(effects.scale_of("glutatem")) if effects != null else 0
+	return float(AlchemyRules.stamina_spec(tier)["sprint_scale"]) if tier > 0 else 1.0
+
+
 ## A new maximum (from the collected level); `grow` gives what was added right away.
 func set_max(value: float, grow: bool = false) -> void:
 	var added: float = value - max_stamina

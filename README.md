@@ -5,16 +5,17 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.5.0 Beta – „Schwingen & Tiefen“
+## 🚀 Aktuelle Version: V0.6.1 Beta – „Hexenwald & Alchemie“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.5.0 Beta:
-* **Oberflächenschwimmen & Gewässer:** Flüsse und Bergseen sind voll durchschwimmbar (Brustschwimmen, Kraulen mit Ausdauer, Wassertreten und Kopfsprung aus dem Sprint). Tiefes Wasser dient als sicherer Zufluchtsort vor Landmonstern.
-* **Neues Wassermonster – Der Lichtfischer:** Schwimmt nachts in tiefen Gewässern und lockt Wanderer mit einer trügerischen Laterne an. Tödlicher Schnapp-Biss, Blendlicht und explosive Irrlichter.
-* **Gefiederte Gefährten (Pet-System):** Zähmt wilde Krähen und Raben durch geduldiges Füttern! 6 Bindungsstufen, individuelle Charaktereigenschaften, Geschenke, Schultersitz und Warnrufe vor Nachtmonstern.
-* **Legendäre Reliktwaffe – Himmelsriss:** Aus Mornaths Feder geschmiedete Klinge mit schnellem Doppelhieb (Rissschnitt & Himmelskreuz), fliegenden Projektilfedern und Leerenbahn-Spitzenriss.
-* **Legendärer Talisman – Die Rissfeder:** Garantierter persönlicher Drop von Boss Mornath. Verhindert den Tod durch *Letzter Flügelschlag* (Überleben mit 30 % HP + Schockwelle) und verleiht *Sturzflug* (+40 % Schaden nach Schattensprüngen).
+### Highlights von V0.6.1 Beta:
+* **Neues Biom – Der Hexenwald (Region 31):** Über 38.000 neue Tiles nahtlos an der Südküste angeschlossen. Kühle Farbpalette, Schieferfelsen, Dauerdämmer und ein geschwungener Pfad zum Hexenturm.
+* **Alchemie & Trankbrauen (Ablösung des Kochen-Systems):** Tränke in 5 Stufen (Wundtau für Sofortheilung, Glutatem für sekündliche Ausdauerschübe auch beim Sprinten). Eigene Trink-Animation im Lauf und Kampf.
+* **Nebel des Wahns & Phantom-Kreaturen:** Giftgrüner Bodennebel mit Statuseffekt *Halluziniert*. Fortschreitender Trug (Flüstern, Schein-Items, zuckendes HUD und Phantom-Spinnen, die im Schlag zu Rauch verpuffen).
+* **Esma die Nebelhexe & Der Hexenturm:** Vollständig ausgestattetes Turminneres mit Kessel, Kamin und Esmas animiertem Tagesablauf.
+* **Kletterranken (Wall Climb):** Erklimmt steile Schieferwände direkt an bewachsenen Kletterranken mit flüssiger Kletter-Animation.
+* **Der Krähenbaum & Klarglas-Ohrringe:** Monumentaler Rastbaum für gefiederte Begleiter und neuer Schutz-Talisman gegen den Nebelwahn.
 
 ---
 

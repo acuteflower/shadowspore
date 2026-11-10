@@ -21,6 +21,24 @@ static func circle(from: Node2D, center: Vector2, radius: float, mask: int) -> A
 	return found
 
 
+## Every hurtbox on `mask` inside a lane: from `origin` along `dir`, `length` long and `half_width` to either side.
+static func lane(from: Node2D, origin: Vector2, dir: Vector2, length: float, half_width: float, mask: int) -> Array[HurtboxComponent]:
+	var shape: RectangleShape2D = RectangleShape2D.new()
+	shape.size = Vector2(length, half_width * 2.0)
+	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+	query.shape = shape
+	query.transform = Transform2D(dir.angle(), origin + dir.normalized() * length * 0.5)
+	query.collision_mask = mask
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var found: Array[HurtboxComponent] = []
+	for hit: Dictionary in from.get_world_2d().direct_space_state.intersect_shape(query, 16):
+		var target: HurtboxComponent = hit["collider"] as HurtboxComponent
+		if target != null and not found.has(target):
+			found.append(target)
+	return found
+
+
 ## Every hurtbox on `mask` inside a fan: apex at `origin`, pointing along `dir`, `reach` long, `arc` radians wide.
 static func fan(from: Node2D, origin: Vector2, dir: Vector2, reach: float, arc: float, mask: int) -> Array[HurtboxComponent]:
 	if arc > PI - 0.01:

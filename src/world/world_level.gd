@@ -152,6 +152,12 @@ func _fill_ground() -> void:
 	var waystones: Waystones = Waystones.new() ## the goddess statues (teleport points): which are awake (docs/waystones.md)
 	waystones.name = "Waystones"
 	add_child(waystones)
+	var relics: BossRelics = BossRelics.new() ## what the bosses leave to one player alone (docs/rissfeder.md)
+	relics.name = "BossRelics"
+	add_child(relics)
+	var pets: PetRegistry = PetRegistry.new() ## the bond with wild crows and ravens (docs/pet_konzept.md)
+	pets.name = "PetRegistry"
+	add_child(pets)
 	_relief = Relief.new()
 	Terrain.relief = _relief
 	if multiplayer.is_server():
@@ -1497,6 +1503,14 @@ func spawn_point() -> Vector2:
 	if hut != null:
 		return hut.exit_position
 	return super()
+
+
+## How deep the river or lake water is at `point` (-1 on land and in unloaded ground, 0 at the bank, 1 where swimming begins): where water creatures may be.
+func water_depth(point: Vector2) -> float:
+	var chunk: Vector2i = Vector2i(floori(point.x / (CHUNK * 16.0)), floori(point.y / (CHUNK * 16.0)))
+	if not _chunks.has(chunk) or Interiors.slot_at(point) >= 0 or MineManager.in_mine(point):
+		return -1.0
+	return _rivers.depth_amount(point)
 
 
 ## Enemy navigation stays inside loaded land, including wall faces used by climb links.

@@ -538,6 +538,50 @@ TOUCH_KEYS = [
 ]
 
 
+# Holding out food to a wild bird (E at a crow or raven that has come close): one second like the other actions. She sinks into a low, wide
+# crouch without hurry, the left hand rests on the knee, the right arm reaches forward and low with the palm up (the game draws the morsel in it).
+# The pose is held at about 0.5 s until the bird has decided (the game keeps frame 6 up to four seconds), then the hand draws back and she
+# rises. `python3 tools/art_hero3d.py feedonly` writes player_feed.png, player_feed_blood.png and the "feed" entries of data/hero_rig.json;
+# `feed out.png <sector>` is a contact sheet.
+FEED_LOW = ((3.0, 7.0, 0), (-3.0, -5.5, 0))
+FEED_KEYS = [
+    (0.00, P(0.0, 0.03, 0.0, STAND, REST_R, REST_L, (0.0, 0.0, 0.0))),
+    (0.15, P(0.10, 0.22, 1.2, ((3.0, 4.0, 0), (-3.0, -3.0, 0)), (-4.0, 22.0, 5.0), (4.5, 22.0, 3.0), (0.6, 0.4, 0.4), 0.03)),
+    (0.32, P(0.18, 0.40, 2.8, FEED_LOW, (-2.5, 17.0, 12.0), (4.0, 15.0, 5.5), (1.2, 0.8, 0.8), 0.05)),
+    (0.46, P(0.20, 0.46, 3.2, FEED_LOW, (-1.8, 14.5, 15.0), (4.0, 14.0, 5.5), (1.6, 1.0, 1.0), 0.06)),
+    (0.56, P(0.20, 0.47, 3.3, FEED_LOW, (-1.8, 14.3, 15.6), (4.0, 14.0, 5.6), (1.6, 1.0, 1.0), 0.06)),
+    (0.72, P(0.10, 0.26, 1.8, ((3.0, 5.0, 0), (-3.0, -3.5, 0)), (-3.0, 20.0, 6.0), (4.2, 20.0, 3.0), (0.6, 0.4, 0.4), 0.03)),
+    (0.88, P(0.03, 0.10, 0.4, STAND, (-4.5, 25.0, 3.0), (4.5, 26.0, 1.5), (0.0, 0.0, 0.0))),
+    (1.00, P(0.0, 0.03, 0.0, STAND, REST_R, REST_L, (0.0, 0.0, 0.0))),
+]
+
+
+def write_feed():
+    """Only the feeding animation: colour sheet, blood thresholds and rig entries."""
+    import json
+    global WANT_BLOOD, frame
+    rows, shoulders, hands, _m = pick_sheet(FEED_KEYS)
+    write_png(ROOT / "characters" / "player_feed.png", PICK_FRAMES * FW, 8 * FH, paste(rows, PICK_FRAMES, 8))
+    rig_path = ROOT.parent / "data" / "hero_rig.json"
+    rig = json.loads(rig_path.read_text())
+    rig.update({"feed_cols": PICK_FRAMES, "feed_shoulder": shoulders, "feed_hand": hands})
+    rig_path.write_text(json.dumps(rig, separators=(",", ":")) + "\n")
+    WANT_BLOOD = True
+    real_frame, collected = frame, []
+
+    def collecting(*args, **kwargs):
+        result = real_frame(*args, **kwargs)
+        collected.append(LAST_BLOOD)
+        return result
+
+    frame = collecting
+    pick_sheet(FEED_KEYS)
+    frame = real_frame
+    WANT_BLOOD = False
+    brows = [collected[r * PICK_FRAMES:(r + 1) * PICK_FRAMES] for r in range(8)]
+    write_png(ROOT / "characters" / "player_feed_blood.png", PICK_FRAMES * FW, 8 * FH, paste(brows, PICK_FRAMES, 8))
+
+
 def write_touch():
     """Only the touch animation: colour sheet, blood thresholds and rig entries."""
     import json
@@ -701,6 +745,7 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
     m.ell(T((0, 36.8, 2.1)), (3.0, 0.9, 1.6), VIOLET, kind="emit", R=TR)  # neckline trim
     # --- arms (her right arm is drawn by the game from the shoulder to the sword grip)
     m.rig = {}
+    arm_pts = {}
     for side in (1, -1):
         sh = T((side * 4.5, 38.0 + breath * 0.2, 0.0))
         if pose:  # attack: hands go where the keyframe puts them (the right one is drawn by the game)
@@ -716,6 +761,7 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             elbow_abs, wrist_abs = ik2(sh_abs, target, 6.6, 6.0, pole)
             d2 = (wrist_abs - elbow_abs) / np.linalg.norm(wrist_abs - elbow_abs)
             elbow, wrist = elbow_abs - m.off, wrist_abs - m.off
+            arm_pts["hand_l" if side == 1 else "hand_r"] = wrist_abs  # swimming: where the hands enter the water
             m.limb(sh, elbow, 1.35, 1.1, COAT)
             m.limb(elbow + 0.4 * d2, wrist, 1.2, 0.95, LEATHER)
             m.ell(elbow + 1.6 * d2, (1.3, 0.5, 1.3), VIOLET, kind="emit")
@@ -745,6 +791,7 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         m.limb(elbow + 0.4 * d2, wrist, 1.2, 0.95, LEATHER)  # bracer
         m.ell(elbow + 1.6 * d2, (1.3, 0.5, 1.3), VIOLET, kind="emit")
         m.ell(wrist + 0.9 * d2, (1.0, 1.15, 1.0), LEATHER)
+    m.rig.update(arm_pts)
     # --- neck, head
     m.limb(T((0, 38.8, 0.0)), T((0, 42.0, 0.3)), 1.2, 1.1, SKIN)
     m.ell(T((0, 40.2, 0.0)), (2.0, 0.9, 2.0), LEATHER)  # collar
@@ -868,9 +915,12 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             p.c = pivot + Rg @ (p.c - pivot)
             p.R = Rg @ p.R
             p.rot = True
-        low = min(float(p.c[1] - np.sqrt(((p.R[1, :] * p.r) ** 2).sum())) for p in m.prims)
+        low = 0.0 if pose.get("level") else min(float(p.c[1] - np.sqrt(((p.R[1, :] * p.r) ** 2).sum())) for p in m.prims)  # "level": no set-down, the pelvis stays at its height (swimming: the water plane is y = 0)
         for p in m.prims:
             p.c = p.c + np.array(pose.get("shift", (0.0, 0.0, 0.0)), float) + np.array([0.0, -low, 0.0])
+        if pose.get("level"):  # the rig points (mouth, ears, hands) turn and move with the body
+            for key, v in list(m.rig.items()):
+                m.rig[key] = pivot + Rg @ (np.asarray(v, float) - pivot) + np.array(pose.get("shift", (0.0, 0.0, 0.0)), float)
     m.bob = bob
     return m
 
@@ -1022,6 +1072,8 @@ if __name__ == "__main__":
         blood_sheets()
     elif len(sys.argv) > 1 and sys.argv[1] == "pullonly":
         write_pull()
+    elif len(sys.argv) > 1 and sys.argv[1] == "feedonly":
+        write_feed()
     elif len(sys.argv) > 1 and sys.argv[1] == "touchonly":
         write_touch()
     elif len(sys.argv) > 1 and sys.argv[1] == "jog":
@@ -1037,12 +1089,12 @@ if __name__ == "__main__":
             for y in range(FH):
                 sheet[r * FH + y][c * FW: (c + 1) * FW] = fr[y]
         write_png(Path(sys.argv[2]), ATTACK_FRAMES * FW, ATTACK_STEPS * FH, sheet)
-    elif len(sys.argv) > 1 and sys.argv[1] in ("pick", "eat", "pull", "animonly"):
+    elif len(sys.argv) > 1 and sys.argv[1] in ("pick", "eat", "pull", "feed", "animonly"):
         # pick|eat <out.png> <sector>: contact sheet of that one-second animation; animonly: rewrite only
         # assets/characters/player_pick.png / player_eat.png and their entries in data/hero_rig.json
         from pathlib import Path
-        if sys.argv[1] in ("pick", "eat", "pull"):
-            keys = {"pick": PICK_KEYS, "eat": EAT_KEYS, "pull": PULL_KEYS}[sys.argv[1]]
+        if sys.argv[1] in ("pick", "eat", "pull", "feed"):
+            keys = {"pick": PICK_KEYS, "eat": EAT_KEYS, "pull": PULL_KEYS, "feed": FEED_KEYS}[sys.argv[1]]
             sector = int(sys.argv[3]) if len(sys.argv) > 3 else 0
             cells = [frame(sector, 0.0, "attack", False, timeline_pose(keys, (i + 0.5) / PICK_FRAMES))[0] for i in range(PICK_FRAMES)]
             sheet = [[CLEAR] * (6 * FW) for _ in range(2 * FH)]

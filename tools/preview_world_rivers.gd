@@ -30,7 +30,7 @@ func _run() -> void:
 		if arg.begins_with("--lake="):
 			var lakes: Array = DataRegistry.table("lakes_baked")["lakes"]
 			var lake: Dictionary = lakes[int(arg.trim_prefix("--lake=")) % lakes.size()]
-			var point: Array = lake.get("shore", lake["deep"])
+			var point: Array = lake["deep"] if Array(Array(OS.get_cmdline_user_args())).any(func(x: String) -> bool: return x.begins_with("--swim=")) else lake.get("shore", lake["deep"])
 			at = Vector2(float(point[0]), float(point[1]))
 		if arg.begins_with("--spot="):
 			var segments: Array = data["segments"]
@@ -65,6 +65,33 @@ func _run() -> void:
 		player._ripples._process(0.25)
 		camera.position = nearest_ford + Vector2(0, -12)
 		camera.zoom = Vector2(1.6, 1.6)
+	# --swim=N (1 tread, 2 breast, 3 crawl) with --lake=K puts a real swimmer in the lake; --facing=sector, --night.
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--swim="):
+			var state: int = int(arg.trim_prefix("--swim="))
+			var swimmer: Player = load("res://src/entities/player/player.tscn").instantiate() as Player
+			swimmer.name = "2"
+			swimmer.position = at
+			world.get_node("Players").add_child(swimmer)
+			swimmer.set_physics_process(false)
+			(swimmer.get_node("Camera2D") as Camera2D).enabled = false
+			swimmer.swim = state
+			swimmer.swimmer.blend = 1.0
+			swimmer.swimmer.active = true
+			swimmer.facing = Vector2.RIGHT
+			for other: String in OS.get_cmdline_user_args():
+				if other.begins_with("--facing="):
+					swimmer.facing = Vector2.RIGHT.rotated(float(int(other.trim_prefix("--facing="))) * PI / 4.0)
+			swimmer.velocity = swimmer.facing * (0.0 if state == 1 else 40.0)
+			for i: int in 48:
+				swimmer._animate(0.05)
+				swimmer._update_water(0.05)
+				if swimmer._ripples != null:
+					swimmer._ripples._process(0.05)
+				if swimmer._swim_water != null:
+					swimmer._swim_water._process(0.05)
+			camera.position = at + Vector2(0, -12)
+			camera.zoom = Vector2(4.0, 4.0)
 	TimeManager.unlock()
 	TimeManager.time_of_day = 0.0 if OS.get_cmdline_user_args().has("--night") else 0.55
 	for i: int in 8: await get_tree().process_frame

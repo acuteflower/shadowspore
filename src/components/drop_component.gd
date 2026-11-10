@@ -34,12 +34,17 @@ func _roll() -> void:
 	var copper: int = roundi(randi_range(int(span.get("min", 0)), int(span.get("max", 0))) * factor)
 	var xp: int = roundi(int(loot.get("xp", 0)) * factor)
 	var ids: PackedInt32Array = []
-	for player: Player in _winners(String(loot.get("award", "killer"))):
+	var winners: Array[Player] = _winners(String(loot.get("award", "killer")))
+	for player: Player in winners:
 		player.progress.award(copper, xp)
 		ids.append(player.name.to_int())
 	if not ids.is_empty() and copper + xp > 0:
 		_reward_fx.rpc(enemy.global_position + Vector2(0, -8), ids, copper, xp)
 	_drop_items(loot.get("items", []), enemy.global_position)
+	var relics: Array = loot.get("relics", []) as Array ## a boss's own piece: certain the first time, rare after (BossRelics)
+	var ledger: BossRelics = BossRelics.of(get_tree())
+	if not relics.is_empty() and ledger != null:
+		ledger.roll(String(enemy.get("enemy_id")), relics, winners, enemy.global_position)
 
 
 ## "killer": whoever landed the last hit. "all": every living player.

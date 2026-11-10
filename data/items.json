@@ -364,7 +364,7 @@
   "rarity": "common",
   "enchant_slots": 0,
   "max_stack": 99,
-  "hotbar": false,
+  "hotbar": true,
   "icon": "res://assets/items/seed_fluff.png",
   "description": "Federleicht. Der kleinste Atem trägt ihn davon. Gut zum Polstern."
  },
@@ -585,7 +585,7 @@
   "rarity": "common",
   "enchant_slots": 0,
   "max_stack": 30,
-  "hotbar": false,
+  "hotbar": true,
   "description": "Flink und schmal, silbern wie der Kies, über den er huscht. Zart im Kessel.",
   "icon": "res://assets/items/fish_silverling.png"
  },
@@ -595,7 +595,7 @@
   "rarity": "common",
   "enchant_slots": 0,
   "max_stack": 30,
-  "hotbar": false,
+  "hotbar": true,
   "description": "Dunkel und kupfern gefleckt. Wer ihn hochzieht, spürt, wie er sich am Grund festhält.",
   "icon": "res://assets/items/fish_loach.png"
  },
@@ -670,7 +670,7 @@
   "rarity": "common",
   "enchant_slots": 0,
   "max_stack": 99,
-  "hotbar": false,
+  "hotbar": true,
   "icon": "res://assets/items/shimmer_beetle.png",
   "description": "Ein Käfer mit blaugrün glänzendem Panzer. Fische mögen ihn als Köder."
  },
@@ -680,7 +680,7 @@
   "rarity": "common",
   "enchant_slots": 0,
   "max_stack": 99,
-  "hotbar": false,
+  "hotbar": true,
   "icon": "res://assets/items/leaf_caterpillar.png",
   "description": "Dick, grün und gefräßig. Als Köder schwer zu schlagen."
  },
@@ -690,7 +690,7 @@
   "rarity": "common",
   "enchant_slots": 0,
   "max_stack": 99,
-  "hotbar": false,
+  "hotbar": true,
   "icon": "res://assets/items/leaf_snail.png",
   "description": "Eine kleine Schnecke mit rosigem Haus. Zieht sich bei jedem Geräusch zurück."
  },
@@ -769,5 +769,93 @@
    ]
   },
   "description": "Du hörst die Leere nicht mehr. Sie dich auch nicht."
+ },
+ "rissfeder": {
+  "name": "Rissfeder",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "necklace",
+  "rarity": "legendary",
+  "enchant_slots": 2,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/rissfeder.png",
+  "bonus": {
+   "health": 20,
+   "armor": 3,
+   "blink_cooldown": -0.3,
+   "corvid_calm": 0.7
+  },
+  "perks": [
+   "ward",
+   "dive"
+  ],
+  "look": {
+   "metal": "ravensteel",
+   "stone": "c07bff",
+   "stones": 1,
+   "pulse": true,
+   "glow": true,
+   "pendant": [
+    "..m..",
+    ".dSd.",
+    "dmTmd",
+    "dSWmd",
+    "dmTSd",
+    ".dSd.",
+    ".dmd.",
+    "..d.."
+   ]
+  },
+  "description": "Eine Schwungfeder, die der Himmel nicht halten konnte. Wer sie trägt, fällt nie ganz."
+ },
+ "sword_rift": {
+  "name": "Himmelsriss",
+  "kind": "weapon",
+  "slot": "main_hand",
+  "weapon_class": "sword_rift",
+  "rarity": "legendary",
+  "enchant_slots": 3,
+  "refinable": true,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/sword_rift.png",
+  "held": "res://assets/items/sword_rift_held.png",
+  "stats": {
+   "damage": 40,
+   "speed": 1.15,
+   "reach": 36,
+   "knockback": 60
+  },
+  "fx": {
+   "motes": [
+    "f4ecff",
+    "c8aaff",
+    "9a6bff",
+    "5a4a9a"
+   ],
+   "trail_edge": "9a6bff",
+   "trail_core": "f4ecff",
+   "sounds": "res://assets/audio/rift/"
+  },
+  "specials": [
+   {
+    "name": "SPITZENRISS",
+    "text": "Der Stoß, der dritte Schlag der Kombination, reißt einen Riss aus Licht 72 Pixel weit nach vorn (45 % Schaden)."
+   },
+   {
+    "name": "RISSSCHNITT",
+    "text": "Rechtsklick, ohne Aufladen: ein diagonaler Hieb von rechts oben nach links unten schickt 5 leuchtende Rissfedern in einem Fächer 90 Pixel weit (je 40 % Schaden, bis zu 3 Federn pro Gegner)."
+   },
+   {
+    "name": "HIMMELSKREUZ",
+    "text": "Noch einmal Rechtsklick, kurz danach: der Gegenhieb von links oben nach rechts unten schickt 7 leuchtende Federn in einem weiten Fächer 110 Pixel weit (je 45 % Schaden, bis zu 3 pro Gegner)."
+   },
+   {
+    "name": "FEDERBUND",
+    "text": "Mit der Rissfeder um den Hals verkürzt jeder vom Himmelskreuz getroffene Gegner die Pause des Letzten Flügelschlags um 8 s (höchstens 32 s je Hieb)."
+   }
+  ],
+  "description": "Aus der Feder, die der Himmel nicht halten konnte, in Torbens Esse zur Klinge geschlagen. Sie spaltet, was sie berührt, und die Luft gleich mit."
  }
 }

@@ -37,6 +37,7 @@ var paths: Array = [] ## trampled ways {s: structure id, p: [[x, y], ...] from a
 var _path_root: Node2D
 const MAX_ORDERS: int = 3
 
+var debug_refine_seed: int = -1 ## tests: >= 0 fixes the dice of the next refinements
 var orders: Array = [] ## what a settler is making on commission: {r recipe id, left work seconds, total, done}; they work only while at their bench, anyone collects. A refinement is one too: {r "refine", k "refine", m maker, w the weapon as it was handed in, to the level it is meant to reach, ok the result (rolled when it was handed in), left, total, done}
 var _order_sync: float = 0.0
 var _walks: Dictionary = {} ## settlers' walks: "ax,ay>bx,by" -> PackedVector2Array (see `walk_route`)
@@ -1529,8 +1530,6 @@ func refine_block(stack: Dictionary, player: Player) -> String:
 	var maker: String = RefineRules.maker()
 	if trust_of(maker) < RefineRules.trust_needed(target):
 		return "%s TRAUT DIR NOCH NICHT" % String(settler_spec(maker).get("name", maker))
-	if orders_of(maker) >= MAX_ORDERS:
-		return "DIE WARTELISTE IST VOLL"
 	var missing: String = missing_text(RefineRules.materials(stack, target), player)
 	if missing != "":
 		return missing
@@ -1564,15 +1563,16 @@ func _host_refine(kind: String, ref: Variant, peer: int) -> void:
 	if reason != "":
 		_tell(peer, reason, false)
 		return
+	if kind == "equip" and not player.inventory.has_room(String(stack.id)):
+		_tell(peer, "KEIN PLATZ IM RUCKSACK", false)
+		return
 	var target: int = RefineRules.next_level(stack)
 	_take_inputs({"in": RefineRules.materials(stack, target)}, player)
 	player.progress.award(-RefineRules.copper(stack, target), 0)
 	var weapon: Dictionary = player.inventory.take_stack(kind, ref)
-	var work: float = maxf(RefineRules.work_seconds(weapon, target), 1.0)
-	orders.append({"r": "refine", "k": "refine", "m": RefineRules.maker(), "w": weapon, "to": target, "ok": RefineRules.roll(weapon, target, randi()), "left": work, "total": work, "done": false})
+	## Refining is instant: the result is rolled now and the weapon goes straight back into the bag.
+	_deliver_refine(weapon, target, RefineRules.roll(weapon, target, randi() if debug_refine_seed < 0 else debug_refine_seed), player, peer)
 	_sync_stock()
-	_rpc_orders.rpc(orders.duplicate(true))
-	_tell(peer, "%s LIEGT AUF DEM AMBOSS" % Items.title(weapon).to_upper(), true)
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -1589,26 +1589,29 @@ func refine_heat(maker: String) -> int:
 	return 0
 
 
-## Host: the finished piece goes back to its owner, with what a failed attempt returns. The notice tells how it went.
+## Host: a refinement still lying on the anvil (older saves, from when it took work time) goes back to its owner.
 func _collect_refine(index: int, player: Player, peer: int) -> void:
 	var order: Dictionary = orders[index] as Dictionary
-	var before: Dictionary = order.w as Dictionary
-	var success: bool = bool(order.ok)
-	var after: Dictionary = RefineRules.result(before, success)
 	orders.remove_at(index)
-	if player.inventory.give(String(after.id), 1, Items.extras(after)) > 0:
+	if not _deliver_refine(order.w as Dictionary, int(order.to), bool(order.ok), player, peer):
 		orders.insert(index, order) ## no room in the bag: the weapon stays on the anvil
 		_tell(peer, "KEIN PLATZ IM RUCKSACK", false)
 		return
-	if not success:
-		var back: Dictionary = RefineRules.refund(before, int(order.to))
-		for item: String in back:
-			var left: int = player.inventory.give(item, int(back[item]))
-			if left > 0:
-				_add_stock(item, left)
 	_sync_stock()
 	_rpc_orders.rpc(orders.duplicate(true))
-	var returned: Dictionary = {} if success else RefineRules.refund(before, int(order.to))
+
+
+## Host: the refined piece goes into the bag, with what a failed attempt returns. The notice tells how it went.
+## False (nothing changed) when the bag has no room for the weapon.
+func _deliver_refine(before: Dictionary, target: int, success: bool, player: Player, peer: int) -> bool:
+	var after: Dictionary = RefineRules.result(before, success)
+	if player.inventory.give(String(after.id), 1, Items.extras(after)) > 0:
+		return false
+	var returned: Dictionary = {} if success else RefineRules.refund(before, target)
+	for item: String in returned:
+		var left: int = player.inventory.give(item, int(returned[item]))
+		if left > 0:
+			_add_stock(item, left)
 	if peer == multiplayer.get_unique_id():
 		refine_done.emit(before, after, success, returned)
 	else:
@@ -1619,6 +1622,7 @@ func _collect_refine(index: int, player: Player, peer: int) -> void:
 		_tell(peer, "MISSLUNGEN, DIE GLUT STEIGT (%d)" % RefineRules.pity(after), false)
 	if player.quests != null:
 		player.quests.set_flag("refined_%s" % ("ok" if success else "failed"))
+	return true
 
 
 @rpc("authority", "call_local", "reliable")

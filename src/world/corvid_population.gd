@@ -21,6 +21,7 @@ var _maintenance: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group("corvid_population")
 	set_process(multiplayer.is_server())
 
 
@@ -61,7 +62,7 @@ func _populate(cell: Vector2i) -> void:
 	rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 6299))
 	for species: String in ["crow", "raven", "owl", "hoopoe"]:
 		var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
-		if rng.randf() > float(spec["chunk_chance"]) or _birds.get_child_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
+		if rng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 			continue
 		var center: Vector2 = Vector2.ZERO
 		var found: bool = false
@@ -76,13 +77,19 @@ func _populate(cell: Vector2i) -> void:
 		var id: String = "%s_%d_%d" % [species, cell.x, cell.y]
 		var count: int = rng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
 		for i: int in count:
-			if _birds.get_child_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
+			if _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 				break
 			var point: Vector2 = center
 			if i > 0:
 				point += Vector2.from_angle(i * TAU / count) * rng.randf_range(25.0, float(spec["group_radius"]))
 			if not _floor(point, species) or not _clear(point, 6.0) or not _player_clear(point, float(spec["alert_range"])):
 				continue
+			var registry: PetRegistry = PetRegistry.of(get_tree())
+			var key: String = "%s#%d" % [id, i] ## the same bird every session: the flocks are seeded from the chunk (PetRegistry)
+			if registry != null and registry.has_record(key):
+				rng.randi_range(0, 2) ## the same draws as the flock bird made, so the rest of the flock stays as it was
+				rng.randf()
+				continue ## it has a name and a territory now: the registry puts it where it belongs, not the flock
 			var scene: PackedScene = load(String(spec["scene"])) as PackedScene
 			var bird: WildCorvid = scene.instantiate() as WildCorvid
 			_serial += 1
@@ -90,6 +97,7 @@ func _populate(cell: Vector2i) -> void:
 			bird.species = species
 			bird.appearance = rng.randi_range(0, 2)
 			bird.flock_id = id
+			bird.pet_key = key
 			bird.home = center
 			bird.position = point
 			bird.facing = rng.randf() * TAU
@@ -106,7 +114,7 @@ func _populate(cell: Vector2i) -> void:
 ## A visitor of the town (TownCritters): one bird of `species` at `point`, grounded, wanting a roof (`visit_roof`). Null when the caps, the ground or the people forbid it.
 func spawn_visitor(species: String, point: Vector2, flock: String) -> WildCorvid:
 	var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
-	if _birds.get_child_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
+	if _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 		return null
 	if not _floor(point, species) or not _clear(point, 6.0) or not _player_clear(point, float(spec["alert_range"])):
 		return null
@@ -123,6 +131,56 @@ func spawn_visitor(species: String, point: Vector2, flock: String) -> WildCorvid
 	_birds.add_child(bird)
 	_visitors.append(bird)
 	return bird
+
+
+## Birds that count against the ambient budget: the registered ones (named, with a territory) have a budget of their own.
+func _wild_count() -> int:
+	var registry: PetRegistry = PetRegistry.of(get_tree())
+	var count: int = 0
+	for node: Node in _birds.get_children():
+		var bird: WildCorvid = node as WildCorvid
+		if not bird.is_queued_for_deletion() and (registry == null or not registry.has_record(bird.pet_key)):
+			count += 1
+	return count
+
+
+## True when the chunk round `point` is loaded here (the host's streaming).
+func is_active_at(point: Vector2) -> bool:
+	return _active.has(_chunk(point))
+
+
+## Host: puts the registered bird `key` at `point` (or a free spot close by). Null when the place is not fit right now (water, a tree, a player near).
+func spawn_pet(key: String, record: Dictionary, point: Vector2, player_clear: float) -> WildCorvid:
+	var species: String = String(record["sp"])
+	var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
+	var at: Vector2 = point
+	var found: bool = false
+	for attempt: int in 6:
+		at = point + (Vector2.from_angle(attempt * 1.7) * float(attempt) * 9.0)
+		if _floor(at, species) and _clear(at, 6.0) and _player_clear(at, player_clear):
+			found = true
+			break
+	if not found:
+		return null
+	var bird: WildCorvid = (load(String(spec["scene"])) as PackedScene).instantiate() as WildCorvid
+	_serial += 1
+	bird.name = "Corvid%d" % _serial
+	bird.species = species
+	bird.appearance = int(record["ap"])
+	bird.flock_id = "pet:%s" % key
+	bird.pet_key = key
+	bird.home = point
+	bird.territory = point
+	bird.position = at
+	bird.facing = randf() * TAU
+	_birds.add_child(bird)
+	return bird
+
+
+## Host: a registered bird whose place is out of view goes away (the registry puts it back when the place is loaded again).
+func remove_pet(bird: WildCorvid) -> void:
+	release_perch(bird)
+	bird.queue_free()
 
 
 func visitors() -> Array[WildCorvid]:
@@ -173,6 +231,11 @@ func can_land(point: Vector2, bird: WildCorvid) -> bool:
 		if other != bird and other.state != WildCorvid.State.FLY and other._height < 1.0 and other.global_position.distance_to(point) < float(bird._spec["personal_space"]):
 			return false
 	return true
+
+
+## A companion may land close to its person (the ambient rule keeps birds away from players).
+func can_land_companion(point: Vector2, bird: WildCorvid) -> bool:
+	return _floor(point, bird.species) and _clear(point, 5.0) and _active.has(_chunk(point))
 
 
 func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:

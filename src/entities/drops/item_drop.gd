@@ -113,6 +113,10 @@ func _collect(player: Player) -> void:
 			var world: Node = get_tree().get_first_node_in_group("world")
 			if world is WorldLevel and (world as WorldLevel).fallen_knight != null:
 				(world as WorldLevel).fallen_knight.sword_taken(player.name.to_int())
+			elif story_id.begins_with(BossRelics.PREFIX):
+				var ledger: BossRelics = BossRelics.of(get_tree())
+				if ledger != null:
+					ledger.collected(String(name)) ## taken in: no need to keep it for the next session
 		_picked.rpc(player.name.to_int(), count - left, left)
 		if left == 0:
 			queue_free()

@@ -1,0 +1,111 @@
+{
+ "stages": {
+  "thresholds": [0, 10, 30, 100, 190, 300],
+  "names": ["FREMD", "BEÄUGT", "BEKANNT", "VERTRAUT", "FREUND", "GEFÄHRTE"]
+ },
+ "feed": {
+  "gain": {"loves": 12.0, "likes": 7.0, "neutral": 3.0, "dislikes": 0.0},
+  "daily_factor": [1.0, 1.0, 1.0, 0.5, 0.5, 0.5],
+  "daily_floor": 0.1,
+  "cooldown": 3.0,
+  "full_after": 8,
+  "hungry_bonus": 0.3,
+  "reach": 46.0,
+  "take_seconds": 0.9,
+  "hold_seconds": 4.0
+ },
+ "lure": {
+  "range": {"crow": 56.0, "raven": 50.0},
+  "stage_range": [1.0, 1.3, 1.6, 2.0, 2.5, 3.0],
+  "calm_range": 1.2,
+  "calm_rate": 1.5,
+  "rate": 0.3,
+  "reaction_rate": {"loves": 1.5, "likes": 1.0, "neutral": 0.6, "dislikes": 0.0},
+  "decay": 0.7,
+  "still_speed": 9.0,
+  "sneak_required": true,
+  "approach_at": 1.0,
+  "keep_at": 0.35,
+  "stand_off": 26.0,
+  "hop": [13.0, 19.0],
+  "pause": [0.7, 1.5],
+  "take_min": 0.7,
+  "scare_after_offer": 6.0
+ },
+ "foods": {
+  "dusk_berry": {"crow": "likes", "raven": "neutral"},
+  "ember_berry": {"crow": "likes", "raven": "neutral"},
+  "seed_fluff": {"crow": "loves", "raven": "likes"},
+  "sun_seed": {"crow": "loves", "raven": "likes"},
+  "shimmer_beetle": {"crow": "likes", "raven": "likes"},
+  "leaf_caterpillar": {"crow": "likes", "raven": "likes"},
+  "leaf_snail": {"crow": "likes", "raven": "likes"},
+  "fish_silverling": {"crow": "neutral", "raven": "loves"},
+  "fish_loach": {"crow": "neutral", "raven": "loves"},
+  "earth_tuber": {"crow": "neutral", "raven": "neutral"},
+  "night_beet": {"crow": "neutral", "raven": "neutral"},
+  "glow_cap": {"crow": "dislikes", "raven": "dislikes"}
+ },
+ "traits": {
+  "curious": {"rate": 1.15, "range": 1.1},
+  "shy": {"rate": 0.8, "range": 0.85},
+  "greedy": {"gain": 1.3},
+  "calm": {"rate": 1.0, "range": 1.0},
+  "bold": {"range": 1.15},
+  "quiet": {"rate": 1.05}
+ },
+ "tag": {"near": 150.0, "show_seconds": 4.0},
+ "register": {
+  "stage": 2,
+  "max_name": 12,
+  "names": {
+   "crow": ["RUSS", "PECH", "KOHL", "ASCHEN", "FLICK", "STRUBBEL", "KRÜMEL", "ZWIRN", "DOCHT", "SPLITTER"],
+   "raven": ["MONDGRAU", "SCHWINGE", "NACHT", "DORNIG", "OBSIDIAN", "TINTE", "RAUNACHT", "GEWÖLK"]
+  },
+  "ring_colors": ["e6c468", "78f4e6", "e0556e", "b99bff", "8ed36b", "f08c4a"],
+  "ring_names": ["GOLD", "TEAL", "ROT", "VIOLETT", "GRÜN", "ORANGE"]
+ },
+ "territory": {
+  "spots": 3,
+  "radius": [36.0, 104.0],
+  "jitter": 14.0,
+  "night_start": 0.8,
+  "night_end": 0.2,
+  "leash": 170.0,
+  "leash_hidden": 420.0,
+  "max_loaded": 6,
+  "spawn_clear": 70.0,
+  "check_seconds": 1.0,
+  "seen_seconds": 20.0
+ },
+ "companion": {
+  "stage": 5,
+  "modes": ["FOLGEN", "BLEIBEN", "HEIM"],
+  "tick": 0.4,
+  "follow_distance": 64.0,
+  "teleport_distance": 520.0,
+  "teleport_hidden": 300.0,
+  "shoulder_after": 2.6,
+  "shoulder_reach": 44.0,
+  "shoulder_offset": [7.0, 1.0],
+  "shoulder_height": 25.0,
+  "whistle_hold": 0.6,
+  "scout": {"range": 260.0, "cooldown": 90.0, "reveal_cells": 9.0, "enemy_radius": 300.0, "timeout": 16.0},
+  "hoard_slots": 12,
+  "perch_seconds": 15.0,
+  "finds": {
+   "seconds": [300.0, 540.0], "daily": 4, "retry": 120.0,
+   "crow": {"name": "MITBRINGSEL", "items": [["seed_fluff", 5], ["dusk_berry", 3], ["stone", 2]]},
+   "raven": {"name": "GLITZERFUND", "items": [["stone", 3], ["iron_ore", 2], ["void_splinter", 1], ["glow_cap", 1]]}
+  },
+  "ability": {
+   "crow": {"name": "FUNDNASE", "cooldown": 45.0, "range": 170.0, "min": 36.0, "seconds": 7.0},
+   "raven": {"name": "WARNRUF", "cooldown": 60.0, "range": 280.0, "seconds": 4.0}
+  }
+ },
+ "decay": {
+  "grace_days": 3,
+  "per_day": 3.0,
+  "registered_floor_stage": 2
+ }
+}

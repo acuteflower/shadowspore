@@ -85,7 +85,7 @@ func _run() -> void:
 	_check(float(spec["max_health"]) > float(DataRegistry.get_entry("enemies", "shadow_spider")["max_health"]), "Crusher must be tougher than the spider")
 	var f3: InputEventKey = InputMap.action_get_events("debug_spawn_crusher")[0] as InputEventKey
 	_check(f3.physical_keycode == KEY_F3, "Crusher spawn is not on F3")
-	_check((_arena.get_node("EnemySpawner") as MultiplayerSpawner).get_spawnable_scene_count() == 3, "Spawner does not register the crusher")
+	_check((_arena.get_node("EnemySpawner") as MultiplayerSpawner).get_spawnable_scene_count() == 4, "Spawner does not register the crusher")
 	var world_spawn: Node2D = _arena.spawn_species("void_crusher", Vector2(200, 100), 0.0, 2.0, 1.5)
 	_check(world_spawn is VoidCrusher and (world_spawn as VoidCrusher)._def["max_health"] == 160.0 and float((world_spawn as VoidCrusher)._def["slam"]["damage"]) == 27.0, "spawn_species does not build a scaled crusher")
 	world_spawn.queue_free()

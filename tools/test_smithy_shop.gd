@@ -72,7 +72,7 @@ func _run() -> void:
 	var ordered: Array[String] = []
 	for row: Dictionary in shop.rows:
 		ordered.append(String(row.recipe))
-	_check(ordered == ["iron_plate", "sword_iron"], "BESTELLEN lists plates and the forged sword (%s)" % str(ordered))
+	_check(ordered == ["iron_plate", "sword_iron", "sword_rift"], "BESTELLEN lists plates, the forged sword and the Himmelsriss (%s)" % str(ordered))
 	player.inventory.give("iron_ingot", 3)
 	_check(town.order_block("iron_plate", player) == "", "plates can be ordered (%s)" % town.order_block("iron_plate", player))
 	town.request_order("iron_plate")
@@ -100,6 +100,27 @@ func _run() -> void:
 	town.request_order("sword_iron")
 	await _frames(3)
 	_check(player.inventory.count_item("sword_basic") == swords - 1 and town.orders.size() == 1, "sword, plates, ingots and splinter are handed over")
+	# --- the Himmelsriss (docs/rissklinge.md): the first legendary sword needs a Rissfeder
+	town.orders.clear()
+	for id: String in ["sword_iron", "iron_plate", "iron_plate", "iron_plate", "iron_plate", "void_slag", "void_slag", "shadow_core", "shadow_core"]:
+		player.inventory.give(id, 1)
+	(town.residents["torben"] as Dictionary).trust = 40
+	_check(town.order_block("sword_rift", player) != "", "the Himmelsriss cannot be ordered without a Rissfeder (%s)" % town.order_block("sword_rift", player))
+	player.inventory.give("rissfeder", 1)
+	(town.residents["torben"] as Dictionary).trust = 30
+	_check("TRAUT" in town.order_block("sword_rift", player), "it wants his trust (40)")
+	(town.residents["torben"] as Dictionary).trust = 40
+	_check(town.order_block("sword_rift", player) == "", "with the feather and the rest it can be ordered (%s)" % town.order_block("sword_rift", player))
+	town.request_order("sword_rift")
+	await _frames(3)
+	_check(player.inventory.count_item("rissfeder") == 0 and player.inventory.count_item("void_slag") == 0 and town.orders.size() == 1, "the Rissfeder, slag, cores, plates and the sword are handed over")
+	(town.orders[0] as Dictionary).left = 0.1
+	await _frames(60)
+	shop._on_town_changed()
+	shop.focus = 0
+	shop._press("collect", false)
+	await _frames(3)
+	_check(player.inventory.count_item("sword_rift") == 1 and town.orders.is_empty(), "Torben hands over the Himmelsriss")
 	# --- KAUFEN / VERKAUFEN
 	player.progress.award(500, 0)
 	shop._set_tab(2)
@@ -147,31 +168,13 @@ func _run() -> void:
 	shop.focus = 0
 	shop._press("refine", false)
 	await _frames(5)
-	_check(town.orders.size() == 1 and TownManager.is_refine(town.orders[0] as Dictionary) and town.maker_of(town.orders[0] as Dictionary) == "torben", "the weapon is on Torben's anvil")
-	_check(player.inventory.count_item("sword_iron") == 0 and player.inventory.count_item("iron_ingot") == ingots_before - 1 and player.progress.copper == copper_before - RefineRules.copper(iron, 1), "weapon, one ingot and the copper are paid")
-	_check(bool((town.orders[0] as Dictionary).ok) and int((town.orders[0] as Dictionary).to) == 1, "a +1 attempt cannot fail")
-	shop._set_tab(1)
-	_check(shop.rows.filter(func(r: Dictionary) -> bool: return String(r.kind) == "queue").is_empty(), "the order tab does not list the refinement")
-	shop._set_tab(4)
-	await _frames(3)
-	_check(shop.rows.size() == 1 and String(shop.rows[0].kind) == "queue" and String(shop.rows[0].name) == "Geschmiedetes Schwert", "the refine tab shows the weapon on the anvil")
-	var wait_a: float = float((town.orders[0] as Dictionary).left)
-	await _frames(120)
-	_check(float((town.orders[0] as Dictionary).left) < wait_a - 1.0, "he works on it at the anvil")
-	town.request_collect(0)
-	await _frames(2)
-	_check(town.orders.size() == 1, "an unfinished weapon cannot be collected")
-	(town.orders[0] as Dictionary).left = 0.1
-	await _frames(60)
-	shop._on_town_changed()
-	shop.focus = 0
-	shop._press("collect", false)
-	await _frames(3)
+	_check(town.orders.is_empty(), "refining is instant: nothing waits on Torben's anvil")
+	_check(player.inventory.count_item("iron_ingot") == ingots_before - 1 and player.progress.copper == copper_before - RefineRules.copper(iron, 1), "one ingot and the copper are paid")
 	var back: Dictionary = {}
 	for i: int in InventoryComponent.SIZE:
 		if String((player.inventory.slots[i] as Dictionary).get("id", "")) == "sword_iron":
 			back = player.inventory.slots[i]
-	_check(Items.refine(back) == 1 and town.orders.is_empty(), "collecting returns the weapon as +1")
+	_check(Items.refine(back) == 1 and player.inventory.count_item("sword_iron") == 1, "the weapon is back in the bag as +1 at once")
 	_check(answers.size() == 1 and bool(answers[0][2]) and Items.refine(answers[0][0]) == 0 and Items.refine(answers[0][1]) == 1, "the collection tells the reveal: success, +0 -> +1")
 	await _frames(5)
 	var reveal: RefineReveal = get_tree().get_first_node_in_group("refine_reveal") as RefineReveal
@@ -211,21 +214,12 @@ func _run() -> void:
 		if String((player.inventory.slots[i] as Dictionary).get("id", "")) == "sword_iron":
 			stack_slot = i
 	player.inventory.slots[stack_slot] = back
-	town.request_refine("inv", stack_slot)
-	await _frames(3)
-	_check(town.orders.size() == 1, "the +9 attempt is on the anvil")
-	_check(town.refine_heat("torben") == 9, "Torben's anvil is hot for a +9 attempt")
-	(town.orders[0] as Dictionary).ok = false ## decide the failure (the roll is rolled at the hand-in)
-	(town.orders[0] as Dictionary).left = 0.0
-	(town.orders[0] as Dictionary).done = true
-	var export: Dictionary = town.export_state()
-	_check(bool(((export.orders as Array)[0] as Dictionary).has("w")) and int((((export.orders as Array)[0] as Dictionary).w as Dictionary).r) == 8, "the weapon on the anvil is part of the saved town")
-	town.import_state(export)
-	_check(town.orders.size() == 1 and TownManager.is_refine(town.orders[0] as Dictionary) and Items.refine(town.orders[0].w) == 8 and typeof((town.orders[0].w as Dictionary).r) == TYPE_INT, "and comes back after loading")
-	shop._on_town_changed()
 	var plates_pre: int = player.inventory.count_item("iron_plate")
-	town.request_collect(0)
+	town.debug_refine_seed = seeded ## decide the failure
+	town.request_refine("inv", stack_slot)
+	town.debug_refine_seed = -1
 	await _frames(3)
+	_check(town.orders.is_empty() and town.refine_heat("torben") == 0, "the +9 attempt is decided at once, nothing waits on the anvil")
 	var failed: Dictionary = {}
 	for i: int in InventoryComponent.SIZE:
 		if String((player.inventory.slots[i] as Dictionary).get("id", "")) == "sword_iron":
@@ -239,12 +233,11 @@ func _run() -> void:
 	_check(milestone_card != null and not milestone_card._milestone.is_empty() and String(milestone_card._milestone.name) == "LEERENFEST", "+10 shows its milestone LEERENFEST")
 	milestone_card.queue_free()
 	await _frames(3)
-	town.orders.clear()
 	var smith: Settler = town.settler_node("torben") ## the loading of the town built him anew
 	var sparks_before: int = smith.get_child_count()
 	smith._anvil_sparks(12, {"face": [0, -1]})
 	_check(smith.get_child_count() == sparks_before + 1 and town.refine_heat("torben") == 0, "Torben's hammer throws sparks, no heat without an order")
-	_check(player.inventory.count_item("iron_plate") == plates_pre + RefineRules.refund(back, 9).get("iron_plate", 0), "half of the iron comes back")
+	_check(player.inventory.count_item("iron_plate") == plates_pre - int(RefineRules.materials(back, 9).get("iron_plate", 0)) + int(RefineRules.refund(back, 9).get("iron_plate", 0)), "half of the iron comes back")
 	_check(is_equal_approx(RefineRules.chance(failed), RefineRules.chance({"id": "sword_iron", "count": 1, "r": 8}) + 0.03), "the next attempt is 3 %% likelier")
 	# the one at the anvil limits the queue, other things are refused
 	player.inventory.slots[stack_slot] = {"id": "sword_basic", "count": 1, "r": 10}

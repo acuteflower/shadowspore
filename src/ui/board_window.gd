@@ -321,7 +321,24 @@ func draw_chip(at: Vector2, item: String, have: int, need: int) -> float:
 	return 21.0 + float(PixelText.width(label)) + 8.0
 
 
-func draw_purse(right: float, y: float, copper: int) -> void:
+## Width draw_purse needs for this amount.
+func purse_width(copper: int) -> float:
+	var parts: Vector3i = Currency.split(copper)
+	var w: float = 0.0
+	for i: int in [2, 1, 0]:
+		if parts[i] <= 0 and not (i == 2 and copper == 0):
+			continue
+		w += float(PixelText.width(str(parts[i]))) + 14.0
+	return w
+
+
+## Same as draw_purse, but starting at the left edge.
+func draw_purse_left(left: float, y: float, copper: int, tone: Color = TEXT) -> void:
+	draw_purse(left + purse_width(copper), y, copper, tone)
+
+
+## `tone` colours the numbers (BAD = cannot afford it).
+func draw_purse(right: float, y: float, copper: int, tone: Color = TEXT) -> void:
 	var parts: Vector3i = Currency.split(copper)
 	var x: float = right
 	for i: int in [2, 1, 0]:
@@ -330,7 +347,7 @@ func draw_purse(right: float, y: float, copper: int) -> void:
 			continue
 		var label: String = str(amount)
 		x -= float(PixelText.width(label))
-		_text(Vector2(x, y), label, TEXT)
+		_text(Vector2(x, y), label, tone)
 		x -= 8.0
 		var colors: Array = PurseVine.COINS[i]
 		for row: int in PurseVine.COIN.size():
@@ -460,6 +477,8 @@ func _draw_list(card: Rect2) -> void:
 		var tag: String = String(row.get("tag", ""))
 		if tag != "":
 			_text(Vector2(rect.end.x - 6.0 - float(PixelText.width(tag)), rect.position.y + 7.0), tag, row.get("tag_color", GOLD) as Color)
+		if row.has("coins"):
+			draw_purse(rect.end.x - 6.0, rect.position.y + 7.0, int(row.coins), BAD if bool(row.get("poor", false)) else TEXT)
 		var bar: float = float(row.get("bar", -1.0))
 		if bar >= 0.0:
 			_canvas.draw_rect(Rect2(rect.position.x + 30.0, rect.end.y - 3.0, rect.size.x - 36.0, 2.0), Color(0, 0, 0, 0.5))
@@ -544,7 +563,7 @@ func _update_tip(card: Rect2) -> void:
 		_tip.show_stack(shown, false)
 		_tip.show()
 	var y: float = card.position.y + LIST_Y + ROW_H * float(focus - scroll)
-	_tip.position = Vector2(card.position.x - _tip.size.x - 10.0, clampf(y, 24.0, 330.0 - _tip.size.y))
+	_tip.position = Vector2(maxf(card.position.x - _tip.size.x - 10.0, 4.0), clampf(y, 24.0, 330.0 - _tip.size.y))
 
 
 # ---------- input ----------

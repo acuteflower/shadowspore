@@ -104,12 +104,22 @@ var _release_pitch: float = CHOP_PITCH_UP
 var _release_yaw: float = CHOP_YAW_BACK
 var _freeze: float = 0.0 ## seconds the whole swing stands still (hit stop)
 var _server_charge_msec: int = 0
+var _alt_stage: int = 0 ## owner: the Himmelsriss's right-click chain: the slash last started (1 or 2, 0 = none)
+var _alt_deadline_msec: int = 0 ## owner: until when a second right click still makes the second slash
+var _alt_buffer_msec: int = 0 ## owner: a right click during the first slash's recovery waits here for it to end
+var _alt_buffer_dir: Vector2 = Vector2.RIGHT
+var _server_alt_stage: int = 0 ## host: the same chain as the host saw it
+var _server_alt_until: int = 0
 var _blade_length: float = 1.0
 var _tips: Array[Dictionary] = [] ## the heavy blow's path: {mid (world), tip (world), age}
 var _burst_life: float = BURST_LIFE
 var _burst_heavy: bool = false
 var _flash: float = 0.0 ## the fully-charged flash at the tip (seconds left)
 var _sounds: Dictionary = {}
+var _fx_colors: Array[Color] = MOTE_COLORS.duplicate() ## what this weapon sheds (item `fx.motes`), its trail (`fx.trail_edge/core`) and where its own sounds live (`fx.sounds`)
+var _trail_edge: Color = TRAIL_EDGE
+var _trail_core: Color = TRAIL_CORE
+var _sound_dir: String = ""
 var _stamina: StaminaComponent
 var _talismans: TalismanComponent ## damage and charge speed of the worn jewellery
 var _skills: SkillTreeComponent ## which combo steps are learned (data/skills.json upgrades)
@@ -187,7 +197,12 @@ func is_heavy_swing() -> bool:
 
 ## How much louder than a normal swing the blow is heard (1 = normal).
 func noise_scale() -> float:
-	return float(_step.get("noise", 1.0)) if is_heavy_swing() else 1.0
+	return float(_step.get("noise", 1.0)) if is_heavy_swing() or _is_diag() else 1.0
+
+
+## A diagonal slash of the right-click chain is being swung (the blade follows its own path, `_step.diag`).
+func _is_diag() -> bool:
+	return _phase != Phase.IDLE and _step.has("diag")
 
 
 ## How fast the heavy blow charges: a talisman's Aufladetempo up to the full charge, then in real time.
@@ -275,7 +290,102 @@ func attack(dir: Vector2) -> void:
 		_rpc_server_swing.rpc_id(1, dir, step)
 
 
-## Owner only: right mouse button went down. Starts charging the weapon's secondary attack everywhere.
+## The held weapon's right click is a chain of slashes (the Himmelsriss) and she may start one now.
+func can_alt() -> bool:
+	if not can_attack():
+		return false
+	var cfg: Dictionary = HeavyRules.config(DataRegistry.get_entry("items", held_weapon))
+	return HeavyRules.is_rift_slash(cfg) and (_stamina == null or _stamina.current >= HeavyRules.rift_cost(cfg, 1))
+
+
+## Owner only: the right mouse button went down on a weapon with a slash chain. Starts the first slash, or the second when it follows the first in time;
+## pressed during the first one it waits until that has ended (nothing is lost by pressing a little early).
+func alt_press(dir: Vector2) -> void:
+	var cfg: Dictionary = HeavyRules.config(DataRegistry.get_entry("items", held_weapon))
+	if not HeavyRules.is_rift_slash(cfg):
+		return
+	dir = dir.normalized() if dir != Vector2.ZERO else aim_dir
+	if _phase != Phase.IDLE:
+		if bool(_step.get("alt", false)) and int(_step.get("stage", 0)) == 1:
+			_alt_buffer_msec = Time.get_ticks_msec()
+			_alt_buffer_dir = dir
+		return
+	if held_weapon == "" or always_drawn or _charging:
+		return
+	_alt_start(cfg, dir)
+
+
+func _alt_start(cfg: Dictionary, dir: Vector2) -> void:
+	var stage: int = 2 if _alt_stage == 1 and Time.get_ticks_msec() <= _alt_deadline_msec else 1
+	if _stamina != null and not _stamina.spend(HeavyRules.rift_cost(cfg, stage)):
+		return
+	_alt_stage = stage
+	_alt_buffer_msec = 0
+	aim_dir = dir
+	_alt_swing.rpc(dir, held_weapon, stage, held_refine)
+	if multiplayer.is_server():
+		_server_alt(dir, stage)
+	else:
+		_rpc_server_alt.rpc_id(1, dir, stage)
+
+
+## The step of the chain for a stack (times scaled by its own speed, a refined weapon is faster).
+func _alt_step(stack: Dictionary, stage: int) -> Dictionary:
+	var cfg: Dictionary = HeavyRules.config(Items.definition(stack))
+	return HeavyRules.rift_step(cfg, {"stats": {"speed": Items.stat(stack, "speed", 1.0)}}, stage)
+
+
+@rpc("authority", "call_local", "reliable")
+func _alt_swing(dir: Vector2, weapon_id: String, stage: int, refine_level: int = 0) -> void:
+	var stack: Dictionary = _stack_of(weapon_id, refine_level)
+	var step: Dictionary = _alt_step(stack, stage)
+	if step.is_empty():
+		return
+	_step = step
+	_reach = Items.stat(stack, "reach", 22.0) * float(step["reach"])
+	_combo_window = 0.5
+	_combo_index = 0
+	aim_dir = dir
+	_charging = false
+	_phase = Phase.WINDUP
+	_time = 0.0
+	_trail_age = TRAIL_FADE
+	_trail_head = -float(step["arc"]) / 2.0
+	_thrust_progress = 0.0
+	_burst_done = true ## the ribbon and the feathers are its flourish, no crescent
+	_tips.clear()
+	_play_sound("swing", -3.0, 1.0 if stage == 1 else 0.86)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_server_alt(dir: Vector2, stage: int) -> void:
+	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+		_server_alt(dir, stage)
+
+
+## Host: scores a slash of the chain after its wind-up. The second slash only counts right after the first.
+func _server_alt(dir: Vector2, stage: int) -> void:
+	var now: int = Time.get_ticks_msec()
+	var stack: Dictionary = inventory.active_stack()
+	if now < _server_ready_msec or stack.is_empty() or dir == Vector2.ZERO:
+		return
+	if stage == 2 and (_server_alt_stage != 1 or now > _server_alt_until):
+		return
+	var step: Dictionary = _alt_step(stack, stage)
+	if step.is_empty():
+		return
+	_server_alt_stage = stage
+	_server_alt_until = now + int((float(step["windup"]) + float(step["active"]) + float(step["recovery"]) + HeavyRules.rift_window(HeavyRules.config(Items.definition(stack)))) * 1000.0)
+	_server_combo_index = 0
+	_server_combo_until = 0
+	_server_ready_msec = now + int((float(step["windup"]) + float(step["active"]) + float(step["recovery"]) * 0.5) * 1000.0)
+	await get_tree().create_timer(float(step["windup"])).timeout
+	await get_tree().physics_frame
+	if is_inside_tree() and (get_parent() as Player).health.current > 0 and _phase != Phase.IDLE:
+		_hit_scan(dir.normalized(), step, stack)
+
+
+## Owner only: the right mouse button went down. Starts charging the weapon's secondary attack everywhere.
 func begin_charge(dir: Vector2) -> void:
 	if not can_charge():
 		return
@@ -489,6 +599,7 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 	var damage: float = Items.stat(stack, "damage", 1.0) * float(step["damage"]) ## the stack's own stats: a refined weapon hits harder
 	if _talismans != null:
 		damage *= _talismans.damage_factor(bool(step.get("heavy", false))) ## Wuchtreif and the like (host: from its own copy of her bag)
+		damage *= _talismans.dive_factor() ## Rissfeder: the first blow after a blink
 	var knockback: float = Items.stat(stack, "knockback", 0.0) * float(step["knock"])
 	var targets: Array[HurtboxComponent] = HitScan.fan(self, origin, dir, Items.stat(stack, "reach", 20.0) * float(step["reach"]), float(step["arc"]), HURTBOX_MASK)
 	for target: HurtboxComponent in targets:
@@ -496,7 +607,81 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 		target.take_hit(damage, origin, knockback, get_multiplayer_authority())
 		target.armor_floor = 0.0
 	if not targets.is_empty():
+		if _talismans != null:
+			_talismans.spend_dive() ## it connected: the dive is used up
 		_on_hit.rpc(_hit_point(targets[0]), dir, float(step["shake"]), float(step.get("hit_stop", 0.0)))
+	_rift(origin, dir, step, stack, damage, targets)
+
+
+## Host: what the Himmelsriss adds to a blow (docs/rissklinge.md): the thrust of the combo (`rift` "line") throws a short lane of light, a slash of the right-click
+## chain (`volley`) shoots a fan of feathers from the blade's tip. `damage` is what the blow itself did to each target.
+func _rift(origin: Vector2, dir: Vector2, step: Dictionary, stack: Dictionary, damage: float, already: Array[HurtboxComponent]) -> void:
+	var unit: float = damage / maxf(float(step["damage"]), 0.01) ## the weapon's own strength, not the blow's bonus
+	if step.has("volley"):
+		_volley(origin, dir, step, stack, unit)
+		return
+	if String(step.get("rift", "")) != "line":
+		return
+	var class_cfg: Dictionary = DataRegistry.get_entry("weapon_classes", String(Items.definition(stack).get("weapon_class", "")))
+	var cfg: Dictionary = HeavyRules.rift_data(class_cfg.get("secondary", {}) as Dictionary, "passive")
+	if cfg.is_empty():
+		return
+	var length: float = float(cfg.get("length", 100.0))
+	var half: float = float(cfg.get("width", 12.0)) * 0.5
+	_rift_fx.rpc(origin, dir, length, float(cfg.get("life", 0.5)))
+	for target: HurtboxComponent in HitScan.lane(self, origin, dir, length, half, HURTBOX_MASK):
+		if not already.has(target):
+			target.take_hit(unit * float(cfg.get("ratio", 0.5)), origin, Items.stat(stack, "knockback", 0.0) * float(cfg.get("knock", 1.0)), get_multiplayer_authority())
+
+
+## Host: the feathers of a slash. A fan of narrow lanes from the blade's tip; a feather that meets something stops there (the fx gets the distance). Everyone a feather
+## hits takes `ratio` of the weapon's damage per feather, up to `max_hits` of them (close to her the fan is a shotgun, far away it is one or two). With the Rissfeder
+## worn, each one the second slash's feathers hit shortens the pause of its Letzter Flügelschlag (Federbund).
+func _volley(origin: Vector2, dir: Vector2, step: Dictionary, stack: Dictionary, unit: float) -> void:
+	var volley: Dictionary = step["volley"] as Dictionary
+	var count: int = maxi(int(volley.get("count", 5)), 1)
+	var spread: float = deg_to_rad(float(volley.get("spread", 40.0)))
+	var length: float = float(volley.get("length", 150.0))
+	var half: float = float(volley.get("width", 8.0)) * 0.5
+	var tip: Vector2 = origin + dir * Items.stat(stack, "reach", 22.0) * float(step["reach"]) * 0.8
+	var hits: Dictionary = {}
+	var stops: PackedFloat32Array = PackedFloat32Array()
+	for i: int in count:
+		var turn: float = 0.0 if count == 1 else lerpf(-spread / 2.0, spread / 2.0, float(i) / float(count - 1))
+		var along: Vector2 = dir.rotated(turn)
+		var stop: float = length
+		for target: HurtboxComponent in HitScan.lane(self, tip, along, length, half, HURTBOX_MASK):
+			hits[target] = int(hits.get(target, 0)) + 1
+			stop = minf(stop, maxf((_hit_point(target) - tip).dot(along), 6.0))
+		stops.append(stop)
+	var max_hits: int = maxi(int(volley.get("max_hits", 3)), 1)
+	for target: Variant in hits:
+		var hurt: HurtboxComponent = target as HurtboxComponent
+		hurt.take_hit(unit * float(volley.get("ratio", 0.4)) * float(mini(int(hits[target]), max_hits)), tip, Items.stat(stack, "knockback", 0.0) * float(volley.get("knock", 1.0)), get_multiplayer_authority())
+	_volley_fx.rpc(tip, dir, count, spread, float(volley.get("speed", 560.0)), stops, int(step.get("stage", 1)))
+	if hits.is_empty():
+		return
+	if _talismans != null and volley.has("ward_refund"):
+		_talismans.shorten_ward(minf(float(volley["ward_refund"]) * hits.size(), float(volley.get("ward_cap", 0.0)))) ## Federbund
+	_on_hit.rpc(_hit_point(hits.keys()[0] as HurtboxComponent), dir, float(step["shake"]), 0.0)
+
+
+## Every peer: the lane of light of the thrust (`RiftFx.lane`).
+@rpc("any_peer", "call_local", "reliable")
+func _rift_fx(at: Vector2, dir: Vector2, length: float, life: float) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	RiftFx.lane(get_tree().current_scene, at, dir, length, life)
+	_play_sound("line", -4.0, randf_range(0.95, 1.08))
+
+
+## Every peer: the feathers fly (`FeatherVolley`), each as far as `stops` says.
+@rpc("any_peer", "call_local", "reliable")
+func _volley_fx(at: Vector2, dir: Vector2, count: int, spread: float, speed: float, stops: PackedFloat32Array, stage: int) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	FeatherVolley.shoot(get_tree().current_scene, at, dir, count, spread, speed, stops)
+	_play_sound("volley", -3.0, 1.0 if stage == 1 else 0.88)
 
 
 func _hit_point(target: HurtboxComponent) -> Vector2:
@@ -585,6 +770,7 @@ func _step_data(stack: Dictionary, index: int) -> Dictionary:
 		"shake": float(step.get("shake", 1)),
 		"block": int(step.get("block", -1)),
 		"requires": String(step.get("requires", "")),
+		"rift": String(step.get("rift", "")),
 	}
 
 
@@ -609,7 +795,7 @@ func _charge_effects(delta: float) -> void:
 		_charge_carry -= 1.0
 		var around: Vector2 = tip + Vector2.from_angle(randf() * TAU) * randf_range(7.0, 13.0)
 		var vel: Vector2 = (tip - around).normalized() * randf_range(18.0, 34.0) ## gathering inwards
-		_motes.append({"pos": around, "vel": vel, "age": 0.0, "life": randf_range(0.18, 0.3), "kind": 0 if randf() < 0.8 else 1, "color": MOTE_COLORS[1 + randi() % 3], "size": randf_range(0.8, 1.2)})
+		_motes.append({"pos": around, "vel": vel, "age": 0.0, "life": randf_range(0.18, 0.3), "kind": 0 if randf() < 0.8 else 1, "color": _fx_colors[1 + randi() % 3], "size": randf_range(0.8, 1.2)})
 	if _motes.size() > 260:
 		_motes = _motes.slice(_motes.size() - 260)
 
@@ -620,7 +806,7 @@ func _track_tips(delta: float) -> void:
 		_tips[i]["age"] = float(_tips[i]["age"]) + delta
 		if float(_tips[i]["age"]) >= HEAVY_TRAIL_LIFE:
 			_tips.remove_at(i)
-	if is_heavy_swing() and _phase != Phase.WINDUP and _freeze <= 0.0:
+	if (is_heavy_swing() or _is_diag()) and _phase != Phase.WINDUP and _freeze <= 0.0:
 		var dir: Vector2 = Vector2.from_angle(_blade_angle)
 		var base: Vector2 = _weapon.global_position
 		_tips.append({"mid": base + dir * _blade_length * BLADE_PX * 0.45, "tip": base + dir * _blade_length * BLADE_PX, "age": 0.0})
@@ -657,13 +843,16 @@ func _impact_dust() -> void:
 
 
 func _play_sound(id: String, volume_db: float = 0.0, pitch: float = 1.0) -> void:
-	var path: String = HEAVY_SOUNDS + id + ".wav"
-	var stream: AudioStream = _sounds.get(id) as AudioStream
+	var key: String = _sound_dir + id
+	var stream: AudioStream = _sounds.get(key) as AudioStream
 	if stream == null:
+		var path: String = _sound_dir + id + ".wav" ## a weapon's own sound first (item `fx.sounds`), else the shared ones
+		if _sound_dir.is_empty() or not ResourceLoader.exists(path):
+			path = HEAVY_SOUNDS + id + ".wav"
 		if not ResourceLoader.exists(path):
 			return
 		stream = load(path) as AudioStream
-		_sounds[id] = stream
+		_sounds[key] = stream
 	var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
 	player.stream = stream
 	player.volume_db = volume_db
@@ -672,6 +861,19 @@ func _play_sound(id: String, volume_db: float = 0.0, pitch: float = 1.0) -> void
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
+
+
+## The look of this weapon's swing: colours of the motes and the trail and the folder of its own sounds (item `fx`), the shared ones when it has none.
+func _load_fx(def: Dictionary) -> void:
+	var fx: Dictionary = def.get("fx", {}) as Dictionary
+	_fx_colors = MOTE_COLORS.duplicate()
+	var motes: Array = fx.get("motes", []) as Array
+	if motes.size() >= 4:
+		for i: int in 4:
+			_fx_colors[i] = Color(String(motes[i]))
+	_trail_edge = Color(String(fx["trail_edge"])) if fx.has("trail_edge") else TRAIL_EDGE
+	_trail_core = Color(String(fx["trail_core"])) if fx.has("trail_core") else TRAIL_CORE
+	_sound_dir = String(fx.get("sounds", ""))
 
 
 ## A stack as every peer knows it from the synced item id and refinement level.
@@ -688,6 +890,7 @@ func _refresh_weapon() -> void:
 	if _weapon == null:
 		return
 	_has_weapon = not def.is_empty()
+	_load_fx(def)
 	_weapon.visible = _has_weapon and _weapon_alpha > 0.01
 	if _has_weapon:
 		_weapon.texture = load(String(def.get("held", "")).replace("_held.png", "_held_rot.png")) as Texture2D ## the grip is the middle pixel of every cell
@@ -712,6 +915,21 @@ func _advance(delta: float) -> void:
 			if _time >= float(_step["recovery"]):
 				_phase = Phase.IDLE
 				_combo_deadline_msec = Time.get_ticks_msec() + int(_combo_window * 1000.0)
+				if bool(_step.get("alt", false)) and is_multiplayer_authority():
+					_alt_chain_ended()
+
+
+## The owner's slash of the right-click chain ended: the first one opens the window for the second (and starts it at once when the button was pressed during
+## the recovery), the second closes the chain.
+func _alt_chain_ended() -> void:
+	if int(_step.get("stage", 0)) != 1:
+		_alt_stage = 0
+		return
+	var cfg: Dictionary = HeavyRules.config(DataRegistry.get_entry("items", held_weapon))
+	_alt_deadline_msec = Time.get_ticks_msec() + int(HeavyRules.rift_window(cfg) * 1000.0)
+	if _alt_buffer_msec > 0 and Time.get_ticks_msec() - _alt_buffer_msec < 350 and HeavyRules.is_rift_slash(cfg):
+		_alt_start(cfg, _alt_buffer_dir)
+	_alt_buffer_msec = 0
 
 
 ## Rest: the hand holds the sword where the walk cycle puts it, blade forward (trailing behind
@@ -769,6 +987,28 @@ func _update_pose(delta: float) -> void:
 			Phase.RECOVERY:
 				var t: float = clampf(_time / float(_step["recovery"]), 0.0, 1.0)
 				var low: Vector2 = _chop_blade(CHOP_PITCH_END, CHOP_YAW_END)
+				var settle: float = t * t * (3.0 - 2.0 * t)
+				angle = lerp_angle(low.angle(), rest_angle, settle)
+				length = lerpf(clampf(low.length(), 0.4, 1.0), _rest_length, settle)
+	elif _has_weapon and _phase != Phase.IDLE and not _step.is_empty() and _step.has("diag"):
+		var path: Dictionary = _step["diag"] as Dictionary ## a diagonal slash: the blade comes over the shoulder and cuts down across her, seen in perspective
+		behind = aim_dir.y < -0.35
+		match _phase:
+			Phase.WINDUP:
+				var t: float = clampf(_time / float(_step["windup"]), 0.0, 1.0)
+				var cocked_blade: Vector2 = _chop_blade(float(path["pitch0"]), float(path["yaw0"]))
+				angle = lerp_angle(rest_angle, cocked_blade.angle(), t)
+				length = lerpf(_rest_length, clampf(cocked_blade.length(), 0.4, 1.0), t)
+			Phase.ACTIVE:
+				var t: float = clampf(_time / float(_step["active"]), 0.0, 1.0)
+				var eased: float = 1.0 - pow(1.0 - t, 3.0) ## fast start, soft end
+				var cut: Vector2 = _chop_blade(lerpf(float(path["pitch0"]), float(path["pitch1"]), eased), lerpf(float(path["yaw0"]), float(path["yaw1"]), eased))
+				angle = cut.angle()
+				length = clampf(cut.length(), 0.4, 1.0)
+				_emit_motes(angle, float(_step["sweep"]), false, delta)
+			Phase.RECOVERY:
+				var t: float = clampf(_time / float(_step["recovery"]), 0.0, 1.0)
+				var low: Vector2 = _chop_blade(float(path["pitch1"]), float(path["yaw1"]))
 				var settle: float = t * t * (3.0 - 2.0 * t)
 				angle = lerp_angle(low.angle(), rest_angle, settle)
 				length = lerpf(clampf(low.length(), 0.4, 1.0), _rest_length, settle)
@@ -905,7 +1145,7 @@ func _elbow(shoulder: Vector2, hand: Vector2) -> Vector2:
 func _draw_trail() -> void:
 	var alpha: float = 1.0 - _trail_age / TRAIL_FADE
 	_draw_heavy_ribbon()
-	if alpha > 0.0 and not _step.is_empty() and not bool(_step.get("heavy", false)):
+	if alpha > 0.0 and not _step.is_empty() and not bool(_step.get("heavy", false)) and not _step.has("diag"):
 		if String(_step["style"]) == "thrust":
 			_draw_thrust_trail(alpha)
 		else:
@@ -924,7 +1164,7 @@ func _draw_heavy_ribbon() -> void:
 		var a: Dictionary = _tips[i - 1]
 		var b: Dictionary = _tips[i]
 		var k: float = 1.0 - float(b["age"]) / HEAVY_TRAIL_LIFE
-		var color: Color = TRAIL_EDGE.lerp(TRAIL_CORE, k)
+		var color: Color = _trail_edge.lerp(_trail_core, k)
 		color.a = clampf(k, 0.0, 1.0) * 0.85
 		var a_mid: Vector2 = _trail.to_local(a["mid"] as Vector2)
 		var a_tip: Vector2 = _trail.to_local(a["tip"] as Vector2)
@@ -951,7 +1191,7 @@ func _draw_charge_glint() -> void:
 	if power <= 0.0 and _flash <= 0.0:
 		return
 	var tip: Vector2 = _trail.to_local(_weapon.global_position + Vector2.from_angle(_blade_angle) * _blade_length * BLADE_PX).round()
-	var color: Color = MOTE_COLORS[0]
+	var color: Color = _fx_colors[0]
 	color.a = 0.35 + 0.5 * power + 0.5 * (_flash / 0.25)
 	var arm: float = 2.0 + 2.0 * power + 4.0 * (_flash / 0.25)
 	_trail.draw_rect(Rect2(tip - Vector2(arm, 0), Vector2(arm * 2.0 + 1.0, 1)), color)
@@ -1003,7 +1243,7 @@ func _emit_motes(angle: float, sweep: float, thrust: bool, delta: float) -> void
 		var radius: float = _reach * randf_range(0.8, 1.0)
 		var flight: Vector2 = along if thrust else along.rotated(sweep * PI / 2.0) ## the way the blade is moving
 		var kind: int = [0, 0, 0, 0, 0, 1][randi() % 6]
-		var color: Color = MOTE_COLORS[1 + randi() % 2]
+		var color: Color = _fx_colors[1 + randi() % 2]
 		var speed: float = randf_range(18.0, 55.0)
 		var vel: Vector2 = flight * speed + along * randf_range(-12.0, 30.0) + Vector2(randf_range(-14.0, 14.0), randf_range(-14.0, 6.0))
 		_motes.append({"pos": origin + along * radius + along.rotated(PI / 2.0) * randf_range(-1.5, 1.5), "vel": vel, "age": 0.0, "life": randf_range(0.2, 0.42), "kind": kind, "color": color, "size": randf_range(0.8, 1.3)})
@@ -1041,7 +1281,7 @@ func _draw_motes() -> void:
 				var arm: float = 1.0
 				_trail.draw_rect(Rect2(at - Vector2(arm, 0), Vector2(arm * 2.0 + 1.0, 1)), color)
 				_trail.draw_rect(Rect2(at - Vector2(0, arm), Vector2(1, arm * 2.0 + 1.0)), color)
-				var core: Color = MOTE_COLORS[0]
+				var core: Color = _fx_colors[0]
 				core.a = color.a
 				_trail.draw_rect(Rect2(at, Vector2(1, 1)), core)
 			_: ## a streak along its flight
@@ -1059,7 +1299,7 @@ func _draw_burst() -> void:
 	var fade: float = pow(1.0 - k, 1.4)
 	var center: Vector2 = _trail.to_local(_burst_center)
 	for layer: int in (2 if _burst_heavy else 1):
-		var color: Color = MOTE_COLORS[1 - layer] if _burst_heavy else MOTE_COLORS[1]
+		var color: Color = _fx_colors[1 - layer] if _burst_heavy else _fx_colors[1]
 		color.a = fade * (0.7 if _burst_heavy else 0.5)
 		if _burst_heavy:
 			var wide: float = _reach + 2.0 + 10.0 * grow - 2.0 * layer
@@ -1088,7 +1328,7 @@ func _draw_slash_trail(alpha: float) -> void:
 		var a1: float = aim + sweep * (from_offset + span * k1)
 		var outer: float = _reach
 		var inner: float = _reach - lerpf(1.5, 9.0, k1)
-		var color: Color = TRAIL_EDGE.lerp(TRAIL_CORE, k1)
+		var color: Color = _trail_edge.lerp(_trail_core, k1)
 		color.a = alpha * lerpf(0.1, 0.95, k1)
 		_trail.draw_colored_polygon(PackedVector2Array([
 			BODY_CENTER + Vector2.from_angle(a0) * inner, BODY_CENTER + Vector2.from_angle(a0) * outer,
@@ -1101,7 +1341,7 @@ func _draw_thrust_trail(alpha: float) -> void:
 	var tip: Vector2 = BODY_CENTER + aim_dir * (2.0 + (_reach - 2.0) * _thrust_progress)
 	for layer: int in 2:
 		var width: float = 4.0 - layer * 2.0
-		var color: Color = TRAIL_EDGE.lerp(TRAIL_CORE, float(layer))
+		var color: Color = _trail_edge.lerp(_trail_core, float(layer))
 		color.a = alpha * (0.6 + 0.3 * layer)
 		_trail.draw_colored_polygon(PackedVector2Array([tail + perp * 0.4, tip + perp * width, tip - perp * width, tail - perp * 0.4]), color)
 

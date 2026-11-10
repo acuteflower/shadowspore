@@ -79,7 +79,7 @@ func _run() -> void:
 	var f3: InputEventKey = InputMap.action_get_events("debug_spawn_crusher")[0] as InputEventKey
 	var f4: InputEventKey = InputMap.action_get_events("debug_time")[0] as InputEventKey
 	_check(f2.physical_keycode == KEY_F2 and f3.physical_keycode == KEY_F3 and f4.physical_keycode == KEY_F4, "F2/F3 spawn keys conflict with the clock binding")
-	_check((_arena.get_node("EnemySpawner") as MultiplayerSpawner).get_spawnable_scene_count() == 3, "Enemy spawner does not register all enemy species")
+	_check((_arena.get_node("EnemySpawner") as MultiplayerSpawner).get_spawnable_scene_count() == 4, "Enemy spawner does not register all enemy species")
 	# Quiet sneaking behind its head avoids detection; sprinting there is audible.
 	_reset_player(Vector2(-120, 0))
 	_actor.heading = 0.0

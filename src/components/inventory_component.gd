@@ -74,7 +74,7 @@ func close_box() -> void:
 ##   the cursor stack: "click" [kind, ref] (take the stack / put it down, top up or swap), "rclick" [kind, ref] (empty hand: take half,
 ##   a single piece of gear: equip; full hand: put down ONE), "quick" [kind, ref] (shift-click: gear to its slot, else hotbar <-> rucksack),
 ##   "hotkey" [kind or "held", ref, n] (number key: swap with hotbar slot n), "throw" [all] (throw the cursor stack or one piece into the world),
-##   "dropslot" [kind, ref, all] (throw from a slot: one piece or all), "sort" [0] (stack and sort the rucksack), "stow" [0] (cursor stack back into the bag),
+##   "dropslot" [kind, ref, all] (throw from a slot: one piece or all), "sort" [0] (stack and sort the rucksack), "stow" [0] (cursor stack back into the bag), "sort_box" [0] / "take_all" [0] (open container: sort it / move everything into the bag),
 ##   "box_open" [box id] / "box_close" [0] (the container slots, kind "box" with an index, work in "click" / "rclick" / "quick" while a box is open and within reach).
 func request(op: String, args: Array) -> void:
 	if multiplayer.is_server():
@@ -280,6 +280,10 @@ func _apply(op: String, args: Array) -> void:
 			ok = _drop_slot(String(args[0]), args[1], bool(args[2]))
 		"sort":
 			ok = _sort()
+		"sort_box":
+			ok = _sort_box()
+		"take_all":
+			ok = _take_all()
 		"stow":
 			ok = _stow()
 		"select":
@@ -541,9 +545,37 @@ func _throw(stack: Dictionary, count: int) -> bool:
 
 ## Merges equal stacks in the rucksack (not the hotbar) and sorts it: tools, gear, food, materials; rarer first, then by name.
 func _sort() -> bool:
+	return _sort_slots(slots, HOTBAR_SIZE, SIZE)
+
+
+## The same for the open container (R / "Sortieren" in a box window).
+func _sort_box() -> bool:
+	return box != null and _sort_slots(box.slots, 0, box.size())
+
+
+## "Alles nehmen": every stack of the open container goes into the bag as far as it fits.
+func _take_all() -> bool:
+	if box == null:
+		return false
+	var moved: bool = false
+	for i: int in box.size():
+		var current: Dictionary = box.slots[i]
+		if current.is_empty():
+			continue
+		var left: int = add_item(String(current["id"]), int(current["count"]), Items.extras(current))
+		if left < int(current["count"]):
+			moved = true
+		if left <= 0:
+			box.slots[i] = {}
+		else:
+			current["count"] = left
+	return moved
+
+
+func _sort_slots(target: Array, from: int, to: int) -> bool:
 	var stacks: Array[Dictionary] = []
-	for i: int in range(HOTBAR_SIZE, SIZE):
-		var stack: Dictionary = (slots[i] as Dictionary).duplicate()
+	for i: int in range(from, to):
+		var stack: Dictionary = (target[i] as Dictionary).duplicate()
 		for other: Dictionary in stacks:
 			if not stack.is_empty() and String(other["id"]) == String(stack["id"]) and Items.extras(other) == Items.extras(stack) and int(other["count"]) < Items.max_stack(other):
 				var room: int = mini(Items.max_stack(other) - int(other["count"]), int(stack["count"]))
@@ -567,8 +599,8 @@ func _sort() -> bool:
 		if ra != rb:
 			return ra > rb
 		return String(da.get("name", a["id"])) < String(db.get("name", b["id"])))
-	for i: int in range(HOTBAR_SIZE, SIZE):
-		slots[i] = stacks[i - HOTBAR_SIZE] if i - HOTBAR_SIZE < stacks.size() else {}
+	for i: int in range(from, to):
+		target[i] = stacks[i - from] if i - from < stacks.size() else {}
 	return true
 
 

@@ -28,7 +28,8 @@ const TABS: Array[Dictionary] = [
 	{"id": "settings", "name": "EINSTELLUNGEN", "x": -92.0, "sealed": false},
 	{"id": "map", "name": "KARTE", "x": -34.0, "sealed": true},
 	{"id": "town", "name": "STADT", "x": 52.0, "sealed": false}, ## the skill graph stays on F / Start (and the settings page lists its key)
-	{"id": "dev", "name": "ENTWICKLER", "x": 120.0, "sealed": false},
+	{"id": "pets", "name": "VÖGEL", "x": 98.0, "sealed": false}, ## the book of the named crows and ravens (docs/pet_konzept.md)
+	{"id": "dev", "name": "ENTWICKLER", "x": 150.0, "sealed": false},
 ]
 const CONTROLS: Array[Array] = [
 	["BEWEGEN", "", "WASD"], ["SPRINTEN", "sprint", ""], ["BLINKEN", "blink", ""],
@@ -42,8 +43,8 @@ var _time: float = 0.0
 var _tab: int = 0
 var _tab_t: float = 1.0 ## 0 -> 1 after switching: the page grows again
 var _bloom_x: float = 0.0
-var _tab_lift: Array[float] = [0.0, 0.0, 0.0, 0.0]
-var _tab_deny: Array[float] = [0.0, 0.0, 0.0, 0.0] ## a sealed tag shivers when clicked
+var _tab_lift: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
+var _tab_deny: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0] ## a sealed tag shivers when clicked
 var _hover_tab: int = -1
 var _items: Array[Dictionary] = []
 var _cursor: Array[float] = [0.0, 0.0]
@@ -63,7 +64,10 @@ var _paused_here: bool = false
 var _vignette: GradientTexture2D
 var _tp_text: String = "" ## the teleport field of the developer tab: "x, y" in tiles
 var _scrolls: Array[float] = [0.0, 0.0] ## per column: how far it is scrolled up (px); a column taller than the screen scrolls on its own
-var _editing: bool = false ## the teleport field takes the keys
+var _editing: bool = false ## a text field takes the keys
+var _field: String = "tp" ## which one: "tp" (teleport, developer tab) or "pet" (the name of a bird)
+var _pet_sel: String = "" ## the bird whose page is open in the VÖGEL tab
+var _pet_text: String = "" ## the new name being typed
 
 
 func _ready() -> void:
@@ -206,6 +210,8 @@ func _build_items() -> void:
 				_add(1, "info", String(row[0]), "", {"text": String(row[2]) if String(row[2]) != "" else _key_of(String(row[1]))})
 		"town":
 			_build_town_page()
+		"pets":
+			_build_pets_page()
 		"dev":
 			_add(0, "heading", "ZEIT")
 			_add(0, "button", "TAG", "", {"action": "day"})
@@ -223,11 +229,16 @@ func _build_items() -> void:
 				_add(0, "button", "+1 STUFE", "", {"action": "level_up"})
 			if multiplayer.is_server():
 				_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
+				_add(0, "button", "HIMMELSRISS BEKOMMEN", "", {"action": "rift_sword"})
 				for lvl: int in [0, 5, 10, 15]:
 					_add(0, "button", "WAFFE +%d" % lvl, "", {"action": "refine_%d" % lvl}) ## sets the refinement of the weapon in her hand
 				_add(0, "button", "TALISMANE ANLEGEN", "", {"action": "talismans_on"})
 				_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
 				_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
+				_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
+				_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
+				_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
+				_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
 			if multiplayer.is_server():
 				_add(0, "heading", "ANGELN")
 				_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
@@ -272,6 +283,69 @@ func _build_items() -> void:
 	for item: Dictionary in _items:
 		if _focus < 0 and _interactive(item):
 			_focus = int(item["idx"])
+
+
+func _on_pets_changed(_key: String = "") -> void:
+	if _opening and String(TABS[_tab]["id"]) == "pets" and not _editing:
+		var keep: int = _focus
+		_build_items()
+		if keep >= 0 and keep < _items.size() and _interactive(_items[keep]):
+			_focus = keep
+
+
+## The VÖGEL tab: the book of the named crows and ravens (docs/pet_konzept.md 9.4). Left the birds, right the page of the chosen one: kind, bond, where it
+## was last seen and the name, which can be changed here.
+func _build_pets_page() -> void:
+	var registry: PetRegistry = PetRegistry.of(get_tree())
+	_add(0, "heading", "GEFIEDERTE")
+	if registry == null or registry.records().is_empty():
+		_add(0, "info", "NOCH KEINER BEKANNT", "", {"text": ""})
+		_add(0, "info", "SCHLEICH DICH MIT FUTTER", "", {"text": ""})
+		_add(0, "info", "AN KRÄHEN UND RABEN", "", {"text": ""})
+		_add(0, "info", "UND FÜTTERE SIE", "", {"text": ""})
+		return
+	if not registry.pet_changed.is_connected(_on_pets_changed):
+		registry.pet_changed.connect(_on_pets_changed)
+	if not registry.companion_changed.is_connected(_on_pets_changed):
+		registry.companion_changed.connect(_on_pets_changed)
+	var me: int = multiplayer.get_unique_id()
+	var list: Array[Dictionary] = registry.records()
+	var found: bool = false
+	for entry: Dictionary in list:
+		found = found or String(entry["key"]) == _pet_sel
+	if not found:
+		_pet_sel = String(list[0]["key"])
+	for entry: Dictionary in list:
+		var mark: String = "> " if String(entry["key"]) == _pet_sel else ""
+		_add(0, "button", mark + String(entry["n"]), "", {"action": "pet_sel:" + String(entry["key"])})
+	var rec: Dictionary = registry.record(_pet_sel)
+	var bp: float = registry.bp_of(_pet_sel, me)
+	var stage: int = PetRules.stage_of(bp)
+	var seen: Vector3 = registry.seen_of(_pet_sel)
+	var ago: int = maxi(0, TimeManager.day - int(seen.z))
+	var next_line: String = "%d" % int(bp) if stage >= 5 else "%d / %d" % [int(bp), int(PetRules.stage_start(stage + 1))]
+	var rings: Array = (PetRules.table()["register"] as Dictionary)["ring_names"] as Array
+	_add(1, "heading", String(rec["n"]))
+	_add(1, "info", "ART", "", {"text": "KRÄHE" if String(rec["sp"]) == "crow" else "RABE"})
+	_add(1, "info", "STUFE", "", {"text": PetRules.stage_name(stage)})
+	_add(1, "info", "BINDUNG", "", {"text": next_line})
+	_add(1, "info", "RING", "", {"text": String(rings[int(rec["ring"]) % rings.size()])})
+	_add(1, "info", "BEKANNT SEIT", "", {"text": "TAG %d" % (int(rec["rd"]) + 1)})
+	_add(1, "info", "GESEHEN", "", {"text": "HEUTE" if ago == 0 else "VOR %d TAGEN" % ago})
+	_add(1, "info", "ORT", "", {"text": "%d, %d" % [int(seen.x / 16.0), int(seen.y / 16.0)]})
+	var companion_cfg: Dictionary = PetRules.table()["companion"] as Dictionary
+	if stage >= int(companion_cfg["stage"]):
+		_add(1, "heading", "GEFÄHRTE")
+		if registry.companion_of(me) == _pet_sel:
+			_add(1, "info", "MODUS", "", {"text": registry.mode_name(me)})
+			_add(1, "button", "MODUS WECHSELN", "", {"action": "pet_mode"})
+			_add(1, "button", "ENTLASSEN", "", {"action": "pet_release"})
+			_add(1, "info", "PFIFF", "", {"text": "G RUFT, G HALTEN WECHSELT"})
+		elif registry.peer_of_companion(_pet_sel) == 0:
+			_add(1, "button", "MITNEHMEN", "", {"action": "pet_take"})
+	_add(1, "heading", "UMBENENNEN")
+	_add(1, "field", "NAME", "pet")
+	_add(1, "button", "NAMEN ÜBERNEHMEN", "", {"action": "pet_rename"})
 
 
 func _town() -> TownManager:
@@ -446,11 +520,43 @@ func _activate(item: Dictionary) -> void:
 			_change(item, 1)
 		"field":
 			_editing = true
+			_field = String(item["key"])
 		"button":
 			_run_action(String(item["action"]))
 
 
 func _run_action(action: String) -> void:
+	if action.begins_with("food:"):
+		var feeder: Player = _player as Player
+		if feeder == null or not multiplayer.is_server():
+			_failed_flash = 2.5
+			return
+		var species: String = action.trim_prefix("food:")
+		var foods: Dictionary = PetRules.table()["foods"] as Dictionary
+		for item: String in foods:
+			var kind: String = String((foods[item] as Dictionary).get(species, ""))
+			if kind == "loves" or kind == "likes":
+				feeder.inventory.give(item, 20 if kind == "loves" else 10)
+		return
+	if action.begins_with("pet_sel:"):
+		_pet_sel = action.trim_prefix("pet_sel:")
+		_pet_text = ""
+		_build_items()
+		return
+	if action in ["pet_take", "pet_release", "pet_mode"]:
+		var comp_registry: PetRegistry = PetRegistry.of(get_tree())
+		if comp_registry != null:
+			comp_registry.ask({"pet_take": "take", "pet_release": "release", "pet_mode": "mode"}[action], _pet_sel)
+		return
+	if action == "pet_rename":
+		var registry: PetRegistry = PetRegistry.of(get_tree())
+		if registry != null and _pet_sel != "" and PetRegistry.clean_name(_pet_text) != "":
+			registry.request_rename(_pet_sel, _pet_text)
+			_pet_text = ""
+			_editing = false
+		else:
+			_failed_flash = 2.5
+		return
 	match action:
 		"skills":
 			var skills: SkillTreeWindow = get_parent().get_node("SkillTreeWindow") as SkillTreeWindow
@@ -636,6 +742,30 @@ func _run_action(action: String) -> void:
 				var def: Dictionary = items[id] as Dictionary
 				if String(def.get("kind", "")) == "talisman" and collector.inventory.count_item(id) == 0 and not TalismanRules.worn_ids(collector.inventory.equipment).has(id):
 					collector.inventory.give(id, 1)
+		"rissfeder": ## the Rissfeder into the bag (host); not twice when she has it or wears it
+			var keeper: Player = _player as Player
+			if keeper == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if keeper.inventory.count_item("rissfeder") == 0 and not TalismanRules.worn_ids(keeper.inventory.equipment).has("rissfeder"):
+				keeper.inventory.give("rissfeder", 1)
+		"relics_reset": ## forget the boss kills of every player: the next kill of Mornath drops the Rissfeder for certain again (host)
+			var ledger: BossRelics = BossRelics.of(get_tree())
+			if ledger == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			ledger.forget("boss_sky_cleaver")
+		"rift_sword": ## the Himmelsriss into the bag and into her hand (host); for the Rissfeder synergy get the feather too
+			var rifter: Player = _player as Player
+			if rifter == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if not rifter.inventory.has_item("sword_rift"):
+				rifter.inventory.give("sword_rift", 1)
+			for i: int in rifter.inventory.slots.size():
+				if not rifter.inventory.slots[i].is_empty() and String(rifter.inventory.slots[i]["id"]) == "sword_rift":
+					rifter.inventory.request("equip", [i, ""])
+					break
 		"strong_sword": ## the void blade (30 damage) into the bag and into her hand (host)
 			var fighter: Player = _player as Player
 			if fighter == null or not multiplayer.is_server():
@@ -764,25 +894,36 @@ func _unhandled_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 
-## Keys for the teleport field: digits, minus, comma and space; Backspace, Ctrl+V, Enter goes, Escape leaves the field.
+## Keys for a text field. The teleport field takes digits, minus, comma and space; the name of a bird letters, digits, space and dash. Backspace, Ctrl+V,
+## Enter confirms (goes / renames), Escape leaves the field.
 func _type_into_field(key: InputEventKey) -> void:
+	var pet: bool = _field == "pet"
+	var text_now: String = _pet_text if pet else _tp_text
 	match key.physical_keycode:
 		KEY_ESCAPE:
 			_editing = false
+			return
 		KEY_ENTER, KEY_KP_ENTER:
 			_editing = false
-			_run_action("teleport")
+			_run_action("pet_rename" if pet else "teleport")
+			return
 		KEY_BACKSPACE:
-			_tp_text = _tp_text.substr(0, _tp_text.length() - 1)
+			text_now = text_now.substr(0, text_now.length() - 1)
 		_:
 			var text: String = ""
 			if key.ctrl_pressed and key.physical_keycode == KEY_V:
 				text = DisplayServer.clipboard_get()
 			elif key.unicode > 0:
 				text = char(key.unicode)
+			var limit: int = int(((PetRules.table()["register"] as Dictionary)["max_name"])) if pet else 18
 			for c: String in text:
-				if c in "0123456789-, " and _tp_text.length() < 18:
-					_tp_text += c
+				var allowed: bool = (c.to_upper() >= "A" and c.to_upper() <= "Z") or c in "ÄÖÜäöüß0123456789 -" if pet else c in "0123456789-, "
+				if allowed and text_now.length() < limit:
+					text_now += c.to_upper() if pet else c
+	if pet:
+		_pet_text = text_now
+	else:
+		_tp_text = text_now
 
 
 func _teleport_to_field() -> void:
@@ -1128,13 +1269,15 @@ func _draw_row(item: Dictionary, p: float, void_level: float) -> void:
 			var box: Rect2 = Rect2(control_x, rect.position.y + 2.0, 112.0, 13.0)
 			draw_rect(box, Color(VineStyle.OUTLINE, p))
 			draw_rect(box.grow(-1.0), Color(VineStyle.BARK_VOID.lerp(VineStyle.BARK, 0.35), p))
-			if _editing:
+			if _editing and _field == String(item["key"]):
 				draw_rect(Rect2(box.position.x, box.end.y - 1.0, box.size.x, 1.0), Color(tone, p)) ## a lit lower edge while it takes the keys
 				VineStyle.glow(self, box.get_center(), 50.0, tone, 0.12 * p)
-			var shown: String = _tp_text if (_tp_text != "" or _editing) else "X, Y"
-			_text(shown, Vector2(box.position.x + 4.0, box.position.y + 3.0), UiStyle.TEXT if _tp_text != "" else Color(UiStyle.TEXT_DIM, 0.6), p)
-			if _editing and int(_time * 2.0) % 2 == 0:
-				draw_rect(Rect2(box.position.x + 4.0 + PixelText.width(_tp_text) + 2.0, box.position.y + 2.0, 1.0, 8.0), Color(tone, p))
+			var pet_field: bool = String(item["key"]) == "pet"
+			var typed: String = _pet_text if pet_field else _tp_text
+			var shown: String = typed if (typed != "" or (_editing and _field == String(item["key"]))) else (String(item.get("hint", "NEUER NAME")) if pet_field else "X, Y")
+			_text(shown, Vector2(box.position.x + 4.0, box.position.y + 3.0), UiStyle.TEXT if typed != "" else Color(UiStyle.TEXT_DIM, 0.6), p)
+			if _editing and _field == String(item["key"]) and int(_time * 2.0) % 2 == 0:
+				draw_rect(Rect2(box.position.x + 4.0 + PixelText.width(typed) + 2.0, box.position.y + 2.0, 1.0, 8.0), Color(tone, p))
 		"info":
 			var text: String = String(item["text"])
 			if text != "": ## a row that only says something (no value) has no plate

@@ -11,7 +11,30 @@
 		"damage": {"label": "SCHADEN", "unit": "percent", "min": 0, "max": 0.5},
 		"heavy_damage": {"label": "WUCHTSCHLAG", "unit": "percent", "min": 0, "max": 0.6},
 		"charge_speed": {"label": "AUFLADETEMPO", "unit": "percent", "min": 0, "max": 0.6},
-		"alarm": {"label": "ALARMREICHWEITE", "unit": "percent", "min": -0.75, "max": 0.5},
-		"absorb": {"label": "SCHADEN GESCHLUCKT", "unit": "percent", "min": 0, "max": 0.5}
+		"alarm": {"label": "ALARMREICHWEITE", "unit": "percent", "min": -0.75, "max": 0.5, "lower_better": true},
+		"absorb": {"label": "SCHADEN GESCHLUCKT", "unit": "percent", "min": 0, "max": 0.5},
+		"blink_cooldown": {"label": "BLINZELPAUSE", "unit": "percent", "min": -0.6, "max": 0.5, "lower_better": true},
+		"corvid_calm": {"label": "KRÄHENGUNST", "unit": "percent", "min": 0, "max": 0.9}
+	},
+	"perks": {
+		"_doc": "Besondere Fähigkeiten einzelner Stücke (items.json `perks`: [Schlüssel]). `text` ist die Kartenbeschreibung, {schlüssel} wird durch den Wert aus diesem Eintrag ersetzt (`percent`: diese Schlüssel als Prozent). Wirkung: TalismanComponent.",
+		"ward": {
+			"name": "LETZTER FLÜGELSCHLAG",
+			"text": "Ein tödlicher Treffer wird abgefangen: du bleibst mit {health} % Leben stehen, bist {invulnerable} s unverwundbar und die Feder stößt Gegner zurück. Wieder bereit nach {cooldown} s.",
+			"percent": ["health"],
+			"cooldown": 240,
+			"health": 0.3,
+			"invulnerable": 2.5,
+			"radius": 72,
+			"damage": 12,
+			"knockback": 260
+		},
+		"dive": {
+			"name": "STURZFLUG",
+			"text": "Nach dem Blinzeln trifft dein nächster Schlag {window} s lang {damage} % härter.",
+			"percent": ["damage"],
+			"window": 3.0,
+			"damage": 0.4
+		}
 	}
 }

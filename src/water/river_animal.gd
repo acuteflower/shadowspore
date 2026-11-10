@@ -91,6 +91,7 @@ func _sense_players() -> void:
 		if kind in ["shoal", "brook"]:
 			radius *= (1.35 if wet and player.velocity.length() > 30 else 0.65)
 		if player.stealth.sneaking: radius *= 0.55
+		if player.swim > 0: radius *= 1.5 if player.swim == SwimRules.CRAWL else 1.15 ## swimmers churn the water
 		if position.distance_to(player.global_position) < radius:
 			_threat = player.global_position
 			_fear_left = 2.5

@@ -13,14 +13,19 @@ var _left_foot: bool = false
 
 
 ## `quiet` (sneaking) skips the puff but still leaves footprints.
-func step(surface: Dictionary, velocity: Vector2, quiet: bool) -> void:
+## `wet` (0..1, soaked from a swim) leaves dark, short-lived prints on dry ground.
+func step(surface: Dictionary, velocity: Vector2, quiet: bool, wet: float = 0.0) -> void:
 	_left_foot = not _left_foot
 	var fx: Dictionary = surface.get("step", {})
 	if not fx.is_empty() and not quiet:
 		_emit(fx, velocity)
 	var print_data: Dictionary = surface.get("footprint", {})
+	var alpha: float = 0.7
+	if wet > 0.15 and not bool(surface.get("ripples", false)):
+		print_data = {"color": "#1c2b33", "seconds": 1.5 + 3.0 * wet}
+		alpha = 0.35 + 0.4 * wet
 	if not print_data.is_empty():
-		_leave_footprint(print_data, velocity)
+		_leave_footprint(print_data, velocity, alpha)
 
 
 func contact_position(velocity: Vector2) -> Vector2:
@@ -53,12 +58,12 @@ func _emit(fx: Dictionary, velocity: Vector2) -> void:
 	_puff.restart()
 
 
-func _leave_footprint(data: Dictionary, velocity: Vector2) -> void:
+func _leave_footprint(data: Dictionary, velocity: Vector2, alpha: float = 0.7) -> void:
 	var dir: Vector2 = velocity.normalized()
 	var sprite: Sprite2D = Sprite2D.new()
 	sprite.texture = FOOTPRINT
 	sprite.modulate = Color(String(data.get("color", "#000000")))
-	sprite.modulate.a = 0.7
+	sprite.modulate.a = alpha
 	sprite.rotation = roundf(dir.angle() / (PI / 4.0)) * (PI / 4.0) ## 8 directions keep the pixels clean
 	sprite.z_index = FOOTPRINT_Z
 	get_tree().current_scene.add_child(sprite)

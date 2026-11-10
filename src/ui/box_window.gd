@@ -23,6 +23,7 @@ var _tip: ItemTooltip
 var _vignette: GradientTexture2D
 var _slots: Array[ItemSlot] = []
 var _hover: ItemSlot
+var _tip_stack: Dictionary = {}
 var _left: Rect2
 var _right: Rect2
 var _time: float = 0.0
@@ -103,12 +104,15 @@ func _add_slot(kind: String, ref: int) -> void:
 func _on_changed() -> void:
 	if not _closing:
 		_tick.play()
+	for slot: ItemSlot in _slots:
+		slot.queue_redraw()
 	if _hover != null and is_instance_valid(_hover):
 		_show_tip(_hover)
 
 
 func _show_tip(slot: ItemSlot) -> void:
 	var stack: Dictionary = slot.stack()
+	_tip_stack = stack.duplicate(true)
 	if stack.is_empty() or _closing:
 		_tip.hide()
 		return
@@ -187,6 +191,12 @@ func _process(delta: float) -> void:
 		queue_free()
 		return
 	_layout()
+	for slot: ItemSlot in _slots: ## slots never redraw by themselves: show moves, host syncs and other players' changes live
+		slot.queue_redraw()
+	if _hover != null and is_instance_valid(_hover): ## keep the card true when the stack under the mouse changed (also remote changes)
+		var now: Dictionary = _hover.stack()
+		if now != _tip_stack:
+			_show_tip(_hover)
 	if _tip.visible:
 		_tip.position = (_canvas.get_local_mouse_position() + Vector2(12, 10)).min(_canvas.size - _tip.size)
 	_canvas.queue_redraw()
@@ -227,7 +237,7 @@ func _draw() -> void:
 	_canvas.draw_rect(Rect2(_right.position + Vector2(PAD, HEAD + BAG_GAP - 6.0), Vector2(CARD_W - 2.0 * PAD, 1.0)), Color(VineStyle.BARK_LIGHT, 0.7))
 	var hints: Array[String] = [
 		"LMT: NEHMEN / ABLEGEN    RMT: HÄLFTE / EINES    UMSCH+LMT: AUF DIE ANDERE SEITE",
-		"ESC ODER TAB: SCHLIESSEN",
+		"R: SORTIEREN (SEITE UNTER DER MAUS)    E: ALLES NEHMEN    ESC ODER TAB: SCHLIESSEN",
 	]
 	for line: int in hints.size():
 		_text(Vector2(roundf(view.x / 2.0) - float(PixelText.width(hints[line])) / 2.0, _left.end.y + 14.0 + 9.0 * float(line)), hints[line], Color(BoardWindow.DIM, 0.8))
@@ -263,6 +273,13 @@ func _input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_cancel") or (event.is_action_pressed("inventory") and not event.is_echo()):
 		_close()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("item_sort") and not event.is_echo():
+		var over_box: bool = _hover != null and _hover.kind == "box"
+		player.inventory.request("sort_box" if over_box else "sort", [0]) ## R sorts the side the mouse is over
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("interact") and not event.is_echo():
+		player.inventory.request("take_all", [0])
 		get_viewport().set_input_as_handled()
 
 

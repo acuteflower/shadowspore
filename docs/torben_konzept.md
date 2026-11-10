@@ -245,6 +245,8 @@ Nur ein neues Basis-Item pro Zeile des Dossiers (Erz → Barren → Platte); kei
 | `sickle_iron` | 2 Barren, 1 Seil | npc | 45 s | 20 |
 | `sword_iron` | wie bisher (Schwert, Bretter, Stein, Void-Splitter) + 2 Barren | npc `torben` | 100 s | 20 |
 
+Zusatz (2026-11-10): `sword_rift` (Himmelsriss, legendär) wird bei Torben bestellt: Vertrauen 40, 300 s, 1 `sword_iron`, 1 `rissfeder`, 4 Platten, 2 Void-Schlacke, 2 Schattenkerne (`docs/rissklinge.md`).
+
 **Werkzeugstufe (Vorschlag, Entscheidung 5):** Werkzeuge bekommen ein Feld `tier` (Stein 1, Eisen 2). Die Mine spricht von `ore_tier` je Zone; Zone 1 hat Tier 1 (geht mit Stein), tiefer braucht die Eisenhacke. Das gibt den Eisenwerkzeugen einen echten Zweck ohne neues System. Nichts davon ist Pflicht für den Einbau; ohne Stufen sind Eisenwerkzeuge einfach stärker (mehr Reichweite/Schaden, haltbarer wäre Haltbarkeit, die es nicht gibt).
 
 ### 7.3 Erzadern in der Mine

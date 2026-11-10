@@ -7,6 +7,9 @@ extends Node
 
 signal changed
 signal absorbed ## on every peer: a blow was partly swallowed (the earrings flash)
+signal warded(at: Vector2) ## on every peer: the Rissfeder caught a lethal blow (feathers burst from her)
+signal ward_changed ## on every peer: the Rissfeder is spent or whole again
+signal dive_changed ## on every peer: the dive window opened or closed
 
 const SOUNDS: String = "res://assets/audio/talisman/"
 
@@ -20,6 +23,11 @@ var worn: PackedStringArray = PackedStringArray(): ## item ids of the worn talis
 			_refresh()
 			_chime(before, value)
 var bonus: Dictionary = {} ## what they add up to (TalismanRules.combine)
+var perks: Dictionary = {} ## the special abilities of the worn pieces (TalismanRules.perks): id -> its entry of the catalogue
+var ward_ready: bool = true ## the last wing beat can still be used (every peer; the host decides)
+var dive_left: float = 0.0 ## seconds the dive after a blink still counts (every peer counts it down)
+
+var _ward_left: float = 0.0 ## host: seconds until the feather is whole again (runs on while it is not worn: taking it off is no reset)
 
 var _inventory: InventoryComponent
 var _ready_done: bool = false
@@ -42,6 +50,23 @@ func _ready() -> void:
 			if health.absorb > 0.0:
 				absorbed.emit()
 				_play("absorb", -7.0))
+
+
+func _process(delta: float) -> void:
+	if dive_left > 0.0:
+		dive_left = maxf(dive_left - delta, 0.0)
+		if dive_left <= 0.0:
+			dive_changed.emit()
+	if _ward_left > 0.0 and multiplayer.is_server():
+		_ward_left = maxf(_ward_left - delta, 0.0)
+		if _ward_left <= 0.0:
+			_ward_state.rpc(true, Vector2.ZERO)
+
+
+## Host: the pause of the Letzter Flügelschlag gets shorter (the Himmelsriss's Federbund). It is ready again at once when it runs out.
+func shorten_ward(seconds: float) -> void:
+	if multiplayer.is_server() and _ward_left > 0.0 and perks.has("ward"):
+		_ward_left = maxf(_ward_left - seconds, 0.0)
 
 
 func _on_inventory_changed() -> void:
@@ -101,16 +126,105 @@ func charge_rate() -> float:
 	return TalismanRules.charge_rate(bonus)
 
 
+## Multiplier on the blink cooldown (Rissfeder: shorter).
+func blink_scale() -> float:
+	return TalismanRules.blink_scale(bonus)
+
+
+## The share by which wild crows and ravens are calmer around her (0 without Rissfeder).
+func corvid_calm() -> float:
+	return TalismanRules.corvid_calm(bonus)
+
+
+# ---------------------------------------------------------------- special abilities (docs/rissfeder.md)
+
+## Every peer, when a blink was played: opens the dive window (the next blow hits harder, see `dive_factor`).
+func note_blink() -> void:
+	if not perks.has("dive"):
+		return
+	dive_left = float((perks["dive"] as Dictionary)["window"])
+	dive_changed.emit()
+
+
+## Host: the factor on the next weapon hit while the dive window is open.
+func dive_factor() -> float:
+	if dive_left > 0.0 and perks.has("dive"):
+		return 1.0 + float((perks["dive"] as Dictionary)["damage"])
+	return 1.0
+
+
+## Host: a blow has landed, the dive is used up (on every peer).
+func spend_dive() -> void:
+	if dive_left > 0.0 and multiplayer.is_server():
+		_dive_end.rpc()
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _dive_end() -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	dive_left = 0.0
+	dive_changed.emit()
+
+
+## Host, called by `HealthComponent` when a blow or tick would take her last point: the feather catches it once, then needs `cooldown` seconds.
+## Returns the health she keeps, or -1 when there is no ward (not worn, or spent).
+func _ward_check(_left: float) -> float:
+	if not multiplayer.is_server() or not perks.has("ward") or _ward_left > 0.0:
+		return -1.0
+	var cfg: Dictionary = perks["ward"] as Dictionary
+	var player: Node2D = get_parent() as Node2D
+	var health: HealthComponent = player.get_node_or_null("HealthComponent") as HealthComponent
+	if health == null:
+		return -1.0
+	_ward_left = float(cfg["cooldown"])
+	health.grant_grace(float(cfg["invulnerable"]))
+	var at: Vector2 = player.global_position
+	for target: HurtboxComponent in HitScan.circle(player, at + Vector2(0.0, -12.0), float(cfg["radius"]), AttackComponent.HURTBOX_MASK):
+		target.take_hit(float(cfg["damage"]), at, float(cfg["knockback"]), get_multiplayer_authority()) ## the burst of feathers pushes them away
+	_ward_state.rpc(false, at)
+	return maxf(health.max_health * float(cfg["health"]), 1.0)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _ward_state(ready: bool, at: Vector2) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	ward_ready = ready
+	if not ready:
+		warded.emit(at)
+		var radius: float = float((perks.get("ward", {}) as Dictionary).get("radius", 72.0))
+		FeatherBurst.burst(get_tree().current_scene, at, radius)
+		var player: Node = get_parent()
+		if is_multiplayer_authority() and player.has_method("add_shake"):
+			player.call("add_shake", 7.0)
+		_play("ward", -3.0)
+	else:
+		_play("ward_ready", -9.0)
+	ward_changed.emit()
+
+
 func _refresh() -> void:
 	var ids: PackedStringArray = worn
 	if multiplayer.is_server() and _inventory != null:
 		ids = TalismanRules.worn_ids(_inventory.equipment)
-	var next: Dictionary = TalismanRules.combine(TalismanRules.stacks_of(ids))
+	var stacks: Array[Dictionary] = TalismanRules.stacks_of(ids)
+	var next: Dictionary = TalismanRules.combine(stacks)
 	var stats_changed: bool = next != bonus
 	bonus = next
+	perks = TalismanRules.perks(stacks)
 	if stats_changed:
 		_apply()
+	_hook_ward()
 	changed.emit()
+
+
+## The host asks the feather before a lethal blow goes through (only while a piece with the ward is worn).
+func _hook_ward() -> void:
+	var player: Node = get_parent()
+	var health: HealthComponent = player.get_node_or_null("HealthComponent") as HealthComponent if player != null else null
+	if health != null and multiplayer.is_server():
+		health.ward = Callable(self, "_ward_check") if perks.has("ward") else Callable()
 
 
 ## Health, armor and the swallowed share follow the jewellery. Never heals (a necklace put on and taken off is no medicine).

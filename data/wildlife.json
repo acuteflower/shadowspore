@@ -89,6 +89,7 @@
   },
   "crow": {
     "scene": "res://src/entities/wildlife/wild_corvid.tscn",
+    "pet": true,
     "texture": "res://assets/wildlife/corvid.png",
     "biomes": [
       "meadow",
@@ -160,6 +161,7 @@
   },
   "raven": {
     "scene": "res://src/entities/wildlife/wild_corvid.tscn",
+    "pet": true,
     "texture": "res://assets/wildlife/corvid.png",
     "biomes": [
       "meadow",

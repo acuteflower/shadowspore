@@ -17,6 +17,7 @@ var _time: float = 0.0
 var _bloom: float = 0.0
 var _step_key: String = ""
 var _age: float = 0.0 ## seconds this step's card has been wanted
+var _event_left: float = 0.0 ## a card that is not a quest lesson (swimming): seconds still to show
 var _live: float = 0.0 ## 0..1, eased: she is sneaking right now
 
 
@@ -28,6 +29,7 @@ func _ready() -> void:
 	offset_bottom = 96.0 + HEIGHT
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("hint_card")
 
 
 func bind(quests: QuestComponent, dialogue: DialogueBox) -> void:
@@ -41,8 +43,17 @@ func bind(quests: QuestComponent, dialogue: DialogueBox) -> void:
 func _refresh() -> void:
 	var now: Dictionary = _quests.current()
 	var hint: String = String(now.get("hint", ""))
-	if hint != "":
+	if hint != "" and _event_left <= 0.0:
 		_hint = hint
+
+
+## First time in deep water: a short card about swimming and the crawl (flag swim_hint_seen, once per save).
+func notify_swim() -> void:
+	if _quests == null or _quests.has_flag("swim_hint_seen"):
+		return
+	_quests.set_flag("swim_hint_seen")
+	_hint = "swim"
+	_event_left = 12.0
 
 
 func _wanted() -> bool:
@@ -64,6 +75,12 @@ func _process(delta: float) -> void:
 	if wanted:
 		_age += delta
 	wanted = wanted and _age < SHOW_SECONDS
+	if _event_left > 0.0:
+		_event_left -= delta
+		wanted = not _dialogue.is_active()
+		if _event_left <= 0.0:
+			_hint = ""
+			wanted = false
 	_grow = move_toward(_grow, 1.0 if wanted else 0.0, delta / (1.1 if wanted else 0.8))
 	_bloom = move_toward(_bloom, 0.0, delta * 0.8)
 	var using_key: bool = InputManager.map_open if _hint == "map" else InputManager.sneak_held()
@@ -88,6 +105,9 @@ func _draw() -> void:
 		return
 	if _hint == "build":
 		_draw_build_hint()
+		return
+	if _hint == "swim":
+		_draw_swim_hint()
 		return
 	if _hint == "craft":
 		_draw_craft_hint()
@@ -195,6 +215,24 @@ func _draw_chop_hint() -> void:
 
 
 ## The town lesson (quest steps "build a lamp post / a workshop"): three pages that turn every few seconds: the build mode, how to place and what stops it, building together.
+func _draw_swim_hint() -> void:
+	var g: float = _grow * _grow * (3 - 2 * _grow)
+	var void_level: float = VineStyle.void_amount()
+	var curve: Callable = func(x: float) -> float: return 6 + sin(x * 0.06) * 1.5
+	VineStyle.branch(self, 0, WIDTH - 12, curve, 4, void_level, 12, _time, g)
+	VineStyle.foliage(self, 0, WIDTH - 12, curve, 5, 130, void_level, 12, _time, g)
+	if g < 0.6:
+		return
+	var at: Vector2 = Vector2(10, roundf(22 - (1 - g) * 20))
+	var fade: float = clampf((g - 0.6) / 0.4, 0, 1)
+	VineStyle.paper(self, Rect2(at, Vector2(WIDTH - 22, HEIGHT - 26)), fade, void_level)
+	PixelText.draw(self, "SCHWIMMEN", Vector2i(at + Vector2(9, 8)), Color(VineStyle.WARM_GLOW, fade), VineStyle.OUTLINE)
+	var cap_w: int = VineStyle.key_cap(self, at + Vector2(9, 20), _action_label("sprint"), fade, 1.0 if InputManager.sprint_held() else 0.0, void_level)
+	PixelText.draw(self, "KRAULEN: SCHNELL", Vector2i(at + Vector2(9 + cap_w + 6, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "DAS KOSTET AUSDAUER.", Vector2i(at + Vector2(9, 42)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "KEIN BLINK IM WASSER.", Vector2i(at + Vector2(9, 51)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+
+
 func _draw_build_hint() -> void:
 	var g: float = _grow * _grow * (3 - 2 * _grow)
 	var void_level: float = VineStyle.void_amount()

@@ -73,6 +73,7 @@ func _run() -> void:
 	_inventory()
 	await _effects()
 	await _enemies()
+	await _rissfeder()
 	_save_and_card()
 	await _art()
 	print("DONE failures=", failures)
@@ -372,3 +373,136 @@ func _art() -> void:
 	hero.health.take_damage(10.0, Vector2.ZERO, 0.0)
 	check(flashes[0] == 1, "a swallowed blow tells the earrings to flash")
 	clear()
+
+
+# ---------------------------------------------------------------- the Rissfeder (docs/rissfeder.md)
+func _rissfeder() -> void:
+	var feather: Dictionary = piece("rissfeder")
+	check(Items.definition(feather).get("rarity") == "legendary" and TalismanRules.type_of(feather) == "necklace", "the Rissfeder is a legendary necklace")
+	var bonus: Dictionary = TalismanRules.combine([feather])
+	check(near(float(bonus.health), 20.0) and near(float(bonus.armor), 3.0) and near(float(bonus.blink_cooldown), -0.3) and near(float(bonus.corvid_calm), 0.7), "its stats: +20 health, +3 armor, -30 %% blink cooldown, 70 %% calmer crows")
+	check(near(TalismanRules.blink_scale(bonus), 0.7) and near(TalismanRules.corvid_calm(bonus), 0.7) and near(TalismanRules.blink_scale({}), 1.0) and near(TalismanRules.corvid_calm({}), 0.0), "blink scale 0.7, crow calm 0.7, neutral without it")
+	check(TalismanRules.better("blink_cooldown", -0.3, 0.0) == 1 and TalismanRules.better("blink_cooldown", 0.0, -0.3) == -1, "comparison: a shorter blink cooldown is better")
+	var perks: Dictionary = TalismanRules.perks([feather, piece("silver_chain")])
+	check(perks.has("ward") and perks.has("dive") and perks.size() == 2 and TalismanRules.perks([piece("silver_chain")]).is_empty(), "the feather carries two special abilities, a plain chain none")
+	check(TalismanRules.perk_ids(feather) == ["ward", "dive"] and TalismanRules.perk_name("ward") == "LETZTER FLÜGELSCHLAG", "perk names: %s" % str(TalismanRules.perk_ids(feather)))
+	var text: String = TalismanRules.perk_text("ward")
+	check(text.contains("30") and text.contains("240") and not text.contains("{"), "the ward text names the numbers and leaves no token: %s" % text)
+	check(TalismanRules.perk_text("dive").contains("40") and not TalismanRules.perk_text("dive").contains("{"), "the dive text names +40 %%")
+	check(TalismanArt.metal(TalismanArt.look_of("rissfeder")).size() == 4 and (TalismanArt.look_of("rissfeder").get("pendant", []) as Array).size() > 0, "the feather has its shape and ravensteel")
+	check(load("res://assets/items/rissfeder.png") != null and load("res://assets/audio/talisman/ward.wav") != null and load("res://assets/audio/talisman/ward_ready.wav") != null and load("res://assets/audio/talisman/equip_ravensteel.wav") != null, "icon and the three sounds exist")
+
+	# worn: the ward catches a lethal blow once
+	clear()
+	var health: HealthComponent = hero.health
+	health._invulnerable_until_msec = 0
+	health.current = health.max_health
+	wear("rissfeder")
+	check(hero.talismans.perks.has("ward") and health.ward.is_valid() and hero.talismans.ward_ready, "worn: the ward is hooked and ready")
+	health.current = 3.0
+	health.take_damage(500.0, Vector2.ZERO, 0.0)
+	await get_tree().process_frame
+	check(health.current > 0.0 and near(health.current, health.max_health * 0.3, 0.6), "a lethal blow leaves 30 %% of the health (%f of %f)" % [health.current, health.max_health])
+	check(not hero.talismans.ward_ready, "the ward is spent")
+	var hp: float = health.current
+	health.take_damage(500.0, Vector2.ZERO, 0.0)
+	check(near(health.current, hp), "the blow right after is ignored (2.5 s grace)")
+	health._invulnerable_until_msec = 0
+	health.take_damage(500.0, Vector2.ZERO, 0.0)
+	await get_tree().process_frame
+	check(health.current <= 0.0, "a second lethal blow within the cooldown kills her (%f)" % health.current)
+	health.current = health.max_health
+	hero.talismans._ward_left = 0.0
+	hero.talismans._ward_state(true, Vector2.ZERO)
+	health._invulnerable_until_msec = 0
+	health.current = 2.0
+	health.take_tick(50.0)
+	await get_tree().process_frame
+	check(health.current > 2.0, "damage over time is caught as well (%f)" % health.current)
+	hero.talismans._ward_left = 0.0
+	hero.talismans._ward_state(true, Vector2.ZERO)
+	unwear("rissfeder")
+	check(not health.ward.is_valid() and hero.talismans.perks.is_empty(), "taking it off removes the ward and the abilities")
+	health.current = health.max_health
+	health._invulnerable_until_msec = 0
+
+	# the blink cooldown and the dive
+	var plain: float = hero.blink.cooldown
+	hero.blink.start_cooldown()
+	check(near(hero.blink.total, plain), "without the feather the blink cooldown is %f" % plain)
+	wear("rissfeder")
+	hero.blink.start_cooldown()
+	check(near(hero.blink.total, plain * 0.7), "with it the blink cooldown is 70 %% (%f)" % hero.blink.total)
+	check(near(hero.talismans.dive_factor(), 1.0), "no dive window before a blink")
+	hero.talismans.note_blink()
+	check(near(hero.talismans.dive_factor(), 1.4) and hero.talismans.dive_left > 2.9, "after a blink the next blow does +40 %%")
+	var weapon: Dictionary = piece("sword_iron")
+	var step: Dictionary = hero.attack._step_data(weapon, 0)
+	var target: HealthComponent = _dummy(12.0)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	hero.talismans.dive_left = 0.0
+	target.current = target.max_health
+	hero.attack._hit_scan(Vector2.RIGHT, step, weapon)
+	var normal: float = target.max_health - target.current
+	hero.talismans.note_blink()
+	target.current = target.max_health
+	hero.attack._hit_scan(Vector2.RIGHT, step, weapon)
+	var dived: float = target.max_health - target.current
+	await get_tree().process_frame
+	check(normal > 0.0 and near(dived, normal * 1.4, 0.05), "the dive blow hurts 40 %% more (%f -> %f)" % [normal, dived])
+	check(near(hero.talismans.dive_factor(), 1.0) and hero.talismans.dive_left <= 0.0, "the dive is used up by one blow")
+	unwear("rissfeder")
+	hero.talismans.note_blink()
+	check(near(hero.talismans.dive_factor(), 1.0), "without the feather a blink opens no dive window")
+	await _boss_relics()
+	clear()
+
+
+## What the boss leaves behind: certain at the first kill of a player, 10 % after (BossRelics).
+func _boss_relics() -> void:
+	var ledger: BossRelics = BossRelics.of(get_tree())
+	check(ledger != null, "the level has a BossRelics ledger")
+	var relics: Array = ((DataRegistry.get_entry("enemies", "boss_sky_cleaver") as Dictionary).get("loot", {}) as Dictionary).get("relics", []) as Array
+	check(relics.size() == 1 and String(relics[0]["id"]) == "rissfeder" and near(float(relics[0]["first"]), 1.0) and near(float(relics[0]["chance"]), 0.1), "Mornath's loot lists the Rissfeder: 100 %% first, 10 %% after")
+	var owner: int = hero.name.to_int()
+	ledger.forget("boss_sky_cleaver")
+	check(ledger.kills_of(owner, "boss_sky_cleaver") == 0, "no kills counted yet")
+	var given: Array[int] = ledger.roll("boss_sky_cleaver", relics, [hero], hero.global_position)
+	check(given == [owner] and ledger.kills_of(owner, "boss_sky_cleaver") == 1 and ledger.owed_count(owner) == 1, "the first kill drops the feather for her, certainly")
+	var drops: Array[ItemDrop] = _relic_drops()
+	check(drops.size() == 1 and drops[0].story_owner == owner and drops[0].item_id == "rissfeder" and drops[0].story_id == "relic:rissfeder", "it lies there as her own drop")
+	# saved and loaded while it still lies on the ground
+	var json: Dictionary = JSON.parse_string(JSON.stringify(ledger.export_state())) as Dictionary
+	ledger.import_state(json)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	check(_relic_drops().size() == 1 and ledger.kills_of(owner, "boss_sky_cleaver") == 1 and ledger.owed_count(owner) == 1, "after a save and load the feather still lies there once and the kill is counted")
+	ledger.collected(String(_relic_drops()[0].name))
+	check(ledger.owed_count(owner) == 0, "picked up: nothing is owed any more")
+	for drop: ItemDrop in _relic_drops():
+		drop.queue_free()
+	await get_tree().process_frame
+	# later kills: 10 %, measured over many rolls
+	var hits: int = 0
+	var rounds: int = 400
+	for i: int in rounds:
+		hits += ledger.roll("boss_sky_cleaver", relics, [hero], hero.global_position).size()
+	check(hits > rounds * 0.04 and hits < rounds * 0.18, "later kills drop it about every tenth time (%d of %d)" % [hits, rounds])
+	check(ledger.kills_of(owner, "boss_sky_cleaver") == rounds + 1, "every kill is counted")
+	ledger.forget("boss_sky_cleaver")
+	check(ledger.roll("boss_sky_cleaver", relics, [hero], hero.global_position).size() == 1, "after forgetting, the next kill is a first kill again")
+	for drop: ItemDrop in _relic_drops():
+		drop.queue_free()
+	await get_tree().process_frame
+	ledger.import_state({})
+	ledger.forget("boss_sky_cleaver")
+
+
+func _relic_drops() -> Array[ItemDrop]:
+	var found: Array[ItemDrop] = []
+	for container: Node in get_tree().get_nodes_in_group("drops"):
+		for drop: Node in container.get_children():
+			if drop is ItemDrop and (drop as ItemDrop).story_id.begins_with(BossRelics.PREFIX) and not drop.is_queued_for_deletion():
+				found.append(drop as ItemDrop)
+	return found

@@ -49,6 +49,8 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 		},
 	}
 	var world: Node = tree.get_first_node_in_group("world")
+	if world != null and world.get("opening_over") != null:
+		data["opening_over"] = bool(world.get("opening_over")) ## the clock stays locked at midnight until the opening is over
 	if world != null and world.has_method("export_things"):
 		data["things"] = world.call("export_things")
 	if world != null and world.has_method("export_story"):
@@ -65,6 +67,12 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and waystones.awake_count() > 0:
 		data["waystones"] = waystones.export_state() ## the awakened goddess statues (docs/waystones.md)
+	var relics: BossRelics = BossRelics.of(tree)
+	if relics != null:
+		data["relics"] = relics.export_state() ## boss kills per player and the relics not picked up yet (docs/rissfeder.md)
+	var pets: PetRegistry = PetRegistry.of(tree)
+	if pets != null and not (pets.export_state()["bonds"] as Dictionary).is_empty():  ## (the birds' records only exist with a bond)
+		data["pets"] = pets.export_state() ## the bonds with wild birds (docs/pet_konzept.md)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
@@ -80,10 +88,18 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	var player: Player = _local_player(tree)
 	if data.is_empty() or player == null:
 		return false
+	var saved: Dictionary = data.get("player", {})
+	## A save made after the opening (she woke up in the hut) must not start with the opening's midnight lock: WorldLevel._ready locks the
+	## clock at 00:00 until `finish_opening`, and `opening_over` is not a node state that survives a reload. Older saves have no
+	## "opening_over" key, so the flag `woke_up` in the quest block counts too.
+	var world_node: Node = tree.get_first_node_in_group("world")
+	var quest_flags: Dictionary = (saved.get("quests", {}) as Dictionary).get("flags", {}) as Dictionary
+	var opening_done: bool = bool(data.get("opening_over", false)) or bool(quest_flags.get("woke_up", false))
+	if opening_done and world_node != null and world_node.has_method("finish_opening"):
+		world_node.call("finish_opening") ## sets opening_over and unlocks the clock
 	if not TimeManager.locked: ## the opening holds the clock at midnight
 		TimeManager.time_of_day = float(data.get("time", TimeManager.time_of_day))
 		TimeManager.day = int(data.get("day", 0))
-	var saved: Dictionary = data.get("player", {})
 	var pos: Array = saved.get("pos", [])
 	if pos.size() == 2:
 		player.position = Vector2(float(pos[0]), float(pos[1]))
@@ -119,6 +135,12 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and data.has("waystones"):
 		waystones.import_state(data.waystones as Dictionary)
+	var relics: BossRelics = BossRelics.of(tree)
+	if relics != null and data.has("relics"):
+		relics.import_state(data.relics as Dictionary)
+	var pets: PetRegistry = PetRegistry.of(tree)
+	if pets != null and data.has("pets"):
+		pets.import_state(data.pets as Dictionary)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null and data.has("map"):
 		discovery.import_saved(Marshalls.base64_to_raw(String(data["map"])))

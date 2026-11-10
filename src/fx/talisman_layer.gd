@@ -48,4 +48,4 @@ func _draw() -> void:
 func _paint(canvas: CanvasItem, glow: CanvasItem) -> void:
 	if _talismans == null or _data.is_empty():
 		return
-	TalismanArt.draw_worn(canvas, glow, _talismans.worn, _data, Vector2.ZERO, 1.0, _time, MineManager.night_at(self, TimeManager.night_amount()), _flash)
+	TalismanArt.draw_worn(canvas, glow, _talismans.worn, _data, Vector2.ZERO, 1.0, _time, MineManager.night_at(self, TimeManager.night_amount()), _flash, not _talismans.ward_ready)

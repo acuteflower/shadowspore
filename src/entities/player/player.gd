@@ -40,6 +40,17 @@ const TOUCH_SHEET: Texture2D = preload("res://assets/characters/player_touch.png
 const PULL_SHEET: Texture2D = preload("res://assets/characters/player_pull.png") ## tools/art_hero3d.py pullonly: she heaves a root out of the ground
 const FISH_SHEET: Texture2D = preload("res://assets/characters/player_fish.png") ## tools/art_hero_fish.py: the rod's body clips (cast, strike, fight, land, snap, sag)
 const FISH_BLOOD: Texture2D = preload("res://assets/characters/player_fish_blood.png")
+const SWIM_SHEET: Texture2D = preload("res://assets/characters/player_swim.png") ## tools/art_hero_swim.py: above-water layer (64x72 frames, water line at row 46)
+const SWIM_UNDER: Texture2D = preload("res://assets/characters/player_swim_under.png") ## the same frames, only what is below the water line (drawn behind, tinted)
+const SWIM_OFFSET: Vector2 = Vector2(0.0, -10.0)
+const SWIM_LEVELS: Array[String] = ["tread", "breast", "crawl"]
+const SWIM_SOUNDS: Dictionary = { ## tools/audio_swim.py
+	"dive_big": preload("res://assets/audio/swim/dive_big.wav"), "dive_small": preload("res://assets/audio/swim/dive_small.wav"),
+	"stroke_a": preload("res://assets/audio/swim/stroke_a.wav"), "stroke_b": preload("res://assets/audio/swim/stroke_b.wav"),
+	"kick": preload("res://assets/audio/swim/kick.wav"), "breath": preload("res://assets/audio/swim/breath.wav"),
+	"bubble": preload("res://assets/audio/swim/bubble.wav"), "exit": preload("res://assets/audio/swim/exit.wav"),
+	"drip": preload("res://assets/audio/swim/drip.wav"), "shake": preload("res://assets/audio/swim/shake.wav"),
+}
 const STANDBY_SHEET: Texture2D = preload("res://assets/characters/player_standby.png")
 const STANDBY_BLOOD: Texture2D = preload("res://assets/characters/player_standby_blood.png")
 const STANDBY_FRAMES: int = 24
@@ -70,6 +81,10 @@ const PICK_SECONDS: float = 1.0
 const PICK_GRAB_TIME: float = 0.34 ## picking: the hand closes around the berries here
 const TOUCH_TIME: float = 0.45 ## touching a statue: the palms lie on the stone here (the statue wakes)
 const TOUCH_HOLD_AT: float = 0.52 ## and stay there until `release_touch`
+const FEED_SHEET: Texture2D = preload("res://assets/characters/player_feed.png") ## tools/art_hero3d.py feedonly: she crouches and holds food out to a wild bird
+const FEED_BLOOD: Texture2D = preload("res://assets/characters/player_feed_blood.png")
+const FEED_REACH_TIME: float = 0.5 ## feeding: the hand is out and stays (frame 6) until the bird has decided (`release_feed`)
+const FEED_HOLD_MAX: float = 5.0 ## and drops by itself after this long
 const PULL_GRAB_TIME: float = 0.52 ## pulling a root: it gives here and she is thrown back
 const EAT_USE_TIME: float = 0.48 ## eating: the berry reaches her mouth (EatEffect.BITE) and takes effect
 const IDLE_FPS: float = 3.5 ## idle frames per second (breathing, hair)
@@ -106,6 +121,26 @@ var _rig_combo_shoulder: PackedVector2Array
 var _rig_combo_hand: PackedVector2Array
 var _rig_heavy_shoulder: PackedVector2Array
 var _rig_heavy_hand: PackedVector2Array
+var _swim_rig: Dictionary = {} ## hero_rig.json "swim": clips (start/count/fps) and hand points
+var _swim_under: Sprite2D
+var _swim_level: int = 0 ## which technique is drawn now (0 tread, 1 breast, 2 crawl); transitions step through them
+var _swim_time: float = 0.0 ## seconds inside the current looping clip
+var _swim_trans: String = "" ## a transition clip that is playing ("enter", "t2b", "b2c")
+var _swim_trans_t: float = 0.0
+var _swim_trans_dir: int = 1
+var _swim_was: int = 0
+var _swim_water: SwimWater
+var _swim_last_local: int = -1
+var _swim_drip: float = 0.0
+var _swim_stir: float = 0.0
+var _swim_wake: float = 0.0
+var _swim_slot_on: bool = false
+var _swim_shake_t: float = -1.0 ## >= 0 while the shake-off clip plays after a swim
+var _swim_swum: float = 0.0 ## seconds spent swimming (a short dip does not need shaking off)
+var _swim_dive: bool = false
+var _wet: float = 0.0
+var _wet_drip: float = 0.0
+var _swim_exit_t: float = -1.0 ## >= 0 while the enter clip plays backwards after she left the water
 var _rig_shoulder: PackedVector2Array ## per sheet frame, relative to the feet (data/hero_rig.json)
 var _rig_hand: PackedVector2Array
 var _rig_attack_shoulder: PackedVector2Array ## the same for the attack sheet
@@ -118,6 +153,11 @@ var _rig_touch_shoulder: PackedVector2Array ## and for the touching sheet
 var _rig_touch_hand: PackedVector2Array
 var touch_hold: bool = false ## the palms stay on the stone (frozen at the end of the reach) until `release_touch`
 var _touch_wait: float = 0.0
+var feed_hold: bool = false ## the hand with the food stays out until `release_feed`
+var _feed_item: String = ""
+var _feed_fx: FeedFx
+var _rig_feed_shoulder: PackedVector2Array ## and for the feeding sheet
+var _rig_feed_hand: PackedVector2Array
 var _rig_eat_shoulder: PackedVector2Array ## and for the eating sheet
 var _rig_eat_hand: PackedVector2Array
 var _rig_eat_mouth: PackedVector2Array
@@ -131,6 +171,9 @@ var _busy: bool = false ## synced by RPC: she is picking and stands still
 var _busy_time: float = 0.0
 var _sector: int = 2
 var sprinting: bool = false ## synced
+var swim: int = 0 ## synced: SwimRules.NONE / TREAD / BREAST / CRAWL (docs/schwimmen_konzept.md)
+var swimmer: SwimComponent
+const SWIM_SUBMERGE: float = 17.0 ## px of water over her body while swimming (stand-in until the swim sheet exists)
 
 var _surface: Dictionary = {} ## terrain.json entry under the feet
 var _last_step: int = -1 ## walk-cycle frame of the previous tick, -1 while standing
@@ -200,6 +243,10 @@ func _ready() -> void:
 	var rest: RestComponent = RestComponent.new()
 	rest.name = "RestComponent"
 	add_child(rest)
+	swimmer = SwimComponent.new()
+	swimmer.name = "SwimComponent"
+	add_child(swimmer)
+	swimmer.setup(self)
 	fishing = FishingComponent.new()
 	fishing.name = "FishingComponent"
 	fishing.set_multiplayer_authority(get_multiplayer_authority()) ## a child made in _ready does not inherit the owner (its own _ready needs it)
@@ -210,6 +257,8 @@ func _ready() -> void:
 	add_child(effects)
 	_eat_fx = EatEffect.new()
 	add_child(_eat_fx)
+	_feed_fx = FeedFx.new()
+	add_child(_feed_fx)
 	_main_sheet = _sprite.texture
 	_sprite.add_child(TalismanLayer.new()) ## the worn necklace and earrings
 	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", BLOOD_MAPS[0])
@@ -355,6 +404,7 @@ func play_burst(dir: Vector2) -> void:
 @rpc("authority", "call_local", "reliable")
 func play_blink(from: Vector2, to: Vector2) -> void:
 	blink.play_effects(_sprite, from, to)
+	talismans.note_blink() ## Rissfeder: the next blow within a few seconds dives in harder
 
 
 ## Jumps toward the facing direction, at most `blink_range` and not past the cursor.
@@ -374,6 +424,9 @@ func _try_blink() -> void:
 
 ## Dev menu: jumps to a place (the owner moves herself; the synchronizer tells the others).
 func request_teleport(to: Vector2) -> void:
+	if swimmer != null:
+		swimmer.reset() ## she lands on foot; the next step decides again
+		swim = SwimRules.NONE
 	global_position = to
 	velocity = Vector2.ZERO
 	_camera.reset_smoothing()
@@ -509,9 +562,20 @@ func _is_submerged() -> bool:
 	return float(_surface.get("submerge", 0.0)) > 0.0
 
 
+## Owner: runs the swim rules for this frame and publishes the technique in `swim` (synced). The ban only keeps her from starting to swim.
+func _update_swim(delta: float, dir: Vector2) -> int:
+	var allowed: bool = health.current > 0.0 and not story_lock and intro == null and not _busy and not fainting and not stumbling and not attack.is_swinging()
+	swim = swimmer.step(delta, float(_surface.get("depth_amount", 0.0)), bool(_surface.get("water", false)), allowed, dir != Vector2.ZERO, InputManager.sprint_held(), stamina, wounded)
+	return swim
+
+
 func _update_water(delta: float) -> void:
 	var submerge: float = float(_surface.get("submerge", 0.0))
+	if swim > 0 or _swim_exit_t >= 0.0:
+		submerge = 0.0 ## the swim sheet carries its own waterline (step 3 adds the water in front)
 	_water.submerge = submerge
+	_update_swim_slot()
+	_update_wet(delta)
 	_sink = move_toward(_sink, roundf(submerge / 2.5), 20.0 * delta)
 	if bool(_surface.get("ripples", false)) and velocity.length() < 5.0: ## ripples while standing still
 		_idle_ripple_timer -= delta
@@ -520,9 +584,77 @@ func _update_water(delta: float) -> void:
 			_idle_ripple_timer = 0.9
 
 
+## A one-shot swim sound at her feet (every peer plays its own; positional).
+func _swim_sound(sound_name: String, db: float, pitch: float = 1.0) -> void:
+	var cfg: Dictionary = SwimRules.cfg().get("sounds", {}) as Dictionary
+	var sound: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+	sound.stream = SWIM_SOUNDS[sound_name] as AudioStream
+	sound.volume_db = db + (float(cfg.get("dive_db", -6.0)) if sound_name.begins_with("dive") else 0.0)
+	sound.pitch_scale = pitch * randf_range(0.93, 1.07)
+	sound.max_distance = float(cfg.get("range", 320.0))
+	add_child(sound)
+	sound.finished.connect(sound.queue_free)
+	sound.play()
+
+
+## The river carries her a little (docs/schwimmen_konzept.md 4.4): at most 18 % of the walking speed, none while crawling.
+func _swim_drift(state: int) -> Vector2:
+	if state == SwimRules.CRAWL or fishing == null:
+		return Vector2.ZERO
+	var cfg: Dictionary = SwimRules.cfg().get("current", {}) as Dictionary
+	return fishing.current_at(global_position) * max_speed * float(cfg.get("max_drift", 0.18))
+
+
+## Swimming against the stream is slower (breaststroke up to 15 %).
+func _against_current(dir: Vector2, state: int) -> float:
+	if state != SwimRules.BREAST or fishing == null:
+		return 1.0
+	var flow: Vector2 = fishing.current_at(global_position)
+	if flow == Vector2.ZERO:
+		return 1.0
+	var cfg: Dictionary = SwimRules.cfg().get("current", {}) as Dictionary
+	return 1.0 - float(cfg.get("against", 0.15)) * clampf(-dir.dot(flow.normalized()) * flow.length(), 0.0, 1.0)
+
+
+## Soaked after a swim (0..1): the shader darkens her, prints on dry ground turn dark, drops fall from hair and coat; dries over about 25 s.
+func _update_wet(delta: float) -> void:
+	var target: float = 0.0
+	if swim > 0:
+		_swim_swum += delta
+		target = 1.0
+	elif float(_surface.get("submerge", 0.0)) > 6.0:
+		target = 0.45
+	var was: float = _wet
+	if target > _wet:
+		_wet = move_toward(_wet, target, 2.5 * delta)
+	else:
+		_wet = move_toward(_wet, 0.0 if target == 0.0 else target, delta / 25.0)
+	if _wet != was:
+		(_sprite.material as ShaderMaterial).set_shader_parameter("soak", _wet)
+	if _wet > 0.3 and swim == 0 and _swim_water != null:
+		_wet_drip -= delta
+		if _wet_drip <= 0.0:
+			_wet_drip = 0.9 / _wet
+			_swim_water.splash(global_position + Vector2(randf_range(-4.0, 4.0), randf_range(-1.0, 1.0)), 1, 0.2, false, 10.0 + randf() * 8.0)
+
+
+## Tells the river surface where a swimmer is so the water rings around her (WorldRivers.set_swimmer, shader river_water).
+func _update_swim_slot() -> void:
+	var on: bool = swim > 0 and swimmer != null
+	if not on and not _swim_slot_on:
+		return
+	for patch: Node in Terrain.patches:
+		if patch is WorldRivers:
+			var slot: Vector4 = Vector4(roundf(global_position.x), roundf(global_position.y), 9.0, 0.0)
+			if on:
+				slot.w = clampf(0.25 + (_swim_water.energy if _swim_water != null else 0.2), 0.2, 1.0)
+			(patch as WorldRivers).set_swimmer(get_instance_id(), slot)
+	_swim_slot_on = on
+
+
 ## Called at every footfall (also for remote players, driven by the walk animation).
 func _on_step() -> void:
-	_footsteps.step(_surface, velocity, stealth.sneaking)
+	_footsteps.step(_surface, velocity, stealth.sneaking, _wet)
 	if (wounded or _wound > 0.55) and not bandaged:
 		BloodSplat.drop(get_tree().current_scene, global_position + Vector2(randf_range(-3.0, 3.0), randf_range(-1.0, 2.0)), 1 + int(randf() < 0.4))
 	if bool(_surface.get("ripples", false)):
@@ -547,23 +679,29 @@ func _move(delta: float) -> void:
 		move_and_slide()
 		return
 	var charging: bool = _update_charge()
+	_update_alt()
 	var dir: Vector2 = InputManager.move_vector()
 	if attack.is_heavy_swing():
 		dir = Vector2.ZERO ## the heavy blow is struck planted
+	var swimming: int = _update_swim(delta, dir)
 	var can_sprint: bool = bool(_surface.get("allow_sprint", true)) and not wounded ## wounded: no sprinting
 	var want_sprint: bool = InputManager.sprint_held() and can_sprint and dir != Vector2.ZERO and not attack.is_swinging() and not _busy and not charging
-	if want_sprint and stamina.current > 0.0:
+	if swimming > 0:
+		sprinting = swimming == SwimRules.CRAWL ## the crawl is the sprint of the water (it pays its own stamina)
+	elif want_sprint and stamina.current > 0.0:
 		sprinting = stamina.drain(sprint_cost_per_sec, delta)
 	else:
 		sprinting = false
 
-	if InputManager.blink_pressed() and blink.is_ready() and not _busy and bool(_surface.get("allow_blink", true)):
+	if InputManager.blink_pressed() and blink.is_ready() and not _busy and swimming == 0 and bool(_surface.get("allow_blink", true)):
 		_try_blink()
 
-	stealth.sneaking = InputManager.sneak_held() and not sprinting and not _busy and not charging
+	stealth.sneaking = InputManager.sneak_held() and not sprinting and not _busy and not charging and swimming == 0
 
 	if dir == Vector2.ZERO:
-		velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+		velocity = velocity.move_toward(_swim_drift(swimming) if swimming > 0 else Vector2.ZERO, friction * delta)
+	elif swimming > 0:
+		velocity = velocity.move_toward(dir * swimmer.speed(wounded) * _against_current(dir, swimming) + _swim_drift(swimming), acceleration * 0.5 * delta) ## water gives way slowly
 	else:
 		var base_speed: float = sprint_speed if sprinting else (sneak_speed if stealth.sneaking else max_speed)
 		var speed: float = base_speed * float(_surface.get("speed", 1.0)) * _slow_factor() * (WOUND_SPEED if wounded else 1.0) * attack.charge_move_factor()
@@ -583,7 +721,7 @@ func _move(delta: float) -> void:
 			facing = look_mouse
 	elif dir != Vector2.ZERO:
 		facing = dir.normalized()
-	if InputManager.attack_pressed() and attack.can_attack() and not _busy:
+	if InputManager.attack_pressed() and attack.can_attack() and not _busy and swimming == 0:
 		if InputManager.using_mouse:
 			var attack_aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER)
 			if attack_aim != Vector2.ZERO:
@@ -597,7 +735,7 @@ func _move(delta: float) -> void:
 func _update_charge() -> bool:
 	if not is_multiplayer_authority():
 		return false
-	var blocked: bool = _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0
+	var blocked: bool = _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0 or swim > 0
 	if attack.is_charging():
 		if blocked or InputManager.blink_pressed():
 			attack.cancel_charge()
@@ -613,9 +751,26 @@ func _update_charge() -> bool:
 	return attack.is_charging()
 
 
+## Owner, every physics frame: the right mouse button on a weapon whose right click is a chain of slashes (the Himmelsriss) starts the first slash, a second press
+## shortly after the second one. Pressed during the first slash it is kept until that has ended.
+func _update_alt() -> void:
+	if not is_multiplayer_authority() or not InputManager.secondary_pressed():
+		return
+	if _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0 or swim > 0 or attack.is_charging():
+		return
+	if not attack.can_alt() and not attack.is_swinging():
+		return
+	var aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER) if InputManager.using_mouse else facing
+	if aim != Vector2.ZERO and not attack.is_swinging():
+		facing = aim
+	if not attack.is_swinging():
+		sprinting = false ## swinging while sprinting drops her into a walk
+	attack.alt_press(aim)
+
+
 ## Something owns her: a cutscene, an action, a fall (the rod cannot be cast then).
 func is_busy() -> bool:
-	return _busy or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging()
+	return _busy or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging() or swim > 0
 
 
 ## Local player: picks toward `dir` (about a second, she stands still, the weapon is put away);
@@ -646,10 +801,28 @@ func _play_release_touch() -> void:
 	touch_hold = false
 
 
+## Local player: crouches and holds `item` out toward `dir` (a wild bird that came close). `on_reach` runs when the hand is out; the hold goes on until
+## `release_feed()` (the host has answered) or `FEED_HOLD_MAX` seconds.
+func begin_feed(dir: Vector2, item: String, on_reach: Callable) -> void:
+	_feed_item = item
+	_begin_action("feed", dir, on_reach, FEED_REACH_TIME)
+
+
+## Ends the hold of `begin_feed` (any peer may call it for the local player; it is replicated).
+func release_feed() -> void:
+	if is_multiplayer_authority():
+		_play_release_feed.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _play_release_feed() -> void:
+	feed_hold = false
+
+
 ## Local player: eats what is in hotbar slot `slot` (a consumable), if that would do anything. The
 ## berry is used up when it reaches her mouth (EAT_USE_TIME); being hit before that stops it.
 func use_slot(slot: int) -> void:
-	if _busy or stumbling or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
+	if _busy or stumbling or swim > 0 or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
 		return
 	var stack: Dictionary = inventory.slots[slot]
 	var def: Dictionary = Items.definition(stack)
@@ -664,7 +837,7 @@ func use_slot(slot: int) -> void:
 
 
 func _begin_action(kind: String, dir: Vector2, on_moment: Callable, moment_time: float) -> void:
-	if _busy or attack.is_swinging() or attack.is_charging() or not is_multiplayer_authority():
+	if _busy or swim > 0 or attack.is_swinging() or attack.is_charging() or not is_multiplayer_authority():
 		return
 	_set_focus(null)
 	_play_action.rpc(kind, dir)
@@ -679,6 +852,7 @@ func _play_action(kind: String, dir: Vector2) -> void:
 	_busy_kind = kind
 	_busy_time = 0.0
 	touch_hold = kind == "touch"
+	feed_hold = kind == "feed"
 	_touch_wait = 0.0
 	sprinting = false
 	if dir != Vector2.ZERO:
@@ -780,45 +954,37 @@ func _set_focus(item: Interactable) -> void:
 ## The sword arm is drawn by AttackComponent from these per-frame points (see tools/art_hero3d.py).
 func _load_rig() -> void:
 	var rig: Dictionary = DataRegistry.table("hero_rig")
-	for point: Array in rig.get("shoulder", []):
-		_rig_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("hand", []):
-		_rig_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("attack_shoulder", []):
-		_rig_attack_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("attack_hand", []):
-		_rig_attack_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("combo_shoulder", []):
-		_rig_combo_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("combo_hand", []):
-		_rig_combo_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("heavy_shoulder", []):
-		_rig_heavy_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("heavy_hand", []):
-		_rig_heavy_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("pick_shoulder", []):
-		_rig_pick_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("pick_hand", []):
-		_rig_pick_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("pull_shoulder", []):
-		_rig_pull_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("pull_hand", []):
-		_rig_pull_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("touch_shoulder", []):
-		_rig_touch_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("touch_hand", []):
-		_rig_touch_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("eat_shoulder", []):
-		_rig_eat_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("eat_hand", []):
-		_rig_eat_hand.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in rig.get("eat_mouth", []):
-		_rig_eat_mouth.append(Vector2(float(point[0]), float(point[1])))
+	_swim_rig = rig.get("swim", {}) as Dictionary
+	_rig_shoulder = _points(rig.get("shoulder", []))
+	_rig_hand = _points(rig.get("hand", []))
+	_rig_attack_shoulder = _points(rig.get("attack_shoulder", []))
+	_rig_attack_hand = _points(rig.get("attack_hand", []))
+	_rig_combo_shoulder = _points(rig.get("combo_shoulder", []))
+	_rig_combo_hand = _points(rig.get("combo_hand", []))
+	_rig_heavy_shoulder = _points(rig.get("heavy_shoulder", []))
+	_rig_heavy_hand = _points(rig.get("heavy_hand", []))
+	_rig_pick_shoulder = _points(rig.get("pick_shoulder", []))
+	_rig_pick_hand = _points(rig.get("pick_hand", []))
+	_rig_pull_shoulder = _points(rig.get("pull_shoulder", []))
+	_rig_pull_hand = _points(rig.get("pull_hand", []))
+	_rig_touch_shoulder = _points(rig.get("touch_shoulder", []))
+	_rig_touch_hand = _points(rig.get("touch_hand", []))
+	_rig_feed_shoulder = _points(rig.get("feed_shoulder", []))
+	_rig_feed_hand = _points(rig.get("feed_hand", []))
+	_rig_eat_shoulder = _points(rig.get("eat_shoulder", []))
+	_rig_eat_hand = _points(rig.get("eat_hand", []))
+	_rig_eat_mouth = _points(rig.get("eat_mouth", []))
 	var standby: Dictionary = rig.get("standby", {}) as Dictionary
-	for point: Array in standby.get("shoulder", []):
-		_rig_standby_shoulder.append(Vector2(float(point[0]), float(point[1])))
-	for point: Array in standby.get("hand", []):
-		_rig_standby_hand.append(Vector2(float(point[0]), float(point[1])))
+	_rig_standby_shoulder = _points(standby.get("shoulder", []))
+	_rig_standby_hand = _points(standby.get("hand", []))
+
+
+## A list of `[x, y]` pairs from data/hero_rig.json as points.
+static func _points(pairs: Variant) -> PackedVector2Array:
+	var out: PackedVector2Array = PackedVector2Array()
+	for point: Array in pairs:
+		out.append(Vector2(float(point[0]), float(point[1])))
+	return out
 
 
 @rpc("authority", "call_local", "reliable")
@@ -874,6 +1040,154 @@ func _update_standby(delta: float, moving: bool) -> void:
 		_start_standby(clip)
 
 
+## Swimming has its own sheet (13): looping tread / breaststroke / crawl, the clips between them and the way into the water, which plays
+## backwards when she climbs out. Returns true while the swim sheet is drawn.
+func _animate_swim(delta: float) -> bool:
+	var clips: Dictionary = _swim_rig.get("clips", {}) as Dictionary
+	var total: int = int(_swim_rig.get("total", 0))
+	if clips.is_empty() or total <= 0:
+		return false
+	var enter: Dictionary = clips["enter"] as Dictionary
+	var idx: int = -1
+	var start: int = 0
+	if swim > 0:
+		_swim_exit_t = -1.0
+		var want: int = swim - 1
+		if _swim_was == 0:
+			_swim_level = 0
+			_swim_time = 0.0
+			_swim_dive = velocity.length() > max_speed * 1.2 ## a run into the water: a head-first dive instead of wading in
+			_swim_trans = "dive" if _swim_dive else "enter"
+			_swim_trans_t = 0.0
+			_swim_trans_dir = 1
+			_swim_shake_t = -1.0
+			_use_sheet(13)
+			_swim_water.splash(global_position, 18 if _swim_dive else 10, 1.8 if _swim_dive else 1.3, true)
+			_swim_sound("dive_big" if _swim_dive else "dive_small", 0.0)
+			if _swim_dive:
+				_shake = maxf(_shake, 1.5)
+			if is_multiplayer_authority():
+				get_tree().call_group("hint_card", "notify_swim")
+		elif _swim_trans == "" and want != _swim_level:
+			var up: bool = want > _swim_level
+			_swim_trans = "t2b" if (_swim_level if up else _swim_level - 1) == 0 else "b2c"
+			_swim_trans_dir = 1 if up else -1
+			var tc: Dictionary = clips[_swim_trans] as Dictionary
+			_swim_trans_t = 0.0 if up else float(tc["count"]) / float(tc["fps"]) - 0.0001
+		_swim_was = swim
+	elif _swim_was > 0:
+		_swim_was = 0
+		_swim_trans = ""
+		_swim_exit_t = 0.0
+		if _swim_water != null:
+			_swim_water.splash(global_position, 6, 1.0, true)
+			_swim_sound("exit", 0.0)
+	if swim == 0:
+		if _swim_shake_t >= 0.0:
+			var sc: Dictionary = clips["shake"] as Dictionary
+			var before: int = int(_swim_shake_t * float(sc["fps"]))
+			_swim_shake_t += delta
+			var at: int = int(_swim_shake_t * float(sc["fps"]))
+			if velocity.length() > 8.0 or at >= int(sc["count"]):
+				_swim_shake_t = -1.0
+				_wet_drip = 0.0
+				return false
+			if at != before and at in [3, 6, 8]: ## the head and the coat throw water
+				_swim_sound("shake" if at == 3 else "drip", -2.0 if at == 3 else -6.0)
+				_swim_water.splash(global_position + Vector2(randf_range(-6.0, 6.0), 0.0), 5, 0.9, false, 18.0)
+			idx = int(sc["start"]) + at
+			_use_sheet(13)
+			_swim_under.visible = false
+			_sprite.frame = _sector * total + idx
+			_sprite.skew = 0.0
+			_sprite.position.y = 0.0
+			return true
+		if _swim_exit_t < 0.0:
+			return false
+		_swim_exit_t += delta
+		var n: int = int(enter["count"])
+		var back: int = n - 1 - int(_swim_exit_t * float(enter["fps"]) * 2.0) ## twice as fast as the way in
+		if back < 0:
+			_swim_exit_t = -1.0
+			if _swim_swum > 2.0 and velocity.length() < 8.0:
+				_swim_shake_t = 0.0 ## she stands: shake the water off
+			_swim_swum = 0.0
+			return false
+		idx = int(enter["start"]) + back
+	elif _swim_trans != "":
+		var c: Dictionary = clips[_swim_trans] as Dictionary
+		var span: float = float(c["count"]) / float(c["fps"])
+		_swim_trans_t += float(_swim_trans_dir) * delta
+		if (_swim_trans_dir > 0 and _swim_trans_t >= span) or (_swim_trans_dir < 0 and _swim_trans_t <= 0.0):
+			if _swim_trans_dir > 0:
+				_swim_level = 0 if _swim_trans in ["enter", "dive"] else (1 if _swim_trans == "t2b" else 2)
+			else:
+				_swim_level = 0 if _swim_trans == "t2b" else 1
+			_swim_trans = ""
+			_swim_time = 0.0
+		else:
+			idx = int(c["start"]) + clampi(int(_swim_trans_t * float(c["fps"])), 0, int(c["count"]) - 1)
+	if idx < 0:
+		var loop: Dictionary = clips[SWIM_LEVELS[_swim_level]] as Dictionary
+		_swim_time += delta
+		start = int(loop["start"])
+		idx = start + int(_swim_time * float(loop["fps"])) % int(loop["count"])
+	_use_sheet(13)
+	_sprite.frame = _sector * total + idx
+	_swim_under.frame = _sprite.frame
+	_swim_effects(delta, clips, idx, total)
+	_sprite.skew = 0.0
+	_sprite.position.y = 0.0
+	return true
+
+
+## Water effects of the swim frames: arms and kicks throw drops at the events of the rig, the crawl blows bubbles at the mouth, the wake leaves rings.
+func _swim_effects(delta: float, clips: Dictionary, idx: int, total: int) -> void:
+	var level: float = float(swimmer.blend) if swim > 0 else maxf(0.0, 1.0 - _swim_exit_t * 3.0)
+	var hard: float = 1.0 if swim == SwimRules.CRAWL else (0.5 if swim == SwimRules.BREAST else 0.15)
+	_swim_water.energy = lerpf(_swim_water.energy, hard, minf(1.0, 6.0 * delta))
+	_swim_water.intensity = level
+	_swim_water.moving = swim > 1 and velocity.length() > 5.0
+	if velocity.length() > 5.0:
+		_swim_water.heading = velocity.normalized()
+	(_swim_under.material as ShaderMaterial).set_shader_parameter("energy", _swim_water.energy)
+	if swim == 0 or _swim_trans != "":
+		_swim_last_local = -1
+		return
+	var clip_name: String = SWIM_LEVELS[_swim_level]
+	var loop: Dictionary = clips[clip_name] as Dictionary
+	var local: int = idx - int(loop["start"])
+	var points: Dictionary = _swim_rig.get("points", {}) as Dictionary
+	if local != _swim_last_local:
+		_swim_last_local = local
+		var events: Dictionary = (_swim_rig.get("events", {}) as Dictionary).get(clip_name, {}) as Dictionary
+		for side: String in ["l", "r"]:
+			if local in (events.get("enter_" + side, []) as Array):
+				var arr: Array = ((points.get("hand_" + side, []) as Array)[_sector] as Array)
+				if idx < arr.size():
+					var hp: Array = arr[idx] as Array
+					_swim_water.splash(global_position + Vector2(float(hp[0]), float(hp[1]) * 0.3), 3 + int(3.0 * _swim_water.energy), 0.7 + _swim_water.energy * 0.6)
+					_swim_sound("stroke_a" if side == "l" else "stroke_b", float((SwimRules.cfg().get("sounds", {}) as Dictionary).get("stroke_db", -14.0)) + 4.0 * _swim_water.energy, 1.0 + 0.25 * _swim_water.energy)
+					if swim == SwimRules.TREAD:
+						_ripples.add(global_position + Vector2(float(hp[0]), 2.0), 0.5)
+	_swim_stir -= delta
+	if _swim_stir <= 0.0 and (not multiplayer.has_multiplayer_peer() or multiplayer.is_server()):
+		_swim_stir = 1.5
+		FishingComponent.add_pressure(global_position, 0.14 if swim == SwimRules.CRAWL else (0.07 if swim == SwimRules.BREAST else 0.02)) ## fish do not like swimmers
+	_swim_wake -= delta
+	if _swim_wake <= 0.0 and velocity.length() > 5.0:
+		_swim_wake = 0.32 - 0.14 * _swim_water.energy
+		_ripples.add(global_position - velocity.normalized() * 6.0, 0.55 + 0.6 * _swim_water.energy)
+	_swim_drip -= delta
+	if swim == SwimRules.CRAWL and _swim_drip <= 0.0:
+		_swim_drip = 0.55
+		var mouth: Array = ((points.get("mouth", []) as Array)[_sector] as Array)
+		if idx < mouth.size():
+			var mp: Array = mouth[idx] as Array
+			_swim_water.bubble(global_position + Vector2(float(mp[0]), float(mp[1]) * 0.3))
+			_swim_sound("breath", -12.0)
+
+
 ## Picks the sheet frame: walk or sprint cycle while moving, idle loop while standing.
 func _animate(delta: float) -> void:
 	var angle: float = facing.angle() / (PI / 4.0)
@@ -916,11 +1230,12 @@ func _animate(delta: float) -> void:
 		shoulder = _rig_shoulder[main_frame]
 		hand = _rig_hand[main_frame]
 	if _busy:
-		var holding: bool = _busy_kind == "touch" and touch_hold and _busy_time >= TOUCH_HOLD_AT
+		var holding: bool = (_busy_kind == "touch" and touch_hold and _busy_time >= TOUCH_HOLD_AT) or (_busy_kind == "feed" and feed_hold and _busy_time >= FEED_REACH_TIME)
 		if holding:
 			_touch_wait += delta
-			if _touch_wait > 14.0:
+			if _touch_wait > (FEED_HOLD_MAX if _busy_kind == "feed" else 14.0):
 				touch_hold = false
+				feed_hold = false
 		else:
 			_busy_time += delta
 		if _busy_time >= PICK_SECONDS:
@@ -929,7 +1244,11 @@ func _animate(delta: float) -> void:
 	var fish_frame_ok: bool = not fish_frame.is_empty() and not attack.is_swinging()
 	if not fish_frame_ok:
 		attack.rod_pose = Vector3.INF
-	if _busy and not _rig_pick_hand.is_empty() and not _rig_eat_hand.is_empty():
+	var swim_drawn: bool = _animate_swim(delta)
+	if swim_drawn:
+		shoulder = Vector2(0.0, -30.0) ## the sheet already shows both arms; the sword arm is hidden below
+		hand = Vector2(0.0, -22.0)
+	elif _busy and not _rig_pick_hand.is_empty() and not _rig_eat_hand.is_empty():
 		## Picking and eating have their own sheets too (legs planted); the right arm is drawn from the rig, weapon put away.
 		var position_in_sheet: float = _busy_time / PICK_SECONDS * float(PICK_FRAMES)
 		var key: float = clampf(position_in_sheet - 0.5, 0.0, float(PICK_FRAMES - 1) - 0.001)
@@ -940,15 +1259,18 @@ func _animate(delta: float) -> void:
 		var base: int = _sector * PICK_FRAMES * (EAT_VARIANTS if eating else 1) + legs * PICK_FRAMES
 		var pulling: bool = _busy_kind == "pull" and not _rig_pull_hand.is_empty()
 		var touching: bool = _busy_kind == "touch" and not _rig_touch_hand.is_empty()
-		var hands: PackedVector2Array = _rig_eat_hand if eating else (_rig_touch_hand if touching else (_rig_pull_hand if pulling else _rig_pick_hand))
-		var shoulders: PackedVector2Array = _rig_eat_shoulder if eating else (_rig_touch_shoulder if touching else (_rig_pull_shoulder if pulling else _rig_pick_shoulder))
-		_use_sheet(3 if eating else (5 if touching else (4 if pulling else 2)))
+		var feeding: bool = _busy_kind == "feed" and not _rig_feed_hand.is_empty()
+		var hands: PackedVector2Array = _rig_feed_hand if feeding else _rig_eat_hand if eating else (_rig_touch_hand if touching else (_rig_pull_hand if pulling else _rig_pick_hand))
+		var shoulders: PackedVector2Array = _rig_feed_shoulder if feeding else _rig_eat_shoulder if eating else (_rig_touch_shoulder if touching else (_rig_pull_shoulder if pulling else _rig_pick_shoulder))
+		_use_sheet(14 if feeding else 3 if eating else (5 if touching else (4 if pulling else 2)))
 		_sprite.frame = base + clampi(int(position_in_sheet), 0, PICK_FRAMES - 1)
 		hand = hands[base + i].lerp(hands[base + i + 1], f)
 		shoulder = shoulders[base + i].lerp(shoulders[base + i + 1], f)
 		if eating:
 			var mouth: Vector2 = _rig_eat_mouth[base + i].lerp(_rig_eat_mouth[base + i + 1], f)
 			_eat_fx.show_state(_busy_time, hand + Vector2(0.0, _sink), mouth + Vector2(0.0, _sink))
+		if feeding and _busy_time >= 0.22:
+			_feed_fx.show_hand(_feed_item, hand + Vector2(0.0, _sink))
 	elif attack.heavy_key() >= 0.0 and not _rig_heavy_hand.is_empty():
 		## The heavy blow (charge, chop, recover) has its own sheet: 10 keys, legs planted or following the walk cycle.
 		var heavy: float = clampf(attack.heavy_key(), 0.0, float(HEAVY_KEYS - 1) - 0.001)
@@ -1001,10 +1323,15 @@ func _animate(delta: float) -> void:
 		_sprite.frame = main_frame
 	if not (_busy and _busy_kind == "eat"):
 		_eat_fx.clear()
+	if not (_busy and _busy_kind == "feed"):
+		_feed_fx.clear()
 	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, _sink + _limp_dip)
 	attack.rig_hand = hand + Vector2(-_sprite.skew * hand.y, _sink + _limp_dip)
 	attack.carrying = running and not attack.is_swinging()
-	attack.sheathed = stealth.sneaking or _busy ## sneaking and picking put the weapon away
+	attack.sheathed = stealth.sneaking or _busy or swim_drawn ## sneaking, picking and swimming put the weapon away
+	var arm_node: Node2D = attack.get_node_or_null("Hand") as Node2D
+	if arm_node != null and arm_node.visible == swim_drawn:
+		arm_node.visible = not swim_drawn ## swim frames carry both arms
 
 
 ## The intro starts: normal HUD parts hide, the wound border and blood stay active.
@@ -1338,12 +1665,43 @@ func _rpc_set_health(value: float) -> void:
 func _use_sheet(sheet: int) -> void:
 	if sheet == _sheet:
 		return
+	var from_swim: bool = _sheet == 13
 	_sheet = sheet
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
+	if sheet == 13:
+		_sprite.offset = SWIM_OFFSET
+	elif from_swim:
+		_sprite.offset = Vector2(0.0, -23.0)
+	if _swim_under != null:
+		_swim_under.visible = sheet == 13
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
 	match sheet:
+		13:
+			_sprite.texture = SWIM_SHEET
+			_sprite.hframes = int(_swim_rig.get("total", 86))
+			_sprite.vframes = 8
+			if _swim_under == null:
+				_swim_under = Sprite2D.new()
+				_swim_under.show_behind_parent = true
+				_swim_under.modulate = Color(0.55, 0.9, 0.95, 0.5)
+				_sprite.add_child(_swim_under)
+			var under_material: ShaderMaterial = ShaderMaterial.new()
+			under_material.shader = load("res://assets/shaders/swim_under.gdshader") as Shader
+			_swim_under.material = under_material
+			_swim_water = SwimWater.new()
+			_swim_water.name = "SwimWater"
+			add_child(_swim_water)
+			_swim_under.texture = SWIM_UNDER
+			_swim_under.offset = SWIM_OFFSET
+			_swim_under.hframes = _sprite.hframes
+			_swim_under.vframes = 8
+			_swim_under.visible = true
 		1:
 			_sprite.texture = ATTACK_SHEET
 			_sprite.hframes = ATTACK_COLS
+			_sprite.vframes = 8
+		14:
+			_sprite.texture = FEED_SHEET
+			_sprite.hframes = PICK_FRAMES
 			_sprite.vframes = 8
 		2, 3, 4, 5:
 			_sprite.texture = PICK_SHEET if sheet == 2 else (EAT_SHEET if sheet == 3 else (TOUCH_SHEET if sheet == 5 else PULL_SHEET))

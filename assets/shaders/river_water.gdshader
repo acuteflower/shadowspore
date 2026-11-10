@@ -17,6 +17,9 @@ uniform bool bank_inner = false;
 // Positions are in world pixels, radius in pixels, strength in 0..1.
 uniform vec4 disturbances[8];
 uniform int disturbance_count = 0;
+// Swimmers (docs/schwimmen_konzept.md 6.3): xy world pixels, z radius, w energy 0..1; set by SwimWater every frame.
+uniform vec4 swimmers[4];
+uniform int swimmer_count = 0;
 // xy top center, z falling height, w width; world pixels.
 uniform vec4 waterfall_links[4];
 uniform int fall_link_count = 0;
@@ -108,6 +111,20 @@ void fragment() {
             float trail = clamp(1.0 - downstream / radius, 0.0, 1.0) * d.w;
             if (downstream > 2.0 && downstream < radius && abs(side) < radius * 0.34 && trail_wave > 0.76) {
                 color = mix(color, vec3(0.61, 0.75, 0.68), trail * 0.65);
+            }
+        }
+        // Swimmers: a soft dent under the body and broken rings that travel outwards (louder when she swims hard).
+        for (int i = 0; i < 4; i++) {
+            if (i >= swimmer_count) { break; }
+            vec4 sw = swimmers[i];
+            vec2 se = vec2(pixel.x - sw.x, (pixel.y - sw.y) * 2.0);
+            float sr = length(se);
+            float sradius = max(sw.z, 1.0);
+            if (sr < sradius * 0.5) { color = mix(color, color * vec3(0.78, 0.86, 0.90), 0.5); }
+            float sfade = clamp(1.0 - sr / (sradius * 2.4), 0.0, 1.0) * sw.w;
+            float sphase = mod(sr - g_water_time * (3.0 + 5.0 * sw.w), 7.0);
+            if (sr > sradius * 0.5 && sphase < 1.5 && sfade > 0.04 && sin(atan(se.y, se.x) * 5.0 + sr * 0.2 - g_water_time) > -0.35) {
+                color = mix(color, vec3(0.67, 0.78, 0.70), sfade * 0.85);
             }
         }
         // Guide surface strokes into the falling sheet and carry its foam out.

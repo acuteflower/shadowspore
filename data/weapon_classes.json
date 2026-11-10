@@ -201,5 +201,167 @@
 				"shake": 2.0
 			}
 		]
+	},
+	"sword_rift": {
+		"name": "Himmelsklinge",
+		"combo_window": 0.55,
+		"secondary": {
+			"kind": "rift_slash",
+			"name": "Rissschnitt / Himmelskreuz",
+			"_doc": "Rechtsklick ohne Aufladen: zwei diagonale Hiebe hintereinander (ein zweiter Rechtsklick innerhalb `window` nach dem ersten), jeder schickt eine Salve Federn aus der Klingenspitze (docs/rissklinge.md). `diag` = Winkel der Klinge in Grad (pitch = Hoehe ueber dem Horizont, yaw = zur Schwertseite) von Ausholen bis Ende.",
+			"window": 0.6,
+			"noise": 1.3,
+			"steps": [
+				{
+					"name": "RISSSCHNITT",
+					"stamina_cost": 20,
+					"sweep": -1,
+					"arc": 120,
+					"windup": 0.12,
+					"active": 0.1,
+					"recovery": 0.34,
+					"damage": 1.5,
+					"reach": 1.15,
+					"knock": 1.6,
+					"lunge": 90,
+					"shake": 3.0,
+					"diag": {
+						"pitch0": 78,
+						"pitch1": -8,
+						"yaw0": 62,
+						"yaw1": -55
+					},
+					"volley": {
+						"count": 5,
+						"spread": 40,
+						"length": 90,
+						"width": 8,
+						"ratio": 0.4,
+						"max_hits": 3,
+						"knock": 0.8,
+						"speed": 430
+					}
+				},
+				{
+					"name": "HIMMELSKREUZ",
+					"stamina_cost": 15,
+					"sweep": 1,
+					"arc": 120,
+					"windup": 0.1,
+					"active": 0.1,
+					"recovery": 0.55,
+					"damage": 2.0,
+					"reach": 1.25,
+					"knock": 2.2,
+					"lunge": 120,
+					"shake": 5.0,
+					"diag": {
+						"pitch0": 72,
+						"pitch1": -10,
+						"yaw0": -62,
+						"yaw1": 58
+					},
+					"volley": {
+						"count": 7,
+						"spread": 70,
+						"length": 110,
+						"width": 8,
+						"ratio": 0.45,
+						"max_hits": 3,
+						"knock": 1.0,
+						"speed": 470,
+						"ward_refund": 8,
+						"ward_cap": 32
+					}
+				}
+			],
+			"rift": {
+				"passive": {
+					"name": "SPITZENRISS",
+					"length": 72,
+					"width": 9,
+					"ratio": 0.45,
+					"knock": 1.0,
+					"life": 0.45
+				}
+			}
+		},
+		"combo": [
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 120,
+				"windup": 0.07,
+				"active": 0.09,
+				"recovery": 0.18,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 1.0,
+				"lunge": 0,
+				"shake": 1.2
+			},
+			{
+				"style": "slash",
+				"sweep": 1,
+				"arc": 120,
+				"windup": 0.05,
+				"active": 0.09,
+				"recovery": 0.18,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 1.0,
+				"lunge": 0,
+				"shake": 1.2
+			},
+			{
+				"style": "thrust",
+				"arc": 40,
+				"windup": 0.14,
+				"active": 0.08,
+				"recovery": 0.3,
+				"damage": 1.6,
+				"reach": 1.2,
+				"knock": 2.0,
+				"lunge": 0,
+				"shake": 2.5,
+				"rift": "line",
+				"_doc": "Spitzenriss: der Stoß schickt den Riss der Passiv-Bahn (`rift.passive`) nach vorn"
+			},
+			{
+				"_doc": "4. Schlag, Upgrade AUFWÄRTSHIEB (Fähigkeiten-Graph): steil von unten nach oben, body = Block 0 von player_combo.png",
+				"requires": "combo_four",
+				"block": 3,
+				"name": "Aufwärtshieb",
+				"style": "slash",
+				"sweep": 1,
+				"arc": 150,
+				"windup": 0.06,
+				"active": 0.08,
+				"recovery": 0.17,
+				"damage": 1.25,
+				"reach": 1.1,
+				"knock": 1.3,
+				"lunge": 0,
+				"shake": 1.8
+			},
+			{
+				"_doc": "5. Schlag, Upgrade WIRBELKLINGE: ein voller Kreis um die Heldin, body = Block 1 von player_combo.png",
+				"requires": "combo_five",
+				"block": 4,
+				"name": "Wirbelklinge",
+				"style": "slash",
+				"sweep": -1,
+				"arc": 330,
+				"windup": 0.13,
+				"active": 0.17,
+				"recovery": 0.4,
+				"damage": 1.8,
+				"reach": 1.15,
+				"knock": 2.2,
+				"lunge": 0,
+				"shake": 3.2
+			}
+		],
+		"_doc": "Klasse des Himmelsriss (docs/rissklinge.md): die Kombination des Einhandschwerts (der dritte Schlag, der Stoß, reißt einen Riss, `rift: line`) und ein Rechtsklick in zwei Stufen: wie der Wuchtschlag, aber ein frühes Loslassen (Stufe 1) reißt zusätzlich eine Rissbahn nach vorn, volle Ladung (Stufe 2, ab charge_full) öffnet einen Riss vor ihr, der nach `delay` in einem Federnschwarm zerplatzt."
 	}
 }

@@ -172,5 +172,25 @@
   "by": "npc",
   "npc": "torben",
   "work": 120.0
+ },
+ "sword_rift": {
+  "name": "HIMMELSRISS",
+  "station": "smithy",
+  "in": {
+   "sword_iron": 1,
+   "rissfeder": 1,
+   "iron_plate": 4,
+   "void_slag": 2,
+   "shadow_core": 2
+  },
+  "out": {
+   "sword_rift": 1
+  },
+  "seconds": 6.0,
+  "trust": 40,
+  "info": "TORBEN SCHMIEDET DIE FEDER ZUR KLINGE",
+  "by": "npc",
+  "npc": "torben",
+  "work": 300.0
  }
 }

@@ -165,13 +165,13 @@ func _rebuild() -> void:
 				var locked: bool = town.trust_of(npc) < int(offer.get("trust", 0))
 				var poor: bool = player.progress.copper < price
 				rows.append({"kind": "buy", "item": String(offer.item), "count": 1, "name": _item_name(String(offer.item)), "sub": "VERTRAUEN %d" % int(offer.trust) if locked else "",
-					"tag": Currency.short_text(price), "tag_color": GOLD, "state": LOCKED if locked else (MISSING if poor else OK), "why": "VERTRAUEN %d NÖTIG" % int(offer.trust) if locked else "ZU WENIG GELD", "price": price})
+					"coins": price, "poor": poor, "state": LOCKED if locked else (MISSING if poor else OK), "why": "VERTRAUEN %d NÖTIG" % int(offer.trust) if locked else "ZU WENIG GELD", "price": price})
 		"sell":
 			for entry: Variant in def.get("sell", []) as Array:
 				var offer: Dictionary = entry as Dictionary
 				var have: int = player.inventory.count_plain(String(offer.item))
 				rows.append({"kind": "sell", "item": String(offer.item), "count": have, "name": _item_name(String(offer.item)), "sub": "IM RUCKSACK" if have > 0 else "DU HAST KEINS",
-					"tag": Currency.short_text(int(offer.price)), "tag_color": GOLD, "state": OK if have > 0 else MISSING, "why": "DU HAST KEIN %s" % _item_name(String(offer.item)), "price": int(offer.price)})
+					"coins": int(offer.price),"state": OK if have > 0 else MISSING, "why": "DU HAST KEIN %s" % _item_name(String(offer.item)), "price": int(offer.price)})
 
 
 ## The refine tab: the weapons on the anvil first (they wait, work or can be collected), then every refinable weapon she carries or wears.
@@ -265,9 +265,15 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 					_text(Vector2(area.position.x, area.position.y + 58.0), "ER ARBEITET NUR AN DER BANK, NICHT NACHTS UND NICHT IN DER PAUSE", Color(DIM, 0.8))
 		"buy", "sell":
 			var verb: String = "KOSTET" if kind == "buy" else "ZAHLT"
-			_text(Vector2(area.position.x, area.position.y + 46.0), "%s %s DAS STÜCK" % [verb, Currency.short_text(int(row.price))], GOLD)
+			var head: String = verb + " "
+			_text(Vector2(area.position.x, area.position.y + 46.0), head, GOLD)
+			var hx: float = area.position.x + float(PixelText.width(head))
+			draw_purse_left(hx, area.position.y + 46.0, int(row.price))
+			_text(Vector2(hx + purse_width(int(row.price)) + 2.0, area.position.y + 46.0), "DAS STÜCK", GOLD)
 			if kind == "sell":
-				_text(Vector2(area.position.x, area.position.y + 58.0), "SHIFT: ALLES  (%s)" % Currency.short_text(int(row.price) * int(row.count)), DIM)
+				var all_head: String = "SHIFT: ALLES  "
+				_text(Vector2(area.position.x, area.position.y + 58.0), all_head, DIM)
+				draw_purse_left(area.position.x + float(PixelText.width(all_head)), area.position.y + 58.0, int(row.price) * int(row.count))
 
 
 ## The weapon big on the left with its fifteen pearls, what the next level gives, what it costs (material chips and copper), how long Torben needs and the chance as a bar
@@ -298,9 +304,9 @@ func _detail_refine(area: Rect2, row: Dictionary) -> void:
 	for need_item: String in mats:
 		cx += draw_chip(Vector2(cx, cy), need_item, town.available(need_item, player), int(mats[need_item]))
 	var price: int = RefineRules.copper(stack, target)
-	_text(Vector2(cx, cy + 6.0), Currency.short_text(price), GOLD if player.progress.copper >= price else BAD)
+	draw_purse_left(cx, cy + 6.0, price, GOLD if player.progress.copper >= price else BAD)
 	var right: float = area.end.x - 4.0
-	var wait: String = "%s BRAUCHT %s" % [String(town.settler_spec(npc).get("name", npc)), duration_text(RefineRules.work_seconds(stack, target))]
+	var wait: String = "%s SCHMIEDET SOFORT" % String(town.settler_spec(npc).get("name", npc))
 	_text(Vector2(right - float(PixelText.width(wait)), area.position.y + 4.0), wait, DIM)
 	var odds: float = RefineRules.chance(stack)
 	var glut: float = RefineRules.pity_bonus(stack)

@@ -125,11 +125,70 @@ static func line(key: String, value: float) -> String:
 	return "%s%d %s" % [sign, roundi(absf(value)), label]
 
 
-## Is `a` better than `b` for this stat? (+1 better, -1 worse, 0 equal): for the comparison on a card. Lower `alarm` is better.
+## Is `a` better than `b` for this stat? (+1 better, -1 worse, 0 equal): for the comparison on a card. Stats with `lower_better` in the catalogue (alarm range,
+## blink pause) are better the lower they are.
 static func better(key: String, a: float, b: float) -> int:
 	if is_equal_approx(a, b):
 		return 0
 	var higher: bool = a > b
-	if key == "alarm":
+	if bool(((catalog().get("stats", {}) as Dictionary).get(key, {}) as Dictionary).get("lower_better", false)):
 		higher = not higher
 	return 1 if higher else -1
+
+
+## Multiplier on the blink cooldown (0.7 = a third shorter).
+static func blink_scale(bonus: Dictionary) -> float:
+	return clampf(1.0 + float(bonus.get("blink_cooldown", 0.0)), 0.4, 1.5)
+
+
+## The share (0..0.9) by which wild crows and ravens notice her later and flee later.
+static func corvid_calm(bonus: Dictionary) -> float:
+	return clampf(float(bonus.get("corvid_calm", 0.0)), 0.0, 0.9)
+
+
+## The special abilities of the worn pieces: perk id -> its entry of the catalogue (`perks`). Like `combine`, only the first piece of each kind counts, and a perk
+## named by two pieces counts once.
+static func perks(stacks: Array) -> Dictionary:
+	var table: Dictionary = catalog().get("perks", {}) as Dictionary
+	var seen: Dictionary = {}
+	var found: Dictionary = {}
+	for entry: Variant in stacks:
+		var stack: Dictionary = entry as Dictionary
+		var type: String = type_of(stack)
+		if type == "" or seen.has(type):
+			continue
+		seen[type] = true
+		for id: Variant in Items.definition(stack).get("perks", []) as Array:
+			if table.has(String(id)):
+				found[String(id)] = table[String(id)]
+	return found
+
+
+## The perks a single piece names (for its card, whether worn or not), in the order of the item.
+static func perk_ids(stack: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	if not is_talisman(stack):
+		return out
+	var table: Dictionary = catalog().get("perks", {}) as Dictionary
+	for id: Variant in Items.definition(stack).get("perks", []) as Array:
+		if table.has(String(id)):
+			out.append(String(id))
+	return out
+
+
+## The card text of a perk with its numbers put in: "{health}" becomes 30 (for a share) or 2,5 (for a plain number).
+static func perk_text(id: String) -> String:
+	var entry: Dictionary = (catalog().get("perks", {}) as Dictionary).get(id, {}) as Dictionary
+	var text: String = String(entry.get("text", ""))
+	var shares: Array = entry.get("percent", []) as Array
+	for key: String in entry:
+		var value: Variant = entry[key]
+		if not (value is float or value is int):
+			continue
+		var shown: String = str(roundi(float(value) * 100.0)) if shares.has(key) else ("%d" % int(value) if is_equal_approx(float(value), roundf(float(value))) else ("%.1f" % float(value)).replace(".", ","))
+		text = text.replace("{%s}" % key, shown)
+	return text
+
+
+static func perk_name(id: String) -> String:
+	return String(((catalog().get("perks", {}) as Dictionary).get(id, {}) as Dictionary).get("name", id.to_upper()))

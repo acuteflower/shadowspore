@@ -8,6 +8,7 @@ varying vec2 daylight_position;
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float wound : hint_range(0.0, 1.0) = 0.0;
+uniform float soak : hint_range(0.0, 1.0) = 0.0; // soaked from the water: darker, richer colours, glints on the lit pixels (Player._wet)
 uniform float bandage : hint_range(0.0, 1.0) = 0.0; // 1 = draw the bandage (the pixels the blood map marks with alpha 254)
 uniform sampler2D blood_map : filter_nearest, hint_default_white; // baked blood thresholds, same layout as the colour sheet (tools/art_hero3d.py blood)
 
@@ -43,6 +44,15 @@ void fragment() {
 			}
 			float ink = 1.0 - smoothstep(0.06, 0.16, lum);
 			COLOR.rgb = mix(cloth, COLOR.rgb, ink * 0.8);
+		}
+	}
+	if (soak > 0.0 && COLOR.a > 0.01) {
+		float wl = dot(COLOR.rgb, vec3(0.3, 0.59, 0.11));
+		vec3 soaked = mix(vec3(wl), COLOR.rgb, 1.25) * 0.8;
+		COLOR.rgb = mix(COLOR.rgb, soaked, soak * 0.85);
+		vec2 wpx = floor(UV * vec2(textureSize(TEXTURE, 0)));
+		if (wl > 0.55 && mod(wpx.x + wpx.y * 2.0, 7.0) < 1.0) {
+			COLOR.rgb += vec3(0.1, 0.14, 0.14) * soak;
 		}
 	}
 	COLOR.rgb = day_grade(COLOR.rgb, daylight_position, 1.0);

@@ -6,7 +6,8 @@ const PLAYER_SCENE: PackedScene = preload("res://src/entities/player/player.tscn
 const SPIDER_SCENE: PackedScene = preload("res://src/entities/enemies/shadow_spider.tscn")
 const LISTENER_SCENE: PackedScene = preload("res://src/entities/enemies/void_listener.tscn")
 const CRUSHER_SCENE: PackedScene = preload("res://src/entities/enemies/void_crusher.tscn")
-const RESONANCE_SCENE: PackedScene = preload("res://src/entities/enemies/resonance_wave.tscn")
+const FISHER_SCENE: PackedScene = preload("res://src/entities/enemies/light_fisher.tscn")
+const RESONANCE_SCENE: PackedScene =preload("res://src/entities/enemies/resonance_wave.tscn")
 const ARENA_LIMIT: Vector2 = Vector2(380, 220)
 
 const LUSH_KINDS: Array[String] = ["flower", "petal", "bloom", "clover", "tuft"]
@@ -62,6 +63,56 @@ func _process(_delta: float) -> void:
 			_spawn_crusher(pos)
 		else:
 			_rpc_spawn_crusher.rpc_id(1, pos)
+	if InputManager.debug_fisher_pressed():
+		var pos: Vector2 = InputManager.aim_world_position()
+		if multiplayer.is_server():
+			_spawn_fisher(pos)
+		else:
+			_rpc_spawn_fisher.rpc_id(1, pos)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_spawn_fisher(pos: Vector2) -> void:
+	if multiplayer.is_server():
+		_spawn_fisher(pos)
+
+
+## Water creatures may only be where there is water: depth as a share of the swimming depth, -1 on land. The arena has none; `WorldLevel` answers from the rivers and lakes.
+func water_depth(_point: Vector2) -> float:
+	return -1.0
+
+
+## The nearest water at least `min_depth` deep within `radius` px of `pos` (a ring search); INF when there is none.
+func water_spot(pos: Vector2, min_depth: float, radius: float = 160.0) -> Vector2:
+	if water_depth(pos) >= min_depth:
+		return pos
+	var step: float = 8.0
+	var rings: int = int(radius / step)
+	for ring: int in range(1, rings + 1):
+		var sides: int = maxi(8, ring * 6)
+		for side: int in sides:
+			var point: Vector2 = pos + Vector2.from_angle(side * TAU / float(sides)) * float(ring) * step
+			if water_depth(point) >= min_depth:
+				return point
+	return Vector2.INF
+
+
+## F5: the nearest deep enough water to the cursor, so a click on the shore also works. Nothing happens away from water.
+func _spawn_fisher(pos: Vector2) -> LightFisher:
+	if not multiplayer.is_server():
+		return null
+	var min_depth: float = float(DataRegistry.get_entry("enemies", "light_fisher").get("min_depth", 0.3))
+	var at: Vector2 = water_spot(pos, min_depth + 0.25)
+	if not at.is_finite():
+		return null
+	var fisher: LightFisher = FISHER_SCENE.instantiate() as LightFisher
+	_enemy_count += 1
+	fisher.name = "Fisher%d" % _enemy_count
+	fisher.position = at
+	fisher.heading = randf() * TAU
+	fisher.emerge_on_spawn = true
+	_enemies.add_child(fisher)
+	return fisher
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -174,6 +225,12 @@ func spawn_species(enemy_id: String, at: Vector2, heading: float, health_scale: 
 		listener.damage_scale = damage_scale
 		listener.emerge_on_spawn = emerge
 		enemy = listener
+	elif enemy_id == "light_fisher":
+		var fisher: LightFisher = FISHER_SCENE.instantiate() as LightFisher
+		fisher.health_scale = health_scale
+		fisher.damage_scale = damage_scale
+		fisher.emerge_on_spawn = emerge
+		enemy = fisher
 	else:
 		var spider: ShadowSpider = SPIDER_SCENE.instantiate() as ShadowSpider
 		spider.enemy_id = enemy_id

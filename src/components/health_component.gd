@@ -24,6 +24,7 @@ var current: float = 0.0:
 var armor: float = 0.0 ## from the collected levels and the talismans: every blow is multiplied by LevelRewards.damage_factor(armor)
 var absorb: float = 0.0 ## the share of every hit and tick that is swallowed (talismans: Schweigtropfen), after the armor
 var floor_value: float = 0.0 ## the story can make a fight unkillable: damage never takes health below this
+var ward: Callable = Callable() ## host: a talisman's last wing beat (Rissfeder). Asked with the health a blow or tick would leave when that is 0; returns the health she keeps (> 0) or -1
 var god_mode: bool = false ## dev cheat (host): no damage, no ticks, no kill
 var overheal_left: float = 0.0 ## seconds until overheal starts to drain (counted on every peer, set by heals)
 var last_attacker: int = 0 ## peer id of the player who hit last (host only), for credit on a kill
@@ -49,7 +50,7 @@ func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0
 		amount = maxf(roundf(amount * LevelRewards.damage_factor(armor) * 10.0) / 10.0, 0.1)
 	if absorb > 0.0:
 		amount = maxf(roundf(amount * (1.0 - absorb) * 10.0) / 10.0, 0.1)
-	_notify.rpc(amount, from, knockback, maxf(current - amount, floor_value))
+	_notify.rpc(amount, from, knockback, _warded(maxf(current - amount, floor_value)))
 
 
 ## Host only: a blow that cannot kill (a story or boss moment): takes `amount`, but never more than all but one point, and ignores the grace period after a hit.
@@ -72,7 +73,20 @@ func take_tick(amount: float, source: int = 0) -> void:
 		last_attacker = source
 	if absorb > 0.0:
 		amount = maxf(amount * (1.0 - absorb), 0.05)
-	_notify_tick.rpc(amount, maxf(current - amount, floor_value))
+	_notify_tick.rpc(amount, _warded(maxf(current - amount, floor_value)))
+
+
+## Host only: `left` is the health a blow would leave. A ward (talisman) may turn a lethal one into a survived one; anything else passes unchanged.
+func _warded(left: float) -> float:
+	if left > 0.0 or not ward.is_valid():
+		return left
+	var kept: float = float(ward.call(left))
+	return kept if kept > 0.0 else left
+
+
+## Host only: no further hit counts for `seconds` (the grace a ward gives).
+func grant_grace(seconds: float) -> void:
+	_invulnerable_until_msec = maxi(_invulnerable_until_msec, Time.get_ticks_msec() + int(seconds * 1000.0))
 
 
 ## Host only: the end, whatever the invulnerability or the floor say (a judgement that falls on everybody).

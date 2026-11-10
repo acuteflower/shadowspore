@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Icons of the talismans (docs/talisman_konzept.md, 16x16 like every item icon): the Schlichte Silberkette, the Wuchtreif and the Schweigtropfen.
-  assets/items/silver_chain.png, wuchtreif.png, schweigtropfen.png
+"""Icons of the talismans (docs/talisman_konzept.md, 16x16 like every item icon): the Schlichte Silberkette, the Wuchtreif, the Schweigtropfen and the Rissfeder
+(the black feather of Mornath, docs/rissfeder.md).
+  assets/items/silver_chain.png, wuchtreif.png, schweigtropfen.png, rissfeder.png
 Same rules as the other item icons (check_icon): inside the frame with a 1 px margin, one connected piece, ink outline 1b1a2e, lit from the top left,
 jewellery hangs upright. Metals: silver (cool), gold (warm, like her hair pin), void steel (blackened, violet rim). Stones: blue (rare), violet (void).
 The worn pieces (pendant, ear drops, wrist band) are a later step (rig points); this script only writes the icons.
@@ -18,6 +19,7 @@ GOLD = [hexc(c) for c in ("6a4a2a", "a07a3a", "d8b45a", "f6e0a0")]
 VOID = [hexc(c) for c in ("14092e", "261a4a", "35227a", "7d57e0")]
 BLUE = [hexc(c) for c in ("2a4a9a", "5aa8ff", "9ad0ff", "e0f2ff")]
 VIOLET = [hexc(c) for c in ("3a1f8a", "9a6bff", "c8aaff", "f4ecff")]
+RAVEN = [hexc(c) for c in ("14102a", "2c2150", "5a4a9a", "a08cf0")]  # blue-black with a violet sheen (items.json metal "ravensteel", same as TalismanArt.METALS)
 
 
 def canvas():
@@ -101,7 +103,34 @@ def schweigtropfen():
     return px
 
 
-ICONS = {"silver_chain": silver_chain, "wuchtreif": wuchtreif, "schweigtropfen": schweigtropfen}
+def rissfeder():
+    """A shallow chain bow and Mornath's black wing feather hanging from it, the spine cracked open by violet light (the pendant of the worn look, drawn larger)."""
+    px = canvas()
+    last = None
+    for x in range(3, 13):
+        yi = round(2.0 + 3.0 * (1.0 - ((x - 7.5) / 4.9) ** 2))
+        put(px, x, yi, RAVEN[2] if x % 2 == 0 else RAVEN[1])
+        if last is not None:  # no gaps where the bow is steep
+            for fill in range(min(last, yi) + 1, max(last, yi)):
+                put(px, x if yi > last else x - 1, fill, RAVEN[1])
+        last = yi
+    colours = {"d": RAVEN[0], "m": RAVEN[1], "l": RAVEN[2], "h": RAVEN[3], "s": VIOLET[0], "S": VIOLET[1], "T": VIOLET[2], "W": VIOLET[3]}
+    feather = ["..lm..",
+               ".dSmd.",
+               "dmTlmd",
+               "dSWmmd",
+               "dmTSld",
+               ".dmSmd",
+               ".dmTd.",
+               "..dm.."]
+    for dy, row in enumerate(feather):
+        for dx, letter in enumerate(row):
+            if letter != ".":
+                put(px, 5 + dx, 6 + dy, colours[letter])
+    return px
+
+
+ICONS = {"silver_chain": silver_chain, "wuchtreif": wuchtreif, "schweigtropfen": schweigtropfen, "rissfeder": rissfeder}
 
 
 def main():

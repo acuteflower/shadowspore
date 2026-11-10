@@ -5,6 +5,7 @@ extends RefCounted
 ## so the host, the owner and the tests all ask the same questions. Numbers: docs/heavy_attack.md.
 
 const KIND_CHARGE: String = "charge_strike"
+const KIND_RIFT: String = "rift_slash" ## the Himmelsriss: no charging, two diagonal slashes that shoot feathers (docs/rissklinge.md)
 
 
 ## The secondary block of an item's weapon class, {} when the weapon has none.
@@ -84,6 +85,68 @@ static func step(cfg: Dictionary, item_def: Dictionary, charge_time: float, chai
 		"hit_stop": float(cfg.get("hit_stop", 0.06)),
 		"noise": float(cfg.get("noise", 1.0)),
 	}
+
+
+## The right click of the Himmelsriss is no charge but a chain of two slashes (`secondary.kind` "rift_slash", `steps` [stage 1, stage 2]).
+static func is_rift_slash(cfg: Dictionary) -> bool:
+	return String(cfg.get("kind", "")) == KIND_RIFT
+
+
+static func rift_steps(cfg: Dictionary) -> int:
+	return (cfg.get("steps", []) as Array).size() if is_rift_slash(cfg) else 0
+
+
+## Stamina one slash costs (stage 1 or 2).
+static func rift_cost(cfg: Dictionary, stage: int) -> float:
+	var steps: Array = cfg.get("steps", []) as Array
+	return float((steps[clampi(stage - 1, 0, steps.size() - 1)] as Dictionary).get("stamina_cost", 20)) if not steps.is_empty() else 0.0
+
+
+## Seconds after a slash ends in which the second right click still continues the chain.
+static func rift_window(cfg: Dictionary) -> float:
+	return float(cfg.get("window", 0.6))
+
+
+## One slash of the chain as a swing step in the shape `AttackComponent` uses (times scaled by the weapon's `speed` stat). `stage` 1 or 2. Carries `diag`
+## (the blade's path in radians: pitch above the horizon and yaw toward her sword side, start and end) and `volley` (the feathers it shoots).
+static func rift_step(cfg: Dictionary, item_def: Dictionary, stage: int) -> Dictionary:
+	var steps: Array = cfg.get("steps", []) as Array
+	if not is_rift_slash(cfg) or steps.is_empty():
+		return {}
+	var index: int = clampi(stage - 1, 0, steps.size() - 1)
+	var data: Dictionary = steps[index] as Dictionary
+	var speed: float = maxf(float(item_def.get("stats", {}).get("speed", 1.0)), 0.1)
+	var diag: Dictionary = data.get("diag", {}) as Dictionary
+	return {
+		"style": "slash",
+		"alt": true,
+		"stage": index + 1,
+		"name": String(data.get("name", "")),
+		"sweep": float(data.get("sweep", 1)),
+		"arc": deg_to_rad(float(data.get("arc", 120))),
+		"windup": float(data.get("windup", 0.1)) / speed,
+		"active": float(data.get("active", 0.1)) / speed,
+		"recovery": float(data.get("recovery", 0.4)) / speed,
+		"damage": float(data.get("damage", 1.5)),
+		"reach": float(data.get("reach", 1.2)),
+		"knock": float(data.get("knock", 1.5)),
+		"lunge": float(data.get("lunge", 0)),
+		"shake": float(data.get("shake", 3.0)),
+		"block": -1,
+		"requires": "",
+		"rift": "",
+		"noise": float(cfg.get("noise", 1.0)),
+		"diag": {"pitch0": deg_to_rad(float(diag.get("pitch0", 70))), "pitch1": deg_to_rad(float(diag.get("pitch1", -10))), "yaw0": deg_to_rad(float(diag.get("yaw0", 60))), "yaw1": deg_to_rad(float(diag.get("yaw1", -60)))},
+		"volley": data.get("volley", {}) as Dictionary,
+	}
+
+
+## The numbers of one rift part ("passive": the thrust's lane) of a weapon class's `secondary.rift` block ({} when there is none).
+static func rift_data(cfg: Dictionary, key: String) -> Dictionary:
+	var rift: Variant = cfg.get("rift", {})
+	if rift is Dictionary and (rift as Dictionary).get(key, {}) is Dictionary:
+		return (rift as Dictionary).get(key, {}) as Dictionary
+	return {}
 
 
 ## The charge time a hold of `real` seconds reaches when the charge runs `rate` times as fast up to the full charge (a talisman's Aufladetempo); the extra

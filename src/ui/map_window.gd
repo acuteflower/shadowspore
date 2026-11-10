@@ -88,6 +88,7 @@ signal travel_chosen(from_id: String, to_id: String) ## travel mode: the player 
 signal travel_cancelled ## travel mode: the map was closed without choosing
 
 var _ways: MapWaystones = MapWaystones.new()
+var _pet_marks: MapPets = MapPets.new() ## the named crows and ravens (docs/pet_konzept.md)
 var _ws_mouse: bool = false ## the left button is held on a waystone (travel mode)
 var _present_left: float = 0.0 ## `present`: seconds the map stays open on its own (a waystone woke up)
 var _present_age: float = 0.0
@@ -270,6 +271,7 @@ func _process(delta: float) -> void:
 	_hover_t = move_toward(_hover_t, 0.0 if _hover_id.is_empty() else 1.0, delta / (0.12 if _hover_id.is_empty() else 0.18))
 	if _hover_t <= 0.0 and _hover_id.is_empty():
 		_hover_marker.clear()
+	_pet_marks.update(get_tree(), _cursor, _to_screen)
 	var pick: String = _ways.update(delta, get_tree(), _cursor, _to_screen, _ws_mouse, InputManager.interact_held() and _opening, InputManager.map_select_step() if _opening else 0)
 	if pick != "":
 		var from_id: String = _ways.travel_from
@@ -548,6 +550,7 @@ func _draw_overlay() -> void:
 	_draw_start(fade)
 	_draw_town(fade)
 	_ways.draw(_overlay, _scale, fade, _time, size, [_present_tile, _present_ring, _present_age] if _present_ring > 0.0 else [])
+	_pet_marks.draw(_overlay, _scale, fade, _time, size, get_tree())
 	_draw_quest(fade)
 	_draw_pins(fade)
 	_draw_presence(fade)

@@ -117,6 +117,11 @@ func debug_crusher_pressed() -> bool:
 	return not ui_blocking and Input.is_action_just_pressed("debug_spawn_crusher")
 
 
+## F5: a Lichtfischer, only in water.
+func debug_fisher_pressed() -> bool:
+	return not ui_blocking and Input.is_action_just_pressed("debug_spawn_fisher")
+
+
 ## Dev key F4 (host): the clock jumps one hour.
 func debug_time_pressed() -> bool:
 	return Input.is_action_just_pressed("debug_time")

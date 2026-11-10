@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One family of hand items: sword (basic, iron), axe, pickaxe, sickle. Needs numpy.
+"""One family of hand items: sword (basic, iron, void, rift), axe, pickaxe, sickle. Needs numpy.
   assets/items/<id>.png           icon 16x16 (handle bottom left, head top right)
   assets/items/<id>_held.png      the item pointing right, pivot = the hand (PIVOTS)
   assets/items/<id>_held_rot.png  the held picture pre-rotated (ROT_ANGLES steps around the circle, rows =
@@ -31,8 +31,10 @@ RAMPS = {  # dark .. light; bevel: lit rim = last, shaded rim = first, inside = 
     "mint": [hexc(c) for c in ("2e4a46", "4f7f74", "8fc4b0", "dff6ec")],  # the forged sword
     "void": [hexc(c) for c in ("14092e", "35227a", "7d57e0", "e8dcff")],  # the void-forged blade of the boss fight
     "dark": [hexc(c) for c in ("1f1d38", "343b58", "4a5472", "77839f")],
+    "raven": [hexc(c) for c in ("0e0a1e", "1a1334", "2c2150", "4a3d8a", "7a68d0")],  # Himmelsriss: blue-black feather steel with a violet sheen (same hues as the Rissfeder's ravensteel)
+    "crack": [hexc(c) for c in ("6a3fd0", "9a6bff", "c8aaff", "f4ecff")],  # the rift of light along the blade
 }
-GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8")}
+GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8"), "sword_rift": hexc("c07bff")}
 
 
 # ------------------------------------------------------------------ geometry (item frame: pointing right, y down)
@@ -127,6 +129,37 @@ def sword(blade, gem_key, steel):
     return build
 
 
+def rift_sword(w, h, tf):
+    """Himmelsriss (docs/rissklinge.md): a long, slightly bowed blade shaped like a black wing feather: a barbed lower edge, a rift of violet light running along its
+    spine, a guard of two swept feathers and a pommel that ends in a feather tip. Deliberately not the plain cross of the other swords."""
+    ax = 7.0
+    start, end = 10.5, 43.0
+    n = 40
+
+    def bow(t):  # the spine bows up in the middle and comes back to the axis at the point
+        return -0.9 * math.sin(math.pi * min(t, 1.0))
+
+    top, low = [], []
+    for i in range(n + 1):
+        t = i / n
+        x = start + (end - start) * t
+        half = 2.7 * (1.0 - t) ** 0.85 + 0.2
+        barb = 1.0 if (i % 7 == 5 and 5 <= i <= n - 9) else 0.0  # the barbs of the vane along the cutting edge
+        top.append((x, ax + bow(t) - half * 0.8))
+        low.append((x, ax + bow(t) + half + barb))
+    tip = (end + 2.4, ax - 0.2)
+    layers = [("grip", stroke_mask([(2.0, ax), (8.6, ax)], 2.0, w, h, tf), "wrap")]
+    layers.append(("pommel", poly_mask([(0.2, ax + 0.3), (1.2, ax - 1.5), (2.8, ax - 1.9), (3.0, ax + 1.9), (1.4, ax + 1.7)], w, h, tf), "raven"))
+    wing_up = [(8.2, ax - 1.1), (10.8, ax - 1.5), (11.4, ax - 3.6), (9.6, ax - 6.0), (7.2, ax - 6.6), (7.0, ax - 4.2)]
+    wing_dn = [(8.2, ax + 1.1), (10.8, ax + 1.5), (11.4, ax + 3.2), (9.8, ax + 5.4), (7.6, ax + 6.0), (7.2, ax + 4.0)]
+    layers.append(("wing_up", poly_mask(wing_up, w, h, tf), "raven"))
+    layers.append(("wing_dn", poly_mask(wing_dn, w, h, tf), "raven"))
+    blade = poly_mask(top + [tip] + list(reversed(low)), w, h, tf)
+    layers.append(("blade", blade, "ridge"))
+    layers.append(("gem", poly_mask([(8.6, ax - 0.7), (10.0, ax - 0.7), (10.0, ax + 0.7), (8.6, ax + 0.7)], w, h, tf), "gem:sword_rift"))
+    return layers
+
+
 def axe(w, h, tf):
     ax = 12.0
     layers = [("handle", stroke_mask([(1.5, ax), (27.0, ax)], 2.0, w, h, tf), "wood")]
@@ -175,6 +208,7 @@ ITEMS = {  # id: (size, pivot in the item frame, builder, steel ramp, icon fit: 
     "sword_basic": ((34, 12), (4.5, 6.0), sword(21, "sword_basic", "steel"), "steel", (-45.0, 0.46, (1.6, 14.4))),
     "sword_iron": ((36, 12), (4.5, 6.0), sword(23, "sword_iron", "mint"), "mint", (-45.0, 0.44, (1.6, 14.4))),
     "sword_void": ((42, 12), (4.5, 6.0), sword(29, "sword_void", "void"), "void", (-45.0, 0.4, (1.6, 14.4))),
+    "sword_rift": ((50, 16), (4.5, 7.0), rift_sword, "raven", (-45.0, 0.4, (1.4, 14.4))),
     "axe_basic": ((34, 18), (5.0, 12.0), axe, "steel", (-45.0, 0.5, (1.0, 15.2))),
     "pickaxe_basic": ((34, 22), (5.0, 11.0), pickaxe, "steel", (-45.0, 0.5, (1.0, 12.4))),
     "sickle_basic": ((26, 20), (5.0, 5.0), sickle, "steel", (-45.0, 0.6, (1.0, 12.6))),
@@ -202,6 +236,37 @@ def compose(item, w, h, tf, material_map=None):
         if mat == "wrap":
             for (x, y), c in bevel(mask, RAMPS["leather"]).items():
                 img[(x, y)] = c if (x + y) % 3 else RAMPS["leather"][1]
+            continue
+        if mat == "crack":  # flat violet light, a bright spark now and then
+            for (x, y) in zip(*np.nonzero(mask)[::-1]):
+                img[(int(x), int(y))] = RAMPS["crack"][2 if (int(x) * 7 + int(y) * 3) % 5 == 0 else 1]
+            continue
+        if mat == "ridge":  # a feather blade: lit upper half, a rift of light along the spine, shaded lower half (per column, so any scale works)
+            ys = np.nonzero(mask)
+            cols = {}
+            for yy, xx in zip(*ys):
+                lo, hi = cols.get(int(xx), (int(yy), int(yy)))
+                cols[int(xx)] = (min(lo, int(yy)), max(hi, int(yy)))
+            for yy, xx in zip(*ys):
+                x, y = int(xx), int(yy)
+                lo, hi = cols[x]
+                span = hi - lo
+                if span == 0:
+                    img[(x, y)] = RAMPS["raven"][3]
+                    continue
+                t = (y - lo) / span
+                spine = 0.5 + (0.0 if (x // 2) % 2 else 0.12)  # the rift zigzags a little
+                if t < 0.001:
+                    c = RAMPS["raven"][3]
+                elif abs(t - spine) <= 0.5 / span + 0.001 and span >= 2:
+                    c = RAMPS["crack"][2 if (x * 7 + y * 3) % 5 == 0 else 1]
+                elif t < spine:
+                    c = RAMPS["raven"][2]
+                elif y == hi:
+                    c = RAMPS["raven"][0]
+                else:
+                    c = RAMPS["raven"][1]
+                img[(x, y)] = c
             continue
         if mat == "steel_dark":
             mat = "dark"

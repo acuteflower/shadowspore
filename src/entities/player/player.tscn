@@ -65,6 +65,9 @@ properties/6/replication_mode = 2
 properties/7/path = NodePath("TalismanComponent:worn")
 properties/7/spawn = true
 properties/7/replication_mode = 2
+properties/8/path = NodePath(".:swim")
+properties/8/spawn = true
+properties/8/replication_mode = 2
 
 [node name="Player" type="CharacterBody2D"]
 y_sort_enabled = true

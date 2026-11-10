@@ -4,9 +4,10 @@ extends RefCounted
 ## `data/hero_jewelry.json` (tools/art_hero_jewelry.py) holds where the collar, the chest and the ear lobes are and how much the torso, head and ears face
 ## the camera; this class draws the chain, the pendant and the ear drops there, pixel by pixel, on any canvas (`TalismanLayer` on her sprite, the inventory doll).
 ## The bracelet sits on the sword arm that `AttackComponent` draws itself (`draw_bracelet`).
-## A piece's picture is data in items.json `look`: `metal` (silver, gold, voidsteel), `stone` (colour) and the shapes `pendant` / `drop` as rows of letters:
+## A piece's picture is data in items.json `look`: `metal` (silver, gold, voidsteel, ravensteel), `stone` (colour) and the shapes `pendant` / `drop` as rows of letters:
 ## metal d m l h (dark .. highlight), stone s S T W (dark, mid, light, glint), '.' empty. Optional: `pulse` (the stone breathes like a void heart), `glow` (the
 ## stone shines on its own at night), `glint` (a light runs over the stone now and then), `stones` (how many, for the bracelet).
+## A piece with the perk `ward` (the Rissfeder) goes dull while its wing beat is spent: the stone greys, no pulse, no glow (`dull` of `draw_worn`).
 
 const STRIDE: int = 16
 const SHEETS: Dictionary = {
@@ -17,6 +18,7 @@ const METALS: Dictionary = { ## dark .. highlight
 	"silver": ["6b7392", "93a0bc", "d4dbec", "f6f9ff"],
 	"gold": ["6a4a2a", "a07a3a", "d8b45a", "f6e0a0"],
 	"voidsteel": ["14092e", "261a4a", "35227a", "7d57e0"],
+	"ravensteel": ["14102a", "2c2150", "5a4a9a", "a08cf0"], ## blue-black with a violet sheen, a raven's feather (Rissfeder)
 }
 const INK: Color = Color("1b1a2e")
 const TORSO_HIDDEN: int = -10 ## percent: the torso faces away: no chain, no pendant
@@ -75,7 +77,7 @@ static func letter_color(letter: String, ramp: Array[Color], stone: Color) -> Co
 
 ## Draws the worn necklaces and earrings of `ids` for one frame (`data` = frame_data). `origin` is where the feet are on `canvas`, `scale` the size of an art pixel;
 ## `glow` (may be the same canvas) gets the shining pixels; `night` 0..1 for the glow, `time` for sways and pulses.
-static func draw_worn(canvas: CanvasItem, glow: CanvasItem, ids: PackedStringArray, data: PackedInt32Array, origin: Vector2, scale: float, time: float, night: float, flash: float = 0.0) -> void:
+static func draw_worn(canvas: CanvasItem, glow: CanvasItem, ids: PackedStringArray, data: PackedInt32Array, origin: Vector2, scale: float, time: float, night: float, flash: float = 0.0, dull: bool = false) -> void:
 	if data.size() < STRIDE:
 		return
 	for id: String in ids:
@@ -83,12 +85,12 @@ static func draw_worn(canvas: CanvasItem, glow: CanvasItem, ids: PackedStringArr
 		var look: Dictionary = def.get("look", {}) as Dictionary
 		match String(def.get("jewelry", "")):
 			"necklace":
-				_necklace(canvas, glow, look, data, origin, scale, time, night)
+				_necklace(canvas, glow, look, data, origin, scale, time, night, dull and (def.get("perks", []) as Array).has("ward"))
 			"earrings":
 				_earrings(canvas, glow, look, data, origin, scale, time, night + flash)
 
 
-static func _necklace(canvas: CanvasItem, glow: CanvasItem, look: Dictionary, d: PackedInt32Array, origin: Vector2, scale: float, time: float, night: float) -> void:
+static func _necklace(canvas: CanvasItem, glow: CanvasItem, look: Dictionary, d: PackedInt32Array, origin: Vector2, scale: float, time: float, night: float, dull: bool = false) -> void:
 	if d[10] < TORSO_HIDDEN:
 		return
 	var ramp: Array[Color] = metal(look)
@@ -112,7 +114,7 @@ static func _necklace(canvas: CanvasItem, glow: CanvasItem, look: Dictionary, d:
 	if shape.is_empty():
 		return
 	var stone: Color = Color(String(look.get("stone", "ffffff")))
-	_shape(canvas, glow, shape, pendant, d[10] >= TORSO_FRONT, ramp, stone, look, origin, scale, time, night, 0.0)
+	_shape(canvas, glow, shape, pendant, d[10] >= TORSO_FRONT, ramp, stone, look, origin, scale, time, night, 0.0, dull)
 
 
 static func _earrings(canvas: CanvasItem, glow: CanvasItem, look: Dictionary, d: PackedInt32Array, origin: Vector2, scale: float, time: float, night: float) -> void:
@@ -133,9 +135,11 @@ static func _earrings(canvas: CanvasItem, glow: CanvasItem, look: Dictionary, d:
 
 
 ## A shape of letters hung with its top middle at `at`. `front`: seen from the front, otherwise edge-on (only the middle column).
-static func _shape(canvas: CanvasItem, glow: CanvasItem, rows: Array, at: Vector2i, front: bool, ramp: Array[Color], stone: Color, look: Dictionary, origin: Vector2, scale: float, time: float, night: float, phase: float) -> void:
+static func _shape(canvas: CanvasItem, glow: CanvasItem, rows: Array, at: Vector2i, front: bool, ramp: Array[Color], stone: Color, look: Dictionary, origin: Vector2, scale: float, time: float, night: float, phase: float, dull: bool = false) -> void:
 	var width: int = String(rows[0]).length()
-	var pulse: float = VoidGlow.pulse(time, phase) if bool(look.get("pulse", false)) else 1.0
+	if dull:
+		stone = stone.lerp(Color(0.34, 0.31, 0.42), 0.8) ## spent: the crack has gone cold
+	var pulse: float = VoidGlow.pulse(time, phase) if bool(look.get("pulse", false)) and not dull else 1.0
 	var shine: float = (0.2 + 0.8 * night) * pulse ## `night` carries a flash (a swallowed blow) as a value above 1
 	for y: int in rows.size():
 		var line: String = String(rows[y])
@@ -148,7 +152,7 @@ static func _shape(canvas: CanvasItem, glow: CanvasItem, rows: Array, at: Vector
 				continue
 			var cell: Vector2i = at + Vector2i((x - width / 2) if front else 0, y)
 			_px(canvas, origin, scale, cell, color)
-			if glow != null and bool(look.get("glow", false)) and letter in "STW":
+			if glow != null and not dull and bool(look.get("glow", false)) and letter in "STW":
 				_px(glow, origin, scale, cell, Color(color.lightened(0.25), clampf(shine, 0.0, 1.0)))
 
 

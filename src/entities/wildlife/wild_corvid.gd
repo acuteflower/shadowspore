@@ -3,7 +3,7 @@ extends CharacterBody2D
 ## Ground-foraging corvids with flock alarms, watch turns, social spacing and real tree perches.
 ## Host chooses complete actions. Reliable packets replay motion and height on peers, including joins.
 
-enum State { IDLE, PECK, WALK, PREEN, WATCH, SOCIAL, FLY, ROOST }
+enum State { IDLE, PECK, WALK, PREEN, WATCH, SOCIAL, FLY, ROOST, FEED } ## FEED: eating from a hand (docs/pet_konzept.md)
 
 var species: String = "crow":
 	set(value):
@@ -15,6 +15,8 @@ var flock_id: String = ""
 var home: Vector2 = Vector2.ZERO
 var facing: float = 0.0
 var ambient_event: bool = false
+var pet_key: String = "" ## who this bird is, for the bond with a player (PetRegistry); empty = never tamed (town visitors)
+var offered_peer: int = 0 ## the player it offers to take food from right now (every peer knows it: the prompt "E FÜTTERN")
 var visit_roof: bool = false ## a visitor of the town (TownCritters): it wants a roof, not a tree or a log
 var state: State = State.IDLE
 var _spec: Dictionary
@@ -40,6 +42,11 @@ var _threat: Vector2 = Vector2.ZERO
 var _danger: bool = false
 var _rally: Vector2 = Vector2.INF
 var _shadow: Node2D
+var _pet: PetBehavior ## host only, crows and ravens with a key
+var _ring: Sprite2D ## the leg ring of a registered bird (tools/art_pet_marks.py), tinted with its colour
+var rider: int = 0 ## peer of the player whose shoulder it sits on (0 = none), set by `_ride` on every peer
+var companion_peer: int = 0 ## host: the player this bird is the companion of: it does not flee from anyone
+var territory: Vector2 = Vector2.INF ## host: the place of a registered bird right now (PetSchedule): its walks lean towards it
 var _calls: Array[AudioStream] = []
 
 @onready var _sprite: Sprite2D = $Sprite2D
@@ -58,7 +65,26 @@ func _ready() -> void:
 	_shadow.show_behind_parent = true
 	_shadow.draw.connect(_draw_shadow)
 	add_child(_shadow)
+	if bool(_spec.get("pet", false)) and pet_key != "":
+		var spot: PetFeedSpot = PetFeedSpot.new()
+		spot.name = "PetFeedSpot"
+		add_child(spot)
+		var tag: PetTag = PetTag.new()
+		tag.name = "PetTag"
+		add_child(tag)
+		_ring = Sprite2D.new()
+		_ring.name = "Ring"
+		_ring.texture = load("res://assets/wildlife/pet_marks.png") as Texture2D
+		_ring.hframes = 50
+		_ring.vframes = 48
+		_ring.centered = false
+		_ring.offset = Vector2(-24, -35)
+		_ring.material = _sprite.material
+		_ring.visible = false
+		add_child(_ring)
 	if multiplayer.is_server():
+		if bool(_spec.get("pet", false)) and pet_key != "":
+			_pet = PetBehavior.new(self)
 		_duration = _range("idle_seconds")
 		_call_left = _range("call_seconds")
 		_sense_left = _rng.randf_range(0.0, float(_spec["sense_interval"]))
@@ -97,6 +123,9 @@ func _range(key: String) -> float:
 
 func _physics_process(delta: float) -> void:
 	_elapsed += delta
+	if rider != 0:
+		_sit_on_shoulder()
+		return
 	_call_pose = maxf(0.0, _call_pose - delta)
 	_caution_left = maxf(0.0, _caution_left - delta)
 	if multiplayer.is_server():
@@ -119,11 +148,72 @@ func _physics_process(delta: float) -> void:
 		_advance()
 
 
+## Every peer: the bird sits on a player's shoulder (peer != 0) or leaves it (0). It is pinned to her every physics frame.
+@rpc("authority", "call_local", "reliable")
+func _ride(peer: int) -> void:
+	rider = peer
+	_moving = false
+	if peer == 0:
+		_height = 0.0
+		state = State.WATCH
+		_elapsed = 0.0
+		_duration = 1.0
+	else:
+		state = State.ROOST
+		_perch_path = ""
+		_start = global_position
+		_end = global_position
+
+
+func _carrier() -> Player:
+	for player: Player in Player.all:
+		if player.name == str(rider):
+			return player
+	return null
+
+
+func _sit_on_shoulder() -> void:
+	var carrier: Player = _carrier()
+	if carrier == null:
+		return
+	var cfg: Dictionary = PetRules.table()["companion"] as Dictionary
+	var off: Array = cfg["shoulder_offset"] as Array
+	global_position = carrier.global_position + Vector2(float(off[0]), float(off[1]))
+	_height = float(cfg["shoulder_height"])
+	state = State.ROOST
+	if carrier.velocity.length() > 5.0:
+		facing = carrier.velocity.angle()
+
+
+## Host: fly to a point (the whistle, the companion following). The landing is not refused for being close to a player.
+func fly_to(goal: Vector2) -> bool:
+	if not multiplayer.is_server() or state == State.FLY or rider != 0:
+		return false
+	if _pet != null:
+		_pet.reset()
+	if _population.has_method("release_perch"):
+		_population.call("release_perch", self)
+	var dist: float = global_position.distance_to(goal)
+	if dist < 6.0:
+		return false
+	var bend: Vector2 = (goal - global_position).orthogonal().normalized() * minf(40.0, dist * 0.15)
+	if _population.has_method("route_bend"):
+		bend = _population.call("route_bend", global_position, goal, bend)
+	var cruise: float = maxf(float(_spec["flight_height"]), _height + float(_spec["flight_clearance"]))
+	if _population.has_method("flight_clearance"):
+		cruise = maxf(cruise, float(_population.call("flight_clearance", global_position, goal, bend)))
+	var duration: float = maxf(float(_spec["flight_seconds_min"]), (dist + bend.length() * 0.7) / float(_spec["flight_speed"]))
+	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, 0.0, cruise, "", 0.0)
+	return true
+
+
 func _process(_delta: float) -> void:
 	var col: int = 0
 	match state:
 		State.PECK:
 			col = 4 + int(_elapsed * 5.0) % 6
+		State.FEED:
+			col = 4 + int(_elapsed * 6.5) % 6 ## pecking at the offered food
 		State.WALK:
 			col = 10 + int(_elapsed * 9.0) % 6
 		State.PREEN, State.SOCIAL:
@@ -151,6 +241,17 @@ func _process(_delta: float) -> void:
 	_sprite.frame = (build * 8 + sector) * 50 + col
 	_sprite.position.y = -roundf(_height)
 	_sprite.z_index = 5 if state == State.FLY and _height > 16.0 else 0
+	if rider != 0:
+		_sprite.z_index = 1 ## in front of the player it sits on
+	if _ring != null:
+		var registry: PetRegistry = PetRegistry.of(get_tree())
+		_ring.visible = registry != null and registry.has_record(pet_key) and state != State.FLY
+		if _ring.visible:
+			var rings: Array = (PetRules.table()["register"] as Dictionary)["ring_colors"] as Array
+			_ring.modulate = Color(String(rings[int(registry.record(pet_key)["ring"]) % rings.size()]))
+			_ring.frame = _sprite.frame
+			_ring.position.y = _sprite.position.y
+			_ring.z_index = _sprite.z_index
 	_shadow.queue_redraw()
 
 
@@ -163,6 +264,8 @@ func _draw_shadow() -> void:
 
 
 func _sense() -> void:
+	if companion_peer != 0:
+		return ## a companion trusts everybody who walks with it
 	_danger = false
 	if state == State.FLY:
 		return
@@ -188,7 +291,11 @@ func _sense() -> void:
 			var player: Player = actor as Player
 			if player.health.current <= 0.0:
 				continue
+			if _pet != null and _pet.tolerates(player, global_position.distance_to(player.global_position), float(_spec["sense_interval"])):
+				continue ## it trusts her right now: food in her hand, still and quiet (PetBehavior)
 			var calm: float = TownManager.calm_at(get_tree(), global_position) ## used to the town's people
+			if species == "crow" or species == "raven":
+				calm *= 1.0 - player.talismans.corvid_calm() ## the Rissfeder: they take her for one of their own
 			alert *= calm
 			flee *= calm
 			if player.stealth.sneaking:
@@ -233,6 +340,8 @@ func _think() -> void:
 	if _danger or _caution_left > 0.0:
 		if _elapsed >= _duration and state != State.WATCH:
 			_set_mood(State.WATCH, _range("watch_seconds"))
+		return
+	if _pet != null and _pet.drive(get_physics_process_delta_time()):
 		return
 	if _elapsed < _duration:
 		return
@@ -279,6 +388,8 @@ func _flock_center() -> Vector2:
 		if bird.flock_id == flock_id and bird.state != State.FLY:
 			sum += bird.global_position
 			count += 1
+	if territory.is_finite():
+		return territory
 	return sum / count if count > 0 else home
 
 
@@ -305,6 +416,8 @@ func _walk(direction: Vector2) -> void:
 
 
 func _can_land(point: Vector2) -> bool:
+	if companion_peer != 0 and _population.has_method("can_land_companion"):
+		return bool(_population.call("can_land_companion", point, self))
 	if _population.has_method("can_land"):
 		return bool(_population.call("can_land", point, self))
 	return Terrain.relief == null or Terrain.relief.flat_around(point, 4.0)
@@ -313,6 +426,8 @@ func _can_land(point: Vector2) -> bool:
 func _take_wing(panic: bool, broadcast: bool = true, ground_only: bool = false, force_perch: bool = false) -> bool:
 	if state == State.FLY:
 		return false
+	if _pet != null:
+		_pet.reset()
 	var destination: Dictionary = {}
 	if _population.has_method("release_perch"):
 		_population.call("release_perch", self)
@@ -368,6 +483,8 @@ func _take_wing(panic: bool, broadcast: bool = true, ground_only: bool = false, 
 func hear_alarm(source: Vector2, rally: Vector2 = Vector2.INF) -> void:
 	if not multiplayer.is_server() or state == State.FLY or _panic_delay >= 0.0:
 		return
+	if _pet != null:
+		_pet.reset()
 	_threat = source
 	_rally = rally
 	var reaction: Array = _spec.get("alarm_reaction", [0.12, 0.42])
@@ -479,7 +596,23 @@ func _finish(at: Vector2, height: float, perch: String) -> void:
 	_duration = float(_spec["calm_seconds"])
 
 
+## Every peer: who the bird offers to take food from now (0 = nobody).
+@rpc("authority", "call_local", "reliable")
+func _offer(peer: int) -> void:
+	offered_peer = peer
+
+
+## Every peer: the bird eats from a hand for `duration` seconds, looking at `angle`.
+@rpc("authority", "call_local", "reliable")
+func _eat(duration: float, angle: float) -> void:
+	offered_peer = 0
+	_act(State.FEED, duration, angle, global_position, global_position, Vector2.ZERO, 0.0, 0.0, 0.0, "", 0.0)
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _request_snapshot() -> void:
 	if multiplayer.is_server():
+		_offer.rpc_id(multiplayer.get_remote_sender_id(), offered_peer)
+		if rider != 0:
+			_ride.rpc_id(multiplayer.get_remote_sender_id(), rider)
 		_act.rpc_id(multiplayer.get_remote_sender_id(), state, _duration, facing, _start, _end, _bend, _height_from if _moving else _height, _height_to if _moving else _height, _cruise, _perch_path, _elapsed)

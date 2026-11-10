@@ -15,10 +15,19 @@ const PEARL_STRIDE: int = 4
 const UNFURL_SECONDS: float = 0.24
 const PAPER: Color = Color("120d22")
 const PAPER_VOID: Color = Color("07030f")
+const MAX_HEIGHT: int = 300 ## a card taller than this (of the 360 px screen) flows into columns side by side
+const COLUMN_GAP: int = 14
+const MAX_COLUMNS: int = 4
 
 var _rows: Array[Dictionary] = [] ## {type, text, ...}: title, sub, rule, stat, desc, hint
 var _heights: Array[int] = []
 var _label_width: int = 0
+var _row_y: Array[int] = [] ## per row: y inside its column
+var _row_col: Array[int] = [] ## per row: its column
+var _col_x: Array[int] = [] ## per column: where its paper starts (the content sits PAD further in)
+var _col_w: Array[int] = [] ## per column: content width + 2 * PAD (what `size.x` was for a single card)
+var _cw: int = 0 ## the column being drawn
+var _sway: float = 0.0
 var _rarity: Color = Color.WHITE
 var _tier: int = 0
 var _age: float = 0.0
@@ -63,6 +72,12 @@ func show_stack(stack: Dictionary, equip_hint: bool, replaces: Dictionary = {}) 
 		_rows.append_array(stat_rows)
 	if refinable:
 		_add_milestones(stack, level)
+	for special: Variant in def.get("specials", []) as Array: ## what only this weapon can do (items.json `specials`: name + text), like a talisman's perks
+		var entry: Dictionary = special as Dictionary
+		_rows.append({"type": "rule"})
+		_rows.append({"type": "perk", "text": String(entry.get("name", ""))})
+		for line: String in _wrap(String(entry.get("text", ""))):
+			_rows.append({"type": "desc", "text": line})
 	if not description.is_empty():
 		_rows.append({"type": "rule"})
 		for line: String in description:
@@ -89,6 +104,11 @@ func _talisman_rows(stack: Dictionary, def: Dictionary, rarity: Dictionary, equi
 			if not bonus.has(key):
 				var label: String = String(((TalismanRules.catalog().get("stats", {}) as Dictionary).get(key, {}) as Dictionary).get("label", key))
 				_rows.append({"type": "bonus", "text": "OHNE %s" % label, "tone": -1})
+	for perk: String in TalismanRules.perk_ids(stack): ## a special ability: its name, then what it does
+		_rows.append({"type": "rule"})
+		_rows.append({"type": "perk", "text": TalismanRules.perk_name(perk)})
+		for line: String in _wrap(TalismanRules.perk_text(perk)):
+			_rows.append({"type": "desc", "text": line})
 	var description: Array[String] = _wrap(String(def.get("description", "")))
 	if not description.is_empty():
 		_rows.append({"type": "rule"})
@@ -105,8 +125,7 @@ func _measure() -> void:
 	for row: Dictionary in _rows:
 		if String(row["type"]) == "stat":
 			_label_width = maxi(_label_width, PixelText.width(String(row["text"])))
-	var widest: int = 0
-	var total: int = 0
+	var widths: Array[int] = []
 	_heights.clear()
 	for row: Dictionary in _rows:
 		var width: int = PixelText.width(String(row.get("text", "")))
@@ -134,13 +153,76 @@ func _measure() -> void:
 			"bonus":
 				width += 8
 				height = 10
+			"perk":
+				width += 8
+				height = 11
 			"hint":
 				width += 8
 				height = 12
-		widest = maxi(widest, width)
+		widths.append(width)
 		_heights.append(height)
-		total += height
-	size = Vector2(widest + PAD * 2, total + PAD * 2 - 1)
+	_layout(widths)
+
+
+## Puts the rows into one column, or, when the card would be taller than `MAX_HEIGHT`, into as few evenly filled columns as fit. A column only breaks in front of a
+## thread (`rule`), so a stat block, a special or the story is never torn apart.
+func _layout(widths: Array[int]) -> void:
+	var limit: int = MAX_HEIGHT - PAD * 2 + 1
+	var blocks: Array[Vector2i] = [] ## [first row, row count]
+	var first: int = 0
+	for i: int in range(1, _rows.size() + 1):
+		if i == _rows.size() or String(_rows[i]["type"]) == "rule":
+			blocks.append(Vector2i(first, i - first))
+			first = i
+	var best: Array[int] = [] ## the column of every block
+	for count: int in range(1, MAX_COLUMNS + 1):
+		var total: int = 0
+		for h: int in _heights:
+			total += h
+		var target: float = float(total) / count
+		var cols: Array[int] = []
+		var heights: Array[int] = [0]
+		var col: int = 0
+		for block: Vector2i in blocks:
+			var h: int = 0
+			for r: int in block.y:
+				h += _heights[block.x + r]
+			if heights[col] > 0 and col < count - 1 and float(heights[col] + h) > target * 1.08:
+				col += 1
+				heights.append(0)
+			heights[col] += h
+			cols.append(col)
+		best = cols
+		if heights.max() <= limit or count == MAX_COLUMNS:
+			break
+	var column_count: int = (best.max() + 1) if not best.is_empty() else 1
+	var content: Array[int] = []
+	var tops: Array[int] = []
+	content.resize(column_count)
+	tops.resize(column_count)
+	content.fill(0)
+	tops.fill(0)
+	_row_y.clear()
+	_row_col.clear()
+	for b: int in blocks.size():
+		var c: int = best[b]
+		for r: int in blocks[b].y:
+			var i: int = blocks[b].x + r
+			_row_y.append(PAD + tops[c])
+			_row_col.append(c)
+			tops[c] += _heights[i]
+			content[c] = maxi(content[c], widths[i])
+	_col_x.clear()
+	_col_w.clear()
+	var x: int = 0
+	for c: int in column_count:
+		_col_x.append(x)
+		_col_w.append(content[c] + PAD * 2)
+		x += content[c] + COLUMN_GAP
+	var tall: int = 0
+	for c: int in column_count:
+		tall = maxi(tall, tops[c])
+	size = Vector2(_col_x[column_count - 1] + _col_w[column_count - 1], tall + PAD * 2 - 1)
 
 
 func _process(delta: float) -> void:
@@ -164,9 +246,11 @@ func _draw() -> void:
 	var unfurl: float = 1.0 - pow(1.0 - clampf(_age / UNFURL_SECONDS, 0.0, 1.0), 3.0)
 	var width: int = int(size.x)
 	var height: int = roundi(size.y * unfurl)
-	draw_set_transform(Vector2(roundf(sin(_time * 1.3) * 0.8), 0.0)) ## it sways a little
+	_sway = roundf(sin(_time * 1.3) * 0.8)
+	draw_set_transform(Vector2(_sway, 0.0)) ## it sways a little
 	_draw_paper(width, height, void_level)
 	_draw_rows(height, void_level)
+	draw_set_transform(Vector2(_sway, 0.0))
 	_draw_vines(width, height, void_level)
 	if _tier >= 3 and unfurl >= 1.0: ## epic and legendary: motes drift up inside the card
 		for k: int in 3 + (_tier - 3) * 2:
@@ -203,14 +287,22 @@ func _draw_paper(width: int, height: int, void_level: float) -> void:
 
 
 func _draw_rows(paper_height: int, void_level: float) -> void:
-	var y: int = PAD
+	for c: int in range(1, _col_x.size()): ## a thread of light between two columns
+		var x: int = _col_x[c]
+		for y: int in range(PAD, int(size.y) - PAD):
+			if y < paper_height - PAD and (y + _salt) % 3 != 0:
+				draw_rect(Rect2(x, y, 1, 1), Color(_rarity, 0.28 * (1.0 - absf(float(y) / size.y - 0.5))))
 	for i: int in _rows.size():
 		var row: Dictionary = _rows[i]
 		var height: int = _heights[i]
-		var p: float = clampf((_age - 0.03 - i * 0.03) / 0.1, 0.0, 1.0)
+		var p: float = clampf((_age - 0.03 - float(_row_y[i]) / 9.0 * 0.03) / 0.1, 0.0, 1.0) ## every column unfurls from its top
+		var y: int = _row_y[i]
+		var col: int = _row_col[i]
 		if p > 0.0 and y + height - 2 <= paper_height:
+			draw_set_transform(Vector2(_sway + _col_x[col], 0.0)) ## a row is drawn as if its column were the whole card
+			_cw = _col_w[col]
 			_draw_row(row, y, height, p, void_level)
-		y += height
+	draw_set_transform(Vector2(_sway, 0.0))
 
 
 func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float) -> void:
@@ -230,7 +322,7 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 		"refine":
 			RefineStyle.draw_pearls(self, Vector2(PAD, y + 3), int(row["level"]), int(row["cap"]), p, _time)
 			var count: String = String(row["text"])
-			PixelText.draw(self, count, Vector2i(int(size.x) - PAD - PixelText.width(count), y), Color(RefineStyle.color(int(row["level"])), p), shade)
+			PixelText.draw(self, count, Vector2i(_cw - PAD - PixelText.width(count), y), Color(RefineStyle.color(int(row["level"])), p), shade)
 		"mile":
 			var reached: bool = bool(row["on"])
 			var mark: Color = RefineStyle.color(int(row["at"])) if reached else UiStyle.TEXT_DIM
@@ -239,7 +331,7 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 			_draw_bloom(Vector2(PAD + 3.0, y + 5.0), p)
 			PixelText.draw(self, text, Vector2i(PAD + 10, y), Color(UiStyle.TEXT_DIM.lerp(_rarity, 0.3), p), shade)
 		"rule": ## a thread with a bud, fading out to the right
-			var span: int = int(size.x) - PAD * 2
+			var span: int = _cw - PAD * 2
 			for x: int in span:
 				draw_rect(Rect2(PAD + x, y + 2, 1, 1), Color(_rarity.lerp(VineStyle.VOID_GLOW, void_level * 0.5), 0.55 * p * (1.0 - float(x) / span)))
 			draw_rect(Rect2(PAD, y + 1, 1, 3), Color(_rarity, p))
@@ -254,7 +346,7 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 				if on:
 					draw_rect(Rect2(at, Vector2.ONE), Color(VineStyle.PETAL, p * 0.8))
 			var value: String = String(row["value"])
-			var value_x: int = int(size.x) - PAD - PixelText.width(value)
+			var value_x: int = _cw - PAD - PixelText.width(value)
 			PixelText.draw(self, value, Vector2i(value_x, y), Color(UiStyle.TEXT, p), shade)
 			var bonus: String = String(row.get("bonus", ""))
 			if bonus != "": ## what the refinement adds, in the colour of the level
@@ -266,6 +358,12 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 			VineStyle.glow(self, bud, 4.0, colour, 0.4 * p)
 			draw_rect(Rect2(bud, Vector2.ONE), Color(VineStyle.PETAL, p))
 			PixelText.draw(self, text, Vector2i(PAD + 8, y), Color(colour.lerp(Color.WHITE, 0.25), p), shade)
+		"perk": ## a special ability: a feather-shaped bud and the name in a lightened rarity colour
+			var bud: Vector2 = Vector2(PAD + 2.0, y + 4.0)
+			VineStyle.glow(self, bud, 6.0, _rarity, (0.5 + 0.15 * sin(_time * 3.0)) * p)
+			draw_rect(Rect2(bud + Vector2(-1.0, 0.0), Vector2(3.0, 1.0)), Color(_rarity, p))
+			draw_rect(Rect2(bud + Vector2(0.0, -2.0), Vector2(1.0, 5.0)), Color(_rarity.lerp(Color.WHITE, 0.5), p))
+			PixelText.draw(self, text, Vector2i(PAD + 8, y + 1), Color(_rarity.lerp(Color.WHITE, 0.4), p), shade)
 		"desc":
 			PixelText.draw(self, text, Vector2i(PAD, y), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, void_level * 0.4), p), shade)
 		"hint":

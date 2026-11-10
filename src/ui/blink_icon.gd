@@ -66,7 +66,7 @@ func _draw() -> void:
 	if _blink == null:
 		return
 	var ready_now: bool = _blink.is_ready()
-	var charged: float = 1.0 - _blink.cooldown_left / _blink.cooldown
+	var charged: float = 1.0 - _blink.cooldown_left / maxf(_blink.total, 0.01)
 	var pulse: float = 0.5 + 0.5 * sin(_time * 3.5)
 	var taken: float = VineStyle.infection(SapVine.STAMINA_LEN + 12.0, VineStyle.void_amount(), 77)
 	var anchor: Vector2 = Vector2(ANCHOR_X, Hotbar.vine_y(Hotbar.SKILL_X))

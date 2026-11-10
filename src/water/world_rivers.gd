@@ -7,6 +7,8 @@ var _spec: Dictionary
 var _queries: Dictionary = {}
 var _query_lock: Mutex = Mutex.new() ## chunk worker threads ask the fields too (Jobs)
 var _materials: Array[ShaderMaterial] = []
+var _water_materials: Array[ShaderMaterial] = [] ## only the surface materials (they carry the swimmer slots)
+var _swimmer_slots: Dictionary = {} ## key -> Vector4
 var _falls: Array[Sprite2D] = []
 var _springs: Array[Sprite2D] = []
 var _spring_glows: Array[Sprite2D] = []
@@ -97,6 +99,12 @@ func is_deep(point: Vector2) -> bool:
 	var field: Vector2 = field_at(point)
 	return field.x <= 0.0 and field.y > float(_spec["deep_threshold"])
 
+## -1 on land, otherwise how deep the water is as a share of the deep threshold (0 at the bank, 1 where swimming starts, more in the middle of a lake). Water creatures ask this.
+func depth_amount(point: Vector2) -> float:
+	var field: Vector2 = field_at(point)
+	if field.x > 0.0: return -1.0
+	return field.y / float(_spec["deep_threshold"])
+
 func surface_at(point: Vector2) -> String:
 	var field: Vector2 = field_at(point)
 	if field.x > 0.0: return ""
@@ -110,6 +118,8 @@ func wade_data(point: Vector2, base: Dictionary) -> Dictionary:
 	var result: Dictionary = base.duplicate(true)
 	result["submerge"] = lerpf(float(settings["depth_min"]), float(settings["depth_max"]), amount)
 	result["speed"] = lerpf(float(settings["wade_speed_max"]), float(settings["wade_speed_min"]), amount)
+	result["water"] = true
+	result["depth_amount"] = amount ## 0..1 up to the deep threshold; SwimRules starts at 0.92
 	return result
 
 func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
@@ -136,7 +146,10 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 	shader_material.set_shader_parameter("world_origin", sprite.position)
 	sprite.material = shader_material
 	_materials.append(shader_material)
-	sprite.tree_exiting.connect(func() -> void: _materials.erase(shader_material))
+	_water_materials.append(shader_material)
+	sprite.tree_exiting.connect(func() -> void:
+		_materials.erase(shader_material)
+		_water_materials.erase(shader_material))
 	parent.add_child(sprite)
 	parent.y_sort_enabled = true
 	var details: RiverDetails = RiverDetails.new()
@@ -242,6 +255,7 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 	shader_material.set_shader_parameter("disturbance_count", count)
 	var body: StaticBody2D = StaticBody2D.new()
 	body.name = "RiverDepth"
+	body.add_to_group("river_depth") ## swimmers skip these (SwimComponent), nobody else does
 	parent.add_child(body)
 	# Offline-merged rectangles avoid a 16k-pixel scan during chunk activation.
 	for rect: Array in record["blocks"]:
@@ -251,6 +265,27 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 		shape.shape = box
 		shape.position = Vector2(cell) * 512.0 + Vector2(float(rect[0]), float(rect[1])) + box.size * 0.5
 		body.add_child(shape)
+
+## Swimmers (up to 4 at once: x, y, radius, energy) make rings in the surface of every loaded water chunk. Each swimmer owns a key;
+## energy <= 0 removes it.
+func set_swimmer(key: int, slot: Vector4) -> void:
+	if slot.w <= 0.0:
+		if not _swimmer_slots.has(key):
+			return
+		_swimmer_slots.erase(key)
+	else:
+		_swimmer_slots[key] = slot
+	var padded: PackedVector4Array = []
+	for value: Variant in _swimmer_slots.values():
+		if padded.size() < 4:
+			padded.append(value as Vector4)
+	var count: int = padded.size()
+	while padded.size() < 4:
+		padded.append(Vector4.ZERO)
+	for material: ShaderMaterial in _water_materials:
+		material.set_shader_parameter("swimmers", padded)
+		material.set_shader_parameter("swimmer_count", count)
+
 
 func _process(delta: float) -> void:
 	_clock += delta

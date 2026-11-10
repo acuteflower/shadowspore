@@ -38,3 +38,6 @@ Bekannt: Die Klinge steht beim Laden ganz senkrecht, das wirkt etwas steif; ein 
 2. `HeavyRules.has_secondary/config` erkennt den Block; für eine neue Art (z. B. Schild-Block, Wurf) eine weitere Regel-Klasse oder ein `kind`-Zweig in `AttackComponent.begin_charge/release_charge`.
 3. Neue Körperposen: Blatt wie `art_hero_heavy.py` (eigener Sheet-Index in `Player._use_sheet`, Rig-Einträge, Branch in `Player._animate`).
 4. Test nach dem Muster `tools/test_heavy.gd`.
+
+## Rechtsklick des Himmelsriss
+Das Himmelsriss nutzt den Wuchtschlag nicht: `sword_rift.secondary` (Art `rift_slash`) ist eine Kette aus zwei diagonalen Hieben ohne Aufladen, die Federn schießen (`HeavyRules.rift_step`, `AttackComponent._alt_start`). Siehe `docs/rissklinge.md`.

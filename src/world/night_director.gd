@@ -48,6 +48,8 @@ var _memory: Dictionary = {} ## sector (int) -> {"b": breaches, "d": defended}: 
 var _radii: PackedFloat32Array = PackedFloat32Array() ## per sector: how far the light reaches from the middle of the town
 var _radii_age: float = 1000.0
 var _fear_calm: float = 0.0
+var _water: Array[Dictionary] = [] ## the creatures of the water (Lichtfischer): {node, key, cost}; they have no NightBehavior, they fish where they were born
+var _water_wait: float = 0.0
 
 
 func setup(world: Variant) -> void:
@@ -310,6 +312,8 @@ func _night(players: Array[Player], progress: float) -> void:
 		if may_spawn and NightRules.spawning(progress):
 			if not _try_spawn(key, members, entry, progress) and _elite_due(progress):
 				_spawn_elite(key, members, entry)
+			if may_spawn and NightRules.spawning(progress):
+				_try_water(key, members, entry, progress)
 
 
 ## Is a group hurt or swamped? Then the dark holds back for a moment (the night breathes with the fight).
@@ -389,6 +393,95 @@ func _try_spawn(key: String, members: Array[Player], entry: Dictionary, progress
 	return true
 
 
+## The water's share of the night (data/night.json `water`): where a river or lake lies within the ring round a group, now and then a Lichtfischer is born into it and fishes there
+## for the rest of the night. It spends from the group's budget like any other creature, is paid back for in part when killed and sinks away at dawn without loot.
+func _try_water(key: String, members: Array[Player], entry: Dictionary, progress: float) -> bool:
+	var spec: Dictionary = NightRules.config().get("water", {}) as Dictionary
+	if spec.is_empty() or not _world.has_method("water_depth"):
+		return false
+	_water_wait = maxf(0.0, _water_wait - float((NightRules.config().spawn as Dictionary).interval))
+	if _water_wait > 0.0 or TimeManager.day < int(spec.min_day):
+		return false
+	var alive: int = 0
+	for item: Dictionary in _water:
+		if String(item.key) == key:
+			alive += 1
+	if _water.size() >= int(spec.global_cap) or alive >= int(spec.alive_per_group) or float(_breather.get(key, 0.0)) > 0.0:
+		return false
+	var budget: float = group_budget(members, bool(entry.died))
+	var left: float = budget * NightRules.released(progress) - float(entry.spent)
+	var levels: Array[int] = []
+	for member: Player in members:
+		levels.append(member.progress.level)
+	if budget < float(spec.min_budget) or left < float(spec.cost) or NightRules.group_level(levels) < int(spec.min_level):
+		return false
+	_water_wait = float(spec.retry_seconds)
+	if _rng.randf() > float(spec.chance):
+		return false
+	var at: Vector2 = _water_spot(members, spec)
+	if not at.is_finite():
+		return false
+	var specials: Dictionary = NightRules.special_spec(special)
+	var strength: float = group_strength(members)
+	var enemy: Node2D = _world.spawn_species(String(spec.id), at, _rng.randf() * TAU, strength * float(specials.health), NightRules.damage_scale(strength) * float(specials.damage), true) as Node2D
+	if enemy == null:
+		return false
+	var item: Dictionary = {"node": enemy, "key": key, "cost": float(spec.cost)}
+	_water.append(item)
+	entry.spent = float(entry.spent) + float(spec.cost)
+	(enemy.get_node("HealthComponent") as HealthComponent).died.connect(_on_water_killed.bind(item))
+	return true
+
+
+## Deep enough water in the ring round a random member, loaded, outside the town's light and not right next to anybody. INF when there is none.
+func _water_spot(members: Array[Player], spec: Dictionary) -> Vector2:
+	var ring: Array = spec.ring_tiles as Array
+	var town: TownManager = _world.town()
+	for attempt: int in 24:
+		var member: Player = members[_rng.randi() % members.size()]
+		var pos: Vector2 = member.global_position + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(float(ring[0]), float(ring[1])) * TownRules.TILE
+		if float(_world.water_depth(pos)) < float(spec.min_depth) or (town != null and town.spawn_blocked(pos)):
+			continue
+		var near: bool = false
+		for other: Player in Player.all:
+			if other.global_position.distance_to(pos) < float(spec.keep_clear_tiles) * TownRules.TILE:
+				near = true
+		if not near:
+			return pos.round()
+	return Vector2.INF
+
+
+func _on_water_killed(item: Dictionary) -> void:
+	var node: Node = item.node as Node
+	if is_instance_valid(node) and (node.get_node("HealthComponent") as HealthComponent).last_attacker != 0:
+		_refund(String(item.key), float(item.cost) * float((NightRules.config().budget as Dictionary).refund_on_kill))
+
+
+func live_water() -> int:
+	return _water.size()
+
+
+## Water creatures left far behind go home like the others (budget back); gone ones leave the list.
+func _prune_water() -> void:
+	var far: float = float((NightRules.config().groups as Dictionary).despawn_tiles) * TownRules.TILE
+	var keep: Array[Dictionary] = []
+	for item: Dictionary in _water:
+		var node: Node2D = item.node as Node2D
+		if not is_instance_valid(node) or node.is_queued_for_deletion() or (node.get_node("HealthComponent") as HealthComponent).current <= 0.0:
+			continue
+		var near: bool = false
+		for player: Player in Player.all:
+			if player.global_position.distance_to(node.global_position) <= far:
+				near = true
+				break
+		if not near and not Player.all.is_empty():
+			_refund(String(item.key), float(item.cost))
+			node.queue_free()
+			continue
+		keep.append(item)
+	_water = keep
+
+
 ## A place next to the pack's first creature (a pack is born together, a few steps apart).
 func _pack_spot(origin: Vector2) -> Vector2:
 	var spread: Array = (NightRules.config().spawn as Dictionary).pack_spread as Array
@@ -465,6 +558,7 @@ func _has_scout() -> bool:
 
 ## Drops entries of creatures that are gone and sends home the ones left far behind (they were born for a group that moved on); the budget they held comes back.
 func _prune() -> void:
+	_prune_water()
 	var far: float = float((NightRules.config().groups as Dictionary).despawn_tiles) * TownRules.TILE
 	var keep: Array[Dictionary] = []
 	for entry: Dictionary in _live:
@@ -644,6 +738,10 @@ func _dawn(window: bool) -> void:
 		return
 	_dawn_marked = true
 	_end_raid(false)
+	for item: Dictionary in _water:
+		if is_instance_valid(item.node):
+			(item.node as Node).call("retire") ## the light goes out and it sinks, without loot
+	_water.clear()
 	for entry: Dictionary in _live:
 		var behavior: NightBehavior = entry.nb as NightBehavior
 		if behavior.remnant:

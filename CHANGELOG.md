@@ -4,6 +4,122 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.6.2 Beta] – 2026-11-10
+### 🪞 Echo der Zerrissenen: Boss-Enthüllung Morwenna, Höhenstufen-Verdeckung, Mornath-Arena-Polishing & Kampffeinschliff
+
+![Der Hexenturm und die Nebelhexe](docs/img/witch_tower_site.png)
+
+> 📜 ***Aus den Warnungen des alten Kriegers Valdric an der Schwelle zum Schieferkessel:***  
+> *„Ellie... sieh dir das Siegel an jener zerbrochenen Klinge am Fuße des Rabenbaums an. Das dort in der Mulde ist kein gewöhnliches Ungeheuer des Forsts. Das ist Morwenna... die Großhexe des Alten Zirkels, von der die Chroniken berichten! Sie fiel damals nicht im Großen Riss – sie versuchte, ihre zerfallende Seele in das unsterbliche Herzholz des Baumes zu binden. Doch die Leere fraß ihren Zauber mitten im Vollzug. Sie existiert in einem ewigen, schmerzhaften Zerrissenwerden – und saugt dem Heiligtum der Raben die pure Lebenskraft aus. Tretet ihr nur mit klarem Geist und geschärfter Klinge entgegen...“*
+
+---
+
+> [!WARNING]
+> **Gefahr am Schieferkessel:**  
+> Morwenna bedient sich unberechenbarer Glitch-Klone und blitzartiger Scheren-Angriffe. Wenn sie Spiegelscherben heraufbeschwört, lauscht den Rufen der Raben in den Wipfeln – sie kreisen nur über der *echten* Hexe!
+
+> [!TIP]
+> **Taktiker-Hinweis zur Höhenstufe:**  
+> Dank des neuen Höhenstufen-Systems könnt ihr Klippenkanten nun gezielt nutzen, um feindlichen Geschossen zu entgehen. Beachtet jedoch, dass höher gelegene Felsplateaus Angreifer unterhalb verbergen können.
+
+---
+
+### 🌟 Die Großen Highlights
+
+#### 1. 🪞 Boss 2: Morwenna, die Spiegelhexe (Die Zerrissene)
+Mit Morwenna betritt der zweite monumentale Story-Boss die Welt von Shadowspore! Ihr Treiben im Schieferkessel des Hexenwalds bedroht das gesamte Gefüge der Region.
+
+![Der monumentale Krähenbaum im Schieferkessel](docs/img/crow_tree.png)
+
+* **Die Tragödie des gescheiterten Wandels:** Morwenna existiert in einem permanenten, instabilen Transmutations-Limbus zwischen physischer Materie und Leere. Ihr Leib wird nur noch durch die Lebenskraft des uralten Rabenbaums zusammengehalten.
+* **Unberechenbares Glitch-Verhalten:**
+  * **Micro-Stutter & Spasmen:** Nach heftigen Schlägen friert ihr Körper kurzzeitig in knisternden Standbildern ein oder zuckt unwillkürlich zur Seite.
+  * **Zweistimmigkeit:** Morwennas Stimme ist gedoppelt – eine erhabene Hexe überlagert von einem schneidenden Void-Echo.
+  * **Permanente Scanline-Klone:** Flüchtige Raum-Fragmente ihrer Existenz unterstützen sie im Kampf. Sie besitzen keinen Bodenschatten und lösen sich bei Treffern in Nebel auf.
+  * **Glitch-Swap:** Morwenna kann jederzeit blitzschnell die Position mit einem Klon tauschen *(Achtet auf die kreisenden Raben – sie markieren das Original!)*.
+* **Mehrphasiger Gefechtsverlauf:**
+  * **Phase 1 (100 % – 66 % HP):** Rasende Zick-Zack-Sprints, 3-teilige Harzschnitt-Kombos, Wurzelspeere aus dem Lehmboden und verlangsamender Fluchsaft.
+  * **Phase 2 (66 % – 33 % HP – „Der Spiegel zerbricht“):** Eine Druckwelle schleudert Angreifer zurück; Morwennas Gesichtsmaske zersplittert. Erste permanente Glitch-Klone spalten sich ab, Scheren-Zangenangriffe und an Schieferfelsen abprallende Spiegelscherben setzen euch zu.
+  * **Phase 3 (33 % – 0 % HP – „Der Schrei des Rabenbaums“):** Morwenna zapft die Hauptwurzeln an. Der gesamte Kessel gerät in Flammen; Fluchspiegel-Käfige sperren den Bewegungsraum ab, während sie zum finalen Vernichtungsschlag ausholt.
+
+<details>
+<summary>📖 <b>Boss-Dossier: Morwenna, die Spiegelhexe (Klicken zum Entfalten)</b></summary>
+
+| Eigenschaft | Detail |
+|---|---|
+| **Klassifizierung** | Gefallene Großhexe / Instabiles Void-Phänomen (Boss 2) |
+| **Arena & Ort** | Schieferkessel am Großen Rabenbaum (Hexenwald, Tile 879, 914) |
+| **Waffen** | Zwei verrostete Zeremonien-Sicheln aus Fluchsilber |
+| **Schwachstelle** | Micro-Stutter nach schweren Scheren-Hieben; Klon-Entlarvung über die Raben |
+| **Phasen-Schwellen** | Phase 1 (100 %), Phase 2 (66 %: Spiegelbruch), Phase 3 (33 %: Wurzel-Entfesselung) |
+
+</details>
+
+---
+
+#### 2. 🏔️ Höhenstufen-Verdeckung & Klippenschatten (Elevation Occlusion)
+Die räumliche Tiefe der Spielwelt wurde grundlegend modernisiert:
+* **Echte visuelle Klippenüberhänge (`ReliefOverhang`):** Wenn Spielfiguren, Gegner oder Gegenstände südlich unterhalb einer Felskante stehen, werden sie nun physikalisch und perspektivisch korrekt von der Felswand überdeckt (`z_index = 1`).
+* **Schattenwurf an Felswänden:** Höhere Plateaus werfen saubere Schattensäume auf die darunterliegenden Wiesen und Schieferböden.
+* **Präzisierte Kletterkanten:** Die Erkennung von `WallClimb` richtet sich nun exakt nach den vertikalen Felsstufen aus.
+
+---
+
+#### 3. ⚔️ Mornath-Arena-Polishing & Schockwellen-Rework
+Der Kampf gegen den Himmelsspalter Mornath in der Feuerarena wurde visuell und spielmechanisch auf Hochglanz poliert:
+* **Schockwellen-Geometrie (`ShockRing`):** Vollständig überarbeitete Schockwellen mit dynamischer Segmentierung, optischen Bodenverzerrungen und pixelgenauer radialer Schadensabfrage.
+* **Stabile Brandfelder (`PixelFlames`):** Brennende Arenazonen flackern ruhiger, besitzen optimierte Partikelraten und verursachen verlässlichen, synchronisierten Flächenschaden.
+* **Leerenbarrieren (`RiftWall`):** Geschärfte Partikelränder und glasklare Begrenzungslinien während der Phasenwechsel.
+
+---
+
+#### 4. 🎯 Kontextsensitiver Cursor & Schadenszahlen-Overhaul
+* **Dynamische Cursor-Glyphen:** Das Fadenkreuz passt sich nun automatisch der Spielsituation an:
+  * 🏹 Fernkampf-Visier beim Spannen von Bögen
+  * ✋ Greifhand an erntebaren Pflanzen und Kisten
+  * 🪶 Feder-Symbol bei der Annäherung an zähmbare Vögel
+  * 🧗 Klettersymbol an besteigbaren Felswänden
+  * 🗡️ Geschärfter Kampffokus im Nahkampf
+* **Schadenszahlen mit Flugparabel:** Zahlen steigen nicht mehr starr nach oben, sondern federn in sanften Bögen zur Seite. Kritische Treffer pulsieren hervorgehoben und sind farblich nach Schadenstyp codiert.
+
+---
+
+#### 5. 🐾 Lebendige Wildnis & Untergrund-Reaktionen
+* **Reaktives Tierverhalten:** Bären, Kaninchen und Krähen reagieren nun sensibel auf Fackellicht, die Nachtphasen des `NightDirector` und nahe Bosskämpfe.
+* **Materialspezifische Schritt-Effekte:** Die Schritt-Komponente erkennt den genauen Untergrund (Gras, Schiefergestein, Holz, flaches Wasser, Matsch) und erzeugt darauf abgestimmte Staubwölkchen, Gischt oder Schlammspritzer.
+
+---
+
+#### 6. 🌌 Atmosphärischer Abgrund-Rand (Void Edge)
+* Die äußeren Grenzen der schwebenden Inseln wurden optisch aufgewertet: Brodelnde Leere-Zungen und schwebende violette Partikel säumen die Klippen und warnen vor dem bodenlosen Fall.
+
+---
+
+### ⚖️ Balance & Spielwerte auf einen Blick
+
+| Status | Bereich / Parameter | Vorher | Jetzt (V0.6.2) | Auswirkung im Spiel |
+|---|---|---|---|---|
+| 🟣 `NEU` | **Boss 2: Morwenna** | – | **Vollständiges Boss-Dossier & Kampf** | 3-Phasen-Gefecht mit Glitch-Klone-Mechanik |
+| 🟣 `NEU` | **Klippen-Verdeckung** | Flache 2D-Überlagerung | **Echte Höhenstufen (`ReliefOverhang`)** | Felsvorsprünge verdecken Figuren darunter korrekt |
+| 🟡 `REWORK` | **Schockwellen (`ShockRing`)** | Starre Kreise | **Dynamisch segmentierte Ringe** | Präziseres Ausweichen und sauberes Hit-Feedback |
+| 🟢 `BUFF` | **Feuerarena-Brandflächen** | Instabile Flackerticks | **Geglättete Partikel- & Schadensraten** | Flüssigere Bildrate und verlässlicher Flammenschaden |
+| 🟣 `NEU` | **Cursor-Zustände** | Statischer Standard-Zeiger | **5 kontextsensitive Glyphen** | Direktes optisches Feedback für Klettern, Fernkampf & Ernte |
+| 🟡 `REWORK` | **Schadenszahlen** | Lineares Aufsteigen | **Bogenparabeln mit Crit-Popout** | Schnell lesbare Schadensspitzen im Gefecht |
+| 🟢 `BUFF` | **Schritt-Partikel** | Einheitlicher Staub | **5 materialspezifische Fußspuren** | Sattes Feedback für Schiefer, Matsch, Holz & Wasser |
+| 🟢 `BUFF` | **Kletter-Erkennung** | Gelegentliches Kantenwackeln | **Exakt ausgerichtete Klettervektoren** | Reibungsloser Auf- und Abstieg an Klippen |
+| 🟣 `NEU` | **Abgrund-Effekte** | Harte Kante zur Leere | **Pulsierende Void-Zungen & Partikelfluss** | Deutlich atmosphärischere Weltgrenzen |
+
+---
+
+### 🔮 Sneak Peek: Was erwartet euch als Nächstes?
+*„Tief unter den Wurzeln des Rabenbaums öffnet sich ein Schacht in die vergessenen Katakomben. Alte Schienen, verrostete Grubenloren und ein metallisches Hämmern im Dunkel kündigen das nächste Kapitel an: **Die Tiefenminen von Shadowspore** erwachen zum Leben...“*
+
+✦ ──────────────── ❖ ──────────────── ✦  
+*Mit leuchtenden Sporen und geschärften Klingen,*  
+**Euer Shadowspore-Entwicklerteam 🌿⚔️**
+
+---
+
 ## [V0.6.1 Beta] – 2026-11-10
 ### 🧙‍♀️ Hexenwald & Alchemie: Esma die Nebelhexe, Trankbrauen, Kletterranken, Dauerdämmer & der Wahn des Nebels
 

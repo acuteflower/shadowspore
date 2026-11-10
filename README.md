@@ -5,17 +5,17 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.6.1 Beta – „Hexenwald & Alchemie“
+## 🚀 Aktuelle Version: V0.6.2 Beta – „Echo der Zerrissenen“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.6.1 Beta:
-* **Neues Biom – Der Hexenwald (Region 31):** Über 38.000 neue Tiles nahtlos an der Südküste angeschlossen. Kühle Farbpalette, Schieferfelsen, Dauerdämmer und ein geschwungener Pfad zum Hexenturm.
-* **Alchemie & Trankbrauen (Ablösung des Kochen-Systems):** Tränke in 5 Stufen (Wundtau für Sofortheilung, Glutatem für sekündliche Ausdauerschübe auch beim Sprinten). Eigene Trink-Animation im Lauf und Kampf.
-* **Nebel des Wahns & Phantom-Kreaturen:** Giftgrüner Bodennebel mit Statuseffekt *Halluziniert*. Fortschreitender Trug (Flüstern, Schein-Items, zuckendes HUD und Phantom-Spinnen, die im Schlag zu Rauch verpuffen).
-* **Esma die Nebelhexe & Der Hexenturm:** Vollständig ausgestattetes Turminneres mit Kessel, Kamin und Esmas animiertem Tagesablauf.
-* **Kletterranken (Wall Climb):** Erklimmt steile Schieferwände direkt an bewachsenen Kletterranken mit flüssiger Kletter-Animation.
-* **Der Krähenbaum & Klarglas-Ohrringe:** Monumentaler Rastbaum für gefiederte Begleiter und neuer Schutz-Talisman gegen den Nebelwahn.
+### Highlights von V0.6.2 Beta:
+* **Boss 2 – Morwenna, die Spiegelhexe:** Die gefallene Großhexe am monumentalen Rabenbaum im Schieferkessel! Unberechenbare Glitch-Mechanik mit Micro-Stutter, zweistimmiger Sprachüberlagerung und permanenten Glitch-Klonen (überwacht von kreisenden Raben).
+* **Höhenstufen-Verdeckung & Relief-Schatten:** Echtes `ReliefOverhang`-System – Klippen und Felsplateaus verdecken darunterstehende Figuren perspektivisch korrekt und werfen saubere Schattensäume.
+* **Mornath-Arena & Schockwellen-Rework:** Vollständig überarbeitete Schockwellen-Geometrie (`ShockRing`) mit radialer Segmentierung, geglättete Brandflächen (`PixelFlames`) und geschärfte Risswände.
+* **Kontextsensitiver Cursor & Schadenszahlen-Overhaul:** 5 dynamische Cursor-Glyphen (Fernkampf, Ernte, Klettern, Vogel-Interaktion, Nahkampf) und bogenförmig federnde Schadenszahlen mit Crit-Hervorhebung.
+* **Lebendige Wildnis & Schritt-Partikel:** Bären, Kaninchen und Krähen reagieren auf Nachtphasen und Fackellicht; Stiefelschritte erzeugen materialspezifische Staub-, Wasser- und Schlammeffekte.
+* **Atmosphärische Abgründe (Void Edge):** Brodelnde Leere-Zungen und schwebende Partikel säumen die Kanten der schwebenden Inselwelt.
 
 ---
 

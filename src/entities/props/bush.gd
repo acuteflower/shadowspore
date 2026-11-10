@@ -13,7 +13,7 @@ const REGROW_BURST: Array[Color] = [Color("d9c8ff"), Color("a6f0d0")]
 var _inside: Array[Player] = []
 var _idle_phase: float = 0.0
 var _sway_rate: float = 0.0
-var _on_screen: bool = true
+var _on_screen: bool = false
 var _notifier: VisibleOnScreenNotifier2D
 var _critter: LeafCritter ## an undergrowth animal on the bush (plants.json "critters"), see LeafCritter
 
@@ -30,6 +30,7 @@ func _setup_prop() -> void:
 	_notifier.screen_entered.connect(_set_on_screen.bind(true))
 	_notifier.screen_exited.connect(_set_on_screen.bind(false))
 	add_child(_notifier)
+	set_process(false)
 	_settle_on_screen.call_deferred()
 	if _spec.has("critters"):
 		_critter = LeafCritter.new()
@@ -38,10 +39,17 @@ func _setup_prop() -> void:
 
 
 func _process(_delta: float) -> void:
-	if not _on_screen:
+	if not _on_screen or _sway_rate <= 0.0001:
 		return
 	if _tween == null or not _tween.is_running(): ## a rustle has the sprite for a moment, else it sways in the wind
-		_sprite.skew = WorldWind.sample(global_position).x * _sway_rate
+		var sample: Vector2 = WorldWind.sample(global_position)
+		if absf(sample.x) < 0.005:
+			if _sprite.skew != 0.0:
+				_sprite.skew = 0.0
+			return
+		var target_skew: float = sample.x * _sway_rate
+		if absf(target_skew - _sprite.skew) > 0.001:
+			_sprite.skew = target_skew
 
 
 ## Off screen a bush does nothing per frame (hundreds of them are loaded): processing follows the notifier.

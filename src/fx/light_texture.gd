@@ -9,6 +9,7 @@ extends RefCounted
 ## so the project's nearest-neighbour filter has nothing left to make blocky.
 
 const SUPERSAMPLE: int = 2 ## texels per art pixel; with the window at 2x (1280x720) this is one texel per screen pixel
+const DEFAULT_RADII: PackedInt32Array = [24, 26, 28, 34, 36, 40, 44, 46, 60]
 
 static var _cache: Dictionary = {}
 
@@ -22,10 +23,17 @@ static func apply(light: PointLight2D, width: int, squash: float = 0.6, variant:
 ## Generates the cookies of common light radii up front (one picture costs a few ms of GDScript; the first light of a size used to
 ## cause that hitch while a chunk streamed in). `radii` are NightLight radii; the three variants and `squash` are the ones
 ## NightLight picks by default, so later `apply` calls hit the cache. The textures are identical to the lazy ones.
-static func prewarm(radii: PackedInt32Array, squash: float = 0.6) -> void:
+## Prewarms common and extended radii (including 44, 46, 60) so boss, trees and interiors never hitch on spawn.
+static func prewarm(radii: PackedInt32Array = DEFAULT_RADII, squash: float = 0.6) -> void:
 	for radius: int in radii:
 		for variant: int in 3:
 			get_texture(radius * 2 * SUPERSAMPLE, squash, variant)
+	for extra: int in [44, 46, 60]:
+		if not radii.has(extra):
+			for variant: int in 3:
+				get_texture(extra * 2 * SUPERSAMPLE, squash, variant)
+	for variant: int in 3:
+		get_texture(60 * 2 * SUPERSAMPLE, 0.8, variant)
 
 
 ## The raw cookie, `width` texels square (square: a non-square cookie got clipped by the renderer). Drawn at texture_scale 1 it is

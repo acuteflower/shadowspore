@@ -72,6 +72,10 @@ var _phase: Phase = Phase.IDLE
 var _time: float = 0.0
 var _step: Dictionary = {} ## the combo step being swung
 var _reach: float = 22.0
+const MAX_MOTES: int = 90
+static var _spark_gradient: Gradient = null
+static var _sparks_pool: Array[CPUParticles2D] = []
+
 var _has_weapon: bool = false
 var _weapon_alpha: float = 1.0
 var _rest_angle: float = 0.0 ## blade angle at rest, eased between ready and sprint carry
@@ -82,6 +86,7 @@ var _trail_age: float = TRAIL_FADE ## >= TRAIL_FADE means hidden
 var _thrust_progress: float = 0.0
 var _motes: Array[Dictionary] = [] ## sparkles shed by the blade: {pos (world), vel, age, life, kind, color, size}
 var _mote_carry: float = 0.0
+var _trail_was_active: bool = false
 var _burst_age: float = BURST_LIFE ## the crescent / ring where a swing ends; >= BURST_LIFE means hidden
 var _burst_done: bool = true
 var _burst_angle: float = 0.0
@@ -159,7 +164,26 @@ func _process(delta: float) -> void:
 		_trail_age += delta
 	_edge_glints(delta)
 	_update_motes(delta)
-	_trail.queue_redraw()
+	var trail_active: bool = _is_trail_active()
+	if trail_active or _trail_was_active:
+		_trail.queue_redraw()
+	_trail_was_active = trail_active
+
+
+func _is_trail_active() -> bool:
+	if _trail_age < TRAIL_FADE:
+		return true
+	if not _motes.is_empty():
+		return true
+	if _tips.size() >= 2:
+		return true
+	if _burst_age < _burst_life:
+		return true
+	if _charging:
+		return true
+	if held_refine >= RefineRules.max_level() and _has_weapon and _weapon_alpha >= 0.4 and not always_drawn:
+		return true
+	return false
 
 
 func is_swinging() -> bool:
@@ -702,31 +726,58 @@ func _on_hit(point: Vector2, dir: Vector2, shake: float, hit_stop: float = 0.0) 
 		hit_landed.emit(shake)
 
 
+static func _get_spark_gradient() -> Gradient:
+	if _spark_gradient == null:
+		_spark_gradient = Gradient.new()
+		_spark_gradient.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+		_spark_gradient.colors = PackedColorArray([Color("fff6dc"), Color("ffb347"), Color(1.0, 0.5, 0.2, 0.0)])
+	return _spark_gradient
+
+
+static func _recycle_sparks(sparks: CPUParticles2D) -> void:
+	if not is_instance_valid(sparks):
+		return
+	sparks.emitting = false
+	if sparks.get_parent() != null:
+		sparks.get_parent().remove_child(sparks)
+	if _sparks_pool.size() < 24:
+		_sparks_pool.append(sparks)
+	else:
+		sparks.queue_free()
+
+
 func _spawn_sparks(point: Vector2, dir: Vector2, heavy: bool = false) -> void:
-	var gradient: Gradient = Gradient.new()
-	gradient.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
-	gradient.colors = PackedColorArray([Color("fff6dc"), Color("ffb347"), Color(1.0, 0.5, 0.2, 0.0)])
-	var sparks: CPUParticles2D = CPUParticles2D.new()
-	sparks.texture = SPARK_TEXTURE
+	var sparks: CPUParticles2D = null
+	while not _sparks_pool.is_empty():
+		var candidate: CPUParticles2D = _sparks_pool.pop_back()
+		if is_instance_valid(candidate):
+			sparks = candidate
+			break
+	if sparks == null:
+		sparks = CPUParticles2D.new()
+		sparks.texture = SPARK_TEXTURE
+		sparks.lifetime = 0.28
+		sparks.one_shot = true
+		sparks.explosiveness = 1.0
+		sparks.spread = 75.0
+		sparks.gravity = Vector2.ZERO
+		sparks.damping_min = 160.0
+		sparks.damping_max = 230.0
+		sparks.scale_amount_min = 0.5
+		sparks.scale_amount_max = 0.9
+		sparks.color_ramp = _get_spark_gradient()
+		sparks.z_index = 20
+		sparks.finished.connect(_recycle_sparks.bind(sparks))
 	sparks.amount = 24 if heavy else 10
-	sparks.lifetime = 0.28
-	sparks.one_shot = true
-	sparks.explosiveness = 1.0
-	sparks.direction = -dir
-	sparks.spread = 75.0
-	sparks.gravity = Vector2.ZERO
 	sparks.initial_velocity_min = 50.0
 	sparks.initial_velocity_max = 200.0 if heavy else 140.0
-	sparks.damping_min = 160.0
-	sparks.damping_max = 230.0
-	sparks.scale_amount_min = 0.5
-	sparks.scale_amount_max = 0.9
-	sparks.color_ramp = gradient
-	sparks.z_index = 20
-	get_tree().current_scene.add_child(sparks)
+	sparks.direction = -dir
+	if sparks.get_parent() != get_tree().current_scene:
+		if sparks.get_parent() != null:
+			sparks.get_parent().remove_child(sparks)
+		get_tree().current_scene.add_child(sparks)
 	sparks.global_position = point
-	sparks.emitting = true
-	get_tree().create_timer(0.6).timeout.connect(sparks.queue_free)
+	sparks.restart()
 
 
 ## How many steps of the weapon class's combo she can swing: the leading ones whose `requires` skill is learned.
@@ -796,8 +847,8 @@ func _charge_effects(delta: float) -> void:
 		var around: Vector2 = tip + Vector2.from_angle(randf() * TAU) * randf_range(7.0, 13.0)
 		var vel: Vector2 = (tip - around).normalized() * randf_range(18.0, 34.0) ## gathering inwards
 		_motes.append({"pos": around, "vel": vel, "age": 0.0, "life": randf_range(0.18, 0.3), "kind": 0 if randf() < 0.8 else 1, "color": _fx_colors[1 + randi() % 3], "size": randf_range(0.8, 1.2)})
-	if _motes.size() > 260:
-		_motes = _motes.slice(_motes.size() - 260)
+	if _motes.size() > MAX_MOTES:
+		_motes = _motes.slice(_motes.size() - MAX_MOTES)
 
 
 ## Remembers where the blade has been during a heavy blow, for the ribbon it leaves behind.
@@ -1247,11 +1298,15 @@ func _emit_motes(angle: float, sweep: float, thrust: bool, delta: float) -> void
 		var speed: float = randf_range(18.0, 55.0)
 		var vel: Vector2 = flight * speed + along * randf_range(-12.0, 30.0) + Vector2(randf_range(-14.0, 14.0), randf_range(-14.0, 6.0))
 		_motes.append({"pos": origin + along * radius + along.rotated(PI / 2.0) * randf_range(-1.5, 1.5), "vel": vel, "age": 0.0, "life": randf_range(0.2, 0.42), "kind": kind, "color": color, "size": randf_range(0.8, 1.3)})
-	if _motes.size() > 260:
-		_motes = _motes.slice(_motes.size() - 260)
+	if _motes.size() > MAX_MOTES:
+		_motes = _motes.slice(_motes.size() - MAX_MOTES)
 
 
 func _update_motes(delta: float) -> void:
+	if _burst_age < _burst_life:
+		_burst_age += delta
+	if _motes.is_empty():
+		return
 	var damping: float = exp(-3.2 * delta)
 	for i: int in range(_motes.size() - 1, -1, -1):
 		var mote: Dictionary = _motes[i]
@@ -1262,16 +1317,17 @@ func _update_motes(delta: float) -> void:
 		var vel: Vector2 = (mote["vel"] as Vector2) * damping + Vector2(0.0, -16.0 * delta) ## drift up like embers
 		mote["vel"] = vel
 		mote["pos"] = (mote["pos"] as Vector2) + vel * delta
-	if _burst_age < _burst_life:
-		_burst_age += delta
 
 
 func _draw_motes() -> void:
+	if _motes.is_empty():
+		return
+	var trail_inv: Transform2D = _trail.global_transform.affine_inverse()
 	for mote: Dictionary in _motes:
 		var k: float = float(mote["age"]) / float(mote["life"])
 		var color: Color = mote["color"] as Color
 		color.a = clampf((1.0 - k) * 1.5, 0.0, 1.0) * 0.8 * (0.8 + 0.2 * sin(float(mote["age"]) * 40.0 + float(mote["size"]) * 9.0)) ## a faint twinkle
-		var at: Vector2 = _trail.to_local(mote["pos"] as Vector2).round()
+		var at: Vector2 = (trail_inv * (mote["pos"] as Vector2)).round()
 		var size: float = float(mote["size"]) * (1.0 - 0.5 * k)
 		match int(mote["kind"]):
 			0: ## a speck
@@ -1321,6 +1377,8 @@ func _draw_slash_trail(alpha: float) -> void:
 	var span: float = _trail_head - from_offset
 	if span <= 0.02:
 		return
+	var quad: PackedVector2Array = PackedVector2Array()
+	quad.resize(4)
 	for i: int in TRAIL_STEPS:
 		var k0: float = float(i) / TRAIL_STEPS
 		var k1: float = float(i + 1) / TRAIL_STEPS
@@ -1330,9 +1388,11 @@ func _draw_slash_trail(alpha: float) -> void:
 		var inner: float = _reach - lerpf(1.5, 9.0, k1)
 		var color: Color = _trail_edge.lerp(_trail_core, k1)
 		color.a = alpha * lerpf(0.1, 0.95, k1)
-		_trail.draw_colored_polygon(PackedVector2Array([
-			BODY_CENTER + Vector2.from_angle(a0) * inner, BODY_CENTER + Vector2.from_angle(a0) * outer,
-			BODY_CENTER + Vector2.from_angle(a1) * outer, BODY_CENTER + Vector2.from_angle(a1) * inner]), color)
+		quad[0] = BODY_CENTER + Vector2.from_angle(a0) * inner
+		quad[1] = BODY_CENTER + Vector2.from_angle(a0) * outer
+		quad[2] = BODY_CENTER + Vector2.from_angle(a1) * outer
+		quad[3] = BODY_CENTER + Vector2.from_angle(a1) * inner
+		_trail.draw_colored_polygon(quad, color)
 
 
 func _draw_thrust_trail(alpha: float) -> void:

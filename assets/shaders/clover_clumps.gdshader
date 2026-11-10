@@ -17,7 +17,7 @@ void vertex() {
 	day_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
 	detail = INSTANCE_CUSTOM;
 	tint = COLOR;
-	vec2 foot = band_origin + vec2((INSTANCE_CUSTOM.a - 0.5) * 256.0, 0.0);
+	vec2 foot = (MODEL_MATRIX * vec4(0.0, 9.0, 0.0, 1.0)).xy;
 	float clock = floor(g_wind_clock * 12.0) / 12.0;
 	float pulse = 0.5 + 0.5 * sin(dot(foot, g_wind_dir) * 0.03 - clock * 1.6 + sin(foot.y * 0.05) * 1.2);
 	float breeze = 0.12 + g_wind_gust * (0.35 + 0.65 * pulse);

@@ -34,6 +34,8 @@ var _hop_end: Vector2
 var _hop_height: float = 4.0
 var _was_hopping: bool = false
 var _shadow: Node2D
+var _nearby_herd: Array[Vector2] = []
+var _nearby_herd_left: float = 0.0
 
 @onready var _sprite: Sprite2D = $Sprite2D
 
@@ -59,6 +61,7 @@ func _physics_process(delta: float) -> void:
 	_state_time += delta
 	_pause_left -= delta
 	if multiplayer.is_server():
+		_nearby_herd_left = maxf(0.0, _nearby_herd_left - delta)
 		_sense_left -= delta
 		if _sense_left <= 0.0:
 			_sense_left = float(_spec["sense_interval"])
@@ -247,8 +250,16 @@ func _try_hop(direction: Vector2, fleeing: bool) -> void:
 	var distance: float = _range("flee_distance" if fleeing else "wander_distance")
 	var best: Vector2 = Vector2.ZERO
 	var best_score: float = -INF
-	var herd: Array[Node] = get_tree().get_nodes_in_group("wildlife") ## once per decision, not once per angle
-	for angle: float in [0.0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2, 1.65, -1.65, 2.2, -2.2, PI]:
+	if _nearby_herd_left <= 0.0 or _nearby_herd.is_empty():
+		_nearby_herd_left = 0.5
+		_nearby_herd.clear()
+		var max_dist_sq: float = (distance + 20.0) * (distance + 20.0)
+		for node: Node in get_tree().get_nodes_in_group("wildlife"):
+			if node != self and node is Node2D:
+				var pos: Vector2 = (node as Node2D).global_position
+				if global_position.distance_squared_to(pos) <= max_dist_sq:
+					_nearby_herd.append(pos)
+	for angle: float in [0.0, 0.6, -0.6, PI]:
 		var step: Vector2 = direction.rotated(angle) * distance
 		var end: Vector2 = global_position + step
 		if test_move(global_transform, step) or not _ground_safe(end) or not _ground_safe(global_position + step * 0.5):
@@ -256,10 +267,10 @@ func _try_hop(direction: Vector2, fleeing: bool) -> void:
 		var score: float = -absf(angle) * 8.0
 		if fleeing:
 			score += end.distance_to(_threat)
-		for neighbour: Node in herd:
-			if neighbour != self:
-				var gap: float = end.distance_to((neighbour as Node2D).global_position)
-				score -= maxf(0.0, 15.0 - gap) * 2.0
+		for neighbour_pos: Vector2 in _nearby_herd:
+			var gap: float = end.distance_to(neighbour_pos)
+			if gap < 15.0:
+				score -= (15.0 - gap) * 2.0
 		if score > best_score:
 			best = end
 			best_score = score

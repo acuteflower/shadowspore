@@ -45,7 +45,14 @@ var _puller: int = 0 ## peer id of the player it is drawn to, 0 = lying still
 var _pull_speed: float = 0.0
 
 
+func _init() -> void:
+	monitoring = false
+	monitorable = false
+
+
 func _ready() -> void:
+	monitoring = false
+	monitorable = false
 	material = Unlit.material() ## loot stays easy to spot at night
 	_stack = {"id": item_id, "count": count}
 	if refine > 0:

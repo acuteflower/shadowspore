@@ -47,6 +47,9 @@ var _glow: Control
 var _fade: float = 1.0 ## 1 -> 0 while it withers
 var _cover: float = 1.0 ## the HUD dims it behind full-screen windows
 var _covered: bool = false
+var _dirty: bool = true
+var _idle_time: float = 0.0
+const IDLE_REDRAW_INTERVAL: float = 0.066 ## ~15 FPS idle shimmer is plenty for pixel art
 
 
 func _ready() -> void:
@@ -88,6 +91,8 @@ func track(title: String, health: HealthComponent) -> void:
 	_flash = 0.4
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
+	health.changed.connect(_on_health_changed)
+	_dirty = true
 	visible = true
 	_fade = 1.0
 	modulate.a = 1.0
@@ -113,6 +118,8 @@ func _untrack() -> void:
 			_health.damaged.disconnect(_on_damaged)
 		if _health.died.is_connected(_on_died):
 			_health.died.disconnect(_on_died)
+		if _health.changed.is_connected(_on_health_changed):
+			_health.changed.disconnect(_on_health_changed)
 	_health = null
 
 
@@ -135,9 +142,14 @@ func _x0() -> int:
 	return int((SIZE.x - W) * 0.5)
 
 
+func _on_health_changed(_c: float, _m: float) -> void:
+	_dirty = true
+
+
 func _on_damaged(amount: float, _from: Vector2, _knockback: float) -> void:
 	if _state != State.OPEN:
 		return
+	_dirty = true
 	_flash = 0.14
 	_ghost_wait = GHOST_DELAY
 	var count: int = clampi(int(amount / maxf(_health.max_health, 1.0) * 60.0) + 4, 4, 18)
@@ -190,37 +202,56 @@ func _process(delta: float) -> void:
 					_impact = 0.55
 					_flash = 0.3
 					_spawn_shards(Vector2(_x0() + _fill(), CRACK_Y), 24, 1.4)
+					_dirty = true
 				_last_phase = phase
 				if _ghost_wait > 0.0:
 					_ghost_wait -= delta
+					_dirty = true
 				elif _ghost > _fraction():
 					_ghost = maxf(_fraction(), _ghost - GHOST_SPEED * delta)
+					_dirty = true
 				elif _fraction() > _ghost:
 					_ghost = _fraction()
+					_dirty = true
 		State.DYING:
 			_dying += delta
 			_fade = clampf(1.0 - (_dying - 0.5) / (DEATH_TIME - 0.5), 0.0, 1.0)
+			_dirty = true
 			if _dying >= DEATH_TIME:
 				_state = State.HIDDEN
 				visible = false
 				set_process(false)
+				return
 	for s: Dictionary in _shards:
 		s["life"] = float(s["life"]) - delta
 		var vel: Vector2 = s["vel"] as Vector2
 		vel.y += SHARD_GRAVITY * delta
 		s["vel"] = vel
 		s["pos"] = (s["pos"] as Vector2) + vel * delta
+	var prev_cover: float = _cover
 	_cover = move_toward(_cover, 0.0 if _covered else 1.0, delta * 8.0)
+	if absf(_cover - prev_cover) > 0.001:
+		_dirty = true
 	modulate.a = _fade * _cover
 	_shards = _shards.filter(func(s: Dictionary) -> bool: return float(s["life"]) > 0.0)
-	if modulate.a > 0.0 and visible:
+	if not _shards.is_empty():
+		_dirty = true
+
+	if not visible or modulate.a <= 0.0:
+		return
+
+	var is_active_anim: bool = (_state == State.DYING or _grow < 1.0 or _flash > 0.0 or _impact > 0.0 or not _shards.is_empty())
+	_idle_time += delta
+	if is_active_anim or _dirty or _idle_time >= IDLE_REDRAW_INTERVAL:
+		_idle_time = 0.0
+		_dirty = false
 		if _rys.size() != W + 1:
 			_rys.resize(W + 1)
 		for i: int in W + 1:
 			_rys[i] = _ry_calc(i)
 		_rys_frame = Engine.get_process_frames()
-	queue_redraw()
-	_glow.queue_redraw()
+		queue_redraw()
+		_glow.queue_redraw()
 
 
 # --- shape of the crack -----------------------------------------------------------------------------------

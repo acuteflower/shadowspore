@@ -11,7 +11,7 @@ const BONE_GLOW: Texture2D = preload("res://assets/props/fallen_logs_bone_glow.p
 const FRAMES: int = 24 ## per sheet
 const FRAME_W: int = 112
 const FRAME_H: int = 80
-const BAND_H: int = 1
+const BAND_H: int = 8
 
 static var _bands_cache: Dictionary = {}
 

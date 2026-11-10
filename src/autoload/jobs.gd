@@ -49,7 +49,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_priority = -100 ## Ergebnisse kommen vor allen anderen _process-Aufrufen an
 	var cores: int = OS.get_processor_count()
-	max_running = clampi(cores / 3, 1, 6)
+	max_running = clampi(cores - 2, 1, 8)
 	if OS.get_cmdline_user_args().has("--no-threads") or OS.get_cmdline_args().has("--no-threads"):
 		threaded = false
 	if cores <= 1:

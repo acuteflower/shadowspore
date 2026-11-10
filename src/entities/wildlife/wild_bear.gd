@@ -2,6 +2,11 @@ class_name WildBear
 extends WoodlandMammal
 ## Shy omnivore: retreat first, warn persistent pursuers, briefly defend personal space.
 ## Cub follow/play and hunting use the same reliable, late-joinable action timeline.
+
+const ATTACK_TEXTURE: Texture2D = preload("res://assets/wildlife/bear_attack.png")
+const PLAY_TEXTURE: Texture2D = preload("res://assets/wildlife/bear_play.png")
+static var _texture_cache: Dictionary = {}
+
 var _pressure: Dictionary = {}
 var _provoker: Player
 var _defending: bool = false
@@ -12,6 +17,7 @@ var _prey: WildRabbit
 var _hunt_left: float = 0.0
 var _meal_cd: float = 10.0
 var _last_swipe_elapsed: float = 0.0
+var _notifier: VisibleOnScreenNotifier2D
 
 func _init() -> void:
 	species = "bear"
@@ -23,6 +29,13 @@ func _ready() -> void:
 	if not is_cub():
 		add_to_group("predators")
 	_meal_cd = _range("hunt_cooldown") * 0.3
+	_notifier = VisibleOnScreenNotifier2D.new()
+	_notifier.rect = Rect2(-36, -36, 72, 72)
+	add_child(_notifier)
+	var default_path: String = String(_spec.get("texture", "res://assets/wildlife/bear.png"))
+	if not _texture_cache.has(default_path) and ResourceLoader.exists(default_path):
+		_texture_cache[default_path] = load(default_path) as Texture2D
+	queue_redraw()
 
 func is_cub() -> bool:
 	return appearance == 2
@@ -252,10 +265,13 @@ func _swipe_hit() -> void:
 			target.take_hit(float(_spec["attack_damage"]), global_position + Vector2(0, -12), float(_spec["attack_knockback"]))
 
 func _process(delta: float) -> void:
+	if _notifier != null and not _notifier.is_on_screen():
+		return
 	_visual_facing += clampf(angle_difference(_visual_facing, facing), -delta * 7.0, delta * 7.0)
 	var col: int = int(_elapsed * 2.0) % 4
 	var cols: int = 44
 	var texture_path: String = String(_spec["texture"])
+	var texture: Texture2D = null
 	match mood:
 		Mood.FORAGE: col = 4 + int(_elapsed * 3.0) % 6
 		Mood.WALK, Mood.RETURN: col = 10 + int(_gait_phase * 8.0) % 8
@@ -267,20 +283,23 @@ func _process(delta: float) -> void:
 		Mood.LOWER: col = 43 - mini(5, int(_elapsed / _duration * 6.0))
 		Mood.SWIPE:
 			cols = 8
-			texture_path = "res://assets/wildlife/bear_attack.png"
+			texture = ATTACK_TEXTURE
 			col = mini(7, int(_elapsed / _duration * 8.0))
 		Mood.PLAY:
 			cols = 6
-			texture_path = "res://assets/wildlife/bear_play.png"
+			texture = PLAY_TEXTURE
 			col = int(_elapsed * 3.0) % 6
-	var texture: Texture2D = load(texture_path) as Texture2D
+	if texture == null:
+		texture = _texture_cache.get(texture_path) as Texture2D
+		if texture == null:
+			texture = load(texture_path) as Texture2D
+			_texture_cache[texture_path] = texture
 	if _sprite.texture != texture:
 		_sprite.texture = texture
 		_sprite.hframes = cols
 		_sprite.vframes = 24
 	var sector: int = posmod(roundi(_visual_facing / (PI / 4.0)), 8)
 	_sprite.frame = (clampi(appearance, 0, 2) * 8 + sector) * cols + col
-	queue_redraw()
 
 func _advance() -> void:
 	var chasing: bool = mood == Mood.CHASE

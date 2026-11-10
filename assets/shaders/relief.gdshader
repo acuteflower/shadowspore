@@ -20,6 +20,9 @@ uniform vec2 view_size = vec2(640.0, 360.0);
 uniform float time = 0.0;
 uniform float night = 0.0;
 uniform bool glow_pass = false; // the second, additive and unlit copy of this shader (ReliefLayer): only the glowing veins of crystal and void walls
+uniform bool overhang_pass = false; // foreground copy (ReliefLayer): occludes actors standing behind/under an elevation
+uniform vec4 occlude_actors[8]; // xy = world px, z = floor level, w = active
+uniform int occlude_count = 0;
 uniform float world_tiles = 1100.0;
 uniform vec3 tints[6]; // what the biome's ground layer multiplies its grass with
 
@@ -451,11 +454,10 @@ vec4 steps(vec2 p, vec2 l, Tile c, vec3 tint, bool rough) {
 
 // ---------------------------------------------------------------------------------- floors
 // lips on the edges of a plateau, shadows and sides on the low ground next to it
-vec4 floor_pixel(vec2 p, vec3 tint) {
+vec4 floor_pixel(vec2 p, vec3 tint, float up) {
 	int home = lev(p);
 	vec4 col = vec4(0.0);
 	if (home > 0) col = vec4(1.0, 0.97, 0.82, 0.045 * float(home)); // higher ground catches a little more light
-	float up = up_dist(p);
 	if (up > WALL && up < 99.0) { // the foot of a wall: its shadow falls down and a little right
 		float reach = 11.0;
 		float k = up - WALL;
@@ -470,6 +472,22 @@ vec4 floor_pixel(vec2 p, vec3 tint) {
 		}
 		if (k <= 3 && lev(p + vec2(fk, 0.0)) > home) { // a plateau to the east, lit on this side
 			col = vec4(side(tile_at(p + vec2(fk, 0.0)).style, 4.0 - fk, p), 1.0);
+			break;
+		}
+	}
+	// a plateau to the south: its shadow falls north onto the lower ground
+	for (int k = 1; k <= 11; k++) {
+		float fk = float(k);
+		bool south_plateau = lev(p + vec2(0.0, fk)) > home;
+		if (!south_plateau && k <= 8) {
+			south_plateau = lev(p + vec2(-fk * 0.7, fk * 0.7)) > home || lev(p + vec2(fk * 0.7, fk * 0.7)) > home;
+		}
+		if (south_plateau) {
+			float reach = 11.0;
+			float strength = 1.0 - (fk - 1.0) / reach;
+			if (strength > bayer(p) * 0.85) {
+				col = vec4(SHADOW, fk <= 2.0 ? 0.70 : 0.52);
+			}
 			break;
 		}
 	}
@@ -491,6 +509,23 @@ vec4 floor_pixel(vec2 p, vec3 tint) {
 
 void fragment() {
 	vec2 p = origin + floor(UV * view_size);
+	if (overhang_pass) {
+		bool in_range = false;
+		int home = lev(p);
+		for (int i = 0; i < occlude_count; i++) {
+			vec4 actor = occlude_actors[i];
+			if (actor.w > 0.5 && float(home) > actor.z) {
+				vec2 d = p - actor.xy;
+				if (abs(d.x) <= 14.0 && d.y >= -38.0 && d.y <= 6.0) {
+					in_range = true;
+					break;
+				}
+			}
+		}
+		if (!in_range) {
+			discard;
+		}
+	}
 	ivec2 tc = ivec2(floor(p / TILE));
 	vec2 l = p - vec2(tc) * TILE;
 	Tile c = tile(tc);
@@ -529,10 +564,11 @@ void fragment() {
 					int style = near.land && near.kind < 2 ? near.style : top.style;
 					COLOR = glow_pass ? wall_glow_pixel(p, up, style) : wall_pixel(p, up, style, tints[top.biome]);
 				} else if (!glow_pass) {
-					COLOR = floor_pixel(p, tint);
+					COLOR = floor_pixel(p, tint, up);
 				}
 			}
 		}
 	}
 	if (!glow_pass) { COLOR.rgb = day_grade(COLOR.rgb, p, 0.4); }
+	if (overhang_pass && COLOR.a < 0.05) { discard; }
 }

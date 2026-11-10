@@ -11,6 +11,8 @@ const SKY_CLEAVER_SCENE: PackedScene = preload("res://src/entities/enemies/sky_c
 const CHUNK: int = 32 ## tiles per chunk side
 const STREAM_BUDGET_USEC: int = 2000 ## cooperative CPU preparation per frame
 const STREAM_URGENT_USEC: int = 5000 ## ... while the chunk being built touches a player's own ring (it may come into view soon)
+const STREAM_OWN_CHUNK_USEC: int = 4000 ## cooperative CPU preparation when the player stands in the building chunk
+const MAX_UNLOADS_PER_FRAME: int = 1 ## unloads are queued to avoid frame spikes from clearing multiple chunks at once
 const LOOKAHEAD_SECONDS: float = 2.5 ## the ring round where a moving player will be this soon is loaded too (ahead of the camera)
 const LOOKAHEAD_MAX_SPEED: float = 420.0 ## px/s; faster jumps are teleports, not running
 const DETAIL_BUCKET: float = 64.0
@@ -117,6 +119,8 @@ class ChunkBuild:
 	var clover_discs: Array[Vector3] = [] ## (x, y, rx) of the fields placed so far (read instead of the nodes, which a worker may still be painting)
 	var clover_jobs: Array[Jobs.Job] = [] ## each field paints its atlas on a worker (`CloverField.setup`); phase 9 waits for them
 	var commit_index: int = 0 ## props of `chunk.things` already added to the tree by `_finish_commit`
+	var commit_stage: int = 0 ## 0 = props, 1 = logs, 2 = clover, 3 = finalize
+	var commit_sub_index: int = 0 ## index within logs or clover
 	var patches_seen: Array[Node] = [] ## Terrain.patches as this chunk last saw them (compared per candidate)
 	var job: Jobs.Job ## phases 0-4 (generator, ground, cliffs, prop nodes) run on a worker thread (Jobs); null = not started / sliced on the main thread
 	var beds_pending: Array[Dictionary] = [] ## forest beds that passed the worker checks; the surface patches decide on the main thread
@@ -987,6 +991,7 @@ var _wood_busy: bool = false
 var _stream_settled: bool = false ## the last `_stream(false)` left nothing to load or drop (see `_stream`)
 var _stream_centers: Array[Vector2i] = [] ## the chunk centres of that pass
 var _stream_motion: Dictionary = {} ## player instance id -> [last position, smoothed velocity] for the look-ahead ring
+var _unload_queue: Array[Vector2i] = [] ## chunks waiting to be unloaded gradually (MAX_UNLOADS_PER_FRAME)
 
 
 func _process(delta: float) -> void:
@@ -1053,6 +1058,7 @@ func _stream(all: bool) -> void:
 	_finish_commit(frame_deadline) ## the ground committed last frame gets its props now (over several frames when it has many)
 	var centers: Array[Vector2i] = []
 	var ahead: Array[Vector2i] = [] ## look-ahead centres: loaded after the players' own rings, never built at once
+	var is_teleport: bool = false
 	if all:
 		centers.append(_start / CHUNK)
 		centers.append(Vector2i(_spawn_position(0) / (16.0 * CHUNK)))
@@ -1064,6 +1070,8 @@ func _stream(all: bool) -> void:
 			centers.append(own)
 			var motion: Array = _stream_motion.get(player.get_instance_id(), [at, Vector2.ZERO])
 			var step: Vector2 = (at - (motion[0] as Vector2)) / delta
+			if step.length() > LOOKAHEAD_MAX_SPEED:
+				is_teleport = true
 			var velocity: Vector2 = Vector2.ZERO if step.length() > LOOKAHEAD_MAX_SPEED else (motion[1] as Vector2).lerp(step, minf(1.0, delta * 4.0))
 			_stream_motion[player.get_instance_id()] = [at, velocity]
 			var forward: Vector2i = Vector2i((at + velocity * LOOKAHEAD_SECONDS) / (16.0 * CHUNK))
@@ -1122,12 +1130,27 @@ func _stream(all: bool) -> void:
 			for i: int in mini(PREFETCH, missing.size()):
 				_prefetch(Vector2i(missing[i].y, missing[i].z))
 		if _building != null and _pending_commit == null:
-			# Only the player's own chunk while it is not loaded at all (startup, teleport) is built at once; every other chunk, in view or not, uses the budget.
-			var deadline: int = 0 if best_d == 0 else (frame_deadline - STREAM_BUDGET_USEC + STREAM_URGENT_USEC if best_d <= 2 else frame_deadline)
-			if _advance_chunk(_building, deadline):
-				var finished: ChunkBuild = _building
-				_building = null
-				_commit_chunk(finished)
+			var has_ground_near: bool = false
+			for center: Vector2i in centers:
+				for dy: int in range(-1, 2):
+					for dx: int in range(-1, 2):
+						if _chunks.has(center + Vector2i(dx, dy)):
+							has_ground_near = true
+							break
+					if has_ground_near: break
+				if has_ground_near: break
+			var is_teleport_dest: bool = (best_d == 0 and not has_ground_near)
+			var time_now: int = Time.get_ticks_usec()
+			if not all and time_now >= frame_deadline and not is_teleport_dest:
+				pass
+			else:
+				var deadline: int = 0 if is_teleport_dest else ((frame_deadline - STREAM_BUDGET_USEC + STREAM_OWN_CHUNK_USEC) if best_d == 0 else (frame_deadline - STREAM_BUDGET_USEC + STREAM_URGENT_USEC if best_d <= 2 else frame_deadline))
+				if _advance_chunk(_building, deadline):
+					var finished: ChunkBuild = _building
+					_building = null
+					_commit_chunk(finished)
+					if is_teleport_dest:
+						_finish_commit()
 	if all or centers.is_empty():
 		return
 	for c: Vector2i in _chunks.keys():
@@ -1140,11 +1163,20 @@ func _stream(all: bool) -> void:
 				near = true
 				break
 		if not near:
-			_unload_chunk(c)
+			if not _unload_queue.has(c):
+				_unload_queue.append(c)
+		else:
+			_unload_queue.erase(c)
+	var unloads: int = 0
+	while not _unload_queue.is_empty() and unloads < MAX_UNLOADS_PER_FRAME:
+		var c_to_unload: Vector2i = _unload_queue.pop_front()
+		if _chunks.has(c_to_unload):
+			_unload_chunk(c_to_unload)
+			unloads += 1
 	_stream_centers = probe
 	if _stream_motion.size() > _players.get_child_count() + 4:
 		_stream_motion.clear()
-	_stream_settled = best.x < 0 and _building == null and _paused_builds.is_empty() and _pending_commit == null
+	_stream_settled = best.x < 0 and _building == null and _paused_builds.is_empty() and _pending_commit == null and _unload_queue.is_empty()
 
 
 func _land_at(x: int, y: int) -> bool:
@@ -1463,39 +1495,66 @@ func _finish_commit(deadline: int = 0) -> void:
 	var build: ChunkBuild = _pending_commit
 	if build == null: return
 	var chunk: Chunk = build.chunk
-	if build.commit_index == 0 and _town_node != null and not _town_node.cleared.is_empty(): ## a chunk that was in preparation while the town cleared a foundation
-		var kept: Array[WorldProp] = []
-		for prepared: WorldProp in chunk.things:
-			if _town_node.cleared.has(prepared.cell):
-				prepared.free()
-			else:
-				kept.append(prepared)
-		chunk.things = kept
-	while build.commit_index < chunk.things.size(): ## props enter the tree one by one: each runs its _ready (sprites, glow, light), which adds up on a thick wood
-		if deadline > 0 and build.commit_index > 0 and Time.get_ticks_usec() >= deadline:
-			return ## the rest follows next frame; the chunk is not in `_chunks` until it is whole
-		var thing: WorldProp = chunk.things[build.commit_index]
-		build.commit_index += 1
-		_props.add_child(thing)
-		_things[thing.cell] = thing
-		if build.custom.has(thing.cell):
-			var spec: Dictionary = build.custom[thing.cell]
-			var pos: Array = spec.get("pos", [thing.position.x, thing.position.y])
-			thing.position = Vector2(float(pos[0]), float(pos[1]))
-			thing.scale = Vector2(float(spec.get("scale", 1.0)) * (-1.0 if bool(spec.get("flip", false)) else 1.0), float(spec.get("scale", 1.0)))
-	_pending_commit = null
-	if sowing != null:
-		sowing.populate(build.cell, chunk)
-	for log_node: FallenLog in chunk.fallen_logs:
-		_props.add_child(log_node)
-		_register_harvest(log_node)
-	for field: CloverField in chunk.clover:
-		_props.add_child(field)
-		_register_harvest(field)
-	_rivers.attach_chunk(chunk.node, build.cell)
-	_chunks[build.cell] = chunk
-	LeafCritter.settle_chunk(chunk.things)
-	_wildlife.chunk_loaded(build.cell)
+
+	# Stage 0: Props
+	if build.commit_stage == 0:
+		if build.commit_index == 0 and _town_node != null and not _town_node.cleared.is_empty(): ## a chunk that was in preparation while the town cleared a foundation
+			var kept: Array[WorldProp] = []
+			for prepared: WorldProp in chunk.things:
+				if _town_node.cleared.has(prepared.cell):
+					prepared.free()
+				else:
+					kept.append(prepared)
+			chunk.things = kept
+		while build.commit_index < chunk.things.size(): ## props enter the tree one by one: each runs its _ready (sprites, glow, light), which adds up on a thick wood
+			if deadline > 0 and build.commit_index > 0 and Time.get_ticks_usec() >= deadline:
+				return ## the rest follows next frame; the chunk is not in `_chunks` until it is whole
+			var thing: WorldProp = chunk.things[build.commit_index]
+			build.commit_index += 1
+			_props.add_child(thing)
+			_things[thing.cell] = thing
+			if build.custom.has(thing.cell):
+				var spec: Dictionary = build.custom[thing.cell]
+				var pos: Array = spec.get("pos", [thing.position.x, thing.position.y])
+				thing.position = Vector2(float(pos[0]), float(pos[1]))
+				thing.scale = Vector2(float(spec.get("scale", 1.0)) * (-1.0 if bool(spec.get("flip", false)) else 1.0), float(spec.get("scale", 1.0)))
+		build.commit_stage = 1
+		build.commit_sub_index = 0
+
+	# Stage 1: Fallen Logs
+	if build.commit_stage == 1:
+		while build.commit_sub_index < chunk.fallen_logs.size():
+			if deadline > 0 and Time.get_ticks_usec() >= deadline:
+				return
+			var log_node: FallenLog = chunk.fallen_logs[build.commit_sub_index]
+			build.commit_sub_index += 1
+			_props.add_child(log_node)
+			_register_harvest(log_node)
+		build.commit_stage = 2
+		build.commit_sub_index = 0
+
+	# Stage 2: Clover Fields
+	if build.commit_stage == 2:
+		while build.commit_sub_index < chunk.clover.size():
+			if deadline > 0 and Time.get_ticks_usec() >= deadline:
+				return
+			var field: CloverField = chunk.clover[build.commit_sub_index]
+			build.commit_sub_index += 1
+			_props.add_child(field)
+			_register_harvest(field)
+		build.commit_stage = 3
+
+	# Stage 3: Finalize
+	if build.commit_stage == 3:
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			return
+		_pending_commit = null
+		if sowing != null:
+			sowing.populate(build.cell, chunk)
+		_rivers.attach_chunk(chunk.node, build.cell)
+		_chunks[build.cell] = chunk
+		LeafCritter.settle_chunk(chunk.things)
+		_wildlife.chunk_loaded(build.cell)
 
 
 ## Frees a build that never became live (its things and logs are not in the tree; a committed node is queued).
@@ -1510,15 +1569,35 @@ func _free_build_nodes(build: ChunkBuild) -> void:
 		Jobs.cancel(clover_job)
 		Jobs.wait(clover_job)
 	build.clover_jobs.clear()
-	for thing: WorldProp in build.chunk.things: thing.free()
-	for log_node: FallenLog in build.chunk.fallen_logs: log_node.free()
-	for field: CloverField in build.chunk.clover: field.free()
+	for thing: WorldProp in build.chunk.things:
+		_things.erase(thing.cell)
+		_young.erase(thing.cell)
+		if thing.is_inside_tree():
+			_props.remove_child(thing)
+			thing.queue_free()
+		else:
+			thing.free()
+	for log_node: FallenLog in build.chunk.fallen_logs:
+		_unregister_harvest(log_node)
+		if log_node.is_inside_tree():
+			_props.remove_child(log_node)
+			log_node.queue_free()
+		else:
+			log_node.free()
+	for field: CloverField in build.chunk.clover:
+		_unregister_harvest(field)
+		if field.is_inside_tree():
+			_props.remove_child(field)
+			field.queue_free()
+		else:
+			field.free()
 	if build.chunk.node.is_inside_tree(): build.chunk.node.queue_free()
 	else: build.chunk.node.free()
 
 
 func _discard_chunk_build() -> void:
 	_finish_commit() ## a committed chunk becomes whole first, so an unload sees all of it
+	_unload_queue.clear()
 	if _building != null:
 		_free_build(_building)
 		_building = null
@@ -1641,6 +1720,9 @@ func _paint(chunk: Chunk, cell: Vector2i, biome: String, rng: RandomNumberGenera
 
 
 func _unload_chunk(c: Vector2i) -> void:
+	_unload_queue.erase(c)
+	if not _chunks.has(c):
+		return
 	_wildlife.chunk_unloaded(c)
 	var chunk: Chunk = _chunks[c]
 	for biome: String in chunk.cells:

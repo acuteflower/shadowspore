@@ -10,6 +10,8 @@ const TINT_AMOUNT: float = 0.6 ## how much of a biome's colour its ground layer 
 var _material: ShaderMaterial = ShaderMaterial.new()
 var _glow: ColorRect ## the veins of crystal and void walls: an additive, unlit copy of the shader that pulses at night
 var _glow_material: ShaderMaterial = ShaderMaterial.new()
+var _overhang: ColorRect ## foreground copy that occludes actors standing behind/under an elevation
+var _overhang_material: ShaderMaterial = ShaderMaterial.new()
 var _clock: float = 0.0
 var _relief: Relief
 var _last_check_tile_rect: Rect2i = Rect2i()
@@ -22,7 +24,9 @@ func setup(texture: Texture2D, field: Texture2D, relief: Relief = null) -> void:
 	glow_shader.code = SHADER.code.replace("shader_type canvas_item;", "shader_type canvas_item;\nrender_mode unshaded, blend_add;")
 	_glow_material.shader = glow_shader
 	_glow_material.set_shader_parameter("glow_pass", true)
-	for m: ShaderMaterial in [_material, _glow_material]:
+	_overhang_material.shader = SHADER
+	_overhang_material.set_shader_parameter("overhang_pass", true)
+	for m: ShaderMaterial in [_material, _glow_material, _overhang_material]:
 		m.set_shader_parameter("relief", texture)
 		m.set_shader_parameter("field", field)
 		m.set_shader_parameter("wobble", Relief.WOBBLE)
@@ -35,11 +39,20 @@ func setup(texture: Texture2D, field: Texture2D, relief: Relief = null) -> void:
 		tints.append(Vector3(tint.r, tint.g, tint.b))
 	_material.set_shader_parameter("tints", tints)
 	_glow_material.set_shader_parameter("tints", tints)
+	_overhang_material.set_shader_parameter("tints", tints)
 	material = _material
 	_glow = ColorRect.new()
 	_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_glow.material = _glow_material
 	add_child(_glow)
+	_overhang = ColorRect.new()
+	_overhang.name = "ReliefOverhang"
+	_overhang.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overhang.material = _overhang_material
+	_overhang.top_level = true
+	_overhang.z_as_relative = false
+	_overhang.z_index = 1
+	add_child(_overhang)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_index = -8 ## above the ground and the glow layer, below everything that stands on it
 
@@ -74,3 +87,26 @@ func _process(delta: float) -> void:
 		_glow_material.set_shader_parameter("view_size", size)
 		_glow_material.set_shader_parameter("time", _clock)
 		_glow_material.set_shader_parameter("night", night)
+	if _overhang != null:
+		var actors: PackedVector4Array = PackedVector4Array()
+		var player_nodes: Array[Node] = get_tree().get_nodes_in_group("players")
+		for node: Node in player_nodes:
+			var character: CharacterBody2D = node as CharacterBody2D
+			if character != null and is_instance_valid(character):
+				var pos: Vector2 = character.global_position
+				var lvl: float = _relief.level_at(pos) if _relief != null else 0.0
+				actors.append(Vector4(pos.x, pos.y, lvl, 1.0))
+				if actors.size() >= 8:
+					break
+		while actors.size() < 8:
+			actors.append(Vector4.ZERO)
+		_overhang.visible = player_nodes.size() > 0
+		if _overhang.visible:
+			_overhang.position = top_left
+			_overhang.size = size
+			_overhang_material.set_shader_parameter("origin", top_left)
+			_overhang_material.set_shader_parameter("view_size", size)
+			_overhang_material.set_shader_parameter("time", _clock)
+			_overhang_material.set_shader_parameter("night", night)
+			_overhang_material.set_shader_parameter("occlude_actors", actors)
+			_overhang_material.set_shader_parameter("occlude_count", player_nodes.size())

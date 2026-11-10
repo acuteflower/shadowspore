@@ -104,27 +104,74 @@ static func _n(x: float) -> float:
 
 
 ## One tongue of flame standing on `base`: `w` wide at the foot, `h` high, `t` the clock, `salt` makes every flame its own, `strength` 0..1.
+## Optimized: Draws flame tongue as a connected polygon with vertex gradient (violet -> magenta -> pale)
+## and an inner white-hot core, replacing 20-35 individual draw_rect calls with 1-2 polygon calls.
 static func flame(canvas: CanvasItem, base: Vector2, w: float, h: float, t: float, salt: float, strength: float) -> void:
 	if h < 2.0 or strength <= 0.01:
 		return
-	var rows: int = int(h)
+
 	var step_t: float = floorf(t * 13.0)
-	for r: int in rows:
-		var k: float = float(r) / float(rows)
-		var wob: float = _n(salt * 13.0 + float(r) * 0.7 + step_t)
-		if k > 0.68 and wob < 0.3: ## the licks at the top break up
-			continue
-		var half: float = w * 0.5 * (1.0 - pow(k, 1.6)) * (0.55 + 0.45 * smoothstep(0.0, 0.25, k)) * (0.65 + 0.7 * wob)
-		var width: int = maxi(1, roundi(half * 2.0))
-		var sway: float = sin(t * 8.0 + salt * 3.0 + k * 3.5) * k * w * 0.45
-		var x: float = roundf(base.x + sway - float(width) * 0.5)
-		var y: float = roundf(base.y) - float(r)
-		var color: Color = VIOLET.lerp(MAGENTA, k / 0.3) if k < 0.3 else MAGENTA.lerp(PALE, (k - 0.3) / 0.7)
-		var a: float = strength * (1.0 - k * 0.55)
-		canvas.draw_rect(Rect2(x, y, float(width), 1.0), Color(color, a))
-		if width >= 3 and k < 0.7:
-			canvas.draw_rect(Rect2(x + 1.0, y, float(width - 2), 1.0), Color(color.lerp(WHITE_HOT, 0.55), a * 0.8))
-	for e: int in 2: ## sparks rise out of it
+	var wob0: float = _n(salt * 13.0 + step_t)
+	var wob1: float = _n(salt * 13.0 + 5.0 + step_t)
+	var wob2: float = _n(salt * 13.0 + 12.0 + step_t)
+
+	# Key heights along the flame: base (0.0), belly (0.28), mid (0.65), tip (1.0)
+	var sway1: float = sin(t * 8.0 + salt * 3.0 + 0.28 * 3.5) * 0.28 * w * 0.45
+	var sway2: float = sin(t * 8.0 + salt * 3.0 + 0.65 * 3.5) * 0.65 * w * 0.45
+	var sway3: float = sin(t * 8.0 + salt * 3.0 + 3.5) * w * 0.45
+
+	var half0: float = maxf(1.0, roundf(w * 0.28 * (0.8 + 0.4 * wob0)))
+	var half1: float = maxf(1.5, roundf(w * 0.42 * (0.8 + 0.4 * wob1)))
+	var half2: float = maxf(1.0, roundf(w * 0.22 * (0.8 + 0.4 * wob2)))
+
+	var y0: float = roundf(base.y)
+	var y1: float = roundf(base.y - h * 0.28)
+	var y2: float = roundf(base.y - h * 0.65)
+	var y3: float = roundf(base.y - h)
+
+	var bx: float = base.x
+	# Construct 7 vertices: Base-L, Belly-L, Mid-L, Tip, Mid-R, Belly-R, Base-R
+	var pts: PackedVector2Array = PackedVector2Array([
+		Vector2(roundf(bx - half0), y0),
+		Vector2(roundf(bx + sway1 - half1), y1),
+		Vector2(roundf(bx + sway2 - half2), y2),
+		Vector2(roundf(bx + sway3), y3),
+		Vector2(roundf(bx + sway2 + half2), y2),
+		Vector2(roundf(bx + sway1 + half1), y1),
+		Vector2(roundf(bx + half0), y0),
+	])
+
+	var col_base: Color = Color(VIOLET, strength)
+	var col_belly: Color = Color(MAGENTA, strength * 0.85)
+	var col_mid: Color = Color(MAGENTA.lerp(PALE, 0.4), strength * 0.65)
+	var col_tip: Color = Color(PALE, strength * 0.45)
+
+	var cols: PackedColorArray = PackedColorArray([
+		col_base,
+		col_belly,
+		col_mid,
+		col_tip,
+		col_mid,
+		col_belly,
+		col_base,
+	])
+
+	canvas.draw_polygon(pts, cols)
+
+	# White-hot inner core in lower body for larger flames
+	if w >= 3.0 and h >= 5.0 and half1 >= 2.0:
+		var in_half0: float = maxf(0.5, half0 * 0.5)
+		var in_half1: float = maxf(0.5, half1 * 0.5)
+		var in_pts: PackedVector2Array = PackedVector2Array([
+			Vector2(roundf(bx - in_half0), y0),
+			Vector2(roundf(bx + sway1 - in_half1), y1),
+			Vector2(roundf(bx + sway1 + in_half1), y1),
+			Vector2(roundf(bx + in_half0), y0),
+		])
+		canvas.draw_colored_polygon(in_pts, Color(WHITE_HOT, strength * 0.7))
+
+	# 2 rising sparks
+	for e: int in 2:
 		var phase: float = fposmod(t * 0.9 + salt * 0.37 + float(e) * 0.5, 1.0)
 		var ex: float = base.x + sin(salt + float(e) * 3.0 + phase * 6.0) * w * 0.6
 		var ey: float = base.y - phase * h * 1.8

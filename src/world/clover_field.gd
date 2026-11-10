@@ -107,6 +107,14 @@ func setup(field: Dictionary, center: Vector2, world: WorldLevel = null) -> void
 		y += step * 0.8
 	var keys: Array = bands.keys()
 	keys.sort()
+	_materials.clear()
+	for layer: int in 2:
+		var mat: ShaderMaterial = ShaderMaterial.new()
+		mat.shader = LIT if layer == 0 else GLOW
+		mat.set_shader_parameter("count", float(CELLS))
+		mat.set_shader_parameter("actors", _no_actors())
+		mat.set_shader_parameter("band_origin", global_position)
+		_materials.append(mat)
 	for key: int in keys:
 		_add_band(key, bands[key] as Array, textures)
 	_notifier = VisibleOnScreenNotifier2D.new()
@@ -138,13 +146,7 @@ func _add_band(key: int, clumps: Array, textures: Array[ImageTexture]) -> void:
 		var instance: MultiMeshInstance2D = MultiMeshInstance2D.new()
 		instance.texture = textures[layer]
 		instance.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var shader_material: ShaderMaterial = ShaderMaterial.new()
-		shader_material.shader = LIT if layer == 0 else GLOW
-		shader_material.set_shader_parameter("count", float(CELLS))
-		shader_material.set_shader_parameter("actors", _no_actors())
-		shader_material.set_shader_parameter("band_origin", global_position + band.position)
-		_materials.append(shader_material)
-		instance.material = shader_material
+		instance.material = _materials[layer]
 		var quad: QuadMesh = QuadMesh.new()
 		quad.size = Vector2(CELL)
 		instance.multimesh = MultiMesh.new()
@@ -197,7 +199,17 @@ func _process(delta: float) -> void:
 		if not _live_ids.has(id): _energy.erase(id)
 	if _kick > 0.0: ## a blow or a cut: the clumps round the spot bend away, then settle
 		_actors[ACTOR_SLOTS - 1] = Vector4(_kick_at.x, _kick_at.y, 0.4 + 0.6 * _kick, 0.0)
-	if _actors != _sent_actors:
+	var changed: bool = false
+	if _sent_actors.size() != ACTOR_SLOTS:
+		changed = true
+	else:
+		for s: int in ACTOR_SLOTS:
+			var a: Vector4 = _actors[s]
+			var b: Vector4 = _sent_actors[s]
+			if Vector2(a.x - b.x, a.y - b.y).length_squared() > 4.0 or absf(a.z - b.z) > 0.05:
+				changed = true
+				break
+	if changed:
 		_sent_actors = _actors.duplicate()
 		for shader_material: ShaderMaterial in _materials:
 			shader_material.set_shader_parameter("actors", _sent_actors)

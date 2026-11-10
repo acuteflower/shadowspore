@@ -20,9 +20,9 @@ const VIOLET: Color = Color("a23cff")
 const TEAL: Color = Color("5fe3d4")
 const TEAL_DARK: Color = Color("0c3d4a")
 const HOST_TICK: float = 0.4
-const REDRAW: float = 1.0 / 30.0
-const EDGE_STRIDE: float = 12.0
-const FLOOR_STRIDE: float = 22.0
+const REDRAW: float = 1.0 / 20.0 ## 0.05s / 20 Hz: throttled redraw rate for arena fire effects
+const EDGE_STRIDE: float = 32.0 ## increased from 12.0 to reduce rim flame spot count by ~70%
+const FLOOR_STRIDE: float = 44.0 ## increased from 22.0 to reduce floor spot count by ~75%
 const SEAL_HEIGHT: float = 78.0
 
 var field: FeatherField
@@ -56,6 +56,30 @@ var _host_acc: float = 0.0
 var _drew: bool = false
 
 
+## Subclass of PixelFlames limiting drawn flame tongues per spot to 1-2 instead of 3.
+class ArenaFlames extends PixelFlames:
+	func _draw() -> void:
+		if amount <= 0.001:
+			return
+		for f: Dictionary in _flames:
+			var c: float = fposmod(_t / float(f["period"]) + float(f["phase"]), 1.0)
+			var duty: float = float(f["duty"])
+			if c >= duty:
+				continue
+			var k: float = smoothstep(0.0, 0.12, c) * (1.0 - smoothstep(duty - 0.18, duty, c)) ## it catches, burns, dies down
+			if k <= 0.03:
+				continue
+			var pos: Vector2 = f["pos"] as Vector2
+			var fw: float = float(f["w"]) * (0.7 + 0.3 * k)
+			var fh: float = float(f["h"]) * k
+			var salt: float = float(f["salt"])
+			# Draw 1 primary tongue per spot (66% reduction in base flame draw calls)
+			flame(self, pos, fw, fh, _t, salt, amount * k)
+			# Only draw a 2nd smaller tongue on every other spot if sufficiently tall
+			if fh > 11.0 and int(salt * 10.0) % 2 == 0:
+				flame(self, pos + Vector2(-fw * 0.45, 1.0), fw * 0.6, fh * 0.6, _t, salt + 3.7, amount * k * 0.8)
+
+
 func setup(p_boss: SkyCleaver, p_field: FeatherField, spec: Dictionary) -> void:
 	boss = p_boss
 	field = p_field
@@ -85,11 +109,11 @@ func setup(p_boss: SkyCleaver, p_field: FeatherField, spec: Dictionary) -> void:
 	_sky.material = add
 	_sky.draw.connect(_draw_sky)
 	add_child(_sky)
-	_edge_flames = PixelFlames.new()
+	_edge_flames = ArenaFlames.new()
 	_edge_flames.name = "EdgeFlames"
 	_edge_flames.z_index = -2
 	add_child(_edge_flames)
-	_floor_flames = PixelFlames.new()
+	_floor_flames = ArenaFlames.new()
 	_floor_flames.name = "FloorFlames"
 	_floor_flames.z_index = -2
 	add_child(_floor_flames)
@@ -107,12 +131,12 @@ static func _n(x: float) -> float:
 func light(centre: Vector2, radius: float, delay: float, seconds: float, scale: float, warn: bool = true) -> void:
 	var spots: Array[Dictionary] = []
 	var seed_v: float = centre.x * 0.37 + centre.y * 0.91
-	var ring_n: int = maxi(6, int(radius * TAU / 8.0))
+	var ring_n: int = maxi(4, int(radius * TAU / 14.0))
 	for i: int in ring_n:
 		var ang: float = TAU * float(i) / float(ring_n) + _n(seed_v + float(i)) * 0.5
 		var rad: float = radius * (0.8 + 0.16 * _n(seed_v * 1.7 + float(i)))
 		spots.append({"o": Vector2.from_angle(ang) * rad, "salt": seed_v + float(i) * 3.3, "w": 8.0, "h": 11.0 + 7.0 * _n(seed_v + float(i) * 2.1)})
-	var inner_n: int = maxi(2, int(radius / 6.5))
+	var inner_n: int = maxi(1, int(radius / 11.0))
 	for k: int in inner_n:
 		var ang2: float = _n(seed_v * 2.3 + float(k)) * TAU
 		var rad2: float = radius * 0.6 * sqrt(_n(seed_v * 0.7 + float(k) * 5.1))
@@ -519,7 +543,7 @@ func _draw_seal_ground(s: Dictionary) -> void:
 			var d: float = r * (0.32 + 0.3 * float(q) / 6.0)
 			if _n(float(sp) * 7.0 + float(q) + floorf(_t * 8.0)) < 0.7:
 				_glow.draw_rect(Rect2(roundf(c.x + dir.x * d), roundf(c.y + dir.y * d), 1.0, 1.0), Color(MAGENTA, 0.5 * land))
-	var tongues: int = int(r * TAU / 11.0)
+	var tongues: int = int(r * TAU / 20.0)
 	for i: int in tongues: ## flames lick up round the sigil, higher and higher towards the burst
 		var ang: float = TAU * float(i) / float(tongues) + _n(float(i)) * 0.3
 		var base: Vector2 = c + Vector2.from_angle(ang) * r * 0.97
@@ -536,8 +560,8 @@ func _draw_burst(b: Dictionary) -> void:
 	_disc(_glow, c, r * (0.5 + 0.55 * out), Color(MAGENTA, 0.3 * (1.0 - k) * (1.0 - k)))
 	_disc(_glow, c, r * 0.5 * (1.0 - k), Color(HOT, 0.5 * (1.0 - k)))
 	_dots(_glow, c, r * (0.45 + 0.7 * out), 96, 0.0, Color(PALE, 0.9 * (1.0 - k)), 3)
-	for i: int in 18:
-		var ang: float = TAU * float(i) / 18.0 + _n(float(i)) * 0.4
+	for i: int in 10:
+		var ang: float = TAU * float(i) / 10.0 + _n(float(i)) * 0.4
 		var rad: float = r * (0.25 + 0.6 * _n(float(i) * 3.7))
 		PixelFlames.flame(_glow, c + Vector2.from_angle(ang) * rad, 11.0, 40.0 * (1.0 - k * 0.6), _t, float(i) * 1.7, 1.0 - k)
 

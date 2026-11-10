@@ -66,6 +66,14 @@ class Blade:
 	var cracked: bool = false
 	var far_edge: PackedVector2Array = PackedVector2Array()
 
+	func _init() -> void:
+		poly.resize(14)
+		left.resize(7)
+		right.resize(7)
+		center.resize(7)
+		lit_edge.resize(5)
+		far_edge.resize(5)
+
 class Wing:
 	extends RefCounted
 	var side: float = 1.0
@@ -108,7 +116,7 @@ const PAL_ROCK: Array[Color] = [OUTLINE, ROCK0, ROCK1, ROCK2, ROCK3]
 const PAL_BEAK: Array[Color] = [OUTLINE, ROCK1, ROCK2, ROCK3, Color("7d7bb0")]
 
 const SQUASH: float = 0.72
-const OFFSCREEN_HZ: float = 10.0
+const OFFSCREEN_HZ: float = 0.0 ## 0.0 = paused while off screen (saves rebuilds and draws)
 const LU: float = 11.0
 const LF: float = 11.0
 const LH: float = 3.5
@@ -272,8 +280,43 @@ var _vein_seen: Dictionary = {}
 @onready var _body: Node2D = $Body
 @onready var _glow: Node2D = $Glow
 
+var _parts_pool: Array[Part] = []
+var _parts_pool_index: int = 0
+var _wing_blades: Array = [[], []]
+var _wing_draw_calls: Array = [[], []]
+var _wing_glow_calls: Array = [[], []]
+var _tail_blades: Array[Blade] = []
+var _tail_draw_calls: Array[Callable] = []
+var _td_screen: Array[PackedVector2Array] = []
+var _tendril_draw_calls: Array[Callable] = []
+var _tendril_glow_calls: Array[Callable] = []
+
+
+func _init_pools() -> void:
+	if not _tail_blades.is_empty():
+		return
+	for si: int in 2:
+		for k: int in 11:
+			var b: Blade = Blade.new()
+			_wing_blades[si].append(b)
+			_wing_draw_calls[si].append(_draw_blade.bind(b))
+			_wing_glow_calls[si].append(_glow_blade.bind(b, si))
+	for k: int in 5:
+		var b: Blade = Blade.new()
+		_tail_blades.append(b)
+		_tail_draw_calls.append(_draw_blade.bind(b, true))
+	for i: int in TD_MAX:
+		var scr: PackedVector2Array = PackedVector2Array()
+		scr.resize(TD_N)
+		_td_screen.append(scr)
+		_tendril_draw_calls.append(_draw_tendril.bind(scr, i))
+		_tendril_glow_calls.append(_glow_tendril.bind(scr, i))
+	for i: int in 80:
+		_parts_pool.append(Part.new())
+
 
 func _ready() -> void:
+	_init_pools()
 	var seed_name: String = String(get_parent().name) if get_parent() != null else "sky"
 	_rng.seed = hash(seed_name + "|mornath")
 	_q = _default_q()
@@ -332,9 +375,11 @@ func start_pose(pose: Pose, duration: float, elapsed: float = 0.0) -> void:
 
 
 func update_rig(delta: float, velocity: Vector2, heading: float, rise: float) -> void:
+	if not on_screen and _drawn_once:
+		return
 	if tick_hz > 0.0 and delta > 0.0:
 		_tick_acc += delta
-		var step: float = 1.0 / (tick_hz if on_screen else OFFSCREEN_HZ)
+		var step: float = 1.0 / tick_hz
 		if _tick_acc < step - 0.0005:
 			return
 		delta = _tick_acc
@@ -1283,7 +1328,13 @@ func _update_life(t: float) -> void:
 
 
 func _new_part(depth: float, draw_call: Callable, glow_call: Callable = Callable(), sp: Span = null) -> Part:
-	var part: Part = Part.new()
+	var part: Part
+	if _parts_pool_index < _parts_pool.size():
+		part = _parts_pool[_parts_pool_index]
+	else:
+		part = Part.new()
+		_parts_pool.append(part)
+	_parts_pool_index += 1
 	part.depth = depth
 	part.order = _order
 	_order += 1
@@ -1318,7 +1369,10 @@ func _tab(x: float, xs: Array[float], ys: Array[float]) -> float:
 
 
 func _build(dt: float, t: float) -> void:
+	if _tail_blades.is_empty():
+		_init_pools()
 	_parts.clear()
+	_parts_pool_index = 0
 	_order = 0
 	_wings.clear()
 	_cp = cos(_q[Q.PITCH])
@@ -1576,46 +1630,57 @@ func _build_tail(dt: float) -> void:
 		else:
 			_tf[k] = _tf[k].lerp(raw, 1.0 - exp(-15.0 * dt)).normalized()
 		var base: Vector3 = _bp(Vector3(-11.5, (float(k) - 2.0) * 0.9, 0.0))
-		var blade: Blade = _make_blade(base, raw, _tf[k], nrm, TAIL_LEN[k], 4.6)
-		_new_part(blade.depth - 0.4 - 0.01 * float(absi(k - 2)), _draw_blade.bind(blade, true), Callable(), blade.span)
+		var blade: Blade = _tail_blades[k]
+		_populate_blade(blade, base, raw, _tf[k], nrm, TAIL_LEN[k], 4.6)
+		_new_part(blade.depth - 0.4 - 0.01 * float(absi(k - 2)), _tail_draw_calls[k], Callable(), blade.span)
 
 
 ## One flat blade: flexible (its root follows `raw`, its tip the lagging `filt`), as a polygon with its screen-space edges and span.
-func _make_blade(base: Vector3, raw: Vector3, filt: Vector3, nrm: Vector3, length: float, width: float) -> Blade:
-	var b: Blade = Blade.new()
+func _populate_blade(b: Blade, base: Vector3, raw: Vector3, filt: Vector3, nrm: Vector3, length: float, width: float) -> Blade:
 	var wd: Vector3 = filt.cross(nrm)
 	if wd.length() < 0.001:
 		wd = Vector3(0, 1, 0)
 	wd = wd.normalized()
-	for i: int in U_S.size():
+	if b.left.size() != 7:
+		b.left.resize(7)
+		b.right.resize(7)
+		b.center.resize(7)
+		b.poly.resize(14)
+		b.lit_edge.resize(5)
+		b.far_edge.resize(5)
+	for i: int in 7:
 		var u: float = U_S[i]
 		var dir: Vector3 = raw.lerp(filt, smoothstep(0.0, 1.0, u))
 		dir = dir.normalized() if dir.length() > 0.001 else filt
 		var pos: Vector3 = base + dir * (length * u)
 		var hw: float = width * 0.5 * HW_S[i]
-		b.left.append(_p(pos - wd * hw))
-		b.right.append(_p(pos + wd * hw))
-		b.center.append(_p(pos))
-	b.poly = b.left.duplicate()
-	for i: int in range(b.right.size() - 1, -1, -1):
-		b.poly.append(b.right[i])
+		b.left[i] = _p(pos - wd * hw)
+		b.right[i] = _p(pos + wd * hw)
+		b.center[i] = _p(pos)
+		b.poly[i] = b.left[i]
+		b.poly[13 - i] = b.right[i]
 	b.span = _span_poly(b.poly)
 	var sum_l: float = 0.0
 	var sum_r: float = 0.0
-	for i: int in b.left.size():
+	for i: int in 7:
 		sum_l += b.left[i].x + b.left[i].y
 		sum_r += b.right[i].x + b.right[i].y
 	var edge: PackedVector2Array = b.left if sum_l <= sum_r else b.right
-	for i: int in range(1, edge.size() - 1):
-		b.lit_edge.append(edge[i])
 	var far: PackedVector2Array = b.right if sum_l <= sum_r else b.left
-	for i: int in range(1, far.size() - 1):
-		b.far_edge.append(far[i])
+	for i: int in 5:
+		b.lit_edge[i] = edge[i + 1]
+		b.far_edge[i] = far[i + 1]
 	b.dorsal = nrm.dot(_view)
-	b.tip = b.center[b.center.size() - 1]
+	b.tip = b.center[6]
 	b.depth = _depth(base + filt * length * 0.5)
 	b.width = width
 	return b
+
+
+## One flat blade: flexible (its root follows `raw`, its tip the lagging `filt`), as a polygon with its screen-space edges and span.
+func _make_blade(base: Vector3, raw: Vector3, filt: Vector3, nrm: Vector3, length: float, width: float) -> Blade:
+	var b: Blade = Blade.new()
+	return _populate_blade(b, base, raw, filt, nrm, length, width)
 
 
 func _draw_blade(blade: Blade, outline: bool = false) -> void:
@@ -1920,7 +1985,8 @@ func _build_wing(si: int, dt: float) -> Wing:
 			hide = _lb > 0.5 and _light_grow < 0.04
 		elif fury_light:
 			blade_len *= 1.0 + 0.25 * _fury
-		var blade: Blade = _make_blade(bases[k], raw[k], filt[k], norms[k], blade_len, widths[k])
+		var blade: Blade = _wing_blades[si][k]
+		_populate_blade(blade, bases[k], raw[k], filt[k], norms[k], blade_len, widths[k])
 		blade.vein_start = starts[k]
 		blade.idx = k
 		blade.salt = float(si * 11 + k)
@@ -1955,10 +2021,10 @@ func _build_wing(si: int, dt: float) -> Wing:
 	_new_part(base_depth, _draw_membrane.bind(wing), _glow_membrane.bind(wing, si), wing.membrane_span)
 	for j: int in range(0, 5):
 		var b: Blade = wing.blades[6 + j]
-		_new_part(base_depth + 0.001 * float(j + 1), _draw_blade.bind(b), _glow_blade.bind(b, si), b.span)
+		_new_part(base_depth + 0.001 * float(j + 1), _wing_draw_calls[si][6 + j], _wing_glow_calls[si][6 + j], b.span)
 	for i: int in range(5, -1, -1):
 		var b2: Blade = wing.blades[i]
-		_new_part(base_depth + 0.01 + 0.001 * float(5 - i), _draw_blade.bind(b2), _glow_blade.bind(b2, si), b2.span)
+		_new_part(base_depth + 0.01 + 0.001 * float(5 - i), _wing_draw_calls[si][i], _wing_glow_calls[si][i], b2.span)
 	_new_part(base_depth + 0.03, _draw_arm.bind(wing), _glow_arm.bind(wing, si), wing.arm_span)
 	return wing
 
@@ -2334,13 +2400,13 @@ func _build_tendril_parts() -> void:
 		if _td_scale[i] < 0.08:
 			continue
 		var pts: PackedVector3Array = _td[i]
-		var screen: PackedVector2Array = PackedVector2Array()
+		var screen: PackedVector2Array = _td_screen[i]
 		for n: int in TD_N:
-			screen.append(_pw(pts[n]))
+			screen[n] = _pw(pts[n])
 		var mid: Vector3 = pts[TD_N / 2]
 		# world frame -> the same depth measure as the body frame (heading already folded in)
 		var depth: float = mid.y + 0.4 * mid.z - 0.3
-		_new_part(depth, _draw_tendril.bind(screen, i), _glow_tendril.bind(screen, i))
+		_new_part(depth, _tendril_draw_calls[i], _tendril_glow_calls[i])
 
 
 func _draw_tendril(screen: PackedVector2Array, i: int) -> void:
@@ -2635,12 +2701,15 @@ func _draw_bits_glow() -> void:
 # --- sorting and drawing -------------------------------------------------------------------------------------------
 
 
+static func _sort_parts(a: Part, b: Part) -> bool:
+	if a.depth != b.depth:
+		return a.depth < b.depth
+	return a.order < b.order
+
+
 func _finish_parts() -> void:
-	_parts.sort_custom(func(a: Part, b: Part) -> bool:
-		if a.depth != b.depth:
-			return a.depth < b.depth
-		return a.order < b.order)
-	_sorted = _parts.duplicate()
+	_parts.sort_custom(_sort_parts)
+	_sorted = _parts
 	_bounds = Rect2()
 	for i: int in _sorted.size():
 		_sorted[i].rank = i

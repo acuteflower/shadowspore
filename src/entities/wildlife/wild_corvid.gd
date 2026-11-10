@@ -202,11 +202,9 @@ func fly_to(goal: Vector2) -> bool:
 	if dist < 6.0:
 		return false
 	var bend: Vector2 = (goal - global_position).orthogonal().normalized() * minf(40.0, dist * 0.15)
-	if _population.has_method("route_bend"):
-		bend = _population.call("route_bend", global_position, goal, bend)
+	bend = _calculate_route_bend(global_position, goal, bend)
 	var cruise: float = maxf(float(_spec["flight_height"]), _height + float(_spec["flight_clearance"]))
-	if _population.has_method("flight_clearance"):
-		cruise = maxf(cruise, float(_population.call("flight_clearance", global_position, goal, bend)))
+	cruise = maxf(cruise, _calculate_flight_clearance(global_position, goal, bend))
 	var duration: float = maxf(float(_spec["flight_seconds_min"]), (dist + bend.length() * 0.7) / float(_spec["flight_speed"]))
 	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, 0.0, cruise, "", 0.0)
 	return true
@@ -459,14 +457,67 @@ func _fly_to_spot(destination: Dictionary) -> bool:
 	if String(destination["path"]).is_empty() and _population.has_method("release_perch"):
 		_population.call("release_perch", self) ## (a branch from perch_near is already claimed for this bird)
 	var bend: Vector2 = (goal - global_position).orthogonal().normalized() * _rng.randf_range(-1.0, 1.0) * minf(60.0, dist * 0.2)
-	if _population.has_method("route_bend"):
-		bend = _population.call("route_bend", global_position, goal, bend)
+	bend = _calculate_route_bend(global_position, goal, bend)
 	var cruise: float = maxf(float(_spec["flight_height"]), maxf(_height, float(destination["height"])) + float(_spec["flight_clearance"]))
-	if _population.has_method("flight_clearance"):
-		cruise = maxf(cruise, float(_population.call("flight_clearance", global_position, goal, bend)))
+	cruise = maxf(cruise, _calculate_flight_clearance(global_position, goal, bend))
 	var duration: float = maxf(float(_spec["flight_seconds_min"]), (dist + bend.length() * 0.7) / float(_spec["flight_speed"]))
 	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, float(destination["height"]), cruise, String(destination["path"]), 0.0)
 	return true
+
+
+func _route_distance(point: Vector2, start: Vector2, end: Vector2, bend: Vector2) -> float:
+	var nearest: float = INF
+	for i: int in range(1, 10):
+		var p: float = i / 10.0
+		var at: Vector2 = start.lerp(end, p) + bend * (4.0 * p * (1.0 - p))
+		nearest = minf(nearest, point.distance_to(at))
+	return nearest
+
+
+func _local_trees(start: Vector2, end: Vector2) -> Array[FirTree]:
+	var mid: Vector2 = (start + end) * 0.5
+	var span: float = start.distance_to(end) * 0.5 + 80.0
+	var span_sq: float = span * span
+	var trees: Array[FirTree] = []
+	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+		var tree: FirTree = node as FirTree
+		if tree != null and not tree.is_depleted():
+			if mid.distance_squared_to(tree.global_position) <= span_sq:
+				trees.append(tree)
+	return trees
+
+
+func _calculate_route_bend(start: Vector2, end: Vector2, preferred: Vector2) -> Vector2:
+	var local_trees: Array[FirTree] = _local_trees(start, end)
+	if local_trees.is_empty():
+		return preferred
+	var side: Vector2 = (end - start).orthogonal().normalized()
+	var best: Vector2 = preferred
+	var cost: float = INF
+	for bend: Vector2 in [preferred, side * 45.0, side * -45.0, side * 90.0, side * -90.0, Vector2.ZERO]:
+		var score: float = bend.distance_to(preferred) * 0.1
+		for tree: FirTree in local_trees:
+			var radius: float = float(tree.spec()["crown_half_width"][tree.variant]) + 12.0
+			if tree.global_position.distance_to(start) < radius or tree.global_position.distance_to(end) < radius:
+				continue ## departing/approaching a branch, not crossing the entire tree
+			if _route_distance(tree.global_position, start, end, bend) < radius:
+				score += float(tree.spec()["height"][tree.variant]) * 4.0
+		if score < cost:
+			cost = score
+			best = bend
+	return best
+
+
+func _calculate_flight_clearance(start: Vector2, end: Vector2, bend: Vector2 = Vector2.ZERO) -> float:
+	var height: float = 0.0
+	var local_trees: Array[FirTree] = _local_trees(start, end)
+	for tree: FirTree in local_trees:
+		var radius: float = float(tree.spec()["crown_half_width"][tree.variant]) + 12.0
+		if tree.global_position.distance_to(start) < radius or tree.global_position.distance_to(end) < radius:
+			continue
+		if _route_distance(tree.global_position, start, end, bend) < radius:
+			height = maxf(height, float(tree.spec()["height"][tree.variant]) + 28.0)
+	return height
 
 
 func _flock_center() -> Vector2:
@@ -553,10 +604,8 @@ func _take_wing(panic: bool, broadcast: bool = true, ground_only: bool = false, 
 	var duration: float = maxf(float(_spec["flight_seconds_min"]), global_position.distance_to(goal) / float(_spec["flight_speed"]))
 	var spread: float = minf(90.0, global_position.distance_to(goal) * float(_spec.get("curve_ratio", 0.25)))
 	var bend: Vector2 = (goal - global_position).orthogonal().normalized() * _rng.randf_range(-spread, spread)
-	if _population.has_method("route_bend"):
-		bend = _population.call("route_bend", global_position, goal, bend)
-	if _population.has_method("flight_clearance"):
-		cruise = maxf(cruise, float(_population.call("flight_clearance", global_position, goal, bend)))
+	bend = _calculate_route_bend(global_position, goal, bend)
+	cruise = maxf(cruise, _calculate_flight_clearance(global_position, goal, bend))
 	duration = maxf(float(_spec["flight_seconds_min"]), (global_position.distance_to(goal) + bend.length() * 0.7) / float(_spec["flight_speed"]))
 	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, float(destination["height"]), cruise, String(destination["path"]), 0.0)
 	_caution_left = float(_spec["calm_seconds"]) if panic else 0.0

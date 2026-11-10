@@ -4,6 +4,7 @@ extends Node
 ## reliable native action packets; fear, collisions and escape take precedence.
 signal event_started(kind: String)
 signal event_finished(kind: String,outcome: String)
+var story_hold: bool = false
 var kind: String = ""
 var last_outcome: String = ""
 var _world: Variant ## avoid the WorldLevel -> player -> HUD -> WorldLevel preload cycle
@@ -48,10 +49,17 @@ func _process(delta: float) -> void:
 		if float(_cooldowns[id]) < _clock: _cooldowns.erase(id)
 
 func _scene_clear() -> bool:
+	if story_hold or _is_boss_present(): return false
 	if InputManager.ui_blocking or InputManager.map_open: return false
 	for player: Player in Player.all:
 		if player.story_lock or player.intro != null or player.fainting: return false
 	return true
+
+func _is_boss_present() -> bool:
+	for node: Node in get_tree().get_nodes_in_group("bosses"):
+		if is_instance_valid(node) and not node.is_queued_for_deletion():
+			return true
+	return false
 
 func _eligible(actor: Node2D) -> bool:
 	if not is_instance_valid(actor) or actor.is_queued_for_deletion() or not _world.navigation_floor(actor.global_position): return false
@@ -89,6 +97,7 @@ func _choose_event() -> void:
 				if begin_event("rabbit_play",rabbit,partner): return
 
 func begin_event(event_kind: String,a: Node2D,b: Node2D) -> bool:
+	if story_hold or _is_boss_present(): return false
 	if not multiplayer.is_server() or kind!="" or a==b or not is_instance_valid(a) or not is_instance_valid(b): return false
 	if event_kind not in ["fox_hunt","rabbit_crow","rabbit_play"]: return false
 	if event_kind=="fox_hunt" and (not a is WoodlandMammal or not b is WildRabbit): return false

@@ -193,7 +193,32 @@ func _rift_up() -> bool:
 
 
 func _rift_blocks(a: Vector2, b: Vector2) -> bool:
-	return _rift_up() and rift.blocks(a, b)
+	if not _rift_up():
+		return false
+	# Quick rejection: if both endpoints are comfortably on the same side of the rift line (>14 px margin), they cannot intersect
+	var sda: float = rift.signed_distance(a)
+	var sdb: float = rift.signed_distance(b)
+	if (sda > 14.0 and sdb > 14.0) or (sda < -14.0 and sdb < -14.0):
+		return false
+	return rift.blocks(a, b)
+
+
+func _set_world_directors_active(active: bool) -> void:
+	if not is_inside_tree():
+		return
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	var night: NightDirector = tree.get_first_node_in_group("night_director") as NightDirector
+	if night != null:
+		night.story_hold = not active
+	var wildlife: WildlifeEvents = tree.get_first_node_in_group("wildlife_events") as WildlifeEvents
+	if wildlife != null:
+		wildlife.set_process(active if multiplayer.is_server() else false)
+
+
+func _exit_tree() -> void:
+	_set_world_directors_active(true)
 
 
 func _extra() -> int:
@@ -676,12 +701,14 @@ func on_touched_down() -> void:
 		return
 	_started = true
 	_opening_left = _num("barrier", "delay")
+	_set_world_directors_active(false)
 	_rpc_started.rpc()
 
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_started() -> void:
 	_started = true
+	_set_world_directors_active(false)
 	if mode == Mode.WAIT:
 		mode = Mode.IDLE
 		_gap = 99.0 ## nothing before the opening
@@ -2029,18 +2056,20 @@ func _host_chase_step(delta: float) -> void:
 	var desired: Vector2 = to.normalized() * float(c["speed"]) * smoothstep(0.0, 24.0, to.length())
 	var vel: Vector2 = (_chase["vel"] as Vector2).move_toward(desired, 280.0 * delta)
 	var next: Vector2 = pos + vel * delta
-	if not field.on_floor(next) or _rift_blocks(pos, next):
+	var rift_active: bool = _rift_up()
+	if not field.on_floor(next) or (rift_active and _rift_blocks(pos, next)):
 		var slide_x: Vector2 = pos + Vector2(vel.x, 0.0) * delta
-		var slide_y: Vector2 = pos + Vector2(0.0, vel.y) * delta
-		if field.on_floor(slide_x) and not _rift_blocks(pos, slide_x):
+		if field.on_floor(slide_x) and (not rift_active or not _rift_blocks(pos, slide_x)):
 			next = slide_x
 			vel.y = 0.0
-		elif field.on_floor(slide_y) and not _rift_blocks(pos, slide_y):
-			next = slide_y
-			vel.x = 0.0
 		else:
-			next = pos
-			vel = Vector2.ZERO
+			var slide_y: Vector2 = pos + Vector2(0.0, vel.y) * delta
+			if field.on_floor(slide_y) and (not rift_active or not _rift_blocks(pos, slide_y)):
+				next = slide_y
+				vel.x = 0.0
+			else:
+				next = pos
+				vel = Vector2.ZERO
 	_chase["vel"] = vel
 	_chase["pos"] = next
 	var close: bool = next.distance_to(target.global_position) < float(c["close"])
@@ -2405,6 +2434,7 @@ func _sync(p_phase: int, built: bool, broken: PackedInt32Array, p_mode: int, bre
 		rift.open_now()
 	_break_pillar = break_pillar
 	_started = true
+	_set_world_directors_active(false)
 	if built and not barrier_done:
 		barrier_done = true
 		for entry: Dictionary in boss.barrier_spec():
@@ -2429,6 +2459,7 @@ func _sync(p_phase: int, built: bool, broken: PackedInt32Array, p_mode: int, bre
 
 ## The boss died or was reset: the feathers crumble, the rift closes, the judgement's light goes out.
 func release_feathers(instant: bool) -> void:
+	_set_world_directors_active(true)
 	_release_phase_two(instant)
 	for feather: StuckFeather in _stuck:
 		if is_instance_valid(feather):

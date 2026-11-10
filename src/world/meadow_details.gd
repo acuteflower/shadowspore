@@ -16,6 +16,9 @@ var sources: Array[Vector2] = []
 var source_kinds: Array[int] = []
 var _origin: Vector2
 var _hidden: Dictionary = {} ## instance index -> true: plants the town's ground has no room for
+var _dirty: bool = false
+var _contact_timer: float = 0.0
+const CONTACT_UPDATE_INTERVAL: float = 0.12 ## Throttle texture upload to ~8 updates/sec max during active contacts
 
 func setup(points: Array[Dictionary], origin: Vector2 = Vector2.ZERO) -> void:
 	_origin = origin
@@ -83,7 +86,7 @@ func stamp_segment(from: Vector2, to: Vector2, force: float) -> bool:
 		return false
 	var touched: bool = false
 	var direction: Vector2 = (to-from).normalized()
-	var steps: int = maxi(1,ceili(from.distance_to(to)/5.0))
+	var steps: int = maxi(1,ceili(from.distance_to(to)/8.0))
 	for step: int in steps+1:
 		var at: Vector2 = from.lerp(to,float(step)/steps)
 		var cell: Vector2i = Vector2i(((at-_origin)/8.0).floor())
@@ -91,26 +94,40 @@ func stamp_segment(from: Vector2, to: Vector2, force: float) -> bool:
 			for dx: int in range(-2,3):
 				var c: Vector2i = cell+Vector2i(dx,dy)
 				if c.x<0 or c.y<0 or c.x>=64 or c.y>=64: continue
-				var distance: float = (Vector2(c)*8+Vector2(4,4)+_origin).distance_to(at)
-				if distance > 17.0: continue
+				var cell_center: Vector2 = Vector2(c)*8.0+Vector2(4,4)+_origin
+				var d_sq: float = cell_center.distance_squared_to(at)
+				if d_sq > 289.0: continue ## 17.0 * 17.0
+				var distance: float = sqrt(d_sq)
 				var amount: float = (1.0-distance/20.0)*force
 				_bends[c] = Vector3(direction.x*amount,direction.y*amount,0.0)
+				_dirty = true
 				if _occupied.has(c): touched = true
 	return touched
 
 func advance_contacts(delta: float) -> void:
-	if _bends.is_empty(): return
-	for cell: Vector2i in _bends.keys():
-		var impulse: Vector3 = _bends[cell]
-		impulse.z += delta
-		if impulse.z > 0.9:
-			_field.set_pixelv(cell,Color(0.5,0.5,0,1))
-			_bends.erase(cell)
-			continue
-		_bends[cell] = impulse
-		var fade: float = exp(-impulse.z*5.0)*cos(impulse.z*10.0)
-		_field.set_pixelv(cell,Color(0.5+impulse.x*fade*0.25,0.5+impulse.y*fade*0.25,0,1))
-	_contact_texture.update(_field)
+	if _bends.is_empty() and not _dirty:
+		return
+	_contact_timer += delta
+	var should_update: bool = _dirty or _contact_timer >= CONTACT_UPDATE_INTERVAL
+	if not _bends.is_empty():
+		for cell: Vector2i in _bends.keys():
+			var impulse: Vector3 = _bends[cell]
+			impulse.z += delta
+			if impulse.z > 0.9:
+				_field.set_pixelv(cell,Color(0.5,0.5,0,1))
+				_bends.erase(cell)
+				should_update = true
+				continue
+			_bends[cell] = impulse
+			if should_update:
+				var fade: float = exp(-impulse.z*5.0)*cos(impulse.z*10.0)
+				_field.set_pixelv(cell,Color(0.5+impulse.x*fade*0.25,0.5+impulse.y*fade*0.25,0,1))
+		if _bends.is_empty():
+			should_update = true
+	if should_update:
+		_contact_texture.update(_field)
+		_contact_timer = 0.0
+		_dirty = false
 
 static func _pixel(im: Image, variant: int, x: int, y: int, color: Color) -> void:
 	if x >= 0 and x < SIZE.x and y >= 0 and y < SIZE.y:

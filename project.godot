@@ -304,6 +304,12 @@ build_next={
 2d_physics/layer_5="hurtbox"
 2d_physics/layer_6="player_hurtbox"
 
+[physics]
+
+common/physics_interpolation=true
+common/max_physics_steps_per_frame=4
+common/physics_ticks_per_second=60
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

@@ -111,7 +111,10 @@ func _landing(heading: Vector2) -> Vector2:
 	var direction: Vector2 = heading.normalized()
 	var foot_center: Vector2 = _shape.global_position
 	var ray: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(foot_center, foot_center + direction * REACH, _player.collision_mask, [_player.get_rid()])
-	var hit: Dictionary = _player.get_world_2d().direct_space_state.intersect_ray(ray)
+	var space: PhysicsDirectSpaceState2D = _player.get_world_2d().direct_space_state
+	if space == null:
+		return Vector2.INF
+	var hit: Dictionary = space.intersect_ray(ray)
 	var body: Node = hit.get("collider") as Node
 	if body == null or not body.is_in_group("relief_walls"):
 		return Vector2.INF
@@ -166,12 +169,15 @@ func _query(at: Vector2, excluded: Array[RID] = []) -> PhysicsShapeQueryParamete
 
 
 func _clear_at(at: Vector2) -> bool:
-	return _player.get_world_2d().direct_space_state.intersect_shape(_query(at), 1).is_empty()
+	var space: PhysicsDirectSpaceState2D = _player.get_world_2d().direct_space_state
+	return space != null and space.intersect_shape(_query(at), 1).is_empty()
 
 
 func _clear_between(from: Vector2, to: Vector2, excluded: Array[RID]) -> bool:
-	var query: PhysicsShapeQueryParameters2D = _query(from, excluded)
 	var space: PhysicsDirectSpaceState2D = _player.get_world_2d().direct_space_state
+	if space == null:
+		return false
+	var query: PhysicsShapeQueryParameters2D = _query(from, excluded)
 	if not space.intersect_shape(query, 1).is_empty():
 		return false
 	query.motion = to - from

@@ -79,8 +79,17 @@ func _process(delta: float) -> void:
 var story_hold: bool = false
 
 
+func is_holding() -> bool:
+	if story_hold:
+		return true
+	for node: Node in get_tree().get_nodes_in_group("bosses"):
+		if is_instance_valid(node) and not node.is_queued_for_deletion():
+			return true
+	return false
+
+
 func active() -> bool:
-	if story_hold or not multiplayer.is_server() or not bool(_world.opening_over):
+	if is_holding() or not multiplayer.is_server() or not bool(_world.opening_over):
 		return false
 	var town: TownManager = _world.town()
 	return town != null and town.founded
@@ -327,6 +336,8 @@ func _stressed(key: String, members: Array[Player]) -> bool:
 
 
 func _try_spawn(key: String, members: Array[Player], entry: Dictionary, progress: float) -> bool:
+	if is_holding() or not active():
+		return false
 	var groups: Dictionary = NightRules.config().groups as Dictionary
 	if live_count(false) >= int(groups.global_cap) or _alive_in(key) >= int(groups.alive_cap):
 		return false
@@ -396,6 +407,8 @@ func _try_spawn(key: String, members: Array[Player], entry: Dictionary, progress
 ## The water's share of the night (data/night.json `water`): where a river or lake lies within the ring round a group, now and then a Lichtfischer is born into it and fishes there
 ## for the rest of the night. It spends from the group's budget like any other creature, is paid back for in part when killed and sinks away at dawn without loot.
 func _try_water(key: String, members: Array[Player], entry: Dictionary, progress: float) -> bool:
+	if is_holding() or not active():
+		return false
 	var spec: Dictionary = NightRules.config().get("water", {}) as Dictionary
 	if spec.is_empty() or not _world.has_method("water_depth"):
 		return false
@@ -595,6 +608,8 @@ func window_cfg() -> Dictionary:
 
 
 func _spawn_elite(key: String, members: Array[Player], entry: Dictionary) -> void:
+	if is_holding() or not active():
+		return
 	var cfg: Dictionary = NightRules.config().elite as Dictionary
 	var spot: Dictionary = spawn_spot(members)
 	if spot.is_empty():
@@ -1413,7 +1428,7 @@ func _raid_attack_tick(players: Array[Player]) -> void:
 
 ## Noise from the water (a long fight at the river bank, docs/fishing.md) draws them a little: the lure rises (host).
 func stir(amount: float) -> void:
-	if amount <= 0.0:
+	if amount <= 0.0 or is_holding() or not active():
 		return
 	var cfg: Dictionary = NightRules.config().lure as Dictionary
 	lure = clampf(lure + amount, 0.0, float(cfg.threshold) * 1.5)

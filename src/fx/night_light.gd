@@ -32,6 +32,11 @@ func _ready() -> void:
 	_notifier.screen_entered.connect(_on_screen_entered)
 	_notifier.screen_exited.connect(_on_screen_exited)
 	add_child(_notifier)
+	var camera: Camera2D = get_viewport().get_camera_2d() if get_viewport() != null else null
+	if camera != null:
+		var reach_total: float = reach + 400.0
+		if global_position.distance_squared_to(camera.get_screen_center_position()) > reach_total * reach_total:
+			_on_screen = false
 	set_night(TimeManager.night_amount())
 
 
@@ -51,6 +56,9 @@ func _update_active() -> void:
 	set_process(active)
 	if not active:
 		energy = 0.0
+	elif energy == 0.0:
+		var breath: float = 1.0 - pulse * 0.5 + pulse * 0.5 * sin(Time.get_ticks_msec() * 0.0013 + _phase)
+		energy = base_energy * _night * breath
 
 
 func set_night(amount: float) -> void:
@@ -61,28 +69,57 @@ func set_night(amount: float) -> void:
 
 func _process(_delta: float) -> void:
 	var breath: float = 1.0 - pulse * 0.5 + pulse * 0.5 * sin(Time.get_ticks_msec() * 0.0013 + _phase)
-	energy = base_energy * _night * breath
+	var new_energy: float = base_energy * _night * breath
+	if absf(energy - new_energy) > 0.02:
+		energy = new_energy
 
 
-const SMALL_RADIUS: int = 34 ## lights this small (glowing plants, moonbells, shrooms) share a budget
+const SMALL_RADIUS: int = 48 ## lights up to this radius (glowing plants, moonbells, shrooms, pillars, boss) share a budget
 const LIGHT_LIMIT: int = 16 ## the renderer's limit per picture
 const SMALL_MIN: int = 4 ## small lights that always shine, even in a crowd of big ones
 
 
-## The renderer lights one picture with at most 16 lights, and a ground tile layer is one picture: with 20 small plant lights about, the big ones (a lamp post, the forge)
-## went missing there, with a hard edge where the next layer begins. So the big ones always shine and the small ones nearest to `center` fill up what is left of the limit (`LIGHT_LIMIT` minus the big lights in view, at least `SMALL_MIN`).
+## The renderer lights one picture with at most 16 lights, and a ground tile layer is one picture.
+## Big landmark lights have priority, while nearby lights (including pillars and boss) are budgeted by distance to center.
+## Offscreen lights are culled by distance to center and notifier.
 static func budget(tree: SceneTree, center: Vector2) -> void:
 	var small: Array[NightLight] = []
-	var big: int = 0
+	var big: Array[NightLight] = []
 	for node: Node in tree.get_nodes_in_group("night_lights"):
 		var light: NightLight = node as NightLight
-		if light != null and light._on_screen and light._night > 0.01:
-			if light.radius <= SMALL_RADIUS:
-				small.append(light)
-			else:
-				big += 1
+		if light == null or light._night <= 0.01:
+			continue
+		var max_reach: float = float(light.radius) + 400.0
+		var d2: float = light.global_position.distance_squared_to(center)
+		if d2 > max_reach * max_reach:
+			if light._on_screen:
+				light._on_screen = false
+				light._update_active()
+			continue
+		if light._notifier != null and light.is_inside_tree():
+			var on_screen: bool = light._notifier.is_on_screen()
+			if light._on_screen != on_screen:
+				light._on_screen = on_screen
+				light._update_active()
+		if not light._on_screen:
+			continue
+		if light.radius <= SMALL_RADIUS:
+			small.append(light)
+		else:
+			big.append(light)
+
+	big.sort_custom(func(a: NightLight, b: NightLight) -> bool: return a.global_position.distance_squared_to(center) < b.global_position.distance_squared_to(center))
+	var max_big: int = LIGHT_LIMIT - SMALL_MIN
+	var allowed_big: int = 0
+	for i: int in big.size():
+		var allow: bool = i < max_big
+		if big[i].budgeted != allow:
+			big[i].budgeted = allow
+		if allow:
+			allowed_big += 1
+
 	small.sort_custom(func(a: NightLight, b: NightLight) -> bool: return a.global_position.distance_squared_to(center) < b.global_position.distance_squared_to(center))
-	var room: int = maxi(SMALL_MIN, LIGHT_LIMIT - big)
+	var room: int = maxi(SMALL_MIN, LIGHT_LIMIT - allowed_big)
 	for i: int in small.size():
 		var allowed: bool = i < room
 		if small[i].budgeted != allowed:

@@ -353,12 +353,13 @@ func _process(delta: float) -> void:
 	_shake = move_toward(_shake, 0.0, 14.0 * delta)
 
 
-var _last_surface_pos: Vector2 = Vector2(INF, INF)
+var _last_surface_tile: Vector2i = Vector2i(1 << 30, 1 << 30)
 var _last_surface_result: Dictionary = {}
 
 func _physics_process(delta: float) -> void:
-	if global_position.distance_squared_to(_last_surface_pos) > 4.0:
-		_last_surface_pos = global_position
+	var tile_pos: Vector2i = Vector2i((global_position / 16.0).floor())
+	if tile_pos != _last_surface_tile:
+		_last_surface_tile = tile_pos
 		_surface = Terrain.surface_data(Terrain.surface_at(global_position))
 		for patch: Node in Terrain.patches:
 			if patch is WorldRivers:

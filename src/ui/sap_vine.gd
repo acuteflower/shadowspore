@@ -35,6 +35,9 @@ var _last_label: String = ""
 var _drop_pos: PackedVector2Array = PackedVector2Array()
 var _drop_vel: PackedVector2Array = PackedVector2Array()
 var _drop_life: PackedFloat32Array = PackedFloat32Array()
+var _dirty: bool = true
+var _redraw_timer: float = 0.0
+const IDLE_REDRAW_INTERVAL: float = 0.066 ## ~15 FPS idle sway/breathing
 
 
 func _ready() -> void:
@@ -50,6 +53,7 @@ func _update_state(_delta: float) -> void:
 ## A hit: the vine flashes and shakes and sprays sap from where the life ends.
 func hit() -> void:
 	_flash = 1.0
+	_dirty = true
 	var head: Vector2 = _point(_shown * length)
 	for i: int in 9:
 		_drop_pos.append(head)
@@ -73,17 +77,25 @@ func _offset(_t: float) -> float:
 
 func _process(delta: float) -> void:
 	_time += delta
+	var prev_ratio: float = ratio
 	_update_state(delta)
 	if lie >= 0.0 and ratio > 0.01: ## a hallucination: the vine shows a value that is not true
 		label = str(ceili(float(label.to_int()) / ratio * lie))
 		ratio = lie
+	var ratio_changing: bool = absf(ratio - prev_ratio) > 0.001
+	var shown_changing: bool = absf(_shown - ratio) > 0.002
+	var trail_changing: bool = trail_color.a > 0.0 and absf(_trail - ratio) > 0.002
 	_shown = lerpf(_shown, ratio, 1.0 - exp(-14.0 * delta))
 	_trail = maxf(_shown, move_toward(_trail, ratio, TRAIL_DRAIN * delta)) if trail_color.a > 0.0 else _shown
+	var was_flashing: bool = _flash > 0.0
 	_flash = maxf(_flash - 3.0 * delta, 0.0)
 	if label != _last_label:
 		_last_label = label
 		_label_alpha = 1.0
+		_dirty = true
+	var label_alpha_changing: bool = _label_alpha > 0.405
 	_label_alpha = maxf(_label_alpha - 0.5 * delta, 0.4)
+	var has_drops: bool = not _drop_pos.is_empty()
 	for i: int in range(_drop_pos.size() - 1, -1, -1):
 		_drop_life[i] -= delta
 		if _drop_life[i] <= 0.0:
@@ -93,7 +105,23 @@ func _process(delta: float) -> void:
 			continue
 		_drop_vel[i].y += 140.0 * delta
 		_drop_pos[i] += _drop_vel[i] * delta
-	queue_redraw()
+
+	if not visible or modulate.a <= 0.0:
+		return
+
+	var is_animating: bool = (ratio_changing
+		or shown_changing
+		or trail_changing
+		or was_flashing
+		or has_drops
+		or label_alpha_changing
+		or alert.a > 0.0)
+
+	_redraw_timer += delta
+	if is_animating or _dirty or _redraw_timer >= IDLE_REDRAW_INTERVAL:
+		_redraw_timer = 0.0
+		_dirty = false
+		queue_redraw()
 
 
 func _draw() -> void:

@@ -1137,5 +1137,141 @@
   "hotbar": false,
   "icon": "res://assets/items/vial_empty.png",
   "description": "Dünnes Glas mit einem Korken. Esma füllt jeden Trank in eine davon."
+ },
+ "mora_shard": {
+  "name": "Moras Spiegelscherbe",
+  "kind": "material",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/mora_shard.png",
+  "description": "Ein Splitter von Moras Spiegelmaske, warm geworden in deiner Hand. Esma wüsste, was daraus werden kann."
+ },
+ "potion_ashen_1": {
+  "name": "Trübe Aschenhaut",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_ashen_1.png",
+  "potion": {
+   "type": "ashen",
+   "tier": 1
+  },
+  "description": "Esmas Spezialsud, Stufe I. Feuer brennt 60 Sekunden lang nur zu 60 % so stark. Wasser löscht die Haut sofort. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_ashen_2": {
+  "name": "Klare Aschenhaut",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_ashen_2.png",
+  "potion": {
+   "type": "ashen",
+   "tier": 2
+  },
+  "description": "Esmas Spezialsud, Stufe II. Feuer brennt 60 Sekunden lang nur zu 40 % so stark. Wasser löscht die Haut sofort. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_ashen_3": {
+  "name": "Aschenhaut-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_ashen_3.png",
+  "potion": {
+   "type": "ashen",
+   "tier": 3
+  },
+  "description": "Esmas Spezialsud, Stufe III. 60 Sekunden lang kann dich das Feuer des Bodens nicht mehr anzünden. Wasser löscht die Haut sofort. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_clarity_1": {
+  "name": "Trüber Klarblick",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_clarity_1.png",
+  "potion": {
+   "type": "clarity",
+   "tier": 1
+  },
+  "description": "Esmas Spezialsud, Stufe I. 60 Sekunden klarer Kopf: keine Halluzinationen im Nebel des Hexenwalds, Pflückbares funkelt. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_clarity_2": {
+  "name": "Klarer Klarblick",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_clarity_2.png",
+  "potion": {
+   "type": "clarity",
+   "tier": 2
+  },
+  "description": "Esmas Spezialsud, Stufe II. 90 Sekunden klarer Kopf: keine Halluzinationen im Nebel des Hexenwalds, Pflückbares funkelt weiter. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_clarity_3": {
+  "name": "Klarblick-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_clarity_3.png",
+  "potion": {
+   "type": "clarity",
+   "tier": 3
+  },
+  "description": "Esmas Spezialsud, Stufe III. 120 Sekunden klarer Kopf: keine Halluzinationen, Pflückbares funkelt, Schattenkreaturen verraten sich im Nebel durch ihre Augen. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_wisp_1": {
+  "name": "Trüber Irrlichtsud",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_wisp_1.png",
+  "potion": {
+   "type": "wisp",
+   "tier": 1
+  },
+  "description": "Esmas Spezialsud, Stufe I. 45 Sekunden ein kleines Irrlicht um dich. Schatten zögern davor. Der Lockruf der Nacht steigt langsam. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_wisp_2": {
+  "name": "Klarer Irrlichtsud",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_wisp_2.png",
+  "potion": {
+   "type": "wisp",
+   "tier": 2
+  },
+  "description": "Esmas Spezialsud, Stufe II. 45 Sekunden ein Irrlicht um dich. Schatten zögern stärker davor. Der Lockruf der Nacht steigt. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_wisp_3": {
+  "name": "Irrlichtsud-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_wisp_3.png",
+  "potion": {
+   "type": "wisp",
+   "tier": 3
+  },
+  "description": "Esmas Spezialsud, Stufe III. 45 Sekunden ein helles Irrlicht. Schatten weichen davor zurück. Der Lockruf der Nacht steigt schnell. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
  }
 }

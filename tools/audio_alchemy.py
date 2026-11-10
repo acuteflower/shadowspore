@@ -114,3 +114,31 @@ for k in range(9):
     place(x, bell(2093 * 2 ** (k / 12.0 * 2), 1.0, 4.0) * 0.18, k * 0.08)
 save("moon", x, 0.4)
 print("ok")
+
+# ashen: a low rush of heat, embers popping and a hissing settle (Aschenhaut closes round her)
+x = np.zeros(int(R * 1.1))
+t = T(0.9)
+place(x, lowpass(rng.standard_normal(len(t)), 40) * np.sin(np.pi * t / 0.9) ** 1.5 * 1.4, 0.0)
+place(x, np.sin(2 * np.pi * 110 * t) * np.sin(np.pi * t / 0.9) * 0.3, 0.0)
+for k in range(14):
+    tt = T(0.01)
+    place(x, rng.standard_normal(len(tt)) * np.exp(-tt * 400) * rng.uniform(0.3, 0.8), rng.uniform(0.1, 0.9))
+save("ashen", x)
+
+# clarity: a clear glassy ring that opens upwards (the head clears)
+x = np.zeros(int(R * 1.2))
+for k, f in enumerate((1047, 1568, 2093, 3136)):
+    place(x, bell(f, 1.0, 4.5) * (0.5 - k * 0.07), k * 0.05)
+t = T(0.5)
+place(x, np.sin(2 * np.pi * (700 + 900 * t / 0.5) * t) * np.sin(np.pi * t / 0.5) * 0.12, 0.0)
+save("clarity", x)
+
+# wisp: a breathy whistle that rises and flutters into a thin shimmer (a small light is born)
+x = np.zeros(int(R * 1.2))
+t = T(0.8)
+fl = 1.0 + 0.02 * np.sin(2 * np.pi * 9 * t)
+place(x, np.sin(2 * np.pi * np.cumsum((520 + 700 * t / 0.8) * fl) / R) * np.sin(np.pi * t / 0.8) ** 2 * 0.4, 0.0)
+place(x, lowpass(rng.standard_normal(len(t)), 6) * np.sin(np.pi * t / 0.8) ** 2 * 0.08, 0.0)
+for k in range(9):
+    place(x, bell(rng.uniform(2400, 5200), 0.4, 14.0) * rng.uniform(0.08, 0.25), 0.25 + rng.uniform(0.0, 0.6))
+save("wisp", x)

@@ -21,7 +21,8 @@ const INK: Color = Color("1b1a2e")
 const SOUNDS: Dictionary = {
 	"cork": preload("res://assets/audio/alchemy/cork.wav"), "gulp": preload("res://assets/audio/alchemy/gulp.wav"),
 	"glass": preload("res://assets/audio/alchemy/glass.wav"), "heal": preload("res://assets/audio/alchemy/heal.wav"),
-	"stamina": preload("res://assets/audio/alchemy/stamina.wav"),
+	"stamina": preload("res://assets/audio/alchemy/stamina.wav"), "ashen": preload("res://assets/audio/alchemy/ashen.wav"),
+	"clarity": preload("res://assets/audio/alchemy/clarity.wav"), "wisp": preload("res://assets/audio/alchemy/wisp.wav"),
 }
 
 var _type: String = "" ## "heal" / "stamina", "" = idle
@@ -45,6 +46,8 @@ func _ready() -> void:
 func begin(type: String, tier: int) -> void:
 	_type = type
 	_tier = clampi(tier, 1, 5)
+	if AlchemyRules.is_special(type):
+		_tier = clampi(tier, 1, 3) * 2 - 1 ## three tiers play like the strength of tier 1, 3, 5
 	_t = 0.0
 	_played.clear()
 	set_process(true)
@@ -172,6 +175,48 @@ func _draw_effect(since: float, tone: Color, shine: Color) -> void:
 			for i: int in 28:
 				var angle: float = i * TAU / 28.0
 				draw_rect(Rect2(Vector2(cos(angle) * radius, sin(angle) * radius * 0.4 - 1.0).round(), Vector2(2, 1)), Color(shine, (1.0 - k) * strength))
+	elif _type == "ashen":
+		var rise: float = since / 0.5 ## a wave of soot and embers climbs from the feet to the head
+		if rise <= 1.2:
+			var wy: float = lerpf(0.0, _mouth.y - 4.0, clampf(rise, 0.0, 1.0))
+			for x: int in range(-5, 6):
+				var wa: float = (1.0 - absf(float(x)) / 6.0) * strength * (1.0 - clampf(rise - 1.0, 0.0, 0.2) / 0.2)
+				_dot(Vector2(x, wy), Color(Color("2a1620").lerp(tone, float((x + int(since * 40.0)) % 3 == 0) * 0.8), wa))
+		for i: int in 8 + _tier * 3:
+			var age1: float = since - float(i % 6) * 0.04
+			if age1 < 0.0 or age1 > 0.7:
+				continue
+			var a1: float = float(i) * 2.399
+			_dot(Vector2(cos(a1) * (4.0 + float(i % 3) * 3.0), -2.0 - age1 * (30.0 + float(i % 4) * 9.0)), Color(tone.lerp(shine, float(i % 3) * 0.3) if i % 2 == 0 else Color("2a1620"), (1.0 - age1 / 0.7) * strength))
+		if since < 0.35: ## the skin hardens: an ember ring at the feet
+			var k1: float = since / 0.35
+			for i: int in 24:
+				var a2: float = float(i) * TAU / 24.0
+				_dot(Vector2(cos(a2) * (4.0 + 12.0 * k1), sin(a2) * (1.5 + 5.0 * k1) - 1.0), Color(tone, (1.0 - k1) * strength))
+	elif _type == "clarity":
+		var eye_y: float = _mouth.y - 8.0
+		if since < 0.45: ## a lens opens at eye height: a line that spreads into a ring, then clear rays
+			var k2: float = since / 0.45
+			for i: int in 28:
+				var a3: float = float(i) * TAU / 28.0
+				_dot(Vector2(cos(a3) * (3.0 + 16.0 * k2), eye_y + sin(a3) * (2.0 + 6.0 * k2)), Color(shine, (1.0 - k2) * strength))
+			for d: int in range(-int(14.0 * k2), int(14.0 * k2) + 1):
+				_dot(Vector2(d, eye_y), Color(tone, (1.0 - k2) * strength * 0.8))
+		for i: int in 6 + _tier:
+			var age2: float = since - float(i % 4) * 0.06
+			if age2 < 0.0 or age2 > 0.6:
+				continue
+			_dot(Vector2(sin(float(i) * 2.0 + age2 * 8.0) * 8.0, eye_y - age2 * 22.0), Color(shine, (1.0 - age2 / 0.6) * strength))
+	elif _type == "wisp":
+		for i: int in 14 + _tier * 2: ## sparks flare out of her mouth and gather into one light above her shoulder
+			var age3: float = since - float(i % 5) * 0.03
+			if age3 < 0.0 or age3 > 0.7:
+				continue
+			var burst: float = clampf(age3 / 0.2, 0.0, 1.0)
+			var gather: float = clampf((age3 - 0.2) / 0.5, 0.0, 1.0)
+			var out_at: Vector2 = _mouth + Vector2(cos(float(i) * 1.9) * 12.0, sin(float(i) * 1.9) * 7.0 - 3.0) * burst
+			var home: Vector2 = Vector2(13.0, _mouth.y - 4.0)
+			_dot(out_at.lerp(home, gather * gather), Color(tone.lerp(shine, float(i % 3) * 0.4), (1.0 - gather * 0.6) * strength))
 	else:
 		for i: int in 10 + 2 * _tier:
 			var start: float = float(i % 5) * 0.05

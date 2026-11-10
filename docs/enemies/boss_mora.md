@@ -203,3 +203,40 @@ Valdric: (neigt ehrfürchtig das Haupt)
 * **Enemies Loot Database:** [`data/enemies.json`](file:///Users/nxye/voidbloom/data/enemies.json) (Drop-Eintrag für Boss 2).
 * **Talisman Database:** [`data/talismans.json`](file:///Users/nxye/voidbloom/data/talismans.json) (Werte für `Scherbe der Klarsicht`).
 * **Blueprint Boss 1 (Mornath):** [`src/entities/enemies/mornath_fight.gd`](file:///Users/nxye/voidbloom/src/entities/enemies/mornath_fight.gd) (Referenz für State Machine, RPC-Sync und Phasenwechsel).
+
+---
+
+### 7. Stand der Umsetzung (2026-11-10)
+
+**Gebaut und headless getestet** (`Godot --headless --path . --fixed-fps 60 tools/test_witch_boss.tscn`, gibt `WITCH BOSS OK` aus, 39 Checks):
+* **Boss-Knoten** `MirrorWitch` (`src/entities/enemies/witch_boss/mirror_witch.gd/.tscn`, über den Enemy-Spawner des `WorldLevel`): Leben, Hurtbox (`MirrorWitchHurtbox`, Faktor `armour` vom Kampf), Beute, Bossbalken `MORWENNA`, Auftrittsbildschirm (`BossIntro`, Daten `intro`), Baum-Anbindung (`tree_drain/hour/free`), Sprechblase (`say`), Lebensraub in 0,5-s-Schritten. Mehr Spieler bedeuten +50 % Leben je weiterem Spieler.
+* **Kampf** `MirrorWitchFight` (alle 14 Attacken, beide Phasenwechsel, Swap, Leech-/Split-Bruch, Erlösung), **Klone** `WitchCloneHurtbox` (zerfallen bei Treffer, kehren nach `clone.return` s zurück), **Raben** `RavenOmen` (Ring über dem Kessel, bei `shriek` ein kreischender Knoten über der ECHTEN Hexe, `panic`, `dive`; Bilder aus `corvid.png`, Rabenbauten 3–5).
+* **Daten** `boss_morwenna` in `data/enemies.json` (960 HP, `fight` mit allen Attacken, `transition1` = DER SPIEGEL ZERBRICHT, `transition2` = DIE HEXENSTUNDE, `release`, `audio`, Beute + Relikt).
+* **Arena** `WitchArena` (Kind des `WorldLevel`, Gruppen `witch_arena`, `climb_block`): RUHE, und gar nichts, solange der Kessel nicht GEÖFFNET ist (Esmas Bitte in der Quest, gespeichert als `opened`) → ein Spieler kommt näher als `wake_range` an den Baum → VORKAMPF (3 Schattenspinnen an `spiders`, Dornenhecken wachsen in den 10 `gates` des gebackenen Kessels und sind fest, `WallClimb` wird verweigert) → letzte Spinne tot → Ellies Zeilen `morwenna_threshold` → BOSS (Sturz aus der Krone, Satz `entrance.line`) → Erlösung → FREI (Tore welken, Baum befreit, Zeilen `morwenna_released`, gespeichert als `"witch"` in save.json). Keiner mehr lebend im `leash` für `reset_seconds`: alles zurück auf RUHE.
+* **Beute** `mora_shard` „Moras Spiegelscherbe“ (Quest-Material, legendär; erster Sieg 100 %, Revanchen 15 % über `BossRelics`). Esma schmiedet daraus die vorhandenen `clarity_earrings` (Quest, Abschnitt 8). Das frühere Relikt „Scherbe der Klarsicht“ ist gestrichen.
+* **Sounds** `py -3 tools/audio_morwenna.py` → `assets/audio/morwenna/` (32 synthetische Platzhalter, doppelte Stimme).
+* **Entwickler:** Pause → ENTWICKLER → MORWENNA → ZUM RABENBAUM (Vorkampf startet beim Ankommen) / MORWENNA SOFORT (ohne Spinnen; eine befreite Hexe wird zurückgeholt).
+
+
+**Überarbeitung nach dem ersten Anspielen (2026-11-10):**
+* **Härter und schneller:** 1300 HP, kürzere Pausen (`gap` 0,75–1,2 s in Phase 1), kürzere Vorwarnungen und Erholungen bei allen Attacken, Läufe 105/300 px/s, mehr Wurzeln, Tropfen, Scherben, Lunges, Dashes und Sturzflüge.
+* **WURZELSCHACH** (`tide`, ab Phase 1, auch in 2 und 3): Ringe aus Wurzeln über den ganzen Kessel um sie herum, in zwei (Phase 3: drei) abwechselnden Wellen. Man springt aus dem leuchtenden Band in eines, das gerade erloschen ist.
+* **Die Klone greifen selbst an:** Sie bleiben in jeder Attacke und Erholung in Bewegung (außer bei Zange, Karussell und Split, wo der Kampf sie selbst führt). Alle 1,6–2,6 s greift ein freier Klon an (Harz-Kombo, Dash-Schnitt oder Wurzeln unter dem Ziel; `harass` in den Daten, `Lock.CLONE`).
+* **Klon-Marker** (`FeatherField`-Art 2, `feather_zones.gdshader` `phantom()`): ein gesprungener Spiegel statt der vollen roten Fläche. Ein gebrochener, flackernder Rand, ein Netz aus Rissen, das bis zum Treffer Zelle für Zelle wächst und aufblitzt, wenige lose Splitter, und Zeilen, die wie ihr Bild verrutschen. Absicht: Beim Split sehen alle drei Strahlen gleich aus, dort zeigen nur die Raben die Echte.
+* **Hologramm** `MorwennaHologram` vor dem Baum nach dem Sieg: der gleiche Projektorring wie bei Mornath (`MornathHologram.draw_projector`, Akzent hexengrün), ihr Bild im Hologramm-Shader. E ruft sie zur Revanche (ohne Spinnen). Der Baum verdunkelt sich während des Kampfs und wird danach wieder frei. Ein Abbruch führt zurück zum Hologramm. Auf der Karte erscheint der Marker `morwenna` (gleicher Stil wie Mornath: Hexensilhouette mit Hut, grüner Geist).
+* **Dornentore:** Die Ausgänge sind um eine Kachel erweitert, auch diagonal, damit keine Ecke offen bleibt. Die Hecken stehen unregelmäßig pro Kachel (2–4, ausgefranst), nur etwa jede fünfte hat leuchtende Knospen, gedämpft.
+
+**Abweichungen vom Konzept oben:** Der Kessel liegt bei Tile `814, 920` (Daten), nicht `879, 914`. Valdric ist beim Kampf nicht dabei, Ellie spricht allein. Alle Texte sind Platzhalter für den Dialog-Autor.
+
+**Nicht gebaut:** der Schattenabwind als sichtbares Feedback der Klettersperre; ein Netzwerktest mit zwei Prozessen; eine gerenderte Sichtprüfung im Spiel; das Icon der Scherbe ist ein Platzhalter (`tools/art_talismans.py`), die Kunst soll der Art-Agent neu machen.
+
+### 8. Die Quest „DIE SPIEGELHEXE“ (`spiegelhexe` in data/quests.json)
+
+Startet von selbst (`WitchArena._watch_quest`), sobald `town_workshop` abgeschlossen ist und Ellie **Level 5** erreicht hat (dann ist auch der erste Talismanplatz frei).
+1. **SPRICH MIT VALDRIC** (`story:sh_valdric`): Er hat am Südufer einen Wald gefunden, in dem es nie hell wird, Raben, die beobachten, einen Turm mit grünem Licht. „Trau dort deinen Augen nicht zu sehr.“
+2. **Der alte Pfad** (`hexenwald_path`, vier Wegpunkte bis zum Turm) mit Ellies Sätzen in der Sprechbox (`bark:sh_road`, `sh_dusk`, `sh_ravens`, `sh_tower`). Unterwegs, nur einmal: die erste Halluzination (`sh_hallu`), die erste Phantomspinne (`sh_phantom`, und wenn sie zerfällt `sh_phantom_gone`).
+3. **BETRITT DEN HEXENTURM / STEIG HINAUF** (Flags `entered_witch_stairs`, `entered_witch_room`), **SPRICH MIT DER HEXE** (Esma ist `quest_actors`, Ziel `witch`): `story:sh_esma`. Erst misstrauisch, dann Mora: ihre Lehrmeisterin, seit dem Riss nachts beim Rabenbaum, seit drei Wochen verschwunden, Fäulnis versperrt Esma den Kessel.
+4. **SUCHE MORA AM RABENBAUM**: Jetzt erst öffnet sich der Kessel (`request_open`). Spinnen (`sh_spiders`, Flag `mora_found`), Esmas Raben (`morwenna_threshold`), der Kampf. **BEFREIE MORA** (`morwenna_released`), **NIMM IHRE SPIEGELSCHERBE** (`mora_shard`).
+5. **BRING DIE SCHERBE ZU ESMA**: `story:sh_esma_forge` nimmt die Scherbe und gibt die **Ohrringe der Klarheit**; Flag `sh_forged`.
+
+Entwickler: ENTWICKLER → MORWENNA → SPIEGELHEXE-QUEST (startet die Quest ohne Levelbedingung neu). Alle Texte sind Platzhalter für den Dialog-Autor. Esma hat noch kein Dialogporträt (Silhouette), und das Schmieden ist nur der Dialog, ohne Animation an der Werkbank.

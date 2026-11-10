@@ -447,5 +447,151 @@
    {"id": "inspect", "text": "UNTERSUCHE DEN TOTEN RITTER", "type": "flag", "flag": "mornath_inspected", "tile": [508, 258]},
    {"id": "fight", "text": "BESIEGE MORNATH", "type": "flag", "flag": "mornath_defeated", "tile": [499, 258]}
   ]
-}
+},
+ "spiegelhexe": {
+  "title": "DIE SPIEGELHEXE",
+  "_doc": "docs/enemies/boss_mora.md section 8. Started by WitchArena (town_workshop finished, level 5).",
+  "steps": [
+   {
+    "id": "sh_valdric",
+    "text": "SPRICH MIT VALDRIC",
+    "type": "reach",
+    "radius": 6,
+    "actor": "knight"
+   },
+   {
+    "id": "sh_valdric_talk",
+    "text": "SPRICH MIT VALDRIC",
+    "type": "flag",
+    "flag": "sh_valdric_told",
+    "event": "story:sh_valdric"
+   },
+   {
+    "id": "sh_path",
+    "text": "FOLGE DEM ALTEN PFAD NACH SÜDEN",
+    "type": "reach",
+    "radius": 6,
+    "tile": [
+     776,
+     770
+    ],
+    "event": "bark:sh_road"
+   },
+   {
+    "id": "sh_wood",
+    "text": "FOLGE DEM PFAD IN DEN HEXENWALD",
+    "type": "reach",
+    "radius": 8,
+    "tile": [
+     825,
+     815
+    ],
+    "event": "bark:sh_dusk"
+   },
+   {
+    "id": "sh_deep",
+    "text": "FOLGE DEM PFAD",
+    "type": "reach",
+    "radius": 8,
+    "tile": [
+     879,
+     865
+    ],
+    "event": "bark:sh_ravens"
+   },
+   {
+    "id": "sh_near",
+    "text": "FOLGE DEM PFAD ZUM TURM",
+    "type": "reach",
+    "radius": 8,
+    "tile": [
+     908,
+     919
+    ]
+   },
+   {
+    "id": "sh_tower",
+    "text": "BETRITT DEN HEXENTURM",
+    "type": "flag",
+    "flag": "entered_witch_stairs",
+    "tile": [
+     891,
+     965
+    ],
+    "event": "bark:sh_tower"
+   },
+   {
+    "id": "sh_climb",
+    "text": "STEIG DEN TURM HINAUF",
+    "type": "flag",
+    "flag": "entered_witch_room"
+   },
+   {
+    "id": "sh_meet",
+    "text": "SPRICH MIT DER HEXE",
+    "type": "reach",
+    "radius": 5,
+    "actor": "witch"
+   },
+   {
+    "id": "sh_esma",
+    "text": "SPRICH MIT DER HEXE",
+    "type": "flag",
+    "flag": "sh_esma_told",
+    "event": "story:sh_esma"
+   },
+   {
+    "id": "sh_tree",
+    "text": "SUCHE MORA AM RABENBAUM",
+    "type": "flag",
+    "flag": "mora_found",
+    "tile": [
+     814,
+     920
+    ]
+   },
+   {
+    "id": "sh_fight",
+    "text": "BEFREIE MORA",
+    "type": "flag",
+    "flag": "morwenna_released",
+    "tile": [
+     814,
+     920
+    ]
+   },
+   {
+    "id": "sh_shard",
+    "text": "NIMM IHRE SPIEGELSCHERBE",
+    "type": "tasks",
+    "tile": [
+     814,
+     920
+    ],
+    "tasks": [
+     {
+      "id": "shard",
+      "text": "MORAS SPIEGELSCHERBE",
+      "kind": "item",
+      "item": "mora_shard",
+      "count": 1
+     }
+    ]
+   },
+   {
+    "id": "sh_back",
+    "text": "BRING DIE SCHERBE ZU ESMA",
+    "type": "reach",
+    "radius": 5,
+    "actor": "witch"
+   },
+   {
+    "id": "sh_forge",
+    "text": "SPRICH MIT ESMA",
+    "type": "flag",
+    "flag": "sh_forged",
+    "event": "story:sh_esma_forge"
+   }
+  ]
+ }
 }

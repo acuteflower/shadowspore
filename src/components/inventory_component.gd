@@ -324,7 +324,7 @@ func _use(index: int) -> bool:
 		return false
 	var pause: String = AlchemyRules.pause_effect(def)
 	if pause != "" and player.effects != null:
-		player.effects.apply(pause, AlchemyRules.pause("heal" if pause == "wound_pause" else "food"))
+		player.effects.apply(pause, AlchemyRules.pause("heal" if pause == "wound_pause" else ("special" if pause == "special_pause" else "food")))
 	stack["count"] = int(stack["count"]) - 1
 	if int(stack["count"]) <= 0:
 		slots[index] = {}
@@ -370,6 +370,17 @@ func _drink(player: Player, info: Dictionary) -> void:
 		"stamina":
 			if player.effects != null:
 				player.effects.apply("glutatem", AlchemyRules.stamina_spec(level).seconds, float(level))
+		"ashen":
+			if player.effects != null:
+				player.effects.clear("burn") ## the skin takes the flames in
+				player.effects.apply("ashen", AlchemyRules.ashen_spec(level).seconds, float(level))
+		"clarity":
+			if player.effects != null:
+				player.effects.apply("clear_vision", AlchemyRules.clarity_spec(level).seconds, float(level))
+				player.effects.clear("hallucinated")
+		"wisp":
+			if player.effects != null:
+				player.effects.apply("wisp", AlchemyRules.wisp_spec(level).seconds, float(level))
 
 
 # ---------------------------------------------------------------- the cursor stack

@@ -1707,6 +1707,9 @@ func brew_block(type: String, level: int, player: Player, maker: String) -> Stri
 	var why: String = AlchemyRules.unlock_block(type, level, trust_of(maker), brewed, String(settler_spec(maker).get("name", maker)))
 	if why != "":
 		return why
+	var cond: String = AlchemyRules.condition_block(type, count_of("smithy") > 0, TimeManager.dew_amount(), TimeManager.night_amount())
+	if cond != "":
+		return cond ## the special potions have their own way: the forge's heat, the morning dew, the night
 	var need: Dictionary = AlchemyRules.ingredients(type, level)
 	for item: String in need:
 		if player.inventory.count_item(item) < int(need[item]):

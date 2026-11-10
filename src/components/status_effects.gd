@@ -30,6 +30,8 @@ func apply(id: String, seconds: float = 0.0, scale: float = 1.0, source: int = 0
 		return
 	if _wet() and String(definition(id).get("extinguish", "")) == "water":
 		return
+	if id == "burn" and has("ashen") and bool(AlchemyRules.ashen_spec(int(scale_of("ashen"))).immune):
+		return ## Aschenhaut III: the flames find nothing to catch on
 	_rpc_apply.rpc(id, seconds if seconds > 0.0 else float(definition(id)["seconds"]), scale, source)
 
 
@@ -105,6 +107,9 @@ func _breathe_mist() -> void:
 	var def: Dictionary = definition("hallucinated")
 	if player == null or def.is_empty():
 		return
+	if has("clear_vision"):
+		clear("hallucinated") ## Klarblick: the clear head holds as long as the potion does
+		return
 	var worn: Variant = player.get("talismans")
 	if worn != null and (worn.get("perks") as Dictionary).has("clear_sight"):
 		clear("hallucinated") ## put on: her head clears at once
@@ -119,6 +124,7 @@ func _physics_process(delta: float) -> void:
 	if _wood_check <= 0.0 and multiplayer.is_server():
 		_wood_check = 1.0
 		_breathe_mist()
+		_wisp_lure()
 	if _effects.is_empty():
 		return
 	var is_host: bool = multiplayer.is_server()
@@ -141,6 +147,8 @@ func _physics_process(delta: float) -> void:
 				if least > 0.0:
 					least = maxf(roundf(least * float(entry["scale"])), 1.0) ## a weaker source (floor fire, scale 0.5) weakens the smallest tick too
 				var amount: float = maxf(roundf(health.max_health * float(def.get("damage_ratio", 0.02)) * float(entry["scale"])), least)
+				if id == "burn" and has("ashen"):
+					amount = maxf(roundf(amount * float(AlchemyRules.ashen_spec(int(scale_of("ashen"))).burn)), 1.0) ## Aschenhaut: the fire bites less
 				health.take_tick(amount, int(entry["source"]))
 			if check_water and String(def.get("extinguish", "")) == "water" and _wet():
 				_rpc_clear.rpc(id)
@@ -158,7 +166,23 @@ func _wet() -> bool:
 	return float(Terrain.surface_data(Terrain.surface_at(player.global_position)).get("submerge", 0.0)) > 0.0
 
 
+## Host, once a second: an Irrlichtsud wisp is seen from afar, the night's lure rises a little (the price of the light).
+func _wisp_lure() -> void:
+	if not has("wisp"):
+		return
+	for world: Node in get_tree().get_nodes_in_group("world"):
+		var director: Variant = world.get("night")
+		if director != null and (director as Object).has_method("stir"):
+			(director as Object).call("stir", float(AlchemyRules.wisp_spec(int(scale_of("wisp"))).lure))
+
+
 func _show(id: String) -> void:
+	if (id == "ashen" or id == "clear_vision" or id == "wisp") and not _fx.has(id) and DisplayServer.get_name() != "headless":
+		var aura: PotionFx = PotionFx.new()
+		aura.name = "PotionFx_" + id
+		(get_parent() as Node2D).add_child(aura)
+		aura.bind(id, self)
+		_fx[id] = aura
 	if id == "hallucinated" and not _fx.has(id) and get_parent().is_multiplayer_authority(): ## what she sees is hers alone: only on her own machine
 		var seen: Hallucinations = Hallucinations.new()
 		seen.name = "Hallucinations"

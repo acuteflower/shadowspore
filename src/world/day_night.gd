@@ -16,6 +16,7 @@ var _sun_glow: ShaderMaterial
 var _daylight: DaylightField
 var _ambience: DayAmbience
 var _atmosphere: NightAtmosphere
+var _mood: MoodGrade
 var _interiors: Interiors
 var _mines: MineManager
 
@@ -34,6 +35,8 @@ func _ready() -> void:
 	add_child(_ambience)
 	_atmosphere = NightAtmosphere.new() ## moonlight, violet ambient light, night fog (docs/nacht_atmosphaere.md)
 	add_child(_atmosphere)
+	_mood = MoodGrade.new() ## the colour mood of the whole picture (data/mood.json): after moonlight and fog, under the HUD
+	add_child(_mood)
 	get_parent().add_child.call_deferred(DayMotes.new())
 	_interiors = get_parent().get_node_or_null("Interiors") as Interiors
 	_mines = get_parent().get_node_or_null("Mines") as MineManager
@@ -110,6 +113,7 @@ func _update() -> void:
 		get_tree().call_group("night_lights", "set_night", night)
 	_ambience.follow(sun, night, indoors, get_process_delta_time())
 	_atmosphere.update(indoors)
+	_mood.follow(indoors, gloom)
 	if _glow != null:
 		_glow.set_shader_parameter("night", night)
 

@@ -31,6 +31,7 @@ var _flicker: float = 1.2
 
 
 func _ready() -> void:
+	add_to_group("phantom_spiders") ## the Spiegelhexe quest lets Ellie remark on the first one (WitchArena)
 	_def = DataRegistry.get_entry("enemies", "shadow_spider")
 	_orbit = 1.0 if randf() < 0.5 else -1.0
 	_zone = Node2D.new()

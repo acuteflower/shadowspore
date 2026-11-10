@@ -66,6 +66,7 @@ var _berry_free: Dictionary = {} ## tiles of the story's first stretch: no berri
 var _barriers: Dictionary = {} ## id -> StaticBody2D: the invisible walls that keep her near the footpath
 var _stone_cells: Dictionary = {} ## tiles lying on the old flagstones: no trees there
 var opening_over: bool = false
+var witch_arena: WitchArena
 var _cover_at: Vector2 = Vector2.ZERO ## the manhole cover (world px), where the story starts; zero = none baked
 var _building: ChunkBuild
 var _gen_pool: Array[PropGenerator] = [] ## forks of `_generator` for the worker jobs (each has its own cluster cache)
@@ -286,6 +287,9 @@ func _add_ground_decals() -> Dictionary:
 	crow_tree.position = Vector2(float(crow_site.tile[0]), float(crow_site.tile[1])) * 16.0 + Vector2(8, 8)
 	add_child(crow_tree)
 	_clear_around(clear, crow_tree.position, int(crow_site.clear_radius))
+	witch_arena = WitchArena.new() ## Morwenna's fight under the tree (docs/enemies/boss_mora.md)
+	add_child(witch_arena)
+	witch_arena.setup(self)
 	for tower_spec: Dictionary in DataRegistry.table("ground").get("towers", []) as Array: ## the Hexenwald's witch tower, origin = the foot of its gate
 		var tower: WitchTower = WitchTower.new()
 		var ttile: Array = tower_spec.tile as Array
@@ -541,6 +545,15 @@ func start_knight_meet(player: Player) -> void:
 	scene.name = "KnightMeetScene"
 	player.add_child(scene)
 	scene.start(player, quarry)
+
+
+## Developer: puts her on the floor of the Schieferkessel; with `fight` Morwenna falls out of the crown at once (no spiders first).
+func debug_morwenna(player: Player, fight: bool) -> void:
+	if player == null or witch_arena == null or not player.is_multiplayer_authority():
+		return
+	player.request_teleport(witch_arena.tree_position() + Vector2(0, 150))
+	if fight:
+		witch_arena.debug_fight()
 
 
 func has_arena_story() -> bool:

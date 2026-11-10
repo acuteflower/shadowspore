@@ -105,6 +105,14 @@ func _push_transform() -> void:
 	var transform: Transform2D = get_viewport().get_canvas_transform()
 	_origin = transform.affine_inverse() * Vector2.ZERO
 	_view = get_viewport().get_visible_rect().size / transform.get_scale()
+	## The renderer snaps the world to whole SCREEN pixels (half an art pixel in a 2x window, a third at 3x). The shaders used to floor this origin to
+	## whole art pixels instead, so while walking the light slid back and forth against the ground by a screen pixel or two: the moonlight juddered.
+	## Snap it exactly the way the picture is snapped.
+	var full: Transform2D = get_viewport().get_final_transform() * transform
+	var snapped_origin: Vector2 = full.origin.round()
+	var exact: Vector2 = Transform2D(full.x, full.y, snapped_origin).affine_inverse() * Vector2.ZERO
+	if exact.is_finite() and exact.distance_squared_to(_origin) < 1.0:
+		_origin = exact
 	for material: ShaderMaterial in [_moon_material, _fog_material]:
 		material.set_shader_parameter("world_origin", _origin)
 		material.set_shader_parameter("view_px", _view)

@@ -349,10 +349,22 @@ func view_camera() -> Camera2D:
 
 
 func _process(delta: float) -> void:
-	_camera.offset = view_shift + ((Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake * GameSettings.shake_factor()).round() if _shake > 0.0 else Vector2.ZERO)
+	## the camera looks a little ahead of where she walks: the smoothing alone lets her drift towards the edge she is heading for
+	var lead_goal: Vector2 = velocity * CAMERA_LEAD if is_multiplayer_authority() and intro == null and not story_lock and health.current > 0.0 else Vector2.ZERO
+	_lead = _lead.lerp(lead_goal, 1.0 - exp(-CAMERA_LEAD_EASE * delta))
+	_camera.offset = view_shift + _lead + ((Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake * GameSettings.shake_factor()).round() if _shake > 0.0 else Vector2.ZERO)
 	_shake = move_toward(_shake, 0.0, 14.0 * delta)
 
 
+const CAMERA_LEAD: float = 0.22 ## seconds of her velocity the camera looks ahead (the smoothing lags about 0.14 s, so she stays near the middle with a little view ahead)
+const CAMERA_LEAD_EASE: float = 2.6 ## how quickly that look-ahead follows a change of direction (1/s)
+const TURN_BOOST: float = 1.5 ## acceleration factor while she pushes against her own motion: a turn-around bites at once instead of sliding
+const SPRINT_RECOVER: float = 15.0 ## stamina she needs back before a sprint run dry starts again (or let go of the key)
+const DIAGONAL_GRACE: float = 0.06 ## seconds a diagonal facing survives one of its two keys: letting go of both never ends on a sideways flick
+var _lead: Vector2 = Vector2.ZERO
+var _winded: bool = false ## the sprint ran dry while the key is still held
+var _face_dir: Vector2 = Vector2.DOWN ## the walking direction her facing follows
+var _face_hold: float = 0.0
 var _last_surface_tile: Vector2i = Vector2i(1 << 30, 1 << 30)
 var _last_surface_result: Dictionary = {}
 
@@ -454,6 +466,8 @@ func request_teleport(to: Vector2) -> void:
 		swim = SwimRules.NONE
 	global_position = to
 	velocity = Vector2.ZERO
+	_lead = Vector2.ZERO
+	reset_physics_interpolation() ## a jump, not a move: without this she is drawn streaking across the world for one tick
 	_camera.reset_smoothing()
 
 
@@ -714,10 +728,13 @@ func _move(delta: float) -> void:
 	var swimming: int = _update_swim(delta, dir)
 	var can_sprint: bool = bool(_surface.get("allow_sprint", true)) and not wounded ## wounded: no sprinting
 	var want_sprint: bool = InputManager.sprint_held() and can_sprint and dir != Vector2.ZERO and not attack.is_swinging() and not _busy and not charging
+	if not InputManager.sprint_held() or stamina.current >= SPRINT_RECOVER:
+		_winded = false
 	if swimming > 0:
 		sprinting = swimming == SwimRules.CRAWL ## the crawl is the sprint of the water (it pays its own stamina)
-	elif want_sprint and stamina.current > 0.0:
+	elif want_sprint and not _winded and stamina.current > 0.0:
 		sprinting = stamina.drain(sprint_cost_per_sec * stamina.sprint_scale(), delta)
+		_winded = not sprinting ## out of breath: no one-frame sprint blips every time a crumb of stamina comes back
 	else:
 		sprinting = false
 
@@ -733,8 +750,20 @@ func _move(delta: float) -> void:
 	else:
 		var base_speed: float = sprint_speed if sprinting else (sneak_speed if stealth.sneaking else max_speed)
 		var speed: float = base_speed * float(_surface.get("speed", 1.0)) * _slow_factor() * (WOUND_SPEED if wounded else 1.0) * attack.charge_move_factor()
-		velocity = velocity.move_toward(dir * speed, acceleration * delta)
+		velocity = velocity.move_toward(dir * speed, acceleration * (TURN_BOOST if velocity.dot(dir) < 0.0 else 1.0) * delta)
 	move_and_slide()
+
+	if dir != Vector2.ZERO:
+		var heading: Vector2 = dir.normalized()
+		var was_diagonal: bool = absf(_face_dir.x) > 0.3 and absf(_face_dir.y) > 0.3
+		var now_straight: bool = absf(heading.x) < 0.05 or absf(heading.y) < 0.05
+		if was_diagonal and now_straight and heading.dot(_face_dir) > 0.6 and _face_hold < DIAGONAL_GRACE:
+			_face_hold += delta ## one key of a diagonal was let go: the other usually follows within a frame or two
+		else:
+			_face_hold = 0.0
+			_face_dir = heading
+	else:
+		_face_hold = 0.0
 
 	if attack.is_swinging():
 		facing = attack.aim_dir ## locked toward the swing
@@ -748,7 +777,7 @@ func _move(delta: float) -> void:
 		if look_mouse != Vector2.ZERO:
 			facing = look_mouse
 	elif dir != Vector2.ZERO:
-		facing = dir.normalized()
+		facing = _face_dir
 	if InputManager.attack_pressed() and attack.can_attack() and not _busy and swimming == 0:
 		if InputManager.using_mouse:
 			var attack_aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER)

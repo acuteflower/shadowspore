@@ -3,7 +3,7 @@
 
 Run: python tools/art_alchemy_icons.py
 Uses the existing item paths in data/items.json. Light comes from top left;
-All eleven icons share one slender witch-vial silhouette, including the empty
+All the alchemy icons share one slender witch-vial silhouette, including the empty
 vial. Violet wax, a knotted cord and a hanging charm unite the set; only
 liquid, rune light and binding colors change with brew type and tier.
 """
@@ -17,7 +17,13 @@ GOLD = [hexc(c) for c in ("6f5020", "b48a38", "e6c468", "fff0b0")]
 LIQUID = {
     "heal": [hexc(c) for c in ("522a49", "94445f", "d96b86", "ffd0dc")],
     "stamina": [hexc(c) for c in ("573347", "a66738", "eaa84f", "fff0b0")],
+    # special potions (docs/alchemie_konzept.md section 11): same vial, own liquid and one tiny motif inside the glass
+    "ashen": [hexc(c) for c in ("20141c", "5a2a1e", "d9602a", "ffd9a0")],
+    "clarity": [hexc(c) for c in ("1f4a3a", "3f8f4f", "a8ff6a", "eaffc4")],
+    "wisp": [hexc(c) for c in ("1c3f4d", "2b8a8e", "4fe0d0", "d6fff6")],
 }
+SPECIAL = ("ashen", "clarity", "wisp")
+SPECIAL_VISUAL = {1: 1, 2: 3, 3: 5}  # three tiers use the fill and the closure of tier 1, 3 and 5
 
 
 def bottle(kind, tier=0):
@@ -92,6 +98,24 @@ def bottle(kind, tier=0):
         px[4][9] = hexc("9468ee")
         px[8][11] = hexc("cbaaff")
 
+    if kind in SPECIAL:
+        liquid = LIQUID[kind]
+        if kind == "ashen":  # ember specks floating in dark, soot-red brew
+            px[10][7] = liquid[2]
+            px[11][8] = liquid[3] if tier >= 3 else liquid[2]
+            if tier == 5:
+                px[9][8] = liquid[2]
+        elif kind == "clarity":  # a clear core, like an eye opening
+            px[10][7] = liquid[3]
+            px[10][8] = liquid[2]
+            if tier >= 3:
+                px[9][7] = liquid[2]
+                px[11][7] = liquid[2]
+        else:  # a wisp that floats free above the liquid in the empty glass
+            px[7][8] = liquid[3]
+            if tier >= 3:
+                px[6][8] = liquid[2]
+                px[8][7] = liquid[2]
     check_icon("%s_%d" % (kind, tier), px)
     return outline_pass(px, hexc("1b1a2e"))
 
@@ -99,6 +123,10 @@ def bottle(kind, tier=0):
 def main():
     icons = {"vial_empty": bottle("empty")}
     for kind in LIQUID:
+        if kind in SPECIAL:
+            for number, visual in SPECIAL_VISUAL.items():
+                icons["potion_%s_%d" % (kind, number)] = bottle(kind, visual)
+            continue
         for tier in range(1, 6):
             icons["potion_%s_%d" % (kind, tier)] = bottle(kind, tier)
     for name, px in icons.items():

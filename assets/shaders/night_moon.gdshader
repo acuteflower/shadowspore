@@ -17,11 +17,14 @@ uniform float moon : hint_range(0.0, 1.0) = 0.7; // TimeManager.moon_light()
 uniform float fog : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 violet : source_color = vec3(0.42, 0.22, 0.74);
 uniform vec3 moon_color : source_color = vec3(0.52, 0.70, 1.0);
+uniform vec3 moon_teal : source_color = vec3(0.42, 0.95, 0.88);
+uniform vec3 moon_fringe : source_color = vec3(0.66, 0.38, 1.0);
 
 void fragment() {
-	vec2 origin = floor(world_origin);
-	vec2 w = origin + UV * view_px; // smooth world position (not snapped to art pixels)
-	vec2 art = origin + floor(UV * view_px); // art pixel, for the glints only
+	// world_origin is NOT floored: the camera glides finer than an art pixel (the picture is snapped to screen pixels, NightAtmosphere hands in exactly
+	// that snapped origin). Flooring it made every pool judder against the ground by a screen pixel or two while walking.
+	vec2 w = world_origin + UV * view_px; // smooth world position
+	vec2 art = floor(w + 0.001); // the art pixel of the world under this fragment, for the glints only
 	float noise = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	vec3 scene = texture(screen_texture, SCREEN_UV).rgb;
 	float lum = dot(scene, vec3(0.30, 0.59, 0.11));
@@ -40,7 +43,11 @@ void fragment() {
 	float light = clamp(level + 0.35 * shaft, 0.0, 1.0) * strength;
 	// a wide soft halo round every pool: the glow that bleeds out of the light
 	float halo = smoothstep(0.42 - breath, 0.58 - breath, p) * (1.0 - core);
-	vec3 lit = scene * (1.0 + 2.4 * light) + moon_color * (0.05 + 0.45 * lum) * light + moon_color * halo * 0.045 * strength;
+	// the light has colour: every pool leans its own way between ice blue and a mint teal (a slow field, so neighbours differ), and the glow that
+	// bleeds out of it is violet: cool light with a warm-violet fringe is what makes the night read as coloured instead of grey
+	float hue = n_fbm(w / 240.0 + vec2(TIME * 0.002, -TIME * 0.0016) + 71.0);
+	vec3 pool_color = mix(moon_color, moon_teal, smoothstep(0.38, 0.62, hue));
+	vec3 lit = scene * (1.0 + 2.4 * light) + pool_color * (0.05 + 0.45 * lum) * light + mix(pool_color, moon_fringe, 0.7) * halo * 0.085 * strength;
 	// glints: single pixels that flare up and die away inside the pools
 	if (level > 0.4 && mod(art.x, 4.0) < 1.0 && mod(art.y, 4.0) < 1.0) {
 		float h = n_hash(floor(art / 4.0) + 17.0);

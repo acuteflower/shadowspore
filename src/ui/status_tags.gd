@@ -50,6 +50,7 @@ var _time: float = 0.0
 var _shown: Dictionary = {} ## id -> 0..1 (how far its tag has dropped in)
 var _flare: Dictionary = {} ## id -> 0..1 (a refresh)
 var _last_left: Dictionary = {}
+var _tier_of: Dictionary = {} ## id -> roman tier, kept while the tag fades out
 
 
 func _ready() -> void:
@@ -115,7 +116,13 @@ func _draw() -> void:
 		var width: int = PixelText.width(label) + 20
 		var y: int = int(roundf((1.0 - VineStyle.back_out(p)) * -8.0))
 		var a: float = minf(p * 1.5, 1.0)
-		_draw_paper(Rect2i(x, y, width, TAG_H), a, void_level, tone)
+		var tiered: bool = bool(def.get("tiered", false)) and _effects.has(id)
+		if tiered:
+			_tier_of[id] = AlchemyRules.roman(int(_effects.scale_of(id)))
+		var numeral: String = String(_tier_of.get(id, "")) if bool(def.get("tiered", false)) else ""
+		_draw_paper(Rect2i(x, y, width, TAG_H + (8 if numeral != "" else 0)), a, void_level, tone)
+		if numeral != "":
+			PixelText.draw(self, "STUFE " + numeral, Vector2i(x + 4, y + TAG_H), Color(hot, a * stutter), Color(VineStyle.OUTLINE, a))
 		_draw_glyph(Vector2i(x + 4, y + 4), tone.lerp(hot, 0.4 + 0.5 * flare), a * stutter, _glyph_of(String(def.get("glyph", ""))))
 		PixelText.draw(self, label, Vector2i(x + 13, y + 3), Color(tone.lerp(UiStyle.TEXT, 0.35 + 0.4 * flare), a * stutter), Color(VineStyle.OUTLINE, a))
 		_draw_crack(x + 4, y + 12, width - 8, frac, tone, hot, a * stutter, flare)

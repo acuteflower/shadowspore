@@ -68,6 +68,9 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and waystones.awake_count() > 0:
 		data["waystones"] = waystones.export_state() ## the awakened goddess statues (docs/waystones.md)
+	var witch: WitchArena = tree.get_first_node_in_group("witch_arena") as WitchArena
+	if witch != null and (witch.released or witch.opened):
+		data["witch"] = witch.export_state() ## Morwenna was released: the Rabenbaum stays free (docs/enemies/boss_mora.md)
 	var relics: BossRelics = BossRelics.of(tree)
 	if relics != null:
 		data["relics"] = relics.export_state() ## boss kills per player and the relics not picked up yet (docs/rissfeder.md)
@@ -138,6 +141,9 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and data.has("waystones"):
 		waystones.import_state(data.waystones as Dictionary)
+	var witch: WitchArena = tree.get_first_node_in_group("witch_arena") as WitchArena
+	if witch != null and data.has("witch"):
+		witch.import_state(data.witch as Dictionary)
 	var relics: BossRelics = BossRelics.of(tree)
 	if relics != null and data.has("relics"):
 		relics.import_state(data.relics as Dictionary)

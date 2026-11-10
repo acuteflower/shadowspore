@@ -204,3 +204,39 @@ Beim ersten Öffnen des Tabs eine kurze Lehr-Szene (Dialog `alchemy_intro`, Text
 5. **Esma braut** (Tab bei ihr), kein Rühren, kein Minispiel.
 6. **Namen** Wundtau / Glutatem und TRÜB … MEISTERSUD bleiben.
 7. **Angeln / Blattkrabbler als Köder** vs. „keine Tiere töten“: vorgemerkt, wird später angegangen, jetzt keine Änderung.
+
+## 11. Drei besondere Tränke (gebaut 2026-11-10)
+
+Wundtau und Glutatem sind die Alltagstränke (5 Stufen, Zahlen steigen). Die drei hier sind **Spezialtränke**: Sie lösen je ein Problem, das es im Spiel schon gibt, und haben einen Preis oder eine Bedingung. Sie haben nur **3 Stufen** (TRÜB / KLAR / MEISTERSUD), Stack 5 statt 10, brauchen seltene Zutaten und ein eigenes Esma-Rezept (Freischaltung über Quest oder Vertrauen). Alle laufen als Status-Effekte (`data/status_effects.json`, `tiered: true`, Tag mit „STUFE n“ im HUD) und teilen sich **eine Spezialpause** von 20 s, sonst trinkt man alle drei gleichzeitig.
+
+### 11.1 Aschenhaut (Farbe: glimmendes Orange-Schwarz)
+- **Problem, das es löst:** VERBRENNEN (Mornath Phase 3, Feuerboden, `FireArena`).
+- **Wirkung 60 s:** Brandschaden × 0,6 / 0,4 / 0,2; Stufe III macht gegen den Brandboden komplett immun, aber nicht gegen Direkttreffer. Ein laufender Brand wird beim Trinken gelöscht.
+- **Preis:** Ellie ist in der Zeit **wasserscheu**: Wasser (Waten, Schwimmen) löscht die Aschenhaut sofort. Man muss also vor dem Boss trinken und darf nicht durch den Fluss.
+- **Zutaten:** Glutbeere, Embermorchel, Fluchsilber-Staub (III). Freischaltung nach der Mornath-Quest.
+- **Technik:** `HealthComponent.take_tick` fragt `effects.scale_of("ashen")`; `Terrain submerge` > 0 räumt den Effekt weg (wie `_wet()` bei burn). Look: schwarze Glutadern am Körper (Shader `soak` in umgekehrter Farbe).
+
+### 11.2 Klarblick (Farbe: Hexengrün mit weißem Kern)
+- **Problem, das es löst:** HALLUZINIERT im Hexenwald-Nebel (Alternative zu den Ohrringen der Klarheit).
+- **Wirkung 90 s:** entfernt `hallucinated` und verhindert es; Lügen der Lebensranke, Phantomspinnen und falsche Funde verschwinden. **Mehr als die Ohrringe:** echte Dinge funkeln schwach (pflückbare Hexenwald-Pflanzen, Truhen, Fallen), Stufe III zeigt zusätzlich Schattenkreaturen im Nebel als schwache magentafarbene Augen (wie `PetGlint`).
+- **Preis:** Nur in Gebieten mit Nebel nützlich; außerhalb passiert nichts außer dem Funkeln. Dafür bleibt der Nebel im Kopf „sauber“: ein Hexen-Tipp für Esma-Quests.
+- **Zutaten:** Geisterfarn, Mandragora (III), Nebellilie. Freischaltung: Esma-Quest nach der Spiegelhexe.
+- **Technik:** Zweig in `StatusEffects._breathe_mist` (wie `clear_sight`), `Hallucinations` bleibt aus; Funkeln über die Gruppe `interactables` + lokale Zeichnung (nur Besitzer).
+
+### 11.3 Irrlichtsud (Farbe: kaltes Türkis, wie die Stadtlampen)
+- **Problem, das es löst:** Nacht außerhalb des Stadtlichts („Licht ist Land“).
+- **Wirkung 45 s:** Ellie trägt ein kleines wanderndes Licht (`NightLight`, folgt ihr mit Verzögerung). Schattenkreaturen in seinem Radius **zögern** (sie behandeln es als Rand der Stadt: `NightBehavior` bleibt am Lichtrand stehen), `TownManager.light_depth` bekommt für sie einen weichen Kreis um sie; Stufe III lässt sie 3 s lang sogar zurückweichen.
+- **Preis:** Der Lichtfischer fällt darauf herein (sein Köder imitiert Stadtlampen) und greift sie an, und Wildtiere (Rehe, Eulen) meiden sie. Außerdem sieht man sie von weit weg: Das **Lockmaß** der Nacht (`NightDirector.stir`) steigt langsam. Sicher heißt hier nicht unsichtbar.
+- **Zutaten:** Leuchtmorchel, Glimmkappe, Sumpfgold; III braucht einen Schattenkern. Freischaltung über Vertrauen 40.
+- **Technik:** `NightLight` an der Spielerin, Gruppe `player_lights`; Kreaturen prüfen sie in `NightBehavior.limit`; Look: Phiole leuchtet, ein einzelner Funke umkreist sie.
+
+### 11.4 Reihenfolge, wenn ihr sie baut
+Aschenhaut zuerst (kleinster Eingriff, direkt am Boss prüfbar), dann Klarblick, zuletzt Irrlichtsud (greift in die Nacht-KI ein, braucht Balancing). Jeder braucht Items + Rezepte in `alchemy.json`, Status-Eintrag, Icon (`art_potions.py`) und einen Dev-Button (der Button „ALLE TRÄNKE“ zählt sie über `AlchemyRules.TYPES` dann mit).
+
+### 11.5 Wie es gebaut wurde (Abweichungen vom Konzept)
+- **Eigene Herstellungswege** (`alchemy.json` `condition`, `AlchemyRules.condition_block`, `TownManager.brew_block`): Aschenhaut nur mit **fertiger Schmiede** in der Stadt, Klarblick nur im **Morgentau** (`TimeManager.dew_amount`, ca. 5 bis 9 Uhr), Irrlichtsud nur **bei Nacht**. Esmas Tab zeigt den Grund in Rot. Vertrauen: Aschenhaut 15/35/55, Klarblick 20/40/60, Irrlichtsud 10/30/50. Eine Freischaltung per Quest ist noch nicht gebaut.
+- **Ein Glas für alle:** `tools/art_alchemy_icons.py` zeichnet dieselbe Phiole mit eigenem Sud und je einem Motiv (Glutfunken, grüner Kern, freies Irrlicht). Drei Stufen spielen wie Stufe 1, 3 und 5 der Alltagstränke (Füllstand, Siegel).
+- **Wirkungen:** `StatusEffects` (`ashen`, `clear_vision`, `wisp`, `special_pause`), Aschenhaut senkt Brandschaden (`burn` 0,6/0,4/0,2) und macht auf III immun gegen das Anzünden, Wasser löscht sie (`extinguish`). Klarblick hält `hallucinated` fern (`_breathe_mist`). Irrlichtsud: `NightBehavior._wisp_say` bremst Kreaturen im Radius (40/52/64 px) und drängt sie auf III zurück, jede Sekunde steigt `NightDirector.stir` (der Preis).
+- **Eigene Effekte:** `PotionFx` (src/fx) zeichnet Ruß/Glut, Funkeln über Pflückbarem und Augen im Nebel (III), das kreisende Irrlicht mit echtem `NightLight`. `DrinkEffect` hat je eine eigene Trink-Wirkung (Rußwelle, Linsenring, Funkenflug) und eigene Klänge (`tools/audio_alchemy.py`: ashen, clarity, wisp).
+- **Test:** `tools/test_potions.tscn` (182 Checks). Dev-Button ENTWICKLER -> ALLE TRÄNKE (ALLE STUFEN).
+- **Noch nicht:** Lichtfischer fällt nicht eigens auf das Irrlicht herein, Wildtiere meiden es nicht, Quest-Freischaltung der Rezepte.

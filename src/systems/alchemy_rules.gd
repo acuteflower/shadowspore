@@ -5,7 +5,8 @@ extends RefCounted
 ## the town (Esma brews) ask it.
 
 const TIERS: int = 5
-const TYPES: Array[String] = ["heal", "stamina"]
+const TYPES: Array[String] = ["heal", "stamina", "ashen", "clarity", "wisp"]
+const SPECIAL: Array[String] = ["ashen", "clarity", "wisp"] ## the special potions: three tiers, own place or time of brewing, one shared pause
 
 
 static func data() -> Dictionary:
@@ -35,13 +36,55 @@ static func of(stack_or_id: Variant) -> Dictionary:
 	return def.get("potion", {}) as Dictionary
 
 
-static func tier_name(level: int) -> String:
-	var names: Array = data().get("tier_names", []) as Array
+## Tiers a potion has: five for the everyday ones, three for the special ones.
+static func tier_count(type: String) -> int:
+	return maxi((potion(type).get("tiers", []) as Array).size(), 1)
+
+
+static func is_special(type: String) -> bool:
+	return bool(potion(type).get("special", false))
+
+
+static func tier_name(level: int, type: String = "") -> String:
+	var names: Array = (data().get("special_tier_names", []) if is_special(type) else data().get("tier_names", [])) as Array
 	return String(names[level - 1]) if level >= 1 and level <= names.size() else str(level)
 
 
 static func roman(level: int) -> String:
 	return ["I", "II", "III", "IV", "V"][clampi(level, 1, TIERS) - 1]
+
+
+## Name of the potion's brewing condition ("forge", "dew", "night", "" = none) and why it is not met right now ("" = fine). The weather is passed in so the rule stays pure.
+static func condition_block(type: String, forge: bool, dew: float, night: float) -> String:
+	var cond: Dictionary = potion(type).get("condition", {}) as Dictionary
+	var met: bool = true
+	match String(cond.get("kind", "")):
+		"forge":
+			met = forge
+		"dew":
+			met = dew >= 0.15
+		"night":
+			met = night >= 0.5
+	return "" if met else String(cond.get("text", "JETZT NICHT MÖGLICH"))
+
+
+## Aschenhaut: seconds, the share of burn damage that still gets through, whether burning cannot start at all.
+static func ashen_spec(level: int) -> Dictionary:
+	var spec: Dictionary = tier("ashen", level)
+	return {"seconds": float(spec.get("seconds", 60.0)), "burn": float(spec.get("burn", 1.0)), "immune": bool(spec.get("immune", false))}
+
+
+## Klarblick: seconds, the radius in which real things glint, whether shadow creatures show their eyes.
+static func clarity_spec(level: int) -> Dictionary:
+	var spec: Dictionary = tier("clarity", level)
+	return {"seconds": float(spec.get("seconds", 60.0)), "radius": float(spec.get("radius", 120.0)), "eyes": bool(spec.get("eyes", false))}
+
+
+## Irrlichtsud: seconds, the light's radius (px), speed factor of a creature inside it, push out (0..1), lure the night gains per second.
+static func wisp_spec(level: int) -> Dictionary:
+	var spec: Dictionary = tier("wisp", level)
+	return {"seconds": float(spec.get("seconds", 45.0)), "radius": float(spec.get("radius", 40.0)), "slow": float(spec.get("slow", 0.6)),
+		"push": float(spec.get("push", 0.0)), "lure": float(spec.get("lure", 0.02))}
 
 
 static func color(type: String) -> Color:
@@ -85,13 +128,15 @@ static func pause(kind: String) -> float:
 
 
 ## The status effect that holds the pause after using this item ("" = none): every consumable starts the food pause,
-## a healing potion the wound pause. Other potions start nothing.
+## a healing potion the wound pause, a special potion the shared special pause. Glutatem starts nothing.
 static func pause_effect(def: Dictionary) -> String:
 	var kind: String = String(def.get("kind", ""))
 	if kind == "consumable":
 		return "food_pause"
 	if kind == "potion" and String((def.get("potion", {}) as Dictionary).get("type", "")) == "heal":
 		return "wound_pause"
+	if kind == "potion" and SPECIAL.has(String((def.get("potion", {}) as Dictionary).get("type", ""))):
+		return "special_pause"
 	return ""
 
 

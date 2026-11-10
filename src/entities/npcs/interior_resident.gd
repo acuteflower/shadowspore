@@ -30,6 +30,7 @@ var _spot: String = ""
 func setup(inside: Node2D, settler_id: String) -> void:
 	room = inside
 	sid = settler_id
+	add_to_group("quest_actors") ## quest steps with `actor` = her id find her (the Spiegelhexe quest: "SPRICH MIT DER HEXE")
 	name = settler_id.capitalize()
 	spec = DataRegistry.get_entry("settlers", sid)
 	var art: String = String(spec.get("art", sid))
@@ -195,6 +196,11 @@ func interact(player: Player) -> void:
 	if spec.has("shop") and is_inside_tree():
 		ShopWindow.open(get_tree(), player, _town, String(spec.shop))
 	_talking = false
+
+
+## `quest_actors`: where she stands, for a quest step whose `actor` is her id.
+func actor_position(who: String) -> Vector2:
+	return global_position if who == sid and is_inside_tree() else Vector2.INF
 
 
 ## One line of her `chat` (placeholders for the dialogue writer): of the spot she is at, of the night, of anything; never the same twice in a row.

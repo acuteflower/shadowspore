@@ -1,0 +1,12 @@
+{
+  "_doc": "Der Schieferkessel am Rabenbaum (Boss 2, docs/enemies/boss_mora.md). tile = der Baum. limits = Kachelrahmen des Kessels [x0, y0, x1, y1], cuts = Kachelboxen, die nicht dazugehoeren. Danach: py -3 tools/bake_witch_arena.py",
+  "id": "raven_hollow",
+  "tile": [814, 920],
+  "limits": [791, 898, 843, 953],
+  "cuts": [[837, 890, 846, 911]],
+  "species": "boss_morwenna",
+  "spiders": [[-82, 55], [74, 75], [4, 116]],
+  "wake_range": 300,
+  "leash": 520,
+  "reset_seconds": 8
+}

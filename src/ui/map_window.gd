@@ -817,6 +817,8 @@ func _live_markers() -> Array[Dictionary]:
 		marker["title"] = String(style.get("title", marker.get("title", "BEWOHNER")))
 		marker["tone"] = Color(String(style.get("color", "a6ceae")))
 		marker["rows"] = style.get("rows", (styles.get("resident", {}) as Dictionary).get("rows", []))
+		marker["frames"] = style.get("frames", BOSS_WINGS) ## a boss hologram's figure: two 11 x 7 frames (Mornath's bird by default)
+		marker["ghost"] = Color(String(style.get("ghost", "f35cf3")))
 		marker["inside"] = Interiors.slot_at(world) >= 0 or MineManager.in_mine(world)
 		markers.append(marker)
 	var tones: Dictionary = _player_tones()
@@ -883,7 +885,7 @@ func _draw_presence(fade: float) -> void:
 			if bool(marker.get("resting", false)):
 				_text("Z", Vector2i(at + Vector2(5, -8)), tone, fade * 0.7)
 		elif kind == "boss":
-			_draw_boss_marker(at, tone, fade)
+			_draw_boss_marker(at, tone, fade, marker.frames as Array, marker.ghost as Color)
 			boss_seen = true
 		elif kind == "self":
 			_draw_hero(at, tone, 1.0, fade)
@@ -910,11 +912,11 @@ func _draw_presence(fade: float) -> void:
 
 ## Mornath's hologram on the map: the bird of the arena's projection (wings beating, scanlines, now and then a tear with a magenta ghost) over a ring of broken
 ## runes, a cone of calling rings pulsing out, glitch specks rising. Fixed screen size at every zoom, like the other marks.
-func _draw_boss_marker(at: Vector2, tone: Color, fade: float) -> void:
+func _draw_boss_marker(at: Vector2, tone: Color, fade: float, frames: Array = BOSS_WINGS, ghost: Color = BOSS_MAGENTA) -> void:
 	var phase: float = 0.5 + 0.5 * sin(_time * 2.4)
 	var glitch: float = _boss_glitch()
 	VineStyle.glow(_overlay, at, 17.0 + 3.0 * phase, tone, 0.34 * fade)
-	VineStyle.glow(_overlay, at + Vector2(0, 3), 10.0, BOSS_MAGENTA, (0.1 + 0.22 * glitch) * fade)
+	VineStyle.glow(_overlay, at + Vector2(0, 3), 10.0, ghost, (0.1 + 0.22 * glitch) * fade)
 	for k: int in 2: # the call: two rings widening out of the bird
 		var t: float = fposmod(_time * 0.45 + k * 0.5, 1.0)
 		VineStyle.ring(_overlay, at, 9 + int(t * 22.0), Color(tone, (1.0 - t) * 0.55 * fade), 0.6)
@@ -927,12 +929,12 @@ func _draw_boss_marker(at: Vector2, tone: Color, fade: float) -> void:
 				continue
 			var a: float = turn + TAU * float(i) / float(steps)
 			var p: Vector2 = at + Vector2(0, 4) + Vector2(roundf(cos(a) * radius), roundf(sin(a) * radius * 0.5))
-			_overlay.draw_rect(Rect2(p, Vector2.ONE), Color(tone if ring == 0 else BOSS_MAGENTA, (0.75 - 0.2 * ring) * fade))
-	_draw_boss_bird(at + Vector2(0, roundf(sin(_time * 1.3) * 1.5) - 3.0), tone, fade, glitch)
+			_overlay.draw_rect(Rect2(p, Vector2.ONE), Color(tone if ring == 0 else ghost, (0.75 - 0.2 * ring) * fade))
+	_draw_boss_bird(at + Vector2(0, roundf(sin(_time * 1.3) * 1.5) - 3.0), tone, fade, glitch, frames, ghost)
 	for k: int in 3: # glitch specks rising
 		var t: float = fposmod(_time * 0.55 + k * 0.33, 1.0)
 		var speck: Vector2 = at + Vector2(roundf(sin(k * 5.1 + _time * 0.3) * 9.0), -6.0 - roundf(t * 16.0))
-		_overlay.draw_rect(Rect2(speck, Vector2(2, 1) if k == 1 else Vector2.ONE), Color(BOSS_MAGENTA if k == 2 else tone, (1.0 - t) * 0.8 * fade))
+		_overlay.draw_rect(Rect2(speck, Vector2(2, 1) if k == 1 else Vector2.ONE), Color(ghost if k == 2 else tone, (1.0 - t) * 0.8 * fade))
 
 
 ## 0..1: a short tear of the hologram, every few seconds (two uneven rhythms).
@@ -943,8 +945,8 @@ func _boss_glitch() -> float:
 
 
 ## The bird (11 x 7, `at` = its middle) as a hologram: every second row dimmer, a bright core, and in a tear rows slip sideways over a magenta ghost.
-func _draw_boss_bird(at: Vector2, tone: Color, fade: float, glitch: float) -> void:
-	var rows: Array = BOSS_WINGS[int(_time * 2.2) % 2] as Array
+func _draw_boss_bird(at: Vector2, tone: Color, fade: float, glitch: float, frames: Array = BOSS_WINGS, ghost: Color = BOSS_MAGENTA) -> void:
+	var rows: Array = frames[int(_time * 2.2) % frames.size()] as Array
 	var origin: Vector2 = (at - Vector2(5, 3)).round()
 	var slip: Array[int] = []
 	for y: int in 7:
@@ -961,7 +963,7 @@ func _draw_boss_bird(at: Vector2, tone: Color, fade: float, glitch: float) -> vo
 						_overlay.draw_rect(Rect2(cell + offset, Vector2.ONE), Color(VineStyle.OUTLINE, 0.9 * fade))
 				elif pass_index == 1:
 					if glitch > 0.0:
-						_overlay.draw_rect(Rect2(cell + Vector2(2, 0), Vector2.ONE), Color(BOSS_MAGENTA, 0.6 * glitch * fade))
+						_overlay.draw_rect(Rect2(cell + Vector2(2, 0), Vector2.ONE), Color(ghost, 0.6 * glitch * fade))
 				else:
 					var color: Color = tone.lerp(VineStyle.PETAL, clampf(0.55 - float(x + y) * 0.04, 0.05, 0.55))
 					if y % 2 == 1:

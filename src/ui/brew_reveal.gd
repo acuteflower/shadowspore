@@ -158,7 +158,7 @@ func _draw_view() -> void:
 	var pop: float = 1.0 + 0.5 * exp(-since * 9.0)
 	_t(middle + Vector2(0, 16), "%d X" % _count, Color(tone, fade), 2.0 * pop)
 	_t(middle + Vector2(0, 34), String(DataRegistry.get_entry("items", AlchemyRules.item_id(_type, _tier)).get("name", "")).to_upper(), Color(Color("d9b25f"), fade))
-	_t(middle + Vector2(0, 44), "STUFE %s  %s" % [AlchemyRules.roman(_tier), AlchemyRules.tier_name(_tier)], Color(tone.lightened(0.2), fade))
+	_t(middle + Vector2(0, 44), "STUFE %s  %s" % [AlchemyRules.roman(_tier), AlchemyRules.tier_name(_tier, _type)], Color(tone.lightened(0.2), fade))
 	if _moon:
 		_t(middle + Vector2(0, 54), "DER VOLLMOND HAT MITGERÜHRT", Color(Color("dfe8ff"), fade * (0.7 + 0.3 * sin(_age * 3.0))))
 	if _age >= BUILD + STAY and _closing < 0.0:

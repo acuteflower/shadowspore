@@ -23,7 +23,7 @@ void fragment() {
 	// day: no fog and no dusk, the output would be fully transparent anyway ('return' is not allowed in fragment())
 	float fog_on = (fog > 0.0 || night > 0.0 || hex > 0.0) ? 1.0 : 0.0;
 	vec2 px = UV * view_px; // smooth, not snapped to art pixels
-	vec2 w = floor(world_origin) + px;
+	vec2 w = world_origin + px; // NOT floored: the camera glides finer than an art pixel, a floored origin makes the fog judder against the ground
 	float noise = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	float a = n_fbm(w / 120.0 + vec2(TIME * 0.011, TIME * 0.004) + 7.0);
 	float b = n_fbm(w / 64.0 + vec2(-TIME * 0.017, TIME * 0.007) + 31.0);

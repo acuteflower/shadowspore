@@ -1,11 +1,18 @@
 {
 	"_doc": "Alchemie (docs/alchemie_konzept.md), gelesen von AlchemyRules (src/systems/alchemy_rules.gd). Esma braut in ihrem Laden (Tab ALCHEMIE, shops.json witch_counter). Jede Stufe ist ein eigenes Item potions[type].item % tier. Stufen schaltet Esmas Vertrauen frei, und Esma muss die Stufe darunter schon einmal gebraut haben (TownManager.brewed). Zahlen sind ein erster Wurf.",
 	"vial": "vial_empty",
-	"tier_names": ["TRÜB", "KLAR", "LEUCHTEND", "STRAHLEND", "MEISTERSUD"],
+	"tier_names": [
+		"TRÜB",
+		"KLAR",
+		"LEUCHTEND",
+		"STRAHLEND",
+		"MEISTERSUD"
+	],
 	"pauses": {
-		"_doc": "Sekunden. food: nach jedem kind consumable (Beeren, Wurzeln ...), heal: nach einem Heiltrank. Getrennt, eine Beere sperrt keinen Heiltrank.",
+		"_doc": "Sekunden. food: nach jedem kind consumable (Beeren, Wurzeln ...), heal: nach einem Heiltrank. Getrennt, eine Beere sperrt keinen Heiltrank. special: nach jedem Spezialtrank (Aschenhaut, Klarblick, Irrlichtsud), gemeinsam fuer alle drei.",
 		"food": 3.0,
-		"heal": 10.0
+		"heal": 10.0,
+		"special": 20.0
 	},
 	"moon": {
 		"_doc": "Mond-Sud: was Esma nachts (night_amount >= night) bei Vollmond (moon_phase == phase) braut, gibt extra Tränke.",
@@ -21,11 +28,72 @@
 			"light": "ffd0dc",
 			"info": "HEILT SOFORT EINEN TEIL DEINER GESUNDHEIT.",
 			"tiers": [
-				{"ratio": 0.20, "min": 20, "trust": 0, "yield": 2, "in": {"wound_leaf": 3, "dusk_berry": 2}},
-				{"ratio": 0.30, "min": 30, "trust": 10, "yield": 2, "in": {"wound_leaf": 4, "moonbell": 2, "sun_seed": 1}},
-				{"ratio": 0.40, "min": 45, "trust": 25, "yield": 2, "in": {"wound_leaf": 4, "sun_seed": 2, "night_beet": 2, "mist_lily": 1}},
-				{"ratio": 0.55, "min": 60, "trust": 40, "yield": 2, "cleanse": ["burn"], "in": {"wound_leaf": 5, "night_beet": 3, "mist_lily": 2, "iris_bloom": 1, "void_bloom": 1}},
-				{"ratio": 0.70, "min": 80, "trust": 60, "yield": 1, "cleanse": ["burn"], "overheal": true, "in": {"wound_leaf": 6, "mist_lily": 3, "iris_bloom": 2, "mandrake": 1, "shadow_core": 1}}
+				{
+					"ratio": 0.2,
+					"min": 20,
+					"trust": 0,
+					"yield": 2,
+					"in": {
+						"wound_leaf": 3,
+						"dusk_berry": 2
+					}
+				},
+				{
+					"ratio": 0.3,
+					"min": 30,
+					"trust": 10,
+					"yield": 2,
+					"in": {
+						"wound_leaf": 4,
+						"moonbell": 2,
+						"sun_seed": 1
+					}
+				},
+				{
+					"ratio": 0.4,
+					"min": 45,
+					"trust": 25,
+					"yield": 2,
+					"in": {
+						"wound_leaf": 4,
+						"sun_seed": 2,
+						"night_beet": 2,
+						"mist_lily": 1
+					}
+				},
+				{
+					"ratio": 0.55,
+					"min": 60,
+					"trust": 40,
+					"yield": 2,
+					"cleanse": [
+						"burn"
+					],
+					"in": {
+						"wound_leaf": 5,
+						"night_beet": 3,
+						"mist_lily": 2,
+						"iris_bloom": 1,
+						"void_bloom": 1
+					}
+				},
+				{
+					"ratio": 0.7,
+					"min": 80,
+					"trust": 60,
+					"yield": 1,
+					"cleanse": [
+						"burn"
+					],
+					"overheal": true,
+					"in": {
+						"wound_leaf": 6,
+						"mist_lily": 3,
+						"iris_bloom": 2,
+						"mandrake": 1,
+						"shadow_core": 1
+					}
+				}
 			]
 		},
 		"stamina": {
@@ -35,12 +103,236 @@
 			"light": "fff0b0",
 			"info": "30 SEKUNDEN LANG JEDE SEKUNDE AUSDAUER, AUCH WÄHREND DU SIE VERBRAUCHST.",
 			"tiers": [
-				{"per_second": 3, "seconds": 30, "delay_scale": 1.0, "sprint_scale": 1.0, "trust": 0, "yield": 2, "in": {"ember_berry": 3, "brook_mint": 2}},
-				{"per_second": 5, "seconds": 30, "delay_scale": 1.0, "sprint_scale": 1.0, "trust": 10, "yield": 2, "in": {"ember_berry": 3, "brook_mint": 3, "spark_poppy": 2}},
-				{"per_second": 7, "seconds": 30, "delay_scale": 1.0, "sprint_scale": 1.0, "trust": 25, "yield": 2, "in": {"ember_carrot": 2, "brook_mint": 3, "ember_morel": 2, "marsh_gold": 1}},
-				{"per_second": 9, "seconds": 30, "delay_scale": 0.75, "sprint_scale": 1.0, "trust": 40, "yield": 2, "in": {"ember_carrot": 3, "ember_morel": 3, "moon_parasol": 2, "toad_cap": 1}},
-				{"per_second": 12, "seconds": 30, "delay_scale": 0.5, "sprint_scale": 0.85, "trust": 60, "yield": 1, "in": {"ember_carrot": 4, "moon_parasol": 3, "toad_cap": 2, "mandrake": 1, "shadow_core": 1}}
+				{
+					"per_second": 3,
+					"seconds": 30,
+					"delay_scale": 1.0,
+					"sprint_scale": 1.0,
+					"trust": 0,
+					"yield": 2,
+					"in": {
+						"ember_berry": 3,
+						"brook_mint": 2
+					}
+				},
+				{
+					"per_second": 5,
+					"seconds": 30,
+					"delay_scale": 1.0,
+					"sprint_scale": 1.0,
+					"trust": 10,
+					"yield": 2,
+					"in": {
+						"ember_berry": 3,
+						"brook_mint": 3,
+						"spark_poppy": 2
+					}
+				},
+				{
+					"per_second": 7,
+					"seconds": 30,
+					"delay_scale": 1.0,
+					"sprint_scale": 1.0,
+					"trust": 25,
+					"yield": 2,
+					"in": {
+						"ember_carrot": 2,
+						"brook_mint": 3,
+						"ember_morel": 2,
+						"marsh_gold": 1
+					}
+				},
+				{
+					"per_second": 9,
+					"seconds": 30,
+					"delay_scale": 0.75,
+					"sprint_scale": 1.0,
+					"trust": 40,
+					"yield": 2,
+					"in": {
+						"ember_carrot": 3,
+						"ember_morel": 3,
+						"moon_parasol": 2,
+						"toad_cap": 1
+					}
+				},
+				{
+					"per_second": 12,
+					"seconds": 30,
+					"delay_scale": 0.5,
+					"sprint_scale": 0.85,
+					"trust": 60,
+					"yield": 1,
+					"in": {
+						"ember_carrot": 4,
+						"moon_parasol": 3,
+						"toad_cap": 2,
+						"mandrake": 1,
+						"shadow_core": 1
+					}
+				}
+			]
+		},
+		"ashen": {
+			"name": "ASCHENHAUT",
+			"item": "potion_ashen_%d",
+			"color": "ff7a2a",
+			"light": "ffd9a0",
+			"special": true,
+			"info": "60 SEKUNDEN LANG BRENNT FEUER SCHWÄCHER. WASSER LÖSCHT DIE HAUT.",
+			"condition": {
+				"kind": "forge",
+				"text": "NUR MIT FERTIGER SCHMIEDE ZU BRAUEN"
+			},
+			"tiers": [
+				{
+					"seconds": 60,
+					"burn": 0.6,
+					"trust": 15,
+					"yield": 2,
+					"in": {
+						"ember_berry": 2,
+						"ember_morel": 2,
+						"ember_carrot": 1
+					}
+				},
+				{
+					"seconds": 60,
+					"burn": 0.4,
+					"trust": 35,
+					"yield": 2,
+					"in": {
+						"ember_morel": 3,
+						"ember_carrot": 2,
+						"void_splinter": 1
+					}
+				},
+				{
+					"seconds": 60,
+					"burn": 0.2,
+					"immune": true,
+					"trust": 55,
+					"yield": 1,
+					"in": {
+						"ember_carrot": 3,
+						"ember_morel": 3,
+						"curse_silver": 2,
+						"shadow_core": 1
+					}
+				}
+			]
+		},
+		"clarity": {
+			"name": "KLARBLICK",
+			"item": "potion_clarity_%d",
+			"color": "a8ff6a",
+			"light": "eaffc4",
+			"special": true,
+			"info": "KLARER KOPF IM NEBEL: KEINE HALLUZINATIONEN, ECHTES FUNKELT.",
+			"condition": {
+				"kind": "dew",
+				"text": "NUR IM MORGENTAU ZU BRAUEN (5 BIS 9 UHR)"
+			},
+			"tiers": [
+				{
+					"seconds": 60,
+					"radius": 120,
+					"eyes": false,
+					"trust": 20,
+					"yield": 2,
+					"in": {
+						"fern_frond": 3,
+						"mist_lily": 2
+					}
+				},
+				{
+					"seconds": 90,
+					"radius": 150,
+					"eyes": false,
+					"trust": 40,
+					"yield": 2,
+					"in": {
+						"ghost_frond": 3,
+						"mist_lily": 2,
+						"toad_cap": 1
+					}
+				},
+				{
+					"seconds": 120,
+					"radius": 180,
+					"eyes": true,
+					"trust": 60,
+					"yield": 1,
+					"in": {
+						"ghost_frond": 4,
+						"mist_lily": 3,
+						"mandrake": 1,
+						"mora_shard": 1
+					}
+				}
+			]
+		},
+		"wisp": {
+			"name": "IRRLICHTSUD",
+			"item": "potion_wisp_%d",
+			"color": "4fe0d0",
+			"light": "d6fff6",
+			"special": true,
+			"info": "45 SEKUNDEN EIN WANDERNDES LICHT. SCHATTEN ZÖGERN, ABER ANDERE BEMERKEN ES AUCH.",
+			"condition": {
+				"kind": "night",
+				"text": "NUR BEI NACHT ZU BRAUEN"
+			},
+			"tiers": [
+				{
+					"seconds": 45,
+					"radius": 40,
+					"slow": 0.6,
+					"push": 0.0,
+					"lure": 0.02,
+					"trust": 10,
+					"yield": 2,
+					"in": {
+						"glow_cap": 3,
+						"marsh_gold": 2
+					}
+				},
+				{
+					"seconds": 45,
+					"radius": 52,
+					"slow": 0.5,
+					"push": 0.0,
+					"lure": 0.03,
+					"trust": 30,
+					"yield": 2,
+					"in": {
+						"glow_cap": 4,
+						"marsh_gold": 2,
+						"moonbell": 2,
+						"grave_candle": 1
+					}
+				},
+				{
+					"seconds": 45,
+					"radius": 64,
+					"slow": 0.4,
+					"push": 1.0,
+					"lure": 0.04,
+					"trust": 50,
+					"yield": 1,
+					"in": {
+						"glow_cap": 5,
+						"moon_parasol": 3,
+						"void_bloom": 2,
+						"shadow_core": 1
+					}
+				}
 			]
 		}
-	}
+	},
+	"special_tier_names": [
+		"TRÜB",
+		"KLAR",
+		"MEISTERSUD"
+	]
 }

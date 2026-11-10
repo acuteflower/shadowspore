@@ -10,7 +10,7 @@ extends ColorRect
 const SHADER: Shader = preload("res://assets/shaders/boss_aura.gdshader")
 const RANGE: float = 480.0 ## a local player this close to the arena's middle feels it
 
-var _fight: MornathFight
+var _fight: Node ## MornathFight or MirrorWitchFight: anything with `aura_level()` and a `boss` that has `centre()`
 var _layer: CanvasLayer
 var _material: ShaderMaterial = ShaderMaterial.new()
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -25,7 +25,7 @@ var _neg_left: float = 0.0
 var _seed: float = 0.0
 
 
-static func begin(fight: MornathFight) -> BossAura:
+static func begin(fight: Node) -> BossAura:
 	if DisplayServer.get_name() == "headless":
 		return null
 	var aura: BossAura = BossAura.new()
@@ -79,15 +79,17 @@ func _interval() -> float:
 
 
 func _process(delta: float) -> void:
-	if not is_instance_valid(_fight) or not is_instance_valid(_fight.boss):
+	var owner_boss: Node2D = (_fight.get("boss") as Node2D) if is_instance_valid(_fight) else null
+	if not is_instance_valid(owner_boss):
 		_layer.queue_free()
 		return
 	_fit()
 	_t += delta
-	var want: float = _fight.aura_level()
+	var want: float = float(_fight.call("aura_level"))
+	var middle: Vector2 = owner_boss.call("centre") as Vector2
 	var near: bool = false
 	for player: Player in Player.all:
-		if player.is_multiplayer_authority() and player.global_position.distance_to(_fight.boss.centre()) < RANGE:
+		if player.is_multiplayer_authority() and player.global_position.distance_to(middle) < RANGE:
 			near = true
 			break
 	_near = move_toward(_near, 1.0 if near else 0.0, delta * 0.5)

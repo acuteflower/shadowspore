@@ -147,7 +147,28 @@ def rissfeder():
     return px
 
 
-ICONS = {"silver_chain": silver_chain, "wuchtreif": wuchtreif, "schweigtropfen": schweigtropfen, "rissfeder": rissfeder, "clarity_earrings": clarity_earrings}
+def mora_shard():
+    """Moras Spiegelscherbe (Morwenna's drop, the quest material Esma forges the Ohrringe der Klarheit from; docs/enemies/boss_mora.md):
+    a long shard of her mirror mask on a silver hook, pale and bright, a crack of witch green gone quiet in it. PLACEHOLDER icon until the art agent redraws it."""
+    px = canvas()
+    mirror = [hexc(c) for c in ("4a6070", "a6c0cc", "d8ecf2", "f6fdff")]
+    green = hexc("a8ff6a")
+    put(px, 8, 1, SILVER[2])  # the hook
+    put(px, 9, 2, SILVER[1])
+    put(px, 8, 3, SILVER[3])
+    put(px, 7, 3, SILVER[1])
+    rows = [(4, 7, 9), (5, 6, 9), (6, 6, 10), (7, 5, 10), (8, 5, 10), (9, 6, 10), (10, 6, 9), (11, 7, 9), (12, 7, 8), (13, 8, 8)]  # (y, x0, x1) of the shard
+    for y, x0, x1 in rows:
+        for x in range(x0, x1 + 1):
+            tone = 3 if x == x0 else (2 if x <= x0 + 1 else (1 if x < x1 else 0))
+            put(px, x, y, mirror[tone])
+    for y, x in ((6, 8), (7, 8), (8, 7), (9, 8), (10, 8)):  # the quiet crack
+        put(px, x, y, green if y in (7, 9) else mirror[0])
+    put(px, 6, 5, mirror[3])  # the glint
+    return px
+
+
+ICONS = {"silver_chain": silver_chain, "wuchtreif": wuchtreif, "schweigtropfen": schweigtropfen, "rissfeder": rissfeder, "clarity_earrings": clarity_earrings, "mora_shard": mora_shard}
 
 
 def main():

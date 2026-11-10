@@ -142,6 +142,9 @@ func _landing(heading: Vector2) -> Vector2:
 			return Vector2.INF
 	if not _outdoor_floor(world, end) or not _clear_at(start) or not _clear_at(end):
 		return Vector2.INF
+	for blocker: Node in get_tree().get_nodes_in_group("climb_block"): ## a sealed boss hollow (WitchArena) refuses every climb in or out
+		if bool(blocker.call("blocks_climb", start, end)):
+			return Vector2.INF
 	return end if _clear_between(start, end, _wall_rids()) else Vector2.INF
 
 

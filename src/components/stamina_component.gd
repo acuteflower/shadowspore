@@ -13,6 +13,7 @@ signal changed(current: float, maximum: float)
 var current: float = 0.0
 
 var _delay_left: float = 0.0
+var _pulse_left: float = 1.0
 
 
 func _ready() -> void:
@@ -21,10 +22,23 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var tier: int = _glutatem_tier()
+	if tier > 0:
+		_pulse_left -= delta
+		if _pulse_left <= 0.0:
+			_pulse_left += 1.0
+			_set_current(current + float(AlchemyRules.stamina_spec(tier)["per_second"])) ## the potion's pulse, also during the pause
+	else:
+		_pulse_left = 1.0
 	if _delay_left > 0.0:
 		_delay_left -= delta
 	elif current < max_stamina:
 		_set_current(current + regen_per_sec * delta)
+
+
+func _glutatem_tier() -> int:
+	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	return int(effects.scale_of("glutatem")) if effects != null else 0
 
 
 ## True while regeneration is paused after use.
@@ -67,7 +81,8 @@ func refill() -> void:
 
 
 func _use(amount: float) -> void:
-	_delay_left = regen_delay
+	var tier: int = _glutatem_tier()
+	_delay_left = regen_delay * (float(AlchemyRules.stamina_spec(tier)["delay_scale"]) if tier > 0 else 1.0)
 	_set_current(current - amount)
 
 

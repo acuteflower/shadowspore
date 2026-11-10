@@ -195,7 +195,7 @@ func _rebuild_brew() -> void:
 		var locked: bool = "TRAUT" in why or "ERST STUFE" in why
 		rows.append({"kind": "brew", "type": type, "tier": level, "item": AlchemyRules.item_id(type, level), "count": town.brew_yield(type, level),
 			"name": "%s %s" % [String(AlchemyRules.potion(type).get("name", type)), AlchemyRules.roman(level)],
-			"sub": AlchemyRules.tier_name(level),
+			"sub": AlchemyRules.tier_name(level, type),
 			"tag": "", "tag_color": DIM,
 			"state": OK if why == "" else (LOCKED if locked else MISSING), "why": why})
 
@@ -383,14 +383,14 @@ func _detail_brew(area: Rect2, row: Dictionary) -> void:
 	draw_cell(area.position + Vector2(0, 2), String(row.item), int(row.count), true, int(row.state) == LOCKED)
 	var x: float = area.position.x + 46.0
 	_text(Vector2(x, area.position.y + 2.0), String(row.name), GOLD)
-	for k: int in AlchemyRules.TIERS: ## the five tiers as drops: filled up to this one
+	for k: int in AlchemyRules.tier_count(type): ## the tiers (five, special potions three) as drops: filled up to this one
 		var pip: Vector2 = Vector2(x + float(k) * 7.0, area.position.y + 13.0)
 		var lit: bool = k < level
 		_canvas.draw_rect(Rect2(pip, Vector2(5, 5)), UiStyle.OUTLINE)
 		_canvas.draw_rect(Rect2(pip + Vector2.ONE, Vector2(3, 3)), tone if lit else Color(0.1, 0.06, 0.16))
 		if lit:
 			_canvas.draw_rect(Rect2(pip + Vector2.ONE, Vector2.ONE), AlchemyRules.light(type))
-	_text(Vector2(x + 40.0, area.position.y + 12.0), AlchemyRules.tier_name(level), tone)
+	_text(Vector2(x + 40.0, area.position.y + 12.0), AlchemyRules.tier_name(level, type), tone)
 	var definition: Dictionary = DataRegistry.get_entry("items", String(row.item))
 	var y: float = area.position.y + 22.0
 	for line: String in _wrap(String(definition.get("description", "")), int(area.size.x) - 52).slice(0, 2):
@@ -498,7 +498,7 @@ func _draw_list(card: Rect2) -> void:
 		if scroll + v >= rows.size():
 			break
 		var row: Dictionary = rows[scroll + v]
-		for level: int in range(1, AlchemyRules.TIERS + 1):
+		for level: int in range(1, AlchemyRules.tier_count(String(row.type)) + 1):
 			var rect: Rect2 = _brew_tier_rect(_row_rect(v), level)
 			var item: String = AlchemyRules.item_id(String(row.type), level)
 			var why: String = town.brew_block(String(row.type), level, player, npc)
@@ -516,7 +516,7 @@ func _draw_list(card: Rect2) -> void:
 
 func _choose_brew_tier(index: int, level: int) -> void:
 	focus = index
-	_brew_tiers[String(rows[index].type)] = clampi(level, 1, AlchemyRules.TIERS)
+	_brew_tiers[String(rows[index].type)] = clampi(level, 1, AlchemyRules.tier_count(String(rows[index].type)))
 	_rebuild()
 	_sound("tick")
 	_canvas.queue_redraw()
@@ -528,7 +528,7 @@ func _on_gui_input(event: InputEvent) -> void:
 		for v: int in VISIBLE_ROWS:
 			if scroll + v >= rows.size():
 				break
-			for level: int in range(1, AlchemyRules.TIERS + 1):
+			for level: int in range(1, AlchemyRules.tier_count(String(rows[scroll + v].type)) + 1):
 				if _brew_tier_rect(_row_rect(v), level).has_point(click.position):
 					_choose_brew_tier(scroll + v, level)
 					_canvas.accept_event()
@@ -541,7 +541,7 @@ func _input(event: InputEvent) -> void:
 		var left: bool = event.is_action_pressed("ui_left") or event.is_action_pressed("move_left")
 		var right: bool = event.is_action_pressed("ui_right") or event.is_action_pressed("move_right")
 		if left or right:
-			_choose_brew_tier(focus, posmod(int(rows[focus].tier) - 1 + (-1 if left else 1), AlchemyRules.TIERS) + 1)
+			_choose_brew_tier(focus, posmod(int(rows[focus].tier) - 1 + (-1 if left else 1), AlchemyRules.tier_count(String(rows[focus].type))) + 1)
 			get_viewport().set_input_as_handled()
 			return
 	super(event)

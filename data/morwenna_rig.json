@@ -1,0 +1,70 @@
+{
+  "frame": [
+    96,
+    96
+  ],
+  "feet": [
+    48,
+    80
+  ],
+  "frames": 47,
+  "rows": 8,
+  "looks": 3,
+  "clips": {
+    "idle": {
+      "start": 0,
+      "count": 4,
+      "fps": 5
+    },
+    "run": {
+      "start": 4,
+      "count": 6,
+      "fps": 13
+    },
+    "slash_a": {
+      "start": 10,
+      "count": 4,
+      "fps": 14,
+      "strike": 1
+    },
+    "slash_b": {
+      "start": 14,
+      "count": 4,
+      "fps": 14,
+      "strike": 1
+    },
+    "slash_c": {
+      "start": 18,
+      "count": 6,
+      "fps": 13,
+      "strike": 3,
+      "hold": 1
+    },
+    "cast": {
+      "start": 24,
+      "count": 5,
+      "fps": 10,
+      "strike": 3
+    },
+    "leap": {
+      "start": 29,
+      "count": 4,
+      "fps": 9
+    },
+    "leech": {
+      "start": 33,
+      "count": 4,
+      "fps": 6
+    },
+    "scream": {
+      "start": 37,
+      "count": 4,
+      "fps": 7
+    },
+    "down": {
+      "start": 41,
+      "count": 6,
+      "fps": 8
+    }
+  }
+}

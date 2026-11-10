@@ -235,6 +235,7 @@ func _build_items() -> void:
 				_add(0, "button", "TALISMANE ANLEGEN", "", {"action": "talismans_on"})
 				_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
 				_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
+				_add(0, "button", "ALLE TRÄNKE (ALLE STUFEN)", "", {"action": "potions_all"})
 				_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
 				_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
 				_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
@@ -264,6 +265,11 @@ func _build_items() -> void:
 				_add(0, "heading", "BOSS-QUEST")
 				_add(0, "button", "MORNATH-QUEST STARTEN", "", {"action": "mornath_quest"})
 				_add(0, "button", "ZUR SÄULENEBENE", "", {"action": "mornath_arena"})
+			if story_world != null and _player != null and story_world.witch_arena != null:
+				_add(0, "heading", "MORWENNA")
+				_add(0, "button", "ZUM RABENBAUM", "", {"action": "morwenna_tree"})
+				_add(0, "button", "MORWENNA SOFORT", "", {"action": "morwenna_fight"})
+				_add(0, "button", "SPIEGELHEXE-QUEST", "", {"action": "morwenna_quest"})
 			if story_world != null and multiplayer.is_server() and multiplayer.get_peers().is_empty():
 				_add(0, "heading", "MINE")
 				for lvl: int in [1, 5, 10, 20]:
@@ -642,6 +648,24 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			boss_world.debug_mornath(_player as Player, action == "mornath_arena")
+		"morwenna_quest":
+			var quest_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+			if quest_world == null or _player == null or quest_world.witch_arena == null:
+				_failed_flash = 2.5
+				return
+			_set_open(false)
+			_open_t = 0.0
+			visible = false
+			quest_world.witch_arena.debug_quest(_player as Player)
+		"morwenna_tree", "morwenna_fight":
+			var witch_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+			if witch_world == null or _player == null or witch_world.witch_arena == null:
+				_failed_flash = 2.5
+				return
+			_set_open(false)
+			_open_t = 0.0
+			visible = false
+			witch_world.debug_morwenna(_player as Player, action == "morwenna_fight")
 		"return_home":
 			var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if world == null or not world.debug_can_return_home():
@@ -732,6 +756,14 @@ func _run_action(action: String) -> void:
 				var def: Dictionary = items[id] as Dictionary
 				if String(def.get("kind", "")) == "talisman" and collector.inventory.count_item(id) == 0 and not TalismanRules.worn_ids(collector.inventory.equipment).has(id):
 					collector.inventory.give(id, 1)
+		"potions_all": ## every potion of every tier into the bag (host), 5 of each
+			var brewer: Player = _player as Player
+			if brewer == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			for type: String in AlchemyRules.TYPES:
+				for level: int in range(1, AlchemyRules.tier_count(type) + 1):
+					brewer.inventory.give(AlchemyRules.item_id(type, level), 5)
 		"rissfeder": ## the Rissfeder into the bag (host); not twice when she has it or wears it
 			var keeper: Player = _player as Player
 			if keeper == null or not multiplayer.is_server():

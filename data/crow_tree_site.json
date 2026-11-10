@@ -1,9 +1,9 @@
 {
   "tile": [
-    879,
-    914
+    814,
+    920
   ],
-  "clear_radius": 12,
+  "clear_radius": 14,
   "spiders": [
     [
       -82,

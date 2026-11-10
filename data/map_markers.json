@@ -1,20 +1,38 @@
 {
   "resident": {
     "color": "a6ceae",
-    "rows": ["..X..", ".XXX.", "XXXXX", ".XXX.", "..X.."]
+    "rows": [
+      "..X..",
+      ".XXX.",
+      "XXXXX",
+      ".XXX.",
+      "..X.."
+    ]
   },
   "valdric": {
     "name": "VALDRIC",
     "title": "RITTER",
     "requires": "knows_adventurer",
     "color": "c8b8ed",
-    "rows": ["XXXXX", "X.X.X", "X.X.X", ".XXX.", "..X.."]
+    "rows": [
+      "XXXXX",
+      "X.X.X",
+      "X.X.X",
+      ".XXX.",
+      "..X.."
+    ]
   },
   "gustav": {
     "name": "GUSTAV",
     "title": "ZIMMERMANN",
     "color": "e6c488",
-    "rows": ["XXXX.", ".XX.X", "..X..", "..X..", "..X.."]
+    "rows": [
+      "XXXX.",
+      ".XX.X",
+      "..X..",
+      "..X..",
+      "..X.."
+    ]
   },
   "mornath": {
     "kind": "boss",
@@ -22,6 +40,47 @@
     "title": "DER HIMMELSSPALTER",
     "extra": "ERNEUTER KAMPF BEREIT",
     "color": "6fe8ff",
-    "rows": ["X...X", "XX.XX", ".XXX.", "..X..", "..X.."]
+    "rows": [
+      "X...X",
+      "XX.XX",
+      ".XXX.",
+      "..X..",
+      "..X.."
+    ]
+  },
+  "morwenna": {
+    "kind": "boss",
+    "name": "MORWENNA",
+    "title": "DIE SPIEGELHEXE",
+    "extra": "ERNEUTER KAMPF BEREIT",
+    "color": "6fe8ff",
+    "ghost": "a8ff6a",
+    "rows": [
+      "..X..",
+      ".XXX.",
+      "XXXXX",
+      ".X.X.",
+      "XX.XX"
+    ],
+    "frames": [
+      [
+        "....XX.....",
+        "...XXX.....",
+        "..XXXX.....",
+        ".XXXXXXX...",
+        "XXXXXXXXXX.",
+        "..XXXXXX...",
+        ".XX.XX.XX.."
+      ],
+      [
+        "....XX.....",
+        "....XXX....",
+        "...XXXX....",
+        "..XXXXXXX..",
+        ".XXXXXXXXXX",
+        "...XXXXXX..",
+        "..XX.XX.XX."
+      ]
+    ]
   }
 }

@@ -5,7 +5,7 @@ render_mode unshaded;
 // closer the hit comes the denser and whiter it gets. The area drawn is the area that hurts. Only the flagstone floor (the arena decal's mask) is drawn on.
 //   shape_a: lane x0 y0 x1 y1 | ring x y 0 0
 //   shape_b: type (0 lane, 1 ring/disc), half width or outer radius, inner radius, 0
-//   shape_c: kind (0 threat, 1 lingering infection), strength 0..1, flow speed, urgency 0..1
+//   shape_c: kind (0 threat, 1 lingering infection, 2 phantom = a glitch clone's blow: a cracked mirror), strength 0..1, flow speed, urgency 0..1
 
 uniform vec4 shape_a[64];
 uniform vec4 shape_b[64];
@@ -24,6 +24,56 @@ void vertex() {
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+// distance to the nearest crack: the edges of a slowly drifting cell pattern (cells of about `cell` px)
+float crack_dist(vec2 p, float cell, float t) {
+	vec2 g = floor(p / cell);
+	float d1 = 1e4;
+	float d2 = 1e4;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 c = g + vec2(float(x), float(y));
+			vec2 o = vec2(hash(c), hash(c + 17.3));
+			o = 0.5 + 0.4 * sin(t * 0.7 + 6.2831 * o);
+			float d = length(p - (c + o) * cell);
+			if (d < d1) {
+				d2 = d1;
+				d1 = d;
+			} else if (d < d2) {
+				d2 = d;
+			}
+		}
+	}
+	return d2 - d1;
+}
+
+// A phantom's warning: few red pixels, a broken rim, a web of cracks that grows over the area as the blow comes, rows that slip like her picture.
+vec4 phantom(vec2 px, float d, float along, vec4 C) {
+	float urg = C.w;
+	float step_t = floor(time * 10.0);
+	float row = floor(px.y / 2.0);
+	if (hash(vec2(row, step_t)) > 0.86) { // a glitch: this row slips sideways for a moment
+		px.x += floor((hash(vec2(row, step_t + 3.0)) - 0.5) * 6.0);
+	}
+	float e = crack_dist(px, 11.0, time);
+	float grown = step(hash(floor(px / 11.0) + 4.1), 0.25 + 0.8 * urg); // cracks spread cell by cell
+	float on = 0.0;
+	vec3 col = vec3(0.0);
+	if (d < 1.5) { // the rim: broken into dashes that flicker
+		if (hash(vec2(floor(along / 3.0), floor(time * 6.0))) < 0.45 + 0.45 * urg) {
+			on = 0.8;
+			col = mix(vec3(0.62, 0.10, 0.20), vec3(1.0, 0.62, 0.68), urg);
+		}
+	} else if (e < 0.9 + 0.5 * urg && grown > 0.5) { // a crack
+		float glint = step(0.93, hash(vec2(floor(e * 7.0 + px.x * 0.11), floor(time * 12.0))));
+		on = 0.45 + 0.45 * urg;
+		col = mix(vec3(0.70, 0.12, 0.22), vec3(1.0, 0.86, 0.88), max(glint, urg * 0.5));
+	} else if (hash(px + floor(time * 4.0)) < 0.025 + 0.06 * urg) { // a few loose splinters
+		on = 0.4;
+		col = vec3(0.86, 0.30, 0.38);
+	}
+	return vec4(col, on * C.y);
 }
 
 float seg_dist(vec2 p, vec2 a, vec2 b) {
@@ -58,6 +108,13 @@ void fragment() {
 			along = r;
 		}
 		if (d < 0.0) {
+			continue;
+		}
+		if (C.x > 1.5) {
+			vec4 ph = phantom(px, d, along, C);
+			if (ph.a > best.a) {
+				best = ph;
+			}
 			continue;
 		}
 		float wave = 0.5 + 0.5 * sin(along * 0.26 - time * C.z + hash(floor(px * 0.5)) * 6.2831);

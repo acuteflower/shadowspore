@@ -81,6 +81,7 @@ func limit(enemy: Node2D, velocity: Vector2, delta: float) -> Vector2:
 	if speed_cap > 0.0:
 		out = out.limit_length(speed_cap)
 	_probe_cool = maxf(0.0, _probe_cool - delta)
+	out = _wisp_say(enemy, out)
 	if town == null or not town.founded:
 		return out
 	var behavior: Dictionary = NightRules.config().behavior as Dictionary
@@ -114,6 +115,27 @@ func limit(enemy: Node2D, velocity: Vector2, delta: float) -> Vector2:
 		if inward > 0.0:
 			out += outward * inward ## slide along the edge, never in
 			town.light_touch(here + out.normalized() * 10.0)
+	return out
+
+
+## Irrlichtsud (docs/alchemie_konzept.md 11.3): the wisp of a player is a small light of its own. Inside its radius the creature is slowed, and from the strongest
+## tier the wisp pushes it back out (a raid member is only slowed, it presses on).
+func _wisp_say(enemy: Node2D, velocity: Vector2) -> Vector2:
+	var out: Vector2 = velocity
+	for node: Node in enemy.get_tree().get_nodes_in_group("players"):
+		var player: Player = node as Player
+		if player == null or player.effects == null or not player.effects.has("wisp"):
+			continue
+		var spec: Dictionary = AlchemyRules.wisp_spec(int(player.effects.scale_of("wisp")))
+		var away: Vector2 = enemy.global_position - player.global_position
+		var reach: float = float(spec.radius)
+		if away.length() > reach:
+			continue
+		out = out.limit_length(top_speed * float(spec.slow))
+		var push: float = float(spec.push)
+		if push > 0.0 and not excited and away != Vector2.ZERO:
+			out += away.normalized() * top_speed * push * (1.0 - away.length() / reach) * 0.9 ## the nearer, the harder
+			goal = Vector2.INF ## it gives up what it was walking to
 	return out
 
 

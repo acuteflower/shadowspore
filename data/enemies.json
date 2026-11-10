@@ -712,7 +712,7 @@
     {
      "id": "rissfeder",
      "first": 1.0,
-     "chance": 0.1
+     "chance": 0.15
     }
    ]
   },
@@ -735,6 +735,343 @@
    "pillar_crack": "res://assets/audio/sky_cleaver_pillar_crack.wav",
    "pillar_break": "res://assets/audio/sky_cleaver_pillar_break.wav",
    "finisher": "res://assets/audio/sky_cleaver_finisher.wav",
+   "volume_db": -6
+  }
+ },
+ "boss_morwenna": {
+  "name": "Morwenna, die Spiegelhexe",
+  "boss": true,
+  "max_health": 1300,
+  "heavy_knockback": 100,
+  "prowl_speed": 105,
+  "run_speed": 300,
+  "bar_range": 380,
+  "shake_radius": 260,
+  "intro": {
+   "name": "MORWENNA",
+   "epithet": "DIE SPIEGELHEXE",
+   "range": 700
+  },
+  "fight": {
+   "phases": [
+    0.66,
+    0.33
+   ],
+   "gap": [
+    [
+     0.75,
+     1.2
+    ],
+    [
+     0.65,
+     1.05
+    ],
+    [
+     0.5,
+     0.9
+    ]
+   ],
+   "rotation": [
+    [
+     "resin",
+     "tide",
+     "prowl",
+     "lance",
+     "spray",
+     "feint",
+     "tide",
+     "resin",
+     "lance"
+    ],
+    [
+     "pincer",
+     "tide",
+     "resin",
+     "shards",
+     "burrow",
+     "cage",
+     "feint",
+     "shards",
+     "pincer",
+     "lance",
+     "tide"
+    ],
+    [
+     "carousel",
+     "tide",
+     "frenzy",
+     "split",
+     "leech",
+     "swarm",
+     "resin",
+     "cage",
+     "split",
+     "shards",
+     "carousel",
+     "tide",
+     "leech"
+    ]
+   ],
+   "entrance": {
+    "wait": 1.6,
+    "fall": 0.5,
+    "card": 4.6,
+    "line": "Nein... rührt das Holz nicht an! Wenn das Band reißt, holt mich die Leere!"
+   },
+   "transition1": {
+    "text": "DER SPIEGEL ZERBRICHT",
+    "line": "Die Risse... sie schließen sich nicht mehr...!",
+    "scream_at": 1.4,
+    "title_at": 2.0,
+    "leave_at": 3.3,
+    "end": 3.9,
+    "push_radius": 190,
+    "push_knock": 270,
+    "push_damage": 2
+   },
+   "transition2": {
+    "text": "DIE HEXENSTUNDE",
+    "line": "Ich werde nicht ins Nichts stürzen! NÄHRE MICH!",
+    "scream_at": 1.6,
+    "title_at": 2.2,
+    "leave_at": 3.6,
+    "end": 4.2,
+    "hot": 0.4,
+    "push_radius": 200,
+    "push_knock": 280,
+    "push_damage": 3
+   },
+   "release": {
+    "clear_at": 1.6,
+    "dust_at": 3.4,
+    "gone_at": 5.6,
+    "line": "Die Kälte... sie lässt nach."
+   },
+   "clone": {
+    "damage_scale": 0.7,
+    "return": 3.2
+   },
+   "swap": {
+    "chance": 0.65,
+    "cooldown": 5.5
+   },
+   "stagger": {
+    "seconds": 1.5,
+    "armour": 1.6
+   },
+   "resin": {
+    "damage": 16,
+    "warn": 0.28,
+    "beat": 0.36,
+    "stutter": 0.26,
+    "final": 1.6,
+    "recover": 0.75
+   },
+   "prowl": {
+    "step": 0.17,
+    "warn": 0.26,
+    "damage": 20,
+    "recover": 0.6
+   },
+   "lance": {
+    "beat": 0.34,
+    "warn": 0.5,
+    "radius": 15,
+    "damage": 17,
+    "recover": 0.6,
+    "rounds": 4
+   },
+   "spray": {
+    "flight": 0.55,
+    "drops": 7,
+    "spread": 0.24,
+    "stay": 3.2,
+    "radius": 17,
+    "damage": 8,
+    "recover": 0.5
+   },
+   "feint": {
+    "gone": 0.18,
+    "warn": 0.3,
+    "damage": 22,
+    "recover": 0.7
+   },
+   "pincer": {
+    "setup": 0.4,
+    "warn": 0.55,
+    "damage": 18,
+    "burst": 44,
+    "recover": 0.75
+   },
+   "shards": {
+    "count": 4,
+    "charge": 0.55,
+    "spread": 0.34,
+    "bounces": 2,
+    "range": 520,
+    "speed": 250,
+    "damage": 16,
+    "recover": 0.45
+   },
+   "burrow": {
+    "hunt": 2.0,
+    "speed": 165,
+    "warn": 0.44,
+    "radius": 32,
+    "damage": 26,
+    "recover": 0.9
+   },
+   "cage": {
+    "arm": 0.6,
+    "burn": 2.6,
+    "posts": 5,
+    "radius": 62,
+    "damage": 11,
+    "roots": 5,
+    "recover": 0.5
+   },
+   "carousel": {
+    "spin": 2.8,
+    "first": 1.0,
+    "beat": 0.52,
+    "lunges": 8,
+    "warn": 0.42,
+    "damage": 18,
+    "recover": 0.8
+   },
+   "leech": {
+    "seconds": 3.4,
+    "heal": 0.012,
+    "bands": [
+     [
+      0,
+      122
+     ],
+     [
+      122,
+      240
+     ],
+     [
+      240,
+      430
+     ]
+    ],
+    "first": 1.0,
+    "beat": 0.8,
+    "warn": 0.9,
+    "damage": 22,
+    "recover": 0.9,
+    "break": 0.05
+   },
+   "frenzy": {
+    "beat": 0.62,
+    "dashes": 6,
+    "length": 300,
+    "warn": 0.4,
+    "seam": 0.85,
+    "damage": 20,
+    "tired": 1.8,
+    "tired_armour": 1.8
+   },
+   "split": {
+    "length": 330,
+    "charge": 1.0,
+    "half": 14,
+    "damage": 28,
+    "recover": 1.0,
+    "break": 0.05
+   },
+   "swarm": {
+    "dives": 8,
+    "beat": 0.58,
+    "warn": 0.7,
+    "half": 16,
+    "damage": 15,
+    "recover": 0.8
+   },
+   "harass": {
+    "min": 1.6,
+    "max": 2.6,
+    "reach": 240
+   },
+   "tide": {
+    "band": 56,
+    "reach": 470,
+    "warn": 0.85,
+    "beat": 0.72,
+    "waves": 2,
+    "damage": 17,
+    "recover": 0.65
+   }
+  },
+  "loot": {
+   "award": "all",
+   "xp": 220,
+   "copper": {
+    "min": 90,
+    "max": 130
+   },
+   "items": [
+    {
+     "id": "void_splinter",
+     "chance": 1.0,
+     "min": 4,
+     "max": 7
+    },
+    {
+     "id": "shadow_core",
+     "chance": 0.8,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "void_slag",
+     "chance": 0.4,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "relics": [
+    {
+     "id": "mora_shard",
+     "first": 1.0,
+     "chance": 0.15
+    }
+   ]
+  },
+  "audio": {
+   "beam": "res://assets/audio/morwenna/beam.wav",
+   "burrow": "res://assets/audio/morwenna/burrow.wav",
+   "burst": "res://assets/audio/morwenna/burst.wav",
+   "cage": "res://assets/audio/morwenna/cage.wav",
+   "cast": "res://assets/audio/morwenna/cast.wav",
+   "charge": "res://assets/audio/morwenna/charge.wav",
+   "crack": "res://assets/audio/morwenna/crack.wav",
+   "dash": "res://assets/audio/morwenna/dash.wav",
+   "death": "res://assets/audio/morwenna/death.wav",
+   "dive": "res://assets/audio/morwenna/dive.wav",
+   "erupt": "res://assets/audio/morwenna/erupt.wav",
+   "land": "res://assets/audio/morwenna/land.wav",
+   "leech": "res://assets/audio/morwenna/leech.wav",
+   "mirror": "res://assets/audio/morwenna/mirror.wav",
+   "poof": "res://assets/audio/morwenna/poof.wav",
+   "pulse": "res://assets/audio/morwenna/pulse.wav",
+   "release": "res://assets/audio/morwenna/release.wav",
+   "root": "res://assets/audio/morwenna/root.wav",
+   "sap": "res://assets/audio/morwenna/sap.wav",
+   "scissor": "res://assets/audio/morwenna/scissor.wav",
+   "scream": "res://assets/audio/morwenna/scream.wav",
+   "seam": "res://assets/audio/morwenna/seam.wav",
+   "shard": "res://assets/audio/morwenna/shard.wav",
+   "shatter": "res://assets/audio/morwenna/shatter.wav",
+   "slash": "res://assets/audio/morwenna/slash.wav",
+   "stagger": "res://assets/audio/morwenna/stagger.wav",
+   "stutter": "res://assets/audio/morwenna/stutter.wav",
+   "swap": "res://assets/audio/morwenna/swap.wav",
+   "threads": "res://assets/audio/morwenna/threads.wav",
+   "vanish": "res://assets/audio/morwenna/vanish.wav",
+   "whet": "res://assets/audio/morwenna/whet.wav",
+   "whirl": "res://assets/audio/morwenna/whirl.wav",
    "volume_db": -6
   }
  }

@@ -1494,5 +1494,331 @@
     "text": "Nicht schon wieder von oben..."
    }
   ]
+ },
+ "morwenna_threshold": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Die Raben schreien... genau wie Esma gesagt hat. Da oben, im Geäst."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Ist das... Mora?",
+    "hold": 2.2
+   }
+  ]
+ },
+ "morwenna_released": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Sie war die ganze Zeit wach da drin. Gefangen in ihrem eigenen Körper. Esma muss das erfahren."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Ruh dich aus, Mora. Der Baum atmet wieder."
+   }
+  ]
+ },
+ "sh_valdric": {
+  "flag": "sh_valdric_told",
+  "lines": [
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ellie. Hast du einen Moment? Ich war gestern am Südufer. Weiter als sonst."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Dort beginnt ein Wald, in dem es nie richtig hell wird. Selbst mittags hängt die Dämmerung zwischen den Stämmen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ein Wald, der den Tag nicht hereinlässt. Klingt einladend."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Die Raben dort fliegen nicht weg, wenn man kommt. Sie sitzen da und schauen. Als warteten sie auf etwas."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Und über den Kronen steht ein Turm. Ganz oben brannte Licht. Grünes Licht."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Jemand wohnt da draußen? Allein?"
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Das will ich wissen. Wer dort überlebt, weiß Dinge über die Leere, die wir nicht wissen. Oder ist selbst ein Teil von ihr."
+   },
+   {
+    "speaker": "???",
+    "known_flag": "knows_adventurer",
+    "known_name": "VALDRIC",
+    "mood": "",
+    "title": "",
+    "text": "Ich kann die Stadt nicht allein lassen. Aber du bist stark geworden. Folg dem alten Pfad nach Süden. Und trau dort deinen Augen nicht zu sehr."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ich sehe mir das an."
+   }
+  ]
+ },
+ "sh_road": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Der alte Pfad nach Süden. Mal sehen, wohin er mich führt."
+   }
+  ]
+ },
+ "sh_dusk": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Es wird dunkler. Dabei stand die Sonne eben noch hoch."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Die Bäume hier haben Adern. Leuchtende Adern."
+   }
+  ]
+ },
+ "sh_ravens": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Da sind sie, Valdrics Raben. Die starren mich wirklich an."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Ich hab nichts für euch. Ehrlich."
+   }
+  ]
+ },
+ "sh_tower": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Da. Der Turm. Und oben brennt tatsächlich grünes Licht."
+   }
+  ]
+ },
+ "sh_hallu": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Was... da war doch gerade was. Augen? Zwischen den Stämmen."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Nein. Es ist dieser Nebel. Er kriecht mir in den Kopf."
+   }
+  ]
+ },
+ "sh_phantom": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Eine Spinne! Hier?! Bleib weg von mir!",
+    "hold": 1.8
+   }
+  ]
+ },
+ "sh_phantom_gone": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Sie ist... einfach zerfallen. Ich sehe Dinge, die nicht da sind. Großartig."
+   }
+  ]
+ },
+ "sh_spiders": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Spinnen! Und diese hier verpuffen nicht!",
+    "hold": 2.0
+   }
+  ]
+ },
+ "sh_esma": {
+  "flag": "sh_esma_told",
+  "lines": [
+   {
+    "speaker": "???",
+    "mood": "",
+    "title": "",
+    "text": "Bleib stehen. Noch ein Schritt, und ich muss mir überlegen, was ich mit dir mache."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ich komme in Frieden. Ein Freund hat Licht in deinem Turm gesehen."
+   },
+   {
+    "speaker": "???",
+    "mood": "",
+    "title": "",
+    "text": "Ein Freund. Und du bist durch den Nebel gekommen, ohne dich zu verlieren. Das schaffen nicht viele."
+   },
+   {
+    "speaker": "???",
+    "mood": "",
+    "title": "",
+    "text": "Du hast sie gesehen, nicht wahr? Die Augen, die Spinnen, die nicht da sind. Und bist trotzdem weitergegangen."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ich habe es versucht. Ich heiße Ellie."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Esma. Früher, als es noch Leute gab, nannten sie mich die Nebelhexe."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Wir waren zu zweit hier oben. Mora und ich. Sie war die Ältere, die Stärkere. Alles, was ich kann, hat sie mir beigebracht."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Als der Riss aufbrach, stand sie ganz vorn. Danach war sie... anders. Nachts ging sie hinunter zum Rabenbaum, in den Kessel im Westen."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Sie sagte, der Baum hält sie zusammen. Ich habe nicht verstanden, was sie meinte. Ich wollte es nicht verstehen."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Seit drei Wochen kommt sie nicht mehr zurück. Und nachts schreien die Raben."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Warum suchst du sie nicht selbst?"
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Weil etwas den Kessel versperrt. Fäulnis. Spinnen. Mich lässt es nicht heran. Dich vielleicht schon."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Geh zum Rabenbaum. Finde Mora. Und wenn sie... nicht mehr sie selbst ist, dann bring mir wenigstens etwas von ihr zurück."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Ich finde sie."
+   }
+  ]
+ },
+ "sh_esma_forge": {
+  "flag": "sh_forged",
+  "take": {
+   "item": "mora_shard",
+   "count": 1
+  },
+  "give": [
+   {
+    "item": "clarity_earrings",
+    "count": 1
+   }
+  ],
+  "lines": [
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Du bist zurück. Und du hältst etwas von ihr in der Hand. Dann weiß ich es schon."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Sie hing am Baum. Halb Hexe, halb Leere. Am Ende sagte sie, die Kälte lässt nach."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "...Dann hat sie endlich Ruhe. Das ist mehr, als ich ihr geben konnte."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Gib mir die Scherbe. Ihr Spiegel hat immer die Wahrheit gezeigt, auch wenn niemand sie hören wollte."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Ich fasse sie in Fluchsilber. Wer sie trägt, den belügt der Nebel nicht mehr."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Hier. Ohrringe der Klarheit. Trag sie für sie."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Danke, Esma. Ich passe gut auf sie auf."
+   },
+   {
+    "speaker": "ESMA",
+    "mood": "",
+    "title": "",
+    "text": "Komm wieder, Ellie. Mein Tresen steht dir offen."
+   }
+  ]
  }
 }

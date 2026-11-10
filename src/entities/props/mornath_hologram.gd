@@ -205,37 +205,42 @@ func _process(delta: float) -> void:
 	_base.queue_redraw()
 
 
-## The ring on the floor: three flattened ellipses of broken arcs and ticks, turning slowly against each other, a faint cone of light up to the bird.
 func _draw_base() -> void:
-	var a: float = _appear
+	draw_projector(_base, _clock, _appear, _glitch, TEAL, MAGENTA)
+
+
+## The ring on the floor: three flattened ellipses of broken arcs and ticks, turning slowly against each other, a faint cone of light up to the picture.
+## Shared by every boss hologram (Mornath: teal + magenta, Morwenna: teal + witch green), so they read as one kind of thing.
+static func draw_projector(canvas: Node2D, clock: float, appear: float, glitch: float, teal: Color, accent: Color) -> void:
+	var a: float = appear
 	if a <= 0.0:
 		return
 	var squash: float = 0.5
 	for ring: int in 3:
 		var radius: float = 26.0 + 11.0 * float(ring)
-		var turn: float = _clock * (0.35 - 0.2 * float(ring)) * (1.0 if ring % 2 == 0 else -1.0)
+		var turn: float = clock * (0.35 - 0.2 * float(ring)) * (1.0 if ring % 2 == 0 else -1.0)
 		var segments: int = 10 + ring * 4
 		for k: int in segments:
 			var from: float = turn + TAU * float(k) / float(segments)
 			var length: float = TAU / float(segments) * (0.55 if (k * 7 + ring * 3) % 5 != 0 else 0.2)
-			var gate: float = fmod(_clock * 0.5 + float(k) * 0.37 + float(ring), 3.0) ## some segments are missing for a moment
-			if gate < 0.25 or (_glitch > 0.3 and (k + int(_clock * 12.0)) % 3 == 0):
+			var gate: float = fmod(clock * 0.5 + float(k) * 0.37 + float(ring), 3.0) ## some segments are missing for a moment
+			if gate < 0.25 or (glitch > 0.3 and (k + int(clock * 12.0)) % 3 == 0):
 				continue
 			var points: PackedVector2Array = PackedVector2Array()
 			for s: int in 7:
 				var ang: float = from + length * float(s) / 6.0
 				points.append(Vector2(roundf(cos(ang) * radius), roundf(sin(ang) * radius * squash)))
-			var color: Color = (TEAL if ring != 1 else MAGENTA)
+			var color: Color = (teal if ring != 1 else accent)
 			color.a = (0.55 - 0.1 * float(ring)) * a
-			_base.draw_polyline(points, color, 1.0)
+			canvas.draw_polyline(points, color, 1.0)
 	# runes: small ticks between the rings
 	for k: int in 12:
-		var ang: float = _clock * 0.2 + TAU * float(k) / 12.0
+		var ang: float = clock * 0.2 + TAU * float(k) / 12.0
 		var c: float = cos(ang)
 		var s_: float = sin(ang)
 		var p0: Vector2 = Vector2(roundf(c * 33.0), roundf(s_ * 33.0 * squash))
 		var p1: Vector2 = Vector2(roundf(c * 37.0), roundf(s_ * 37.0 * squash))
-		_base.draw_line(p0, p1, Color(TEAL.r, TEAL.g, TEAL.b, 0.5 * a), 1.0)
+		canvas.draw_line(p0, p1, Color(teal.r, teal.g, teal.b, 0.5 * a), 1.0)
 	# the cone of light up to the bird, dithered
 	for row: int in 28:
 		var y: float = -2.0 - float(row) * 2.0
@@ -244,6 +249,6 @@ func _draw_base() -> void:
 		for edge: int in 2:
 			var xe: float = half if edge == 0 else -half
 			if (row + edge) % 2 == 0:
-				_base.draw_rect(Rect2(Vector2(roundf(xe), roundf(y)), Vector2(1, 1)), Color(TEAL.r, TEAL.g, TEAL.b, strength * 3.0))
+				canvas.draw_rect(Rect2(Vector2(roundf(xe), roundf(y)), Vector2(1, 1)), Color(teal.r, teal.g, teal.b, strength * 3.0))
 		if row % 2 == 0:
-			_base.draw_rect(Rect2(Vector2(roundf(-half * 0.5), roundf(y)), Vector2(roundf(half), 1)), Color(TEAL.r, TEAL.g, TEAL.b, strength * 0.6))
+			canvas.draw_rect(Rect2(Vector2(roundf(-half * 0.5), roundf(y)), Vector2(roundf(half), 1)), Color(teal.r, teal.g, teal.b, strength * 0.6))

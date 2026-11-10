@@ -4,6 +4,8 @@ extends WorldProp
 ## slower and it rustles; berries are picked with E; the sickle plucks it for fibers, leaves and
 ## sticks (3 hits leave bare twigs); everything grows back by the days (see `WorldLevel._grow_things`).
 
+const BUSH_WIND_KNEE: float = 1.3 ## wind strength a bush follows one to one (the calm day's top)
+const BUSH_WIND_EXTRA: float = 1.0 ## how much further storm may push it (a soft ceiling at KNEE + EXTRA)
 const IDLE_SWAY: float = 0.02 ## skew of the sprite in the wind (plants.json "sway" overrides: grass moves more)
 const DEFAULT_PICK_BURST: Array[Color] = [Color("8a5cf0"), Color("d9c8ff"), Color("78f4e6")]
 const DEFAULT_LEAF_COLORS: Array[Color] = [Color("55985f"), Color("7cb96d"), Color("3e7d56")]
@@ -47,9 +49,18 @@ func _process(_delta: float) -> void:
 			if _sprite.skew != 0.0:
 				_sprite.skew = 0.0
 			return
-		var target_skew: float = sample.x * _sway_rate
+		var target_skew: float = _soft_wind(sample.x) * _sway_rate
 		if absf(target_skew - _sprite.skew) > 0.001:
 			_sprite.skew = target_skew
+
+
+## Bushes lean with a calm day's wind as before, but rain and storm only push them a little further (the trees get the full weather gain, a bush would tear): 
+## above BUSH_WIND_KNEE the excess is squeezed into a soft ceiling.
+func _soft_wind(w: float) -> float:
+	var a: float = absf(w)
+	if a <= BUSH_WIND_KNEE:
+		return w
+	return signf(w) * (BUSH_WIND_KNEE + BUSH_WIND_EXTRA * tanh((a - BUSH_WIND_KNEE) * 0.25))
 
 
 ## Off screen a bush does nothing per frame (hundreds of them are loaded): processing follows the notifier.
@@ -100,12 +111,15 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 		"hit":
 			_rustle(randf_range(-1.0, 1.0))
 			_burst(5, _leaf_colors())
+			Sfx.at(self, "sickle_cut", global_position, -3.0, 0.06)
 		"strip":
 			_rustle(randf_range(-1.0, 1.0))
 			_burst(14, _leaf_colors())
+			Sfx.at(self, "sickle_cut", global_position, -1.0, 0.06)
 		"pick":
 			_rustle(randf_range(-1.0, 1.0))
 			_burst(7, _pick_colors())
+			Sfx.at(self, "pluck", global_position, -3.0)
 		"regrow":
 			_burst(6, REGROW_BURST, 0.0)
 		"catch":

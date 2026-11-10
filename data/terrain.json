@@ -5,7 +5,8 @@
 			"kind": "puff",
 			"color": "#b7dc94",
 			"amount": 2
-		}
+		},
+		"sound": "grass"
 	},
 	"path": {
 		"speed": 1.0,
@@ -13,7 +14,8 @@
 			"kind": "puff",
 			"color": "#d6c9a8",
 			"amount": 3
-		}
+		},
+		"sound": "path"
 	},
 	"mud": {
 		"speed": 0.7,
@@ -25,7 +27,9 @@
 		"footprint": {
 			"color": "#2e1d15",
 			"seconds": 14
-		}
+		},
+		"sound": "mud",
+		"sound_gain": 1.0
 	},
 	"shallow_water": {
 		"speed": 0.8,
@@ -35,7 +39,8 @@
 			"kind": "splash",
 			"color": "#bfe9ff",
 			"amount": 6
-		}
+		},
+		"sound": "shallow_water"
 	},
 	"deep_water": {
 		"speed": 0.5,
@@ -47,7 +52,9 @@
 			"kind": "splash",
 			"color": "#bfe9ff",
 			"amount": 8
-		}
+		},
+		"sound": "shallow_water",
+		"sound_gain": 3.0
 	},
 	"slope": {
 		"speed": 0.92,
@@ -55,7 +62,8 @@
 			"kind": "puff",
 			"color": "#a58a68",
 			"amount": 3
-		}
+		},
+		"sound": "slope"
 	},
 	"stone": {
 		"speed": 1.0,
@@ -63,7 +71,8 @@
 			"kind": "puff",
 			"color": "#b9b7d0",
 			"amount": 2
-		}
+		},
+		"sound": "stone"
 	},
 	"wood": {
 		"speed": 1.0,
@@ -71,7 +80,8 @@
 			"kind": "puff",
 			"color": "#8a7a6c",
 			"amount": 2
-		}
+		},
+		"sound": "wood"
 	},
 	"bed": {
 		"speed": 0.8,
@@ -79,7 +89,8 @@
 			"kind": "puff",
 			"color": "#6b4a36",
 			"amount": 3
-		}
+		},
+		"sound": "bed"
 	},
 	"mine_stone": {
 		"speed": 1.0,
@@ -87,6 +98,21 @@
 			"kind": "puff",
 			"color": "#6c6680",
 			"amount": 2
-		}
+		},
+		"sound": "mine_stone"
+	},
+	"field": {
+		"speed": 0.95,
+		"step": {
+			"kind": "puff",
+			"color": "#6a4e48",
+			"amount": 3
+		},
+		"footprint": {
+			"color": "#2e2024",
+			"seconds": 10
+		},
+		"sound": "mud",
+		"sound_gain": -4.0
 	}
 }

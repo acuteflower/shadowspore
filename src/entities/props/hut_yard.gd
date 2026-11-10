@@ -126,6 +126,8 @@ func _prop(spec: Dictionary) -> void:
 	if spec.has("sound"):
 		var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
 		player.stream = load(String(spec.sound) if String(spec.sound).begins_with("res://") else "res://assets/audio/hut/" + String(spec.sound)) as AudioStream
+		if String(spec.sound) == "fire.wav" and Sfx.has("fire_crackle_loop"):
+			player.stream = Sfx.loop("fire_crackle_loop") ## the Higgsfield bed replaces the placeholder crackle
 		player.max_distance = 150.0
 		player.volume_db = -20.0
 		player.finished.connect(func() -> void: player.play())

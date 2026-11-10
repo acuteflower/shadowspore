@@ -31,6 +31,9 @@ var stock: Dictionary = {} ## item id -> count: the totals of `box`, refreshed w
 var cleared: Dictionary = {} ## Vector2i prop cell -> true: soft props the foundations removed for good
 var residents: Dictionary = {} ## settler id -> {trust, talked}
 var next_id: int = 1
+var unlocks: Dictionary = {} ## name -> true: what the town has learned to do (docs/farming.md: "farming" opens the fields once Gustav has made the first hoe or can)
+var board: BoardManager ## the quest board's notices (docs/questtafel_konzept.md); a child created on every peer
+var farm: FarmManager ## the state of the fields (cells, crops); a child created on every peer
 
 var _build: BuildMode ## the local builder (made once a local player exists)
 var _banner: TownBanner
@@ -118,6 +121,14 @@ func _ready() -> void:
 	chatter.name = "Chatter"
 	chatter.town = self
 	add_child(chatter)
+	farm = FarmManager.new()
+	farm.name = "Farm"
+	add_child(farm)
+	farm.setup(self)
+	board = BoardManager.new()
+	board.name = "Board"
+	add_child(board)
+	board.setup(self)
 	_seat_root = Node2D.new()
 	_seat_root.name = "Seats"
 	_seat_root.y_sort_enabled = true
@@ -128,7 +139,7 @@ func _ready() -> void:
 	add_child(_settler_root)
 	Terrain.patches.append(self)
 	if multiplayer.is_server():
-		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_snapshot.rpc_id(id, export_state()))
+		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_snapshot.rpc_id(id, export_state(true)))
 	built.connect(_on_built)
 	changed.connect(func() -> void: _wear_dirty = true)
 	town_founded.connect(func() -> void:
@@ -582,6 +593,9 @@ func is_unlocked(piece: String) -> bool:
 	var needs_who: String = String(spec.get("needs_resident", ""))
 	if needs_who != "" and not residents.has(needs_who):
 		return false ## the workshop waits for Gustav (story: he is rescued first)
+	var needs_unlock: String = String(spec.get("needs_unlock", ""))
+	if needs_unlock != "" and not unlocks.has(needs_unlock):
+		return false ## the fields wait for Gustav's first hoe or watering can
 	var needs: String = String(spec.get("needs", ""))
 	return needs == "" or has_built(needs)
 
@@ -593,6 +607,9 @@ func lock_reason(piece: String) -> String:
 	var needs_who: String = String(spec.get("needs_resident", ""))
 	if needs_who != "" and not residents.has(needs_who):
 		return "BRAUCHT %s" % String(settler_spec(needs_who).get("name", needs_who))
+	var needs_unlock: String = String(spec.get("needs_unlock", ""))
+	if needs_unlock != "" and not unlocks.has(needs_unlock):
+		return "GUSTAV MUSS HACKE ODER KANNE FERTIGEN"
 	var needs: String = String(spec.get("needs", ""))
 	if needs != "" and not has_built(needs):
 		return "BRAUCHT %s" % String(TownRules.piece(needs).get("name", needs))
@@ -707,7 +724,7 @@ func _host_found() -> void:
 	structures[0] = {"p": "house", "x": center.x, "y": center.y, "f": 0, "g": PROGRESS_FULL, "b": TimeManager.day}
 	_circles_dirty = true
 	_apply_all()
-	_rpc_snapshot.rpc(export_state())
+	_rpc_snapshot.rpc(export_state(true))
 	town_founded.emit()
 
 
@@ -771,6 +788,8 @@ func debug_build_all(with_torben: bool = false) -> void:
 	request_found()
 	if not founded:
 		return
+	if not unlocks.has("farming"):
+		_rpc_unlock.rpc("farming", false) ## the checkpoint town has its hoe and can: fields are open
 	var plan: Array = [["lamp_post", Vector2(-80, 120)], ["lamp_post", Vector2(150, 140)], ["workshop", Vector2(40, 175)], ["stockpile", Vector2(-110, 190)], ["bench", Vector2(80, 100)]]
 	for k: int in 4:
 		plan.append(["fence", Vector2(-170 + k * 24, 215)])
@@ -1078,6 +1097,8 @@ func _rpc_removed(id: int) -> void:
 		(_views[id] as TownStructure).dismantle()
 		_views.erase(id)
 	structures.erase(id)
+	if farm != null:
+		farm.field_removed(id)
 	for i: int in range(paths.size() - 1, -1, -1):
 		if int((paths[i] as Dictionary).s) == id and int((paths[i] as Dictionary).d) == 0:
 			paths.remove_at(i) ## a way nobody ever walked is not kept
@@ -1900,6 +1921,8 @@ func _host_craft(recipe_id: String, peer: int) -> void:
 			_add_stock(item, left) ## a full bag: the rest goes to the stock
 	_sync_stock()
 	_tell(peer, "%s GEFERTIGT" % String(recipe.name), true)
+	if recipe.has("unlocks"):
+		unlock(String(recipe.unlocks)) ## the first hoe or can opens the fields for the whole town
 	if player.quests != null: ## story hook: the quest steps ask for "crafted_<recipe>" (solo / host player owns the quests)
 		player.quests.set_flag("crafted_" + recipe_id)
 		if recipe_id == "pickaxe_basic" and not player.quests.has_flag("crafted_pickaxe"):
@@ -1907,6 +1930,23 @@ func _host_craft(recipe_id: String, peer: int) -> void:
 			var box: Node = get_tree().get_first_node_in_group("speech_box")
 			if box != null and box.has_method("play"):
 				box.call("play", "pickaxe_made") ## Gustav's remark at the first pickaxe
+
+
+## Host: the town learns something (`unlocks`), everybody hears it once. "farming" makes the fields buildable (docs/farming.md).
+func unlock(what: String) -> void:
+	if not multiplayer.is_server() or unlocks.has(what):
+		return
+	_rpc_unlock.rpc(what, true)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_unlock(what: String, announce: bool) -> void:
+	if unlocks.has(what):
+		return
+	unlocks[what] = true
+	changed.emit()
+	if announce and what == String(FarmRules.config().get("unlock", "farming")):
+		_announce("FELDER FREIGESCHALTET", "BAUMENÜ · ACKER")
 
 
 # ---------- the name ----------
@@ -2066,7 +2106,7 @@ func _stream_views(force: bool = false) -> void:
 				(_views[id] as TownStructure).queue_free()
 				_views.erase(id)
 		elif distance <= near or (force and centers.is_empty()):
-			var view: TownStructure = TownStructure.new()
+			var view: TownStructure = FarmField.new() if bool(TownRules.piece(String(data.p)).get("farm", false)) else TownStructure.new()
 			view.name = "S%d" % id
 			_root.add_child(view)
 			view.setup(self, id)
@@ -2172,7 +2212,7 @@ func _watch_territory(_delta: float) -> void:
 
 # ---------- saving and joining ----------
 
-func export_state() -> Dictionary:
+func export_state(snapshot: bool = false) -> Dictionary:
 	var out_structures: Dictionary = {}
 	for id: int in structures:
 		out_structures[str(id)] = (structures[id] as Dictionary).duplicate()
@@ -2183,6 +2223,8 @@ func export_state() -> Dictionary:
 		"version": STATE_VERSION, "founded": founded, "name": name_index, "center": [center.x, center.y], "day": founded_day,
 		"next_id": next_id, "structures": out_structures, "stock_slots": box.slots.duplicate(true), "cleared": out_cleared, "residents": residents.duplicate(true), "paths": paths.duplicate(true), "orders": orders.duplicate(true),
 		"fear": fear_on, "brewed": brewed.duplicate(), "alchemy_gift": alchemy_gift,
+		"unlocks": unlocks.keys(), "farm": farm.export_state() if farm != null else {},
+		"board": board.export_state(snapshot) if board != null else {},
 	}
 
 
@@ -2194,6 +2236,7 @@ func import_state(data: Dictionary) -> void:
 	paths.clear()
 	orders.clear()
 	_progress.clear()
+	unlocks.clear()
 	for view: Variant in _views.values():
 		(view as TownStructure).queue_free()
 	_views.clear()
@@ -2242,6 +2285,12 @@ func import_state(data: Dictionary) -> void:
 	for sid: String in people:
 		var entry: Dictionary = people[sid] as Dictionary
 		residents[sid] = {"trust": int(entry.get("trust", 0)), "talked": int(entry.get("talked", -1))}
+	for what: Variant in data.get("unlocks", []) as Array:
+		unlocks[String(what)] = true
+	if farm != null:
+		farm.import_state(data.get("farm", {}) as Dictionary)
+	if board != null:
+		board.import_state(data.get("board", {}) as Dictionary)
 	_apply_all()
 
 

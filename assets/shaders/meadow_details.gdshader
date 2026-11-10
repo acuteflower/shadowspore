@@ -16,7 +16,7 @@ void vertex() {
 	vec2 world = (MODEL_MATRIX * vec4(0.,9.,0.,1.)).xy;
 	float clock = floor(g_wind_clock*12.)/12.;
 	float pulse = .5+.5*sin(dot(world,g_wind_dir)*.014-clock*1.6);
-	float breeze = (.12+g_wind_gust*(.35+.65*pulse))*detail.a;
+	float breeze = (.12+(g_wind_gust <= 1.1 ? g_wind_gust : 1.1 + 0.9 * tanh((g_wind_gust - 1.1) * 0.35))*(.35+.65*pulse))*detail.a;
 	float flutter = sin(clock*2.1+detail.g*6.283)*breeze*.25;
 	vec2 bend = texture(contacts,(world-chunk_origin)/512.).rg-vec2(.5);
 	vec2 wind = g_wind_dir*breeze*detail.b*2.2+vec2(flutter,flutter*.25);

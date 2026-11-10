@@ -189,10 +189,75 @@ void fragment() {
 		if (shift < 0.0) {
 			c.rgb = mix(c.rgb, vec3(0.20, 0.22, 0.40), (0.16 + 0.16 * gloom) * clamp(-shift, 0.0, 1.0)); // shade leans cool violet (more in the Hexenwald)
 		}
+		// colour drifts: the meadow is not one green. Broad, slow regions lean lime-yellow (sunny leas) or blue-teal (cool hollows), and sunlit
+		// patches take a warm cast, so the day has more colour than the six palette greens alone; the Hexenwald keeps its own ramp.
+		float region = fbm(px / 340.0 + vec2(91.0, 17.0)) - 0.5;
+		float warm = clamp(shift, 0.0, 2.0) * 0.5;
+		vec3 cast = vec3(1.0 + 0.30 * region, 1.0 + 0.05 * region, 1.0 - 0.45 * region);
+		cast = mix(cast, cast * vec3(1.08, 1.02, 0.82), warm * (0.35 + 0.65 * sun));
+		c.rgb *= mix(vec3(1.0), cast, 1.0 - gloom);
 		if (tip == 3 && g_dew > 0.0 && hash(px + vec2(3301.0, 77.0)) > 0.5) {
 			// morning dew: a blade tip now and then catches a pale glint
 			float tw = step(0.6, fract(effect_time * 0.25 + hash(px) * 9.0));
 			c.rgb = mix(c.rgb, vec3(0.93, 1.0, 0.93), 0.85 * g_dew * tw);
+		}
+	}
+	if (g_wet > 0.01) {
+		// the wet world (docs/wetter_konzept.md 6.3): darker and cooler ground, puddles that mirror the sky with rings in the rain, splashes
+		c.rgb *= mix(vec3(1.0), vec3(0.84, 0.88, 0.95), g_wet * 0.8);
+		float rl = rain_local(px) * (1.0 - 0.8 * day_cover(px));
+		float pm = 0.0;
+		if (g_puddle > 0.02) {
+			// puddles gather in hollows: a broad "puddly" region decides where, a warped noise shapes each one (ragged, lobed, never round)
+			float hollow = vnoise(px / 150.0 + vec2(51.0, 9.0)); // one cheap octave: most of the ground is dry and stops right here
+			float warp = (hollow < 0.2 ? 0.0 : vnoise(px / 8.0 + vec2(7.0, 61.0)) - 0.5);
+			float pn = hollow < 0.2 ? 0.0 : fbm(px / 27.0 + vec2(133.0, 41.0) + warp * 0.55) + 0.55 * (hollow - 0.5);
+			float pthr = 0.815 - 0.12 * g_puddle;
+			float depth = clamp((pn - pthr) / 0.08, 0.0, 1.0);
+			float edge = hash(px + vec2(311.0, 5.0)); // the shore is dithered, so the pool dissolves into the mud
+			pm = pn > pthr + 0.018 * edge ? 1.0 : 0.0;
+			// wet mud round the water: darker, a little browner
+			float mud = smoothstep(pthr - 0.08, pthr - 0.005, pn) * (1.0 - pm);
+			c.rgb = mix(c.rgb, c.rgb * vec3(0.60, 0.56, 0.55), 0.85 * mud);
+			if (pm > 0.5) {
+				// the sky in the water: a vertical gradient wobbled by the ripples, darker and bluer towards the middle (deep), clearer at the edge
+				float wob = vnoise(px / 5.0 + vec2(TIME * 0.05, 0.0)) - 0.5;
+				float gy = clamp(0.5 + 0.5 * sin((px.y + wob * 14.0) / 9.0), 0.0, 1.0);
+				vec3 sky_day = mix(vec3(0.44, 0.60, 0.74), vec3(0.78, 0.89, 0.95), gy * (0.25 + 0.75 * sun));
+				vec3 sky_night = mix(vec3(0.10, 0.12, 0.26), vec3(0.26, 0.30, 0.52), gy);
+				vec3 sky = mix(sky_day, sky_night, g_night);
+				vec3 deep = mix(vec3(0.15, 0.26, 0.36), vec3(0.05, 0.07, 0.15), g_night);
+				vec3 water = mix(sky, deep, 0.55 * depth);
+				c.rgb = mix(c.rgb * 0.6, water, 0.55 + 0.30 * smoothstep(0.0, 0.5, depth)); // shallow: the ground still shows through
+				// the reflection breaks up in short, wobbling pixel streaks (a bush or a trunk standing in the mirror)
+				float streak = hash(vec2(floor((px.x + wob * 6.0) / 3.0), floor(px.y / 2.0) + 17.0));
+				if (streak > 0.93) { c.rgb = mix(c.rgb, mix(vec3(0.93, 0.97, 1.0), vec3(0.62, 0.68, 0.95), g_night), 0.22 + 0.18 * (1.0 - depth)); }
+				if (streak < 0.05) { c.rgb *= 0.88; }
+				// a thin bright rim where the water meets the land
+				if (depth < 0.12) { c.rgb = mix(c.rgb, vec3(0.86, 0.92, 0.98), 0.20 * (1.0 - g_night * 0.6)); }
+				vec2 rc = floor(px / 11.0);
+				float rh = hash(rc + vec2(7.0, 3.0));
+				if (rh < 0.55 * rl) {
+					float ph = fract(TIME * 0.9 + rh * 17.0);
+					vec2 centre = (rc + 0.25 + 0.5 * vec2(hash(rc + 1.0), hash(rc + 2.0))) * 11.0;
+					vec2 dv = (px + 0.5 - centre) * vec2(1.0, 1.6); // rings lie flat on the ground (3/4 view)
+					float rd = length(dv);
+					if (ph < 0.85 && abs(rd - ph * 5.5) < 0.72) { c.rgb = mix(c.rgb, vec3(0.92, 0.96, 1.0), 0.6 * (1.0 - ph)); }
+				}
+			}
+		}
+		if (pm < 0.5 && rl > 0.05) {
+			vec2 sc = floor(px / 10.0);
+			float sh = hash(sc + vec2(23.0, 5.0));
+			if (sh < 0.16 * rl) {
+				float sp = fract(TIME * 2.2 + sh * 11.0);
+				vec2 at = floor(vec2(hash(sc + 4.0), hash(sc + 9.0)) * 8.0) + 1.0;
+				vec2 lp = px - sc * 10.0;
+				if (sp < 0.34) {
+					if (lp == at) { c.rgb = mix(c.rgb, vec3(0.88, 0.94, 1.0), 0.55); }
+					else if (sp > 0.12 && (lp == at + vec2(2.0, -1.0) || lp == at + vec2(-2.0, -1.0))) { c.rgb = mix(c.rgb, vec3(0.88, 0.94, 1.0), 0.32); } // the crown of the splash
+				}
+			}
 		}
 	}
 	c.rgb = day_grade(c.rgb, px, 0.45);

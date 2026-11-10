@@ -389,6 +389,21 @@
     "item": "mandrake",
     "price": 180,
     "trust": 40
+   },
+   {
+    "item": "potion_leere_1",
+    "price": 120,
+    "trust": 15
+   },
+   {
+    "item": "potion_leere_2",
+    "price": 250,
+    "trust": 40
+   },
+   {
+    "item": "potion_leere_3",
+    "price": 500,
+    "trust": 65
    }
   ],
   "sell": [

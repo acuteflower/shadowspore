@@ -1273,5 +1273,129 @@
    "tier": 3
   },
   "description": "Esmas Spezialsud, Stufe III. 45 Sekunden ein helles Irrlicht. Schatten weichen davor zurück. Der Lockruf der Nacht steigt schnell. Danach wirkt 20 Sekunden lang kein weiterer Spezialtrank."
+ },
+ "potion_leere_1": {
+  "name": "Trübe Leere",
+  "kind": "potion",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_leere_1.png",
+  "potion": {
+   "type": "leere",
+   "tier": 1
+  },
+  "description": "Esmas Spezialsud, Stufe I. 5 Sekunden ein Riss der Leere. Gegner erleiden Void-Schaden, du verlierst etwas Gesundheit. Danach 20 Sekunden Pause."
+ },
+ "potion_leere_2": {
+  "name": "Klare Leere",
+  "kind": "potion",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_leere_2.png",
+  "potion": {
+   "type": "leere",
+   "tier": 2
+  },
+  "description": "Esmas Spezialsud, Stufe II. 6 Sekunden ein großer Riss. Hoher Void-Schaden an Gegnern, 50% als Lebensraub. Danach 20 Sekunden Pause."
+ },
+ "potion_leere_3": {
+  "name": "Leere-Meistersud",
+  "kind": "potion",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 5,
+  "hotbar": true,
+  "icon": "res://assets/items/potion_leere_3.png",
+  "potion": {
+   "type": "leere",
+   "tier": 3
+  },
+  "description": "Esmas Spezialsud, Stufe III. 7 Sekunden massive Rift. Enorme Void-Schaden, 75% Lebensraub, Gegner verlangsamt. Danach 20 Sekunden Pause."
+ },
+ "hoe_basic": {
+  "name": "Einfache Hacke",
+  "kind": "tool",
+  "tool": "hoe",
+  "weapon_class": "hoe_1h",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/hoe_basic.png",
+  "held": "res://assets/items/hoe_basic_held.png",
+  "stats": {
+   "damage": 3,
+   "speed": 0.95,
+   "reach": 22,
+   "knockback": 6
+  },
+  "description": "Bricht Erde auf. Auf einem Feld hackt man damit die Beete, bevor gesät wird. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
+ },
+ "watering_can": {
+  "name": "Gießkanne",
+  "kind": "tool",
+  "tool": "can",
+  "weapon_class": "can_1h",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/watering_can.png",
+  "held": "res://assets/items/watering_can_held.png",
+  "stats": {
+   "damage": 0,
+   "speed": 0.9,
+   "reach": 24,
+   "knockback": 0
+  },
+  "description": "Ein Schwall über die Beete und die Saat trinkt. Nur gegossene Pflanzen wachsen über Nacht weiter. Regen giesst von selbst."
+ },
+ "tuber_seed": {
+  "name": "Knollenkeim",
+  "kind": "material",
+  "seed": true,
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/tuber_seed.png",
+  "description": "Ein schrumpeliger Keim der Erdknolle. Auf einem Feld setzt man ihn in gehackte Erde und giesst ihn. In der Schnellleiste gewählt, setzt E ihn in ein gehacktes Beet."
+ },
+ "ember_carrot_seed": {
+  "name": "Glutmöhrensamen",
+  "kind": "material",
+  "seed": true,
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/ember_carrot_seed.png",
+  "description": "Winzige Körner, die in der Hand warm werden. Brauchen gehackte, feuchte Erde. In der Schnellleiste gewählt, setzt E ihn in ein gehacktes Beet."
+ },
+ "night_beet_seed": {
+  "name": "Nachtrübensamen",
+  "kind": "material",
+  "seed": true,
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/night_beet_seed.png",
+  "description": "Dunkle Samen mit einem türkisen Schimmer. Sie keimen langsam, aber sicher. In der Schnellleiste gewählt, setzt E ihn in ein gehacktes Beet."
+ },
+ "wound_leaf_seed": {
+  "name": "Wundblattsamen",
+  "kind": "material",
+  "seed": true,
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/wound_leaf_seed.png",
+  "description": "Flache, zähe Samen. Das Blatt wächst nach, wenn man es pflückt. In der Schnellleiste gewählt, setzt E ihn in ein gehacktes Beet."
  }
 }

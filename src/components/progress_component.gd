@@ -106,6 +106,8 @@ func award(copper_amount: int, xp_amount: int) -> void:
 	var owner_id: int = get_multiplayer_authority()
 	if owner_id != multiplayer.get_unique_id():
 		_rpc_state.rpc_id(owner_id, {"copper": copper, "xp": xp})
+	elif copper_amount > 0:
+		Sfx.ui(self, "coin_pickup", -4.0) ## the coins of a kill, in her own purse
 
 
 @rpc("any_peer", "call_remote", "reliable")

@@ -100,6 +100,7 @@ static func _get_canvas(tree: SceneTree) -> FootprintCanvas:
 ## `wet` (0..1, soaked from a swim) leaves dark, short-lived prints on dry ground.
 func step(surface: Dictionary, velocity: Vector2, quiet: bool, wet: float = 0.0) -> void:
 	_left_foot = not _left_foot
+	_play_sound(surface, velocity, quiet, wet)
 	var fx: Dictionary = surface.get("step", {})
 	if not fx.is_empty() and not quiet:
 		_emit(fx, velocity)
@@ -110,6 +111,55 @@ func step(surface: Dictionary, velocity: Vector2, quiet: bool, wet: float = 0.0)
 		alpha = 0.35 + 0.4 * wet
 	if not print_data.is_empty():
 		_leave_footprint(print_data, velocity, alpha)
+
+
+## Step sounds (assets/audio/steps/<sound>_1..3.mp3, made with Higgsfield): the surface's `sound` picks the set,
+## speed sets loudness and pitch (sprinting hits harder and brighter), sneaking is hushed and soft, a soaked
+## heroine adds a little water slap on dry ground. Never the same variant twice in a row.
+const STEP_VARIANTS: int = 3
+const STEP_RANGE: float = 260.0
+const STEP_DB_WALK: float = -13.0
+const STEP_DB_SPRINT: float = -6.0
+static var _step_cache: Dictionary = {}
+var _last_variant: Dictionary = {}
+
+
+static func _step_stream(sound: String, variant: int) -> AudioStream:
+	var key: String = "%s_%d" % [sound, variant]
+	if not _step_cache.has(key):
+		var path: String = "res://assets/audio/steps/%s.mp3" % key
+		_step_cache[key] = load(path) if ResourceLoader.exists(path) else null
+	return _step_cache[key] as AudioStream
+
+
+func _play_sound(surface: Dictionary, velocity: Vector2, quiet: bool, wet: float) -> void:
+	var sound: String = String(surface.get("sound", ""))
+	if sound.is_empty():
+		return
+	var speed: float = velocity.length()
+	var run: float = clampf((speed - 55.0) / 55.0, 0.0, 1.0) ## 0 walking .. 1 at full sprint
+	var last: int = int(_last_variant.get(sound, 0))
+	var variant: int = 1 + (last + randi() % (STEP_VARIANTS - 1)) % STEP_VARIANTS
+	_last_variant[sound] = variant
+	var stream: AudioStream = _step_stream(sound, variant)
+	if stream == null:
+		return
+	var db: float = lerpf(STEP_DB_WALK, STEP_DB_SPRINT, run) + float(surface.get("sound_gain", 0.0))
+	var pitch: float = lerpf(1.0, 1.08, run) * randf_range(0.94, 1.06)
+	if quiet:
+		db -= 9.0
+		pitch *= 0.93
+	if wet > 0.3 and not bool(surface.get("ripples", false)):
+		pitch *= lerpf(1.0, 0.96, wet) ## wet boots darken the tone on dry ground
+	var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+	player.stream = stream
+	player.volume_db = db + (1.5 if _left_foot else 0.0) ## the feet differ a little
+	player.pitch_scale = pitch
+	player.max_distance = STEP_RANGE
+	player.position = to_local(contact_position(velocity))
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
 
 
 func contact_position(velocity: Vector2) -> Vector2:

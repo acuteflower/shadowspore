@@ -174,6 +174,8 @@ func _item_keys() -> void:
 
 
 func _set_open(open: bool) -> void:
+	if open != _opening:
+		Sfx.ui(self, "inv_open" if open else "inv_close", -2.0)
 	_opening = open
 	InputManager.ui_blocking = open
 	InputManager.inventory_open = open

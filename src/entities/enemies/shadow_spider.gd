@@ -281,17 +281,29 @@ func _chase(delta: float) -> void:
 		_navigation.invalidate()
 	var speed: float = float(_def["stalk_speed"])
 	var direction: Vector2 = toward.normalized()
+	var surging: bool = false
 	if _hunt_clock < stalk:
 		direction = (direction * 0.45 + direction.orthogonal() * _orbit_side * 0.8).normalized()
 	else:
 		var phase: float = fposmod(_hunt_clock - stalk, float(_def["surge_seconds"]) + float(_def["settle_seconds"]))
 		if phase < float(_def["surge_seconds"]):
 			speed = float(_def["chase_speed"])
+			surging = true
 		else:
 			speed = float(_def["settle_speed"])
 		if distance < float(_def["orbit_distance"]):
 			direction = (direction + direction.orthogonal() * _orbit_side * float(_def["orbit_weight"])).normalized()
+	if not surging:
+		speed *= _skitter() * 1.6 ## bursts and freezes, the average pace stays about the same
 	velocity = velocity.move_toward(_steer(direction) * speed, 650.0 * delta)
+
+
+## Stalking is not a steady walk: it scuttles a few quick steps, freezes with its legs trembling, then scuttles again.
+## Each spider has its own rhythm (seeded by its name), so a pack never moves in step.
+func _skitter() -> float:
+	var seed_offset: float = float(absi(hash(name)) % 97) * 0.37
+	var wave: float = sin(_hunt_clock * 6.4 + seed_offset) + 0.55 * sin(_hunt_clock * 2.3 + seed_offset * 1.7)
+	return clampf(wave * 1.4 + 0.45, 0.0, 1.0)
 
 
 ## Short obstacle feelers; attack paths additionally require a clear world ray.
@@ -702,6 +714,17 @@ func _enter_state() -> void:
 		State.DEAD:
 			pose = SpiderRig.Pose.DEAD
 			duration = DEATH_SECONDS
+	match state: ## sounds of the shared set (assets/audio/sfx), on every peer
+		State.NOTICE:
+			Sfx.at(self, "spider_notice", global_position, -4.0)
+		State.STRIKE:
+			Sfx.at(self, "spider_attack", global_position, -2.0)
+		State.GRAPPLE_THROW:
+			Sfx.at(self, "spider_grapple", global_position, -2.0)
+		State.HURT:
+			Sfx.at(self, "spider_hurt", global_position, -2.0)
+		State.DEAD:
+			Sfx.at(self, "spider_death", global_position, -1.0)
 	_rig.attack_side = attack_side
 	if state in [State.CLIMB_WINDUP, State.CLIMB, State.CLIMB_RETREAT]:
 		_rig.set_climb(attack_origin, anchor, _height_at(anchor) > _height_at(attack_origin))

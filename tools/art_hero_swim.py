@@ -62,7 +62,7 @@ def cyc(keys, u):
 
 
 def pose(pitch, sink, lean=0.0, twist=0.0, legs=((0.0, 0.05), (0.0, 0.05)), hl=(3.0, 26.0, 1.0), hr=(-3.0, 26.0, 1.0),
-         hair=(0.0, 0.0, 0.0), droop=1.5, head_yaw=0.0, pole_l=(0.8, -0.4, -0.5), pole_r=(-0.8, -0.4, -0.5), spread=0.8, curl=0.5, lift=0.0):
+         hair=(0.0, 0.0, 0.0), droop=1.5, head_yaw=0.0, pole_l=(0.8, -0.4, -0.5), pole_r=(-0.8, -0.4, -0.5), spread=0.8, curl=0.5, lift=0.0, nod=0.0):
     """One swimming key pose. `pitch` turns the body about the pelvis (0 upright, 1.5 flat face down, negative on the back), `sink` is how far the
     pelvis lies under the water plane, `lift` raises everything (leaps)."""
     d = em.Q(twist=twist, lean=lean, pz=0.0, dy=0.0, pitch=pitch if abs(pitch) > 1e-3 else 0.001, shift=(0.0, -24.0 - sink + lift, 0.0), legs=legs,
@@ -71,7 +71,15 @@ def pose(pitch, sink, lean=0.0, twist=0.0, legs=((0.0, 0.05), (0.0, 0.05)), hl=(
     d["head_yaw"] = head_yaw
     d["spread"] = spread
     d["curl"] = curl
+    if nod:
+        d["nod"] = nod
     return d
+
+
+def drift(u, k=1.0, waves=2):
+    """The wet mane afloat: it streams back along the body, lifted a little off the back, waving with the strokes."""
+    s = 2 * math.pi * u * waves
+    return (1.1 * math.sin(s), -7.0 * k, -3.4 * k + 0.9 * math.sin(s + 1.0))
 
 
 def mix(a, b, k):
@@ -108,9 +116,9 @@ def breast(i, n=14):
     a = cyc(BREAST_ARM, u)
     th, fl = cyc(BREAST_LEG, u + 0.04)
     glide = 0.5 + 0.5 * math.cos(2 * math.pi * u)  # high at the glide: the body lifts and sinks a little with the stroke
-    return pose(1.2, 1.5 + 0.8 * (1.0 - glide), lean=-0.6, legs=((th, fl), (th * 0.9, fl)),
-                hl=fsd(a[0], a[1], a[2]), hr=fsd(a[0], -a[1], a[2]), droop=14.0, hair=(0.0, -1.0, 0.0),
-                pole_l=(0.7, -0.3, -0.6), pole_r=(-0.7, -0.3, -0.6), spread=1.2, curl=0.7)
+    return pose(1.36, 1.5 + 0.8 * (1.0 - glide), lean=-0.5, legs=((th, fl), (th * 0.9, fl)),
+                hl=fsd(a[0], a[1], a[2]), hr=fsd(a[0], -a[1], a[2]), droop=2.4, hair=drift(u, 0.9, 1),
+                pole_l=(0.7, -0.3, -0.6), pole_r=(-0.7, -0.3, -0.6), spread=1.6, curl=1.0, nod=-0.8)
 
 
 CRAWL_ARM = [
@@ -127,8 +135,8 @@ def crawl(i, n=16):
     legs = ((0.32 * math.sin(kick), 0.30 + 0.22 * math.cos(kick)), (0.32 * math.sin(kick + math.pi), 0.30 + 0.22 * math.cos(kick + math.pi)))
     bump = max(0.0, math.cos(2 * math.pi * (u - 0.5))) ** 3  # once per cycle she turns her face to breathe
     return pose(1.40, 0.8, lean=-0.22, twist=0.42 * math.sin(2 * math.pi * u), legs=legs,
-                hl=fsd(a[0], a[1], a[2]), hr=fsd(b[0], -b[1], b[2]), droop=12.0, head_yaw=1.25 * bump, hair=(0.0, -1.0, 0.0),
-                pole_l=(0.6, 0.0, -0.9), pole_r=(-0.6, 0.0, -0.9), spread=1.4, curl=0.9)
+                hl=fsd(a[0], a[1], a[2]), hr=fsd(b[0], -b[1], b[2]), droop=1.8, head_yaw=1.25 * bump, hair=drift(u, 1.0, 2),
+                pole_l=(0.6, 0.0, -0.9), pole_r=(-0.6, 0.0, -0.9), spread=1.8, curl=1.2, nod=-1.1 * (1.0 - 0.6 * bump))
 
 
 def enter(i, n=7):

@@ -44,6 +44,8 @@ const LAYERS: Array[Dictionary] = [
 	{"id": 28, "name": "witch_flora", "cell": 4, "reach": 3},
 	{"id": 29, "name": "witch_patch", "cell": 10, "reach": 5},
 	{"id": 30, "name": "witch_ore", "cell": 22, "reach": 4},
+	{"id": 31, "name": "bloom_drift", "cell": 21, "reach": 9},
+	{"id": 32, "name": "boulder_nook", "cell": 33, "reach": 7},
 ]
 const WITCH_KINDS: Array[String] = ["hag_tree", "bone_tree", "thorn_hedge", "grave_candle", "witch_hat", "toad_cap", "ghost_fern", "mandrake", "curse_rock", "hex_shrub", "witch_broom"] ## the Hexenwald's own plant world (tools/art_hexenwald.py): grows only where the biome is `bare` of the meadow's
 const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail"] ## may grow at the water's edge
@@ -84,7 +86,7 @@ var _plants: Dictionary
 var _cache: Dictionary = {}
 var _cluster_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 const CACHE_LIMIT: int = 40000 ## clusters kept at most; beyond it the cache starts over (one chunk alone asks for ~4000, neighbours share most of them)
-const LAYER_NEEDS: Dictionary = {"lone_bush": 2, "lone_grass": 1, "tussock": 1, "lone_mushroom": 2, "lone_snapper": 2, "lone_flora": 2, "lone_root": 1, "shroom_patch": 2, "flora_patch": 2} ## layers that read the slope (1) or slope and damp (2) of a cluster
+const LAYER_NEEDS: Dictionary = {"lone_bush": 2, "lone_grass": 1, "tussock": 1, "lone_mushroom": 2, "lone_snapper": 2, "lone_flora": 2, "lone_root": 1, "shroom_patch": 2, "flora_patch": 2, "bloom_drift": 2, "boulder_nook": 2} ## layers that read the slope (1) or slope and damp (2) of a cluster
 
 
 func _init(zone: FastNoiseLite, sdf: PackedByteArray, relief: Relief, exclude: Rect2i, world_seed: int) -> void:
@@ -301,6 +303,8 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 		"lone_tree":
 			if rng.randf() < lerpf(0.5, 0.8, wild):
 				_add(found, rng, "tree", [0, 0, 1, 1, 2][rng.randi() % 5], center)
+				if not found.is_empty(): ## a lone tree is never bare-footed: grass, a flower or a toadstool, a bush now and then (drawn after the tree, so the tree itself never moves)
+					_skirt(found, rng, center, wild, shore, slope, 1.6, 4.2, rng.randi_range(2, 5))
 		"lone_bush":
 			if rng.randf() < 0.42 * lush:
 				var kind: String = _berry_kind(center, "berry_bush") if rng.randf() < 0.12 else "bush"
@@ -309,6 +313,8 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 			if rng.randf() < 0.4 + 0.15 * shore + (0.3 if _relief.wall_above(Vector2i(floori(center.x), floori(center.y))) else 0.0): ## rubble lies at the foot of a cliff
 				if rng.randf() < 0.12: ## now and then a single small rock instead
 					_add(found, rng, "rock", SMALL_ROCKS[rng.randi() % SMALL_ROCKS.size()], center)
+					if not found.is_empty():
+						_skirt(found, rng, center, wild, shore, slope, 1.2, 3.0, rng.randi_range(2, 4))
 				else:
 					_add(found, rng, "pebble", _weighted(rng, "pebble"), center)
 		"lone_ore": ## single iron rocks: rarer than stone, more at the foot of cliffs and on the high ground, a little more in the wild
@@ -374,6 +380,12 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 		"flora_patch":
 			if rng.randf() < 0.5 * lush:
 				_flora_patch(found, rng, center, shade, shore, slope)
+		"bloom_drift": ## colour islands in the open meadow: a drift of one flower with a few of another and tufts of grass between
+			if shore < 0.5 and rng.randf() < (0.78 - 0.58 * shade) * lush:
+				_bloom_drift(found, rng, center, shade, damp, slope)
+		"boulder_nook": ## a single big boulder with its own little garden round its foot: a landmark in a field
+			if rng.randf() < 0.28 + 0.22 * shade + 0.2 * shore:
+				_boulder_nook(found, rng, center, shade, shore, slope)
 		"witch_wood", "witch_tree", "witch_flora", "witch_patch", "witch_ore":
 			if is_bare(Vector2i(floori(center.x), floori(center.y))):
 				_witch(String(layer.name), found, rng, center, wild)
@@ -619,6 +631,61 @@ func _orchard(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vect
 		_add(found, rng, "blossom", _weighted(rng, "blossom"), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.0, 7.0))
 	for _i: int in rng.randi_range(1, 2):
 		_tussock(found, rng, center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(2.0, 7.0))
+
+
+## A drift of flowers: 12-20 plants of one kind in a stretched, tilted oval 3.5-7 tiles long with a few of another kind among them (the main kind follows the
+## ground: sun flowers and poppies in the open and on sunny slopes, moonbells and lilies in the shade and the damp) and some tufts of grass between.
+## Flora yields to everything woody and stony (priority), so a drift simply has a hole where a bush stands. Small colour islands, never a carpet.
+func _bloom_drift(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2, wild: float, damp: float, slope: float) -> void:
+	var open: float = 1.0 - wild
+	var kinds: Array[String] = ["sunbloom", "spark_poppy", "puffseed", "moonbell", "mist_lily"]
+	var weights: PackedFloat32Array = PackedFloat32Array([0.3 + 2.5 * open + 1.2 * maxf(slope, 0.0), 0.3 + 2.4 * open, 0.2 + 1.2 * open, 0.4 + 2.2 * wild, 0.2 + 1.6 * wild + 1.6 * damp])
+	var main: String = kinds[rng.rand_weighted(weights)]
+	var accent: String = kinds[rng.randi() % kinds.size()]
+	if accent == main:
+		accent = "puffseed" if main != "puffseed" else "sunbloom"
+	var radius: float = rng.randf_range(3.5, 7.0)
+	var turn: float = rng.randf() * PI
+	var stretch: float = rng.randf_range(0.45, 0.8)
+	for _i: int in rng.randi_range(12, 20):
+		var angle: float = rng.randf() * TAU
+		var reach: float = sqrt(rng.randf())
+		var local: Vector2 = Vector2(cos(angle) * radius * reach, sin(angle) * radius * stretch * reach).rotated(turn)
+		var kind: String = accent if rng.randf() < 0.22 else main
+		_add(found, rng, kind, _weighted(rng, kind), center + local)
+	for _i: int in rng.randi_range(2, 5):
+		var angle: float = rng.randf() * TAU
+		var reach: float = sqrt(rng.randf())
+		_add(found, rng, "grass", _weighted(rng, "grass"), center + Vector2(cos(angle) * radius * reach, sin(angle) * radius * stretch * reach).rotated(turn))
+
+
+## One big boulder with a garden at its foot: tufts, flowers that fit the ground, a toadstool in the shade, pebbles and a bush now and then.
+func _boulder_nook(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2, wild: float, shore: float, slope: float) -> void:
+	_add(found, rng, "rock", BIG_ROCKS[rng.randi() % BIG_ROCKS.size()], center)
+	if found.is_empty():
+		return
+	_skirt(found, rng, center, wild, shore, slope, 1.8, 4.5, rng.randi_range(6, 10), true)
+
+
+## Small plants round a prop at `center` (`inner` / `outer` in tiles): grass, flowers for this ground, glow caps in the shade, bushes now and then
+## (and pebbles at a boulder). Every candidate is checked against everything already found, so the skirt only lives where there is room.
+func _skirt(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2, wild: float, shore: float, slope: float, inner: float, outer: float, count: int, stony: bool = false) -> void:
+	for _i: int in count:
+		var at: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(inner, outer)
+		var roll: float = rng.randf()
+		if roll < 0.34:
+			_add(found, rng, "grass", _weighted(rng, "grass"), at)
+		elif roll < 0.68:
+			var flora: String = _flora_kind(rng, at, wild, shore, slope)
+			_add(found, rng, flora, _weighted(rng, flora), at)
+		elif roll < 0.80 and wild > 0.25:
+			_add(found, rng, "mushroom", _weighted(rng, "mushroom"), at)
+		elif roll < 0.90 and stony:
+			_add(found, rng, "pebble", _weighted(rng, "pebble"), at)
+		elif roll < 0.95:
+			_add(found, rng, "bush", _weighted(rng, "bush"), at)
+		else:
+			_add(found, rng, "grass", _weighted(rng, "grass"), at)
 
 
 ## The small plants of the meadow: which one grows at `at`. Open ground likes plantain, seed heads and sun flowers, shade

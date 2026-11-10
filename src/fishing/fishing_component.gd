@@ -723,7 +723,8 @@ func _ctx() -> Dictionary:
 	away.append_array(_refused.keys())
 	return {"x": field.x, "y": field.y, "flow": current_at(bobber).length(), "night": TimeManager.night_amount(),
 		"light_depth": light, "bait": _bait_used, "pose": cast_pose, "scared": away,
-		"reach": feet().distance_to(bobber), "sun": TimeManager.sun_amount(), "golden": TimeManager.golden_amount(),
+		"reach": feet().distance_to(bobber), "sun": TimeManager.sun_amount() * WeatherManager.sun_scale(), "golden": TimeManager.golden_amount() * WeatherManager.sun_scale(),
+		"rain": WeatherManager.rain_now(), "storm": WeatherManager.storm_now(),
 		"pressure": pressure_at(bobber)}
 
 

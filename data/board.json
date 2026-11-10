@@ -1,0 +1,27 @@
+{
+ "piece": "quest_board",
+ "reach": 150.0,
+ "limits": {"simple": 4, "per_giver": 1, "new_per_day": 2},
+ "post": {"chance": 0.8},
+ "lifetime": [3, 5],
+ "templates": [
+  {"id": "gustav_wood", "kind": "fetch", "givers": ["gustav"], "item": "wood", "count": [12, 24], "copper_each": [2, 4], "xp_each": 1, "trust": 3, "text": "ICH BRAUCHE {count} {item} FÜR DIE WERKBANK."},
+  {"id": "gustav_fiber", "kind": "fetch", "givers": ["gustav"], "item": "plant_fiber", "count": [6, 12], "copper_each": [3, 5], "xp_each": 1, "trust": 3, "text": "BRING MIR {count} {item}, DIE SEILE GEHEN AUS."},
+  {"id": "gustav_stone", "kind": "fetch", "givers": ["gustav"], "item": "stone", "count": [8, 16], "copper_each": [2, 4], "xp_each": 1, "trust": 3, "text": "{count} {item} WÄREN GUT FÜR DEN HOF."},
+  {"id": "valdric_spider", "kind": "kill", "givers": ["valdric"], "species": "shadow_spider", "count": [2, 4], "copper_each": [6, 10], "xp_each": 3, "trust": 4, "text": "VERTREIB {count}X {species} VOM RAND DES LICHTS."},
+  {"id": "valdric_listener", "kind": "kill", "givers": ["valdric"], "species": "void_listener", "count": [1, 2], "copper_each": [12, 18], "xp_each": 6, "trust": 5, "min_day": 3, "text": "SCHICK {count}X {species} ZURÜCK IN DIE DUNKELHEIT."},
+  {"id": "witch_cap", "kind": "fetch", "givers": ["witch"], "item": "glow_cap", "count": [3, 6], "copper_each": [5, 8], "xp_each": 2, "trust": 4, "text": "FÜR MEINE SUDE: {count} {item}."},
+  {"id": "witch_bell", "kind": "fetch", "givers": ["witch"], "item": "moonbell", "count": [3, 5], "copper_each": [5, 8], "xp_each": 2, "trust": 4, "text": "{count} {item}, BEI NACHT GEPFLÜCKT, WENN ES GEHT."},
+  {"id": "any_berry", "kind": "fetch", "givers": [], "item": "dusk_berry", "count": [4, 8], "copper_each": [3, 5], "xp_each": 1, "trust": 2, "text": "MIR FEHLEN {count} {item}."},
+  {"id": "any_ember", "kind": "fetch", "givers": [], "item": "ember_berry", "count": [3, 6], "copper_each": [4, 6], "xp_each": 2, "trust": 2, "min_day": 2, "text": "KANNST DU {count} {item} BESORGEN?"},
+  {"id": "any_blossom", "kind": "fetch", "givers": [], "item": "dusk_blossom", "count": [3, 6], "copper_each": [4, 6], "xp_each": 2, "trust": 2, "text": "ICH SUCHE {count} {item}."},
+  {"id": "any_carrot", "kind": "fetch", "givers": [], "item": "ember_carrot", "count": [2, 4], "copper_each": [6, 9], "xp_each": 2, "trust": 3, "min_day": 2, "text": "{count} {item} AUS DEM WILDEN BODEN, BITTE."},
+  {"id": "any_beet", "kind": "fetch", "givers": [], "item": "night_beet", "count": [2, 4], "copper_each": [6, 9], "xp_each": 2, "trust": 3, "min_day": 2, "text": "{count} {item}, FRISCH GEZOGEN."},
+  {"id": "any_silverling", "kind": "fetch", "givers": [], "item": "fish_silverling", "count": [1, 3], "copper_each": [8, 12], "xp_each": 3, "trust": 3, "text": "EIN ABENDESSEN: {count} {item}."},
+  {"id": "any_trout", "kind": "fetch", "givers": [], "item": "fish_trout", "count": [1, 2], "copper_each": [14, 20], "xp_each": 5, "trust": 4, "min_day": 3, "bonus": {"id": "glow_cap", "n": 2, "chance": 0.4}, "text": "EINE {item}, WENN DIR DER FANG GLÜCKT."},
+  {"id": "any_eel", "kind": "fetch", "givers": [], "item": "fish_eel", "count": [1, 1], "copper_each": [30, 45], "xp_each": 10, "trust": 6, "min_day": 4, "bonus": {"id": "willow_thread", "n": 2, "chance": 0.6}, "text": "EINEN {item}. NUR BEI NACHT UND TIEFEM WASSER."}
+ ],
+ "story": [
+  {"id": "story_example", "quest": "board_example", "giver": "valdric", "title": "RUF DES RITTERS", "text": "VALDRIC HAT DIR ETWAS ZU SAGEN. KOMM, WENN DU BEREIT BIST.", "after": "town_start", "flag": ""}
+ ]
+}

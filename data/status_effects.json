@@ -1,128 +1,139 @@
 {
- "burn": {
-  "name": "VERBRENNEN",
-  "seconds": 4.0,
-  "tick": 0.5,
-  "damage_ratio": 0.02,
-  "min_damage": 2,
-  "extinguish": "water",
-  "color": "ff6ad8",
-  "hot": "ffd0f2"
- },
- "brandmark": {
-  "name": "BRANDMAL",
-  "seconds": 4.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "ff4fd8",
-  "hot": "fff0fb"
- },
- "hallucinated": {
-  "name": "HALLUZINIERT",
-  "seconds": 8.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "a8ff6a",
-  "hot": "eaffc4",
-  "permanent": true,
-  "glyph": "eye",
-  "min_gloom": 0.35,
-  "trug_seconds": 45.0,
-  "eyes": [
-   3.0,
-   8.0
-  ],
-  "whisper": [
-   6.0,
-   15.0
-  ],
-  "decoy": [
-   14.0,
-   32.0
-  ],
-  "lie": [
-   12.0,
-   28.0
-  ],
-  "phantom": [
-   7.0,
-   18.0
-  ]
- },
- "glutatem": {
-  "name": "GLUTATEM",
-  "seconds": 30.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "ffb347",
-  "hot": "fff0b0",
-  "glyph": "spark",
-  "tiered": true
- },
- "wound_pause": {
-  "name": "WUNDPAUSE",
-  "seconds": 10.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "ff6f8e",
-  "hot": "ffd0dc",
-  "glyph": "drop"
- },
- "food_pause": {
-  "name": "ESSPAUSE",
-  "seconds": 3.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "8ad48a",
-  "hot": "e0ffe0",
-  "hidden": true
- },
- "ashen": {
-  "name": "ASCHENHAUT",
-  "seconds": 60.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "extinguish": "water",
-  "color": "ff7a2a",
-  "hot": "ffd9a0",
-  "tiered": true
- },
- "clear_vision": {
-  "name": "KLARBLICK",
-  "seconds": 60.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "a8ff6a",
-  "hot": "eaffc4",
-  "glyph": "eye",
-  "tiered": true
- },
- "wisp": {
-  "name": "IRRLICHT",
-  "seconds": 45.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "4fe0d0",
-  "hot": "d6fff6",
-  "glyph": "spark",
-  "tiered": true
- },
- "special_pause": {
-  "name": "SUDPAUSE",
-  "seconds": 20.0,
-  "tick": 99.0,
-  "damage_ratio": 0.0,
-  "min_damage": 0,
-  "color": "b99bff",
-  "hot": "efe4ff",
-  "glyph": "drop"
- }
+  "burn": {
+    "name": "VERBRENNEN",
+    "seconds": 4.0,
+    "tick": 0.5,
+    "damage_ratio": 0.02,
+    "min_damage": 2,
+    "extinguish": "water",
+    "color": "ff6ad8",
+    "hot": "ffd0f2"
+  },
+  "brandmark": {
+    "name": "BRANDMAL",
+    "seconds": 4.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "ff4fd8",
+    "hot": "fff0fb"
+  },
+  "hallucinated": {
+    "name": "HALLUZINIERT",
+    "seconds": 8.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "a8ff6a",
+    "hot": "eaffc4",
+    "permanent": true,
+    "glyph": "eye",
+    "min_gloom": 0.35,
+    "trug_seconds": 45.0,
+    "eyes": [
+      3.0,
+      8.0
+    ],
+    "whisper": [
+      6.0,
+      15.0
+    ],
+    "decoy": [
+      14.0,
+      32.0
+    ],
+    "lie": [
+      12.0,
+      28.0
+    ],
+    "phantom": [
+      7.0,
+      18.0
+    ]
+  },
+  "glutatem": {
+    "name": "GLUTATEM",
+    "seconds": 30.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "ffb347",
+    "hot": "fff0b0",
+    "glyph": "spark",
+    "tiered": true
+  },
+  "wound_pause": {
+    "name": "WUNDPAUSE",
+    "seconds": 10.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "ff6f8e",
+    "hot": "ffd0dc",
+    "glyph": "drop"
+  },
+  "food_pause": {
+    "name": "ESSPAUSE",
+    "seconds": 3.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "8ad48a",
+    "hot": "e0ffe0",
+    "hidden": true
+  },
+  "ashen": {
+    "name": "ASCHENHAUT",
+    "seconds": 60.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "extinguish": "water",
+    "color": "ff7a2a",
+    "hot": "ffd9a0",
+    "tiered": true
+  },
+  "clear_vision": {
+    "name": "KLARBLICK",
+    "seconds": 60.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "a8ff6a",
+    "hot": "eaffc4",
+    "glyph": "eye",
+    "tiered": true
+  },
+  "wisp": {
+    "name": "IRRLICHT",
+    "seconds": 45.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "4fe0d0",
+    "hot": "d6fff6",
+    "glyph": "spark",
+    "tiered": true
+  },
+  "special_pause": {
+    "name": "SUDPAUSE",
+    "seconds": 20.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "b99bff",
+    "hot": "efe4ff",
+    "glyph": "drop"
+  },
+  "void_rift": {
+    "name": "LEERE",
+    "seconds": 5.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "6a3fa0",
+    "hot": "c8b4f0",
+    "glyph": "drop",
+    "tiered": true
+  }
 }

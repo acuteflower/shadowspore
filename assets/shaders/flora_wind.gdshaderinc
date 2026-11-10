@@ -22,7 +22,7 @@ vec2 wind_uv(vec2 uv, vec2 size) {
 	float row = mod(floor(px.y), frame_size.y);
 	float h = max(pivot_row - row, 0.0) / 16.0;
 	float pulse = 0.5 + 0.5 * sin(dot(origin, g_wind_dir) * 0.014 - g_wind_clock * 1.6);
-	float wind = g_wind_dir.x * (0.12 + g_wind_gust * (0.35 + 0.65 * pulse));
+	float wind = g_wind_dir.x * (0.12 + (g_wind_gust <= 1.1 ? g_wind_gust : 1.1 + 0.9 * tanh((g_wind_gust - 1.1) * 0.35)) * (0.35 + 0.65 * pulse));
 	float phase = phase_seed;
 	float cell = floor(px.x / cell_w);
 	float tick = floor(g_wind_clock * 12.0) / 12.0;

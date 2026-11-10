@@ -5,8 +5,8 @@ extends RefCounted
 ## the town (Esma brews) ask it.
 
 const TIERS: int = 5
-const TYPES: Array[String] = ["heal", "stamina", "ashen", "clarity", "wisp"]
-const SPECIAL: Array[String] = ["ashen", "clarity", "wisp"] ## the special potions: three tiers, own place or time of brewing, one shared pause
+const TYPES: Array[String] = ["heal", "stamina", "ashen", "clarity", "wisp", "leere"]
+const SPECIAL: Array[String] = ["ashen", "clarity", "wisp", "leere"] ## the special potions: three tiers, own place or time of brewing, one shared pause
 
 
 static func data() -> Dictionary:
@@ -85,6 +85,14 @@ static func wisp_spec(level: int) -> Dictionary:
 	var spec: Dictionary = tier("wisp", level)
 	return {"seconds": float(spec.get("seconds", 45.0)), "radius": float(spec.get("radius", 40.0)), "slow": float(spec.get("slow", 0.6)),
 		"push": float(spec.get("push", 0.0)), "lure": float(spec.get("lure", 0.02))}
+
+
+## Leere: seconds, rift radius (px), void damage per second, lifesteal share (0..1), player self-damage per second, slow share (0..1), pull (0 or 1).
+static func leere_spec(level: int) -> Dictionary:
+	var spec: Dictionary = tier("leere", level)
+	return {"seconds": float(spec.get("seconds", 5.0)), "radius": float(spec.get("radius", 128.0)), "dps": float(spec.get("dps", 8.0)),
+		"lifesteal": float(spec.get("lifesteal", 0.0)), "self_dps": float(spec.get("self_dps", 2.0)),
+		"slow": float(spec.get("slow", 0.0)), "pull": float(spec.get("pull", 0.0))}
 
 
 static func color(type: String) -> Color:

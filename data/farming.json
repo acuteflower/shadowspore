@@ -1,0 +1,109 @@
+{
+ "cell": 16,
+ "unlock": "farming",
+ "fallow_days": 3,
+ "ripe_bonus": 1,
+ "wild_seeds": {
+  "earth_tuber": {
+   "seed": "tuber_seed",
+   "chance": 0.45
+  },
+  "ember_carrot": {
+   "seed": "ember_carrot_seed",
+   "chance": 0.5
+  },
+  "night_beet": {
+   "seed": "night_beet_seed",
+   "chance": 0.5
+  },
+  "wound_leaf": {
+   "seed": "wound_leaf_seed",
+   "chance": 0.4
+  }
+ },
+ "crops": {
+  "tuber": {
+   "name": "ERDKNOLLE",
+   "seed": "tuber_seed",
+   "grow": [
+    1,
+    1,
+    2
+   ],
+   "yield": {
+    "item": "earth_tuber",
+    "min": 2,
+    "max": 3
+   },
+   "seed_back": {
+    "chance": 0.35,
+    "min": 1,
+    "max": 1
+   },
+   "origin": "wild"
+  },
+  "ember_carrot": {
+   "name": "GLUTMÖHRE",
+   "seed": "ember_carrot_seed",
+   "grow": [
+    1,
+    2,
+    2
+   ],
+   "yield": {
+    "item": "ember_carrot",
+    "min": 1,
+    "max": 2
+   },
+   "seed_back": {
+    "chance": 0.4,
+    "min": 1,
+    "max": 2
+   },
+   "glow": true,
+   "origin": "wild"
+  },
+  "night_beet": {
+   "name": "NACHTRÜBE",
+   "seed": "night_beet_seed",
+   "grow": [
+    2,
+    2,
+    2
+   ],
+   "yield": {
+    "item": "night_beet",
+    "min": 1,
+    "max": 2
+   },
+   "seed_back": {
+    "chance": 0.4,
+    "min": 1,
+    "max": 1
+   },
+   "glow": true,
+   "origin": "wild"
+  },
+  "wound_leaf": {
+   "name": "WUNDBLATT",
+   "seed": "wound_leaf_seed",
+   "grow": [
+    1,
+    1,
+    1
+   ],
+   "regrow": 2,
+   "yield": {
+    "item": "wound_leaf",
+    "min": 1,
+    "max": 2
+   },
+   "seed_back": {
+    "chance": 0.15,
+    "min": 1,
+    "max": 1
+   },
+   "origin": "wild"
+  }
+ }
+}

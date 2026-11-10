@@ -1,0 +1,469 @@
+{
+	"_doc": "Sound set made with Higgsfield seed_audio (format wav). Every prompt = base + 'The sound: ' + prompt. py -3 tools/sfx_process.py turns the raw wavs into assets/audio/sfx/<id>.wav (trim, fade, filter, level). max = seconds kept, gain = dB after normalising to -3 dBFS peak.",
+	"base": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth.",
+	"sounds": [
+		{
+			"id": "sword_swing_a",
+			"max": 0.7,
+			"gain": -4,
+			"prompt": "one quick one-handed sword slash through the air, a thin steel whoosh with a slight leather creak of the grip, ends cleanly."
+		},
+		{
+			"id": "sword_swing_b",
+			"max": 0.8,
+			"gain": -4,
+			"prompt": "a slightly lower and slower backhand sword slash through the air, a thin steel whoosh, ends cleanly."
+		},
+		{
+			"id": "sword_hit",
+			"max": 0.7,
+			"gain": -2,
+			"prompt": "a sword blade striking a shadow creature, a dull wet-dark thud with a short steel ring and a faint cold shimmer."
+		},
+		{
+			"id": "blink_out",
+			"max": 0.8,
+			"gain": -3,
+			"prompt": "a short magical blink: a sharp air pop and a cold rising shimmer as a body vanishes into shadow."
+		},
+		{
+			"id": "blink_in",
+			"max": 0.4,
+			"gain": -5,
+			"prompt": "a short soft arrival pop with a fading cold shimmer and a light cloth rustle."
+		},
+		{
+			"id": "ellie_hurt_a",
+			"max": 0.9,
+			"gain": -3,
+			"prompt": "a young woman's short pained grunt when struck, no words, breathy and strained."
+		},
+		{
+			"id": "ellie_hurt_b",
+			"max": 0.9,
+			"gain": -3,
+			"prompt": "a young woman's sharp pained gasp when struck, no words, short."
+		},
+		{
+			"id": "spider_notice",
+			"max": 1.2,
+			"gain": -6,
+			"prompt": "a quiet dry clicking hiss as a spider notices prey, rasping chitin."
+		},
+		{
+			"id": "spider_attack",
+			"max": 0.9,
+			"gain": -3,
+			"prompt": "a shadow spider's sickle-like claw sweeping through the air with a dry chitin scrape and a low hiss."
+		},
+		{
+			"id": "spider_grapple",
+			"max": 1.0,
+			"gain": -3,
+			"prompt": "a spider leg slamming into the ground with a wet dark thud and a rasping hiss."
+		},
+		{
+			"id": "spider_hurt",
+			"max": 0.8,
+			"gain": -3,
+			"prompt": "a shadow spider's short wet shriek of pain, rasping and slightly glitchy."
+		},
+		{
+			"id": "spider_death",
+			"max": 2.0,
+			"gain": -3,
+			"prompt": "a shadow spider collapsing: a wet rasping shriek fading into a dry crumble of chitin and a cold shimmer."
+		},
+		{
+			"id": "axe_chop",
+			"max": 0.6,
+			"gain": -3,
+			"prompt": "a hand axe biting into a living fir trunk, a hard dull wooden chock with a short woody ring."
+		},
+		{
+			"id": "tree_fall",
+			"max": 3.0,
+			"gain": -2,
+			"prompt": "a big tree trunk cracking, then falling with creaking snapping branches and a heavy thud on mossy ground."
+		},
+		{
+			"id": "pick_rock",
+			"max": 0.6,
+			"gain": -3,
+			"prompt": "a pickaxe striking stone, a sharp metallic clink with a stony crack and small chips flying."
+		},
+		{
+			"id": "rock_break",
+			"max": 1.2,
+			"gain": -3,
+			"prompt": "a rock crumbling into rubble, a gravelly cracking crumble that settles."
+		},
+		{
+			"id": "sickle_cut",
+			"max": 0.5,
+			"gain": -4,
+			"prompt": "a sickle cutting tough grass stems, a quick crisp swish and snip."
+		},
+		{
+			"id": "pluck",
+			"max": 0.6,
+			"gain": -5,
+			"prompt": "a hand plucking berries from a bush, a soft leaf rustle and a small wet snap."
+		},
+		{
+			"id": "eat_bite",
+			"max": 0.9,
+			"gain": -5,
+			"prompt": "a bite into a juicy berry, a crisp small crunch and a short soft chew."
+		},
+		{
+			"id": "drop_pop",
+			"max": 0.5,
+			"gain": -6,
+			"prompt": "a small item popping out and landing on moss, a soft pop and a tiny dull plop."
+		},
+		{
+			"id": "item_pickup",
+			"max": 0.5,
+			"gain": -7,
+			"prompt": "a small item swept up, a quick light airy whoosh and one tiny soft glassy chime."
+		},
+		{
+			"id": "coin_pickup",
+			"max": 0.7,
+			"gain": -6,
+			"prompt": "a few old copper coins clinking together in a hand, soft dull metal chimes."
+		},
+		{
+			"id": "inv_open",
+			"max": 0.7,
+			"gain": -6,
+			"prompt": "a leather satchel being opened, soft leather rustle and a small buckle click."
+		},
+		{
+			"id": "inv_close",
+			"max": 0.6,
+			"gain": -6,
+			"prompt": "a leather satchel being closed, soft leather rustle and a small buckle click."
+		},
+		{
+			"id": "item_take",
+			"max": 0.35,
+			"gain": -8,
+			"prompt": "picking a small item out of a cloth bag, a soft cloth rustle and a tiny tick."
+		},
+		{
+			"id": "item_put",
+			"max": 0.35,
+			"gain": -8,
+			"prompt": "setting a small item down on wood, a soft wooden tick."
+		},
+		{
+			"id": "equip",
+			"max": 0.7,
+			"gain": -5,
+			"prompt": "buckling on a piece of leather and steel gear, a short leather creak and a metal clink."
+		},
+		{
+			"id": "hotbar_select",
+			"max": 0.25,
+			"gain": -10,
+			"prompt": "a tiny soft wooden tick like a bead on a string."
+		},
+		{
+			"id": "ui_click",
+			"max": 0.25,
+			"gain": -9,
+			"prompt": "a small dry wooden tap."
+		},
+		{
+			"id": "ui_confirm",
+			"max": 0.6,
+			"gain": -7,
+			"prompt": "a soft warm wooden knock with a faint cold shimmer fading after it."
+		},
+		{
+			"id": "ui_back",
+			"max": 0.3,
+			"gain": -9,
+			"prompt": "a soft muted lower wooden tap."
+		},
+		{
+			"id": "map_open",
+			"max": 1.4,
+			"gain": -6,
+			"prompt": "an old parchment map unrolling, a long paper rustle with a faint cold shimmer."
+		},
+		{
+			"id": "map_close",
+			"max": 0.9,
+			"gain": -7,
+			"prompt": "an old parchment map rolling up quickly, a short paper rustle."
+		},
+		{
+			"id": "build_place",
+			"max": 1.0,
+			"gain": -3,
+			"prompt": "a heavy wooden post set into soil, a dull thud and a creak of timber."
+		},
+		{
+			"id": "build_demolish",
+			"max": 1.4,
+			"gain": -4,
+			"prompt": "wooden planks pulled apart and clattering down, creaking splintering wood."
+		},
+		{
+			"id": "leaves_walk",
+			"max": 0.6,
+			"gain": -9,
+			"prompt": "one soft footstep pushing through dry fallen leaves, a quick crisp rustle."
+		},
+		{
+			"id": "cricket_night",
+			"max": 3.0,
+			"gain": -10,
+			"prompt": "crickets chirping softly at night in grass, a steady gentle trill.",
+			"loop": true
+		},
+		{
+			"id": "wind_day_loop",
+			"max": 3.0,
+			"gain": -12,
+			"prompt": "a gentle daytime breeze moving through tree leaves, a soft steady rustling hush.",
+			"loop": true
+		},
+		{
+			"id": "wind_night_loop",
+			"max": 3.0,
+			"gain": -12,
+			"prompt": "a cold low night wind moving through bare branches, a soft hollow moan.",
+			"loop": true
+		},
+		{
+			"id": "river_loop",
+			"max": 3.0,
+			"gain": -12,
+			"prompt": "a calm small river flowing over stones, soft steady water babbling.",
+			"loop": true
+		},
+		{
+			"id": "fire_crackle_loop",
+			"max": 3.0,
+			"gain": -10,
+			"prompt": "a small campfire crackling, soft steady wood pops and a low flame hiss.",
+			"loop": true
+		},
+		{
+			"id": "rabbit_thump",
+			"max": 0.5,
+			"gain": -5,
+			"prompt": "a wild rabbit's single hard hind-foot thump on packed earth, one short dull low knock, nothing else.",
+			"animal": true
+		},
+		{
+			"id": "hedgehog_snuffle",
+			"max": 1.2,
+			"gain": -8,
+			"prompt": "a hedgehog snuffling through dry leaf litter, quick wet little sniffs, soft huffs and tiny rustles.",
+			"animal": true
+		},
+		{
+			"id": "badger_grunt",
+			"max": 1.0,
+			"gain": -5,
+			"prompt": "a badger's low gruff grunt from the chest, one deep huff and a short rough breath.",
+			"animal": true
+		},
+		{
+			"id": "deer_call",
+			"max": 0.9,
+			"gain": -4,
+			"prompt": "a roe deer's single sharp hoarse bark, loud and abrupt like a coughing dog.",
+			"animal": true
+		},
+		{
+			"id": "fox_bark",
+			"max": 0.9,
+			"gain": -4,
+			"prompt": "a red fox's single short hoarse bark, sharp and a little raspy.",
+			"animal": true
+		},
+		{
+			"id": "bee_buzz",
+			"max": 2.5,
+			"gain": -10,
+			"prompt": "one honey bee flying past close, a soft wing buzz that rises and fades.",
+			"animal": true
+		},
+		{
+			"id": "bear_growl",
+			"max": 2.0,
+			"gain": -4,
+			"prompt": "a brown bear's low rumbling growl, a deep chest rumble with a rough wet snarl.",
+			"animal": true
+		},
+		{
+			"id": "bear_roar",
+			"max": 2.5,
+			"gain": -2,
+			"prompt": "a brown bear's loud roar, raw and deep, breaking into a rough growl at the end.",
+			"animal": true
+		},
+		{
+			"id": "crow_caw_a",
+			"max": 0.8,
+			"gain": -5,
+			"prompt": "a carrion crow's single hoarse 'kraa' caw, harsh and dry, outdoors.",
+			"animal": true
+		},
+		{
+			"id": "crow_caw_b",
+			"max": 1.4,
+			"gain": -5,
+			"prompt": "three short harsh crow caws in a quick row, 'kra kra kra'.",
+			"animal": true
+		},
+		{
+			"id": "crow_soft",
+			"max": 1.0,
+			"gain": -8,
+			"prompt": "a crow's soft low conversational croak, quiet and rolling, as if talking to its flock.",
+			"animal": true
+		},
+		{
+			"id": "raven_croak",
+			"max": 1.0,
+			"gain": -5,
+			"prompt": "a raven's deep resonant 'kronk' croak, much lower and more hollow than a crow.",
+			"animal": true
+		},
+		{
+			"id": "raven_call",
+			"max": 1.6,
+			"gain": -5,
+			"prompt": "a raven's long rolling gargling call, deep, hollow and slightly metallic.",
+			"animal": true
+		},
+		{
+			"id": "wing_flap",
+			"max": 1.0,
+			"gain": -8,
+			"prompt": "a large black bird taking off from the ground, a few heavy wing flaps and a quick feather rustle.",
+			"animal": true
+		},
+		{
+			"id": "wing_land",
+			"max": 0.8,
+			"gain": -8,
+			"prompt": "a bird landing on a branch, a quick feather flutter and a soft light touch of claws on wood.",
+			"animal": true
+		},
+		{
+			"id": "owl_screech",
+			"max": 1.5,
+			"gain": -6,
+			"prompt": "a barn owl's long raspy screech at night, breathy and eerie, far from sharp.",
+			"animal": true
+		},
+		{
+			"id": "hoopoe_call",
+			"max": 1.0,
+			"gain": -6,
+			"prompt": "a hoopoe's soft hollow 'hoo-poo-poo' call, three gentle low notes.",
+			"animal": true
+		}
+	],
+	"packs": [
+		{
+			"raw": "pack_ui1",
+			"ids": [
+				"ui_click",
+				"hotbar_select",
+				"item_put",
+				"ui_back"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 4 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a small dry wooden tap; second: a tiny soft wooden tick like a bead on a string; third: setting a small item down on wood, a soft wooden tick; fourth: a soft muted lower wooden tap."
+		},
+		{
+			"raw": "pack_ui2",
+			"ids": [
+				"ui_confirm",
+				"map_close",
+				"equip"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 3 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a soft warm wooden knock with a faint cold shimmer fading after it; second: an old parchment map rolling up quickly, a short paper rustle; third: buckling on a piece of leather and steel gear, a short leather creak and a metal clink."
+		},
+		{
+			"raw": "pack_build",
+			"ids": [
+				"build_place",
+				"build_demolish"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 2 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a heavy wooden post set into soil, a dull thud and a creak of timber; second: wooden planks pulled apart and clattering down, creaking splintering wood."
+		},
+		{
+			"raw": "pack_misc",
+			"ids": [
+				"spider_notice",
+				"leaves_walk"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 2 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a quiet dry clicking hiss as a spider notices prey, rasping chitin; second: one soft footstep pushing through dry fallen leaves, a quick crisp rustle."
+		},
+		{
+			"raw": "pack_small",
+			"ids": [
+				"rabbit_thump",
+				"hedgehog_snuffle",
+				"badger_grunt"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. Realistic close wildlife field recording of the real animal, true to life, no cartoon, no exaggeration, recorded outdoors at dusk with the animal fairly close, dry with only a short natural tail. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 3 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a wild rabbit's single hard hind-foot thump on packed earth, one short dull low knock, nothing else; second: a hedgehog snuffling through dry leaf litter, quick wet little sniffs, soft huffs and tiny rustles; third: a badger's low gruff grunt from the chest, one deep huff and a short rough breath."
+		},
+		{
+			"raw": "pack_deerfox",
+			"ids": [
+				"deer_call",
+				"fox_bark",
+				"bee_buzz"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. Realistic close wildlife field recording of the real animal, true to life, no cartoon, no exaggeration, recorded outdoors at dusk with the animal fairly close, dry with only a short natural tail. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 3 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a roe deer's single sharp hoarse bark, loud and abrupt like a coughing dog; second: a red fox's single short hoarse bark, sharp and a little raspy; third: one honey bee flying past close, a soft wing buzz that rises and fades."
+		},
+		{
+			"raw": "pack_bear",
+			"ids": [
+				"bear_growl",
+				"bear_roar"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. Realistic close wildlife field recording of the real animal, true to life, no cartoon, no exaggeration, recorded outdoors at dusk with the animal fairly close, dry with only a short natural tail. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 2 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a brown bear's low rumbling growl, a deep chest rumble with a rough wet snarl; second: a brown bear's loud roar, raw and deep, breaking into a rough growl at the end."
+		},
+		{
+			"raw": "pack_crow",
+			"ids": [
+				"crow_caw_a",
+				"crow_caw_b",
+				"crow_soft"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. Realistic close wildlife field recording of the real animal, true to life, no cartoon, no exaggeration, recorded outdoors at dusk with the animal fairly close, dry with only a short natural tail. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 3 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a carrion crow's single hoarse 'kraa' caw, harsh and dry, outdoors; second: three short harsh crow caws in a quick row, 'kra kra kra'; third: a crow's soft low conversational croak, quiet and rolling, as if talking to its flock."
+		},
+		{
+			"raw": "pack_raven",
+			"ids": [
+				"raven_croak",
+				"raven_call",
+				"wing_flap"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. Realistic close wildlife field recording of the real animal, true to life, no cartoon, no exaggeration, recorded outdoors at dusk with the animal fairly close, dry with only a short natural tail. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 3 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a raven's deep resonant 'kronk' croak, much lower and more hollow than a crow; second: a raven's long rolling gargling call, deep, hollow and slightly metallic; third: a large black bird taking off from the ground, a few heavy wing flaps and a quick feather rustle."
+		},
+		{
+			"raw": "pack_birds2",
+			"ids": [
+				"wing_land",
+				"owl_screech",
+				"hoopoe_call"
+			],
+			"prompt": "Foley sound effect for a dark fairy-tale pixel-art game, no speech, no music. World style: intimate dry close-miked foley in a cold twilight forest, natural worn materials (oiled blue steel, aged leather, damp wood, moss, cold stone), muted soft highs, short natural air tail with a faint cold violet shimmer as if touched by a void, no big reverb, no synth. Realistic close wildlife field recording of the real animal, true to life, no cartoon, no exaggeration, recorded outdoors at dusk with the animal fairly close, dry with only a short natural tail. The sound starts immediately at 0 seconds with no lead-in silence. The clip holds 3 separate sounds one after another, each followed by one full second of complete silence, nothing else in between. first: a bird landing on a branch, a quick feather flutter and a soft light touch of claws on wood; second: a barn owl's long raspy screech at night, breathy and eerie, far from sharp; third: a hoopoe's soft hollow 'hoo-poo-poo' call, three gentle low notes."
+		}
+	],
+	"_packs": "Free seed_audio queues ~7 min per job, so several short sounds go into ONE clip (separated by ~1 s of silence, prompt in packs[].prompt is built from the sound prompts) and sfx_process.py cuts it apart. item_take is a single job.",
+	"animal_base": "Realistic close wildlife field recording of the real animal, true to life, no cartoon, no exaggeration, recorded outdoors at dusk with the animal fairly close, dry with only a short natural tail.",
+	"_animals": "Animal sounds use base + animal_base (realism clause) so they stay true to life but sit in the same dusk-forest mix."
+}

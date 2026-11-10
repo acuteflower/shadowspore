@@ -706,8 +706,9 @@ func _process(delta: float) -> void:
 		var s: float = sin(_time * 0.9 + float(crown.phase)) + 0.4 * sin(_time * 2.1 + float(crown.phase) * 2.0)
 		(crown.crown as Sprite2D).skew = s * float(crown.sway)
 		(crown.trunk as Sprite2D).skew = s * float(crown.sway) * 0.18
+	var rain_in: float = WeatherManager.current.rain if WeatherManager.current != null and not _fresh else 0.0 ## a broken roof lets the rain through: the drips come in a stream
 	for drip: Dictionary in _drips:
-		drip.left = float(drip.left) - delta
+		drip.left = float(drip.left) - delta * (1.0 + 6.0 * rain_in)
 		if float(drip.left) <= 0.0:
 			drip.left = float(drip.every) * randf_range(0.8, 1.3)
 			_fall(drip.pos as Vector2, drip.land as Vector2)

@@ -51,6 +51,12 @@ var witch: bool = false ## host: it lives in the Hexenwald (set by CorvidPopulat
 var _observe_peer: int = 0 ## host: the player this bird is shadowing (0 = none), see `_observe`
 var _observe_hops: int = 0
 var _observe_cool: float = 0.0
+const CALL_SFX: Dictionary = {
+	"crow": ["crow_caw_a", "crow_caw_b"],
+	"raven": ["raven_croak", "raven_call"],
+	"owl": ["owl_screech"],
+	"hoopoe": ["hoopoe_call"],
+}
 var _calls: Array[AudioStream] = []
 
 @onready var _sprite: Sprite2D = $Sprite2D
@@ -101,8 +107,13 @@ func _load_species() -> void:
 	if _sprite != null and _spec.has("texture"):
 		_sprite.texture = load(String(_spec["texture"])) as Texture2D
 	_calls.clear()
+	var set_ids: Array = CALL_SFX.get(species, []) ## the Higgsfield set (assets/audio/sfx) where it has the species, else the old placeholders
 	for i: int in 2:
-		_calls.append(load("res://assets/audio/wildlife/%s_%d.wav" % [species, i]) as AudioStream)
+		var id: String = String(set_ids[mini(i, set_ids.size() - 1)]) if not set_ids.is_empty() else ""
+		if id != "" and Sfx.has(id):
+			_calls.append(Sfx.stream(id))
+		else:
+			_calls.append(load("res://assets/audio/wildlife/%s_%d.wav" % [species, i]) as AudioStream)
 
 
 func _exit_tree() -> void:
@@ -674,6 +685,8 @@ func _act(mood: int, duration: float, direction: float, start: Vector2, end: Vec
 	_perch_path = perch
 	_height = from_height
 	_moving = state in [State.WALK, State.FLY]
+	if state == State.FLY and elapsed < 0.05 and species != "owl":
+		Sfx.at(self, "wing_flap", start, -6.0, 0.08, 240.0)
 	if not _moving:
 		global_position = end
 
@@ -723,6 +736,8 @@ func _reroute() -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _finish(at: Vector2, height: float, perch: String) -> void:
+	if _moving and state == State.FLY and not perch.is_empty() and species != "owl":
+		Sfx.at(self, "wing_land", at, -8.0, 0.08, 220.0)
 	global_position = at
 	_start = at
 	_end = at

@@ -158,6 +158,7 @@ func _select_tab(index: int) -> void:
 	if bool(TABS[index]["sealed"]):
 		_tab_deny[index] = 1.0
 		return
+	Sfx.ui(self, "ui_click", -2.0)
 	_tab = index
 	_tab_t = 0.0
 	_drag = -1
@@ -192,7 +193,7 @@ func _build_items() -> void:
 		"settings":
 			_add(0, "heading", "TON")
 			_add(0, "slider", "GESAMT", "master")
-			_add(0, "slider", "MUSIK", "music", {"soon": true})
+			_add(0, "slider", "MUSIK", "music")
 			_add(0, "slider", "EFFEKTE", "sfx", {"soon": true})
 			_add(0, "heading", "BILD")
 			_add(0, "toggle", "VOLLBILD", "fullscreen")
@@ -204,6 +205,8 @@ func _build_items() -> void:
 			_add(1, "toggle", "SCHADENSZAHLEN", "numbers")
 			_add(1, "toggle", "POSITION", "position")
 			_add(1, "toggle", "EIGENER CURSOR", "cursor") ## the pixel cursor (GameCursor); off = the system pointer
+			_add(1, "button", "WETTER-EFFEKTE: %s" % ["AUS", "REDUZIERT", "VOLL"][clampi(int(GameSettings.get_value("weather_fx")), 0, 2)], "", {"action": "weather_fx"})
+			_add(1, "toggle", "BLITZE SANFT", "flash_soft") ## accessibility: weaker flashes, no bolt drawing
 			_add(1, "choice", "SPRACHE", "language", {"soon": true, "text": "DEUTSCH"})
 			_add(1, "heading", "STEUERUNG")
 			for row: Array in CONTROLS:
@@ -216,6 +219,9 @@ func _build_items() -> void:
 			_add(0, "heading", "ZEIT")
 			_add(0, "button", "TAG", "", {"action": "day"})
 			_add(0, "button", "NACHT", "", {"action": "night"})
+			_add(0, "heading", "WETTER: %s" % (WeatherManager.current.display_name() if WeatherManager.current != null else "-"))
+			for pair: Array in [["KLAR", "clear"], ["WOLKIG", "broken"], ["BEDECKT", "overcast"], ["NIESELN", "drizzle"], ["REGEN", "rain"], ["STARKREGEN", "downpour"], ["GEWITTER", "storm"], ["STURMWIND", "gale"], ["NEBEL", "fog"], ["AUTOMATISCH", ""]]:
+				_add(0, "button", String(pair[0]), "", {"action": "weather:" + String(pair[1])})
 			if multiplayer.is_server() and get_tree().get_first_node_in_group("world") is WorldLevel:
 				_add(0, "button", "VORSTOSS AUSLÖSEN", "", {"action": "raid"})
 			_add(0, "heading", "SPIELER")
@@ -527,6 +533,7 @@ func _toggle(item: Dictionary) -> void:
 
 
 func _activate(item: Dictionary) -> void:
+	Sfx.ui(self, "ui_confirm", -3.0)
 	match String(item["kind"]):
 		"toggle":
 			_toggle(item)
@@ -551,6 +558,22 @@ func _run_action(action: String) -> void:
 			var kind: String = String((foods[item] as Dictionary).get(species, ""))
 			if kind == "loves" or kind == "likes":
 				feeder.inventory.give(item, 20 if kind == "loves" else 10)
+		return
+	if action.begins_with("weather:"):
+		if WeatherManager.current == null or not multiplayer.is_server():
+			_failed_flash = 2.5
+			return
+		var forced: String = action.trim_prefix("weather:")
+		if forced == "":
+			WeatherManager.current.release()
+		else:
+			WeatherManager.current.force(forced, 0.0)
+		_build_items()
+		return
+	if action == "weather_fx":
+		GameSettings.set_value("weather_fx", (int(GameSettings.get_value("weather_fx")) + 2) % 3) ## 2 full -> 1 reduced -> 0 off -> 2
+		_dirty = true
+		_build_items()
 		return
 	if action.begins_with("pet_sel:"):
 		_pet_sel = action.trim_prefix("pet_sel:")
@@ -908,6 +931,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _opening:
 			if _quit_t < 0.0:
 				_set_open(false)
+				Sfx.ui(self, "ui_back", -3.0)
 			get_viewport().set_input_as_handled()
 		elif not InputManager.ui_blocking: ## the inventory takes its own Escape first
 			_set_open(true)

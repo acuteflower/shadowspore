@@ -194,6 +194,29 @@ def sickle(w, h, tf):
     return layers
 
 
+def hoe(w, h, tf):
+    """The hoe (docs/farming.md): a long haft with a broad flat blade turned down at the end, like the garden tools of the town."""
+    ax = 6.0
+    layers = [("handle", stroke_mask([(1.5, ax), (26.0, ax)], 2.0, w, h, tf), "wood")]
+    layers.append(("wrap", stroke_mask([(2.0, ax), (8.0, ax)], 2.0, w, h, tf), "wrap"))
+    layers.append(("collar", poly_mask([(23.4, ax - 2.0), (26.8, ax - 2.0), (26.8, ax + 2.2), (23.4, ax + 2.2)], w, h, tf), "steel_dark"))
+    blade = poly_mask([(24.2, ax + 1.6), (27.4, ax + 1.2), (30.6, ax + 9.2), (30.8, ax + 11.2), (24.4, ax + 11.0), (23.4, ax + 8.4)], w, h, tf)
+    layers.append(("blade", blade, "steel"))
+    return layers
+
+
+def can(w, h, tf):
+    """The watering can: a tin drum with a lid band, a wooden handle loop at the back (where the hand is) and a long spout with a rose that points the way she aims."""
+    ax = 9.0
+    body = poly_mask([(5.4, ax - 3.6), (14.6, ax - 3.6), (15.6, ax - 2.4), (15.6, ax + 4.4), (14.6, ax + 5.6), (5.4, ax + 5.6), (4.4, ax + 4.4), (4.4, ax - 2.4)], w, h, tf)
+    layers = [("handle", stroke_mask([(6.0, ax - 4.2), (2.6, ax - 3.4), (1.6, ax + 0.4), (2.6, ax + 4.2), (6.0, ax + 5.0)], 1.8, w, h, tf), "wood")]
+    layers.append(("spout", stroke_mask([(14.6, ax + 3.4), (20.0, ax - 0.6), (26.0, ax - 4.4)], lambda u: 2.4 - 1.0 * u, w, h, tf), "steel"))
+    layers.append(("body", body, "steel"))
+    layers.append(("band", poly_mask([(4.4, ax - 3.6), (15.6, ax - 3.6), (15.6, ax - 1.6), (4.4, ax - 1.6)], w, h, tf), "steel_dark"))
+    layers.append(("rose", poly_mask([(25.4, ax - 7.4), (28.6, ax - 6.0), (28.2, ax - 2.6), (25.2, ax - 3.4)], w, h, tf), "steel_dark"))
+    return layers
+
+
 def rod(w, h, tf):
     ax = 4.0
     layers = [("shaft", stroke_mask([(6.0, ax), (46.0, ax - 0.3)], lambda u: 1.7 - 0.8 * u, w, h, tf), "wood")]
@@ -213,6 +236,8 @@ ITEMS = {  # id: (size, pivot in the item frame, builder, steel ramp, icon fit: 
     "pickaxe_basic": ((34, 22), (5.0, 11.0), pickaxe, "steel", (-45.0, 0.5, (1.0, 12.4))),
     "sickle_basic": ((26, 20), (5.0, 5.0), sickle, "steel", (-45.0, 0.6, (1.0, 12.6))),
     "rod_basic": ((49, 9), (4.0, 4.0), rod, "steel", (-45.0, 0.3, (2.4, 13.6))),
+    "hoe_basic": ((34, 20), (5.0, 6.0), hoe, "steel", (-45.0, 0.5, (1.0, 13.0))),
+    "watering_can": ((32, 20), (3.0, 9.0), can, "steel", (0.0, 0.43, (3.0, 8.8))),
 }
 
 
@@ -398,6 +423,9 @@ def preview(out):
 if __name__ == "__main__":
     if len(sys.argv) > 2 and sys.argv[1] == "preview":
         preview(sys.argv[2])
+    elif len(sys.argv) > 2 and sys.argv[1] == "only":  # build just these ids: art_weapons.py only hoe_basic watering_can
+        for name in sys.argv[2:]:
+            print(name, "cell", build(name))
     else:
         for name in ITEMS:
             print(name, "cell", build(name))

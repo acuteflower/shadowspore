@@ -32,7 +32,7 @@ func _run() -> void:
 		_check(float(spec.feet) <= float(frame[1]), "%s: the feet row is inside the frame" % id)
 		var foot: Array = spec.foot as Array
 		_check(float(foot[0]) <= float(frame[0]) + 8.0, "%s: the footprint is not wider than the picture" % id)
-		_check(ResourceLoader.exists("res://assets/town/%s.png" % String(spec.texture)), "%s has its picture" % id)
+		_check(bool(spec.get("farm", false)) or ResourceLoader.exists("res://assets/town/%s.png" % String(spec.texture)), "%s has its picture" % id) ## fields are painted at run time (FieldSoil)
 		if bool(spec.get("pad", false)):
 			_check(ResourceLoader.exists("res://assets/town/%s_pad.png" % String(spec.texture)), "%s has its ground pad" % id)
 		if bool(spec.get("glow", false)):

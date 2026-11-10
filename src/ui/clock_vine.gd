@@ -159,3 +159,8 @@ func _draw_text(now: float, night: float, tone: Color) -> void:
 		var tile: Vector2i = Vector2i((_player.global_position / 16.0).floor())
 		var where: String = "X %d  Y %d" % [tile.x, tile.y]
 		PixelText.draw(self, where, Vector2i(int(CLOCK_POS.x) + 19 - PixelText.width(where) / 2, 54), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.6), 0.75), VineStyle.OUTLINE)
+	var sky: WeatherManager = WeatherManager.current ## the weather, only when it is not plain sunshine
+	if sky != null and not (sky.state_id in ["clear", "fair"]):
+		var sky_word: String = sky.display_name()
+		var row: int = 65 if bool(GameSettings.get_value("position")) and _player != null else 54
+		PixelText.draw(self, sky_word, Vector2i(int(CLOCK_POS.x) + 19 - PixelText.width(sky_word) / 2, row), Color(Color(0.66, 0.80, 0.95).lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.5), 0.85), VineStyle.OUTLINE)

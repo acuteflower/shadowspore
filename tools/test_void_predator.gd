@@ -186,6 +186,33 @@ func _run() -> void:
 		_check(visited.has(expected), "Fight never reached state %s" % ShadowSpider.State.keys()[expected])
 	_check(player.health.current < 1000.0, "Enemy never landed a hit in the live simulation")
 
+	# Gait: moving, the legs run an alternating tetrapod (never more than three in the air, both groups really swing).
+	rig.set_process(false)
+	rig.start_pose(SpiderRig.Pose.LOCOMOTION, 1.0)
+	var gait_speed: Vector2 = Vector2(60, 0)
+	var most_airborne: int = 0
+	var tally: Array[int] = [0, 0] ## landings, landings ahead of the body (a lambda captures plain ints by value)
+	var landed_connection: Callable = func(point: Vector2) -> void:
+		tally[0] += 1
+		for leg: SpiderRig.Leg in rig._legs:
+			if leg.foot == point and point.x >= rig._rest_foot(leg, rig.global_position).x - 0.5:
+				tally[1] += 1
+	rig.foot_landed.connect(landed_connection)
+	for frame: int in 180:
+		rig.global_position += gait_speed / 60.0
+		rig.update_rig(1.0 / 60.0, gait_speed, 0.0)
+		var airborne: int = 0
+		for leg: SpiderRig.Leg in rig._legs:
+			if leg.stepping:
+				airborne += 1
+		if frame >= 30: ## the first half second settles from standing
+			most_airborne = maxi(most_airborne, airborne)
+	rig.foot_landed.disconnect(landed_connection)
+	_check(most_airborne <= 3, "More than three legs in the air at a walking pace (%d)" % most_airborne)
+	_check(tally[0] >= 18, "Legs barely step while the spider walks (%d landings in 3 s)" % tally[0])
+	_check(tally[1] >= tally[0] * 0.7, "Feet land behind the body instead of ahead of it")
+	_check(rig._legs[0].group == rig._legs[3].group and rig._legs[0].group == rig._legs[4].group and rig._legs[0].group != rig._legs[1].group, "Tetrapod groups are not front-right/mid-left/rear-right")
+
 	print("Void predator: %d checks, %d failures" % [_checks, _failures])
 	level.queue_free()
 	await get_tree().process_frame

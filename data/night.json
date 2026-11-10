@@ -215,7 +215,8 @@
 		"kinds": {
 			"flood": {"weight": 1.0, "budget": 1.6, "health": 0.7, "damage": 0.8, "notice": "DIE LEERE DRÄNGT HEUTE NACHT", "hunters": 0},
 			"fog": {"weight": 1.0, "budget": 1.0, "health": 1.0, "damage": 1.0, "notice": "EIN SCHWERER NEBEL ZIEHT AUF", "hunters": 0, "fog": 0.55, "light_scale": 0.8},
-			"silent": {"weight": 1.0, "budget": 0.4, "health": 1.0, "damage": 1.0, "notice": "EINE UNHEIMLICHE STILLE LIEGT ÜBER DEM LAND", "hunters": 1, "hunter_health": 1.8}
+			"silent": {"weight": 1.0, "budget": 0.4, "health": 1.0, "damage": 1.0, "notice": "EINE UNHEIMLICHE STILLE LIEGT ÜBER DEM LAND", "hunters": 1, "hunter_health": 1.8},
+			"storm": {"weight": 1.0, "budget": 1.15, "health": 1.0, "damage": 1.0, "notice": "EIN GEWITTER ZIEHT HEUTE NACHT HERAUF", "hunters": 0, "light_scale": 0.9}
 		}
 	},
 	"survive": {

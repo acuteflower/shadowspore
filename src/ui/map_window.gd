@@ -340,6 +340,8 @@ func _set_open(open: bool) -> void:
 		_load_data()
 		if not _loaded:
 			return
+	if open != _opening:
+		Sfx.ui(self, "map_open" if open else "map_close", -2.0)
 	_opening = open
 	_hover_id = ""
 	_hover_t = 0.0

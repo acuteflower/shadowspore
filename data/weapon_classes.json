@@ -363,5 +363,69 @@
 			}
 		],
 		"_doc": "Klasse des Himmelsriss (docs/rissklinge.md): die Kombination des Einhandschwerts (der dritte Schlag, der Stoß, reißt einen Riss, `rift: line`) und ein Rechtsklick in zwei Stufen: wie der Wuchtschlag, aber ein frühes Loslassen (Stufe 1) reißt zusätzlich eine Rissbahn nach vorn, volle Ladung (Stufe 2, ab charge_full) öffnet einen Riss vor ihr, der nach `delay` in einem Federnschwarm zerplatzt."
+	},
+	"hoe_1h": {
+		"name": "Hacke",
+		"combo_window": 0.5,
+		"combo": [
+			{
+				"style": "slash",
+				"sweep": 1,
+				"arc": 100,
+				"windup": 0.1,
+				"active": 0.1,
+				"recovery": 0.25,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.4,
+				"lunge": 0,
+				"shake": 0.5
+			},
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 100,
+				"windup": 0.09,
+				"active": 0.1,
+				"recovery": 0.25,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.4,
+				"lunge": 0,
+				"shake": 0.5
+			}
+		]
+	},
+	"can_1h": {
+		"name": "Gießkanne",
+		"combo_window": 0.5,
+		"combo": [
+			{
+				"style": "slash",
+				"sweep": 1,
+				"arc": 110,
+				"windup": 0.1,
+				"active": 0.12,
+				"recovery": 0.3,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.0,
+				"lunge": 0,
+				"shake": 0.2
+			},
+			{
+				"style": "slash",
+				"sweep": -1,
+				"arc": 110,
+				"windup": 0.1,
+				"active": 0.12,
+				"recovery": 0.3,
+				"damage": 1.0,
+				"reach": 1.0,
+				"knock": 0.0,
+				"lunge": 0,
+				"shake": 0.2
+			}
+		]
 	}
 }

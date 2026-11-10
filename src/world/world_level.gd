@@ -2082,7 +2082,11 @@ func _pick_thing(thing: WorldProp) -> void:
 	if pickup.has("amount"): ## the variant decides: a cluster of three gives three
 		amount_min = int((pickup.amount as Array)[thing.variant])
 		amount_max = amount_min
-	DropComponent.spawn_drops(get_tree(), [{"id": pickup.item, "chance": 1.0, "min": amount_min, "max": amount_max}], thing.global_position + Vector2(0, -8))
+	var entries: Array = [{"id": pickup.item, "chance": 1.0, "min": amount_min, "max": amount_max}]
+	var seed_drop: Dictionary = FarmRules.wild_seed(thing.kind) ## some wild plants give a seed as well (docs/farming.md)
+	if not seed_drop.is_empty():
+		entries.append({"id": seed_drop.id, "chance": seed_drop.chance, "min": 1, "max": 1})
+	DropComponent.spawn_drops(get_tree(), entries, thing.global_position + Vector2(0, -8))
 	var next: Dictionary = thing.state.duplicate()
 	next["p"] = TimeManager.day + 1 ## the day it was picked (+ 1, so day 0 still counts as set)
 	next["k"] = thing.kind

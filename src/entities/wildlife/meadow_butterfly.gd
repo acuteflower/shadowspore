@@ -60,12 +60,12 @@ func _physics_process(delta: float) -> void:
 		var tangent: Vector2 = _end - _start + _bend * (4.0 * (1.0 - 2.0 * p))
 		_facing = tangent.angle()
 		if multiplayer.is_server() and t >= 1.0:
-			_act.rpc(State.REST if TimeManager.night_amount() > 0.6 else State.FEED, _range("feed_seconds"), _end, _end, Vector2.ZERO, 4.0, 0.0)
+			_act.rpc(State.REST if TimeManager.night_amount() > 0.6 or WeatherManager.sky_wet() else State.FEED, _range("feed_seconds"), _end, _end, Vector2.ZERO, 4.0, 0.0)
 	elif multiplayer.is_server():
-		if state == State.REST and TimeManager.night_amount() < 0.5:
+		if state == State.REST and TimeManager.night_amount() < 0.5 and not WeatherManager.sky_wet():
 			_act.rpc(State.FEED, _range("feed_seconds"), global_position, global_position, Vector2.ZERO, 4.0, 0.0)
 		elif _elapsed >= _duration:
-			if TimeManager.night_amount() > 0.6:
+			if TimeManager.night_amount() > 0.6 or WeatherManager.sky_wet(): ## rain: wings folded under a leaf
 				_act.rpc(State.REST, _range("rest_seconds"), global_position, global_position, Vector2.ZERO, 4.0, 0.0)
 			else:
 				_visit(false)

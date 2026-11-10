@@ -100,7 +100,12 @@ static func activity(ctx: Dictionary) -> float:
 	var wary: float = lerpf(float(a["wary_min"]), 1.0, smoothstep(float(a["wary_near"]), float(a["wary_far"]), float(ctx.get("reach", 999.0))))
 	var cap: float = float((settings()["pressure"] as Dictionary)["cap"])
 	var calm: float = 1.0 - clampf(float(ctx.get("pressure", 0.0)), 0.0, cap)
-	return maxf(0.02, mood * wary * calm)
+	var g: Dictionary = (WeatherRules.cfg().get("gameplay", {}) as Dictionary)
+	var rain: float = clampf(float(ctx.get("rain", 0.0)), 0.0, 1.0)
+	var storm: float = clampf(float(ctx.get("storm", 0.0)), 0.0, 1.0)
+	## light rain wakes the fish (the surface hides the angler), a storm drives them down (docs/wetter_konzept.md 9)
+	var weather: float = (1.0 + float(g.get("fish_light_rain", 0.30)) * rain * (1.0 - storm)) * lerpf(1.0, float(g.get("fish_storm", 0.85)), storm)
+	return maxf(0.02, mood * wary * calm * weather)
 
 
 static func pick(weights_in: Dictionary, rng: RandomNumberGenerator) -> String:

@@ -443,8 +443,36 @@ func _command(action: int, duration: float, direction: float, start: Vector2, en
 	_gait_phase = gait
 	_rolling = rolling
 	_moving = start.distance_squared_to(end) > 0.01 and mood in [Mood.WALK, Mood.FLEE, Mood.RETURN, Mood.SPECIAL, Mood.EMERGE, Mood.CHASE]
+	if elapsed < 0.05:
+		_voice_for(mood)
 	if not _moving:
 		global_position = end
+
+
+## The sound set (assets/audio/sfx): what a species says when it enters a mood, with a chance so it stays rare. Every peer, cosmetic.
+const VOICES: Dictionary = {
+	"deer": {Mood.ALERT: ["deer_call", 0.3], Mood.FLEE: ["deer_call", 0.35]},
+	"fox": {Mood.ALERT: ["fox_bark", 0.45], Mood.CHASE: ["fox_bark", 0.3], Mood.LISTEN: ["fox_bark", 0.08]},
+	"badger": {Mood.ALERT: ["badger_grunt", 0.5], Mood.FLEE: ["badger_grunt", 0.3]},
+	"hedgehog": {Mood.FORAGE: ["hedgehog_snuffle", 0.4], Mood.UNROLL: ["hedgehog_snuffle", 0.6]},
+	"bear": {Mood.REAR: ["bear_roar", 1.0], Mood.LOWER: ["bear_growl", 0.8], Mood.SWIPE: ["bear_growl", 0.5], Mood.ALERT: ["bear_growl", 0.35]},
+}
+var _voice_cool: float = 0.0
+
+
+func _voice_for(next: Mood) -> void:
+	var table: Dictionary = VOICES.get(species, {})
+	if not table.has(next) or (has_method("is_cub") and bool(call("is_cub"))):
+		return
+	var now: float = Time.get_ticks_msec() * 0.001
+	if now < _voice_cool:
+		return
+	var entry: Array = table[next]
+	if randf() > float(entry[1]):
+		return
+	_voice_cool = now + 6.0
+	var loud: bool = species == "bear"
+	Sfx.at(self, String(entry[0]), global_position, -2.0 if loud else -6.0, 0.06, 420.0 if loud else 260.0)
 
 
 func _route_progress(t: float) -> float:

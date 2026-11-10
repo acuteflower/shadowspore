@@ -15,7 +15,7 @@ void vertex() {
 	vec2 foot = (MODEL_MATRIX * vec4(0.0, 9.0, 0.0, 1.0)).xy;
 	float clock = floor(g_wind_clock * 12.0) / 12.0;
 	float pulse = 0.5 + 0.5 * sin(dot(foot, g_wind_dir) * 0.03 - clock * 1.6 + sin(foot.y * 0.05) * 1.2);
-	float breeze = 0.12 + g_wind_gust * (0.35 + 0.65 * pulse);
+	float breeze = 0.12 + (g_wind_gust <= 1.1 ? g_wind_gust : 1.1 + 0.9 * tanh((g_wind_gust - 1.1) * 0.35)) * (0.35 + 0.65 * pulse);
 	float flutter = sin(clock * 2.3 + detail.g * 6.283) * breeze * 0.35;
 	vec2 wind = g_wind_dir * breeze * detail.b * 2.0 + vec2(flutter, flutter * 0.25);
 	vec2 contact = vec2(0.0);

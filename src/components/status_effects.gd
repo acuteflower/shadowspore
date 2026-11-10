@@ -177,7 +177,7 @@ func _wisp_lure() -> void:
 
 
 func _show(id: String) -> void:
-	if (id == "ashen" or id == "clear_vision" or id == "wisp") and not _fx.has(id) and DisplayServer.get_name() != "headless":
+	if (id == "ashen" or id == "clear_vision" or id == "wisp" or id == "void_rift") and not _fx.has(id) and DisplayServer.get_name() != "headless":
 		var aura: PotionFx = PotionFx.new()
 		aura.name = "PotionFx_" + id
 		(get_parent() as Node2D).add_child(aura)

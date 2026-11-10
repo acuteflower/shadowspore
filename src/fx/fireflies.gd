@@ -4,7 +4,7 @@ extends Node2D
 ## Only as many as fit the screen, they live where the camera looks, fade in with the evening and
 ## vanish by day. Purely cosmetic, so every peer runs its own. Unlit, so they shine against the tint.
 
-const COUNT: int = 56
+const COUNT: int = 76
 const MARGIN: float = 40.0 ## px outside the screen where a firefly may still live
 const NEAR_FLORA: float = 0.7 ## share that hovers around a glowing plant
 const COLORS: Array[Color] = [Color("a4fff0"), Color("d6ffe6"), Color("a4fff0"), Color("f6dc8c")]
@@ -71,7 +71,7 @@ func _process(delta: float) -> void:
 
 
 func _night_here() -> float:
-	return maxf(TimeManager.night_amount(), WITCH_DUSK * BiomeBlend.amount_at(_view_rect().get_center()))
+	return maxf(TimeManager.night_amount(), WITCH_DUSK * BiomeBlend.amount_at(_view_rect().get_center())) * (1.0 - 0.7 * clampf(WeatherManager.rain_now(), 0.0, 1.0)) ## rain puts the little lights out
 
 
 func _view_rect() -> Rect2:

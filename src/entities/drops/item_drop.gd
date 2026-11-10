@@ -81,6 +81,7 @@ func _physics_process(delta: float) -> void:
 				_vz = absf(_vz) * 0.35
 			else:
 				_landed = true
+				Sfx.at(self, "drop_pop", global_position, -4.0, 0.08, 240.0)
 	_hop = move_toward(_hop, 0.0, 4.0 * delta)
 	if _puller != 0:
 		_pull(delta)
@@ -195,6 +196,7 @@ func _picked(player_id: int, taken: int, remaining: int) -> void:
 		if player.name.to_int() == player_id:
 			DamageNumber.spawn_text(get_tree().current_scene, player.global_position + Vector2(0, -58),
 				"+%d %s" % [taken, _label], _rarity_color)
+			Sfx.at(self, "item_pickup", player.global_position, -2.0, 0.06, 240.0)
 	count = remaining
 
 

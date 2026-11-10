@@ -1,0 +1,49 @@
+{
+  "_doc": "The weather (docs/wetter_konzept.md). A pure function of the world seed and the world time (WeatherRules), so every peer sees the same sky without a single packet. The weather is a chain of SEGMENTS: each has a state (below), a length in days (a day is 720 s) and a wind direction; the next one is drawn from `next` (weights), shaped by `hour_bias` (time of day, 0 = midnight, 0.5 = noon) and `calm_until`. Between two segments everything blends over `blend` days. States: cloud = how much of the sky is covered (0..1), rain = rain rate, wind = wind strength, storm = thunderstorm strength, fog = mist. `len` = [min, max] length in days. `speed` = how fast the clouds drift in px per second at wind 0 and at wind 1.",
+  "enabled": true,
+  "calm_until": 3.0,
+  "blend": 0.035,
+  "speed": [6.0, 34.0],
+  "tile": 2048,
+  "light_dir": [-0.7, -0.7],
+  "cloud_height": {"noon": [54.0, 62.0], "low_sun": [104.0, 122.0]},
+  "start": "fair",
+  "states": {
+    "clear":    {"name": "KLAR",        "cloud": 0.05, "rain": 0.00, "wind": 0.15, "storm": 0.0, "fog": 0.00, "len": [0.30, 0.80]},
+    "fair":     {"name": "HEITER",      "cloud": 0.26, "rain": 0.00, "wind": 0.25, "storm": 0.0, "fog": 0.00, "len": [0.30, 0.75]},
+    "broken":   {"name": "WOLKIG",      "cloud": 0.56, "rain": 0.00, "wind": 0.35, "storm": 0.0, "fog": 0.00, "len": [0.25, 0.60]},
+    "overcast": {"name": "BEDECKT",     "cloud": 0.88, "rain": 0.00, "wind": 0.35, "storm": 0.0, "fog": 0.00, "len": [0.20, 0.45]},
+    "drizzle":  {"name": "NIESELREGEN", "cloud": 0.82, "rain": 0.20, "wind": 0.25, "storm": 0.0, "fog": 0.08, "len": [0.15, 0.35]},
+    "rain":     {"name": "REGEN",       "cloud": 0.92, "rain": 0.52, "wind": 0.50, "storm": 0.0, "fog": 0.05, "len": [0.15, 0.38]},
+    "downpour": {"name": "STARKREGEN",  "cloud": 1.00, "rain": 0.86, "wind": 0.70, "storm": 0.0, "fog": 0.05, "len": [0.08, 0.22]},
+    "storm":    {"name": "GEWITTER",    "cloud": 1.00, "rain": 0.92, "wind": 1.00, "storm": 1.0, "fog": 0.00, "len": [0.10, 0.22]},
+    "gale":     {"name": "STURMWIND",   "cloud": 0.58, "rain": 0.00, "wind": 0.92, "storm": 0.30, "fog": 0.00, "len": [0.10, 0.28]},
+    "fog":      {"name": "NEBEL",       "cloud": 0.62, "rain": 0.00, "wind": 0.05, "storm": 0.0, "fog": 0.85, "len": [0.10, 0.25]}
+  },
+  "next": {
+    "clear":    {"fair": 6, "broken": 2, "fog": 1},
+    "fair":     {"clear": 4, "broken": 5, "drizzle": 1},
+    "broken":   {"fair": 4, "overcast": 4, "clear": 1, "drizzle": 2, "gale": 1},
+    "overcast": {"broken": 3, "drizzle": 4, "rain": 3, "fog": 1, "fair": 1},
+    "drizzle":  {"overcast": 2, "rain": 3, "broken": 3, "fair": 1},
+    "rain":     {"drizzle": 3, "downpour": 6, "overcast": 2, "broken": 2},
+    "downpour": {"rain": 3, "storm": 8, "drizzle": 1},
+    "storm":    {"downpour": 2, "rain": 4, "broken": 1, "gale": 1},
+    "gale":     {"broken": 4, "fair": 3, "clear": 1, "rain": 1},
+    "fog":      {"clear": 3, "fair": 3, "broken": 2, "drizzle": 1}
+  },
+  "hour_bias": {
+    "fog":   [[0.17, 0.36, 4.0], [0.36, 0.7, 0.3]],
+    "storm": [[0.55, 0.9, 1.8], [0.2, 0.45, 0.5]],
+    "clear": [[0.3, 0.7, 1.3]]
+  },
+  "storm_night": {"from": 0.55, "to": 0.95, "ramp": 0.04},
+  "ground": {"dry_days": 0.35, "gain": 1.25, "steps": 14, "step_days": 0.1},
+  "lightning": {"slice": 1.0, "chance": 0.11, "double": 0.35, "delay": [0.25, 3.2], "min_storm": 0.35, "flash_seconds": 0.55},
+  "light": {"cloud_dim": 0.14, "rain_dim": 0.08, "shadow": 0.74, "storm_dim": 0.12},
+  "gameplay": {"alarm_rain": 0.25, "alarm_storm": 0.10, "alarm_min": 0.6, "fish_light_rain": 0.30, "fish_storm": 0.85},
+  "regions": {
+    "hexenwald": {"cloud_min": 0.58, "fog_min": 0.22, "flash": [0.62, 1.0, 0.36]}
+  },
+  "audio": {"rain_db": -14.0, "wind_db": -16.0, "thunder_db": -6.0, "roof_db": -12.0}
+}

@@ -133,7 +133,7 @@ func _run() -> void:
 		await get_tree().physics_frame
 	population = world.get_node("Wildlife/Corvids") as CorvidPopulation
 	population.set_process(false)
-	_check(population._birds.get_child_count() <= 8, "New species increased the shared bird budget")
+	_check(population._birds.get_child_count() <= 11, "New species increased the shared bird budget")
 	_check(population._species_count("owl") <= 1 and population._species_count("hoopoe") <= 2, "Rare species exceeded their individual caps")
 	var tree: FirTree = get_tree().get_first_node_in_group("bird_perches") as FirTree
 	_check(tree != null, "No tree available for daytime owl roost")

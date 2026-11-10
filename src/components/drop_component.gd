@@ -25,6 +25,7 @@ func _roll() -> void:
 	var enemy: Node2D = get_parent() as Node2D
 	if enemy.has_meta("burned") and _health.last_attacker == 0: ## the sun took it, nobody killed it: no spoils
 		return
+	_note_for_board(String(enemy.get("enemy_id")))
 	var loot: Dictionary = DataRegistry.get_entry("enemies", String(enemy.get("enemy_id"))).get("loot", {})
 	if loot.is_empty():
 		return
@@ -45,6 +46,16 @@ func _roll() -> void:
 	var ledger: BossRelics = BossRelics.of(get_tree())
 	if not relics.is_empty() and ledger != null:
 		ledger.roll(String(enemy.get("enemy_id")), relics, winners, enemy.global_position)
+
+
+## The quest board counts the kill for whoever landed the last hit (duck typed: no cycle with the town).
+func _note_for_board(species: String) -> void:
+	var town_node: Node = get_tree().get_first_node_in_group("town")
+	var board: Object = town_node.get("board") as Object if town_node != null else null
+	if board == null:
+		return
+	for player: Player in _winners("killer"):
+		board.call("note_kill", player, species)
 
 
 ## "killer": whoever landed the last hit. "all": every living player.

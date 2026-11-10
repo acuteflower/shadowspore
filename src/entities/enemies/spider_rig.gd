@@ -38,6 +38,8 @@ class Leg:
 	var cooldown: float = 0.0
 	var idle_timer: float = 1.0 ## next restless shift while standing
 	var twitch: float = 0.0 ## 1 right after a spasm, fades
+	var group: int = 0 ## tetrapod group: legs of one group swing together while the other carries the body
+	var swung: bool = false ## already stepped in this swing turn
 
 ## Slightly uneven on purpose: this is a creature, not a machine.
 const LEG_DEFS: Array = [
@@ -57,7 +59,9 @@ const STEP_TIME: Vector2 = Vector2(0.07, 0.17) ## random range per step
 const STEP_LIFT: Vector2 = Vector2(4.0, 9.5)
 const STEP_TRIGGER: Vector2 = Vector2(5.0, 9.5) ## a foot steps once it is this far from where it should be
 const MAX_STRETCH: float = 26.0
-const MAX_STEPPING: int = 2 ## legs in the air at once
+const MAX_STEPPING: int = 2 ## legs in the air at once while standing
+const GAIT_MIN_SPEED: float = 6.0 ## above this the legs run the alternating tetrapod gait
+const GAIT_GROUPS: Array[int] = [0, 1, 1, 0, 0, 1] ## per LEG_DEFS entry: front-right, mid-left, rear-right swing together
 const WOBBLE: float = 1.4
 const GRAB_SPREAD: float = 8.0 ## px: how far apart the front claws dig in during the grapple
 const OUTLINE: Color = Color("040208")
@@ -104,6 +108,10 @@ var _climb_start: Vector2
 var _climb_end: Vector2
 var _climb_grip: Vector2
 var _clock: RigClock = RigClock.new()
+var _swing_group: int = 0 ## which tetrapod group may step now
+var _swing_t: float = 0.0
+var _was_moving: bool = false
+var _half_cycle: float = 0.3 ## seconds one group swings; shorter the faster it runs
 
 @onready var _back: Node2D = $Back
 @onready var _body: Sprite2D = $Body
@@ -113,8 +121,10 @@ var _clock: RigClock = RigClock.new()
 
 func _ready() -> void:
 	_emission = ShadowEmission.attach(_body)
-	for def: Dictionary in LEG_DEFS:
+	for def_index: int in LEG_DEFS.size():
+		var def: Dictionary = LEG_DEFS[def_index]
 		var leg: Leg = Leg.new()
+		leg.group = GAIT_GROUPS[def_index]
 		leg.angle = deg_to_rad(float(def["angle"]))
 		leg.radius = float(def["radius"])
 		leg.root = def["root"]
@@ -194,6 +204,22 @@ func update_rig(delta: float, velocity: Vector2, heading: float) -> void:
 			leg.pose_from = leg.foot
 		_feet_ready = true
 	_gait_phase += velocity.length() * 0.16 * delta
+	var run_speed: float = velocity.length()
+	if run_speed >= GAIT_MIN_SPEED and _pose == Pose.LOCOMOTION:
+		_half_cycle = lerpf(0.24, 0.1, clampf(run_speed / 110.0, 0.0, 1.0)) ## a slow stalk is deliberate, a surge is a skitter
+		_swing_t += delta
+		if _swing_t >= _half_cycle:
+			_swing_t = 0.0
+			_swing_group = 1 - _swing_group
+			for leg: Leg in _legs:
+				leg.swung = false
+	else:
+		_swing_t = 0.0
+		if _was_moving and _pose == Pose.LOCOMOTION: ## a sudden freeze: the legs quiver as the mass settles
+			for leg: Leg in _legs:
+				leg.twitch = maxf(leg.twitch, randf_range(0.4, 0.9))
+			agitation = maxf(agitation, 0.2)
+	_was_moving = run_speed >= GAIT_MIN_SPEED
 	_update_body(t, velocity)
 	for leg: Leg in _legs:
 		if emergence < 1.0:
@@ -226,6 +252,15 @@ func _update_body(t: float, velocity: Vector2) -> void:
 	offset += -velocity * 0.018 + _sway
 	offset.y += sin(_time * 2.0) * 0.35
 	scale_goal = Vector2(1.0 + speed * 0.09, 1.0 - speed * 0.12)
+	if speed > 0.05 and _pose == Pose.LOCOMOTION:
+		# The mass rides the gait: it sinks each time the groups swap, flows sideways over the group that carries it
+		# and hangs low while skittering, so it glides more than it walks.
+		var gp: float = clampf(_swing_t / maxf(_half_cycle, 0.01), 0.0, 1.0)
+		var lateral: float = sin((float(_swing_group) + gp) * PI)
+		var side: Vector2 = Vector2.from_angle(_heading).orthogonal()
+		offset += side * lateral * 1.2 * speed
+		offset.y += (0.5 + 0.5 * cos(gp * TAU)) * 0.9 * speed + speed * 1.4
+		scale_goal.y -= (0.5 + 0.5 * cos(gp * TAU)) * 0.04 * speed
 	var telegraph: float = 0.0
 	_warning = 0.0
 	match _pose:
@@ -446,13 +481,32 @@ func _update_leg(leg: Leg, delta: float, origin: Vector2, velocity: Vector2, t: 
 		return
 	leg.height = move_toward(leg.height, 0.0, 35.0 * delta)
 	var stretch: float = leg.foot.distance_to(rest)
+	var speed: float = velocity.length()
+	if speed >= GAIT_MIN_SPEED:
+		# Alternating tetrapod, like a real arachnid: one group of three swings while the other three carry the body,
+		# then they swap. The foot lands ahead of where the body will be, so it never drags.
+		if stretch > MAX_STRETCH:
+			_start_step(leg, rest + velocity * 0.09)
+		elif leg.group == _swing_group and not leg.swung and not leg.stepping:
+			leg.swung = true
+			var speed_k: float = clampf(speed / 110.0, 0.0, 1.0)
+			leg.step_time = clampf(_half_cycle * 0.7, 0.06, 0.2) * randf_range(0.92, 1.08)
+			leg.lift = lerpf(8.5, 5.5, speed_k) * randf_range(0.85, 1.15) ## a slow stalk lifts high and places each foot, a skitter stays low
+			_start_step(leg, rest + velocity * (leg.step_time * 1.6 + 0.02))
+		return
 	var free: bool = _stepping_count() < MAX_STEPPING
 	if stretch > MAX_STRETCH or (leg.cooldown <= 0.0 and free and stretch > leg.trigger):
 		_start_step(leg, rest + velocity * 0.09)
-	elif velocity.length() < 6.0 and leg.idle_timer <= 0.0 and free:
-		leg.idle_timer = randf_range(1.8, 4.2)
-		leg.lift = 3.0
-		_start_step(leg, rest + Vector2(randf_range(-3.0, 3.0), randf_range(-2.0, 2.0)))
+	elif leg.idle_timer <= 0.0 and free:
+		if leg.grabber: ## the forelimbs keep feeling ahead of it, tip-tapping the ground
+			leg.idle_timer = randf_range(0.55, 1.5)
+			leg.lift = randf_range(4.0, 6.5)
+			leg.step_time = randf_range(0.07, 0.12)
+			_start_step(leg, rest + Vector2.from_angle(_ground_heading) * randf_range(2.0, 5.0) + Vector2(randf_range(-2.5, 2.5), randf_range(-1.5, 1.5)))
+		else:
+			leg.idle_timer = randf_range(1.8, 4.2)
+			leg.lift = 3.0
+			_start_step(leg, rest + Vector2(randf_range(-3.0, 3.0), randf_range(-2.0, 2.0)))
 
 
 ## Soft cubic limbs, with distributed curvature and fixed endpoints (no knee flips or foot jitter).

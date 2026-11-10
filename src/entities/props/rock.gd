@@ -50,8 +50,10 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 		"hit":
 			_rustle(randf_range(-1.0, 1.0), 0.05)
 			_burst(7, _chips(), 46.0, Vector2(0, -_radius * 0.8))
+			Sfx.at(self, "pick_rock", global_position, -2.0, 0.06)
 		"strip":
 			_rustle(randf_range(-1.0, 1.0), 0.07)
 			_burst(16, _chips(), 60.0, Vector2(0, -_radius * 0.6))
+			Sfx.at(self, "rock_break", global_position, -1.0, 0.05)
 		"regrow":
 			_burst(6, REGROW_BURST, 0.0)

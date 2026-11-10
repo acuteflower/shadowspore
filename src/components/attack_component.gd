@@ -534,7 +534,11 @@ func _heavy_swing(dir: Vector2, weapon_id: String, charge_time: float, chained: 
 	_thrust_progress = 0.0
 	_burst_done = false
 	_tips.clear()
-	_play_sound("swing", -3.0, 0.92 + 0.16 * float(step["power"]))
+	var swing_pitch: float = 0.92 + 0.16 * float(step["power"])
+	if _sound_dir.is_empty() and Sfx.has("sword_swing_a"): ## the shared set; a weapon with its own sounds (item `fx.sounds`) keeps them
+		Sfx.at(self, "sword_swing_b" if float(step["sweep"]) > 0.0 and String(step["style"]) != "thrust" else "sword_swing_a", global_position, -2.0, 0.04)
+	else:
+		_play_sound("swing", -3.0, swing_pitch)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -722,6 +726,8 @@ func _on_hit(point: Vector2, dir: Vector2, shake: float, hit_stop: float = 0.0) 
 	if hit_stop > 0.0:
 		_freeze = maxf(_freeze, hit_stop) ## the heavy blow bites: the swing stands still for a moment (animation only)
 		_play_sound("hit", -2.0)
+	elif Sfx.has("sword_hit"):
+		Sfx.at(self, "sword_hit", point, -4.0, 0.06) ## every normal blow that lands
 	if is_multiplayer_authority():
 		hit_landed.emit(shake)
 

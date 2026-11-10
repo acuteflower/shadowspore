@@ -266,5 +266,41 @@
   "seconds": 4.5,
   "trust": 60,
   "info": "ZWEI TROPFEN STILLE, IN SILBER GEFASST"
+ },
+ "hoe_basic": {
+  "name": "HACKE",
+  "station": "workshop",
+  "in": {
+   "wood": 2,
+   "stone": 1,
+   "plant_fiber": 2
+  },
+  "out": {
+   "hoe_basic": 1
+  },
+  "seconds": 2.5,
+  "trust": 0,
+  "info": "ZUM AUFBRECHEN DER ERDE",
+  "once": true,
+  "by": "self",
+  "unlocks": "farming"
+ },
+ "watering_can": {
+  "name": "GIESSKANNE",
+  "station": "workshop",
+  "in": {
+   "wood": 2,
+   "plant_fiber": 2,
+   "stone": 1
+  },
+  "out": {
+   "watering_can": 1
+  },
+  "seconds": 3.0,
+  "trust": 0,
+  "info": "DAMIT DIE SAAT TRINKT",
+  "once": true,
+  "by": "self",
+  "unlocks": "farming"
  }
 }

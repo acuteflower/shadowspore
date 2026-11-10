@@ -5,10 +5,33 @@ global uniform float g_day_clock;
 global uniform vec2 g_day_sway;
 global uniform float g_day_strength;
 global uniform float g_day_gold;
+// The weather's cloud field (WeatherField, docs/wetter_konzept.md): one tileable noise texture shared with the CPU. Keep cloud_density / cloud_thick in sync with
+// WeatherField.density / thick (GDScript twin). No cloud at all while g_cloud_thresh is 2.
+global uniform sampler2D g_cloud_tex : filter_linear, repeat_enable;
+global uniform vec2 g_cloud_drift; // where the clouds are now (WeatherRules.drift_at)
+global uniform float g_cloud_thresh; // density above which there is cloud
+global uniform float g_cloud_bonus; // an overcast sky is thick even at its thin places
+global uniform float g_cloud_shadow; // light under the thickest cloud (1 = none)
+global uniform float g_rain; // the regime's rain rate 0..1 (the local rain is rain_local)
+global uniform float g_storm; // thunderstorm strength 0..1
+global uniform float g_wet; // how wet the ground is 0..1
+global uniform float g_puddle; // how many puddles stand 0..1
+float cloud_density(vec2 p) {
+	vec2 q = p - g_cloud_drift;
+	return texture(g_cloud_tex, q / 2048.0).r * 0.76 + texture(g_cloud_tex, q / 512.0 + vec2(0.37, 0.61)).g * 0.24;
+}
+float cloud_thick(vec2 p) {
+	if (g_cloud_thresh > 1.5) { return 0.0; }
+	return clamp((cloud_density(p) - g_cloud_thresh) / 0.17 + g_cloud_bonus, 0.0, 1.0);
+}
 float day_cloud(vec2 p) {
-	vec2 q = p / 270.0 - vec2(g_day_clock * 0.009, g_day_clock * 0.004);
-	float n = sin(q.x + sin(q.y * 0.83) * 1.2) * 0.55 + sin(q.y * 1.31 - q.x * 0.47) * 0.3;
-	return mix(0.62, 1.0, smoothstep(-0.35, 0.48, n));
+	return mix(1.0, g_cloud_shadow, smoothstep(0.04, 0.5, cloud_thick(p)));
+}
+// Rain on the ground at a world position (WeatherField.rain_at): only under cloud, heaviest in its cores.
+float rain_local(vec2 p) {
+	if (g_rain <= 0.001) { return 0.0; }
+	float th = cloud_thick(p);
+	return clamp(g_rain * (0.45 + 0.75 * smoothstep(0.1, 0.75, th)) * smoothstep(0.02, 0.25, th), 0.0, 1.0);
 }
 float day_cover(vec2 p) {
 	if (g_day_rect.z <= 0.0) { return 0.0; }

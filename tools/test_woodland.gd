@@ -250,7 +250,7 @@ func _run() -> void:
 	var insects: ButterflyPopulation = world.get_node("Wildlife/MeadowInsects") as ButterflyPopulation
 	insects.set_process(false)
 	print("Initial woodland residents: %d; butterflies: %d" % [population._residents.get_child_count(), insects._butterflies.get_child_count()])
-	_check(population._residents.get_child_count() <= 8 and insects._butterflies.get_child_count() <= 10, "New wildlife budgets exceeded")
+	_check(population._residents.get_child_count() <= 10 and insects._butterflies.get_child_count() <= 16, "New wildlife budgets exceeded")
 	for node: Node in population._residents.get_children():
 		var resident: WoodlandMammal = node as WoodlandMammal
 		resident.set_physics_process(false)

@@ -40,6 +40,8 @@ var _nearby_herd_left: float = 0.0
 @onready var _sprite: Sprite2D = $Sprite2D
 
 
+var _thump_cool: float = 0.0
+
 func _ready() -> void:
 	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_spec = DataRegistry.get_entry("wildlife", "rabbit")
@@ -297,6 +299,9 @@ func _begin_hop(start: Vector2, end: Vector2, duration: float, height: float, el
 	_hop_height = height
 	_hop_time = elapsed
 	_hopping = true
+	if state == State.FLEE and elapsed < 0.05 and Time.get_ticks_msec() * 0.001 > _thump_cool and randf() < 0.3:
+		_thump_cool = Time.get_ticks_msec() * 0.001 + 8.0
+		Sfx.at(self, "rabbit_thump", start, -6.0, 0.06, 240.0)
 	facing = (end - start).angle()
 
 

@@ -328,6 +328,70 @@
 					}
 				}
 			]
+		},
+		"leere": {
+			"name": "LEERE",
+			"item": "potion_leere_%d",
+			"color": "5b2a9e",
+			"light": "c9a0ff",
+			"special": true,
+			"info": "EIN RISS IN DER REALITÄT SAUGT LEBEN AUF UND GIBT ES TEILWEISE ZURÜCK.",
+			"condition": {
+				"kind": "night",
+				"text": "NUR BEI NACHT ZU BRAUEN"
+			},
+			"tiers": [
+				{
+					"seconds": 5,
+					"radius": 128,
+					"dps": 8,
+					"lifesteal": 0.0,
+					"self_dps": 2,
+					"slow": 0.0,
+					"pull": 0.0,
+					"trust": 15,
+					"yield": 2,
+					"in": {
+						"void_splinter": 2,
+						"grave_candle": 1,
+						"toad_cap": 1
+					}
+				},
+				{
+					"seconds": 6,
+					"radius": 192,
+					"dps": 12,
+					"lifesteal": 0.5,
+					"self_dps": 1,
+					"slow": 0.0,
+					"pull": 0.0,
+					"trust": 40,
+					"yield": 2,
+					"in": {
+						"void_splinter": 3,
+						"void_bloom": 1,
+						"curse_silver": 1,
+						"grave_candle": 1
+					}
+				},
+				{
+					"seconds": 7,
+					"radius": 256,
+					"dps": 18,
+					"lifesteal": 0.75,
+					"self_dps": 0,
+					"slow": 0.3,
+					"pull": 1.0,
+					"trust": 65,
+					"yield": 1,
+					"in": {
+						"void_bloom": 2,
+						"shadow_core": 1,
+						"mora_shard": 1,
+						"curse_silver": 2
+					}
+				}
+			]
 		}
 	},
 	"special_tier_names": [

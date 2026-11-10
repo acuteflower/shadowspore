@@ -268,11 +268,13 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 			_shake(1.0)
 			_needle_rain(9)
 			_burst(6, BARK, 34.0, Vector2(0, -16))
+			Sfx.at(self, "axe_chop", global_position, -2.0, 0.06)
 		"regrow":
 			_burst(6, REGROW_BURST, 0.0, Vector2(0, -12))
 		"pick":
 			_shake(0.6)
 			_needle_rain(16)
+			Sfx.at(self, "pluck", global_position, -3.0)
 	if _prompt_node != null:
 		set_focused(_prompt_node.visible)
 
@@ -468,6 +470,7 @@ func _fades() -> bool:
 ## moment and fades; the stump is all that is left.
 func _fell() -> void:
 	_falling = true
+	Sfx.at(self, "tree_fall", global_position, 0.0, 0.03, 480.0)
 	_wobble = 0.0
 	_covering = false
 	if _fade != null:

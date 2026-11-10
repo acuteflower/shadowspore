@@ -12,6 +12,8 @@ static var world_seed: int = 0
 
 
 static func is_wet_day(day: int) -> bool:
+	if WeatherRules.enabled(): ## the weather decides now (docs/wetter_konzept.md 6.3): did it rain enough this morning to leave the land wet
+		return WeatherRules.wet_day(world_seed, day) or fog_night(day - 1)
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash([world_seed, day, 6203])
 	return rng.randf() < WET_DAY_CHANCE or fog_night(day - 1)
@@ -25,6 +27,13 @@ static func fog_night(night_id: int) -> bool:
 static func wetness() -> float:
 	var t: float = TimeManager.time_of_day
 	var day: int = TimeManager.day
+	if WeatherRules.enabled() and WeatherManager.current != null: ## the real, smoothed ground wetness of the weather (rain soaks it, sun and wind dry it)
+		var live: float = WeatherManager.wet_now()
+		if fog_night(day) and t >= TimeManager.DAY_START:
+			live = maxf(live, 0.8 * TimeManager.night_amount())
+		elif fog_night(day) and t < TimeManager.DAY_START:
+			live = maxf(live, 0.8)
+		return live
 	var value: float = 0.0
 	if t >= TimeManager.DAY_START:
 		if is_wet_day(day):

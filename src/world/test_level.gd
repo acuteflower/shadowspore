@@ -297,9 +297,9 @@ func _pick_tile_kind(density: float, rng: RandomNumberGenerator) -> String:
 	var lush: float = smoothstep(0.5, 0.78, density)
 	var wild: float = smoothstep(0.5, 0.78, 1.0 - density)
 	var roll: float = rng.randf()
-	if roll < 0.05 + 0.2 * lush:
+	if roll < 0.065 + 0.26 * lush: ## flower meadows carry a few more blossoms than they used to (the second band moves up by the same amount)
 		return LUSH_KINDS[rng.rand_weighted(LUSH_WEIGHTS)]
-	if roll < 0.1 + 0.2 * lush + 0.14 * wild:
+	if roll < 0.115 + 0.26 * lush + 0.14 * wild:
 		if wild > 0.15 and rng.randf() < wild:
 			return WILD_KINDS[rng.rand_weighted(WILD_WEIGHTS)]
 		return COMMON_KINDS[rng.rand_weighted(COMMON_WEIGHTS)]

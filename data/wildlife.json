@@ -22,11 +22,11 @@
     "biomes": [
       "meadow"
     ],
-    "chunk_chance": 0.72,
+    "chunk_chance": 0.8,
     "group_min": 1,
     "group_max": 3,
     "group_radius": 54,
-    "max_loaded": 36,
+    "max_loaded": 44,
     "spawn_attempts": 12,
     "spawn_margin": 42,
     "home_radius": 105,
@@ -96,7 +96,7 @@
       "mist_forest",
       "witch_forest"
     ],
-    "max_loaded": 8,
+    "max_loaded": 11,
     "spawn_attempts": 14,
     "spawn_margin": 58,
     "group_radius": 66,
@@ -157,7 +157,7 @@
     "name": "Rabenkr\u00e4he",
     "group_min": 2,
     "group_max": 3,
-    "chunk_chance": 0.22,
+    "chunk_chance": 0.30,
     "build_offset": 0,
     "witch_forest": {
       "chunk_chance": 0.75,
@@ -192,7 +192,7 @@
       "mist_forest",
       "witch_forest"
     ],
-    "max_loaded": 8,
+    "max_loaded": 11,
     "spawn_attempts": 14,
     "spawn_margin": 58,
     "group_radius": 66,
@@ -286,7 +286,7 @@
       "meadow",
       "mist_forest"
     ],
-    "max_loaded": 8,
+    "max_loaded": 11,
     "spawn_attempts": 14,
     "spawn_margin": 58,
     "group_radius": 45,
@@ -374,7 +374,7 @@
     "biomes": [
       "meadow"
     ],
-    "max_loaded": 8,
+    "max_loaded": 11,
     "spawn_attempts": 14,
     "spawn_margin": 58,
     "group_radius": 65,
@@ -435,7 +435,7 @@
     "name": "Wiedehopf",
     "group_min": 1,
     "group_max": 2,
-    "chunk_chance": 0.12,
+    "chunk_chance": 0.16,
     "build_offset": 3,
     "max_species_loaded": 2,
     "requires_perch": false,
@@ -456,7 +456,7 @@
       "meadow",
       "mist_forest"
     ],
-    "max_loaded": 8,
+    "max_loaded": 10,
     "spawn_margin": 62,
     "spawn_attempts": 16,
     "home_radius": 150,
@@ -500,7 +500,7 @@
     "nocturnal": false,
     "texture": "res://assets/wildlife/deer.png",
     "name": "Reh",
-    "chunk_chance": 0.12,
+    "chunk_chance": 0.16,
     "max_species_loaded": 3,
     "group_min": 2,
     "group_max": 3,
@@ -515,7 +515,7 @@
       "meadow",
       "mist_forest"
     ],
-    "max_loaded": 8,
+    "max_loaded": 10,
     "spawn_margin": 62,
     "spawn_attempts": 16,
     "home_radius": 85,
@@ -559,7 +559,7 @@
     "nocturnal": true,
     "texture": "res://assets/wildlife/badger.png",
     "name": "Dachs",
-    "chunk_chance": 0.1,
+    "chunk_chance": 0.12,
     "max_species_loaded": 2,
     "group_min": 1,
     "group_max": 2,
@@ -576,7 +576,7 @@
       "meadow",
       "mist_forest"
     ],
-    "max_loaded": 8,
+    "max_loaded": 10,
     "spawn_margin": 62,
     "spawn_attempts": 16,
     "home_radius": 145,
@@ -642,7 +642,7 @@
       "meadow",
       "mist_forest"
     ],
-    "max_loaded": 8,
+    "max_loaded": 10,
     "spawn_margin": 62,
     "spawn_attempts": 16,
     "home_radius": 65,
@@ -686,7 +686,7 @@
     "nocturnal": true,
     "texture": "res://assets/wildlife/hedgehog.png",
     "name": "Igel",
-    "chunk_chance": 0.13,
+    "chunk_chance": 0.18,
     "max_species_loaded": 2,
     "group_min": 1,
     "group_max": 1,
@@ -701,10 +701,10 @@
     "biomes": [
       "meadow"
     ],
-    "chunk_chance": 0.32,
+    "chunk_chance": 0.5,
     "group_min": 2,
     "group_max": 4,
-    "max_loaded": 10,
+    "max_loaded": 16,
     "min_flowers": 6,
     "flower_kinds": [
       "flower",
@@ -737,7 +737,7 @@
       "meadow"
     ],
     "body_radius": 1,
-    "max_loaded": 24,
+    "max_loaded": 28,
     "chunk_chance": 0.75,
     "group_min": 3,
     "group_max": 5,
@@ -761,7 +761,7 @@
       "mist_forest"
     ],
     "body_radius": 1,
-    "max_loaded": 18,
+    "max_loaded": 22,
     "chunk_chance": 0.7,
     "group_min": 2,
     "group_max": 3,
@@ -784,7 +784,7 @@
       "meadow"
     ],
     "body_radius": 1,
-    "max_loaded": 12,
+    "max_loaded": 16,
     "chunk_chance": 0.5,
     "group_min": 1,
     "group_max": 2,
@@ -814,7 +814,7 @@
       "mist_forest"
     ],
     "body_radius": 1,
-    "max_loaded": 14,
+    "max_loaded": 18,
     "chunk_chance": 0.6,
     "group_min": 2,
     "group_max": 3,

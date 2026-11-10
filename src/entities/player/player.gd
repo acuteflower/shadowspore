@@ -47,8 +47,8 @@ const CLIMB_OFFSET: Vector2 = Vector2(0.0, -29.0) ## 68 px frames with the foot 
 const CLIMB_SHEET: int = 15
 const SWIM_LEVELS: Array[String] = ["tread", "breast", "crawl"]
 const SWIM_SOUNDS: Dictionary = { ## tools/audio_swim.py
-	"dive_big": preload("res://assets/audio/swim/dive_big.wav"), "dive_small": preload("res://assets/audio/swim/dive_small.wav"),
-	"stroke_a": preload("res://assets/audio/swim/stroke_a.wav"), "stroke_b": preload("res://assets/audio/swim/stroke_b.wav"),
+	"dive_big": preload("res://assets/audio/steps/swim_dive_1.mp3"), "dive_small": preload("res://assets/audio/swim/dive_small.wav"),
+	"stroke_a": preload("res://assets/audio/steps/swim_stroke_1.mp3"), "stroke_b": preload("res://assets/audio/steps/swim_stroke_2.mp3"),
 	"kick": preload("res://assets/audio/swim/kick.wav"), "breath": preload("res://assets/audio/swim/breath.wav"),
 	"bubble": preload("res://assets/audio/swim/bubble.wav"), "exit": preload("res://assets/audio/swim/exit.wav"),
 	"drip": preload("res://assets/audio/swim/drip.wav"), "shake": preload("res://assets/audio/swim/shake.wav"),
@@ -540,6 +540,8 @@ func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
 	flash.set_shader_parameter("flash", 1.0)
 	create_tween().tween_property(flash, "shader_parameter/flash", 0.0, 0.2)
 	DamageNumber.spawn(get_tree().current_scene, global_position + Vector2(0, -50), amount, away, Color("ff5a6a"))
+	if health.current > 0.0:
+		Sfx.at_any(self, ["ellie_hurt_a", "ellie_hurt_b"], global_position, -2.0, 0.04) ## a grunt for every hit she survives
 	if is_multiplayer_authority():
 		velocity += away * knockback
 		_shake = maxf(_shake, 3.0)
@@ -667,10 +669,15 @@ func _update_wet(delta: float) -> void:
 	elif float(_surface.get("submerge", 0.0)) > 6.0:
 		target = 0.45
 	var was: float = _wet
+	var rained_on: float = 0.0 ## the weather (docs/wetter_konzept.md 9): rain soaks her slowly, under a crown or a roof she stays dry
+	if swim == 0 and WeatherManager.current != null and target == 0.0:
+		rained_on = clampf(WeatherManager.current.exposure_at(global_position) * 0.85, 0.0, 0.8)
 	if target > _wet:
 		_wet = move_toward(_wet, target, 2.5 * delta)
+	elif rained_on > _wet:
+		_wet = move_toward(_wet, rained_on, delta / 9.0)
 	else:
-		_wet = move_toward(_wet, 0.0 if target == 0.0 else target, delta / 25.0)
+		_wet = move_toward(_wet, rained_on if target == 0.0 else target, delta / 25.0)
 	if _wet != was:
 		(_sprite.material as ShaderMaterial).set_shader_parameter("soak", _wet)
 	if _wet > 0.3 and swim == 0 and _swim_water != null:

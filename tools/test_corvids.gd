@@ -153,7 +153,7 @@ func _run() -> void:
 	population.set_process(false)
 	print("Initial corvid population: ", population._birds.get_child_count())
 	_check(population._birds.get_child_count() > 0, "Starting meadow contains no corvids")
-	_check(population._birds.get_child_count() <= 8, "Corvid population budget exceeded")
+	_check(population._birds.get_child_count() <= 11, "Corvid population budget exceeded")
 	for node: Node in population._birds.get_children():
 		var bird: WildCorvid = node as WildCorvid
 		bird.set_physics_process(false)

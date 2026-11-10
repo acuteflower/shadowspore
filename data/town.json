@@ -72,6 +72,10 @@
   {
    "id": "ground",
    "name": "WEGE"
+  },
+  {
+   "id": "farm",
+   "name": "ACKER"
   }
  ],
  "pieces": {
@@ -787,6 +791,47 @@
     "front": true
    }
   },
+  "quest_board": {
+   "name": "QUESTTAFEL",
+   "needs": "lamp_post",
+   "category": "living",
+   "texture": "quest_board",
+   "frame": [
+    56,
+    56
+   ],
+   "feet": 50,
+   "foot": [
+    40,
+    10
+   ],
+   "snap": 8,
+   "cost": {
+    "wood": 8,
+    "plant_fiber": 2
+   },
+   "build_seconds": 6.0,
+   "reach": 40.0,
+   "worth": 2,
+   "role": "board",
+   "glow": true,
+   "light": {
+    "color": "78f4e6",
+    "radius": 48,
+    "energy": 0.5,
+    "at": [
+     22,
+     -36
+    ],
+    "flicker": 0.15
+   },
+   "info": "ZETTEL DER BEWOHNER",
+   "paths": true,
+   "front": [
+    40,
+    16
+   ]
+  },
   "smithy": {
    "name": "SCHMIEDE",
    "needs_resident": "torben",
@@ -987,6 +1032,37 @@
     "strength": 1.0,
     "margin": 18,
     "front": true
+   }
+  },
+  "field": {
+   "name": "FELD",
+   "category": "farm",
+   "texture": "field",
+   "frame": [
+    64,
+    64
+   ],
+   "feet": 56,
+   "foot": [
+    48,
+    48
+   ],
+   "snap": 16,
+   "walk": true,
+   "farm": true,
+   "surface": "field",
+   "needs_unlock": "farming",
+   "cost": {
+    "wood": 2,
+    "plant_fiber": 2
+   },
+   "build_seconds": 3.0,
+   "worth": 0.4,
+   "info": "BEETE ZUM HACKEN, SÄEN UND ERNTEN",
+   "trample": {
+    "strength": 0.2,
+    "margin": 4,
+    "front": false
    }
   }
  },

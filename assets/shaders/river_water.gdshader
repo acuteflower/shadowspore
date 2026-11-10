@@ -75,6 +75,19 @@ void fragment() {
                 color = mix(color, vec3(0.78, 0.88, 1.0), 0.8 * g_night);
             }
         }
+        if (g_rain > 0.02) { // rain: little rings spread where drops land (docs/wetter_konzept.md 6.3)
+            float rl = rain_local(pixel);
+            if (rl > 0.03) {
+                vec2 rc = floor(pixel / 9.0);
+                float rh = hash21(rc + 311.0);
+                if (rh < 0.75 * rl) {
+                    float ph = fract(g_water_time * 0.9 + rh * 13.0);
+                    vec2 centre = (rc + 0.2 + 0.6 * vec2(hash21(rc + 5.0), hash21(rc + 9.0))) * 9.0;
+                    float rd = distance(pixel + 0.5, centre);
+                    if (ph < 0.9 && abs(rd - ph * 4.5) < 0.7) { color = mix(color, vec3(0.80, 0.90, 0.95), 0.6 * (1.0 - ph)); }
+                }
+            }
+        }
         // Sunlight: rare glints that wink on the surface and a drifting net of light over the shallows.
         float daylight = g_day_strength * day_local(pixel);
         if (daylight > 0.05) {

@@ -22,6 +22,7 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 	if not light.is_empty():
 		_set_light(not gone, Color(String(light.color)), int(light.radius), float(light.energy)) ## a pool of light while it stands
 	if fx == "pick":
+		Sfx.at(self, "item_pickup" if String(_spec.pickup.get("item", "")) == "stone" else "pluck", global_position, -3.0)
 		_burst(4 + int(_spec.pickup.get("amount", [1])[variant] if _spec.pickup.has("amount") else 0), _burst_colors(), 30.0, Vector2(0, -_height * 0.5))
 	elif fx == "regrow":
 		_burst(4, REGROW_BURST, 0.0, Vector2(0, -_height * 0.5))

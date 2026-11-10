@@ -206,6 +206,7 @@ func _place() -> void:
 		return
 	_last_placed = pos
 	town.request_place(piece, pos, flip)
+	Sfx.at(self, "build_place", pos, -1.0, 0.04, 480.0)
 
 
 func _input(event: InputEvent) -> void:
@@ -221,6 +222,7 @@ func _input(event: InputEvent) -> void:
 		elif demolish:
 			if target_id >= 0:
 				town.request_demolish(target_id)
+				Sfx.ui(self, "build_demolish", -3.0)
 		elif piece != "":
 			if reason == "":
 				_place()

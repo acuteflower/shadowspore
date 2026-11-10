@@ -67,7 +67,7 @@ func critter_wind_offset(at: Vector2) -> Vector2:
 	var phase: float = fposmod(global_position.x * 0.37 + global_position.y * 0.91, TAU)
 	var ripple: float = sin(tick * 2.4 + row * 0.11 + floorf(column / 5.0) * 1.9 + phase) * 0.35
 	var amount: float = float(_spec.get("sway", 0.02)) * 60.0
-	return Vector2(floorf((WorldWind.sample(global_position).x * amount + ripple) * pow(height, 1.3) + 0.5), 0.0)
+	return Vector2(floorf((WorldWind.sample_soft(global_position).x * amount + ripple) * pow(height, 1.3) + 0.5), 0.0)
 
 
 func _process(delta: float) -> void:
@@ -139,7 +139,7 @@ func _pose() -> void:
 	if _sprite == null or not (_spec.has("sun") or _spec.has("bloom")):
 		return
 	var picked: bool = bool(state.get("p", 0))
-	var dark: bool = TimeManager.night_amount() > (0.55 if _spec.has("sun") else 0.4) or MineManager.night_at(self, 0.0) > 0.0
+	var dark: bool = TimeManager.night_amount() > (0.55 if _spec.has("sun") else 0.4) or MineManager.night_at(self, 0.0) > 0.0 or (_spec.has("sun") and WeatherManager.rain_now() > 0.35) ## the sun bloom closes its head in the rain
 	var row: int
 	if _spec.has("sun"):
 		var t: float = TimeManager.time_of_day

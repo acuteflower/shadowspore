@@ -44,7 +44,7 @@ func _run() -> void:
 		counts[animal.species] += 1
 		if animal.species == "bee":
 			_check(animal.flowers.has(animal.position) or animal.state == TinyWildlife.State.MOVE, "Bee spawned away from actual flowers")
-	_check(counts.bee <= 24 and counts.snail <= 18 and counts.ladybug <= 12 and counts.moth == 0, "Small wildlife exceeded sparse caps")
+	_check(counts.bee <= 28 and counts.snail <= 22 and counts.ladybug <= 16 and counts.moth == 0, "Small wildlife exceeded sparse caps")
 	var bee: TinyWildlife = _make(pop, "bee", world._spawn_position(0))
 	bee.flowers = [bee.home, bee.home + Vector2(30, 0), bee.home + Vector2(65, 15)]
 	bee._fly(bee.home - Vector2(10, 0))
@@ -113,7 +113,7 @@ func _run() -> void:
 	for node: Node in pop._animals.get_children():
 		if (node as TinyWildlife).species == "moth" and not node.is_queued_for_deletion():
 			moth_count += 1
-	_check(moth_count > 0 and moth_count <= 14, "Nightfall did not populate the existing loaded chunks with moths")
+	_check(moth_count > 0 and moth_count <= 18, "Nightfall did not populate the existing loaded chunks with moths")
 	var moth: TinyWildlife = _make(pop, "moth", bee.home)
 	moth.flowers = [moth.home, moth.home + Vector2(35, 0), moth.home + Vector2(60, 20)]
 	moth._fly()

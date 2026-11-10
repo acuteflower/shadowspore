@@ -17,6 +17,7 @@ uniform float vibrance : hint_range(0.0, 1.0) = 0.0;
 uniform float contrast : hint_range(0.0, 0.5) = 0.0;
 uniform float bloom : hint_range(0.0, 2.0) = 0.0;
 uniform float threshold : hint_range(0.0, 1.0) = 0.6;
+uniform float vignette : hint_range(0.0, 1.0) = 0.0; // the picture's rim sinks into the mood's shadow colour (strong at night: the dark closes in)
 uniform float px_scale = 2.0;
 
 vec3 blurred(vec2 uv, float lod, vec2 texel) {
@@ -49,6 +50,10 @@ void fragment() {
 	// S curve around the mid tones
 	vec3 s = c * c * (3.0 - 2.0 * c);
 	c = mix(c, s, contrast * 2.0);
+	// vignette: an oval, so the sides close in more than top and bottom; the dark leans towards the shadow tint, not grey
+	vec2 q = (SCREEN_UV - 0.5) * vec2(1.0, 1.25);
+	float rim = smoothstep(0.30, 0.78, length(q));
+	c = mix(c, c * shadow_tint * 0.55, vignette * rim);
 	float noise = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
 	COLOR = vec4(clamp(c, 0.0, 1.0) + vec3(noise / 255.0), 1.0);
 }

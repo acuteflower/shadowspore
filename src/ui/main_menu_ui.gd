@@ -201,6 +201,7 @@ func _flip(id: String) -> void:
 
 
 func _press(row: Dictionary, at: Vector2) -> void:
+	Sfx.ui(self, "ui_confirm", -3.0)
 	var id: String = String(row.id)
 	var kind: String = String(row.get("kind", ""))
 	if kind == "slider":

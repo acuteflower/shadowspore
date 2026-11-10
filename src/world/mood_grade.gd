@@ -4,7 +4,7 @@ extends CanvasLayer
 ## shade and light in opposed hues by the time of day, lifts the saturation and lets bright things glow. Cosmetic and local on every peer.
 ## `DayNight` creates it and calls `follow` every frame. Rooms and the mine use the `indoors` preset, the Hexenwald leans to `hex`.
 
-const FIELDS: Array[String] = ["split", "vibrance", "contrast", "bloom", "threshold"]
+const FIELDS: Array[String] = ["split", "vibrance", "contrast", "bloom", "threshold", "vignette"]
 
 var _material: ShaderMaterial
 var _keys: Array[Dictionary] = []
@@ -71,6 +71,7 @@ func follow(indoors: bool, gloom: float) -> void:
 	_material.set_shader_parameter("contrast", float(mood["contrast"]) * _strength)
 	_material.set_shader_parameter("bloom", float(mood["bloom"]) * _strength)
 	_material.set_shader_parameter("threshold", float(mood["threshold"]))
+	_material.set_shader_parameter("vignette", float(mood["vignette"]) * _strength)
 	var px_scale: float = (get_viewport().get_final_transform() * get_viewport().get_canvas_transform()).get_scale().x ## screen pixels per art pixel
 	if absf(px_scale - _scale) > 0.001:
 		_scale = px_scale

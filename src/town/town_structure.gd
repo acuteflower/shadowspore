@@ -79,7 +79,7 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 		_pad.show_behind_parent = false
 		add_child(_pad)
 	_sprite = Sprite2D.new()
-	_sprite.texture = load(DIR + texture_name + ".png") as Texture2D
+	_sprite.texture = _load_picture(texture_name)
 	_sprite.centered = false
 	_sprite.flip_h = _flipped
 	if bool(_spec.get("walk", false)):
@@ -130,10 +130,34 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	_add_layer(_sprite, float(window[0]), float(window[1]), false)
 	for part: Dictionary in _parts:
 		_add_layer(part.sprite as Sprite2D, float(part.from), float(part.to), part.sway != null)
+	if String(_spec.get("role", "")) == "board":
+		_make_board_notes()
 	add_to_group("night_lights")
 	_update_lamp_k()
 	_apply_progress()
 	set_night(TimeManager.night_amount())
+
+
+## The quest board shows its notices on the panel (`BoardNotes`: the paper, and the story notices' seals unlit on top).
+func _make_board_notes() -> void:
+	if manager.board == null:
+		return
+	for lit: bool in [false, true]:
+		var notes: BoardNotes = BoardNotes.new()
+		notes.name = "SealNotes" if lit else "Notes"
+		notes.board = manager.board
+		notes.structure = self
+		notes.unlit = lit
+		add_child(notes)
+
+
+func is_flipped() -> bool:
+	return _flipped
+
+
+## The picture of the piece (a field paints its own ground, `FarmField`).
+func _load_picture(texture_name: String) -> Texture2D:
+	return load(DIR + texture_name + ".png") as Texture2D
 
 
 ## An unlit sheet over `parent` (the piece's emissive pixels): `anim` {frames, fps} makes it a loop of frames side by side; 
@@ -673,7 +697,12 @@ func prompt() -> String:
 		return ""
 	if _spec.has("fuel"):
 		return manager.lamp_prompt(id)
-	return "LAGER ÖFFNEN" if String(_spec.get("role", "")) == "stock" else ""
+	match String(_spec.get("role", "")):
+		"stock":
+			return "LAGER ÖFFNEN"
+		"board":
+			return "AUSHANG LESEN"
+	return ""
 
 
 func reach_distance(from: Vector2) -> float:
@@ -694,3 +723,5 @@ func interact(player: Player) -> void:
 	if String(_spec.get("role", "")) == "stock":
 		open_shutters()
 		StockWindow.open(get_tree(), player, manager, global_position + Vector2(0.0, -20.0))
+	elif String(_spec.get("role", "")) == "board":
+		QuestBoardWindow.open(get_tree(), player, manager, global_position + Vector2(0.0, -20.0))

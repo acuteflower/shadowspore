@@ -52,6 +52,8 @@ const TOAD_TONES: Array[Array] = [ ## dark, body, lit, wart, belly: three muted 
 ]
 
 
+var _buzz_cool: float = 0.0
+
 func _ready() -> void:
 	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
 	_spec = DataRegistry.get_entry("wildlife", species)
@@ -161,13 +163,13 @@ func _physics_process(delta: float) -> void:
 			return
 		if species in ["bee", "moth"]:
 			if state == State.MOVE:
-				_choose(State.FEED if species == "moth" or TimeManager.night_amount() < 0.5 else State.REST, _range("feed_seconds"))
-			elif species == "bee" and TimeManager.night_amount() > 0.5:
+				_choose(State.FEED if species == "moth" or (TimeManager.night_amount() < 0.5 and not WeatherManager.sky_wet()) else State.REST, _range("feed_seconds"))
+			elif species == "bee" and (TimeManager.night_amount() > 0.5 or WeatherManager.sky_wet()): ## bees stay in the rain
 				_choose(State.REST, _range("rest_seconds"))
 			else:
 				_fly()
 		elif species == "ladybug":
-			if TimeManager.night_amount() > 0.5:
+			if TimeManager.night_amount() > 0.5 or WeatherManager.sky_wet():
 				_choose(State.REST, _range("rest_seconds"))
 			elif state in [State.MOVE, State.FLY]:
 				_choose(State.FEED, _range("feed_seconds"))
@@ -310,6 +312,9 @@ func _fly(danger: Vector2 = Vector2.INF) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _act(next: int, start: Vector2, end: Vector2, seconds: float, tree: String, offset: Vector2, elapsed: float) -> void:
+	if species == "bee" and next == State.MOVE and elapsed < 0.05 and Time.get_ticks_msec() * 0.001 > _buzz_cool and randf() < 0.25:
+		_buzz_cool = Time.get_ticks_msec() * 0.001 + 6.0
+		Sfx.at(self, "bee_buzz", start, -10.0, 0.08, 120.0)
 	if species == "bat": ## heights of the segment: from the hang it leaves (or the air), to the hang it wants (offset.y) or its cruise
 		_h_from = -tree_offset.y if not tree_path.is_empty() else (_h_to if state == State.FLY else _bat_cruise())
 		_h_to = -offset.y if tree.is_empty() and offset.y < 0.0 else _bat_cruise()

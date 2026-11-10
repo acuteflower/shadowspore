@@ -196,6 +196,8 @@ func _update_drag_targets() -> void:
 
 
 func _select(index: int) -> void:
+	if index != selected:
+		Sfx.ui(self, "hotbar_select", -2.0, 0.05)
 	selected = index
 	if _inventory != null:
 		_inventory.select(index) ## a tool in this slot now replaces the weapon in her hand

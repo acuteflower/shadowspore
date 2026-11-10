@@ -2,13 +2,14 @@ class_name GameSettings
 extends RefCounted
 ## Player settings (user://settings.cfg). Values live in a Dictionary; `apply()` pushes the ones the
 ## engine can use (master volume, fullscreen, vsync) and the game reads the rest (`shake_factor`,
-## damage numbers, the position display). Music, effects and language are stored but have no effect yet.
+## damage numbers, the position display; music = volume of the bus "Music"). Effects and language are stored but have no effect yet.
 
 const PATH: String = "user://settings.cfg"
 const DEFAULTS: Dictionary = {
 	"master": 80, "music": 70, "sfx": 80,
 	"fullscreen": false, "vsync": true, "shake": 100,
 	"numbers": true, "language": "de", "position": true, "cursor": true,
+	"weather_fx": 2, "flash_soft": false,
 }
 
 static var _values: Dictionary = {}
@@ -36,6 +37,15 @@ static func apply() -> void:
 	AudioServer.set_bus_mute(0, master <= 0)
 	if master > 0:
 		AudioServer.set_bus_volume_db(0, linear_to_db(master / 100.0))
+	var bus: int = AudioServer.get_bus_index(&"Music") ## the music's own bus (MusicDirector), made on first use
+	if bus < 0:
+		AudioServer.add_bus()
+		bus = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(bus, &"Music")
+	var music: int = int(get_value("music"))
+	AudioServer.set_bus_mute(bus, music <= 0)
+	if music > 0:
+		AudioServer.set_bus_volume_db(bus, linear_to_db(music / 100.0))
 	var fullscreen: bool = bool(get_value("fullscreen"))
 	var is_fullscreen: bool = DisplayServer.window_get_mode() in [DisplayServer.WINDOW_MODE_FULLSCREEN, DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN]
 	if fullscreen != is_fullscreen:

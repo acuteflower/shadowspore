@@ -344,6 +344,42 @@ g_wind_clock={
 "type": "float",
 "value": 0.0
 }
+g_cloud_tex={
+"type": "sampler2D",
+"value": "res://assets/world/town_wear_empty.png"
+}
+g_cloud_drift={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+g_cloud_thresh={
+"type": "float",
+"value": 2.0
+}
+g_cloud_bonus={
+"type": "float",
+"value": 0.0
+}
+g_cloud_shadow={
+"type": "float",
+"value": 1.0
+}
+g_rain={
+"type": "float",
+"value": 0.0
+}
+g_storm={
+"type": "float",
+"value": 0.0
+}
+g_wet={
+"type": "float",
+"value": 0.0
+}
+g_puddle={
+"type": "float",
+"value": 0.0
+}
 g_water_time={
 "type": "float",
 "value": 0.0

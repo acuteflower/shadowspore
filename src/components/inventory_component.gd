@@ -381,6 +381,16 @@ func _drink(player: Player, info: Dictionary) -> void:
 		"wisp":
 			if player.effects != null:
 				player.effects.apply("wisp", AlchemyRules.wisp_spec(level).seconds, float(level))
+		"leere":
+			var spec: Dictionary = AlchemyRules.leere_spec(level)
+			if player.effects != null:
+				player.effects.apply("void_rift", spec.seconds, float(level))
+			# Spawn the actual rift effect
+			var rift_script: GDScript = load("res://src/effects/void_rift_effect.gd")
+			var rift: Object = rift_script.new()
+			rift.name = "VoidRift_%d" % player.get_instance_id()
+			player.add_child(rift)
+			rift.open(player.global_position, spec.radius, spec.dps, spec.lifesteal, spec.self_dps, spec.slow, spec.pull, spec.seconds)
 
 
 # ---------------------------------------------------------------- the cursor stack

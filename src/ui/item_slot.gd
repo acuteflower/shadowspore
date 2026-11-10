@@ -57,6 +57,9 @@ func _gui_input(event: InputEvent) -> void:
 	var click: InputEventMouseButton = event as InputEventMouseButton
 	if click == null or not click.pressed or inventory == null or not InputManager.inventory_open:
 		return
+	var carrying: bool = not inventory.held.is_empty()
+	var sound: String = "equip" if kind == "equip" else ("item_put" if carrying else "item_take")
+	var has_sound: bool = carrying or not stack().is_empty() ## nothing happens on an empty slot with an empty cursor
 	if click.button_index == MOUSE_BUTTON_LEFT:
 		if kind == "equip" and not inventory.held.is_empty():
 			var why: String = inventory.refusal(String(ref), inventory.held)
@@ -65,7 +68,11 @@ func _gui_input(event: InputEvent) -> void:
 				accept_event()
 				return
 		inventory.request("quick" if click.shift_pressed else "click", [kind, ref])
+		if has_sound:
+			Sfx.ui(self, sound, -2.0)
 		accept_event()
 	elif click.button_index == MOUSE_BUTTON_RIGHT:
 		inventory.request("rclick", [kind, ref])
+		if has_sound:
+			Sfx.ui(self, sound, -2.0)
 		accept_event()

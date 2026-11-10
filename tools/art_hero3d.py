@@ -389,6 +389,57 @@ def ik2(root, target, l1: float, l2: float, pole):
     return root + dirv * x + p * h, root + dirv * dist
 
 
+# The sprint, one leg over the six frames of the cycle: (thigh, knee flex, foot pitch; + = toes down). Foot strike, stance, toe-off (the flight begins),
+# heel up, knee through, high knee (flight). The other leg is three frames ahead, so frames 0 and 3 are the two foot strikes.
+SPRINT_LEG = [(0.38, 0.30, -0.12), (-0.18, 0.42, 0.0), (-0.66, 0.06, 0.85), (-0.42, 1.50, 1.15), (0.40, 1.75, 0.6), (1.02, 1.05, 0.15)]
+SPRINT_LIFT = 1.4  # how far the flight carries the body above the height of the foot strike
+
+
+def sprint_leg(phase: float):
+    """(thigh, flex, foot pitch) of a sprinting leg at `phase` (radians, 0 = its foot strike), eased between the keys."""
+    u = (phase / (2 * math.pi)) % 1.0 * 6.0
+    i = int(u) % 6
+    k = u - int(u)
+    k = k * k * (3 - 2 * k)
+    a, b = SPRINT_LEG[i], SPRINT_LEG[(i + 1) % 6]
+    return tuple(a[j] + (b[j] - a[j]) * k for j in range(3))
+
+
+# The sneak (crouched rows): a stalking prowl, not a squat. The hips sit low over a long, lunge-like stride, the torso leans far forward, each foot is
+# set down ball first and rolled flat, the other one peels off the ground heel first and glides through close to the earth. The foot's path is
+# the key (the stance foot slides back at body speed, so it never skates), the leg is solved from it: `sneak_leg(phase)` -> (thigh, flex, foot pitch).
+SNEAK_STRIDE = 8.8  # half stride: how far the stance foot travels in front of and behind the hip
+SNEAK_PITCH = [(0.00, 0.16), (0.08, 0.0), (0.30, 0.0), (0.42, 0.30), (0.50, 0.78), (0.65, 0.55), (0.85, 0.30), (1.00, 0.16)]  # (cycle, toes down)
+
+
+def sneak_foot(u: float):
+    """The ankle relative to the hip for a leg `u` (0..1) into its cycle, 0 = foot set down in front: (forward, depth below the hip)."""
+    if u < 0.5:  # stance: the foot rests, the body glides over it; the knee takes the weight in the middle, the heel lifts at the end
+        k = u / 0.5
+        return SNEAK_STRIDE * (1.0 - 2.0 * k), 18.7 - 0.8 * math.sin(math.pi * k) - 1.9 * max(0.0, (k - 0.72) / 0.28) ** 2
+    k = (u - 0.5) / 0.5  # swing: peel off, glide through low, place softly
+    e = k * k * (3.0 - 2.0 * k)
+    return SNEAK_STRIDE * (-1.0 + 2.0 * e), (16.8 + 1.9 * e) - 3.4 * math.sin(math.pi * k) ** 1.2
+
+
+def sneak_leg(phase: float):
+    """(thigh, flex, foot pitch) of a sneaking leg at `phase` (radians, 0 = foot set down in front), solved from `sneak_foot`."""
+    u = (phase / (2 * math.pi)) % 1.0
+    z, depth = sneak_foot(u)
+    d = min(math.hypot(z, depth), 21.3)
+    a = math.acos(max(-1.0, min(1.0, (11.5 ** 2 + d * d - 10.0 ** 2) / (2 * 11.5 * d))))
+    thigh = math.atan2(z, depth) + a
+    kz, ky = 11.5 * math.sin(thigh), 11.5 * math.cos(thigh)
+    shank = math.atan2(z - kz, depth - ky)
+    pitch = SNEAK_PITCH[-1][1]
+    for (u0, v0), (u1, v1) in zip(SNEAK_PITCH, SNEAK_PITCH[1:]):
+        if u0 <= u <= u1:
+            k = (u - u0) / (u1 - u0)
+            pitch = v0 + (v1 - v0) * (k * k * (3 - 2 * k))
+            break
+    return thigh, thigh - shank, pitch
+
+
 def P(twist, lean, pz, feet, hand_r, hand_l, hair, flare=0.0):
     """One attack keyframe. twist/lean: upper body (radians, + = turned to her left / forward),
     pz: how far the pelvis moved forward, feet: ((x, z, lift) left, right), hands: model-space
@@ -413,31 +464,42 @@ def pose_legs(pose):
     return legs, hy - 24.0
 
 
+def A(twist, lean, pz, feet, hand_r, hand_l, hair, flare=0.0, roll=0.0, look=0.7):
+    """A combo keyframe: like P, but her eyes stay on the target (the head turns back by `look` x the twist) and the shoulders may tilt (`roll`)."""
+    pose = P(twist, lean, pz, feet, hand_r, hand_l, hair, flare)
+    pose["head_yaw"] = -look * twist
+    if roll:
+        pose["roll"] = roll
+    return pose
+
+
 # The sword combo, one block per step: wind-up pose (0), strike (1-2), follow-through (3), recovery (4-5).
-# Step 1 is a forehand (right to left), step 2 a backhand (left to right), step 3 a lunging thrust.
+# Step 1 is a forehand (right to left), step 2 a backhand (left to right), step 3 a lunging thrust. Every strike is a whole-body move: she coils
+# against the cut with her weight on the back foot, steps into it, the hips lead and the shoulders over-turn in the follow-through, the free arm
+# is thrown out as a counterweight, hair and coat whip after the turn, and her head stays on the target throughout.
 ATTACK_POSES = [
     [
-        P(-0.65, -0.06, -0.8, ((3.2, 2.0, 0), (-3.0, -3.5, 0)), (-8.0, 31.5, -2.0), (5.5, 31.5, 6.0), (-1.5, 0.3, 0.5)),
-        P(-0.2, 0.02, 0.3, ((3.0, 3.0, 0), (-3.0, -3.0, 0)), (-6.5, 31.5, 4.0), (6.0, 31.0, 3.0), (1.5, 0.6, 0.0)),
-        P(0.2, 0.1, 1.2, ((3.0, 4.2, 0), (-3.0, -2.5, 0.6)), (-1.0, 32.0, 8.5), (6.5, 32.0, -1.0), (2.2, 0.9, -0.3)),
-        P(0.6, 0.16, 2.0, ((3.0, 5.0, 0), (-3.0, -1.5, 0.2)), (4.0, 31.0, 7.0), (7.5, 34.0, -3.0), (3.0, 1.0, -0.5), 0.2),
-        P(0.4, 0.1, 1.5, ((3.0, 4.4, 0), (-3.0, -1.2, 0)), (3.0, 29.0, 6.0), (6.5, 31.0, -1.0), (-1.2, 0.3, 0.3), 0.1),
+        A(-0.95, -0.10, -1.6, ((3.4, 3.0, 0), (-3.4, -4.5, 0)), (-9.0, 33.0, -3.5), (6.0, 32.0, 7.5), (-2.2, 0.4, 0.8), 0.0, 0.08),
+        A(-0.30, 0.06, 0.6, ((3.2, 4.5, 0.8), (-3.2, -3.8, 0)), (-7.5, 32.0, 4.5), (6.5, 31.0, 3.0), (2.2, 0.8, -0.2), 0.12),
+        A(0.35, 0.16, 1.8, ((3.2, 6.2, 0), (-3.2, -3.6, 0.5)), (-0.5, 32.0, 9.5), (7.5, 32.0, -2.0), (3.4, 1.2, -0.5), 0.25),
+        A(0.90, 0.22, 2.6, ((3.2, 6.8, 0), (-3.2, -4.0, 0.3)), (5.0, 30.5, 7.5), (8.5, 35.0, -4.5), (4.2, 1.4, -0.8), 0.38, -0.10),
+        A(0.55, 0.12, 1.8, ((3.0, 5.6, 0), (-3.0, -1.8, 0)), (3.5, 29.0, 6.5), (7.0, 31.5, -1.5), (-1.8, 0.4, 0.4), 0.15),
         P(0.1, 0.03, 0.6, ((2.8, 3.0, 0), (-2.8, -0.5, 0)), (-5.0, 25.5, 2.0), (4.5, 26.0, 1.0), (0.4, 0.0, 0.0)),
     ],
     [
-        P(0.6, -0.04, -0.2, ((3.0, 4.0, 0), (-3.0, -1.5, 0)), (4.5, 30.5, 5.0), (7.5, 33.0, -2.0), (-1.5, 0.4, 0.3)),
-        P(0.15, 0.04, 0.8, ((3.0, 3.2, 0), (-3.0, -0.5, 0.3)), (1.5, 31.5, 8.5), (6.5, 33.0, -1.5), (1.5, 0.6, 0.0)),
-        P(-0.3, 0.1, 1.4, ((3.0, 2.0, 0.3), (-3.0, 4.0, 0)), (-4.0, 31.5, 7.0), (6.0, 31.0, 1.0), (-2.0, 0.9, -0.2)),
-        P(-0.65, 0.14, 1.8, ((3.0, 1.5, 0.3), (-3.0, 5.0, 0)), (-8.0, 31.0, 2.5), (5.5, 32.0, 4.5), (-3.0, 1.0, -0.4), 0.2),
-        P(-0.4, 0.09, 1.3, ((3.0, 1.5, 0), (-3.0, 4.2, 0)), (-7.0, 29.5, 2.0), (5.5, 30.0, 3.0), (1.0, 0.3, 0.3), 0.1),
+        A(0.90, -0.06, -0.6, ((3.2, 4.5, 0), (-3.2, -2.5, 0)), (5.5, 31.0, 5.0), (8.5, 34.0, -3.5), (-2.2, 0.5, 0.4), 0.0, -0.08),
+        A(0.25, 0.06, 0.9, ((3.2, 3.4, 0), (-3.2, 0.5, 0.8)), (1.5, 32.0, 9.5), (7.0, 33.0, -2.0), (2.0, 0.8, 0.0), 0.12),
+        A(-0.40, 0.14, 1.8, ((3.2, 1.5, 0.3), (-3.2, 5.2, 0)), (-5.0, 32.0, 7.5), (6.5, 31.0, 1.5), (-3.0, 1.1, -0.3), 0.25),
+        A(-0.95, 0.20, 2.4, ((3.2, -0.6, 0.3), (-3.2, 6.4, 0)), (-9.5, 31.0, 2.0), (6.0, 32.5, 6.0), (-4.2, 1.3, -0.6), 0.38, 0.10),
+        A(-0.55, 0.11, 1.6, ((3.0, 0.8, 0), (-3.0, 5.0, 0)), (-7.5, 29.5, 2.0), (5.5, 30.0, 3.5), (1.6, 0.4, 0.4), 0.15),
         P(-0.05, 0.03, 0.5, ((2.8, 0.5, 0), (-2.8, 3.0, 0)), (-5.0, 25.5, 2.0), (4.5, 26.0, 1.0), (-0.4, 0.0, 0.0)),
     ],
     [
-        P(-0.7, -0.2, -1.8, ((3.5, 3.0, 0), (-3.2, -5.0, 0)), (-5.5, 29.0, -3.0), (4.5, 33.5, 6.5), (0.6, 0.2, 1.6)),
-        P(-0.45, 0.0, 0.0, ((3.5, 4.0, 0), (-3.2, -4.5, 0)), (-5.0, 30.5, 2.5), (5.0, 33.0, 5.0), (0.8, 0.4, 0.6)),
-        P(-0.1, 0.2, 2.2, ((3.0, 7.0, 0), (-3.0, -4.5, 0)), (-3.0, 31.5, 10.0), (6.5, 33.0, 0.0), (0.0, 0.8, -1.2)),
-        P(0.2, 0.28, 3.0, ((3.0, 9.0, 0), (-3.0, -4.0, 0)), (-2.2, 32.5, 12.0), (6.5, 34.0, -3.0), (-0.5, 1.2, -2.2), 0.15),
-        P(0.1, 0.18, 2.4, ((3.0, 8.0, 0), (-3.0, -3.5, 0)), (-3.0, 30.5, 8.0), (6.0, 32.0, -1.5), (0.4, 0.4, -0.6), 0.05),
+        A(-0.90, -0.26, -2.6, ((3.5, 3.0, 0), (-3.4, -6.0, 0)), (-6.0, 29.5, -4.5), (4.5, 34.0, 8.0), (0.8, 0.2, 2.2)),
+        A(-0.50, 0.00, 0.0, ((3.5, 5.0, 1.0), (-3.4, -5.0, 0)), (-5.0, 30.5, 3.0), (5.0, 33.0, 5.0), (0.8, 0.5, 0.6)),
+        A(-0.05, 0.26, 3.0, ((3.0, 9.0, 0), (-3.0, -5.0, 0)), (-2.8, 31.5, 11.5), (7.0, 33.0, -1.5), (0.0, 1.0, -2.0), 0.15),
+        A(0.30, 0.36, 4.0, ((3.0, 10.5, 0), (-3.0, -5.0, 0)), (-2.0, 32.5, 13.5), (7.5, 34.5, -5.0), (-0.5, 1.5, -3.2), 0.30),
+        A(0.15, 0.22, 3.0, ((3.0, 9.0, 0), (-3.0, -4.0, 0)), (-3.0, 30.5, 9.0), (6.5, 32.0, -2.5), (0.6, 0.5, -0.8), 0.10),
         P(0.0, 0.03, 0.8, ((2.8, 4.0, 0), (-2.8, -1.5, 0)), (-5.0, 25.5, 2.0), (4.5, 26.0, 1.0), (0.0, 0.0, 0.0)),
     ],
 ]
@@ -467,6 +529,8 @@ def lerp_pose(a, b, k):
             "hair": tuple(mix(a["hair"], b["hair"])), "flare": float(mix(a["flare"], b["flare"]))}
     if "head_yaw" in a or "head_yaw" in b:
         result["head_yaw"] = float(mix(a.get("head_yaw", 0.0), b.get("head_yaw", 0.0)))
+    if "roll" in a or "roll" in b:
+        result["roll"] = float(mix(a.get("roll", 0.0), b.get("roll", 0.0)))
     return result
 
 
@@ -688,22 +752,79 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
     walking = mode in ("walk", "run")
     mi = 1.0 if running else 0.0
     twist = pose["twist"] if pose else 0.0
+    # --- natural body mechanics of the free loops (no pose): the pelvis turns with the stride and shifts over the standing leg, the standing hip
+    # rides high, the shoulders counter-turn and tilt against the hips, the head stays on its line. Standing, she rests her weight on her left leg.
+    free = pose is None
+    cw, sw = math.cos(w), math.sin(w)
+    pel_yaw = shift_x = hip_dy = sh_roll = head_yaw_free = 0.0
+    hip_rest = (0.0, 0.0)  # extra height of the left / right hip
+    sprint = free and running  # the sprint loop: a real run with a flight phase (keys in SPRINT_LEG)
+    sneak = free and crouch  # the crouched loops: a stalking prowl (SNEAK_* above)
+    if sprint:
+        cr = math.cos(w + 0.45)
+        pel_yaw = -0.22 * cr
+        twist = 0.30 * cr
+        shift_x = 0.3 * sw
+        sh_roll = -0.05 * sw
+        head_yaw_free = -0.85 * twist
+    elif sneak:
+        if walking:  # the hips turn a little with the stride, her weight rides over the stance leg, the head stays level and watchful
+            cr = math.cos(w + 0.3)
+            pel_yaw = -0.09 * cr
+            twist = 0.12 * cr
+            shift_x = 0.9 * sw
+            sh_roll = -0.045 * sw
+            head_yaw_free = -0.7 * twist + 0.05 * math.sin(w * 0.5)
+        else:  # standing ready: weight a little forward, scanning slowly left and right
+            shift_x = 0.6 + 0.15 * sw
+            sh_roll = -0.03 + 0.01 * sw
+            twist = -0.05
+            head_yaw_free = 0.32 * math.sin(w - 0.4)
+    elif free and walking:
+        amp = 1.3 if running else (0.55 if crouch else 1.0)
+        pel_yaw = -0.14 * amp * cw
+        twist = 0.17 * amp * cw
+        shift_x = (0.45 if running else 0.8) * sw
+        hip_dy = 0.4 * amp * sw
+        sh_roll = -0.055 * amp * sw
+        head_yaw_free = -0.6 * twist
+    elif free and not crouch:
+        shift_x = 0.75 + 0.2 * sw
+        hip_rest = (0.12, -0.26)
+        sh_roll = -0.05 + 0.012 * sw
+        twist = -0.07
+        head_yaw_free = 0.11 + 0.05 * math.sin(w + 1.0)
+
+    def rot_z(a: float):
+        c, s_ = math.cos(a), math.sin(a)
+        return np.array([[c, -s_, 0], [s_, c, 0], [0, 0, 1]])
+
+    def sneak_phase(side: int):  # standing ready she holds a lunge: the right foot set down in front, the left behind it with the heel up
+        return (w if side == 1 else w + math.pi) if walking else (0.3 if side == 1 else math.pi + 0.3)
 
     # --- legs: sagittal swing, solved for the lowest foot to stand on the ground
     def leg_chain(side: int, phase: float):
         hx = side * 2.5
-        if running:
+        if sneak:
+            thigh, flex, _pitch = sneak_leg(sneak_phase(side))
+        elif sprint:
+            thigh, flex, _pitch = sprint_leg(phase)
+        elif running:
             thigh = 0.06 + 0.30 * math.cos(phase)
             flex = 0.16 + 0.82 * max(0.0, -math.sin(phase))
         elif walking:
             thigh = (0.28 if crouch else 0.4) * math.cos(phase)  # a prowl takes short, careful steps
             flex = 0.08 + (0.45 if crouch else 0.55) * max(0.0, -math.sin(phase))
+        elif free and not crouch and side == -1:
+            thigh, flex = 0.14, 0.30  # the resting leg: knee loose, foot a little forward
         else:
             thigh, flex = 0.0, 0.04
-        if crouch:  # low and ready, knees bent but not sitting
+        if crouch and not sneak:  # low and ready, knees bent but not sitting
             thigh += 0.38
             flex += 0.78
         hip = np.array([hx, 24.0, 0.2])
+        if free:
+            hip = np.array([shift_x, 24.0, 0.2]) + rot_y(pel_yaw) @ np.array([hx, 0.0 if sneak else side * hip_dy + hip_rest[0 if side == 1 else 1], 0.0])
         knee = hip + 11.5 * np.array([0.0, -math.cos(thigh), math.sin(thigh)])
         shank = thigh - flex
         ankle = knee + 10.0 * np.array([0.0, -math.cos(shank), math.sin(shank)])
@@ -733,11 +854,19 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         lowest = min(leg[2][1] - 2.5 for leg in legs)
         bob = -lowest
         drop = 0.0
-    body_off = np.array([0.0, drop, pose["pz"] if pose else 0.0])
-    if running:
+    body_off = np.array([shift_x, drop, pose["pz"] if pose else 0.0])
+    if sprint:  # grounded at the strike and in the stance (where the body sinks into the knee), then she flies
+        def grounded(ph):
+            return -min(leg[2][1] - 2.5 for leg in (leg_chain(1, ph), leg_chain(-1, ph + math.pi)))
+        heights = [grounded(0.0), grounded(math.pi / 3.0), grounded(0.0) + SPRINT_LIFT]
+        u = (t * 6.0) % 3.0
+        k = u - int(u)
+        k = k * k * (3 - 2 * k)
+        bob = heights[int(u) % 3] + (heights[(int(u) + 1) % 3] - heights[int(u) % 3]) * k
+    elif running:
         bob += 0.65 * (1.0 - math.cos(2 * w)) / 2.0  # a light lift between grounded contacts
     # torso lean and breathing
-    lean = pose["lean"] if pose else (0.36 if crouch else (0.15 if running else (0.05 if walking else 0.0)))
+    lean = pose["lean"] if pose else (((0.44 + 0.03 * math.sin(2 * w)) if walking else 0.40) if crouch else ((0.34 if sprint else 0.15) if running else (0.05 if walking else 0.0)))
     breath = 0.0 if (walking or pose) else math.sin(w)
     sway_x = 0.0 if (walking or pose) else 0.5 * math.sin(w)
 
@@ -751,6 +880,8 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         ph = 2 * math.pi * i / 14
         wave = (0.55 * math.sin(w + ph * 2) if not walking else 0.9 * math.sin(w + ph) - 0.5 * math.cos(ph)) * 0.7 * (1.3 if running else 1.0)
         tilt = 0.16 + 0.04 * (i % 2) + 0.04 * wave + (pose["flare"] * (0.6 + 0.4 * math.cos(ph)) if pose else 0.0)
+        if sprint:
+            tilt += 0.16 * max(0.0, -math.sin(ph))  # the back of the skirt lifts in the wind of the run
         rx, rz = 4.7, 3.9
         ax = (math.cos(ph) * rx, 22.8, math.sin(ph) * rz)
         up = np.array([-math.sin(tilt) * math.cos(ph), math.cos(tilt), -math.sin(tilt) * math.sin(ph) * 0.8])
@@ -765,9 +896,17 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         follow = (0.7 * math.sin(w + side * 0.45) if walking else 0.25 * math.sin(w + side))
         if pose:
             follow = 0.4 * float(pose.get("flare", 0.0))
+        drift = (-0.9 * math.sin(w - 0.9) if walking else -0.5) if free and not crouch else 0.0  # the tails lag behind the sideways shift of the hips
+        if sprint:  # the tails fly out behind her, each with its own wave
+            flap = math.sin(2 * w + side * 0.9)
+            m.ribbon([(side * 2.7, 24.0, -1.8),
+                      (side * 3.2 + drift * 0.4, 22.6 + 0.5 * flap, -7.0),
+                      (side * 3.6 + drift, 21.2 + 1.5 * math.sin(2 * w + side * 0.9 - 1.1), -13.0)],
+                     [2.0, 3.5, 3.0, 0.45], 0.8, COAT, (1, 0, 0), kind="")
+            continue
         m.ribbon([(side * 2.7, 24.0, -1.8),
-                  (side * 3.1, 19.0, -4.5 + follow * 0.5),
-                  (side * 3.3, 13.0, -8.0 + follow)],
+                  (side * 3.1 + drift * 0.45, 19.0, -4.5 + follow * 0.5),
+                  (side * 3.3 + drift, 13.0, -8.0 + follow)],
                  [2.0, 3.5, 3.0, 0.45], 0.8, COAT, (1, 0, 0), kind="")
 
     # --- legs and boots
@@ -779,14 +918,28 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         m.limb(up, knee, 2.05, 2.0, BOOT)
         m.ell(up, (2.25, 0.6, 2.25), VIOLET, kind="emit")
         fdir = np.array([0.0, -math.sin(shank) * 0.0, math.cos(shank)])
+        if (free and walking) or sneak:  # the foot rolls: toes up at the heel strike, hanging while the leg swings through
+            ph_leg = sneak_phase(side) if sneak else (w if side == 1 else w + math.pi)
+            Rf = rot_x(-0.32 * max(0.0, math.cos(ph_leg)) ** 2 * (0.0 if crouch else 1.0) + (0.6 if running else 0.42) * max(0.0, -math.sin(ph_leg)))
+            if sprint:
+                Rf = rot_x(sprint_leg(ph_leg)[2])
+            elif sneak:
+                Rf = rot_x(sneak_leg(ph_leg)[2])
+            heel = ankle + np.array([0.0, -2.2, -0.9])
+            m.ell(heel + Rf @ np.array([0.0, 0.7, 2.2]), (1.55, 1.1, 2.7), BOOT, R=Rf)
+            m.ell(heel, (1.45, 0.8, 1.1), BOOT)
+            m.ell(heel + Rf @ np.array([0.0, 2.7, 2.1]), (1.6, 0.35, 1.2), GOLD, kind="emit", R=Rf)
+            continue
         m.ell(ankle + np.array([0.0, -1.5, 1.3]), (1.55, 1.1, 2.7), BOOT)
         m.ell(ankle + np.array([0.0, -2.2, -0.9]), (1.45, 0.8, 1.1), BOOT)
         m.ell(ankle + np.array([0.0, 0.5, 1.2]), (1.6, 0.35, 1.2), GOLD, kind="emit")  # buckle
 
     # --- torso
     m.off = body_off
-    tor = rot_x(lean) @ rot_y(twist)
-    TR = tor if pose else None
+    tor = rot_x(lean) @ rot_z(sh_roll) @ rot_y(twist) if free else rot_x(lean) @ rot_y(twist)
+    if pose and pose.get("roll"):  # optional: the shoulders tilt into a cut
+        tor = rot_x(lean) @ rot_z(float(pose["roll"])) @ rot_y(twist)
+    TR = tor if (pose or twist or sh_roll) else None
     def T(p):
         base = np.array([0.0, 27.0, 0.0])
         return base + tor @ (np.array(p, float) - base)
@@ -827,14 +980,31 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         else:
             swing = 0.08 * math.sin(w + (0 if side == 1 else 1.4))
         flex = 0.95 if running else 0.3 + (0.18 * max(0.0, -swing) if walking else 0.0)
-        if crouch:  # arms held forward and bent, ready to spring
+        if sneak:  # stalking: the arms are held forward and bent, the free one counter-swings softly, the sword hand rides by the hip
+            cy = math.cos((w if side == 1 else w + math.pi) - 0.4) if walking else 0.0
+            swing = (0.62 - 0.16 * cy) if side == 1 else (0.45 - 0.08 * cy)
+            flex = (1.15 + 0.15 * cy) if side == 1 else 0.95
+            if not walking:
+                swing += 0.03 * math.sin(w + side)
+        elif free and walking and not running:  # a loose arm: the forearm lags behind the upper arm and folds on the way forward
+            lagged = -(0.18 if crouch else 0.38) * math.cos((w if side == 1 else w + math.pi) - 0.55)
+            flex = 0.2 + 1.0 * max(0.0, lagged) + 0.12 * max(0.0, -lagged)
+        elif sprint:  # pumping arms: the free one bent square and driven hard, the sword arm calmer so the blade can trail
+            pump = -math.cos((w if side == 1 else w + math.pi) + 0.45)
+            swing = (0.95 * pump + 0.12) if side == 1 else (0.55 * pump - 0.05)
+            flex = (1.45 + 0.3 * pump) if side == 1 else (0.95 + 0.2 * pump)
+        elif free and not crouch and side == 1:
+            flex = 0.42  # standing: the free hand rests a little bent
+        if crouch and not sneak:  # arms held forward and bent, ready to spring
             swing += 0.5
             flex += 0.55
-        abd = 0.16 - 0.08 * mi
+        abd = 0.16 - 0.08 * mi + (0.05 if free and walking and not running else 0.0)
         d1 = np.array([side * math.sin(abd), -math.cos(abd) * math.cos(swing), math.cos(abd) * math.sin(swing)])
-        elbow = sh + 6.6 * d1
         sw2 = swing + flex
         d2 = np.array([side * math.sin(abd * 0.6), -math.cos(sw2), math.sin(sw2)])
+        if free and twist:  # the arms hang from the turned shoulders
+            d1, d2 = rot_y(twist) @ d1, rot_y(twist) @ d2
+        elbow = sh + 6.6 * d1
         wrist = elbow + 6.0 * d2
         m.ell(sh, (1.75, 1.75, 1.75), LEATHER)
         if side == -1:
@@ -851,13 +1021,26 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
     m.ell(T((0, 41.3, 0.15)), (1.5, 0.45, 1.5), LEATHER)  # choker
     m.ell(T((0, 41.2, 1.55)), (0.65, 0.65, 0.5), CRYSTAL, kind="emit")
     bobh = 0.2 * breath
-    head_yaw = float(pose.get("head_yaw", 0.0)) if pose else 0.0
+    head_yaw = float(pose.get("head_yaw", 0.0)) if pose else head_yaw_free
     head_turn = rot_y(head_yaw)
+    if pose and pose.get("nod"):  # optional: the head tips about its own centre (negative = the face comes up: swimming with the head carried high)
+        head_turn = rot_x(float(pose["nod"])) @ head_turn
     def H(p):
         pivot = np.array([0.0, 45.0 + bobh, 0.35])
-        return T(pivot + head_turn @ (np.asarray(p, float) - pivot)) if head_yaw else T(p)
-    head_R = tor @ head_turn if pose else None
+        return T(pivot + head_turn @ (np.asarray(p, float) - pivot)) if (head_yaw or (pose and pose.get("nod"))) else T(p)
+    def HL(p, l):  # a point of the long hair: its root follows the nodding head, further down it follows the body only
+        a = H(p)
+        if not (pose and pose.get("nod")):
+            return a
+        pv = np.array([0.0, 45.0 + bobh, 0.35])
+        b = T(pv + rot_y(head_yaw) @ (np.asarray(p, float) - pv))
+        return a + (b - a) * min(1.0, 1.5 * l)
+    head_R = tor @ head_turn if pose else (rot_y(twist + head_yaw) if (twist or head_yaw) else None)  # free loops: the head only turns, it never nods with the lean
     hc = H((0.0, 45.0 + bobh, 0.35))
+    Rhang = rot_x(-0.42 * lean) if sneak else None
+
+    def HH(p):  # sneaking: the long hair hangs by gravity, it does not lean over with the torso
+        return p if Rhang is None else hc + Rhang @ (np.asarray(p, float) - hc)
     head_tilt = (0.06 * math.sin(w + 1.0)) if not walking else 0.0
     m.ell(hc, (4.65, 5.1, 4.55), SKIN, kind="head", R=head_R)
     if pose:  # where food goes (for the game's eating effects), absolute like the other rig points
@@ -871,7 +1054,7 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
     m.rig["neck_b"] = T((-1.9, 39.9, 1.0)) + m.off
     m.rig["pendant"] = T((0.0, 35.2, 3.7)) + m.off
     m.facing = [tor @ np.array([0.0, 0.0, 1.0]), hR @ np.array([0.0, 0.0, 1.0]), hR @ np.array([1.0, 0.0, 0.0]), hR @ np.array([-1.0, 0.0, 0.0]), tor @ np.array([1.0, 0.0, 0.0]), tor @ np.array([-1.0, 0.0, 0.0])]
-    cap_c = hc + (head_R @ np.array([0.0, 0.45, -0.35]) if pose else np.array([0.0, 0.45, -0.35]))
+    cap_c = hc + (head_R @ np.array([0.0, 0.45, -0.35]) if head_R is not None else np.array([0.0, 0.45, -0.35]))
     m.ell(cap_c, (5.05, 5.5, 4.95), HAIR, kind="hair", tag=3.0, clip=face_open, R=head_R)
     # --- hair: fringe, side locks, long back hair with a travelling wave
     def hair_off(l: float, i: int, side_scale: float = 1.0):
@@ -896,11 +1079,22 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             x = 1.6 * l ** 1.2 * math.sin(lag + 0.5) * side_scale
             z = -(3.0 + 1.9 * math.sin(lag - 0.8)) * l ** 1.25
             y = (0.9 + 1.3 * math.sin(lag - 1.5)) * l ** 1.15
+            if sprint:  # the hair flies: a long mane streaming out behind the head, a wave running down it twice a stride, the strands fanned apart
+                run = 2 * w - 3.2 * l + ph * 0.5
+                fan = math.sin(ph * 1.7 + 0.6)
+                x = (1.5 * math.sin(run + 0.5) + 1.1 * fan) * l ** 1.2 * side_scale
+                z = -(8.2 + 1.4 * math.sin(run - 0.8) + 1.0 * fan) * l ** 1.1
+                y = 12.0 * l ** 1.1 - 4.5 * l ** 2.6 + (3.6 * math.sin(run) + 2.4 * fan) * l ** 1.3  # rises off the neck, the tips sink and whip
         elif walking:
             lag = w - 1.5 * l + ph * 0.24
             x = 1.2 * l ** 1.2 * math.sin(lag + 0.4) * side_scale
+            if free:  # the mass of hair swings out behind the sideways shift of the hips
+                x += 0.9 * l ** 1.3 * (math.sin(w - 1.3 - 0.8 * l) - sw)
             z = -(1.4 + 1.0 * math.sin(lag - 0.8)) * l ** 1.25
             y = (0.25 + 0.8 * math.sin(lag - 1.5)) * l ** 1.15
+            if free and not crouch:  # more life in the walk: the mane lifts off her back and each strand has its own beat
+                z -= (1.3 + 0.9 * math.sin(2 * w - 2.4 * l + ph * 0.6)) * l ** 1.2
+                y += (0.9 + 0.8 * math.sin(2 * w - 2.4 * l + ph * 0.6 - 0.7)) * l ** 1.2
         else:
             x = 1.3 * l ** 1.2 * math.sin(w + ph - 1.6 * l) * side_scale
             z = 0.8 * l * math.sin(w + ph * 0.5 - 1.0 * l)
@@ -921,8 +1115,8 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
     for side in (-1, 1):  # long side locks framing the face
         pts = []
         for k, l in enumerate(np.linspace(0, 1, 6)):
-            base = H((side * (4.9 + 0.3 * l), 45.2 - 15.0 * l, 1.8 + 0.5 * l))
-            pts.append(base + hair_off(l, 3 + side) * 0.7)
+            base = HL((side * (4.9 + 0.3 * l), 45.2 - 15.0 * l, 1.8 + 0.5 * l), l)
+            pts.append(HH(base + hair_off(l, 3 + side) * 0.7))
         m.ribbon(pts, [1.15, 1.2, 1.15, 0.9, 0.5], 0.85, HAIR, (0, 0, 1), tag=7 + side)
     back = [(-3.4, 1.0), (-2.2, 0.6), (-1.0, 0.0), (0.2, 0.4), (1.4, 0.0), (2.6, 0.7), (3.6, 1.1)]
     for i, (bx, extra) in enumerate(back):
@@ -933,16 +1127,16 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             z = -3.0 - 0.9 * math.sin(math.pi * min(l * 1.3, 1.0)) - (0.35 + extra * 0.55) * l
             at_y = 45.5 - (45.5 - y_end) * l
             z -= min(max((28.0 - at_y) / 7.0, 0.0), 1.0) * (2.3 + 0.9 * mi)  # below the waist the hair hangs clear of the skirt
-            p = H((spread, at_y, z))
-            pts.append(p + hair_off(l, i))
+            p = HL((spread, at_y, z), l)
+            pts.append(HH(p + hair_off(l, i)))
         m.ribbon(pts, [1.5, 1.65, 1.55, 1.4, 1.15, 0.85, 0.55, 0.3, 0.12], 0.95, HAIR, (0, 0, -1), tag=i * 1.7)
     # Two lighter, separated outer locks give the silhouette the portrait's
     # layered shape; their tips lag independently from the main hair mass.
     for side in (-1, 1):
         pts = []
         for l in np.linspace(0, 1, 7):
-            base = H((side * (4.0 + 1.5 * l), 45.2 - 23.0 * l, -1.5 - 2.4 * l))
-            pts.append(base + hair_off(l, 9 + side * 2, 1.1))
+            base = HL((side * (4.0 + 1.5 * l), 45.2 - 23.0 * l, -1.5 - 2.4 * l), l)
+            pts.append(HH(base + hair_off(l, 9 + side * 2, 1.1)))
         m.ribbon(pts, [0.85, 1.0, 0.85, 0.55, 0.1], 0.6, HAIR, (0, 0, -1), tag=13 + side * 1.3)
     # hair ornament: a small gold pin with a violet gem
     m.ell(H((4.7, 48.0 + bobh, 0.8)), (0.5, 0.9, 0.5), GOLD, kind="emit")

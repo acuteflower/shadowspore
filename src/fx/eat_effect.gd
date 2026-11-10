@@ -27,6 +27,8 @@ func _ready() -> void:
 func show_state(time: float, hand: Vector2, mouth: Vector2) -> void:
 	if time < LAUNCH:
 		_launch_from = hand
+	if _t < BITE and time >= BITE:
+		Sfx.at(self, "eat_bite", global_position + mouth, -3.0, 0.04, 220.0) ## the first bite
 	_t = time
 	_hand = hand
 	_mouth = mouth

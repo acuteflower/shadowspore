@@ -40,5 +40,7 @@ func play_effects(sprite: Sprite2D, from: Vector2, to: Vector2) -> void:
 		fx.global_position = point
 		world.add_child(fx)
 
+	Sfx.at(self, "blink_out", from, -2.0)
+	Sfx.at(self, "blink_in", to, -3.0)
 	sprite.modulate = ARRIVE_TINT
 	create_tween().tween_property(sprite, "modulate", Color.WHITE, 0.35)

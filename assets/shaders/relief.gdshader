@@ -21,7 +21,7 @@ uniform float time = 0.0;
 uniform float night = 0.0;
 uniform bool glow_pass = false; // the second, additive and unlit copy of this shader (ReliefLayer): only the glowing veins of crystal and void walls
 uniform float world_tiles = 1100.0;
-uniform vec3 tints[5]; // what the biome's ground layer multiplies its grass with
+uniform vec3 tints[6]; // what the biome's ground layer multiplies its grass with
 
 const float TILE = 16.0;
 const float WALL = 32.0; // px a wall is tall
@@ -62,7 +62,7 @@ Tile tile(ivec2 t) {
 	r.kind = b.g & 15;
 	r.style = b.g >> 4;
 	r.geom = b.b;
-	r.biome = clamp(b.a - 200, 0, 4);
+	r.biome = clamp(b.a - 200, 0, 5);
 	return r;
 }
 
@@ -130,12 +130,15 @@ float up_dist_wall(vec2 p) {
 	return found;
 }
 
+bool glows(int style) { return style == 3 || style == 4; }
+
 // palette step i (0 dark .. 5 light) of a style's rock
 vec3 rock(int style, int i) {
 	i = clamp(i, 0, 5);
 	if (style == 2) return MASON[i];
 	if (style == 3) return STONE[i] * vec3(0.86, 0.8, 1.12);
 	if (style == 4) return STONE[i] * vec3(0.42, 0.32, 0.6);
+	if (style == 5) return STONE[i] * vec3(0.5, 0.58, 0.64); // Hexenwald: cold dark slate
 	return STONE[i];
 }
 
@@ -193,7 +196,7 @@ vec3 wall_color(vec2 p, float dy, int style, vec3 tint) {
 		if (hash21(vec2(slab, layer)) > 0.78 && mod(p.x + layer * 5.0, 7.0) < 1.0) tone -= 1.7;
 		tone += (bayer(p) - 0.5) * 0.7;
 		col = rock(style, int(floor(tone)));
-		if (style == 1 && within < 1.5 && vnoise(p * 0.11 + 3.0) > 0.64) col = grass(int(floor(2.0 + hash21(p) * 2.0)), tint);
+		if ((style == 1 || style == 5) && within < 1.5 && vnoise(p * 0.11 + 3.0) > 0.64) col = grass(int(floor(2.0 + hash21(p) * 2.0)), tint);
 		if (style == 3) {
 			float d = p.x * 0.6 + p.y * 0.35 + vnoise(p * 0.15) * 7.0;
 			float vein = abs(fract(d / 11.0) - 0.5);
@@ -300,7 +303,7 @@ vec4 wall_pixel(vec2 p, float dist, int style, vec3 tint) {
 	vec3 col = wall_color(p, dy, style, tint);
 	col = wall_life(p, dy, style, col, tint);
 	// grass spills over rock and masonry from the lip in ragged tongues
-	float tongue = style == 0 ? 0.0 : (vnoise(vec2(p.x * 0.17, 3.0)) - 0.42) * 16.0 * (style == 1 ? 1.0 : 0.5);
+	float tongue = style == 0 ? 0.0 : (vnoise(vec2(p.x * 0.17, 3.0)) - 0.42) * 16.0 * (style == 1 || style == 5 ? 1.0 : 0.5);
 	if (dy < tongue + (hash21(vec2(p.x, 5.0)) - 0.5) * 3.0) col = grass(2 + int(floor(hash21(p) * 2.6)), tint);
 	float jag = (style == 0 ? 2.0 : 1.0) + floor(hash21(vec2(floor(p.x / 2.0), 1.0)) * (style == 0 ? 4.0 : 3.0));
 	if (dy < jag) {
@@ -420,7 +423,7 @@ vec4 forest_steps(vec2 p, vec2 l, Tile c, vec3 tint) {
 }
 
 vec4 steps(vec2 p, vec2 l, Tile c, vec3 tint, bool rough) {
-	if (c.style < 3) return forest_steps(p, l, c, tint); // crystal and void biomes keep their stone
+	if (c.style < 3 || c.style == 5) return forest_steps(p, l, c, tint); // crystal and void biomes keep their stone
 	int cpos = (c.geom >> 4) & 3;
 	float jitter = rough ? floor((hash21(vec2(floor(p.x / 4.0), floor(l.y / 4.0))) - 0.5) * 3.0) : 0.0;
 	float ly = l.y + jitter;
@@ -506,13 +509,13 @@ void fragment() {
 				Tile up1 = tile(tc - ivec2(0, 1));
 				Tile up2 = tile(tc - ivec2(0, 2));
 				Tile up3 = tile(tc - ivec2(0, 3));
-				may_glow = c.style >= 3 || up1.style >= 3 || up2.style >= 3 || up3.style >= 3;
+				may_glow = glows(c.style) || glows(up1.style) || glows(up2.style) || glows(up3.style);
 				if (!may_glow) {
 					Tile up1_l = tile(tc + ivec2(-1, -1));
 					Tile up1_r = tile(tc + ivec2(1, -1));
 					Tile up2_l = tile(tc + ivec2(-1, -2));
 					Tile up2_r = tile(tc + ivec2(1, -2));
-					may_glow = up1_l.style >= 3 || up1_r.style >= 3 || up2_l.style >= 3 || up2_r.style >= 3;
+					may_glow = glows(up1_l.style) || glows(up1_r.style) || glows(up2_l.style) || glows(up2_r.style);
 				}
 			}
 			if (!glow_pass || may_glow) {

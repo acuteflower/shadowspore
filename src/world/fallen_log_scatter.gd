@@ -11,7 +11,7 @@ static func candidate(world: Variant,c: Vector2i,index: int,obstacles: Array[Dic
 	rng.seed = hash(Vector3i(c.x*4+x,c.y*4+y,world._map.world_seed+12409))
 	var pos: Vector2 = Vector2(c*32)*16+Vector2(x*128+64,y*128+64)+Vector2(rng.randf_range(-20,20),rng.randf_range(-20,20)).round()
 	var tile: Vector2i = Vector2i(pos/16.0)
-	if not world._land_at(tile.x,tile.y): return {}
+	if not world._land_at(tile.x,tile.y) or world._generator.is_bare(tile): return {}
 	var trees: int = _trees_near(pos, obstacles, grid)
 	var chance: float = float(DataRegistry.table("fallen_logs").get("chance",0.42))
 	chance *= 0.12 if trees == 0 else 1.0 + 0.15 * float(mini(trees, 4)) ## a trunk lies in or at a wood, rarely out in the open

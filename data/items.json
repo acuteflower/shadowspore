@@ -857,5 +857,135 @@
    }
   ],
   "description": "Aus der Feder, die der Himmel nicht halten konnte, in Torbens Esse zur Klinge geschlagen. Sie spaltet, was sie berührt, und die Luft gleich mit."
+ },
+ "hag_wood": {
+  "name": "Hexenholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/hag_wood.png",
+  "description": "Fast schwarzes, in sich verdrehtes Holz. Die Maserung läuft in Spiralen, als hätte der Baum sich im Wachsen umgesehen."
+ },
+ "bone_wood": {
+  "name": "Bleichholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/bone_wood.png",
+  "description": "Totes Holz, hell und glatt wie ein Knochen. Es ist leichter, als es sein dürfte."
+ },
+ "hex_thorn": {
+  "name": "Hexendorn",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/hex_thorn.png",
+  "description": "Ein fingerlanger, bleicher Dorn. Sticht auch, wenn man gut aufpasst."
+ },
+ "hex_berry": {
+  "name": "Hexenbeere",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/hex_berry.png",
+  "description": "Schwarzviolett und prall, mit einem giftgrünen Glanzpunkt. Niemand im Dorf würde sie essen."
+ },
+ "grave_candle": {
+  "name": "Totenkerze",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/grave_candle.png",
+  "description": "Eine wächserne Blüte, auf der eine kalte grüne Flamme steht. Sie wärmt nicht und geht im Wind nicht aus."
+ },
+ "witch_hat": {
+  "name": "Hexenhut",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/witch_hat.png",
+  "description": "Eine violette Blüte mit krummer Spitze und breiter Krempe. Unter der Krempe glimmt es grün."
+ },
+ "toad_cap": {
+  "name": "Krötenschirm",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/toad_cap.png",
+  "description": "Gedrungen, weinrot, mit bleichen Warzen, die nachts schwach leuchten. Kröten sitzen gern darunter."
+ },
+ "ghost_frond": {
+  "name": "Geisterwedel",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/ghost_frond.png",
+  "description": "Ein blasser, fast durchscheinender Farnwedel. Im Dunkeln sieht man ihn besser als bei Tag."
+ },
+ "mandrake": {
+  "name": "Alraune",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/items/mandrake.png",
+  "description": "Eine Wurzel mit Armen, Beinen und einem schlafenden Gesicht. Man sagt, sie schreit, wenn man sie weckt. Diese hier schweigt."
+ },
+ "curse_silver": {
+  "name": "Fluchsilber",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/curse_silver.png",
+  "description": "Dunkles Gestein, durchzogen von blassem Silber, das nachts giftgrün aufglimmt. Liegt kalt in der Hand, auch am Feuer."
+ },
+ "clarity_earrings": {
+  "name": "Ohrringe der Klarheit",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "earrings",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/clarity_earrings.png",
+  "bonus": {
+   "absorb": 0.04
+  },
+  "perks": [
+   "clear_sight"
+  ],
+  "look": {
+   "metal": "silver",
+   "stone": "a8ff6a",
+   "stones": 2,
+   "glow": true,
+   "drop": [
+    "m",
+    "S",
+    "T",
+    "s"
+   ]
+  },
+  "description": "Zwei Splitter Fluchsilber an einem Hexenknoten. Der Wald lügt weiter. Du hörst nur nicht mehr hin."
  }
 }

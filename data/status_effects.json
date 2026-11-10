@@ -17,5 +17,38 @@
   "min_damage": 0,
   "color": "ff4fd8",
   "hot": "fff0fb"
+ },
+ "hallucinated": {
+  "name": "HALLUZINIERT",
+  "seconds": 8.0,
+  "tick": 99.0,
+  "damage_ratio": 0.0,
+  "min_damage": 0,
+  "color": "a8ff6a",
+  "hot": "eaffc4",
+  "permanent": true,
+  "glyph": "eye",
+  "min_gloom": 0.35,
+  "trug_seconds": 90.0,
+  "eyes": [
+   6.0,
+   16.0
+  ],
+  "whisper": [
+   14.0,
+   34.0
+  ],
+  "decoy": [
+   30.0,
+   70.0
+  ],
+  "lie": [
+   25.0,
+   60.0
+  ],
+  "phantom": [
+   40.0,
+   110.0
+  ]
  }
 }

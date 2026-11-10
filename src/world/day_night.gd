@@ -78,16 +78,21 @@ func _update() -> void:
 	if not indoors:
 		var wet: float = Moisture.wetness() ## a damp day or after a fog night: the world is a little cooler and darker
 		color = color.lerp(color * Color(0.9, 0.95, 1.0, 1.0), wet * 0.6)
-	var sun: float = 0.0 if indoors else TimeManager.sun_amount()
-	_daylight.follow(indoors, sun, TimeManager.golden_amount())
+	var gloom: float = 0.0 if indoors else _gloom_here() ## the Hexenwald: permanent dusk by day, a deeper night (docs/hexenwald_konzept.md, stage 3)
+	if gloom > 0.0:
+		color = color.lerp(TimeManager.NIGHT_COLOR, gloom) ## always night in the mood, whatever the clock says
+	var sun: float = 0.0 if indoors else TimeManager.sun_amount() * (1.0 - gloom)
+	_daylight.follow(indoors, sun, TimeManager.golden_amount() * (1.0 - gloom))
 	if _ground != null:
 		_ground.set_shader_parameter("sun", sun)
-		_ground.set_shader_parameter("golden", 0.0 if indoors else TimeManager.golden_amount())
+		_ground.set_shader_parameter("golden", 0.0 if indoors else TimeManager.golden_amount() * (1.0 - gloom))
 	if _sun_glow != null:
 		_sun_glow.set_shader_parameter("sun", sun)
-		_sun_glow.set_shader_parameter("golden", 0.0 if indoors else TimeManager.golden_amount())
+		_sun_glow.set_shader_parameter("golden", 0.0 if indoors else TimeManager.golden_amount() * (1.0 - gloom))
 	## water glints, crystal and flora sparkle, void lip: only sent when they really moved
-	var g_night: float = 0.0 if indoors else TimeManager.night_amount()
+	var night: float = TimeManager.night_amount()
+	night = lerpf(night, 1.0, gloom) ## its glowing plants, moon patches and mist are always at night strength
+	var g_night: float = 0.0 if indoors else night
 	var g_dew: float = 0.0 if indoors else maxf(TimeManager.dew_amount(), 0.7 * Moisture.wetness()) ## the wet ground shows dew drops
 	if absf(sun - _g_sun) > GLOBAL_EPSILON:
 		_g_sun = sun
@@ -98,7 +103,6 @@ func _update() -> void:
 	if absf(g_dew - _g_dew) > GLOBAL_EPSILON:
 		_g_dew = g_dew
 		RenderingServer.global_shader_parameter_set("g_dew", g_dew)
-	var night: float = TimeManager.night_amount()
 	var now: int = Time.get_ticks_msec()
 	if absf(night - _last_night) > 0.002 and now - _night_sent_ms >= NIGHT_CALL_MS: ## at most 10 times a second during dusk
 		_night_sent_ms = now
@@ -108,3 +112,9 @@ func _update() -> void:
 	_atmosphere.update(indoors)
 	if _glow != null:
 		_glow.set_shader_parameter("night", night)
+
+
+## 0 on the meadow .. 1 deep in the Hexenwald, at the middle of what the camera sees (BiomeBlend).
+func _gloom_here() -> float:
+	var camera: Camera2D = get_viewport().get_camera_2d()
+	return BiomeBlend.amount_at(camera.get_screen_center_position()) if camera != null else 0.0

@@ -236,6 +236,8 @@ func _build_items() -> void:
 				_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
 				_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
 				_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
+				_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
+				_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
 				_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
 				_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
 				_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
@@ -749,6 +751,17 @@ func _run_action(action: String) -> void:
 				return
 			if keeper.inventory.count_item("rissfeder") == 0 and not TalismanRules.worn_ids(keeper.inventory.equipment).has("rissfeder"):
 				keeper.inventory.give("rissfeder", 1)
+		"clarity": ## the Ohrringe der Klarheit into the bag (host), not twice
+			var wearer: Player = _player as Player
+			if wearer == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if wearer.inventory.count_item("clarity_earrings") == 0 and not TalismanRules.worn_ids(wearer.inventory.equipment).has("clarity_earrings"):
+				wearer.inventory.give("clarity_earrings", 1)
+		"hexenwald": ## into the middle of the Hexenwald
+			if _player is Player:
+				(_player as Player).request_teleport(Vector2(826, 880) * 16.0)
+				_set_open(false)
 		"relics_reset": ## forget the boss kills of every player: the next kill of Mornath drops the Rissfeder for certain again (host)
 			var ledger: BossRelics = BossRelics.of(get_tree())
 			if ledger == null or not multiplayer.is_server():

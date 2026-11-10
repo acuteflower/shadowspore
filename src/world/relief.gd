@@ -54,8 +54,12 @@ func _apply_world_biome() -> void:
 	var biome: int = DataRegistry.table("biomes").keys().find(active)
 	if biome < 0:
 		return
+	var own: Array = []
+	var ids: Array = DataRegistry.table("biomes").keys()
+	for id: Variant in DataRegistry.table("world_map").get("own_biomes", []): ## biomes of their own keep the bake's biome byte
+		own.append(200 + ids.find(String(id)))
 	for i: int in range(0, _bytes.size(), 4):
-		if _bytes[i + 3] == 0:
+		if _bytes[i + 3] == 0 or own.has(int(_bytes[i + 3])):
 			continue
 		_bytes[i + 3] = 200 + biome
 		if active == "meadow":
@@ -98,7 +102,7 @@ func has_glow_style(rect: Rect2i) -> bool:
 			var idx: int = row + x * 4
 			if _bytes[idx + 3] != 0: ## land
 				var st: int = _bytes[idx + 1] >> 4
-				if st >= 3:
+				if st == 3 or st == 4:
 					return true
 	return false
 

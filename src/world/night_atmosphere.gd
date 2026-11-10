@@ -9,6 +9,8 @@ const LIGHTS: int = 8
 
 var fog: float = 0.0 ## 0..1, what the shader uses right now (readable for tests)
 var moon: float = 0.0
+var hex: float = 0.0 ## 0..1, the Hexenwald's own mist on this screen (by day too)
+var clearing: float = 0.0 ## px: how far the Ohrringe der Klarheit push it back round the local heroine right now
 var special: String = "none" ## tonight's special kind (the same pure function the NightDirector uses, so every peer agrees)
 
 var _layer: CanvasLayer
@@ -64,18 +66,36 @@ func update(indoors: bool) -> void:
 	var town: TownManager = _find_town()
 	if town != null:
 		town.light_scale = NightRules.light_scale(special) if window else 1.0
+	_push_transform()
+	var deep: float = 0.0 ## the wood anywhere on this screen
+	if not indoors:
+		for corner: Vector2 in [Vector2(0.5, 0.5), Vector2.ZERO, Vector2.RIGHT, Vector2.DOWN, Vector2.ONE]:
+			deep = maxf(deep, BiomeBlend.amount_at(_origin + _view * corner))
+	night = lerpf(night, 1.0, deep) ## the Hexenwald is always night: moon pools and fog run at full strength there
 	var mist: float = 0.0 if indoors else 0.4 * TimeManager.dew_amount() ## the dawn: a thin mist that burns off
 	fog = maxf(night * clampf(0.22 + 0.34 * (1.0 - moon) * 2.0 + NightRules.fog_boost(special), 0.0, 1.0), mist)
-	_layer.visible = night > 0.003 or fog > 0.003
+	hex = 0.0 if deep <= 0.003 else 0.74 + 0.22 * night
+	clearing = move_toward(clearing, 230.0 if _clear_sighted() else 0.0, 150.0 * get_process_delta_time()) ## putting them on: the mist draws back as a wave
+	_fog_material.set_shader_parameter("hex", hex)
+	_fog_material.set_shader_parameter("clear_px", clearing)
+	_layer.visible = night > 0.003 or fog > 0.003 or hex > 0.003
 	if not _layer.visible:
 		return
-	_push_transform()
 	for material: ShaderMaterial in [_moon_material, _fog_material]:
 		material.set_shader_parameter("fog", fog)
 	_moon_material.set_shader_parameter("night", night)
 	_moon_material.set_shader_parameter("moon", moon)
 	_fog_material.set_shader_parameter("night", night)
 	_fog_material.set_shader_parameter("lights", _lights(town, _origin + _view * 0.5, _view.length() * 0.5))
+
+
+## The local heroine wears a piece with the perk `clear_sight` (duck typed: this node must not name Player).
+func _clear_sighted() -> bool:
+	for player: Node in get_tree().get_nodes_in_group("players"):
+		if player.is_multiplayer_authority():
+			var worn: Variant = player.get("talismans")
+			return worn != null and (worn.get("perks") as Dictionary).has("clear_sight")
+	return false
 
 
 ## Hands the camera's current view (world origin and size of the screen) to both shaders. Runs right before every draw, so the pools and the fog stay nailed to the ground.

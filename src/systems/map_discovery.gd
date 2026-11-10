@@ -35,6 +35,8 @@ func _process(delta: float) -> void:
 	_timer = TICK
 	var fresh: PackedInt32Array = PackedInt32Array()
 	for player: Player in Player.all:
+		if player.effects != null and player.effects.has("hallucinated"):
+			continue ## the mist: nothing she sees there can be trusted, so nothing is drawn on the map
 		_scan(Interiors.outer(get_tree(), player.global_position) / CELL_PX, fresh)
 	if not fresh.is_empty():
 		_rpc_reveal.rpc(fresh)

@@ -173,12 +173,14 @@ func _fill_ground() -> void:
 	for id: String in biomes:
 		var active: String = RegionMap.active_biome(id)
 		if not _layers.has(active):
-			_layers[active] = _ground if active == "meadow" else _make_layer(active, Color((biomes[active] as Dictionary).color as String))
+			_layers[active] = _ground if active == "meadow" or (biomes[active] as Dictionary).has("gloom") else _make_layer(active, Color((biomes[active] as Dictionary).color as String)) ## a biome with `gloom` is painted by the ground shader itself (palette mixed by BiomeBlend), on the shared layer
 		_layers[id] = _layers[active]
 	_start = _map.start if _map.start.x >= 0 else _map.anchor(_map.start_region)
 	var cleared: Rect2i = Rect2i() ## nothing is cleared by area any more: the generator fills the start like everywhere else (only the footpath and the cover stay free)
 	_generator = PropGenerator.new(_zone, _sdf, _relief, cleared, _map.world_seed)
 	Moisture.world_seed = _map.world_seed
+	_generator.bare = _map.bare_cells()
+	BiomeBlend.install(_map)
 	_generator.blocked_cells = _add_ground_decals()
 	_generator.extra_props = _extra_props()
 	_rivers = WorldRivers.new()
@@ -269,6 +271,13 @@ func _add_ground_decals() -> Dictionary:
 		post.flag = String(sign_spec.get("flag", ""))
 		add_child(post)
 		_clear_around(clear, post.position, int(sign_spec.get("clear_radius", 3)))
+	for tower_spec: Dictionary in DataRegistry.table("ground").get("towers", []) as Array: ## the Hexenwald's witch tower, origin = the foot of its gate
+		var tower: WitchTower = WitchTower.new()
+		var ttile: Array = tower_spec.tile as Array
+		tower.name = "Tower_" + String(tower_spec.id)
+		tower.position = Vector2(float(ttile[0]), float(ttile[1])) * 16.0 + Vector2(8, 8)
+		add_child(tower)
+		_clear_around(clear, tower.position + Vector2(0, -16), 9) ## the body and the yard stay free of generated plants
 	for stone_spec: Dictionary in DataRegistry.table("waystones").get("statues", []) as Array: ## the waystones, goddess statues on their plinths (WaystoneStatue)
 		var statue: WaystoneStatue = WaystoneStatue.new()
 		var wtile: Array = stone_spec.tile as Array
@@ -1116,7 +1125,7 @@ func _land_at(x: int, y: int) -> bool:
 ## The biome of a land tile. The lookup is bent by a little noise so borders are ragged at tile
 ## size; where the bent lookup falls in the sea the nearest land decides.
 func _land_biome(cell: Vector2i) -> String:
-	if not _map.world_biome.is_empty():
+	if not _map.world_biome.is_empty() and _map.own_biomes.is_empty():
 		return _map.world_biome
 	var authored: Dictionary = {} if edits.terrain.is_empty() else edits.terrain.get(WorldEdits.key(cell), {})
 	if authored.has("biome"):
@@ -1566,8 +1575,13 @@ func _paint(chunk: Chunk, cell: Vector2i, biome: String, rng: RandomNumberGenera
 	var authored: Dictionary = {} if edits.terrain.is_empty() else edits.terrain.get(WorldEdits.key(cell), {}) ## (no key string per tile without edits)
 	biome = RegionMap.active_biome(String(authored.get("biome", biome)))
 	var kind: String = "plain"
+	var ground: Dictionary = (DataRegistry.get_entry("biomes", biome).get("ground", {}) as Dictionary)
 	if biome == "meadow":
 		kind = _pick_tile_kind(_zone.get_noise_2d(cell.x, cell.y) * 0.5 + 0.5, rng)
+	elif not ground.is_empty(): ## a biome with its own ground: only the kinds it names (the Hexenwald: plain grass and low tufts)
+		var kinds: Array = ground.kinds as Array
+		if rng.randf() < float(ground.chance):
+			kind = String(kinds[rng.randi() % kinds.size()])
 	elif rng.randf() < PLACEHOLDER_CHANCE:
 		kind = COMMON_KINDS[rng.rand_weighted(COMMON_WEIGHTS)]
 	if _relief.kind(cell.x, cell.y) != Relief.FLOOR: ## walls, ramps and stairs are drawn over plain ground
@@ -1694,8 +1708,11 @@ func _detail_candidate(build: ChunkBuild) -> void:
 				kind = [9,10,11,18,19,24,25][build.rng.randi_range(0,6)] ## wet ground: moss and ferns
 			elif damp < 0.18 and build.rng.randf() < 0.5:
 				kind = [22,23,0,2,22,23][build.rng.randi_range(0,5)] ## dry ground: straw and thin grass
+	if biome == "witch_forest":
+		kind = [0, 1, 2, 3, 12, 13, 13, 14][build.rng.randi_range(0, 7)] ## only grass in the first stage
 	var tint: Color = Color.WHITE
 	match biome:
+		"witch_forest": tint = Color.WHITE.lerp(Color(0.42, 0.5, 0.68), BiomeBlend.amount_at(pos)) ## as dark as the ground under it
 		"mist_forest": tint = Color(0.79,0.95,0.94)
 		"glass_cliffs": tint = Color(0.88,0.85,1.0)
 		"sunken_ruins": tint = Color(0.94,0.88,0.73)
@@ -1721,7 +1738,7 @@ func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 	for a: int in 8:
 		var edge: Vector2 = center + Vector2.from_angle(float(a) * TAU / 8.0) * Vector2(rx, ry) * 0.9
 		var cell: Vector2i = Vector2i((edge / 16.0).floor())
-		if not ok or not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
+		if not ok or not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell) or _generator.is_bare(cell):
 			ok = false
 			break
 	if ok:
@@ -2288,7 +2305,7 @@ func _town_soft(thing: WorldProp) -> bool:
 		return true
 	if thing.kind in PropGenerator.TREE_KINDS:
 		return thing.state.has("f") ## felled: stump and sapling have no collision (a young tree grows back by itself otherwise)
-	return (thing.kind == "rock" or thing.kind == "iron_rock") and thing.is_depleted()
+	return (thing.kind == "rock" or thing.kind == "iron_rock" or thing.kind == "curse_rock") and thing.is_depleted()
 
 
 ## The loaded props a foundation on `rect` sweeps away (cells): bushes, grass, pebbles, mushrooms, stumps and spent rocks.

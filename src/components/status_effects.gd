@@ -15,6 +15,7 @@ var health: HealthComponent
 var _effects: Dictionary = {} ## id -> {left, total, scale, acc, source}
 var _fx: Dictionary = {} ## id -> the node that shows it on the body
 var _wet_check: float = 0.0
+var _wood_check: float = 0.0
 
 
 func _ready() -> void:
@@ -92,7 +93,25 @@ func _rpc_clear(id: String) -> void:
 	changed.emit()
 
 
+## Host, once a second: the Hexenwald's mist keeps HALLUZINIERT on everybody in it who does not wear a piece with the perk `clear_sight`
+## (docs/hexenwald_nebel_konzept.md). It is refreshed, never stacked, so it fades by itself a few seconds after she has left the wood.
+func _breathe_mist() -> void:
+	var player: Node2D = get_parent() as Node2D
+	var def: Dictionary = definition("hallucinated")
+	if player == null or def.is_empty():
+		return
+	var worn: Variant = player.get("talismans")
+	if worn != null and (worn.get("perks") as Dictionary).has("clear_sight"):
+		clear("hallucinated") ## put on: her head clears at once
+	elif BiomeBlend.amount_at(player.global_position) > float(def.get("min_gloom", 0.35)):
+		apply("hallucinated")
+
+
 func _physics_process(delta: float) -> void:
+	_wood_check -= delta
+	if _wood_check <= 0.0 and multiplayer.is_server():
+		_wood_check = 1.0
+		_breathe_mist()
 	if _effects.is_empty():
 		return
 	var is_host: bool = multiplayer.is_server()
@@ -131,6 +150,11 @@ func _wet() -> bool:
 
 
 func _show(id: String) -> void:
+	if id == "hallucinated" and not _fx.has(id) and get_parent().is_multiplayer_authority(): ## what she sees is hers alone: only on her own machine
+		var seen: Hallucinations = Hallucinations.new()
+		seen.name = "Hallucinations"
+		get_parent().add_child(seen)
+		_fx[id] = seen
 	if id == "burn" and not _fx.has(id) and DisplayServer.get_name() != "headless":
 		var fx: BurnFx = BurnFx.new()
 		fx.name = "BurnFx"
@@ -144,5 +168,7 @@ func _remove(id: String) -> void:
 	if _fx.has(id):
 		var node: Node = _fx[id] as Node
 		if is_instance_valid(node):
+			if node.has_method("end"):
+				node.call("end")
 			node.queue_free()
 		_fx.erase(id)

@@ -17,6 +17,16 @@ const vec3 RAMP[6] = vec3[6](
 	vec3(0.4863, 0.7255, 0.4275),
 	vec3(0.6588, 0.8627, 0.5490)
 );
+// The Hexenwald's greens: the same six steps in cold, dark blue-green with a violet lean (docs/hexenwald_konzept.md, section 4).
+// Each tile pixel keeps its step; `g_gloom` (BiomeBlend, 0 meadow .. 1 Hexenwald) decides which ramp it is read from.
+const vec3 HEX[6] = vec3[6](
+	vec3(0.0510, 0.0588, 0.1020),
+	vec3(0.0745, 0.1176, 0.1490),
+	vec3(0.1059, 0.1725, 0.1765),
+	vec3(0.1529, 0.2392, 0.2196),
+	vec3(0.2196, 0.3137, 0.2471),
+	vec3(0.3137, 0.4078, 0.2824)
+);
 const float SOFT = 0.06; // half width of a patch edge, in noise units (bigger = softer light patches)
 
 uniform float patch_size = 110.0; // px per sunlit/shaded patch
@@ -26,10 +36,16 @@ global uniform float g_dew;
 global uniform float g_night; // 0..1 night (DayNight): moonlit patches and ground mist
 global uniform sampler2D g_town_wear : filter_linear, repeat_disable; // the town's trodden ground (TownWear: R8, one pixel per 8 px cell)
 global uniform vec4 g_town_wear_rect; // world px of that picture: x, y, w, h (w = 0: no town)
+global uniform sampler2D g_gloom : filter_linear, repeat_disable; // BiomeBlend: how much of the Hexenwald's palette each place has (R8, one pixel per 4 x 4 tiles)
+global uniform vec4 g_gloom_rect; // world px of that picture: x, y, w, h (w = 0: none)
 uniform float golden : hint_range(0.0, 1.0) = 0.0; // TimeManager.golden_amount(): warmer sun spots
 uniform float sun : hint_range(0.0, 1.0) = 0.0; // TimeManager.sun_amount(): more sunlit meadow, sun flecks, cloud shadows
 
 varying vec2 world_px;
+
+vec3 ramp(int i, float gloom) {
+	return mix(RAMP[i], HEX[i], gloom);
+}
 
 // Integer hash (callers pass whole numbers, or whole numbers plus an offset: the fraction is dropped). The old sin() hash lost its
 // precision at world coordinates, so neighbouring noise cells got the same value and the sun patches showed hard squares.
@@ -118,34 +134,41 @@ void fragment() {
 				wear = texture(g_town_wear, wuv).r;
 			}
 		}
+		float gloom = 0.0; // the Hexenwald's share of the palette here; the edge is ragged where it is neither 0 nor 1
+		if (g_gloom_rect.z > 0.0) {
+			gloom = texture(g_gloom, (px - g_gloom_rect.xy) / g_gloom_rect.zw).r;
+			gloom = clamp(gloom + (fbm(px / 19.0 + vec2(40.0, 13.0)) - 0.5) * 0.7 * (1.0 - abs(2.0 * gloom - 1.0)), 0.0, 1.0);
+		}
 		float macro = fbm(px / patch_size + vec2(3.7, 1.9));
 		float mist = fbm(px / mist_size + vec2(effect_time * 0.016, effect_time * 0.007) * mist_speed + vec2(11.0, 5.0));
 		float day = g_day_strength; // golden hour has its own light budget
 		float shift = 0.0; // in palette steps, now fractional
 		float spot = 0.0;
-		shift += smoothstep(0.62 - 0.08 * sun - SOFT, 0.62 - 0.08 * sun + SOFT, macro); // sunlit meadow (wider at midday)
-		shift += smoothstep(0.78 - 0.10 * sun - SOFT, 0.78 - 0.10 * sun + SOFT, macro);
+		float lit = 1.0 - 0.85 * gloom; // little sun reaches the Hexenwald
+		shift += lit * smoothstep(0.62 - 0.08 * sun - SOFT, 0.62 - 0.08 * sun + SOFT, macro); // sunlit meadow (wider at midday)
+		shift += lit * smoothstep(0.78 - 0.10 * sun - SOFT, 0.78 - 0.10 * sun + SOFT, macro);
 		shift -= 1.0 - smoothstep(0.38 - SOFT, 0.38 + SOFT, macro); // shaded, mossy
 		shift -= 1.0 - smoothstep(0.22 - SOFT, 0.22 + SOFT, macro);
-		shift -= 1.0 - smoothstep(0.32 - SOFT, 0.32 + SOFT, mist); // a drifting shadow
+		shift -= 1.0 - smoothstep(0.32 + 0.14 * gloom - SOFT, 0.32 + 0.14 * gloom + SOFT, mist); // a drifting shadow (more of them in the Hexenwald)
+		shift -= 0.45 * gloom;
 		if (day > 0.0) {
 			// small drifting flecks of full sun, and big slow cloud shadows: the contrast is what reads as bright
 			float fleck = fbm(px / 38.0 + vec2(effect_time * 0.020, effect_time * 0.012) + vec2(21.0, 8.0));
 			float cloud = day_cloud(px);
-			spot = smoothstep(0.63 - SOFT, 0.63 + SOFT, fleck) * day * day_local(px);
+			spot = smoothstep(0.63 - SOFT, 0.63 + SOFT, fleck) * day * day_local(px) * (1.0 - 0.8 * gloom);
 			shift += spot;
 			shift -= (1.0 - cloud) * day * 0.65;
 			// dappled light: patches of sun that reach the shaded ground through the boughs, drifting with the wind
-			shift += day_dapple(px) * day_cover(px) * day * 0.7;
+			shift += day_dapple(px) * day_cover(px) * day * 0.7 * (1.0 - 0.8 * gloom);
 		}
 		float f = clamp(float(idx) + shift, 0.0, 5.0); // fractional ramp position: blend two neighbouring greens
 		int lo = int(floor(f));
 		int hi = min(lo + 1, 5);
-		c.rgb = mix(RAMP[lo], RAMP[hi], fract(f));
+		c.rgb = mix(ramp(lo, gloom), ramp(hi, gloom), fract(f));
 		if (idx >= 1 && idx <= 4) {
 			tip = blade_shift(px, macro, wear); // the blades stay crisp: whole palette steps, one pixel wide
 			if (tip != 0) {
-				c.rgb = RAMP[clamp(int(floor(f + 0.5)) + tip, 0, 5)];
+				c.rgb = ramp(clamp(int(floor(f + 0.5)) + tip, 0, 5), gloom);
 			}
 		}
 		if (wear > 0.02) { // trodden earth: dithered earth pixels that grow denser with the wear
@@ -164,7 +187,7 @@ void fragment() {
 			c.rgb = mix(c.rgb, mix(vec3(1.0, 0.98, 0.78), vec3(1.0, 0.80, 0.45), golden), 0.20 * day * spot * smoothstep(3.0, 4.0, f));
 		}
 		if (shift < 0.0) {
-			c.rgb = mix(c.rgb, vec3(0.20, 0.22, 0.40), 0.16 * clamp(-shift, 0.0, 1.0)); // shade leans cool violet
+			c.rgb = mix(c.rgb, vec3(0.20, 0.22, 0.40), (0.16 + 0.16 * gloom) * clamp(-shift, 0.0, 1.0)); // shade leans cool violet (more in the Hexenwald)
 		}
 		if (tip == 3 && g_dew > 0.0 && hash(px + vec2(3301.0, 77.0)) > 0.5) {
 			// morning dew: a blade tip now and then catches a pale glint

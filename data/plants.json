@@ -2146,5 +2146,640 @@
   "slow": 0.85,
   "scene": "res://src/entities/props/snapper.tscn",
   "edge_margin": 3
+ },
+ "hag_tree": {
+  "name": "Hexenulme",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/hag_tree.png",
+  "growth": "res://assets/props/hag_tree_growth.png",
+  "columns": 4,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   1
+  ],
+  "radius": [
+   12,
+   15,
+   19,
+   22
+  ],
+  "height": [
+   80,
+   114,
+   148,
+   178
+  ],
+  "hits": [
+   4,
+   6,
+   8,
+   9
+  ],
+  "crown_fade": [
+   true,
+   true,
+   true,
+   true
+  ],
+  "crown_half_width": [
+   29,
+   39,
+   48,
+   53
+  ],
+  "trunk_half_width": [
+   4,
+   6,
+   8,
+   9
+  ],
+  "clear": [
+   30,
+   48,
+   66,
+   84
+  ],
+  "crown_shape": "dome",
+  "sway": 0.012,
+  "light_color": "#a8ff6a",
+  "light_from": 1,
+  "light_energy": 0.26,
+  "rain_colors": [
+   "#1d4a48",
+   "#2d6a58",
+   "#557468"
+  ],
+  "density": {
+   "base": 0.0,
+   "wild": 0.0
+  },
+  "edge_margin": 5,
+  "min_gap": 4,
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "hag_wood",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "hag_wood",
+     "chance": 1.0,
+     "min": 2,
+     "max": 3
+    },
+    {
+     "id": "resin",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  }
+ },
+ "bone_tree": {
+  "name": "Bleichbaum",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/bone_tree.png",
+  "growth": "res://assets/props/bone_tree_growth.png",
+  "columns": 4,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   1
+  ],
+  "radius": [
+   10,
+   12,
+   15,
+   17
+  ],
+  "height": [
+   72,
+   102,
+   134,
+   162
+  ],
+  "hits": [
+   3,
+   4,
+   6,
+   7
+  ],
+  "crown_fade": [
+   true,
+   true,
+   true,
+   true
+  ],
+  "crown_half_width": [
+   25,
+   33,
+   42,
+   48
+  ],
+  "trunk_half_width": [
+   3,
+   5,
+   6,
+   7
+  ],
+  "clear": [
+   28,
+   40,
+   54,
+   68
+  ],
+  "crown_shape": "dome",
+  "sway": 0.006,
+  "light_color": "#a8ff6a",
+  "light_from": 1,
+  "light_energy": 0.26,
+  "rain_colors": [
+   "#b8b4b8",
+   "#dedacc",
+   "#56506c"
+  ],
+  "density": {
+   "base": 0.0,
+   "wild": 0.0
+  },
+  "edge_margin": 5,
+  "min_gap": 4,
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 2,
+   "drops": [
+    {
+     "id": "bone_wood",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.2,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "bone_wood",
+     "chance": 1.0,
+     "min": 2,
+     "max": 3
+    },
+    {
+     "id": "stick",
+     "chance": 0.8,
+     "min": 1,
+     "max": 2
+    }
+   ]
+  }
+ },
+ "grave_candle": {
+  "name": "Totenkerze",
+  "texture": "res://assets/props/grave_candle.png",
+  "glow": "res://assets/props/grave_candle_glow.png",
+  "light": {
+   "color": "#a8ff6a",
+   "radius": 15,
+   "energy": 0.26
+  },
+  "sway": 0.012,
+  "leaf_colors": [
+   "#dcd8d4",
+   "#b0acbc",
+   "#a8ff6a"
+  ],
+  "pickup": {
+   "item": "grave_candle",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 4,
+   "burst": [
+    "#fbf8e8",
+    "#a8ff6a",
+    "#eaffc4"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   6,
+   10,
+   14
+  ],
+  "height": [
+   22,
+   26,
+   28
+  ],
+  "slow": 0.9,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3,
+  "fireflies": true
+ },
+ "witch_hat": {
+  "name": "Hexenhut",
+  "texture": "res://assets/props/witch_hat.png",
+  "glow": "res://assets/props/witch_hat_glow.png",
+  "light": {
+   "color": "#a8ff6a",
+   "radius": 12,
+   "energy": 0.16
+  },
+  "sway": 0.04,
+  "leaf_colors": [
+   "#6434a6",
+   "#9458cc",
+   "#24584a"
+  ],
+  "pickup": {
+   "item": "witch_hat",
+   "min": 1,
+   "max": 2,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#9458cc",
+    "#c690ec",
+    "#a8ff6a"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   6,
+   9,
+   13
+  ],
+  "height": [
+   24,
+   28,
+   30
+  ],
+  "slow": 0.9,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "toad_cap": {
+  "name": "Krötenschirm",
+  "texture": "res://assets/props/toad_cap.png",
+  "glow": "res://assets/props/toad_cap_glow.png",
+  "light": {
+   "color": "#a8ff6a",
+   "radius": 12,
+   "energy": 0.14
+  },
+  "sway": 0.008,
+  "leaf_colors": [
+   "#8e1430",
+   "#c43044",
+   "#dedacc"
+  ],
+  "pickup": {
+   "item": "toad_cap",
+   "min": 1,
+   "max": 2,
+   "prompt": "SAMMELN",
+   "regrow_days": 5,
+   "burst": [
+    "#c43044",
+    "#dedacc",
+    "#8e1430"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   7,
+   12,
+   15
+  ],
+  "height": [
+   16,
+   20,
+   22
+  ],
+  "slow": 0.92,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "mandrake": {
+  "name": "Alraune",
+  "texture": "res://assets/props/mandrake.png",
+  "glow": "res://assets/props/mandrake_glow.png",
+  "light": {
+   "color": "#c690ec",
+   "radius": 11,
+   "energy": 0.14
+  },
+  "sway": 0.02,
+  "leaf_colors": [
+   "#24584a",
+   "#3a785a",
+   "#927460"
+  ],
+  "pickup": {
+   "item": "mandrake",
+   "min": 1,
+   "max": 1,
+   "prompt": "AUSZIEHEN",
+   "regrow_days": 7,
+   "burst": [
+    "#6a4e42",
+    "#927460",
+    "#c690ec"
+   ]
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   4,
+   3,
+   2
+  ],
+  "radius": [
+   9,
+   12,
+   14
+  ],
+  "height": [
+   14,
+   16,
+   18
+  ],
+  "slow": 0.88,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3,
+  "pull": true
+ },
+ "ghost_fern": {
+  "name": "Geisterfarn",
+  "texture": "res://assets/props/ghost_fern.png",
+  "glow": "res://assets/props/ghost_fern_glow.png",
+  "stripped": "res://assets/props/ghost_fern_stripped.png",
+  "light": {
+   "color": "#c8ecdc",
+   "radius": 14,
+   "energy": 0.18
+  },
+  "sway": 0.04,
+  "leaf_colors": [
+   "#568690",
+   "#8ab8b0",
+   "#c8ecdc"
+  ],
+  "harvest": {
+   "tool": "sickle",
+   "hits": 2,
+   "drops": [
+    {
+     "id": "ghost_frond",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "ghost_frond",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "plant_fiber",
+     "chance": 0.3,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "regrow_days": 1
+  },
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   3,
+   3,
+   2
+  ],
+  "radius": [
+   10,
+   14,
+   17
+  ],
+  "height": [
+   12,
+   14,
+   16
+  ],
+  "slow": 0.7,
+  "scene": "res://src/entities/props/flora.tscn",
+  "edge_margin": 3
+ },
+ "thorn_hedge": {
+  "name": "Dornenhecke",
+  "texture": "res://assets/props/thorn_hedge.png",
+  "glow": "res://assets/props/thorn_hedge_glow.png",
+  "light": {
+   "color": "#a8ff6a",
+   "radius": 13,
+   "energy": 0.16
+  },
+  "stripped": "res://assets/props/thorn_hedge_stripped.png",
+  "leaf_colors": [
+   "#1d4a48",
+   "#2d6a58",
+   "#4a3458"
+  ],
+  "columns": 3,
+  "rows": 2,
+  "weights": [
+   2,
+   2,
+   1
+  ],
+  "radius": [
+   10,
+   14,
+   15
+  ],
+  "height": [
+   18,
+   24,
+   20
+  ],
+  "slow": 0.55,
+  "harvest": {
+   "tool": "sickle",
+   "hits": 3,
+   "drops": [
+    {
+     "id": "hex_thorn",
+     "chance": 0.3,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stick",
+     "chance": 0.15,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "hex_thorn",
+     "chance": 0.8,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "stick",
+     "chance": 0.5,
+     "min": 1,
+     "max": 2
+    }
+   ],
+   "regrow_days": 1
+  },
+  "pickup": {
+   "item": "hex_berry",
+   "min": 1,
+   "max": 3,
+   "prompt": "PFLÜCKEN",
+   "regrow_days": 3,
+   "burst": [
+    "#6434a6",
+    "#9458cc",
+    "#a8ff6a"
+   ]
+  },
+  "scene": "res://src/entities/props/bush.tscn",
+  "edge_margin": 4
+ },
+ "curse_rock": {
+  "name": "Fluchsilberfels",
+  "texture": "res://assets/props/curse_rock.png",
+  "glow": "res://assets/props/curse_rock_glow.png",
+  "light": [
+   0.12,
+   0.16,
+   0.24,
+   0.2,
+   0.16,
+   0.2
+  ],
+  "columns": 6,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   1,
+   2,
+   1
+  ],
+  "radius": [
+   10,
+   14,
+   20,
+   8,
+   18,
+   14
+  ],
+  "height": [
+   22,
+   30,
+   42,
+   50,
+   20,
+   36
+  ],
+  "hits": [
+   3,
+   4,
+   6,
+   5,
+   4,
+   6
+  ],
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 4,
+   "drops": [
+    {
+     "id": "curse_silver",
+     "chance": 0.6,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "stone",
+     "chance": 0.35,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "curse_silver",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "stone",
+     "chance": 0.5,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "scene": "res://src/entities/props/rock.tscn",
+  "edge_margin": 4,
+  "chips": [
+   "2e5c54",
+   "c4f8d4",
+   "3a425c",
+   "262a42"
+  ]
  }
 }

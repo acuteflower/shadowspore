@@ -1,13 +1,14 @@
-extends SceneTree
+extends Node
 ## Bakes the world's coast into assets/world/land_sdf.png (1 pixel per tile): a signed distance to
 ## the coast, in 1/8 tile steps around 128 (>= 128 land, below void; range about +-16 tiles). The
 ## game paints and blocks tiles from it and the void-edge shader samples it:
-##   Godot --headless --path . --script tools/bake_land_sdf.gd
+##   Godot --headless --path . tools/bake_land_sdf.tscn
+## (a scene, not --script: RegionMap needs the DataRegistry autoload)
 ## then `Godot --headless --import --path .`. Needs data/world_map.json. Takes about a minute.
 
 const FAR: int = 1 << 20
 
-func _init() -> void:
+func _ready() -> void:
 	var map: RegionMap = RegionMap.new(0, JSON.parse_string(FileAccess.get_file_as_string("res://data/world_map.json")) as Dictionary)
 	var side: int = RegionMap.WORLD_TILES
 	var mask: PackedByteArray = map.tile_land_mask()
@@ -21,7 +22,7 @@ func _init() -> void:
 		bytes[i] = clampi(128 + roundi(d * 8.0), 0, 255)
 	Image.create_from_data(side, side, false, Image.FORMAT_L8, bytes).save_png("res://assets/world/land_sdf.png")
 	print("baked assets/world/land_sdf.png")
-	quit()
+	get_tree().quit()
 
 
 ## Distance (3-4 chamfer, units of a third of a tile) from every cell with `mask == value` to the

@@ -184,6 +184,15 @@ static func entry_days_left(offer: Dictionary, entry: Dictionary, day: int) -> i
 	return -1 if due < 0 else maxi(0, due - day)
 
 
+static func entry_expired(offer: Dictionary, entry: Dictionary, day: int, tod: float) -> bool:
+	var due: int = entry_due(offer, entry)
+	return (due >= 0 and day >= due) or urgent_over(offer, day, tod)
+
+
+static func entry_active(offer: Dictionary, entry: Dictionary, day: int, tod: float) -> bool:
+	return not offer.is_empty() and String(offer.k) != STORY and not entry.is_empty() and not bool(entry.get("done", false)) and not entry_expired(offer, entry, day, tod)
+
+
 ## Does the notice still hang on the board (a notice only held by those who took it has run out)?
 static func is_hanging(offer: Dictionary, day: int, tod: float = -1.0) -> bool:
 	return not is_expired(offer, day) and not urgent_over(offer, day, TimeManager.time_of_day if tod < 0.0 else tod)
@@ -407,9 +416,12 @@ static func can_finish(offer: Dictionary, entry: Dictionary, have: int) -> bool:
 	return String(offer.k) != STORY and not entry.is_empty() and not bool(entry.get("done", false)) and progress(offer, entry, have) >= int(offer.n)
 
 
-## Is the entry of `story` due (its quest exists, the condition holds)? `finished` asks whether a quest id is finished, `flag` whether a player flag is set.
-static func story_due(entry: Dictionary, quests: Dictionary, finished: Callable, flag: Callable) -> bool:
+## Is the entry of `story` due (its quest exists, the condition holds)? `finished` asks whether a quest id is finished, `flag` whether a player flag is set,
+## `level` is the player's level (an entry's `min_level`: the lake witch's notice hangs from level 10).
+static func story_due(entry: Dictionary, quests: Dictionary, finished: Callable, flag: Callable, level: int = 999) -> bool:
 	if not quests.has(String(entry.quest)):
+		return false
+	if level < int(entry.get("min_level", 0)):
 		return false
 	var after: String = String(entry.get("after", ""))
 	if after != "" and not bool(finished.call(after)):

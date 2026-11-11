@@ -217,8 +217,24 @@ func _by_id(id: int) -> Player:
 	return null
 
 
+## The players she can aim at: alive, near, and not veiled by Nebelschleier (docs/magie_konzept.md). Everything that picks a target or a
+## spot uses this; the reset check and the player-count scaling keep `_living()`.
+func _seen() -> Array[Player]:
+	var out: Array[Player] = []
+	for player: Player in _living():
+		if not player.veiled():
+			out.append(player)
+	return out
+
+
+## `_by_id`, but a veiled player is not found (she lost the trail).
+func _by_seen(id: int) -> Player:
+	var player: Player = _by_id(id)
+	return player if player != null and not player.veiled() else null
+
+
 func _pick_target() -> Player:
-	var living: Array[Player] = _living()
+	var living: Array[Player] = _seen()
 	if living.is_empty():
 		return null
 	if living.size() > 1: ## never the same one twice in a row
@@ -539,10 +555,10 @@ func _check_phase() -> bool:
 
 
 func _idle_step(delta: float, only_clones: bool = false) -> void:
-	var living: Array[Player] = _living()
+	var living: Array[Player] = _seen()
 	if living.is_empty():
 		return
-	var target: Player = _by_id(_last_target)
+	var target: Player = _by_seen(_last_target)
 	if target == null or target.health.current <= 0.0:
 		target = living[0]
 	_orbit += delta * 0.55 * _orbit_dir
@@ -583,7 +599,7 @@ func _clone_attacks(delta: float) -> void:
 		_harass[i] -= delta
 		if _harass[i] > 0.0:
 			continue
-		var living: Array[Player] = _living()
+		var living: Array[Player] = _seen()
 		if living.is_empty():
 			return
 		var target: Player = living[(i + _pick.randi()) % living.size()]
@@ -647,7 +663,7 @@ func _choose() -> void:
 			pts = [me, at]
 		Act.CAGE:
 			pts = [me, at]
-			for player: Player in _living():
+			for player: Player in _seen():
 				if player != target and pts.size() < 4:
 					pts.append(player.global_position)
 		Act.CAROUSEL:
@@ -813,7 +829,7 @@ func _start_lance(pts: PackedVector2Array, rounds: int, delay: float) -> void:
 			if not _host:
 				return
 			var spots: PackedVector2Array = PackedVector2Array()
-			for player: Player in _living():
+			for player: Player in _seen():
 				if spots.size() < 4:
 					spots.append(player.global_position + player.velocity * (0.12 * float(k % 3)))
 			if not spots.is_empty():
@@ -862,7 +878,7 @@ func _start_feint(pts: PackedVector2Array) -> void:
 	_at(_t + run + _n("feint", "gone", 0.24), func() -> void:
 		if not _host:
 			return
-		var target: Player = _by_id(_last_target)
+		var target: Player = _by_seen(_last_target)
 		var at: Vector2 = target.global_position if target != null else pts[1]
 		_rpc_lock.rpc(Lock.FEINT, PackedVector2Array([_on_floor(at + dir * 20.0), at]), PackedInt32Array()))
 	_finish(_t + run + _n("feint", "gone", 0.24) + _n("feint", "warn", 0.32) + 0.3, _n("feint", "recover", 1.0), 1.5)
@@ -1005,7 +1021,7 @@ func _start_burrow(pts: PackedVector2Array, ids: PackedInt32Array) -> void:
 
 func _act_step(delta: float) -> void:
 	if not _burrow.is_empty() and bool(_burrow.get("under", false)):
-		var target: Player = _by_id(int(_burrow["id"]))
+		var target: Player = _by_seen(int(_burrow["id"]))
 		if target == null or target.health.current <= 0.0:
 			target = _pick_target()
 		var at: Vector2 = target.global_position if target != null else _pos[0]
@@ -1017,7 +1033,7 @@ func _act_step(delta: float) -> void:
 			_burrow["under"] = false
 			_rpc_lock.rpc(Lock.BURROW, PackedVector2Array([_pos[0]]), PackedInt32Array())
 	if not _carousel.is_empty():
-		var target2: Player = _by_id(_last_target)
+		var target2: Player = _by_seen(_last_target)
 		var centre: Vector2 = _carousel["c"] as Vector2
 		if target2 != null:
 			centre = centre.lerp(target2.global_position, 1.0 - exp(-1.6 * delta)) ## the wheel drifts after her
@@ -1094,7 +1110,7 @@ func _start_carousel(pts: PackedVector2Array) -> void:
 					break
 			if who < 0:
 				return
-			var target: Player = _by_id(_last_target)
+			var target: Player = _by_seen(_last_target)
 			var at: Vector2 = target.global_position if target != null else (_carousel["c"] as Vector2)
 			_rpc_lock.rpc(Lock.LUNGE, PackedVector2Array([_pos[who], at]), PackedInt32Array([who])))
 	_at(_t + first + beat * float(lunges) + 0.5, func() -> void:
@@ -1148,7 +1164,7 @@ func _start_frenzy() -> void:
 		_at(_t + 0.5 + beat * float(k), func() -> void:
 			if not _host:
 				return
-			var living: Array[Player] = _living()
+			var living: Array[Player] = _seen()
 			if living.is_empty():
 				return
 			var at: Vector2 = living[k % living.size()].global_position ## shared out among the players
@@ -1191,7 +1207,7 @@ func _start_split(pts: PackedVector2Array) -> void:
 		boss.set_combat(true, 1.0)
 		if not _host:
 			return
-		var living: Array[Player] = _living()
+		var living: Array[Player] = _seen()
 		if living.is_empty():
 			return
 		var lines: PackedVector2Array = PackedVector2Array()
@@ -1228,7 +1244,7 @@ func _start_swarm() -> void:
 		_at(_t + 0.8 + beat * float(k), func() -> void:
 			if not _host:
 				return
-			var living: Array[Player] = _living()
+			var living: Array[Player] = _seen()
 			if living.is_empty():
 				return
 			var at: Vector2 = living[k % living.size()].global_position
@@ -1395,7 +1411,7 @@ func on_damaged(amount: float, knockback: float) -> void:
 		_seg[0] = {}
 		_seg[k] = {}
 		_rpc_swap.rpc(k, a, _pos[0])
-		var target: Player = _by_id(_last_target)
+		var target: Player = _by_seen(_last_target)
 		if target != null: ## the phantom she left in her place cuts at once
 			_rpc_lock.rpc(Lock.SWAP_CUT, PackedVector2Array([a, target.global_position]), PackedInt32Array([k]))
 

@@ -11,6 +11,7 @@ signal built(piece: String, id: int)
 signal resident_joined(settler: String)
 signal refine_done(before: Dictionary, after: Dictionary, success: bool, refund: Dictionary) ## the local player collected a refined weapon: the reveal card plays
 signal brew_done(type: String, tier: int, count: int, moon: bool) ## the local player got potions from a brew (Esma): the brew card plays
+signal refresh_done(raw: String, stones: Array) ## for the asking player only: Ilva showed what the raw stones hid (LÄUTERN)
 signal notice(text: String, good: bool) ## a short message for the local builder ("NICHT GENUG HOLZ")
 signal event(kind: String, data: Dictionary) ## what happened to the town, on every peer: "lamp_out", "level_up", "alert" (docs/town_ausbau.md; the settlers' chatter and the map listen)
 
@@ -80,6 +81,10 @@ var light_scale: float = 1.0 ## 1, or less on a fog night: the light reaches tha
 var _scaled: Array[Vector3] = []
 var _scaled_version: int = -1
 var _scaled_for: float = 1.0
+static var magic_lights: Dictionary = {} ## instance id of a cast light -> Vector3(x, y, radius) (`add_magic_light`)
+static var magic_version: int = 0
+var _with_magic: Array[Vector3] = []
+var _magic_built: Vector3i = Vector3i(-1, -1, -1)
 var _surfaces: Dictionary = {} ## Vector2i (16 px cell) -> surface name
 var _progress: Dictionary = {} ## host: id -> float progress
 var _progress_clock: float = 0.0
@@ -513,15 +518,34 @@ func lit_circles() -> Array[Vector3]:
 				_lit.append(Vector3(float(data.x), float(data.y) - 8.0, reach))
 		_lit_dirty = false
 		_circles_version += 1
-	if is_equal_approx(light_scale, 1.0):
-		return _lit
-	if _scaled_version != _circles_version or not is_equal_approx(_scaled_for, light_scale):
-		_scaled.clear()
-		for c: Vector3 in _lit:
-			_scaled.append(Vector3(c.x, c.y, c.z * light_scale))
-		_scaled_version = _circles_version
-		_scaled_for = light_scale
-	return _scaled
+	var base: Array[Vector3] = _lit
+	if not is_equal_approx(light_scale, 1.0):
+		if _scaled_version != _circles_version or not is_equal_approx(_scaled_for, light_scale):
+			_scaled.clear()
+			for c: Vector3 in _lit:
+				_scaled.append(Vector3(c.x, c.y, c.z * light_scale))
+			_scaled_version = _circles_version
+			_scaled_for = light_scale
+		base = _scaled
+	if magic_lights.is_empty():
+		return base
+	if _magic_built != Vector3i(magic_version, _circles_version, roundi(light_scale * 1000.0)):
+		_with_magic = base.duplicate()
+		for circle: Variant in magic_lights.values():
+			_with_magic.append(circle as Vector3)
+		_magic_built = Vector3i(magic_version, _circles_version, roundi(light_scale * 1000.0))
+	return _with_magic
+
+
+## Magic (docs/magie_konzept.md): a cast light the night respects like a lamp (Bannlicht from tier III, BANNKREIS) while it stands. Every peer keeps its own copy.
+static func add_magic_light(key: int, circle: Vector3) -> void:
+	magic_lights[key] = circle
+	magic_version += 1
+
+
+static func remove_magic_light(key: int) -> void:
+	if magic_lights.erase(key):
+		magic_version += 1
 
 
 ## Away from the light at `pos` (a unit vector).
@@ -1291,6 +1315,28 @@ func settler_ids() -> Array:
 	return DataRegistry.table(SETTLERS_TABLE).keys()
 
 
+## Has the player really met this person? A settler is known from the first talk on (`talked` >= 0); the founder
+## (Valdric) and whoever the story brought in (`arrive.story`, Gustav) are known from the story. Somebody who only
+## stands in `residents` (a checkpoint, an arrival nobody has spoken to yet, Esma or Ilva before the first visit)
+## is still a stranger: the board takes no notice from them.
+func has_met(id: String) -> bool:
+	if not residents.has(id):
+		return false
+	var spec: Dictionary = settler_spec(id)
+	if bool(spec.get("founder", false)) or String((spec.get("arrive", {}) as Dictionary).get("story", "")) != "":
+		return true
+	return int((residents[id] as Dictionary).get("talked", -1)) >= 0
+
+
+## The residents the player knows: only they may let notices hang on the board.
+func met_residents() -> Dictionary:
+	var met: Dictionary = {}
+	for sid: String in residents:
+		if has_met(sid):
+			met[sid] = residents[sid]
+	return met
+
+
 func trust_of(id: String) -> int:
 	return int((residents.get(id, {}) as Dictionary).get("trust", 0))
 
@@ -1888,6 +1934,125 @@ func _host_trade(shop_id: String, mode: String, item: String, amount: int, peer:
 		player.progress.award(price * sold, 0)
 		_tell(peer, "%d X %s VERKAUFT" % [sold, item_name], true)
 
+
+
+## The lake witch's SCHLIFF (docs/seehexe_konzept.md 5, CrystalRules): three equal stones + the tier's material + copper become one stone a tier higher, at once,
+## never a failure. The host checks the reach of her room, trust, the stones, the material and the purse.
+func request_grind(shop_id: String, item: String) -> void:
+	if multiplayer.is_server():
+		_host_grind(shop_id, item, multiplayer.get_unique_id())
+	else:
+		_rpc_grind.rpc_id(1, shop_id, item)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_grind(shop_id: String, item: String) -> void:
+	if multiplayer.is_server():
+		_host_grind(shop_id, item, multiplayer.get_remote_sender_id())
+
+
+func _host_grind(shop_id: String, item: String, peer: int) -> void:
+	var player: Player = player_of(peer)
+	var def: Dictionary = shop(shop_id)
+	if player == null or def.is_empty() or not def.has("grind"):
+		return
+	if not _near_role(player, String(def.get("role", "")), float(def.get("reach", 150.0))):
+		_tell(peer, "ZU WEIT WEG", false)
+		return
+	var grind: Dictionary = def.grind as Dictionary
+	var c: Dictionary = CrystalRules.cost(grind, item)
+	var have: Dictionary = {item: player.inventory.count_plain(item)}
+	for need: String in c.get("in", {}) as Dictionary:
+		have[need] = player.inventory.count_plain(need)
+	var why: String = CrystalRules.block(grind, item, have, player.progress.copper, trust_of(String(def.get("npc", ""))))
+	if why != "":
+		_tell(peer, why, false)
+		return
+	player.inventory.remove_item(item, int(c.count))
+	for need: String in c.in as Dictionary:
+		player.inventory.remove_item(need, int((c.in as Dictionary)[need]))
+	player.progress.award(-int(c.copper), 0)
+	var left: int = player.inventory.give(String(c.out), 1)
+	if left > 0:
+		_add_stock(String(c.out), left)
+	_tell(peer, "%s GESCHLIFFEN" % String(DataRegistry.get_entry("items", String(c.out)).get("name", c.out)).to_upper(), true)
+
+
+## LÄUTERN (docs/seehexe_konzept.md 14): Ilva washes `amount` raw stones `raw` in the lake (free: the fee is 0); each gives the stone it hid since it was found (`InventoryComponent.take_hidden`).
+func request_refresh(shop_id: String, raw: String, amount: int) -> void:
+	if multiplayer.is_server():
+		_host_refresh(shop_id, raw, amount, multiplayer.get_unique_id())
+	else:
+		_rpc_refresh.rpc_id(1, shop_id, raw, amount)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_refresh(shop_id: String, raw: String, amount: int) -> void:
+	if multiplayer.is_server():
+		_host_refresh(shop_id, raw, amount, multiplayer.get_remote_sender_id())
+
+
+func _host_refresh(shop_id: String, raw: String, amount: int, peer: int) -> void:
+	var player: Player = player_of(peer)
+	var def: Dictionary = shop(shop_id)
+	if player == null or def.is_empty() or not def.has("refresh") or amount > 99:
+		return
+	if not _near_role(player, String(def.get("role", "")), float(def.get("reach", 150.0))):
+		_tell(peer, "ZU WEIT WEG", false)
+		return
+	var refresh: Dictionary = def.refresh as Dictionary
+	var why: String = CrystalRules.refresh_block(refresh, raw, amount, player.inventory.count_item(raw), player.progress.copper, trust_of(String(def.get("npc", ""))))
+	if why != "":
+		_tell(peer, why, false)
+		return
+	var stones: Array[String] = player.inventory.take_hidden(raw, amount)
+	if stones.size() != amount:
+		return
+	player.progress.award(-int((refresh.fee as Dictionary)[raw]) * amount, 0)
+	var stocked: int = 0
+	for stone: String in stones:
+		var left: int = player.inventory.give(stone, 1)
+		if left > 0:
+			_add_stock(stone, left)
+			stocked += left
+	if stocked > 0:
+		_sync_stock()
+		_tell(peer, "KEIN PLATZ: %d IM LAGER DER STADT" % stocked, false)
+	if peer == multiplayer.get_unique_id():
+		refresh_done.emit(raw, stones)
+	else:
+		_rpc_refresh_done.rpc_id(peer, raw, stones)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_refresh_done(raw: String, stones: Array) -> void:
+	refresh_done.emit(raw, stones)
+
+
+## The DEV tab of a shop (its dev block: kinds + items; to be removed later): hands the item out for free, host-checked like a trade.
+func request_dev_give(shop_id: String, item: String, amount: int) -> void:
+	if multiplayer.is_server():
+		_host_dev_give(shop_id, item, amount, multiplayer.get_unique_id())
+	else:
+		_rpc_dev_give.rpc_id(1, shop_id, item, amount)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_dev_give(shop_id: String, item: String, amount: int) -> void:
+	if multiplayer.is_server():
+		_host_dev_give(shop_id, item, amount, multiplayer.get_remote_sender_id())
+
+
+func _host_dev_give(shop_id: String, item: String, amount: int, peer: int) -> void:
+	var player: Player = player_of(peer)
+	var def: Dictionary = shop(shop_id)
+	if player == null or not def.has("dev") or amount < 1 or amount > 99 or not CrystalRules.dev_allowed(def.dev as Dictionary, item):
+		return
+	var left: int = player.inventory.give(item, amount)
+	if left >= amount:
+		_tell(peer, "KEIN PLATZ IM RUCKSACK", false)
+		return
+	_tell(peer, "%d X %s" % [amount - left, String(DataRegistry.get_entry("items", item).get("name", item)).to_upper()], true)
 
 
 func request_craft(recipe_id: String) -> void:

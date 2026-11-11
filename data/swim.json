@@ -3,8 +3,8 @@
  "exit_amount": 0.8,
  "min_state_time": 0.25,
  "wade_through": {
-  "distance": 56.0,
-  "idle_time": 1.0
+  "distance": 0.0,
+  "idle_time": 0.0
  },
  "blend_seconds": {
   "enter": 0.35,

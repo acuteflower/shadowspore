@@ -64,6 +64,7 @@
   {"id": "any_eel", "kind": "fetch", "givers": [], "item": "fish_eel", "count": [1, 1], "copper_each": [30, 45], "xp_each": 10, "trust": 6, "min_day": 4, "bonus": {"id": "willow_thread", "n": 2, "chance": 0.6}, "text": "EINEN {item}. NUR BEI NACHT UND TIEFEM WASSER."}
  ],
  "story": [
-  {"id": "story_example", "quest": "board_example", "giver": "valdric", "title": "RUF DES RITTERS", "text": "VALDRIC HAT DIR ETWAS ZU SAGEN. KOMM, WENN DU BEREIT BIST.", "after": "town_start", "flag": ""}
+  {"id": "story_example", "quest": "board_example", "giver": "valdric", "title": "RUF DES RITTERS", "text": "VALDRIC HAT DIR ETWAS ZU SAGEN. KOMM, WENN DU BEREIT BIST.", "after": "town_start", "flag": ""},
+  {"id": "lake_witch_notice", "quest": "lake_witch", "giver": "lake_witch", "title": "AM WESTSEE BRENNT KEIN LICHT", "text": "DAS HAUS AM SEE IM WESTEN DES HEXENWALDS IST DUNKEL. WER WEISS, WAS DORT FEHLT?", "after": "spiegelhexe", "flag": "", "min_level": 10}
  ]
 }

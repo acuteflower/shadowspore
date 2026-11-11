@@ -302,5 +302,44 @@
   "once": true,
   "by": "self",
   "unlocks": "farming"
+ },
+ "staff_hag_elm": {
+  "name": "HEXENULMENSTAB",
+  "station": "lake_bench",
+  "role": "lake_witch",
+  "npc": "lake_witch",
+  "group": "staff",
+  "by": "self",
+  "in": {
+   "hag_wood": 4,
+   "curse_silver": 2,
+   "lake_glimmer": 1
+  },
+  "out": {
+   "staff_hag_elm": 1
+  },
+  "seconds": 3.0,
+  "trust": 0,
+  "info": "HEXENULME, ESMAS FLUCHSILBER, EIN TROPFEN SEE"
+ },
+ "staff_bone_fork": {
+  "name": "BLEICHGABEL",
+  "station": "lake_bench",
+  "role": "lake_witch",
+  "npc": "lake_witch",
+  "group": "staff",
+  "by": "self",
+  "in": {
+   "bone_wood": 6,
+   "curse_silver": 3,
+   "lake_moonstone": 2,
+   "shadow_core": 1
+  },
+  "out": {
+   "staff_bone_fork": 1
+  },
+  "seconds": 4.0,
+  "trust": 30,
+  "info": "EIN GESPALTENER BLEICHAST, ZWEI ZINKEN, EIN SCHATTENKERN IN DER GABEL"
  }
 }

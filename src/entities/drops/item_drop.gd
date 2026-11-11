@@ -27,6 +27,7 @@ const BAYER: Array = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 
 @export var count: int = 1
 @export var refine: int = 0 ## a thrown refined weapon keeps its level ...
 @export var refine_pity: int = 0 ## ... and its Glut
+var sockets: Dictionary = {} ## host only: the crystals of a thrown staff ("sp" / "gm", docs/magie_konzept.md), handed back on pickup
 @export var launch: Vector2 = Vector2.ZERO ## horizontal speed of the pop
 
 var _age: float = 0.0
@@ -59,6 +60,7 @@ func _ready() -> void:
 		_stack[RefineRules.KEY_LEVEL] = refine
 	if refine_pity > 0:
 		_stack[RefineRules.KEY_PITY] = refine_pity
+	_stack.merge(sockets)
 	var def: Dictionary = Items.definition(_stack)
 	_label = Items.title(_stack)
 	_rarity_color = Items.rarity_color(_stack)
@@ -159,7 +161,7 @@ func _player_by_id(player_id: int) -> Player:
 
 ## Host: folds this drop into a landed drop of the same item nearby, if the stack limit allows.
 func _try_merge() -> bool:
-	if story_id != "" or refine > 0 or refine_pity > 0:
+	if story_id != "" or refine > 0 or refine_pity > 0 or not sockets.is_empty():
 		return false
 	if _merged:
 		return true

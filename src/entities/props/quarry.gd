@@ -116,7 +116,7 @@ func _check_sight() -> void:
 		var player: Player = node as Player
 		if player == null or not player.is_multiplayer_authority() or player.quests == null:
 			continue
-		if String(player.quests.current().get("step_id", "")) != "find_knight":
+		if player.quests.active_step_id("find_help") != "find_knight":
 			continue
 		var from: Vector2 = player.global_position + Vector2(0, -14)
 		var to: Vector2 = knight.global_position + Vector2(0, -22)

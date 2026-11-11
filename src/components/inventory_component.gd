@@ -4,6 +4,7 @@ extends Node
 ## validates every change; the owning client keeps a mirror that the host pushes after each change.
 
 signal changed
+signal socketed(socket: String) ## host: a crystal went into or out of a staff ("sp"/"sp2" spell sockets, "gm"/"gm2" gems): the spell starts charging anew
 
 const HOTBAR_SIZE: int = 8
 const BACKPACK_SIZE: int = 24
@@ -15,6 +16,7 @@ var equipment: Dictionary = {} ## slot name -> stack
 var held: Dictionary = {} ## the stack on the cursor while the inventory window is open (the host holds the truth, the owner sees it)
 var box: ItemBox ## the container this player has open (the town's stock, a chest): slot kind "box"; the host sets it with the "box_open" op after checking the reach
 var selected: int = 0 ## the hotbar slot in use (the owner's choice, told to the host with the "select" op)
+var hidden: Dictionary = {} ## host: raw stone id -> Array of the stones they hide, rolled when they came into the bag (`CrystalRules.roll`, items.json `hidden`); saved, never sent
 
 
 func _ready() -> void:
@@ -35,6 +37,12 @@ func active_stack() -> Dictionary:
 	if not held.is_empty() and String(Items.definition(held).get("kind", "")) == "tool":
 		return held
 	return equipment.get("main_hand", {})
+
+
+## The staff in her hand ({} when she holds none): a staff is a tool in the selected hotbar slot (docs/magie_konzept.md).
+func active_staff() -> Dictionary:
+	var stack: Dictionary = slots[selected]
+	return stack if SpellRules.is_staff(stack) else {}
 
 
 ## Owner: picks a hotbar slot. Applied at once on the owner's machine, the host is told.
@@ -148,6 +156,29 @@ func count_plain(id: String) -> int:
 func remove_item(id: String, count: int) -> bool:
 	if count_item(id) < count:
 		return false
+	_take_items(id, count)
+	_commit()
+	return true
+
+
+## Host only: exchange goods and a quest reward together, even if the reward
+## needs the space freed by handing the goods over.
+func exchange_items(take_id: String, take_count: int, reward_id: String, reward_count: int, dry_run: bool = false) -> bool:
+	if count_item(take_id) < take_count:
+		return false
+	var before: Array = slots
+	slots = slots.duplicate(true)
+	if take_count > 0:
+		_take_items(take_id, take_count)
+	var fits: bool = add_item(reward_id, reward_count) == 0
+	if dry_run or not fits:
+		slots = before
+	else:
+		_commit()
+	return fits
+
+
+func _take_items(id: String, count: int) -> void:
 	var order: Array[int] = [] ## plain pieces go first: a refined weapon is only given up when nothing else is left
 	for i: int in SIZE:
 		order.append(i)
@@ -160,8 +191,6 @@ func remove_item(id: String, count: int) -> bool:
 			count -= taken
 			if int(stack["count"]) <= 0:
 				slots[i] = {}
-	_commit()
-	return true
 
 
 ## True if one of `id` is in the bag or worn.
@@ -210,6 +239,54 @@ func debug_set_refine(level: int) -> bool:
 	return true
 
 
+## Host: one hidden roll per raw stone in the bag and on the cursor. New stones get theirs now (they are "found"), stones that left take their rolls
+## with them (the newest first). Nobody can see a roll, so which stone left does not matter.
+func sync_hidden() -> void:
+	var counts: Dictionary = {}
+	for stack: Variant in slots + [held]:
+		var s: Dictionary = stack as Dictionary
+		if not s.is_empty() and not CrystalRules.hidden_of(String(s["id"])).is_empty():
+			counts[String(s["id"])] = int(counts.get(String(s["id"]), 0)) + int(s["count"])
+	for id: Variant in hidden.keys():
+		if not counts.has(id):
+			hidden.erase(id)
+	for id: String in counts:
+		var rolls: Array = hidden.get(id, []) as Array
+		while rolls.size() > int(counts[id]):
+			rolls.pop_back()
+		while rolls.size() < int(counts[id]):
+			rolls.append(CrystalRules.roll(CrystalRules.hidden_of(id), randf(), randf()))
+		hidden[id] = rolls
+
+
+## Host: takes `count` raw stones `id` out of the bag and returns the stones they hid (the oldest first); [] and nothing taken when there are fewer.
+func take_hidden(id: String, count: int) -> Array[String]:
+	sync_hidden()
+	var out: Array[String] = []
+	var rolls: Array = hidden.get(id, []) as Array
+	if count < 1 or rolls.size() < count or count_item(id) < count:
+		return out
+	for i: int in count:
+		out.append(String(rolls.pop_front()))
+	hidden[id] = rolls
+	_take_items(id, count)
+	_commit()
+	return out
+
+
+## The saved rolls (`SaveGame` "raw_rolls"); counts that no longer match are put right at the next change.
+func import_hidden(saved: Dictionary) -> void:
+	hidden.clear()
+	for id: Variant in saved:
+		var rolls: Array = []
+		for r: Variant in saved[id] as Array:
+			if not DataRegistry.get_entry("items", String(r)).is_empty():
+				rolls.append(String(r))
+		hidden[String(id)] = rolls
+	if multiplayer.is_server():
+		sync_hidden()
+
+
 ## Empties the bag, the hotbar and the worn equipment (the wake-up in the hut: the story starts again with nothing). Host only.
 func clear_all() -> void:
 	for i: int in slots.size():
@@ -245,6 +322,8 @@ func _valid(index: int) -> bool:
 
 
 func _commit() -> void:
+	if multiplayer.is_server():
+		sync_hidden()
 	changed.emit()
 	if box != null and multiplayer.is_server():
 		box.touch() ## the box's owner syncs it to every peer
@@ -267,9 +346,9 @@ func _apply(op: String, args: Array) -> void:
 		"use":
 			ok = _use(int(args[0]))
 		"click":
-			ok = _click(String(args[0]), args[1])
+			ok = _click(String(args[0]), args[1], int(args[2]) if args.size() > 2 else -1)
 		"rclick":
-			ok = _rclick(String(args[0]), args[1])
+			ok = _rclick(String(args[0]), args[1], int(args[2]) if args.size() > 2 else -1)
 		"quick":
 			ok = _quick(String(args[0]), args[1])
 		"hotkey":
@@ -437,10 +516,12 @@ func slot_open(slot_name: String) -> bool:
 
 ## Left click: take the whole stack; with a full hand put it down (an empty slot), top up a stack of the same item (the rest stays in the
 ## hand) or swap with what lies there.
-func _click(kind: String, ref: Variant) -> bool:
+func _click(kind: String, ref: Variant, prong: int = -1) -> bool:
 	if not _exists(kind, ref):
 		return false
 	var current: Dictionary = stack_at(kind, ref)
+	if not held.is_empty() and SpellRules.is_staff(current) and SpellRules.socket_of(held) != "":
+		return _socket(current, prong) ## a crystal laid on a staff goes into its socket (on a forked staff: the prong under the pointer)
 	if held.is_empty():
 		if current.is_empty():
 			return false
@@ -470,15 +551,75 @@ func _click(kind: String, ref: Variant) -> bool:
 	return true
 
 
+## Sets one stone of the cursor stack into the staff `staff` (docs/magie_konzept.md): a spell crystal into the spell socket, a gem into the gem socket.
+## A stone that sat there comes back: onto the cursor when the hand held only this one, else into the bag (refused when there is no room).
+func _socket(staff: Dictionary, prong: int = -1) -> bool:
+	if not SpellRules.can_socket(staff, held):
+		return false
+	var spell_stone: bool = SpellRules.socket_of(held) == SpellRules.KEY_SPELL
+	var prongs: int = SpellRules.prongs_of(String(staff.get("id", "")))
+	var pick: int = prong if prong >= 0 and prong < prongs else -1
+	if pick < 0: ## no prong named: the first empty one, else the first
+		pick = 0
+		for p: int in prongs:
+			if String(staff.get(SpellRules.spell_key(p) if spell_stone else SpellRules.gem_key(p), "")) == "":
+				pick = p
+				break
+	var key: String = SpellRules.spell_key(pick) if spell_stone else SpellRules.gem_key(pick)
+	var old: String = String(staff.get(key, ""))
+	var stone: String = String(held["id"])
+	if old == stone:
+		return false
+	if old != "" and int(held["count"]) > 1 and not has_room(old):
+		return false
+	staff[key] = stone
+	held["count"] = int(held["count"]) - 1
+	if int(held["count"]) <= 0:
+		held = {"id": old, "count": 1} if old != "" else {}
+	elif old != "":
+		add_item(old, 1)
+	socketed.emit(key)
+	return true
+
+
+## Takes the spell crystal (or, when there is none, the gem) out of `staff` onto the cursor: of `prong` first (a forked staff: the
+## prong under the pointer), then of the other one.
+func _unsocket(staff: Dictionary, prong: int = -1) -> bool:
+	if not held.is_empty():
+		return false
+	var order: Array[int] = [0, 1]
+	if prong == 1:
+		order = [1, 0]
+	var key: String = ""
+	for p: int in order:
+		if p >= SpellRules.prongs_of(String(staff.get("id", ""))) and String(staff.get(SpellRules.spell_key(p), "")) == "" and String(staff.get(SpellRules.gem_key(p), "")) == "":
+			continue
+		if String(staff.get(SpellRules.spell_key(p), "")) != "":
+			key = SpellRules.spell_key(p)
+		elif String(staff.get(SpellRules.gem_key(p), "")) != "":
+			key = SpellRules.gem_key(p)
+		if key != "":
+			break
+	var stone: String = String(staff.get(key, "")) if key != "" else ""
+	if stone == "":
+		return false
+	staff.erase(key)
+	held = {"id": stone, "count": 1}
+	socketed.emit(key)
+	return true
+
+
 ## Right click: with an empty hand take half of a stack (rounded up); a single piece of gear is equipped, worn gear taken off.
 ## With a full hand put down exactly one piece.
-func _rclick(kind: String, ref: Variant) -> bool:
+func _rclick(kind: String, ref: Variant, prong: int = -1) -> bool:
 	if not _exists(kind, ref):
 		return false
 	var current: Dictionary = stack_at(kind, ref)
 	if held.is_empty():
 		if current.is_empty():
 			return false
+		if SpellRules.is_staff(current) and SpellRules.has_stones(current):
+			return _unsocket(current, prong) ## right click on a staff takes a crystal out (the spell crystal first)
 		if kind == "equip":
 			return _unequip(String(ref), -1)
 		if Items.max_stack(current) <= 1:

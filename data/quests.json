@@ -35,7 +35,7 @@
     "hint": "sneak"
    },
    {
-    "id": "find_knight",
+    "id": "find_fallen_knight",
     "text": "FOLGE DEM PFAD WEITER",
     "type": "reach",
     "tile": [
@@ -591,6 +591,112 @@
     "type": "flag",
     "flag": "sh_forged",
     "event": "story:sh_esma_forge"
+   }
+  ]
+ },
+ "lake_witch": {
+  "title": "DER RING AM SEE",
+  "_note": "docs/seehexe_konzept.md 8; texts are PLACEHOLDERS",
+  "steps": [
+   {
+    "id": "lw_lake",
+    "text": "FINDE DAS HAUS AM WESTSEE",
+    "type": "flag",
+    "flag": "lake_witch_seen",
+    "tile": [
+     738,
+     936
+    ],
+    "search": 30,
+    "event": "bark:lw_start"
+   },
+   {
+    "id": "lw_door",
+    "text": "KLOPF AN DIE TÜR",
+    "type": "flag",
+    "flag": "lake_witch_door",
+    "tile": [
+     738,
+     936
+    ],
+    "event": "bark:lw_dark"
+   },
+   {
+    "id": "lw_feed",
+    "text": "NÄHRE DIE BANNSTEINE",
+    "type": "tasks",
+    "tile": [
+     738,
+     934
+    ],
+    "tasks": [
+     {
+      "id": "a",
+      "text": "BANNSTEIN IM SÜDEN",
+      "kind": "flag",
+      "flag": "lake_witch_fed_a"
+     },
+     {
+      "id": "b",
+      "text": "BANNSTEIN AN DER LEERE",
+      "kind": "flag",
+      "flag": "lake_witch_fed_b"
+     },
+     {
+      "id": "shadows",
+      "text": "VERTREIBE DIE SCHATTEN",
+      "kind": "flag",
+      "flag": "lake_witch_shadows"
+     },
+     {
+      "id": "c",
+      "text": "BANNSTEIN IM WESTEN",
+      "kind": "flag",
+      "flag": "lake_witch_fed_c"
+     }
+    ]
+   },
+   {
+    "id": "lw_enter",
+    "text": "BETRITT DAS HAUS",
+    "type": "flag",
+    "flag": "entered_lake_hut",
+    "tile": [
+     738,
+     936
+    ]
+   },
+   {
+    "id": "lw_meet",
+    "text": "SPRICH MIT DER SEEHEXE",
+    "type": "flag",
+    "flag": "lake_witch_met",
+    "actor": "lake_witch",
+    "talk_to": "lake_witch",
+    "talk": "lw_meet"
+   },
+   {
+    "id": "lw_socket",
+    "text": "SETZE DIE STEINE IN DEN STAB",
+    "type": "flag",
+    "flag": "lake_witch_socketed",
+    "hint": "socket"
+   },
+   {
+    "id": "lw_cast",
+    "text": "WIRKE DEINEN ERSTEN ZAUBER",
+    "type": "flag",
+    "flag": "lake_witch_cast",
+    "hint": "cast"
+   },
+   {
+    "id": "lw_end",
+    "text": "ERZÄHL DER SEEHEXE DAVON",
+    "type": "flag",
+    "flag": "lake_witch_done",
+    "actor": "lake_witch",
+    "talk_to": "lake_witch",
+    "talk": "lw_end"
    }
   ]
  }

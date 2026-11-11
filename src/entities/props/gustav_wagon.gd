@@ -89,7 +89,7 @@ func _process(delta: float) -> void:
 
 ## The wagon is "found" when it is in her picture, close and nothing solid is between (like the knight at the quarry).
 func _check_sight(player: Player) -> void:
-	if player == null or player.quests == null or String(player.quests.current().get("step_id", "")) != "follow_knocks":
+	if player == null or player.quests == null or player.quests.active_step_id("gustav_rescue") != "follow_knocks":
 		return
 	var from: Vector2 = player.global_position + Vector2(0, -14)
 	var to: Vector2 = global_position + Vector2(0, -16)
@@ -110,7 +110,7 @@ func prompt() -> String:
 	var player: Player = _local_player()
 	if player == null or player.quests == null or player.story_lock or InputManager.ui_blocking:
 		return ""
-	return "TÜR LÖSEN" if String(player.quests.current().get("step_id", "")) == "free_gustav" else ""
+	return "TÜR LÖSEN" if player.quests.active_step_id("gustav_rescue") == "free_gustav" else ""
 
 
 func reach_distance(from: Vector2) -> float:

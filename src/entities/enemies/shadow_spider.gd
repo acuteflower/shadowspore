@@ -556,14 +556,14 @@ func _strike() -> void:
 
 
 func _target_valid() -> bool:
-	return is_instance_valid(_target) and _target.health.current > 0.0 and global_position.distance_to(_target.global_position) <= float(_def["lose_range"]) * _target.stealth.detection_multiplier()
+	return is_instance_valid(_target) and _target.health.current > 0.0 and not _target.veiled() and global_position.distance_to(_target.global_position) <= float(_def["lose_range"]) * _target.stealth.detection_multiplier()
 
 
 func _find_target() -> Player:
 	var best: Player = null
 	var nearest: float = INF
 	for player: Player in Player.all:
-		if player.health.current <= 0.0:
+		if player.health.current <= 0.0 or player.veiled(): ## Nebelschleier: the mist hides her
 			continue
 		var distance: float = global_position.distance_to(player.global_position)
 		if distance < nearest and distance <= float(_def["sight_range"]) * player.stealth.detection_multiplier() * player.stealth.alarm_scale() and (_clear_path(global_position, player.global_position) or _sees_over_cliff(player.global_position)):

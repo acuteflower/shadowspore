@@ -1397,5 +1397,751 @@
   "hotbar": true,
   "icon": "res://assets/items/wound_leaf_seed.png",
   "description": "Flache, zähe Samen. Das Blatt wächst nach, wenn man es pflückt. In der Schnellleiste gewählt, setzt E ihn in ein gehacktes Beet."
+ },
+ "staff_hag_elm": {
+  "name": "Hexenulmenstab",
+  "kind": "tool",
+  "tool": "staff",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/staff_hag_elm.png",
+  "held": "res://assets/items/staff_hag_elm_held.png",
+  "description": "Ein gedrehter Ast der Hexenulme. Oben klammert eine Krone aus drei Zweigen einen Zauberkristall, darunter hält ein Astknoten einen Verstärker. In der Schnellleiste gewählt: Linksklick wirkt den Zauber."
+ },
+ "staff_bone_fork": {
+  "name": "Bleichgabel",
+  "kind": "tool",
+  "tool": "staff",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 1,
+  "hotbar": true,
+  "icon": "res://assets/items/staff_bone_fork.png",
+  "held": "res://assets/items/staff_bone_fork_held.png",
+  "description": "Ein Ast des Bleichbaums, der sich oben in zwei Zinken spaltet. Jede Zinke hält einen Zauberkristall, darunter je einen Verstärker. Linksklick wirkt die linke Zinke, Rechtsklick die rechte. Wer beide kurz nacheinander wirkt, lässt die Gabel singen."
+ },
+ "crystal_banish_1": {
+  "name": "Bannlicht-Splitter",
+  "kind": "crystal",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_banish_1.png",
+  "crystal": {
+   "spell": "banish",
+   "tier": 1
+  },
+  "description": "Ein Zauberkristall der Schule LICHT. Im Stab wirkt er BANNLICHT: einen stehenden Lichtschein um Ellie, in dem Schattenwesen verbrennen."
+ },
+ "crystal_banish_2": {
+  "name": "Bannlicht-Scherbe",
+  "kind": "crystal",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_banish_2.png",
+  "crystal": {
+   "spell": "banish",
+   "tier": 2
+  },
+  "description": "Ein Zauberkristall der Schule LICHT. Im Stab wirkt er BANNLICHT: einen stehenden Lichtschein um Ellie, in dem Schattenwesen verbrennen."
+ },
+ "crystal_banish_3": {
+  "name": "Bannlicht-Kristall",
+  "kind": "crystal",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_banish_3.png",
+  "crystal": {
+   "spell": "banish",
+   "tier": 3
+  },
+  "description": "Ein Zauberkristall der Schule LICHT. Im Stab wirkt er BANNLICHT: einen stehenden Lichtschein um Ellie, in dem Schattenwesen verbrennen."
+ },
+ "crystal_banish_4": {
+  "name": "Bannlicht-Herzstein",
+  "kind": "crystal",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_banish_4.png",
+  "crystal": {
+   "spell": "banish",
+   "tier": 4
+  },
+  "description": "Ein Zauberkristall der Schule LICHT. Im Stab wirkt er BANNLICHT: einen stehenden Lichtschein um Ellie, in dem Schattenwesen verbrennen."
+ },
+ "crystal_banish_5": {
+  "name": "Bannlicht-Sternstein",
+  "kind": "crystal",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_banish_5.png",
+  "crystal": {
+   "spell": "banish",
+   "tier": 5
+  },
+  "description": "Ein Zauberkristall der Schule LICHT. Im Stab wirkt er BANNLICHT: einen stehenden Lichtschein um Ellie, in dem Schattenwesen verbrennen."
+ },
+ "crystal_roots_1": {
+  "name": "Wurzelgrund-Splitter",
+  "kind": "crystal",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_roots_1.png",
+  "crystal": {
+   "spell": "roots",
+   "tier": 1
+  },
+  "description": "Ein Zauberkristall der Schule WURZEL. Im Stab wirkt er WURZELGRUND: wilde Wurzeln brechen aus dem Boden und heilen alle, die im Kreis stehen."
+ },
+ "crystal_roots_2": {
+  "name": "Wurzelgrund-Scherbe",
+  "kind": "crystal",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_roots_2.png",
+  "crystal": {
+   "spell": "roots",
+   "tier": 2
+  },
+  "description": "Ein Zauberkristall der Schule WURZEL. Im Stab wirkt er WURZELGRUND: wilde Wurzeln brechen aus dem Boden und heilen alle, die im Kreis stehen."
+ },
+ "crystal_roots_3": {
+  "name": "Wurzelgrund-Kristall",
+  "kind": "crystal",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_roots_3.png",
+  "crystal": {
+   "spell": "roots",
+   "tier": 3
+  },
+  "description": "Ein Zauberkristall der Schule WURZEL. Im Stab wirkt er WURZELGRUND: wilde Wurzeln brechen aus dem Boden und heilen alle, die im Kreis stehen."
+ },
+ "crystal_roots_4": {
+  "name": "Wurzelgrund-Herzstein",
+  "kind": "crystal",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_roots_4.png",
+  "crystal": {
+   "spell": "roots",
+   "tier": 4
+  },
+  "description": "Ein Zauberkristall der Schule WURZEL. Im Stab wirkt er WURZELGRUND: wilde Wurzeln brechen aus dem Boden und heilen alle, die im Kreis stehen."
+ },
+ "crystal_roots_5": {
+  "name": "Wurzelgrund-Sternstein",
+  "kind": "crystal",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_roots_5.png",
+  "crystal": {
+   "spell": "roots",
+   "tier": 5
+  },
+  "description": "Ein Zauberkristall der Schule WURZEL. Im Stab wirkt er WURZELGRUND: wilde Wurzeln brechen aus dem Boden und heilen alle, die im Kreis stehen."
+ },
+ "crystal_embers_1": {
+  "name": "Glutschwarm-Splitter",
+  "kind": "crystal",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_embers_1.png",
+  "crystal": {
+   "spell": "embers",
+   "tier": 1
+  },
+  "description": "Ein Zauberkristall der Schule GLUT. Im Stab wirkt er GLUTSCHWARM: brennende Splitter fliegen aus dem Kristall, je einer auf einen Gegner in der Nähe, und setzen ihn in Brand."
+ },
+ "crystal_embers_2": {
+  "name": "Glutschwarm-Scherbe",
+  "kind": "crystal",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_embers_2.png",
+  "crystal": {
+   "spell": "embers",
+   "tier": 2
+  },
+  "description": "Ein Zauberkristall der Schule GLUT. Im Stab wirkt er GLUTSCHWARM: brennende Splitter fliegen aus dem Kristall, je einer auf einen Gegner in der Nähe, und setzen ihn in Brand."
+ },
+ "crystal_embers_3": {
+  "name": "Glutschwarm-Kristall",
+  "kind": "crystal",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_embers_3.png",
+  "crystal": {
+   "spell": "embers",
+   "tier": 3
+  },
+  "description": "Ein Zauberkristall der Schule GLUT. Im Stab wirkt er GLUTSCHWARM: brennende Splitter fliegen aus dem Kristall, je einer auf einen Gegner in der Nähe, und setzen ihn in Brand."
+ },
+ "crystal_embers_4": {
+  "name": "Glutschwarm-Herzstein",
+  "kind": "crystal",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_embers_4.png",
+  "crystal": {
+   "spell": "embers",
+   "tier": 4
+  },
+  "description": "Ein Zauberkristall der Schule GLUT. Im Stab wirkt er GLUTSCHWARM: brennende Splitter fliegen aus dem Kristall, je einer auf einen Gegner in der Nähe, und setzen ihn in Brand."
+ },
+ "crystal_embers_5": {
+  "name": "Glutschwarm-Sternstein",
+  "kind": "crystal",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_embers_5.png",
+  "crystal": {
+   "spell": "embers",
+   "tier": 5
+  },
+  "description": "Ein Zauberkristall der Schule GLUT. Im Stab wirkt er GLUTSCHWARM: brennende Splitter fliegen aus dem Kristall, je einer auf einen Gegner in der Nähe, und setzen ihn in Brand."
+ },
+ "crystal_veil_1": {
+  "name": "Nebelschleier-Splitter",
+  "kind": "crystal",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_veil_1.png",
+  "crystal": {
+   "spell": "veil",
+   "tier": 1
+  },
+  "description": "Ein Zauberkristall der Schule NEBEL. Im Stab wirkt er NEBELSCHLEIER: ein Spieler (du selbst oder wen du anzielst) verschwimmt im Nebel und kann von Schattenwesen nicht mehr angegriffen werden."
+ },
+ "crystal_veil_2": {
+  "name": "Nebelschleier-Scherbe",
+  "kind": "crystal",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_veil_2.png",
+  "crystal": {
+   "spell": "veil",
+   "tier": 2
+  },
+  "description": "Ein Zauberkristall der Schule NEBEL. Im Stab wirkt er NEBELSCHLEIER: ein Spieler (du selbst oder wen du anzielst) verschwimmt im Nebel und kann von Schattenwesen nicht mehr angegriffen werden."
+ },
+ "crystal_veil_3": {
+  "name": "Nebelschleier-Kristall",
+  "kind": "crystal",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_veil_3.png",
+  "crystal": {
+   "spell": "veil",
+   "tier": 3
+  },
+  "description": "Ein Zauberkristall der Schule NEBEL. Im Stab wirkt er NEBELSCHLEIER: ein Spieler (du selbst oder wen du anzielst) verschwimmt im Nebel und kann von Schattenwesen nicht mehr angegriffen werden."
+ },
+ "crystal_veil_4": {
+  "name": "Nebelschleier-Herzstein",
+  "kind": "crystal",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_veil_4.png",
+  "crystal": {
+   "spell": "veil",
+   "tier": 4
+  },
+  "description": "Ein Zauberkristall der Schule NEBEL. Im Stab wirkt er NEBELSCHLEIER: ein Spieler (du selbst oder wen du anzielst) verschwimmt im Nebel und kann von Schattenwesen nicht mehr angegriffen werden."
+ },
+ "crystal_veil_5": {
+  "name": "Nebelschleier-Sternstein",
+  "kind": "crystal",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_veil_5.png",
+  "crystal": {
+   "spell": "veil",
+   "tier": 5
+  },
+  "description": "Ein Zauberkristall der Schule NEBEL. Im Stab wirkt er NEBELSCHLEIER: ein Spieler (du selbst oder wen du anzielst) verschwimmt im Nebel und kann von Schattenwesen nicht mehr angegriffen werden."
+ },
+ "crystal_maw_1": {
+  "name": "Leerenschlund-Splitter",
+  "kind": "crystal",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_maw_1.png",
+  "crystal": {
+   "spell": "maw",
+   "tier": 1
+  },
+  "description": "Ein Zauberkristall der Schule LEERE. Im Stab wirkt er LEERENSCHLUND: kostet dich Leben. An der Stelle reißt der Boden zur Leere auf, saugt Schattenwesen hinein und schnappt zu. Für jedes, das er frisst, gibt er dir Leben zurück."
+ },
+ "crystal_maw_2": {
+  "name": "Leerenschlund-Scherbe",
+  "kind": "crystal",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_maw_2.png",
+  "crystal": {
+   "spell": "maw",
+   "tier": 2
+  },
+  "description": "Ein Zauberkristall der Schule LEERE. Im Stab wirkt er LEERENSCHLUND: kostet dich Leben. An der Stelle reißt der Boden zur Leere auf, saugt Schattenwesen hinein und schnappt zu. Für jedes, das er frisst, gibt er dir Leben zurück."
+ },
+ "crystal_maw_3": {
+  "name": "Leerenschlund-Kristall",
+  "kind": "crystal",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_maw_3.png",
+  "crystal": {
+   "spell": "maw",
+   "tier": 3
+  },
+  "description": "Ein Zauberkristall der Schule LEERE. Im Stab wirkt er LEERENSCHLUND: kostet dich Leben. An der Stelle reißt der Boden zur Leere auf, saugt Schattenwesen hinein und schnappt zu. Für jedes, das er frisst, gibt er dir Leben zurück."
+ },
+ "crystal_maw_4": {
+  "name": "Leerenschlund-Herzstein",
+  "kind": "crystal",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_maw_4.png",
+  "crystal": {
+   "spell": "maw",
+   "tier": 4
+  },
+  "description": "Ein Zauberkristall der Schule LEERE. Im Stab wirkt er LEERENSCHLUND: kostet dich Leben. An der Stelle reißt der Boden zur Leere auf, saugt Schattenwesen hinein und schnappt zu. Für jedes, das er frisst, gibt er dir Leben zurück."
+ },
+ "crystal_maw_5": {
+  "name": "Leerenschlund-Sternstein",
+  "kind": "crystal",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/crystal_maw_5.png",
+  "crystal": {
+   "spell": "maw",
+   "tier": 5
+  },
+  "description": "Ein Zauberkristall der Schule LEERE. Im Stab wirkt er LEERENSCHLUND: kostet dich Leben. An der Stelle reißt der Boden zur Leere auf, saugt Schattenwesen hinein und schnappt zu. Für jedes, das er frisst, gibt er dir Leben zurück."
+ },
+ "gem_tinder_1": {
+  "name": "Zunder-Rohschliff",
+  "kind": "gem",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_tinder_1.png",
+  "gem": {
+   "mod": "tinder",
+   "tier": 1
+  },
+  "description": "Ein Verstärkerstein der Familie ZUNDER. In der Fassung eines Stabs mit einem Zauber der Schule GLUT: Glutzauber brennen heißer und länger."
+ },
+ "gem_tinder_2": {
+  "name": "Zunder-Tropfen",
+  "kind": "gem",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_tinder_2.png",
+  "gem": {
+   "mod": "tinder",
+   "tier": 2
+  },
+  "description": "Ein Verstärkerstein der Familie ZUNDER. In der Fassung eines Stabs mit einem Zauber der Schule GLUT: Glutzauber brennen heißer und länger."
+ },
+ "gem_tinder_3": {
+  "name": "Zunder-Linse",
+  "kind": "gem",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_tinder_3.png",
+  "gem": {
+   "mod": "tinder",
+   "tier": 3
+  },
+  "description": "Ein Verstärkerstein der Familie ZUNDER. In der Fassung eines Stabs mit einem Zauber der Schule GLUT: Glutzauber brennen heißer und länger."
+ },
+ "gem_tinder_4": {
+  "name": "Zunder-Facette",
+  "kind": "gem",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_tinder_4.png",
+  "gem": {
+   "mod": "tinder",
+   "tier": 4
+  },
+  "description": "Ein Verstärkerstein der Familie ZUNDER. In der Fassung eines Stabs mit einem Zauber der Schule GLUT: Glutzauber brennen heißer und länger."
+ },
+ "gem_tinder_5": {
+  "name": "Zunder-Krone",
+  "kind": "gem",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_tinder_5.png",
+  "gem": {
+   "mod": "tinder",
+   "tier": 5
+  },
+  "description": "Ein Verstärkerstein der Familie ZUNDER. In der Fassung eines Stabs mit einem Zauber der Schule GLUT: Glutzauber brennen heißer und länger."
+ },
+ "gem_haze_1": {
+  "name": "Dunst-Rohschliff",
+  "kind": "gem",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_haze_1.png",
+  "gem": {
+   "mod": "haze",
+   "tier": 1
+  },
+  "description": "Ein Verstärkerstein der Familie DUNST. In der Fassung eines Stabs mit einem Zauber der Schule NEBEL: Nebelzauber halten länger."
+ },
+ "gem_haze_2": {
+  "name": "Dunst-Tropfen",
+  "kind": "gem",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_haze_2.png",
+  "gem": {
+   "mod": "haze",
+   "tier": 2
+  },
+  "description": "Ein Verstärkerstein der Familie DUNST. In der Fassung eines Stabs mit einem Zauber der Schule NEBEL: Nebelzauber halten länger."
+ },
+ "gem_haze_3": {
+  "name": "Dunst-Linse",
+  "kind": "gem",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_haze_3.png",
+  "gem": {
+   "mod": "haze",
+   "tier": 3
+  },
+  "description": "Ein Verstärkerstein der Familie DUNST. In der Fassung eines Stabs mit einem Zauber der Schule NEBEL: Nebelzauber halten länger."
+ },
+ "gem_haze_4": {
+  "name": "Dunst-Facette",
+  "kind": "gem",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_haze_4.png",
+  "gem": {
+   "mod": "haze",
+   "tier": 4
+  },
+  "description": "Ein Verstärkerstein der Familie DUNST. In der Fassung eines Stabs mit einem Zauber der Schule NEBEL: Nebelzauber halten länger."
+ },
+ "gem_haze_5": {
+  "name": "Dunst-Krone",
+  "kind": "gem",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_haze_5.png",
+  "gem": {
+   "mod": "haze",
+   "tier": 5
+  },
+  "description": "Ein Verstärkerstein der Familie DUNST. In der Fassung eines Stabs mit einem Zauber der Schule NEBEL: Nebelzauber halten länger."
+ },
+ "gem_hunger_1": {
+  "name": "Hunger-Rohschliff",
+  "kind": "gem",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_hunger_1.png",
+  "gem": {
+   "mod": "hunger",
+   "tier": 1
+  },
+  "description": "Ein Verstärkerstein der Familie HUNGER. In der Fassung eines Stabs mit einem Zauber der Schule LEERE: Leerezauber geben mehr Leben zurück."
+ },
+ "gem_hunger_2": {
+  "name": "Hunger-Tropfen",
+  "kind": "gem",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_hunger_2.png",
+  "gem": {
+   "mod": "hunger",
+   "tier": 2
+  },
+  "description": "Ein Verstärkerstein der Familie HUNGER. In der Fassung eines Stabs mit einem Zauber der Schule LEERE: Leerezauber geben mehr Leben zurück."
+ },
+ "gem_hunger_3": {
+  "name": "Hunger-Linse",
+  "kind": "gem",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_hunger_3.png",
+  "gem": {
+   "mod": "hunger",
+   "tier": 3
+  },
+  "description": "Ein Verstärkerstein der Familie HUNGER. In der Fassung eines Stabs mit einem Zauber der Schule LEERE: Leerezauber geben mehr Leben zurück."
+ },
+ "gem_hunger_4": {
+  "name": "Hunger-Facette",
+  "kind": "gem",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_hunger_4.png",
+  "gem": {
+   "mod": "hunger",
+   "tier": 4
+  },
+  "description": "Ein Verstärkerstein der Familie HUNGER. In der Fassung eines Stabs mit einem Zauber der Schule LEERE: Leerezauber geben mehr Leben zurück."
+ },
+ "gem_hunger_5": {
+  "name": "Hunger-Krone",
+  "kind": "gem",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_hunger_5.png",
+  "gem": {
+   "mod": "hunger",
+   "tier": 5
+  },
+  "description": "Ein Verstärkerstein der Familie HUNGER. In der Fassung eines Stabs mit einem Zauber der Schule LEERE: Leerezauber geben mehr Leben zurück."
+ },
+ "gem_lens_1": {
+  "name": "Brennglas-Rohschliff",
+  "kind": "gem",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_lens_1.png",
+  "gem": {
+   "mod": "lens",
+   "tier": 1
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Lichtzauber stärker brennen."
+ },
+ "gem_lens_2": {
+  "name": "Brennglas-Tropfen",
+  "kind": "gem",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_lens_2.png",
+  "gem": {
+   "mod": "lens",
+   "tier": 2
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Lichtzauber stärker brennen."
+ },
+ "gem_lens_3": {
+  "name": "Brennglas-Linse",
+  "kind": "gem",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_lens_3.png",
+  "gem": {
+   "mod": "lens",
+   "tier": 3
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Lichtzauber stärker brennen."
+ },
+ "gem_lens_4": {
+  "name": "Brennglas-Facette",
+  "kind": "gem",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_lens_4.png",
+  "gem": {
+   "mod": "lens",
+   "tier": 4
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Lichtzauber stärker brennen."
+ },
+ "gem_lens_5": {
+  "name": "Brennglas-Krone",
+  "kind": "gem",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_lens_5.png",
+  "gem": {
+   "mod": "lens",
+   "tier": 5
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Lichtzauber stärker brennen."
+ },
+ "gem_wild_1": {
+  "name": "Wildwuchs-Rohschliff",
+  "kind": "gem",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_wild_1.png",
+  "gem": {
+   "mod": "wild",
+   "tier": 1
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Wurzelzauber länger und wilder wachsen."
+ },
+ "gem_wild_2": {
+  "name": "Wildwuchs-Tropfen",
+  "kind": "gem",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_wild_2.png",
+  "gem": {
+   "mod": "wild",
+   "tier": 2
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Wurzelzauber länger und wilder wachsen."
+ },
+ "gem_wild_3": {
+  "name": "Wildwuchs-Linse",
+  "kind": "gem",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_wild_3.png",
+  "gem": {
+   "mod": "wild",
+   "tier": 3
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Wurzelzauber länger und wilder wachsen."
+ },
+ "gem_wild_4": {
+  "name": "Wildwuchs-Facette",
+  "kind": "gem",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_wild_4.png",
+  "gem": {
+   "mod": "wild",
+   "tier": 4
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Wurzelzauber länger und wilder wachsen."
+ },
+ "gem_wild_5": {
+  "name": "Wildwuchs-Krone",
+  "kind": "gem",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": false,
+  "icon": "res://assets/magic/crystals/gem_wild_5.png",
+  "gem": {
+   "mod": "wild",
+   "tier": 5
+  },
+  "description": "Ein geschliffener Verstärker. In der Verstärkerfassung lässt er Wurzelzauber länger und wilder wachsen."
+ },
+ "lake_glimmer": {
+  "name": "Seeglimmer",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/lake_glimmer.png",
+  "description": "Ein Büschel gewachsener Kristalle aus dem Flachwasser des Hexenwald-Sees. Nur nachts zu finden. Welcher Zauberkristall darin steckt, steht schon fest: Ilva frischt ihn auf.",
+  "hidden": {"kinds": ["crystal_banish", "crystal_roots", "crystal_embers", "crystal_veil", "crystal_maw"], "tiers": {"1": 74, "2": 20, "3": 5, "4": 1}}
+ },
+ "lake_moonstone": {
+  "name": "Seemondstein",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/lake_moonstone.png",
+  "description": "Ein milchiger, runder Kiesel vom Ufer des Hexenwald-Sees. Unter der Kruste schläft ein Verstärkerstein: Ilva frischt ihn auf.",
+  "hidden": {"kinds": ["gem_lens", "gem_wild", "gem_tinder", "gem_haze", "gem_hunger"], "tiers": {"1": 74, "2": 20, "3": 5, "4": 1}}
  }
 }

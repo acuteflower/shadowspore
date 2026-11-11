@@ -73,7 +73,10 @@ static func at_any(parent: Node, ids: Array, position: Vector2, db: float = 0.0,
 
 ## A flat sound for the interface; keeps playing while the game is paused.
 static func ui(parent: Node, id: String, db: float = 0.0, pitch_spread: float = 0.03) -> void:
-	var s: AudioStream = stream(id)
+	ui_stream(parent, stream(id), db, pitch_spread)
+
+
+static func ui_stream(parent: Node, s: AudioStream, db: float = 0.0, pitch_spread: float = 0.03) -> void:
 	if s == null or parent == null or not parent.is_inside_tree():
 		return
 	var player: AudioStreamPlayer = AudioStreamPlayer.new()

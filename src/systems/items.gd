@@ -63,5 +63,8 @@ static func extras(stack: Dictionary) -> Dictionary:
 	for key: String in [RefineRules.KEY_LEVEL, RefineRules.KEY_PITY]:
 		if int(stack.get(key, 0)) > 0:
 			out[key] = int(stack[key])
+	for key: String in SpellRules.SOCKET_KEYS: ## the crystals set into a staff (docs/magie_konzept.md)
+		if String(stack.get(key, "")) != "":
+			out[key] = String(stack[key])
 	return out
 

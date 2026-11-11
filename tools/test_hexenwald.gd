@@ -85,7 +85,7 @@ func _run() -> void:
 				var cell: Vector2i = entry.cell
 				if String(entry.kind) == "stonebed" or String(entry.kind) == "forestbed":
 					continue
-				if world._generator.is_bare(cell) != (PropGenerator.WITCH_KINDS.has(String(entry.kind)) or (PropGenerator.WITCH_SHARED.has(String(entry.kind)) and world._generator.is_bare(cell))):
+				if world._generator.is_bare(cell) != (PropGenerator.WITCH_KINDS.has(String(entry.kind)) or PropGenerator.LAKE_KINDS.has(String(entry.kind)) or (PropGenerator.WITCH_SHARED.has(String(entry.kind)) and world._generator.is_bare(cell))):
 					foreign += 1
 				if world._generator.is_bare(cell):
 					props += 1
@@ -93,7 +93,7 @@ func _run() -> void:
 				else:
 					meadow_props += 1
 			for entry: Dictionary in unbare.props_for_chunk(rect):
-				if world._generator.is_bare(entry.cell) and not PropGenerator.WITCH_KINDS.has(String(entry.kind)) and not PropGenerator.WITCH_SHARED.has(String(entry.kind)):
+				if world._generator.is_bare(entry.cell) and not PropGenerator.WITCH_KINDS.has(String(entry.kind)) and not PropGenerator.LAKE_KINDS.has(String(entry.kind)) and not PropGenerator.WITCH_SHARED.has(String(entry.kind)):
 					would += 1
 	_check(would > 200, "without the rule the area would grow props (%d), so the check means something" % would)
 	print("HEXENWALD props: %d in the sampled chunks, per kind %s" % [props, kinds])

@@ -229,8 +229,10 @@ func _turn_toward(angle: float, delta: float) -> void:
 func _sense() -> void:
 	var best: Player
 	var evidence: float = -INF
+	if is_instance_valid(_target) and _target.veiled(): ## Nebelschleier: it loses her, goes to where it last saw her and searches there
+		_memory = minf(_memory, 1.6)
 	for player: Player in Player.all:
-		if player.health.current <= 0.0:
+		if player.health.current <= 0.0 or player.veiled():
 			continue
 		var point: Vector2 = player.global_position
 		var moved: bool = point.distance_to(_positions.get(player.get_instance_id(), point)) > 0.75 or player.velocity.length() > 8.0
@@ -268,7 +270,7 @@ func _track_behind(delta: float) -> void:
 	var spec: Dictionary = _def["sweep"]
 	var best: Player
 	for player: Player in Player.all:
-		if player.health.current <= 0.0:
+		if player.health.current <= 0.0 or player.veiled():
 			continue
 		var offset: Vector2 = player.global_position - global_position
 		if offset.length() < float(spec["behind_range"]) and Vector2.from_angle(heading).dot(offset.normalized()) < -0.2 and _same_floor(global_position, player.global_position) and _line_clear(global_position, player.global_position):
@@ -631,7 +633,7 @@ func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
 	if not multiplayer.is_server() or _health.current <= 0.0 or state in [State.DEAD, State.SLAM, State.SWEEP, State.STUN, State.HURT]:
 		return
 	for player: Player in Player.all:
-		if player.name.to_int() == _health.last_attacker:
+		if player.name.to_int() == _health.last_attacker and not player.veiled():
 			_target = player
 			_known = player.global_position
 			_memory = float(_def["memory_seconds"])

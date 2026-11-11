@@ -60,6 +60,25 @@ func active_step_id(quest_id: String) -> String:
 	return String(_step(quest_id).get("id", "")) if _active.has(quest_id) else ""
 
 
+func has_active_step(step_id: String) -> bool:
+	if step_id == "":
+		return false
+	for quest_id: String in _active:
+		if active_step_id(quest_id) == step_id:
+			return true
+	return false
+
+
+func completed_step_ids(quest_id: String) -> Array[String]:
+	var ids: Array[String] = []
+	var definition: Dictionary = _quests.get(quest_id, {})
+	var steps: Array = definition.get("steps", [])
+	var completed: int = steps.size() if is_finished(quest_id) else int(_active.get(quest_id, 0))
+	for i: int in completed:
+		ids.append(String((steps[i] as Dictionary).get("id", "")))
+	return ids
+
+
 func is_finished(quest_id: String) -> bool:
 	return _done.has(quest_id)
 
@@ -75,14 +94,37 @@ func set_flag(flag: String) -> void:
 	changed.emit()
 
 
-## What the HUD and the map show: the first running quest: {id, title, text, step, steps, target (world px, or Vector2.INF without one)}. Empty without one.
+## The first running quest for the existing story and tutorial scripts.
 func current() -> Dictionary:
 	for quest_id: String in _active:
-		var quest: Dictionary = _quests[quest_id] as Dictionary
-		var steps: Array = quest.steps as Array
-		var step: Dictionary = steps[int(_active[quest_id])] as Dictionary
-		return {"id": quest_id, "step_id": String(step.get("id", "")), "title": String(quest.title), "text": String(step.text), "step": int(_active[quest_id]), "steps": steps.size(), "target": _target(step), "hint": String(step.get("hint", "")), "search": float(step.get("search", 0.0)), "tasks": task_states(step)}
+		return active_entry(quest_id)
 	return {}
+
+
+func active_ids() -> Array[String]:
+	var ids: Array[String] = []
+	ids.assign(_active.keys())
+	return ids
+
+
+func finished_ids() -> Array[String]:
+	return _done.duplicate()
+
+
+func next_quest(quest_id: String) -> String:
+	return String((_quests.get(quest_id, {}) as Dictionary).get("next", ""))
+
+
+func quest_title(quest_id: String) -> String:
+	return String((_quests.get(quest_id, {}) as Dictionary).get("title", quest_id))
+
+
+func active_entry(quest_id: String) -> Dictionary:
+	if not is_active(quest_id):
+		return {}
+	var step: Dictionary = _step(quest_id)
+	var steps: Array = (_quests[quest_id] as Dictionary).steps
+	return {"id": quest_id, "step_id": String(step.get("id", "")), "title": quest_title(quest_id), "text": String(step.text), "step": int(_active[quest_id]), "steps": steps.size(), "target": _target(step), "hint": String(step.get("hint", "")), "search": float(step.get("search", 0.0)), "tasks": task_states(step)}
 
 
 func _target(step: Dictionary) -> Vector2:
@@ -239,12 +281,18 @@ func export_data() -> Dictionary:
 
 
 func import_data(data: Dictionary) -> void:
+	_closest.clear()
+	_task_signature = ""
+	_flags = (data.get("flags", {}) as Dictionary).duplicate()
 	_active.clear()
 	for quest_id: String in (data.get("active", {}) as Dictionary):
 		if _quests.has(quest_id):
 			var index: int = int((data.active as Dictionary)[quest_id])
 			var name_saved: String = String((data.get("active_steps", {}) as Dictionary).get(quest_id, ""))
 			var steps: Array = (_quests[quest_id] as Dictionary).steps
+			## Older versions used find_knight on both sides of the ambush.
+			if quest_id == "find_help" and name_saved == "find_knight" and not has_flag("woke_up") and not has_flag("left_hut") and index < 10:
+				name_saved = "find_fallen_knight"
 			if name_saved != "":
 				for i: int in steps.size():
 					if String((steps[i] as Dictionary).get("id", "")) == name_saved: index = i
@@ -254,7 +302,6 @@ func import_data(data: Dictionary) -> void:
 	_done.clear()
 	for quest_id: Variant in data.get("done", []) as Array:
 		_done.append(String(quest_id))
-	_flags = (data.get("flags", {}) as Dictionary).duplicate()
 	_migrate_town_start(data)
 	changed.emit()
 

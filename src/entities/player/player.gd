@@ -106,6 +106,19 @@ const STEP_GONE: float = 0.1 ## the shadow step's clock: fully dissolved here (f
 const STEP_BACK: float = 0.13 ## ... she starts to condense out of the rift (frames 4-7 after)
 const STEP_FORM: float = 0.08 ## ... and needs this long to be whole again
 const STEP_END: float = 0.32 ## ... back in her own animation
+const CAST_SHEET_ID: int = 18 ## `_use_sheet` number of the casting sheet (docs/magie_konzept.md)
+const CAST_SHEET_PATH: String = "res://assets/characters/player_cast.png" ## tools/art_hero_cast.py: 8 sectors x 12 frames per clip (CAST_CLIPS)
+const CAST_BLOOD_PATH: String = "res://assets/characters/player_cast_blood.png"
+const CAST_CLIPS: Array[String] = ["light", "root", "ember", "veil", "maw"]
+const STAFF_REST: Vector3 = Vector3(0.32, 0.28, 1.0) ## how she holds a staff (forward, side, lift in her own frame): upright beside her
+const STAFF_RUN: Vector3 = Vector3(-0.5, 0.35, 0.55) ## leaning back while she sprints
+const STAFF_KEYS: Dictionary = { ## the staff through a cast: [time share, pose]
+	"light": [[0.0, Vector3(0.32, 0.28, 1.0)], [0.3, Vector3(0.04, 0.06, 1.0)], [0.46, Vector3(0.16, 0.1, 1.0)], [0.78, Vector3(0.18, 0.12, 1.0)], [1.0, Vector3(0.32, 0.28, 1.0)]],
+	"root": [[0.0, Vector3(0.32, 0.28, 1.0)], [0.28, Vector3(-0.45, 0.38, 0.8)], [0.48, Vector3(1.0, -0.05, 0.3)], [0.76, Vector3(1.0, -0.05, 0.36)], [1.0, Vector3(0.32, 0.28, 1.0)]],
+	"ember": [[0.0, Vector3(0.32, 0.28, 1.0)], [0.3, Vector3(-0.55, 0.42, 0.8)], [0.42, Vector3(1.0, -0.02, 0.14)], [0.7, Vector3(1.0, -0.02, 0.2)], [1.0, Vector3(0.32, 0.28, 1.0)]],
+	"veil": [[0.0, Vector3(0.32, 0.28, 1.0)], [0.22, Vector3(0.12, -0.08, 1.0)], [0.4, Vector3(0.05, 0.05, 1.0)], [0.52, Vector3(0.6, 0.22, 0.7)], [0.76, Vector3(0.55, 0.22, 0.75)], [1.0, Vector3(0.32, 0.28, 1.0)]],
+	"maw": [[0.0, Vector3(0.32, 0.28, 1.0)], [0.24, Vector3(0.1, 0.3, 1.0)], [0.4, Vector3(-0.1, 0.3, 1.0)], [0.54, Vector3(0.9, 0.05, -0.45)], [0.78, Vector3(0.9, 0.05, -0.4)], [1.0, Vector3(0.32, 0.28, 1.0)]],
+}
 const DRINK_SECONDS: float = 0.6 ## drinking is quick (docs/alchemie_konzept.md): the 12 frames play in 0.6 s
 const DRINK_USE_TIME: float = 0.30 ## the draught: the potion takes effect (DrinkEffect.EFFECT)
 const DRINK_BREAK_KNOCKBACK: float = 100.0 ## only a blow this heavy knocks the vial from her lips (the potion is kept)
@@ -208,6 +221,12 @@ var _rig_drink_shoulder: PackedVector2Array ## the potion sheet's rig (like eati
 var _rig_drink_hand: PackedVector2Array
 var _rig_drink_mouth: PackedVector2Array
 var fishing: FishingComponent ## the rod (docs/fishing.md)
+var spells: SpellComponent ## the magic staff and its crystals (docs/magie_konzept.md)
+var _cast_target: Vector2 = Vector2.ZERO ## where the running cast aims (world px), for the staff's pose
+var _rig_cast_shoulder: PackedVector2Array ## the casting sheet's rig (tools/art_hero_cast.py: 12 frames x 2 clips, legs planted)
+var _rig_cast_hand: PackedVector2Array
+var _cast_sheet: Texture2D
+var _cast_blood: Texture2D
 var effects: StatusEffects ## burning and the like (data/status_effects.json)
 var _main_sheet: Texture2D
 var _sheet: int = 0 ## which sheet the sprite shows: 0 main, 1 sword swing, 2 picking, 3 eating, 4 pulling a root
@@ -301,6 +320,11 @@ func _ready() -> void:
 	fishing.name = "FishingComponent"
 	fishing.set_multiplayer_authority(get_multiplayer_authority()) ## a child made in _ready does not inherit the owner (its own _ready needs it)
 	add_child(fishing)
+	spells = SpellComponent.new()
+	spells.name = "SpellComponent"
+	spells.set_multiplayer_authority(get_multiplayer_authority())
+	spells.setup(self)
+	add_child(spells)
 	effects = StatusEffects.new()
 	effects.name = "Effects"
 	effects.set_multiplayer_authority(get_multiplayer_authority())
@@ -954,6 +978,14 @@ func _move(delta: float) -> void:
 			facing = look_mouse
 	elif dir != Vector2.ZERO:
 		facing = _face_dir
+	if InputManager.attack_pressed() and spells != null and spells.staff_held and attack.holds_staff() and not _busy and swimming == 0:
+		var aim_at: Vector2 = InputManager.aim_world_position() if InputManager.using_mouse else global_position + facing * 60.0
+		if spells.try_cast(aim_at): ## a staff in her hand: the left button casts its crystal (docs/magie_konzept.md)
+			sprinting = false
+	if InputManager.secondary_held() and spells != null and spells.staff_held and spells.prongs > 1 and attack.holds_staff() and not _busy and swimming == 0:
+		var aim_right: Vector2 = InputManager.aim_world_position() if InputManager.using_mouse else global_position + facing * 60.0
+		if spells.try_cast(aim_right, 1): ## the Bleichgabel: the right button casts the crystal of its second prong (docs/magie_konzept.md 17)
+			sprinting = false
 	if InputManager.attack_pressed() and attack.can_attack() and not _busy and swimming == 0:
 		if InputManager.using_mouse:
 			var attack_aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER)
@@ -1076,14 +1108,72 @@ func use_slot(slot: int) -> void:
 		_shake = maxf(_shake, 1.2), EAT_USE_TIME)
 
 
+## Nebelschleier (docs/magie_konzept.md): while the mist veils her, shadow creatures can neither pick her as a target nor keep her as one.
+func veiled() -> bool:
+	return effects != null and effects.has("veil")
+
+
 ## True while she drinks a potion (busy kind "drink_<type>_<tier>").
 func _drinking() -> bool:
-	return _busy and _busy_kind.begins_with("drink")
+	return _busy and (_busy_kind.begins_with("drink") or _busy_kind.begins_with("cast_")) ## a cast, like a draught, only breaks under a heavy blow
 
 
 ## How long the running action lasts: the one-second actions, a potion in 0.6 s.
 func _busy_length() -> float:
+	if _busy_kind.begins_with("cast_"):
+		return SpellRules.cast_timing(_cast_motion()).x
 	return DRINK_SECONDS if _busy_kind.begins_with("drink") else PICK_SECONDS
+
+
+## Local player, magic (docs/magie_konzept.md): the cast motion `cast` ("light": the staff raised and struck on the ground; "root": swept towards
+## `target`) toward `dir`; `on_release` runs at `release_time` when the magic leaves the staff. She stands still while she casts. False when she
+## cannot start now.
+func begin_cast(cast: String, dir: Vector2, target: Vector2, on_release: Callable, release_time: float) -> bool:
+	if _busy or climb.active() or swim > 0 or attack.is_swinging() or attack.is_charging() or not is_multiplayer_authority() or health.current <= 0.0:
+		return false
+	_cast_target = target
+	_begin_action("cast_" + cast, dir, on_release, release_time)
+	return true
+
+
+## The cast motion of the running action ("light", "root", "ember", "veil", "maw"); the prong of a forked staff rides after an "@".
+func _cast_motion() -> String:
+	return _busy_kind.trim_prefix("cast_").get_slice("@", 0)
+
+
+## Which prong the running cast comes from (0, or 1 for the Bleichgabel's right prong), -1 when she does not cast.
+func cast_prong() -> int:
+	if not _busy or not _busy_kind.begins_with("cast_"):
+		return -1
+	return 1 if _busy_kind.ends_with("@1") else 0
+
+
+## 0..1 the flare of the staff while a cast releases its magic (StaffCrystals), on every peer; with `prong` only for that prong's crystal.
+func cast_glow(prong: int = -1) -> float:
+	if prong >= 0 and cast_prong() != prong:
+		return 0.0
+	if not _busy or not _busy_kind.begins_with("cast_"):
+		return 0.0
+	var release: float = SpellRules.cast_timing(_cast_motion()).y
+	return clampf(1.0 - absf(_busy_time - release) / 0.25, 0.0, 1.0) + clampf(_busy_time / maxf(release, 0.01), 0.0, 1.0) * 0.35
+
+
+## The staff's pose (forward, side, lift in her own frame) for AttackComponent.rod_pose: upright beside her, leaning back in a sprint,
+## and through a cast along STAFF_KEYS.
+func _staff_pose(moving: bool) -> Vector3:
+	if _busy and _busy_kind.begins_with("cast_"):
+		var keys: Array = STAFF_KEYS.get(_cast_motion(), []) as Array
+		var share: float = clampf(_busy_time / _busy_length(), 0.0, 1.0)
+		for k: int in range(1, keys.size()):
+			var a: Array = keys[k - 1] as Array
+			var b: Array = keys[k] as Array
+			if share <= float(b[0]):
+				var f: float = (share - float(a[0])) / maxf(float(b[0]) - float(a[0]), 0.001)
+				return (a[1] as Vector3).lerp(b[1] as Vector3, f * f * (3.0 - 2.0 * f))
+		return STAFF_REST
+	if moving and _gait == 2:
+		return STAFF_RUN
+	return STAFF_REST
 
 
 func _begin_action(kind: String, dir: Vector2, on_moment: Callable, moment_time: float) -> void:
@@ -1107,6 +1197,8 @@ func _play_action(kind: String, dir: Vector2) -> void:
 	sprinting = false
 	if dir != Vector2.ZERO:
 		facing = dir
+	if kind.begins_with("cast_"):
+		SpellZone.sound(self, kind.get_slice("@", 0), global_position, -2.0) ## cast_light / cast_root / cast_ember / cast_veil / cast_maw (tools/audio_magic.py)
 	if kind.begins_with("drink"):
 		var parts: PackedStringArray = kind.split("_")
 		_drink_fx.begin(parts[1] if parts.size() > 1 else "heal", int(parts[2]) if parts.size() > 2 else 1)
@@ -1240,6 +1332,11 @@ func _load_rig() -> void:
 	var standby: Dictionary = rig.get("standby", {}) as Dictionary
 	_rig_standby_shoulder = _points(standby.get("shoulder", []))
 	_rig_standby_hand = _points(standby.get("hand", []))
+	_rig_cast_shoulder = _points(rig.get("cast_shoulder", []))
+	_rig_cast_hand = _points(rig.get("cast_hand", []))
+	if not _rig_cast_hand.is_empty() and ResourceLoader.exists(CAST_SHEET_PATH):
+		_cast_sheet = load(CAST_SHEET_PATH) as Texture2D
+		_cast_blood = load(CAST_BLOOD_PATH) as Texture2D if ResourceLoader.exists(CAST_BLOOD_PATH) else null
 
 
 ## A list of `[x, y]` pairs from data/hero_rig.json as points.
@@ -1578,6 +1675,18 @@ func _animate(delta: float) -> void:
 	if swim_drawn:
 		shoulder = Vector2(0.0, -30.0) ## the sheet already shows both arms; the sword arm is hidden below
 		hand = Vector2(0.0, -22.0)
+	elif _busy and _busy_kind.begins_with("cast_") and _cast_sheet != null:
+		## Casting (docs/magie_konzept.md): its own sheet, legs planted; the right arm holds the staff from the rig, the staff's angle follows STAFF_KEYS.
+		var clip: int = maxi(CAST_CLIPS.find(_cast_motion()), 0)
+		var cast_pos: float = _busy_time / _busy_length() * float(PICK_FRAMES)
+		var cast_key: float = clampf(cast_pos - 0.5, 0.0, float(PICK_FRAMES - 1) - 0.001)
+		var ci: int = int(cast_key)
+		var cf: float = cast_key - float(ci)
+		var cast_base: int = (_sector * CAST_CLIPS.size() + clip) * PICK_FRAMES
+		_use_sheet(CAST_SHEET_ID)
+		_sprite.frame = cast_base + clampi(int(cast_pos), 0, PICK_FRAMES - 1)
+		hand = _rig_cast_hand[cast_base + ci].lerp(_rig_cast_hand[cast_base + ci + 1], cf)
+		shoulder = _rig_cast_shoulder[cast_base + ci].lerp(_rig_cast_shoulder[cast_base + ci + 1], cf)
 	elif _busy and not _rig_pick_hand.is_empty() and not _rig_eat_hand.is_empty():
 		## Picking and eating have their own sheets too (legs planted); the right arm is drawn from the rig, weapon put away.
 		var position_in_sheet: float = _busy_time / _busy_length() * float(PICK_FRAMES)
@@ -1664,7 +1773,9 @@ func _animate(delta: float) -> void:
 	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, _sink + _limp_dip)
 	attack.rig_hand = hand + Vector2(-_sprite.skew * hand.y, _sink + _limp_dip)
 	attack.carrying = moving and _gait == 2 and not attack.is_swinging() ## the blade trails back only in the real sprint
-	attack.sheathed = stealth.sneaking or _busy or swim_drawn ## sneaking, picking and swimming put the weapon away
+	attack.sheathed = stealth.sneaking or (_busy and not _busy_kind.begins_with("cast_")) or swim_drawn ## sneaking, picking and swimming put the weapon away (a cast needs the staff)
+	if attack.holds_staff() and not fish_frame_ok:
+		attack.rod_pose = _staff_pose(moving)
 	var arm_node: Node2D = attack.get_node_or_null("Hand") as Node2D
 	if arm_node != null and arm_node.visible == swim_drawn:
 		arm_node.visible = not swim_drawn ## swim frames carry both arms
@@ -2011,7 +2122,7 @@ func _use_sheet(sheet: int) -> void:
 		_sprite.offset = Vector2(0.0, -23.0)
 	if _swim_under != null:
 		_swim_under.visible = sheet == 13
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", STEP_BLOOD if sheet == STEP_SHEET_ID else WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", _cast_blood if sheet == CAST_SHEET_ID else STEP_BLOOD if sheet == STEP_SHEET_ID else WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
 	match sheet:
 		CLIMB_SHEET:
 			_sprite.texture = WallClimb.SHEET
@@ -2044,6 +2155,10 @@ func _use_sheet(sheet: int) -> void:
 		STEP_SHEET_ID:
 			_sprite.texture = STEP_SHEET
 			_sprite.hframes = STEP_FRAMES
+			_sprite.vframes = 8
+		CAST_SHEET_ID:
+			_sprite.texture = _cast_sheet
+			_sprite.hframes = PICK_FRAMES * CAST_CLIPS.size()
 			_sprite.vframes = 8
 		DRINK_SHEET_ID:
 			_sprite.texture = DRINK_SHEET

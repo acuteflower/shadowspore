@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://src/ui/map_window.gd" id="15_map"]
 [ext_resource type="Script" path="res://src/ui/skill_tree_window.gd" id="16_skills"]
 [ext_resource type="Script" path="res://src/ui/progress_window.gd" id="17_progress"]
+[ext_resource type="Script" path="res://src/ui/quest_journal.gd" id="18_journal"]
 [ext_resource type="Shader" path="res://assets/shaders/damage_vignette.gdshader" id="11_dshader"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_dvig"]
@@ -95,6 +96,15 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("17_progress")
+
+[node name="QuestJournal" type="Control" parent="."]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("18_journal")
 
 [node name="PauseMenu" type="Control" parent="."]
 visible = false

@@ -108,6 +108,9 @@ static func spawn_thrown(tree: SceneTree, id: String, count: int, origin: Vector
 	drop.count = count
 	drop.refine = int(extra.get(RefineRules.KEY_LEVEL, 0))
 	drop.refine_pity = int(extra.get(RefineRules.KEY_PITY, 0))
+	for key: String in SpellRules.SOCKET_KEYS:
+		if extra.has(key):
+			drop.sockets[key] = String(extra[key])
 	drop.position = origin
 	var way: Vector2 = direction.normalized() if direction.length() > 0.1 else Vector2.DOWN
 	drop.launch = way * 70.0

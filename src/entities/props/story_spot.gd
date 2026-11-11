@@ -1,6 +1,6 @@
 class_name StorySpot
 extends Interactable
-## A place E can use only while the local player's current quest step is `step` (the seats at the hut's fire during "sit by the fire", the bed during "go to sleep").
+## A place E can use while the local player has the matching story step (the seats at the hut's fire, the bed at night).
 ## `use` is called with the player; the spot says nothing at any other time.
 
 var label: String = "SITZEN"
@@ -14,7 +14,7 @@ func prompt() -> String:
 	var player: Player = _local_player()
 	if player == null or player.quests == null or player.story_lock or InputManager.ui_blocking:
 		return ""
-	return label if String(player.quests.current().get("step_id", "")) == step else ""
+	return label if player.quests.has_active_step(step) else ""
 
 
 func reach_distance(from: Vector2) -> float:

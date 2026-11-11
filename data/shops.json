@@ -525,5 +525,356 @@
     "DU WILLST TRÄNKE? BRING MIR KRAUT UND GLAS, DEN REST MACHE ICH. HIER, FÜNF PHIOLEN FÜR DEN ANFANG."
    ]
   }
+ },
+ "lake_counter": {
+  "title": "SEEHAUS",
+  "npc": "lake_witch",
+  "role": "lake_witch",
+  "station": "lake_bench",
+  "reach": 190.0,
+  "tabs": [
+   {
+    "id": "buy",
+    "name": "KAUFEN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "VERKAUFEN",
+    "kind": "sell"
+   },
+   {
+    "id": "staves",
+    "name": "STÄBE",
+    "kind": "craft",
+    "group": "staff"
+   },
+   {
+    "id": "refresh",
+    "name": "LÄUTERN",
+    "kind": "refresh"
+   },
+   {
+    "id": "grind",
+    "name": "SCHLIFF",
+    "kind": "grind"
+   },
+   {
+    "id": "dev",
+    "name": "DEV",
+    "kind": "dev"
+   }
+  ],
+  "buy": [
+   {
+    "item": "crystal_banish_1",
+    "price": 60,
+    "trust": 0
+   },
+   {
+    "item": "crystal_roots_1",
+    "price": 60,
+    "trust": 0
+   },
+   {
+    "item": "crystal_embers_1",
+    "price": 60,
+    "trust": 0
+   },
+   {
+    "item": "crystal_veil_1",
+    "price": 60,
+    "trust": 0
+   },
+   {
+    "item": "crystal_maw_1",
+    "price": 60,
+    "trust": 0
+   },
+   {
+    "item": "gem_lens_1",
+    "price": 50,
+    "trust": 0
+   },
+   {
+    "item": "gem_wild_1",
+    "price": 50,
+    "trust": 0
+   },
+   {
+    "item": "gem_tinder_1",
+    "price": 50,
+    "trust": 0
+   },
+   {
+    "item": "gem_haze_1",
+    "price": 50,
+    "trust": 0
+   },
+   {
+    "item": "gem_hunger_1",
+    "price": 50,
+    "trust": 0
+   },
+   {
+    "item": "crystal_banish_2",
+    "price": 150,
+    "trust": 25
+   },
+   {
+    "item": "crystal_roots_2",
+    "price": 150,
+    "trust": 25
+   },
+   {
+    "item": "crystal_embers_2",
+    "price": 150,
+    "trust": 25
+   },
+   {
+    "item": "crystal_veil_2",
+    "price": 150,
+    "trust": 25
+   },
+   {
+    "item": "crystal_maw_2",
+    "price": 150,
+    "trust": 25
+   },
+   {
+    "item": "gem_lens_2",
+    "price": 130,
+    "trust": 25
+   },
+   {
+    "item": "gem_wild_2",
+    "price": 130,
+    "trust": 25
+   },
+   {
+    "item": "gem_tinder_2",
+    "price": 130,
+    "trust": 25
+   },
+   {
+    "item": "gem_haze_2",
+    "price": 130,
+    "trust": 25
+   },
+   {
+    "item": "gem_hunger_2",
+    "price": 130,
+    "trust": 25
+   },
+   {
+    "item": "lake_glimmer",
+    "price": 22,
+    "trust": 0
+   },
+   {
+    "item": "lake_moonstone",
+    "price": 14,
+    "trust": 0
+   }
+  ],
+  "sell": [
+   {
+    "item": "lake_glimmer",
+    "price": 9
+   },
+   {
+    "item": "lake_moonstone",
+    "price": 6
+   },
+   {
+    "item": "void_splinter",
+    "price": 8
+   },
+   {
+    "item": "shadow_core",
+    "price": 45
+   },
+   {
+    "item": "curse_silver",
+    "price": 25
+   },
+   {
+    "item": "hag_wood",
+    "price": 4
+   },
+   {
+    "item": "glow_cap",
+    "price": 6
+   },
+   {
+    "item": "void_bloom",
+    "price": 12
+   },
+   {
+    "item": "crystal_banish_1",
+    "price": 20
+   },
+   {
+    "item": "crystal_roots_1",
+    "price": 20
+   },
+   {
+    "item": "crystal_embers_1",
+    "price": 20
+   },
+   {
+    "item": "crystal_veil_1",
+    "price": 20
+   },
+   {
+    "item": "crystal_maw_1",
+    "price": 20
+   },
+   {
+    "item": "gem_lens_1",
+    "price": 16
+   },
+   {
+    "item": "gem_wild_1",
+    "price": 16
+   },
+   {
+    "item": "gem_tinder_1",
+    "price": 16
+   },
+   {
+    "item": "gem_haze_1",
+    "price": 16
+   },
+   {
+    "item": "gem_hunger_1",
+    "price": 16
+   }
+  ],
+  "refresh": {
+   "_note": "docs/seehexe_konzept.md 14: LÄUTERN, a raw stone hides its stone from the moment it is found (items.json hidden); Ilva washes it free of charge (fee 0 per stone)",
+   "trust": 0,
+   "fee": {
+    "lake_glimmer": 0,
+    "lake_moonstone": 0
+   }
+  },
+  "grind": {
+   "count": 3,
+   "tiers": {
+    "2": {
+     "copper": 40,
+     "trust": 0,
+     "in": {
+      "lake_glimmer": 2
+     }
+    },
+    "3": {
+     "copper": 120,
+     "trust": 20,
+     "in": {
+      "lake_glimmer": 3,
+      "void_splinter": 2
+     }
+    },
+    "4": {
+     "copper": 320,
+     "trust": 40,
+     "in": {
+      "lake_glimmer": 4,
+      "shadow_core": 2
+     }
+    },
+    "5": {
+     "copper": 800,
+     "trust": 60,
+     "in": {
+      "shadow_core": 3,
+      "mora_shard": 1
+     }
+    }
+   },
+   "gem_tiers": {
+    "2": {
+     "copper": 35,
+     "trust": 0,
+     "in": {
+      "lake_moonstone": 2
+     }
+    },
+    "3": {
+     "copper": 110,
+     "trust": 20,
+     "in": {
+      "lake_moonstone": 3,
+      "void_splinter": 2
+     }
+    },
+    "4": {
+     "copper": 300,
+     "trust": 40,
+     "in": {
+      "lake_moonstone": 4,
+      "shadow_core": 2
+     }
+    },
+    "5": {
+     "copper": 760,
+     "trust": 60,
+     "in": {
+      "shadow_core": 3,
+      "mora_shard": 1
+     }
+    }
+   }
+  },
+  "dev": {
+   "kinds": [
+    "staff",
+    "crystal",
+    "gem"
+   ],
+   "items": [
+    "lake_glimmer",
+    "lake_moonstone",
+    "curse_silver",
+    "hag_wood",
+    "void_splinter",
+    "shadow_core",
+    "mora_shard",
+    "glow_cap",
+    "wound_leaf",
+    "ember_berry",
+    "mist_lily",
+    "void_bloom"
+   ]
+  },
+  "lines": {
+   "_note": "PLACEHOLDER lines for the dialogue writer",
+   "open": [
+    "Komm rein, der Nebel bleibt draußen.",
+    "Ah. Die mit den nassen Stiefeln."
+   ],
+   "buy": [
+    "Gut gewählt. Er hat dich schon angesehen.",
+    "Pass auf ihn auf."
+   ],
+   "sell": [
+    "Den nehme ich. Der See wird sich freuen.",
+    "Hm. Ehrlich gefunden? Gut."
+   ],
+   "craft": [
+    "Da. Frisch aus dem Wasser und geschliffen.",
+    "Halt ihn ans Licht. Siehst du?"
+   ],
+   "grind": [
+    "Drei Stimmen, ein Lied. Hör.",
+    "Gut. Er ist jetzt erwachsen."
+   ],
+   "refresh_done": [
+    "Siehst du? Er wusste es die ganze Zeit.",
+    "Der See hat ihn so gemacht. Nicht ich."
+   ]
+  }
  }
 }

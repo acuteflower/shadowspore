@@ -2938,5 +2938,79 @@
   },
   "scene": "res://src/entities/props/bush.tscn",
   "edge_margin": 4
+ },
+ "lake_glimmer": {
+  "name": "Seeglimmer",
+  "texture": "res://assets/props/lake_glimmer.png",
+  "glow": "res://assets/props/lake_glimmer_glow.png",
+  "light": {
+   "color": "#78f4e6",
+   "radius": 12,
+   "energy": 0.25
+  },
+  "columns": 2,
+  "rows": 1,
+  "weights": [
+   3,
+   2
+  ],
+  "radius": [
+   5,
+   6
+  ],
+  "height": [
+   8,
+   9
+  ],
+  "night_only": true,
+  "pickup": {
+   "item": "lake_glimmer",
+   "amount": [
+    1,
+    2
+   ],
+   "regrow_days": 3,
+   "prompt": "SAMMELN",
+   "burst": [
+    "#78f4e6",
+    "#b8fff4"
+   ]
+  },
+  "scene": "res://src/entities/props/pebble.tscn",
+  "edge_margin": 2
+ },
+ "lake_moonstone": {
+  "name": "Seemondstein",
+  "texture": "res://assets/props/lake_moonstone.png",
+  "glow": "res://assets/props/lake_moonstone_glow.png",
+  "columns": 2,
+  "rows": 1,
+  "weights": [
+   3,
+   1
+  ],
+  "radius": [
+   5,
+   7
+  ],
+  "height": [
+   5,
+   6
+  ],
+  "pickup": {
+   "item": "lake_moonstone",
+   "amount": [
+    1,
+    2
+   ],
+   "regrow_days": 3,
+   "prompt": "AUFHEBEN",
+   "burst": [
+    "#eef0f6",
+    "#c8a8d8"
+   ]
+  },
+  "scene": "res://src/entities/props/pebble.tscn",
+  "edge_margin": 2
  }
 }

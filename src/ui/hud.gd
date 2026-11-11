@@ -32,6 +32,7 @@ var _idle_time: float = 0.0
 var _idle_alpha: float = 1.0 ## 1 = HUD shown, 0 = hidden by idling
 var _cover_alpha: Dictionary = {} ## part name -> fade of the full-screen menus (QuestVine, HintCard)
 var _last_pos: Vector2 = Vector2.INF
+var _fold_base: Dictionary = {} ## part -> its offsets from hud.tscn, before the hotbar fold moved it
 
 
 ## Any real input or cursor movement counts as activity.
@@ -82,13 +83,40 @@ func _process(delta: float) -> void:
 	var skills: SkillTreeWindow = get_node_or_null("SkillTreeWindow") as SkillTreeWindow
 	var progress: ProgressWindow = get_node_or_null("ProgressWindow") as ProgressWindow
 	var pause: CanvasItem = get_node_or_null("PauseMenu") as CanvasItem
-	var covered: bool = $InventoryWindow.visible or $MapWindow.visible or (skills != null and skills.visible) or (progress != null and progress.visible) or (pause != null and pause.visible) ## the Escape menu too
+	var covered: bool = $InventoryWindow.visible or $MapWindow.visible or $QuestJournal.visible or (skills != null and skills.visible) or (progress != null and progress.visible) or (pause != null and pause.visible) ## the Escape menu too
 	var boss: BossBar = get_node_or_null("BossBar") as BossBar
 	if boss != null:
 		boss.set_covered(covered)
 	for part: String in ["QuestVine", "HintCard"]:
 		_cover_alpha[part] = move_toward(float(_cover_alpha.get(part, 1.0)), 0.0 if covered else 1.0, delta * 8.0)
 	_apply_idle_fade(delta, covered)
+	_follow_hotbar_fold()
+
+
+## The folded hotbar sinks and draws in: the sap vines stay on its ends, the skill crystal sinks and fades with the pendants.
+func _follow_hotbar_fold() -> void:
+	var bar: Hotbar = $Hotbar as Hotbar
+	if bar == null:
+		return
+	_shift_part("Hotbar", Vector2(0.0, bar.drop))
+	_shift_part("HealthBar", Vector2(bar.inset, bar.drop))
+	_shift_part("StaminaBar", Vector2(-bar.inset, bar.drop))
+	_shift_part("BlinkIcon", Vector2(-bar.inset, bar.drop + bar.sink))
+	_shift_part("StatusTags", Vector2(0.0, bar.drop)) ## burning and the like stay above the health vine
+	($BlinkIcon as CanvasItem).self_modulate.a = bar.shown
+
+
+func _shift_part(part: String, by: Vector2) -> void:
+	var node: Control = get_node_or_null(part) as Control
+	if node == null:
+		return
+	if not _fold_base.has(part):
+		_fold_base[part] = Rect2(node.offset_left, node.offset_top, node.offset_right, node.offset_bottom) ## (left, top, right, bottom) as laid out in hud.tscn
+	var base: Rect2 = _fold_base[part]
+	node.offset_left = base.position.x + by.x
+	node.offset_right = base.size.x + by.x
+	node.offset_top = base.position.y + by.y
+	node.offset_bottom = base.size.y + by.y
 
 
 func _ready() -> void:
@@ -121,6 +149,7 @@ func bind(player: Node) -> void:
 	$MapWindow.bind(player)
 	$SkillTreeWindow.bind(player)
 	$ProgressWindow.bind(player)
+	$QuestJournal.bind(player)
 	var tags: StatusTags = StatusTags.new() ## burning and the like, above the left end of the health vine
 	tags.name = "StatusTags"
 	tags.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
@@ -162,7 +191,7 @@ func bind(player: Node) -> void:
 		var hint: HintCard = HintCard.new() ## the sneaking tutorial card
 		hint.name = "HintCard"
 		add_child(hint)
-		hint.bind(player.quests, dialogue)
+		hint.bind(player.quests, dialogue, player.tracked)
 	_story_world = get_tree().get_first_node_in_group("world") is WorldLevel
 	_story_quests = player.quests
 	if _story_quests != null:
@@ -244,6 +273,7 @@ func _refresh_story_hud() -> void:
 
 ## Keep the wound overlay alive beneath the cinematic fade; suspend other HUD parts.
 func begin_intro() -> void:
+	$QuestJournal.interrupt()
 	var skills: SkillTreeWindow = get_node_or_null("SkillTreeWindow") as SkillTreeWindow
 	if skills != null and skills._owns_input:
 		skills._finish_close()

@@ -54,6 +54,11 @@ func show_stack(stack: Dictionary, equip_hint: bool, replaces: Dictionary = {}) 
 		_measure()
 		queue_redraw()
 		return
+	if SpellRules.is_staff(stack) or SpellRules.is_spell_crystal(stack) or SpellRules.is_gem(stack):
+		_magic_rows(stack, def, rarity)
+		_measure()
+		queue_redraw()
+		return
 	_rows.append({"type": "sub", "text": "%s %s" % [rarity.get("name", ""), type_name]})
 	var stats: Dictionary = def.get("stats", {})
 	var refinable: bool = RefineRules.is_refinable(stack)
@@ -120,6 +125,98 @@ func _talisman_rows(stack: Dictionary, def: Dictionary, rarity: Dictionary, equi
 		_rows.append({"type": "hint", "text": "Rechtsklick: anlegen"})
 
 
+## Magic (docs/magie_konzept.md): a stone shows its big picture, tier, values and the two milestone perks (dim until reached); a staff shows its two sockets.
+func _magic_rows(stack: Dictionary, def: Dictionary, rarity: Dictionary) -> void:
+	var id: String = String(stack.get("id", ""))
+	if SpellRules.is_staff(stack):
+		_rows.append({"type": "sub", "text": "%s ZAUBERSTAB" % rarity.get("name", "")})
+		_rows.append({"type": "rule"})
+		var count: int = SpellRules.prongs_of(id)
+		for prong: int in count:
+			var spell: String = SpellRules.spell_in(stack, prong)
+			var gem: String = SpellRules.gem_in(stack, prong)
+			var crown_label: String = "KRONE" if count == 1 else ("LANGE ZINKE" if prong == 0 else "KURZE ZINKE")
+			var gem_label: String = "KNOTEN" if count == 1 else "FASSUNG"
+			_rows.append({"type": "socket", "stone": spell, "text": String(Items.definition({"id": spell}).get("name", "")) if spell != "" else "LEER: ZAUBERFASSUNG", "label": crown_label})
+			_rows.append({"type": "socket", "stone": gem, "text": String(Items.definition({"id": gem}).get("name", "")) if gem != "" else "LEER: VERSTÄRKERFASSUNG", "label": gem_label})
+			if spell != "" and gem != "":
+				var ok: bool = SpellRules.fits(spell, gem)
+				var name_of: String = String(SpellRules.spell_def(String(SpellRules.spell_info(spell).get("spell", ""))).get("name", ""))
+				_rows.append({"type": "bonus", "text": ("WIRKT AUF %s" if ok else "WIRKT NICHT AUF %s") % name_of, "tone": 1 if ok else -1})
+			if count > 1 and spell != "": ## the forked staff: which button casts it
+				var spell_name: String = String(SpellRules.spell_def(String(SpellRules.spell_info(spell).get("spell", ""))).get("name", ""))
+				_rows.append({"type": "bonus", "text": "%s: %s" % ["LINKSKLICK" if prong == 0 else "RECHTSKLICK", spell_name], "tone": 0, "glow": SpellRules.stone_color(spell)})
+			if count == 1 and spell != "":
+				_rows.append({"type": "rule"})
+				for line: Array in SpellRules.value_lines(spell):
+					_rows.append({"type": "bonus", "text": "%s %s" % [line[0], line[1]], "tone": 0, "glow": SpellRules.stone_color(spell)})
+				var p: Dictionary = SpellRules.params(spell, gem)
+				if bool(p.get("gem_ok", false)): ## what the gem adds to this cast, as the staff will cast it
+					_rows.append({"type": "bonus", "text": "MIT VERSTÄRKER: %d PX, %s S" % [roundi(float(p["radius"])), _number(snappedf(float(p["seconds"]), 0.1))], "tone": 1})
+			if count > 1 and prong == 0:
+				_rows.append({"type": "rule"})
+		if count > 1: ## GABELSCHLAG and the bond of the two crystals
+			var fork: Dictionary = SpellRules.fork_rules(stack)
+			_rows.append({"type": "rule"})
+			_rows.append({"type": "perk", "text": "GABELSCHLAG"})
+			for line: String in _wrap("Wirkst du die andere Zinke binnen %s Sekunden nach der ersten, trifft ihr Zauber %d %% stärker." % [_number(float(fork["window"])), roundi((float(fork["echo"]) - 1.0) * 100.0)]):
+				_rows.append({"type": "desc", "text": line})
+			match String(fork["bond"]):
+				"harmony":
+					_rows.append({"type": "bonus", "text": "GLEICHKLANG: BEIDE LADEN %d %% SCHNELLER" % roundi((1.0 - float(fork["charge"])) * 100.0), "tone": 1})
+				"tension":
+					_rows.append({"type": "bonus", "text": "ZWIESPALT: %d %% LANGSAMER, GABELSCHLAG +%d %%" % [roundi((float(fork["charge"]) - 1.0) * 100.0), roundi((float(fork["echo"]) - 1.0) * 100.0)], "tone": 0})
+				_:
+					_rows.append({"type": "desc", "text": "Gleiche Schule: Gleichklang. Gegensätze: Zwiespalt.", "dim": true})
+		var staff_text: Array[String] = _wrap(String(def.get("description", "")))
+		if not staff_text.is_empty():
+			_rows.append({"type": "rule"})
+			for line: String in staff_text:
+				_rows.append({"type": "desc", "text": line})
+		_rows.append({"type": "hint", "text": "Kristall darauflegen: einsetzen"})
+		if SpellRules.has_stones(stack):
+			_rows.append({"type": "hint", "text": "Rechtsklick: herausnehmen"})
+		if SpellRules.prongs_of(id) > 1:
+			_rows.append({"type": "hint", "text": "Obere / untere Hälfte des Bilds: welche Zinke"})
+		return
+	var crystal: bool = SpellRules.is_spell_crystal(stack)
+	var colour: Color = SpellRules.stone_color(id)
+	var groups: Dictionary = SpellRules.config().get("schools" if crystal else "families", {}) as Dictionary
+	var group: String = String((groups.get(SpellRules.school_of(id) if crystal else SpellRules.family_of(id), {}) as Dictionary).get("name", ""))
+	_rows.append({"type": "sub", "text": "%s %s" % [SpellRules.tier_name(id), "ZAUBERKRISTALL" if crystal else "VERSTÄRKER"]})
+	_rows.append({"type": "stone", "id": id, "glow": colour, "text": group})
+	_rows.append({"type": "rule"})
+	for line: Array in SpellRules.value_lines(id):
+		_rows.append({"type": "bonus", "text": "%s %s" % [line[0], line[1]], "tone": 0, "glow": colour})
+	if not crystal:
+		var fits: Array = SpellRules.gem_def(String(SpellRules.gem_info(id).get("mod", ""))).get("fits", []) as Array
+		var names: Array[String] = []
+		for school: Variant in fits:
+			names.append(String(((SpellRules.config().get("schools", {}) as Dictionary).get(String(school), {}) as Dictionary).get("name", "")))
+		_rows.append({"type": "desc", "text": "PASST ZU %s-ZAUBERN" % ", ".join(names)})
+	for perk: Dictionary in SpellRules.perks(id):
+		_rows.append({"type": "rule"})
+		_rows.append({"type": "perk", "text": "%s (STUFE %s)" % [String(perk["name"]), "III" if int(perk["at"]) == 3 else "V"], "dim": not bool(perk["on"])})
+		for line: String in _wrap(String(perk["text"])):
+			_rows.append({"type": "desc", "text": line, "dim": not bool(perk["on"])})
+	var description: Array[String] = _wrap(String(def.get("description", "")))
+	if not description.is_empty():
+		_rows.append({"type": "rule"})
+		for line: String in description:
+			_rows.append({"type": "desc", "text": line})
+	_rows.append({"type": "hint", "text": "Auf einen Stab legen: einsetzen"})
+
+
+static var _stone_pictures: Dictionary = {} ## kept alive: draw_texture does not hold its texture
+
+
+static func stone_picture(id: String) -> Texture2D:
+	if not _stone_pictures.has(id):
+		var path: String = "res://assets/magic/crystals/%s_big.png" % id
+		_stone_pictures[id] = load(path) if ResourceLoader.exists(path) else null
+	return _stone_pictures[id] as Texture2D
+
+
 func _measure() -> void:
 	_label_width = 0
 	for row: Dictionary in _rows:
@@ -159,6 +256,12 @@ func _measure() -> void:
 			"hint":
 				width += 8
 				height = 12
+			"stone":
+				width = maxi(width, 40)
+				height = 40
+			"socket":
+				width += 30
+				height = 20
 		widths.append(width)
 		_heights.append(height)
 	_layout(widths)
@@ -353,19 +456,41 @@ func _draw_row(row: Dictionary, y: int, height: int, p: float, void_level: float
 				PixelText.draw(self, bonus, Vector2i(value_x - 4 - PixelText.width(bonus), y), Color(RefineStyle.color(int(row["level"])), p), shade)
 		"bonus": ## an effect of jewellery: a bud and the line, green when it beats the worn piece, red when it falls short
 			var tone: int = int(row.get("tone", 0))
-			var colour: Color = _rarity if tone == 0 else (Color("6fd08c") if tone > 0 else Color("ff5a6a"))
+			var colour: Color = (row["glow"] as Color if row.has("glow") else _rarity) if tone == 0 else (Color("6fd08c") if tone > 0 else Color("ff5a6a"))
 			var bud: Vector2 = Vector2(PAD + 2.0, y + 4.0)
 			VineStyle.glow(self, bud, 4.0, colour, 0.4 * p)
 			draw_rect(Rect2(bud, Vector2.ONE), Color(VineStyle.PETAL, p))
 			PixelText.draw(self, text, Vector2i(PAD + 8, y), Color(colour.lerp(Color.WHITE, 0.25), p), shade)
 		"perk": ## a special ability: a feather-shaped bud and the name in a lightened rarity colour
+			if bool(row.get("dim", false)): ## a milestone not reached yet (magic stones): a grey bud
+				p *= 0.5
 			var bud: Vector2 = Vector2(PAD + 2.0, y + 4.0)
 			VineStyle.glow(self, bud, 6.0, _rarity, (0.5 + 0.15 * sin(_time * 3.0)) * p)
 			draw_rect(Rect2(bud + Vector2(-1.0, 0.0), Vector2(3.0, 1.0)), Color(_rarity, p))
 			draw_rect(Rect2(bud + Vector2(0.0, -2.0), Vector2(1.0, 5.0)), Color(_rarity.lerp(Color.WHITE, 0.5), p))
 			PixelText.draw(self, text, Vector2i(PAD + 8, y + 1), Color(_rarity.lerp(Color.WHITE, 0.4), p), shade)
 		"desc":
-			PixelText.draw(self, text, Vector2i(PAD, y), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, void_level * 0.4), p), shade)
+			PixelText.draw(self, text, Vector2i(PAD, y), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, void_level * 0.4), p * (0.45 if bool(row.get("dim", false)) else 1.0)), shade)
+		"stone": ## the stone big, on a breathing halo of its own light, its school or family beside it
+			var glow: Color = row["glow"] as Color
+			var centre: Vector2 = Vector2(PAD + 18.0, y + 19.0)
+			VineStyle.glow(self, centre, 20.0, glow, (0.22 + 0.06 * sin(_time * 2.2)) * p)
+			var picture: Texture2D = stone_picture(String(row["id"]))
+			if picture != null:
+				draw_texture(picture, Vector2(PAD + 2, y + 3) + Vector2(0.0, roundf(sin(_time * 1.6) * 0.6)), Color(1, 1, 1, p))
+			PixelText.draw(self, text, Vector2i(PAD + 40, y + 15), Color(glow.lerp(Color.WHITE, 0.2), p), shade)
+		"socket": ## a socket of a staff: a bark ring with the stone in it (or empty), its name beside it
+			var stone: String = String(row.get("stone", ""))
+			var at: Vector2 = Vector2(PAD, y + 1)
+			draw_rect(Rect2(at, Vector2(18, 18)), Color(VineStyle.OUTLINE, p))
+			draw_rect(Rect2(at + Vector2.ONE, Vector2(16, 16)), Color(PAPER.lightened(0.06), p))
+			if stone != "":
+				VineStyle.glow(self, at + Vector2(9, 9), 9.0, SpellRules.stone_color(stone), 0.35 * p)
+				var icon: Texture2D = Items.icon({"id": stone})
+				if icon != null:
+					draw_texture(icon, at + Vector2.ONE, Color(1, 1, 1, p))
+			PixelText.draw(self, String(row.get("label", "")), Vector2i(PAD + 22, y + 1), Color(UiStyle.TEXT_DIM, p * 0.7), shade)
+			PixelText.draw(self, text, Vector2i(PAD + 22, y + 9), Color((Items.rarity_color({"id": stone}) if stone != "" else UiStyle.TEXT_DIM), p * (1.0 if stone != "" else 0.6)), shade)
 		"hint":
 			var bud: Vector2 = Vector2(PAD + 2.0, y + 6.0)
 			VineStyle.glow(self, bud, 5.0, UiStyle.ACCENT, 0.5 * p)

@@ -94,6 +94,8 @@ func _hint() -> String:
 
 
 func _giver_name(offer: Dictionary) -> String:
+	if not town.has_met(String(offer.g)):
+		return "UNBEKANNT" ## a name the player has not learned yet is not shown
 	var spec: Dictionary = town.settler_spec(String(offer.g))
 	return String(spec.get("name", String(offer.g).to_upper()))
 
@@ -216,7 +218,7 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 	if why != "": ## the occasion: the small proof that the town reacts
 		_text(Vector2(x + float(PixelText.width(_giver_name(offer))) + 8.0, area.position.y + 4.0), why, RUSH if BoardRules.is_urgent(offer) else LIT)
 	if _kind() == "mine" and tracked != null: ## whether the notice is in the quest branch and on the map
-		var follow: String = "IM QUEST-ZWEIG" if tracked.is_tracked(int(offer.id)) else "NICHT VERFOLGT"
+		var follow: String = "IM FOKUS" if tracked.is_tracked(int(offer.id)) else "OFFEN"
 		_text(Vector2(area.end.x - float(PixelText.width(follow)), area.position.y + 4.0), follow, LIT if tracked.is_tracked(int(offer.id)) else DIM)
 	elif BoardRules.is_urgent(offer):
 		var clock: String = "NUR NOCH %d H" % BoardRules.urgent_hours(offer, TimeManager.time_of_day)
@@ -266,7 +268,7 @@ func _buttons() -> Array[Dictionary]:
 		return [{"id": "wear", "label": "ABLEGEN" if bool(row.worn) else "TRAGEN", "ready": bool(row.earned)}]
 	if _kind() == "mine":
 		var follows: bool = tracked != null and tracked.is_tracked(int(row.id)) ## reporting is done at the settler who gave the notice, not here
-		return [{"id": "track", "label": "NICHT VERFOLGEN" if follows else "VERFOLGEN", "ready": tracked != null}]
+		return [{"id": "track", "label": "FOKUS LÖSEN" if follows else "FOKUSSIEREN", "ready": tracked != null}]
 	return [{"id": "accept", "label": "ANNEHMEN", "ready": true}]
 
 

@@ -44,6 +44,8 @@ func _draw() -> void:
 	var icon: Texture2D = Items.icon(item)
 	if icon:
 		draw_texture(icon, Vector2(2, 2))
+	if SpellRules.is_staff(item):
+		StaffCrystals.draw_icon_stones(self, item, Vector2(2, 2)) ## the stones set into a staff show in its icon
 	RefineStyle.draw_badge(self, Items.refine(item), SIZE - 2, SIZE - 2) ## "+7" of a refined weapon
 	var count: int = int(item.get("count", 1))
 	if count > 1:
@@ -67,12 +69,18 @@ func _gui_input(event: InputEvent) -> void:
 				refused.emit(why)
 				accept_event()
 				return
-		inventory.request("quick" if click.shift_pressed else "click", [kind, ref])
+		inventory.request("quick" if click.shift_pressed else "click", [kind, ref, _prong_at(click.position)])
 		if has_sound:
 			Sfx.ui(self, sound, -2.0)
 		accept_event()
 	elif click.button_index == MOUSE_BUTTON_RIGHT:
-		inventory.request("rclick", [kind, ref])
+		inventory.request("rclick", [kind, ref, _prong_at(click.position)])
 		if has_sound:
 			Sfx.ui(self, sound, -2.0)
 		accept_event()
+
+
+## A forked staff (docs/magie_konzept.md 17): which prong the pointer is on. The staff lies diagonally in its icon (grip bottom left, head top
+## right), so the upper-left side of that diagonal is prong 0 (left mouse button), the lower-right side prong 1.
+func _prong_at(at: Vector2) -> int:
+	return 0 if at.x + at.y < (size.x + size.y) * 0.5 else 1

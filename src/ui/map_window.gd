@@ -86,6 +86,8 @@ var _hover_id: String = ""
 var _hover_t: float = 0.0
 signal travel_chosen(from_id: String, to_id: String) ## travel mode: the player held on another waystone
 signal travel_cancelled ## travel mode: the map was closed without choosing
+signal quest_preview_closed
+var _quest_preview: String = ""
 
 var _ways: MapWaystones = MapWaystones.new()
 var _pet_marks: MapPets = MapPets.new() ## the named crows and ravens (docs/pet_konzept.md)
@@ -329,7 +331,32 @@ func present(tile: Vector2, seconds: float, ring_tiles: float = 0.0) -> void:
 	_present_tile = tile
 
 
-func _set_open(open: bool) -> void:
+static func quest_location(entry: Dictionary) -> Vector2:
+	var area: Vector3 = entry.get("area", Vector3.INF) as Vector3
+	if area != Vector3.INF:
+		return Vector2(area.x, area.y)
+	var target: Vector2 = entry.get("target", Vector2.INF) as Vector2
+	return target if target.x < Interiors.POCKET_X0 else Vector2.INF
+
+
+func open_quest_preview(entry: Dictionary) -> void:
+	var location: Vector2 = quest_location(entry)
+	if _opening or location == Vector2.INF or not InputManager.journal_open:
+		return
+	_set_open(true)
+	if _opening:
+		_quest_preview = String(entry.id)
+		_center = location / 16.0
+		_scale = 0.92
+		_scale_target = 1.35
+
+
+func cancel_quest_preview() -> void:
+	if _quest_preview != "":
+		_set_open(false, false)
+
+
+func _set_open(open: bool, return_to_journal: bool = true) -> void:
 	_present_left = 0.0
 	_present_ring = 0.0
 	_ws_mouse = false
@@ -340,6 +367,10 @@ func _set_open(open: bool) -> void:
 		_load_data()
 		if not _loaded:
 			return
+	if open and InputManager.journal_open:
+		var journal: QuestJournal = get_parent().get_node_or_null("QuestJournal") as QuestJournal
+		if journal != null:
+			journal.close()
 	if open != _opening:
 		Sfx.ui(self, "map_open" if open else "map_close", -2.0)
 	_opening = open
@@ -347,7 +378,8 @@ func _set_open(open: bool) -> void:
 	_hover_t = 0.0
 	_hover_marker.clear()
 	InputManager.map_open = open
-	InputManager.ui_blocking = open
+	var health: HealthComponent = _player.get("health") as HealthComponent if is_instance_valid(_player) else null
+	InputManager.ui_blocking = open or InputManager.menu_open or (health != null and health.current <= 0.0)
 	if open:
 		_center = _player_tile()
 		_scale = _scale_target * 0.8
@@ -360,10 +392,14 @@ func _set_open(open: bool) -> void:
 		_dragging = false
 		_slider_drag = false
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if _quest_preview != "":
+			_quest_preview = ""
+			if return_to_journal:
+				quest_preview_closed.emit()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _opening and event.is_action_pressed("ui_cancel"):
+	if _opening and (event.is_action_pressed("ui_cancel") or (_quest_preview != "" and event.is_action_pressed("quest_journal"))):
 		_set_open(false)
 		get_viewport().set_input_as_handled()
 
@@ -553,8 +589,14 @@ func _draw_overlay() -> void:
 	_draw_town(fade)
 	_ways.draw(_overlay, _scale, fade, _time, size, [_present_tile, _present_ring, _present_age] if _present_ring > 0.0 else [])
 	_pet_marks.draw(_overlay, _scale, fade, _time, size, get_tree())
-	_draw_quest(fade)
-	_draw_board_marks(fade)
+	var tracked: TrackedQuests = _player.get("tracked") as TrackedQuests if is_instance_valid(_player) else null
+	if tracked != null:
+		var focused: Dictionary = tracked.focused() if _quest_preview == "" else tracked.active_entry(_quest_preview)
+		match String(focused.get("source", "")):
+			"story":
+				_draw_quest(focused, fade)
+			"board":
+				_draw_board_mark(focused, fade)
 	_draw_pins(fade)
 	_draw_presence(fade)
 	_draw_frame(fade, void_level)
@@ -664,11 +706,7 @@ func _draw_town(fade: float) -> void:
 
 
 ## The goal of the current quest: a golden bloom with rings that open outwards, a stem and its name; off screen a chevron at the edge points to it.
-func _draw_quest(fade: float) -> void:
-	var quests: QuestComponent = (_player.get("quests") as QuestComponent) if _player != null else null
-	if quests == null:
-		return
-	var now: Dictionary = quests.current()
+func _draw_quest(now: Dictionary, fade: float) -> void:
 	if now.is_empty() or (now.target as Vector2) == Vector2.INF or (now.target as Vector2).x >= Interiors.POCKET_X0:
 		return
 	var at: Vector2 = _to_screen((now.target as Vector2) / 16.0)
@@ -694,35 +732,30 @@ func _draw_quest(fade: float) -> void:
 		_text_centered(String(now.title), at + Vector2(0, 9), Color(tone, 0.95), fade)
 
 
-## The quest-board notices the player took (`TrackedQuests`): a pinned paper with a pulsing ring where something can be done about them. Today that is the giver once the goods
-## or kills are there (the mark follows the settler); a chevron at the edge points to it off screen. The story quest keeps its golden bloom (`_draw_quest`).
-func _draw_board_marks(fade: float) -> void:
-	var tracked: TrackedQuests = (_player.get("tracked") as TrackedQuests) if _player != null else null
-	if tracked == null:
+## The focused board notice: a search area or a paper pin on the giver.
+func _draw_board_mark(entry: Dictionary, fade: float) -> void:
+	var area: Vector3 = entry.get("area", Vector3.INF) as Vector3
+	if area != Vector3.INF:
+		_draw_notice_area(area, String(entry.area_name), bool(entry.get("urgent", false)), String(entry.kind) == BoardRules.KILL, fade, bool(entry.get("bounty", false)))
+	var goal: Vector2 = entry.target as Vector2
+	if goal == Vector2.INF or goal.x >= Interiors.POCKET_X0:
 		return
-	for entry: Dictionary in tracked.board_entries(false):
-		var area: Vector3 = entry.get("area", Vector3.INF) as Vector3
-		if area != Vector3.INF:
-			_draw_notice_area(area, String(entry.area_name), bool(entry.get("urgent", false)), String(entry.kind) == BoardRules.KILL, fade, bool(entry.get("bounty", false)))
-		var goal: Vector2 = entry.target as Vector2
-		if goal == Vector2.INF or goal.x >= Interiors.POCKET_X0:
-			continue
-		var at: Vector2 = _to_screen(goal / 16.0)
-		var tone: Color = Color("78f4e6")
-		if not _on_screen(at, 4.0):
-			_draw_pointer(at, tone, fade)
-			continue
-		var wave: float = fposmod(_time * 0.8 + float(int(entry.oid)) * 0.37, 1.0)
-		VineStyle.glow(_overlay, at, 12.0, tone, 0.38 * fade * (0.8 + 0.2 * sin(_time * 3.0)))
-		VineStyle.ring(_overlay, at, 3 + int(wave * 10.0), Color(tone, (1.0 - wave) * 0.8 * fade), 0.7)
-		var corner: Vector2 = (at - Vector2(3, 3)).round()
-		_overlay.draw_rect(Rect2(corner - Vector2.ONE, Vector2(9, 8)), Color(VineStyle.OUTLINE, 0.9 * fade)) ## the paper, pinned
-		_overlay.draw_rect(Rect2(corner, Vector2(7, 6)), Color(BoardNotes.KILL_PAPER if String(entry.kind) == BoardRules.KILL else BoardNotes.FETCH_PAPER, fade))
-		_overlay.draw_rect(Rect2(corner + Vector2(1, 2), Vector2(4, 1)), Color(BoardNotes.INK, 0.75 * fade))
-		_overlay.draw_rect(Rect2(corner + Vector2(1, 4), Vector2(3, 1)), Color(BoardNotes.INK, 0.75 * fade))
-		_overlay.draw_rect(Rect2(corner + Vector2(3, 0), Vector2.ONE), Color(BoardNotes.PIN, fade))
-		if _scale > 0.4:
-			_text_centered("MELDEN %s" % String(entry.giver_name), at + Vector2(0, 10), Color(tone, 0.95), fade)
+	var at: Vector2 = _to_screen(goal / 16.0)
+	var tone: Color = Color("78f4e6")
+	if not _on_screen(at, 4.0):
+		_draw_pointer(at, tone, fade)
+		return
+	var wave: float = fposmod(_time * 0.8 + float(int(entry.oid)) * 0.37, 1.0)
+	VineStyle.glow(_overlay, at, 12.0, tone, 0.38 * fade * (0.8 + 0.2 * sin(_time * 3.0)))
+	VineStyle.ring(_overlay, at, 3 + int(wave * 10.0), Color(tone, (1.0 - wave) * 0.8 * fade), 0.7)
+	var corner: Vector2 = (at - Vector2(3, 3)).round()
+	_overlay.draw_rect(Rect2(corner - Vector2.ONE, Vector2(9, 8)), Color(VineStyle.OUTLINE, 0.9 * fade)) ## the paper, pinned
+	_overlay.draw_rect(Rect2(corner, Vector2(7, 6)), Color(BoardNotes.KILL_PAPER if String(entry.kind) == BoardRules.KILL else BoardNotes.FETCH_PAPER, fade))
+	_overlay.draw_rect(Rect2(corner + Vector2(1, 2), Vector2(4, 1)), Color(BoardNotes.INK, 0.75 * fade))
+	_overlay.draw_rect(Rect2(corner + Vector2(1, 4), Vector2(3, 1)), Color(BoardNotes.INK, 0.75 * fade))
+	_overlay.draw_rect(Rect2(corner + Vector2(3, 0), Vector2.ONE), Color(BoardNotes.PIN, fade))
+	if _scale > 0.4:
+		_text_centered("MELDEN %s" % String(entry.giver_name), at + Vector2(0, 10), Color(tone, 0.95), fade)
 
 
 ## A quest-board notice's place on the map as a ring of dashes: the hunting ground of a report (red) or where a plant grows (gold). No dot: nobody says where exactly.
@@ -1221,7 +1254,8 @@ func _draw_frame(fade: float, void_level: float) -> void:
 		var hint: String = "WEGSTEIN WAEHLEN: MAUS ODER A D   HALTEN: REISEN   ESC: ABBRECHEN" if not _ways.destinations().is_empty() else "KEIN ANDERER WEGSTEIN ERWACHT   ESC: ABBRECHEN"
 		_text_centered(hint, Vector2(size.x / 2.0, 299.0), Color(Color("9ff5ec"), 0.8), fade)
 	else:
-		_text_centered("ZIEHEN: SCHIEBEN   RAD: ZOOM   RECHTSKLICK: ZEICHEN   LEERTASTE: ZU MIR   M: SCHLIESSEN", Vector2(size.x / 2.0, 299.0), Color(UiStyle.TEXT_DIM, 0.6), fade)
+		var controls: String = "ZIEHEN: SCHIEBEN   RAD: ZOOM   J / ESC: TAGEBUCH" if _quest_preview != "" else "ZIEHEN: SCHIEBEN   RAD: ZOOM   RECHTSKLICK: ZEICHEN   LEERTASTE: ZU MIR   M: SCHLIESSEN"
+		_text_centered(controls, Vector2(size.x / 2.0, 299.0), Color(UiStyle.TEXT_DIM, 0.6), fade)
 
 
 func _draw_readout(fade: float) -> void:

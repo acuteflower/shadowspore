@@ -33,6 +33,9 @@ RAMPS = {  # dark .. light; bevel: lit rim = last, shaded rim = first, inside = 
     "dark": [hexc(c) for c in ("1f1d38", "343b58", "4a5472", "77839f")],
     "raven": [hexc(c) for c in ("0e0a1e", "1a1334", "2c2150", "4a3d8a", "7a68d0")],  # Himmelsriss: blue-black feather steel with a violet sheen (same hues as the Rissfeder's ravensteel)
     "crack": [hexc(c) for c in ("6a3fd0", "9a6bff", "c8aaff", "f4ecff")],  # the rift of light along the blade
+    "hagwood": [hexc(c) for c in ("2b1a38", "4c2f5e", "73508a", "a07cb8")],
+    "silver": [hexc(c) for c in ("3a4260", "6d7898", "a3adc8", "d6dcef")],
+    "bone": [hexc(c) for c in ("4a4560", "8a8698", "b8b4b8", "dedacc", "f6f2e0")],  # Bleichbaum: bleached wood with a violet shade (art_hexenwald.py BONE)  # Fluchsilber of the staff's head  # Hexenulme: nearly black violet bark (docs/magie_konzept.md)
 }
 GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8"), "sword_rift": hexc("c07bff")}
 
@@ -227,6 +230,70 @@ def rod(w, h, tf):
     return layers
 
 
+def staff(w, h, tf):
+    """Hexenulmenstab (docs/magie_konzept.md), short and stout: a twisted branch of the Hexenulme with a knobbed root end and a leather wrap,
+    a band of Fluchsilber where the head begins, a silver bezel for the gem (KNOT_PX = 16 from the grip) and a cradle of two gnarled prongs
+    that close round the spell crystal (CROWN_PX = 23). The stones are drawn by the game into the open cradle and bezel (StaffCrystals),
+    which also lays the silver clasp over the crystal so it sits IN the head. Short witch-green veins wander along the bark."""
+    ax = 4.5
+    pts = [(1.6 + i * 1.0, ax + 0.45 * math.sin(i * 0.7)) for i in range(21)]
+    layers = [("shaft", stroke_mask(pts, lambda u: 3.2 - 0.5 * u, w, h, tf), "hagwood")]
+    layers.append(("root", poly_mask([(0.0, ax - 1.8), (1.6, ax - 2.6), (3.6, ax - 1.8), (3.8, ax + 2.0), (1.6, ax + 2.6), (0.0, ax + 1.6)], w, h, tf), "hagwood"))
+    layers.append(("wrap", stroke_mask([(5.4, ax), (10.6, ax)], 3.6, w, h, tf), "wrap"))
+    head = poly_mask([(19.6, ax - 2.2), (22.0, ax - 3.6), (25.6, ax - 3.4), (26.4, ax), (25.6, ax + 3.4), (22.0, ax + 3.6), (19.6, ax + 2.2)], w, h, tf)
+    layers.append(("head", head, "hagwood"))
+    layers.append(("band", poly_mask([(18.6, ax - 2.0), (20.0, ax - 2.2), (20.0, ax + 2.2), (18.6, ax + 2.0)], w, h, tf), "silver"))
+    bezel = stroke_mask([(16.0 + 2.0 * math.cos(a), ax + 2.0 * math.sin(a)) for a in [i / 12.0 * 2 * math.pi for i in range(13)]], 1.0, w, h, tf)
+    layers.append(("bezel_hole", poly_mask([(14.6, ax - 1.4), (17.4, ax - 1.4), (17.4, ax + 1.4), (14.6, ax + 1.4)], w, h, tf), "hollow"))
+    layers.append(("bezel", bezel, "silver"))
+    up = [(25.0, ax - 2.6), (27.6, ax - 4.4), (30.6, ax - 4.6), (33.0, ax - 3.0), (33.6, ax - 1.0)]
+    dn = [(25.0, ax + 2.6), (27.6, ax + 4.4), (30.6, ax + 4.6), (33.0, ax + 3.0), (33.6, ax + 1.0)]
+    layers.append(("prong_up", stroke_mask(up, lambda u: 2.2 - 0.9 * u, w, h, tf), "hagwood"))
+    layers.append(("prong_dn", stroke_mask(dn, lambda u: 2.2 - 0.9 * u, w, h, tf), "hagwood"))
+    layers.append(("cradle", poly_mask([(26.0, ax - 1.6), (27.4, ax - 2.0), (27.4, ax + 2.0), (26.0, ax + 1.6)], w, h, tf), "hollow"))
+    for a, b in (((4.0, ax - 0.8), (5.0, ax + 0.6)), ((12.0, ax + 0.8), (14.0, ax - 0.6)), ((21.4, ax - 1.6), (23.6, ax + 0.4)), ((28.6, ax - 3.6), (30.4, ax - 4.0))):
+        layers.append(("vein", stroke_mask([a, b], 0.7, w, h, tf), "vein"))
+    return layers
+
+
+def bone_fork(w, h, tf):
+    """Bleichgabel (docs/magie_konzept.md 17): a branch of the Bleichbaum that splits into a narrow, uneven Y, as it grew: the upper prong
+    (prong 0, left mouse button) runs on longer, the lower one (prong 1, right mouse button) stops short. Bleached, bone-white wood with
+    dark violet cracks along it, a knuckled root end, a leather wrap on the grip, a band of Fluchsilber just below the split and in the
+    crotch a shadow core that glows. Each prong carries a silver bezel for its gem and ends in a claw of two bony fingers that cradle its
+    spell crystal. The places (px from the grip along the staff, px across, + = down in this picture) are `crowns`/`knots` of
+    `staff_bone_fork` in data/spells.json: long prong crown (31.5, -4.8), knot (20.8, -3.4); short prong crown (26.1, 4.2), knot (18.0, 2.6).
+    StaffCrystals draws the stones into bezels and claws."""
+    ax = 8.5
+    pts = [(1.8 + i * 1.0, ax + 0.35 * math.sin(i * 0.55)) for i in range(23)]
+    layers = [("shaft", stroke_mask(pts, lambda u: 3.0 - 0.4 * u, w, h, tf), "bone")]
+    layers.append(("root", poly_mask([(0.0, ax - 1.6), (1.2, ax - 2.6), (3.0, ax - 2.4), (4.0, ax - 1.0), (4.0, ax + 1.2), (3.0, ax + 2.6), (1.2, ax + 2.4), (0.0, ax + 1.4)], w, h, tf), "bone"))
+    layers.append(("wrap", stroke_mask([(5.6, ax), (11.6, ax)], 3.6, w, h, tf), "wrap"))
+    prongs = (  # side, the arm, where its claw sits (end x, y), its knot (x, y)
+        (-1.0, [(22.6, -0.6), (25.0, -1.9), (27.8, -3.1), (30.8, -3.9), (34.0, -4.4), (37.0, -4.7)], (37.2, -4.8), (28.8, -3.4)),
+        (1.0, [(22.6, 0.6), (24.8, 1.8), (27.0, 2.9), (29.4, 3.6), (31.6, 4.0)], (31.8, 4.2), (26.0, 2.6)),
+    )
+    for side, arm, _end, _knot in prongs:
+        layers.append(("prong", stroke_mask([(x, ax + y) for x, y in arm], lambda u: 2.5 - 0.8 * u, w, h, tf), "bone"))
+    layers.append(("band", poly_mask([(20.4, ax - 2.0), (21.9, ax - 2.2), (21.9, ax + 2.2), (20.4, ax + 2.0)], w, h, tf), "silver"))
+    layers.append(("crotch", poly_mask([(23.6, ax - 0.9), (25.0, ax - 1.3), (25.4, ax), (25.0, ax + 1.3), (23.6, ax + 0.9)], w, h, tf), "hollow"))
+    layers.append(("core", stroke_mask([(24.5, ax), (24.6, ax)], 1.2, w, h, tf), "core"))
+    for side, _arm, (ex, ey0), (kx, ky0) in prongs:
+        ky = ax + ky0
+        ring = [(kx + 1.6 * math.cos(a), ky + 1.6 * math.sin(a)) for a in [i / 12.0 * 2 * math.pi for i in range(13)]]
+        layers.append(("bezel_hole", poly_mask([(kx - 0.9, ky - 0.9), (kx + 0.9, ky - 0.9), (kx + 0.9, ky + 0.9), (kx - 0.9, ky + 0.9)], w, h, tf), "hollow"))
+        layers.append(("bezel", stroke_mask(ring, 0.9, w, h, tf), "silver"))
+        ey = ax + ey0
+        outer = [(ex, ey), (ex + 1.6, ey + side * 1.9), (ex + 3.8, ey + side * 2.4), (ex + 5.2, ey + side * 1.6)]
+        inner = [(ex, ey), (ex + 1.6, ey - side * 1.8), (ex + 3.8, ey - side * 2.2), (ex + 5.0, ey - side * 1.4)]
+        layers.append(("claw_out", stroke_mask(outer, lambda u: 1.7 - 0.8 * u, w, h, tf), "bone"))
+        layers.append(("claw_in", stroke_mask(inner, lambda u: 1.7 - 0.8 * u, w, h, tf), "bone"))
+        layers.append(("cradle", poly_mask([(ex + 1.4, ey - 1.1), (ex + 3.2, ey - 1.3), (ex + 3.2, ey + 1.3), (ex + 1.4, ey + 1.1)], w, h, tf), "hollow"))
+    for a, b in (((13.0, ax - 0.9), (16.4, ax - 0.3)), ((17.4, ax + 0.9), (19.6, ax + 0.4)), ((31.4, ax - 4.0), (33.6, ax - 4.4)), ((27.6, ax + 3.1), (28.8, ax + 3.5)), ((2.0, ax + 1.0), (3.4, ax + 1.8))):
+        layers.append(("crack", stroke_mask([a, b], 0.6, w, h, tf), "bonecrack"))
+    return layers
+
+
 ITEMS = {  # id: (size, pivot in the item frame, builder, steel ramp, icon fit: (rotation, scale, offset))
     "sword_basic": ((34, 12), (4.5, 6.0), sword(21, "sword_basic", "steel"), "steel", (-45.0, 0.46, (1.6, 14.4))),
     "sword_iron": ((36, 12), (4.5, 6.0), sword(23, "sword_iron", "mint"), "mint", (-45.0, 0.44, (1.6, 14.4))),
@@ -238,6 +305,8 @@ ITEMS = {  # id: (size, pivot in the item frame, builder, steel ramp, icon fit: 
     "rod_basic": ((49, 9), (4.0, 4.0), rod, "steel", (-45.0, 0.3, (2.4, 13.6))),
     "hoe_basic": ((34, 20), (5.0, 6.0), hoe, "steel", (-45.0, 0.5, (1.0, 13.0))),
     "watering_can": ((32, 20), (3.0, 9.0), can, "steel", (0.0, 0.43, (3.0, 8.8))),
+    "staff_hag_elm": ((35, 10), (8.0, 4.5), staff, "steel", (-45.0, 0.46, (4.2, 11.8))),
+    "staff_bone_fork": ((44, 17), (8.0, 8.5), bone_fork, "steel", (-45.0, 0.34, (3.8, 12.2))),
 }
 
 
@@ -292,6 +361,34 @@ def compose(item, w, h, tf, material_map=None):
                 else:
                     c = RAMPS["raven"][1]
                 img[(x, y)] = c
+            continue
+        if mat == "hagwood":  # the bevel, and a twisted grain: dark grooves winding round the branch
+            for (x, y), c in bevel(mask, RAMPS["hagwood"]).items():
+                img[(x, y)] = RAMPS["hagwood"][0] if (x * 2 + y) % 7 == 0 and c != RAMPS["hagwood"][-1] else c
+            continue
+        if mat == "hollow":  # the knot's hollow: a dark socket with a lit lower lip
+            ys = np.nonzero(mask)
+            lowest = int(max(ys[0])) if len(ys[0]) else 0
+            for yy, xx in zip(*ys):
+                img[(int(xx), int(yy))] = hexc("8a6a9a") if int(yy) == lowest else hexc("0c0812")
+            continue
+        if mat == "bone":  # bleached wood: the bevel, and fine grain lines running along it
+            for (x, y), c in bevel(mask, RAMPS["bone"]).items():
+                img[(x, y)] = RAMPS["bone"][1] if (x * 3 + y * 7) % 11 == 0 and c != RAMPS["bone"][-1] else c
+            continue
+        if mat == "bonecrack":  # dark violet cracks in the bleached wood
+            for (x, y) in zip(*np.nonzero(mask)[::-1]):
+                if (int(x), int(y)) in img:
+                    img[(int(x), int(y))] = hexc("2e2a44") if (int(x) + int(y)) % 4 else hexc("6a3fa0")
+            continue
+        if mat == "core":  # the shadow core in the crotch: a magenta heart in violet
+            for (x, y) in zip(*np.nonzero(mask)[::-1]):
+                img[(int(x), int(y))] = hexc("ff4fd8") if (int(x) + int(y)) % 2 == 0 else hexc("8a3fd0")
+            continue
+        if mat == "vein":  # short witch-green veins (the Hexenwald's trees)
+            for (x, y) in zip(*np.nonzero(mask)[::-1]):
+                if (int(x), int(y)) in img:
+                    img[(int(x), int(y))] = hexc("7fd65a") if (int(x) + int(y)) % 3 else hexc("c4ff9a")
             continue
         if mat == "steel_dark":
             mat = "dark"

@@ -311,6 +311,10 @@ func _spawn_player(id: int) -> void:
 	player.name = str(id)
 	player.position = _spawn_position(_players.get_child_count())
 	_players.add_child(player)
+	if id != multiplayer.get_unique_id():
+		var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
+		if town != null and town.board != null:
+			town.board.restore_guest(player)
 
 
 func _despawn_player(id: int) -> void:

@@ -115,6 +115,8 @@ func _breathe_mist() -> void:
 		clear("hallucinated") ## put on: her head clears at once
 	elif Interiors.slot_at(player.global_position) >= 0 or MineManager.in_mine(player.global_position):
 		clear("hallucinated") ## under a roof (the witch's tower) there is no mist: nothing false follows her inside
+	elif WardRing.shelters(player.global_position):
+		clear("hallucinated") ## inside an awake ring of ward stones (the lake witch's house) the mist tells no lies
 	elif BiomeBlend.amount_at(player.global_position) > float(def.get("min_gloom", 0.35)):
 		apply("hallucinated")
 
@@ -188,6 +190,12 @@ func _show(id: String) -> void:
 		seen.name = "Hallucinations"
 		get_parent().add_child(seen)
 		_fx[id] = seen
+	if id == "veil" and not _fx.has(id): ## Nebelschleier (docs/magie_konzept.md): her picture veils itself on every peer
+		var veil: VeilFx = VeilFx.new()
+		veil.name = "VeilFx"
+		(get_parent() as Node2D).add_child(veil)
+		veil.bind(self)
+		_fx[id] = veil
 	if id == "burn" and not _fx.has(id) and DisplayServer.get_name() != "headless":
 		var fx: BurnFx = BurnFx.new()
 		fx.name = "BurnFx"

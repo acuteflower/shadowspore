@@ -9,6 +9,8 @@ const PATH: String = "res://data/gustav_portrait.json"
 
 var talk_char: String = ""
 var speaking: bool = false
+var hurt: bool = false ## sheets with four rows (Ellie): rows 2-3 are the wounded pair
+var eyes_shut: bool = false ## holds the eyes closed (reflective lines)
 var _sheet: Texture2D
 var _frame: AtlasTexture = AtlasTexture.new()
 var _cell: Vector2i = DialogueArt.LOGICAL_SIZE
@@ -66,7 +68,7 @@ func advance(delta: float) -> void:
 	if _next_blink <= 0.0:
 		_blink_left = _blink_length
 		_next_blink = _blink_every + sin(_clock * 0.7) * 0.7
-	_apply(_viseme, _blink_left > 0.0)
+	_apply(_viseme, _blink_left > 0.0 or eyes_shut)
 
 
 static func _viseme_for(character: String) -> int:
@@ -83,4 +85,5 @@ static func _viseme_for(character: String) -> int:
 
 
 func _apply(viseme: int, closed: bool) -> void:
-	_frame.region = Rect2(viseme * _cell.x, (_cell.y if closed else 0), _cell.x, _cell.y)
+	var row: int = (2 if hurt else 0) + (1 if closed else 0)
+	_frame.region = Rect2(viseme * _cell.x, row * _cell.y, _cell.x, _cell.y)

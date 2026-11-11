@@ -135,5 +135,16 @@
     "hot": "c8b4f0",
     "glyph": "drop",
     "tiered": true
+  },
+  "veil": {
+    "name": "VERNEBELT",
+    "seconds": 5.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "b9aaff",
+    "hot": "f2eeff",
+    "glyph": "eye",
+    "tiered": true
   }
 }

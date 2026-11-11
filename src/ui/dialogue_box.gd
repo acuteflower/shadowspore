@@ -15,8 +15,9 @@ const MAX_ROWS: int = 3
 
 var _vignette: GradientTexture2D
 const NPC_PORTRAITS: Dictionary = { ## speakers other than Ellie: name plate text -> portrait
-	"???": preload("res://assets/ui/portrait_adventurer_v2.png"),
-	"RITTER": preload("res://assets/ui/portrait_adventurer_v2.png"),
+	"???": preload("res://assets/ui/portrait_adventurer_v3.png"),
+	"RITTER": preload("res://assets/ui/portrait_adventurer_v3.png"),
+	"VALDRIC": preload("res://assets/ui/portrait_adventurer_v3.png"),
 }
 ## Speakers whose portrait is made apart (docs/town.md, docs/characters/): the picture is picked up as soon as the file exists (103 x 153, docs/dialogue_art.md); until then
 ## nobody is shown beside their lines. "FREMDER" is the stranger who becomes Gustav: a silhouette until the story names him (`known_flag`).
@@ -24,12 +25,15 @@ const LATE_PORTRAITS: Dictionary = {
 	"GUSTAV": "res://assets/ui/portrait_gustav.png",
 	"FREMDER": "res://assets/ui/portrait_gustav.png",
 	"MAREN": "res://assets/ui/portrait_maren.png",
+	"TORBEN": "res://assets/ui/portrait_torben.png",
+	"ESMA": "res://assets/ui/portrait_esma.png",
+	"MORWENNA": "res://assets/ui/portrait_morwenna.png",
+	"ILVA": "res://assets/ui/portrait_lake_witch.png", ## the lake witch (docs/seehexe_konzept.md): no portrait yet, so none is shown
 }
 ## Speakers with a baked speaking portrait: name plate text -> sheet description (`SpeechPortrait`, made by tools/art_gustav_portrait.py). They share one
 ## instance per sheet, so the stranger and Gustav blink and talk the same. Each also stays in LATE_PORTRAITS as the still fallback.
 const TALKING_PORTRAITS: Dictionary = {
-	"GUSTAV": "res://data/gustav_portrait.json",
-	"FREMDER": "res://data/gustav_portrait.json",
+	## Speaking and blinking are switched off for now: Gustav shows his still portrait (the baked sheet stays in assets/ui/portrait_gustav_talk.png).
 }
 var _talkers: Dictionary = {}
 const UNKNOWN_SHADER: Shader = preload("res://assets/shaders/unknown_portrait.gdshader")
@@ -116,6 +120,9 @@ func start(id: String) -> void:
 	_lines = _paginate(entry.get("lines", []) as Array)
 	if _lines.is_empty():
 		return
+	var journal: QuestJournal = get_parent().get_node_or_null("QuestJournal") as QuestJournal
+	if journal != null:
+		journal.interrupt()
 	_time = 0.0
 	_menu_before = InputManager.menu_open
 	InputManager.menu_open = true

@@ -190,3 +190,7 @@ Ziel: Spitzen und Rückblick.
 ## 8. Bewusst nicht in diesem Plan
 
 Siedler heften ihre Zettel selbst an, Handschrift je Siedler, Koch-/Angel-Zettel, Zettelketten und Gemeinschaftszettel mit gemeinsamem Balken. Die Adapter-Naht (3.1) und `occasions` lassen alle später zu.
+
+## 9. Nur Bekannte hängen Zettel aus (2026-11-11)
+
+Die Tafel nimmt nur Zettel von Leuten, die die Spielerin schon kennt: `TownManager.has_met(id)` ist wahr, wenn einmal mit der Person gesprochen wurde (`talked >= 0`), für den Gründer (Valdric) und für Siedler, die die Geschichte bringt (`arrive.story`, Gustav). Wer nur im Siedlerbuch steht (Checkpoint-Sprung, `away`-Hexen wie Esma und Ilva vor dem ersten Besuch), hängt weder einfache Zettel (`BoardRules.roll` bekommt `met_residents()`), noch Anlässe, Eil-Upgrades oder Steckbriefe aus. Ein Geschichtszettel (z. B. `lake_witch_notice`) bleibt als Gerücht bestehen, nennt aber bei unbekanntem Geber "UNBEKANNT" statt des Namens (Tafelfenster und Questast).

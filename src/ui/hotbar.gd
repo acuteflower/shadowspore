@@ -8,6 +8,9 @@ extends Control
 ## XP and level grow along the same vine: a thin golden light runs through it up to a bud at the
 ## current XP, the level number sits above it (no exact XP). A gain makes the light surge and shows "+XP"; a
 ## level-up fills the vine, the light sweeps across and blooms open one after another.
+## Folding: after FOLD_DELAY s without switching slots the pendants sink and fade, then the branch
+## narrows and drops to the screen edge (only level, XP and the sap vines stay); switching unfolds it
+## almost at once. The HUD moves the sap vines and the skill crystal along (`inset`, `drop`, `sink`, `shown`).
 
 signal use_requested(slot: int) ## the number key of the already selected slot was pressed again
 
@@ -22,6 +25,12 @@ const XP_START: float = 4.0
 const XP_END: float = W - 4.0
 const BLOOMS: int = 9
 const BURST_SECONDS: float = 2.4
+const FOLD_DELAY: float = 6.5 ## s without switching before the pendants fold away
+const FOLD_OUT_TIME: float = 0.75 ## s for the whole fold
+const FOLD_IN_TIME: float = 0.08 ## s to unfold again: almost instant
+const NARROW: float = 34.0 ## px the folded vine draws in at each end
+const DROP: float = 24.0 ## px the folded branch sinks towards the screen edge
+const SINK: float = 30.0 ## px the pendants sink (on top of the drop) while they fade
 
 var selected: int = 0
 
@@ -48,12 +57,56 @@ var _badge: Control ## the LV label is a button: it opens the Fortschritt window
 var _badge_hover: bool = false
 var _ready_pulse: float = 0.0 ## rewards waiting: the bud beats
 var _deny: Array[float] = [] ## 1 -> 0: the slot shook its head (nothing to heal, a pause runs)
+var _quiet: float = 0.0 ## s since the last switch (or anything else that shows the slots)
+var _fold: float = 0.0 ## 0 open .. 1 folded, linear
+var inset: float = 0.0 ## px the vine is drawn in at each end (whole pixels)
+var drop: float = 0.0 ## px the branch has sunk
+var sink: float = 0.0 ## px the pendants sink inside the bar
+var shown: float = 1.0 ## alpha of the pendants (and the skill crystal)
+var _pend: Control ## overlay of the pendants (numbers, pause rings): fades with them
 
 
 ## The vine's height at `x`: it sags in the middle and meets the sap vines at both ends.
 static func vine_y(x: float) -> float:
 	var u: float = 2.0 * x / W - 1.0
 	return BASE_Y + (5.0 + sin(x * 0.13) * 0.8) * (1.0 - u * u)
+
+
+## The same course over the (possibly folded) vine between `inset` and W - `inset`.
+func _vy(x: float) -> float:
+	var span: float = W - 2.0 * inset
+	var u: float = clampf(2.0 * (x - inset) / span - 1.0, -1.0, 1.0)
+	return BASE_Y + (5.0 + sin((x - inset) * 0.13) * 0.8) * (1.0 - u * u)
+
+
+## `x` of the unfolded vine mapped onto the folded one.
+func _fx(x: float) -> float:
+	return inset + x * (W - 2.0 * inset) / W
+
+
+## Keeps the slots out for another FOLD_DELAY s (and unfolds them now).
+func wake() -> void:
+	_quiet = 0.0
+
+
+func _update_fold(delta: float) -> void:
+	if InputManager.inventory_open or _dragging:
+		_quiet = 0.0
+	for p: float in _pop: ## a new item came into a slot
+		if p > 0.0:
+			_quiet = 0.0
+	for d: float in _deny: ## an item refused: show which
+		if d > 0.0:
+			_quiet = 0.0
+	_quiet += delta
+	var target: float = 1.0 if _quiet >= FOLD_DELAY else 0.0
+	_fold = move_toward(_fold, target, delta / (FOLD_OUT_TIME if target > _fold else FOLD_IN_TIME))
+	var pendants: float = smoothstep(0.0, 0.55, _fold) ## first the pendants sink and fade ...
+	var branch: float = smoothstep(0.35, 1.0, _fold) ## ... then the branch draws in and drops
+	shown = 1.0 - pendants
+	sink = roundf(pendants * SINK)
+	inset = roundf(branch * NARROW)
+	drop = roundf(branch * DROP)
 
 
 func bind(inventory: InventoryComponent) -> void:
@@ -73,6 +126,10 @@ func bind(inventory: InventoryComponent) -> void:
 	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.draw.connect(_draw_overlay)
 	add_child(_overlay)
+	_pend = Control.new()
+	_pend.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pend.draw.connect(_draw_pendants)
+	add_child(_pend)
 	inventory.changed.connect(_on_inventory_changed)
 	_update_drag_targets()
 	_select(0)
@@ -165,14 +222,17 @@ func _process(delta: float) -> void:
 	_update_xp(delta)
 	var pick: int = InputManager.hotbar_pick()
 	if pick >= 0:
+		wake()
 		if pick == selected: ## the same key again uses the item (eat a berry)
 			use_requested.emit(pick)
 		else:
 			_select(pick)
 	elif InputManager.hotbar_step() != 0:
+		wake()
 		_select(posmod(selected + InputManager.hotbar_step(), InventoryComponent.HOTBAR_SIZE))
 	var ease_in: float = 1.0 - exp(-14.0 * delta)
 	_update_drag_targets()
+	_update_fold(delta)
 	for i: int in _slots.size():
 		_lift[i] = lerpf(_lift[i], LIFT if i == selected else (2.0 if _drag_ok[i] else 0.0), ease_in)
 		_pop[i] = maxf(_pop[i] - 3.0 * delta, 0.0)
@@ -183,6 +243,9 @@ func _process(delta: float) -> void:
 	queue_redraw()
 	if _overlay != null:
 		_overlay.queue_redraw()
+	if _pend != null:
+		_pend.modulate.a = shown
+		_pend.queue_redraw()
 
 
 func _update_drag_targets() -> void:
@@ -229,12 +292,12 @@ func _sway(i: int) -> float:
 
 func _anchor(i: int) -> Vector2:
 	var x: float = _center_x(i)
-	return Vector2(x, vine_y(x))
+	return Vector2(x, _vy(x))
 
 
 func _slot_center(i: int) -> Vector2:
 	var a: Vector2 = _anchor(i)
-	var y: float = a.y + _thread_len(i) - _lift[i] - sin(_pop[i] * PI) * POP + ItemSlot.SIZE / 2.0
+	var y: float = a.y + sink + _thread_len(i) - _lift[i] - sin(_pop[i] * PI) * POP + ItemSlot.SIZE / 2.0
 	var shake: float = sin(_deny[i] * 40.0) * 2.0 * _deny[i] if i < _deny.size() else 0.0
 	return Vector2(roundf(a.x + _sway(i) * 1.2 + shake), roundf(y))
 
@@ -243,18 +306,24 @@ func _place_slots() -> void:
 	for i: int in _slots.size():
 		_slots[i].position = _slot_center(i) - Vector2(ItemSlot.SIZE, ItemSlot.SIZE) / 2.0
 		var taken: float = _taken(_anchor(i).x)
-		_slots[i].modulate = Color.WHITE.lerp(Color(0.78, 0.66, 1.0), taken * 0.7)
+		_slots[i].modulate = Color(Color.WHITE.lerp(Color(0.78, 0.66, 1.0), taken * 0.7), shown)
+		_slots[i].visible = shown > 0.02 ## folded away: no clicks, no tooltips
 
 
 func _taken(x: float) -> float:
-	return VineStyle.infection(minf(SapVine.HEALTH_LEN + x, SapVine.STAMINA_LEN + W - x), VineStyle.void_amount(), int(x / 3.0))
+	return VineStyle.infection(minf(SapVine.HEALTH_LEN + x - inset, SapVine.STAMINA_LEN + W - inset - x), VineStyle.void_amount(), int(x / 3.0))
+
+
+## `color` faded with the pendants.
+func _fa(color: Color) -> Color:
+	return Color(color, color.a * shown)
 
 
 func _draw() -> void:
 	var void_level: float = VineStyle.void_amount()
-	for xi: int in int(W) + 1: ## the vine itself
+	for xi: int in range(int(inset), int(W - inset) + 1): ## the vine itself
 		var x: float = xi
-		var y: float = roundf(vine_y(x))
+		var y: float = roundf(_vy(x))
 		var taken: float = _taken(x)
 		var glitch: float = 1.0 if taken > 0.5 and VineStyle.rand(xi + int(_time * 6.0) * 131) < 0.03 * void_level else 0.0
 		y += glitch
@@ -266,9 +335,9 @@ func _draw() -> void:
 			draw_rect(Rect2(x, y, 1, 1), VineStyle.VOID_GLOW)
 
 	if _drag_any: ## dragging something the hotbar takes: a teal light runs along the vine
-		for xi: int in int(W) + 1:
+		for xi: int in range(int(inset), int(W - inset) + 1):
 			var phase: float = fposmod(_time * 90.0 - xi, 60.0)
-			draw_rect(Rect2(xi, roundf(vine_y(xi)) + 2, 1, 1), Color(UiStyle.ACCENT, 0.35 + 0.65 * (1.0 - phase / 60.0)))
+			draw_rect(Rect2(xi, roundf(_vy(xi)) + 2, 1, 1), Color(UiStyle.ACCENT, 0.35 + 0.65 * (1.0 - phase / 60.0)))
 	_draw_xp(void_level)
 
 	for k: int in 14: ## leaves and the odd bloom, scattered
@@ -276,8 +345,9 @@ func _draw() -> void:
 		var r: float = VineStyle.rand(k * 11 + 3)
 		if r < 0.15 or x > W - 4.0:
 			continue
+		x = roundf(_fx(x))
 		var taken: float = _taken(x)
-		var p: Vector2 = Vector2(x, roundf(vine_y(x)))
+		var p: Vector2 = Vector2(x, roundf(_vy(x)))
 		var up: int = -1 if k % 2 == 0 else 1
 		if r > 0.82: ## a small bloom: pale by day, a violet void flower with a dark heart at night
 			var petals: Color = VineStyle.PETAL.lerp(VineStyle.LEAF_VOID_LIGHT, taken)
@@ -292,69 +362,71 @@ func _draw() -> void:
 
 	if void_level > 0.05: ## tendrils creep along the taken stretches
 		for k: int in 9:
-			var x: float = VineStyle.rand(k + 70) * W
+			var x: float = _fx(VineStyle.rand(k + 70) * W)
 			if _taken(x) < 0.6:
 				continue
 			var heading: Vector2 = Vector2(VineStyle.rand(k + 5) - 0.5, -0.9 if k % 2 == 0 else 0.9).normalized()
-			VineStyle.tendril(self, Vector2(x, vine_y(x)), heading, int(3 + 7 * void_level + VineStyle.rand(k) * 3.0), _time, k)
+			VineStyle.tendril(self, Vector2(x, _vy(x)), heading, int(3 + 7 * void_level + VineStyle.rand(k) * 3.0), _time, k)
 
-	for i: int in _slots.size(): ## threads, glows and empty buds
-		var a: Vector2 = _anchor(i)
+	for i: int in (_slots.size() if shown > 0.02 else 0): ## threads, glows and empty buds (fading with the pendants)
+		var a: Vector2 = _anchor(i) + Vector2(0, sink) ## folding: the thread lets go of the vine and sinks with its pendant
 		var c: Vector2 = _slot_center(i)
 		var taken: float = _taken(a.x)
 		var top_y: float = c.y - ItemSlot.SIZE / 2.0 + 1.0
 		var steps: int = int(top_y - a.y)
 		for s: int in range(1, steps):
 			var x: float = a.x + (c.x - a.x) * float(s) / steps
-			draw_rect(Rect2(roundf(x), a.y + s, 1, 1), VineStyle.BARK_LIGHT.lerp(VineStyle.BARK_VOID_LIGHT, taken) if s % 2 == 0 else VineStyle.BARK.lerp(VineStyle.BARK_VOID, taken))
-		draw_rect(Rect2(c.x - 1, top_y - 1, 3, 1), VineStyle.LEAF.lerp(VineStyle.LEAF_VOID, taken)) ## a little leaf cap holds the pendant
+			draw_rect(Rect2(roundf(x), a.y + s, 1, 1), _fa(VineStyle.BARK_LIGHT.lerp(VineStyle.BARK_VOID_LIGHT, taken) if s % 2 == 0 else VineStyle.BARK.lerp(VineStyle.BARK_VOID, taken)))
+		draw_rect(Rect2(c.x - 1, top_y - 1, 3, 1), _fa(VineStyle.LEAF.lerp(VineStyle.LEAF_VOID, taken))) ## a little leaf cap holds the pendant
 		var has_item: bool = not _inventory.stack_at("inv", i).is_empty()
 		var is_pick: bool = i == selected
 		var tone: Color = VineStyle.WARM_GLOW.lerp(VineStyle.VOID_GLOW, taken)
 		if _drag_ok[i]:
 			tone = UiStyle.ACCENT ## drop targets glow teal
 		var glow_strength: float = (0.45 if has_item else 0.12) + (0.6 if is_pick else 0.0) + taken * 0.2 + (0.5 if _drag_ok[i] else 0.0)
-		VineStyle.glow(self, c, 16.0 if is_pick else 10.0, tone, glow_strength * (0.85 + 0.15 * sin(_time * 2.5 + i)))
+		VineStyle.glow(self, c, 16.0 if is_pick else 10.0, tone, glow_strength * (0.85 + 0.15 * sin(_time * 2.5 + i)) * shown)
 		if not has_item: ## a seed pod waiting to be filled
-			draw_rect(Rect2(c.x - 1, c.y - 1, 3, 3), VineStyle.BARK_VOID if taken > 0.4 else VineStyle.BARK)
-			draw_rect(Rect2(c.x, c.y - 1, 1, 1), tone if is_pick else VineStyle.BARK_LIGHT)
+			draw_rect(Rect2(c.x - 1, c.y - 1, 3, 3), _fa(VineStyle.BARK_VOID if taken > 0.4 else VineStyle.BARK))
+			draw_rect(Rect2(c.x, c.y - 1, 1, 1), _fa(tone if is_pick else VineStyle.BARK_LIGHT))
 
 	if _burst > 0.0: ## level-up: blooms open along the vine behind the sweeping light
 		var sweep: float = (1.0 - _burst) * 1.5 * W
 		for k: int in BLOOMS:
-			var x: float = 14.0 + k * (W - 28.0) / (BLOOMS - 1)
+			var x: float = _fx(14.0 + k * (W - 28.0) / (BLOOMS - 1))
 			var open: float = clampf((sweep - x) / 30.0, 0.0, 1.0) * sqrt(_burst)
 			if open <= 0.0:
 				continue
-			var p: Vector2 = Vector2(x, roundf(vine_y(x)) - 4.0)
+			var p: Vector2 = Vector2(roundf(x), roundf(_vy(x)) - 4.0)
 			var radius: int = 1 + int(open * 2.5)
 			VineStyle.glow(self, p, 9.0 * open, VineStyle.WARM_GLOW.lerp(VineStyle.VOID_GLOW, _taken(x)), 0.9)
 			for o: Vector2 in [Vector2(-radius, 0), Vector2(radius, 0), Vector2(0, -radius), Vector2(0, radius), Vector2(-radius + 1, -radius + 1), Vector2(radius - 1, -radius + 1)]:
 				draw_rect(Rect2(p + o, Vector2.ONE), VineStyle.PETAL)
 			draw_rect(Rect2(p, Vector2.ONE), VineStyle.WARM_GLOW)
 		for k: int in 18: ## spores rise
-			var sx: float = VineStyle.rand(k + 600) * W
+			var sx: float = _fx(VineStyle.rand(k + 600) * W)
 			if sx > sweep:
 				continue
 			var rise: float = (1.0 - _burst) * (10.0 + VineStyle.rand(k + 650) * 18.0)
-			draw_rect(Rect2(roundf(sx + sin(_time * 2.0 + k) * 2.0), roundf(vine_y(sx)) - 5.0 - rise, 1, 1), Color(VineStyle.PETAL, _burst))
+			draw_rect(Rect2(roundf(sx + sin(_time * 2.0 + k) * 2.0), roundf(_vy(sx)) - 5.0 - rise, 1, 1), Color(VineStyle.PETAL, _burst))
 
-	var bloom: Vector2 = Vector2(roundf(_cursor_x), roundf(vine_y(_cursor_x)) - 3.0) ## the picked slot's bloom
+	if shown <= 0.02:
+		return
+	var bloom: Vector2 = Vector2(roundf(_cursor_x), roundf(_vy(_cursor_x)) - 3.0) ## the picked slot's bloom (closes with the pendants)
 	var open: int = 1 + int(1.5 + 1.5 * sin(_time * 3.0))
-	VineStyle.glow(self, bloom, 8.0, VineStyle.WARM_GLOW.lerp(VineStyle.VOID_GLOW, _taken(_cursor_x)), 0.9)
+	VineStyle.glow(self, bloom, 8.0, VineStyle.WARM_GLOW.lerp(VineStyle.VOID_GLOW, _taken(_cursor_x)), 0.9 * shown)
 	for o: Vector2 in [Vector2(-open, 0), Vector2(open, 0), Vector2(0, -open), Vector2(0, open)]:
-		draw_rect(Rect2(bloom + o, Vector2.ONE), VineStyle.PETAL)
-	draw_rect(Rect2(bloom, Vector2.ONE), VineStyle.WARM_GLOW)
+		draw_rect(Rect2(bloom + o, Vector2.ONE), _fa(VineStyle.PETAL))
+	draw_rect(Rect2(bloom, Vector2.ONE), _fa(VineStyle.WARM_GLOW))
 
 
 func _draw_xp(void_level: float) -> void:
 	if _progress == null:
 		return
-	var head: float = XP_START + _shown * (XP_END - XP_START)
-	var sweep: float = (1.0 - _burst) * 1.5 * W if _burst > 0.0 else -99.0
-	for xi: int in range(int(XP_START), int(head) + 1):
+	var head: float = roundf(_fx(XP_START + _shown * (XP_END - XP_START)))
+	var sweep: float = _fx((1.0 - _burst) * 1.5 * W) if _burst > 0.0 else -99.0
+	for xi: int in range(int(_fx(XP_START)), int(head) + 1):
 		var x: float = xi
-		var y: float = roundf(vine_y(x))
+		var y: float = roundf(_vy(x))
 		var tone: Color = VineStyle.WARM_GLOW.lerp(VineStyle.VOID_GLOW, _taken(x))
 		var phase: float = fposmod(_time * 24.0 - x, 70.0) ## a light runs along the thread
 		var color: Color = tone.lerp(VineStyle.PETAL, 1.0 - phase / 5.0 if phase < 5.0 else 0.0)
@@ -363,10 +435,10 @@ func _draw_xp(void_level: float) -> void:
 		if _surge > 0.3 and xi % 2 == 0:
 			draw_rect(Rect2(x, y - 2, 1, 1), Color(tone, _surge * 0.5))
 	if _burst > 0.0: ## the sweeping light of a level-up
-		for xi: int in range(maxi(int(sweep) - 14, 0), mini(int(sweep) + 1, int(W) + 1)):
-			var y: float = roundf(vine_y(xi))
+		for xi: int in range(maxi(int(sweep) - 14, int(inset)), mini(int(sweep) + 1, int(W - inset) + 1)):
+			var y: float = roundf(_vy(xi))
 			draw_rect(Rect2(xi, y - 2, 1, 5), Color(VineStyle.PETAL, _burst * (1.0 - (sweep - xi) / 15.0) * 0.8))
-	var tip: Vector2 = Vector2(roundf(head), roundf(vine_y(head)) - 3.0) ## the bud at the current XP
+	var tip: Vector2 = Vector2(roundf(head), roundf(_vy(head)) - 3.0) ## the bud at the current XP
 	var tone_tip: Color = VineStyle.WARM_GLOW.lerp(VineStyle.VOID_GLOW, _taken(head))
 	VineStyle.glow(self, tip, 6.0 + _surge * 4.0, tone_tip, 0.6 + _surge * 0.4)
 	draw_rect(Rect2(tip, Vector2.ONE), VineStyle.PETAL)
@@ -381,7 +453,7 @@ func _draw_xp_label() -> void:
 	var center: float = W / 2.0
 	var bounce: float = roundf(sin(minf(_burst * 3.0, 1.0) * PI) * 3.0)
 	var taken: float = _taken(center)
-	var base_y: int = roundi(vine_y(center)) - 16 - int(bounce)
+	var base_y: int = roundi(_vy(center)) - 16 - int(bounce)
 	var number: String = str(_display_level)
 	var tone: Color = VineStyle.WARM_GLOW.lerp(VineStyle.LEAF_VOID_LIGHT, taken).lerp(VineStyle.PETAL, _burst)
 	var dim: Color = Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, taken), 0.8)
@@ -401,14 +473,20 @@ func _draw_xp_label() -> void:
 		var note: String = "BELOHNUNG" if waiting == 1 else "%d BELOHNUNGEN" % waiting
 		PixelText.draw(_overlay, note, Vector2i(roundi(center) - PixelText.width(note) / 2, base_y - 9), Color(VineStyle.WARM_GLOW, 0.55 + beat * 0.4), VineStyle.OUTLINE)
 	if _gain_age < 1.4: ## "+12" floats up from the bud
-		var head: float = XP_START + _shown * (XP_END - XP_START)
+		var head: float = _fx(XP_START + _shown * (XP_END - XP_START))
 		var text: String = "+%d" % _gain
 		var fade: float = 1.0 - _gain_age / 1.4
-		PixelText.draw(_overlay, text, Vector2i(roundi(head) - PixelText.width(text) / 2, roundi(vine_y(head)) - 12 - int(_gain_age * 10.0)), Color(VineStyle.WARM_GLOW, fade), Color(VineStyle.OUTLINE, fade))
+		PixelText.draw(_overlay, text, Vector2i(roundi(head) - PixelText.width(text) / 2, roundi(_vy(head)) - 12 - int(_gain_age * 10.0)), Color(VineStyle.WARM_GLOW, fade), Color(VineStyle.OUTLINE, fade))
 
 
 func _draw_overlay() -> void:
 	_draw_xp_label()
+
+
+## Numbers, pause rings and drag marks of the pendants (on `_pend`, which fades with them).
+func _draw_pendants() -> void:
+	if shown <= 0.02:
+		return
 	for i: int in _slots.size():
 		var c: Vector2 = _slot_center(i)
 		var is_pick: bool = i == selected
@@ -416,9 +494,9 @@ func _draw_overlay() -> void:
 		var taken: float = _taken(_center_x(i))
 		var color: Color = VineStyle.PETAL if is_pick else UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, taken)
 		if has_item:
-			PixelText.draw(_overlay, str(i + 1), Vector2i(roundi(c.x) - 10, roundi(c.y) - 11), color, VineStyle.OUTLINE)
+			PixelText.draw(_pend, str(i + 1), Vector2i(roundi(c.x) - 10, roundi(c.y) - 11), color, VineStyle.OUTLINE)
 		else:
-			PixelText.draw(_overlay, str(i + 1), Vector2i(roundi(c.x) - 1, roundi(c.y) + 3), Color(color, 0.7), VineStyle.OUTLINE)
+			PixelText.draw(_pend, str(i + 1), Vector2i(roundi(c.x) - 1, roundi(c.y) + 3), Color(color, 0.7), VineStyle.OUTLINE)
 	for i: int in _slots.size(): ## a pause blocks this item: a dim ring runs out around it (the part still to wait)
 		var left: float = _pause_left(i)
 		if left <= 0.0:
@@ -430,21 +508,21 @@ func _draw_overlay() -> void:
 			if along > left:
 				break
 			var angle: float = -PI / 2.0 + along * TAU
-			_overlay.draw_rect(Rect2((spot + Vector2(cos(angle) * 10.0, sin(angle) * 10.0)).round(), Vector2.ONE), Color(VineStyle.PETAL, 0.75))
-		_overlay.draw_rect(Rect2(spot - Vector2(7, 7), Vector2(14, 14)), Color(0.05, 0.02, 0.1, 0.35 * left))
+			_pend.draw_rect(Rect2((spot + Vector2(cos(angle) * 10.0, sin(angle) * 10.0)).round(), Vector2.ONE), Color(VineStyle.PETAL, 0.75))
+		_pend.draw_rect(Rect2(spot - Vector2(7, 7), Vector2(14, 14)), Color(0.05, 0.02, 0.1, 0.35 * left))
 	if _dragging and not _drag_any: ## the hotbar only takes tools: show that nothing fits
 		for i: int in _slots.size():
 			var spot: Vector2 = _slot_center(i)
 			for o: Vector2 in [Vector2(-2, -2), Vector2(-1, -1), Vector2(0, 0), Vector2(1, 1), Vector2(2, 2), Vector2(2, -2), Vector2(1, -1), Vector2(-1, 1), Vector2(-2, 2)]:
-				_overlay.draw_rect(Rect2(spot + o, Vector2.ONE), Color("c04a6a", 0.7))
+				_pend.draw_rect(Rect2(spot + o, Vector2.ONE), Color("c04a6a", 0.7))
 	for i: int in _slots.size(): ## dragging an item: slots that take it light up with a pulsing ring and arrows
 		if _drag_ok[i]:
 			var spot: Vector2 = _slot_center(i)
-			VineStyle.ring(_overlay, spot, 11, Color(UiStyle.ACCENT, 0.55 + 0.4 * sin(_time * 8.0)))
+			VineStyle.ring(_pend, spot, 11, Color(UiStyle.ACCENT, 0.55 + 0.4 * sin(_time * 8.0)))
 			var bob: float = roundf(sin(_time * 6.0 + i) * 1.0)
 			for o: Vector2 in [Vector2(-1, -16), Vector2(0, -15), Vector2(1, -16)]:
-				_overlay.draw_rect(Rect2(spot + o + Vector2(0, bob), Vector2.ONE), Color(UiStyle.ACCENT, 0.9))
+				_pend.draw_rect(Rect2(spot + o + Vector2(0, bob), Vector2.ONE), Color(UiStyle.ACCENT, 0.9))
 	var c: Vector2 = _slot_center(selected)
 	for k: int in 3: ## motes circle the picked pendant
 		var angle: float = _time * 2.0 + k * TAU / 3.0
-		_overlay.draw_rect(Rect2(roundf(c.x + cos(angle) * 13.0), roundf(c.y + sin(angle) * 8.0), 1, 1), VineStyle.PETAL)
+		_pend.draw_rect(Rect2(roundf(c.x + cos(angle) * 13.0), roundf(c.y + sin(angle) * 8.0), 1, 1), VineStyle.PETAL)

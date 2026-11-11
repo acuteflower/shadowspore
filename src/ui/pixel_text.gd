@@ -60,6 +60,46 @@ const GLYPHS: Dictionary = {
 const CACHE_LIMIT: int = 512
 static var _meshes: Dictionary = {}
 static var _cache_order: Array[String] = []
+static var _bitmap: FontFile
+
+
+## The same glyphs for standard Godot Controls, with wrapping, focus and scrolling.
+static func bitmap_font() -> FontFile:
+	if _bitmap != null:
+		return _bitmap
+	var characters: Array = GLYPHS.keys() + ACCENTS.keys() + [" ", "·", "„", "“"]
+	var atlas: Image = Image.create(characters.size() * ADVANCE, HEIGHT, false, Image.FORMAT_RGBA8)
+	_bitmap = FontFile.new()
+	_bitmap.fixed_size = HEIGHT
+	_bitmap.fixed_size_scale_mode = TextServer.FIXED_SIZE_SCALE_INTEGER_ONLY
+	var cache: Vector2i = Vector2i(HEIGHT, 0)
+	_bitmap.set_cache_ascent(0, HEIGHT, HEIGHT - 1)
+	_bitmap.set_cache_descent(0, HEIGHT, 1.0)
+	for i: int in characters.size():
+		var character: String = String(characters[i])
+		var x: int = i * ADVANCE
+		var rows: Array = GLYPHS.get(ACCENTS.get(character, character), [])
+		for row: int in rows.size():
+			for col: int in 3:
+				if rows[row][col] == "X":
+					atlas.set_pixel(x + col, 2 + row, Color.WHITE)
+		if ACCENTS.has(character):
+			atlas.set_pixel(x, 0, Color.WHITE)
+			atlas.set_pixel(x + 2, 0, Color.WHITE)
+		if character == "·":
+			atlas.set_pixel(x + 1, 4, Color.WHITE)
+		elif character in ["„", "“"]:
+			var y: int = 5 if character == "„" else 1
+			atlas.set_pixel(x, y, Color.WHITE)
+			atlas.set_pixel(x + 2, y, Color.WHITE)
+		var glyph: int = character.unicode_at(0)
+		_bitmap.set_glyph_advance(0, HEIGHT, glyph, Vector2(ADVANCE, 0))
+		_bitmap.set_glyph_offset(0, cache, glyph, Vector2(0, 1 - HEIGHT))
+		_bitmap.set_glyph_size(0, cache, glyph, Vector2(3, HEIGHT))
+		_bitmap.set_glyph_uv_rect(0, cache, glyph, Rect2(x, 0, 3, HEIGHT))
+		_bitmap.set_glyph_texture_idx(0, cache, glyph, 0)
+	_bitmap.set_texture_image(0, cache, 0, atlas)
+	return _bitmap
 
 
 static func width(text: String) -> int:

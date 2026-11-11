@@ -1820,5 +1820,166 @@
     "text": "Komm wieder, Ellie. Mein Tresen steht dir offen."
    }
   ]
+ },
+ "lw_start": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Ein See am Rand der Welt. Und dahinter... nichts. Wer wohnt bitte hier?"
+   }
+  ]
+ },
+ "lw_dark": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Da ist das Haus. Kein Licht. Die Steine drumherum sind kalt."
+   }
+  ]
+ },
+ "lw_door": {
+  "flag": "lake_witch_door",
+  "give": [
+   {
+    "item": "lake_glimmer",
+    "count": 3
+   }
+  ],
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Hallo? Ist da jemand?"
+   },
+   {
+    "speaker": "ILVA",
+    "known_flag": "knows_lake_witch",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Nicht so laut! Wer klopft, wenn der Ring aus ist, ist entweder mutig oder dumm."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Eher müde. Am Brett hing ein Zettel. Hier brennt kein Licht, stand da."
+   },
+   {
+    "speaker": "ILVA",
+    "known_flag": "knows_lake_witch",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Weil die drei schwachen Steine hungern. Ich halte den letzten Kristall im Becken wach, sonst bricht mir die Leere durch den Boden. Ich kann hier nicht weg."
+   },
+   {
+    "speaker": "ILVA",
+    "known_flag": "knows_lake_witch",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Unter der Tür, nimm. Drei Seeglimmer. Leg je einen in die rissigen Steine. Und wenn es knirscht... lauf nicht weg."
+   }
+  ]
+ },
+ "lw_ambush": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Der Boden reißt auf! Da kommt was raus!"
+   }
+  ]
+ },
+ "lw_woken": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "text": "Sie leuchten. Alle. Und die Tür... ist offen."
+   }
+  ]
+ },
+ "lw_meet": {
+  "flag": "lake_witch_met",
+  "town_talk": "lake_witch",
+  "give": [
+   {
+    "item": "staff_hag_elm",
+    "count": 1
+   },
+   {
+    "item": "crystal_banish_1",
+    "count": 1
+   },
+   {
+    "item": "gem_lens_1",
+    "count": 1
+   }
+  ],
+  "lines": [
+   {
+    "speaker": "ILVA",
+    "known_flag": "knows_lake_witch",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Da ist sie ja. Nasse Stiefel, Schatten am Saum. Danke, Kind. Ohne dich hätte ich das Becken heute Nacht verloren."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Was sind das für Steine draußen? Und das hier drin... das leuchtet ja überall."
+   },
+   {
+    "speaker": "ILVA",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "SEEHEXE",
+    "text": "Licht, das die Leere zusammengedrückt hat. Am Rand wächst es im Wasser. Ich bin Ilva. Ich hole es heraus und mache etwas daraus."
+   },
+   {
+    "speaker": "ILVA",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Esma macht Schmuck und Tränke. Ich mache Stäbe. Ihr Silber, mein Holz, das Licht vom See. Hier, das ist deiner."
+   },
+   {
+    "speaker": "ILVA",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Ein Splitter Bannlicht für die Krone, ein Rohschliff in den Knoten. Setz sie ein, dann zeig mir, dass du ihn halten kannst."
+   }
+  ]
+ },
+ "lw_end": {
+  "flag": "lake_witch_done",
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Es hat... geleuchtet. Wirklich geleuchtet. Aus meiner Hand."
+   },
+   {
+    "speaker": "ILVA",
+    "known_flag": "knows_lake_witch",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Aus dem Stein. Deine Hand hat nur gehalten. Aber gut gehalten."
+   },
+   {
+    "speaker": "ILVA",
+    "known_flag": "knows_lake_witch",
+    "known_name": "ILVA",
+    "mood": "",
+    "title": "",
+    "text": "Komm wieder, wenn du drei gleiche hast. Dann schleife ich dir einen größeren. Und bring Seeglimmer mit, nachts liegt er im Flachwasser."
+   }
+  ]
  }
 }

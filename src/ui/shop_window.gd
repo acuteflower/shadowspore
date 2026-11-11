@@ -7,7 +7,11 @@ extends BoardWindow
 ##           (so it stops at night and when they take a break), the finished piece waits on the bench until anybody collects it; the queue is the town's, not yours;
 ##   buy   - the person sells (`buy` list: item, price in copper, `trust`);
 ##   sell  - the person buys from your bag (`sell` list);
-##   brew  - the person brews potions from what you bring (data/alchemy.json, AlchemyRules; Esma): instant, the brew card plays (`BrewReveal`).
+##   brew  - the person brews potions from what you bring (data/alchemy.json, AlchemyRules; Esma): instant, the brew card plays (`BrewReveal`);
+##   grind - the lake witch's SCHLIFF: three equal crystals or gems become one a tier higher (`CrystalRules`, the shop's `grind` block);
+##   refresh - the lake witch's LÄUTERN (free, no money shown): a raw stone shows the stone it has hidden since it was found and becomes it (`CrystalRules`, the shop's `refresh` block, `StoneReveal`);
+##   dev   - a developer tab that hands out every staff, crystal and gem (and the `dev.items` extras) for free (to be removed later).
+## A craft tab may name a `group`: then it lists only recipes of that group (the lake witch's STÄBE and STEINE share her bench).
 ## The look and the staging are `BoardWindow`'s. `ShopWindow.open(tree, player, town, shop_id)`; the person answers from a bubble (lines in the data, placeholders for the
 ## dialogue writer). Everything with consequences is asked of the host (`TownManager.request_craft / request_order / request_collect / request_trade`).
 
@@ -44,6 +48,7 @@ func _setup_board() -> void:
 	focus_world = person.global_position if person != null else player.global_position
 	town.refine_done.connect(_on_refine_done)
 	town.brew_done.connect(_on_brew_done)
+	town.refresh_done.connect(_on_refresh_done)
 	player.inventory.changed.connect(_on_town_changed) ## the bag and the purse change what can be bought and sold
 	player.progress.changed.connect(_on_town_changed)
 	_say_line("open")
@@ -60,7 +65,15 @@ func _on_brew_done(type: String, level: int, count: int, moon: bool) -> void:
 	_say_line("brew_moon" if moon else "brew_done")
 
 
+## Ilva cleaned the raw stones: the card shows what they hid.
+func _on_refresh_done(raw: String, stones: Array) -> void:
+	StoneReveal.present(get_tree(), raw, stones)
+	_say_line("refresh_done")
+
+
 func _exit_tree() -> void:
+	if town != null and town.refresh_done.is_connected(_on_refresh_done):
+		town.refresh_done.disconnect(_on_refresh_done)
 	if town != null and town.brew_done.is_connected(_on_brew_done):
 		town.brew_done.disconnect(_on_brew_done)
 	if town != null and town.refine_done.is_connected(_on_refine_done):
@@ -98,7 +111,7 @@ func _persona() -> PackedStringArray:
 
 
 func _header_right(right: float, y: float) -> void:
-	if _kind() in ["buy", "sell"]:
+	if _kind() in ["buy", "sell", "grind"]:
 		draw_purse(right, y, player.progress.copper)
 	else:
 		draw_trust(right, y, npc)
@@ -146,10 +159,24 @@ func _rebuild() -> void:
 		return
 	match _kind():
 		"craft":
+			var group: String = String(tabs[tab].get("group", ""))
 			for id: String in town.recipes():
 				var made: Dictionary = town.recipes()[id] as Dictionary
-				if String(made.get("by", "self")) == "self" and String(made.get("station", "workshop")) == station:
+				if String(made.get("by", "self")) == "self" and String(made.get("station", "workshop")) == station and (group == "" or String(made.get("group", "")) == group):
 					rows.append(_recipe_row(id))
+		"grind":
+			_rebuild_grind()
+		"refresh":
+			var refresh: Dictionary = def.get("refresh", {}) as Dictionary
+			for raw: String in refresh.get("fee", {}) as Dictionary:
+				var have: int = player.inventory.count_item(raw)
+				var fee: int = int((refresh.fee as Dictionary)[raw])
+				var why: String = CrystalRules.refresh_block(refresh, raw, 1, have, player.progress.copper, town.trust_of(npc))
+				rows.append({"kind": "refresh", "item": raw, "count": have, "name": _item_name(raw), "sub": "INHALT VERBORGEN" if have > 0 else "DU HAST KEINEN",
+					"state": OK if why == "" else (LOCKED if "VERTRAUEN" in why else MISSING), "why": why, "price": fee})
+		"dev":
+			for item: String in CrystalRules.dev_items(def.get("dev", {}) as Dictionary):
+				rows.append({"kind": "dev", "item": item, "count": 1, "name": _item_name(item), "sub": "DEV: GRATIS", "state": OK, "why": ""})
 		"order":
 			for i: int in town.orders.size():
 				var order: Dictionary = town.orders[i] as Dictionary
@@ -185,6 +212,23 @@ func _rebuild() -> void:
 				var have: int = player.inventory.count_plain(String(offer.item))
 				rows.append({"kind": "sell", "item": String(offer.item), "count": have, "name": _item_name(String(offer.item)), "sub": "IM RUCKSACK" if have > 0 else "DU HAST KEINS",
 					"coins": int(offer.price),"state": OK if have > 0 else MISSING, "why": "DU HAST KEIN %s" % _item_name(String(offer.item)), "price": int(offer.price)})
+
+
+## SCHLIFF: one row per crystal or gem in the bag that can still go a tier higher (tier V cannot), with what it would become and what stops it.
+func _rebuild_grind() -> void:
+	var grind: Dictionary = def.get("grind", {}) as Dictionary
+	for item: String in CrystalRules.dev_items({"kinds": ["crystal", "gem"]}):
+		if player.inventory.count_plain(item) <= 0:
+			continue
+		var c: Dictionary = CrystalRules.cost(grind, item)
+		if c.is_empty():
+			continue
+		var have: Dictionary = {item: player.inventory.count_plain(item)}
+		for need: String in c.in as Dictionary:
+			have[need] = player.inventory.count_plain(need)
+		var why: String = CrystalRules.block(grind, item, have, player.progress.copper, town.trust_of(npc))
+		rows.append({"kind": "grind", "item": String(c.out), "from": item, "count": 1, "name": _item_name(String(c.out)), "sub": "AUS %d X %s" % [int(c.count), _item_name(item)],
+			"state": OK if why == "" else (LOCKED if "VERTRAUEN" in why else MISSING), "why": why, "cost": c, "price": int(c.copper)})
 
 
 ## The alchemy tab: every potion in its five tiers. A tier is locked until the brewer trusts her enough and has brewed the tier below once.
@@ -307,6 +351,22 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 				var speaker_node: Settler = town.settler_node(npc)
 				if speaker_node != null and not speaker_node.is_working():
 					_text(Vector2(area.position.x, area.position.y + 58.0), "ER ARBEITET NUR AN DER BANK, NICHT NACHTS UND NICHT IN DER PAUSE", Color(DIM, 0.8))
+		"grind":
+			var c: Dictionary = row.cost as Dictionary
+			var gx: float = area.position.x
+			var gy: float = area.position.y + 42.0
+			gx += draw_chip(Vector2(gx, gy), String(row.from), player.inventory.count_plain(String(row.from)), int(c.count))
+			for need_item: String in c.in as Dictionary:
+				gx += draw_chip(Vector2(gx, gy), need_item, player.inventory.count_plain(need_item), int((c.in as Dictionary)[need_item]))
+			draw_purse_left(gx, gy + 6.0, int(c.copper), GOLD if player.progress.copper >= int(c.copper) else BAD)
+			var made_by: String = "%s SCHLEIFT SOFORT, NICHTS GEHT VERLOREN" % String(town.settler_spec(npc).get("name", npc))
+			_text(Vector2(area.position.x, area.position.y + 64.0), made_by if String(row.why) == "" else String(row.why), DIM if String(row.why) == "" else BAD)
+		"refresh":
+			_text(Vector2(area.position.x, area.position.y + 46.0), "%s WÄSCHT DEN STEIN IM SEE" % String(town.settler_spec(npc).get("name", npc)), GOLD)
+			var says: String = "WAS DRIN STECKT, STEHT SEIT DEM FUND FEST. SHIFT: ALLE"
+			_text(Vector2(area.position.x, area.position.y + 58.0), says if String(row.why) == "" else String(row.why), DIM if String(row.why) == "" else BAD)
+		"dev":
+			_text(Vector2(area.position.x, area.position.y + 46.0), "ENTWICKLER: GRATIS IN DEN RUCKSACK. E 1 X, SHIFT 10 X.", DIM)
 		"buy", "sell":
 			var verb: String = "KOSTET" if kind == "buy" else "ZAHLT"
 			var head: String = verb + " "
@@ -449,6 +509,12 @@ func _buttons() -> Array[Dictionary]:
 			return [{"id": "buy", "label": "KAUFEN", "ready": ready}, {"id": "buy10", "label": "10 X", "ready": ready and player.progress.copper >= int(row.price) * 2}]
 		"sell":
 			return [{"id": "sell", "label": "VERKAUFEN", "ready": ready}, {"id": "sell_all", "label": "ALLES", "ready": ready}]
+		"grind":
+			return [{"id": "grind", "label": "SCHLEIFEN", "ready": ready}]
+		"refresh":
+			return [{"id": "refresh", "label": "LÄUTERN", "ready": ready}, {"id": "refresh_all", "label": "ALLE", "ready": ready and int(row.count) > 1}]
+		"dev":
+			return [{"id": "dev", "label": "GEBEN", "ready": true}, {"id": "dev10", "label": "10 X", "ready": true}]
 	return []
 
 
@@ -483,6 +549,17 @@ func _press(id: String, bulk: bool) -> void:
 			town.request_trade(shop_id, "sell", String(row.item), int(row.count) if (id == "sell_all" or bulk) else 1)
 			_sound("coin")
 			_say_line("sell")
+		"grind":
+			town.request_grind(shop_id, String(row.from))
+			_sound("coin")
+			_say_line("grind")
+		"refresh", "refresh_all":
+			var all: int = int(row.count) if int(row.price) <= 0 else mini(int(row.count), player.progress.copper / int(row.price))
+			town.request_refresh(shop_id, String(row.item), all if (id == "refresh_all" or bulk) else 1)
+			_sound("tick")
+		"dev", "dev10":
+			town.request_dev_give(shop_id, String(row.item), 10 if (id == "dev10" or bulk) else 1)
+			_sound("tick")
 
 
 # Compact brew families: one persistent selection per potion, including locked tiers.

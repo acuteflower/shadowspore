@@ -18,6 +18,26 @@ uniform int step_mode = 0;
 uniform float step_amt : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 step_dir = vec2(1.0, 0.0);
 uniform float step_seed = 0.0;
+// Nebelschleier (VeilFx, docs/magie_konzept.md): `veil` 0..1 veiled, `veil_keep` how much of her stays (drifting mist holes eat the rest),
+// `veil_seed` changes with every glitch tick (rows slip sideways).
+uniform float veil : hint_range(0.0, 1.0) = 0.0;
+uniform float veil_keep : hint_range(0.0, 1.0) = 0.5;
+uniform float veil_seed = 0.0;
+
+float veil_hash(vec2 p) {
+	return fract(sin(dot(p, vec2(41.3, 289.1)) + veil_seed * 3.17) * 15731.743);
+}
+
+float veil_noise(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	f = f * f * (3.0 - 2.0 * f);
+	float a = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453);
+	float b = fract(sin(dot(i + vec2(1.0, 0.0), vec2(127.1, 311.7))) * 43758.5453);
+	float c = fract(sin(dot(i + vec2(0.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+	float d = fract(sin(dot(i + vec2(1.0, 1.0), vec2(127.1, 311.7))) * 43758.5453);
+	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
 
 void vertex() {
 	daylight_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
@@ -84,6 +104,32 @@ void fragment() {
 	}
 	COLOR.rgb = day_grade(COLOR.rgb, daylight_position, 1.0);
 	COLOR.rgb = mix(COLOR.rgb, flash_color.rgb, flash);
+	if (veil > 0.0 && COLOR.a > 0.01) {
+		vec2 cell = floor(local_px);
+		vec2 vtex = 1.0 / vec2(textureSize(TEXTURE, 0));
+		// whole rows slip sideways now and then
+		if (veil_hash(vec2(cell.y * 0.53, 2.0)) > 1.0 - 0.22 * veil) {
+			float shift = (veil_hash(vec2(cell.y, 4.0)) < 0.5 ? -1.0 : 1.0) * (1.0 + floor(veil_hash(vec2(cell.y, 6.0)) * 3.0));
+			vec4 slipped = texture(TEXTURE, UV + vec2(shift * vtex.x, 0.0));
+			COLOR.rgb = slipped.a > 0.01 ? slipped.rgb : COLOR.rgb * 0.4;
+		}
+		// her colours wash into the mist: shadows lilac-dark, lights pale lilac
+		float vl = dot(COLOR.rgb, vec3(0.3, 0.59, 0.11));
+		vec3 misted = mix(vec3(0.16, 0.13, 0.34), vec3(0.74, 0.68, 1.0), smoothstep(0.05, 0.9, vl));
+		COLOR.rgb = mix(COLOR.rgb, misted, 0.5 * veil);
+		// mist holes drift through her (dithered against a 4x4 Bayer grid, so the edges stay pixel art)
+		float flow = veil_noise(cell * vec2(0.16, 0.11) + vec2(TIME * 0.7, -TIME * 1.1)) * 0.65 + veil_noise(cell * 0.4 + vec2(-TIME * 1.6, TIME * 0.5)) * 0.35;
+		int bi = int(mod(cell.x, 4.0)) + int(mod(cell.y, 4.0)) * 4;
+		float bayer = (float((bi * 7 + (bi / 4) * 3) % 16) + 0.5) / 16.0;
+		float keep = mix(1.0, veil_keep, veil);
+		float eaten = flow * 0.7 + bayer * 0.3;
+		if (eaten > keep + 0.12) {
+			COLOR.a = 0.0;
+		} else if (eaten > keep + 0.085) {
+			COLOR.rgb = mix(COLOR.rgb, vec3(0.8, 0.74, 1.0), 0.45); // the pale rim of a hole
+		}
+		COLOR.a *= mix(1.0, 0.55 + 0.45 * veil_keep, veil);
+	}
 	if (step_mode > 0 && COLOR.a > 0.01) {
 		// glitch: whole pixel rows slip along the step, more of them the further the void has eaten in
 		vec2 tex_px = 1.0 / vec2(textureSize(TEXTURE, 0));

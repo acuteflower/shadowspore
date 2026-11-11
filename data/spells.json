@@ -1,0 +1,187 @@
+{
+ "tiers": {
+  "spell": ["SPLITTER", "SCHERBE", "KRISTALL", "HERZSTEIN", "STERNSTEIN"],
+  "gem": ["ROHSCHLIFF", "TROPFEN", "LINSE", "FACETTE", "KRONE"],
+  "rarity": ["common", "uncommon", "rare", "epic", "legendary"]
+ },
+ "schools": {
+  "light": {"name": "LICHT", "color": "#7ff0dc", "deep": "#1f8f8a"},
+  "root": {"name": "WURZEL", "color": "#a8f070", "deep": "#3f7a2a"},
+  "ember": {"name": "GLUT", "color": "#ff9a42", "deep": "#8a2a10"},
+  "mist": {"name": "NEBEL", "color": "#b9aaff", "deep": "#3e3478"},
+  "void": {"name": "LEERE", "color": "#d27bff", "deep": "#2a0f45"}
+ },
+ "families": {
+  "light": {"name": "BRENNGLAS", "color": "#7ff0dc"},
+  "root": {"name": "WILDWUCHS", "color": "#a8f070"},
+  "ember": {"name": "ZUNDER", "color": "#ff9a42"},
+  "mist": {"name": "DUNST", "color": "#b9aaff"},
+  "void": {"name": "HUNGER", "color": "#d27bff"}
+ },
+ "spells": {
+  "banish": {
+   "name": "BANNLICHT",
+   "mini": 0,
+   "school": "light",
+   "kind": "aura",
+   "cast": "light",
+   "radius": [36, 40, 44, 50, 56],
+   "seconds": [5.0, 6.0, 7.0, 8.0, 10.0],
+   "dps": [6.0, 8.0, 10.5, 13.5, 17.0],
+   "cooldown": [18.0, 16.5, 15.0, 13.5, 12.0],
+   "tick": 0.5,
+   "perk3": {"name": "BANNKREIS", "text": "Ruhige Schattenwesen meiden den Schein, und in ihm steigt nichts aus dem Boden."},
+   "perk5": {"name": "SONNENKERN", "text": "Alle zwei Sekunden bricht ein Lichtring aus dem Kern und trifft alles im Schein.", "every": 2.0, "burst": 0.9},
+   "text": "Ein stehender Lichtschein um Ellie. Schattenwesen darin verbrennen."
+  },
+  "roots": {
+   "name": "WURZELGRUND",
+   "mini": 1,
+   "school": "root",
+   "kind": "ground",
+   "cast": "root",
+   "range": 110,
+   "no_water": true,
+   "radius": [30, 33, 36, 40, 46],
+   "seconds": [6.0, 7.0, 8.0, 9.0, 11.0],
+   "heal": [0.02, 0.025, 0.03, 0.035, 0.045],
+   "cooldown": [24.0, 22.0, 20.0, 18.0, 15.0],
+   "tick": 1.0,
+   "thorns": [0.0, 0.0, 3.0, 4.0, 5.0],
+   "perk3": {"name": "DORNEN", "text": "Die Wurzeln peitschen nach Schattenwesen, die im Kreis stehen."},
+   "perk5": {"name": "LEBENSBLÜTE", "text": "Die Heilung wächst über das Leben hinaus (Überheilung) und löscht Brennen."},
+   "text": "An der gezielten Stelle brechen wilde Wurzeln aus dem Boden. Wer im Kreis steht, wird geheilt, solange sie stehen."
+  },
+  "embers": {
+   "name": "GLUTSCHWARM",
+   "mini": 4,
+   "school": "ember",
+   "kind": "volley",
+   "cast": "ember",
+   "range": [140, 150, 160, 170, 180],
+   "shards": [1, 2, 3, 4, 5],
+   "damage": [9.0, 11.0, 13.0, 16.0, 20.0],
+   "burn_dps": [3.0, 3.5, 4.5, 5.5, 7.0],
+   "burn_seconds": [4.0, 4.5, 5.0, 5.5, 6.0],
+   "focus": 1.5,
+   "extend": 1.0,
+   "cooldown": [9.0, 9.0, 8.5, 8.0, 7.5],
+   "radius": [0, 0, 0, 0, 0],
+   "seconds": [0, 0, 0, 0, 0],
+   "perk3": {"name": "FUNKENSPRUNG", "text": "Stirbt ein brennendes Schattenwesen, springt sein Feuer auf das nächste in der Nähe über.", "jump": 64},
+   "perk5": {"name": "GLUTHERZ", "text": "Der letzte Splitter zerbirst in einem Ring aus Glut, der alles um sein Ziel trifft und entzündet.", "ring": 30, "ring_share": 0.5},
+   "text": "Brennende Splitter lösen sich aus dem Kristall und fliegen auf die Schattenwesen, die dem Zeiger am nächsten sind: einer auf jedes. Sind es weniger Gegner als Splitter, bündeln sie sich; jeder weitere Splitter auf dasselbe Ziel trifft mit x1,5. Getroffene brennen. Ohne Gegner in der Nähe geschieht nichts, und der Kristall bleibt voll."
+  },
+  "veil": {
+   "name": "NEBELSCHLEIER",
+   "mini": 5,
+   "school": "mist",
+   "kind": "veil",
+   "cast": "veil",
+   "range": 170,
+   "radius": [0, 0, 0, 0, 0],
+   "seconds": [4.0, 5.0, 6.0, 7.0, 8.5],
+   "cooldown": [30.0, 28.0, 26.0, 24.0, 22.0],
+   "perk3": {"name": "IRRSPUR", "text": "Wo der Schleier fällt, bleibt ein Trugbild aus Nebel stehen. Schattenwesen, die die Person jagten, laufen darauf zu.", "ghost": 3.0},
+   "perk5": {"name": "SCHLEIERKREIS", "text": "Der Nebel legt sich auch über jeden anderen Spieler, der dicht neben dem Ziel steht.", "group": 40},
+   "text": "Ein Spieler deiner Wahl (wen du mit dem Zeiger berührst, sonst du selbst) verschwimmt im Nebel: halb unsichtbar, flackernd, und Schattenwesen können ihn nicht mehr anvisieren. Wer ihn gerade jagt, verliert ihn und sucht dort, wo er ihn zuletzt sah."
+  },
+  "maw": {
+   "name": "LEERENSCHLUND",
+   "mini": 6,
+   "school": "void",
+   "kind": "maw",
+   "cast": "maw",
+   "range": 130,
+   "radius": [44, 48, 52, 56, 62],
+   "seconds": [2.2, 2.4, 2.6, 2.8, 3.1],
+   "pull": [48.0, 54.0, 60.0, 66.0, 74.0],
+   "damage": [18.0, 24.0, 31.0, 39.0, 50.0],
+   "price": [0.1, 0.1, 0.09, 0.08, 0.07],
+   "refund": [0.04, 0.045, 0.05, 0.055, 0.06],
+   "cooldown": [16.0, 15.0, 14.0, 13.0, 12.0],
+   "tick": 0.1,
+   "perk3": {"name": "SATTER SCHLUND", "text": "Frisst er drei oder mehr Schattenwesen, lädt sich der Kristall danach doppelt so schnell.", "fed": 3},
+   "perk5": {"name": "LEERER STERN", "text": "Wer beim Zuschnappen weniger als ein Fünftel seines Lebens hat, wird ganz verschlungen und gibt doppelt Leben zurück.", "devour": 0.2},
+   "text": "Die Leere nimmt immer einen Preis: der Zauber kostet dich Leben. An der gezielten Stelle reißt der Boden auf, ein Schlund saugt alle Schattenwesen in der Nähe an und schnappt zu. Für jedes, das er trifft, fließt Leben zu dir zurück: viele Gegner, viel Leben."
+  }
+ },
+ "gems": {
+  "lens": {
+   "name": "BRENNGLAS",
+   "mini": 2,
+   "family": "light",
+   "fits": ["light"],
+   "burn": [0.15, 0.25, 0.35, 0.45, 0.6],
+   "radius3": 0.15,
+   "perk3": {"name": "WEITER SCHEIN", "text": "Der Schein wird um 15 % größer."},
+   "perk5": {"name": "NACHBRAND", "text": "Erlischt der Schein, flammt er ein letztes Mal auf und brennt alles darin."},
+   "flare": 2.0,
+   "text": "Bündelt Licht: Lichtzauber brennen stärker."
+  },
+  "wild": {
+   "name": "WILDWUCHS",
+   "mini": 3,
+   "family": "root",
+   "fits": ["root"],
+   "seconds": [0.15, 0.25, 0.35, 0.45, 0.6],
+   "radius3": 0.15,
+   "perk3": {"name": "WEITE WURZELN", "text": "Der Wurzelkreis wird um 15 % größer."},
+   "perk5": {"name": "BLÜTENSCHLUSS", "text": "Wenn die Wurzeln vergehen, blühen sie auf und heilen alle darin um 8 % ihres Lebens."},
+   "bloom": 0.08,
+   "text": "Lässt Wurzelzauber länger und wilder wachsen."
+  },
+  "tinder": {
+   "name": "ZUNDER",
+   "mini": 7,
+   "family": "ember",
+   "fits": ["ember"],
+   "burn_up": [0.15, 0.25, 0.35, 0.45, 0.6],
+   "shard3": 1,
+   "rekindle": 2.0,
+   "perk3": {"name": "FUNKENFLUG", "text": "Ein Splitter mehr bricht aus dem Kristall."},
+   "perk5": {"name": "AUFLODERN", "text": "Trifft ein Splitter ein Wesen, das schon brennt, lodert es auf: doppelter Schaden."},
+   "text": "Nährt das Feuer: Glutzauber brennen heißer und länger."
+  },
+  "haze": {
+   "name": "DUNST",
+   "mini": 8,
+   "family": "mist",
+   "fits": ["mist"],
+   "seconds": [0.15, 0.25, 0.35, 0.45, 0.6],
+   "quick3": 0.15,
+   "cloud": 4.0,
+   "cloud_radius": 34,
+   "perk3": {"name": "FLÜCHTIG", "text": "Der Kristall lädt sich 15 % schneller."},
+   "perk5": {"name": "NEBELWAND", "text": "Wo der Schleier fällt, bleibt eine Nebelwolke liegen, solange er hält und 4 Sekunden länger. Wer darin steht, bleibt vernebelt."},
+   "text": "Verdichtet den Nebel: Nebelzauber halten länger."
+  },
+  "hunger": {
+   "name": "HUNGER",
+   "mini": 9,
+   "family": "void",
+   "fits": ["void"],
+   "refund_up": [0.15, 0.25, 0.35, 0.45, 0.6],
+   "radius3": 0.15,
+   "bite2": 0.5,
+   "perk3": {"name": "WEITER SCHLUND", "text": "Der Sog reicht 15 % weiter."},
+   "perk5": {"name": "ZWEITER BISS", "text": "Der Schlund schnappt ein zweites Mal zu, mit halbem Biss."},
+   "text": "Macht die Leere gieriger: Leerezauber geben mehr Leben zurück."
+  }
+ },
+ "staffs": {
+  "staff_hag_elm": {"spell_slots": 1, "gem_slots": 1, "max_tier": 5,
+   "crowns": [[22.5, 0.0]], "knots": [[8.0, 0.0]], "icon_crowns": [[11.5, 4.5]], "icon_knots": [[6.8, 9.2]]},
+  "staff_bone_fork": {"spell_slots": 2, "gem_slots": 2, "max_tier": 5, "small_stones": true,
+   "crowns": [[31.5, -4.8], [26.1, 4.2]], "knots": [[20.8, -3.4], [18.0, 2.6]], "icon_crowns": [[10.2, 3.5], [11.1, 7.0]], "icon_knots": [[8.0, 6.4], [8.8, 8.5]],
+   "fork": {"window": 3.0, "echo": 1.25, "harmony_charge": 0.85, "tension_charge": 1.1, "tension_echo": 1.5}}
+ },
+ "opposites": [["light", "void"], ["root", "ember"], ["light", "mist"]],
+ "cast": {
+  "light": {"seconds": 0.8, "release": 0.42},
+  "root": {"seconds": 0.8, "release": 0.4},
+  "ember": {"seconds": 0.7, "release": 0.3},
+  "veil": {"seconds": 0.85, "release": 0.42},
+  "maw": {"seconds": 0.9, "release": 0.47}
+ }
+}

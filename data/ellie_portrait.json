@@ -1,0 +1,19 @@
+{
+ "sheet": "res://assets/ui/ellie_dialogue_v4.png",
+ "frame": [
+  103,
+  153
+ ],
+ "visemes": 5,
+ "rows": [
+  "open",
+  "closed",
+  "hurt_open",
+  "hurt_closed"
+ ],
+ "viseme_hold": 0.07,
+ "blink": {
+  "interval": 3.4,
+  "length": 0.13
+ }
+}

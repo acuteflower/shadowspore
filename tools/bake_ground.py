@@ -807,10 +807,15 @@ def main():
             baked.append({"id": spec["id"], "texture": "res://assets/world/ground/%s.png" % spec["id"], "mask": "res://assets/world/ground/%s_mask.png" % spec["id"], "x": centre[0] + ox, "y": centre[1] + oy})
             shown.append((img, mask, (ox, oy)))
             print("baked", spec["id"], img.shape[1], "x", img.shape[0])
-    for i, hut in enumerate(data.get("huts", []) + data.get("quarries", [])):  # the forecourt of each hut and the gravel of each quarry (px relative to its tile's centre)
+    places = data.get("huts", []) + data.get("quarries", [])
+    order = [p for p in places if "seed_index" not in p.get("yard", {})]  # later yards carry their own seed_index, so adding one never reshuffles the older ones
+    for hut in places:  # the forecourt of each hut and the gravel of each quarry (px relative to its tile's centre)
         if "yard" not in hut:
             continue
+        i = hut["yard"].get("seed_index", order.index(hut) if hut in order else 0)
         img, mask, (ox, oy) = bake_yard(hut["yard"], seed + 900 + i * 13)
+        if hut["yard"].get("gloom"):  # a yard in the Hexenwald (the lake witch's) is darkened like its paths
+            gloom_tone(img, (hut["tile"][0] * 16 + 8 + ox, hut["tile"][1] * 16 + 8 + oy))
         name = hut["id"] + "_yard"
         save(ROOT / "assets" / "world" / "ground" / (name + ".png"), img)
         save(ROOT / "assets" / "world" / "ground" / (name + "_mask.png"), mask)

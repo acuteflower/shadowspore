@@ -44,6 +44,7 @@ static func launch(tree: SceneTree, request: Dictionary) -> void:
 	InputManager.menu_open = false
 	InputManager.build_open = false
 	InputManager.map_open = false
+	InputManager.journal_open = false
 	InputManager.skills_open = false
 	InputManager.progress_open = false
 	Terrain.relief = null
@@ -59,7 +60,6 @@ static func start(main: Node, request: Dictionary) -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var mode: String = String(request.get("mode", "continue"))
 	var err: Error = OK
-	var solo: bool = false
 	match mode:
 		"host":
 			err = NetworkManager.host_multiplayer()
@@ -67,16 +67,15 @@ static func start(main: Node, request: Dictionary) -> void:
 			err = NetworkManager.join(String(request.get("address", "127.0.0.1")), int(request.get("port", NetworkManager.DEFAULT_PORT)))
 		_:
 			err = NetworkManager.host_singleplayer()
-			solo = true
 	if err != OK:
 		push_error("Network setup failed: %s" % error_string(err))
 		return
 	var level: Node = (load(ARENA_PATH if args.has("--arena") else WORLD_PATH) as PackedScene).instantiate()
 	main.add_child(level)
 	var loaded: bool = false
-	if solo and mode != "new":
+	if mode == "continue" or mode == "host":
 		loaded = SaveGame.load_into(main.get_tree())
-	if solo and not loaded and not args.has("--skip-intro") and level.has_method("start_intro"):
+	if mode != "join" and not loaded and not args.has("--skip-intro") and level.has_method("start_intro"):
 		level.call("start_intro") ## a new game begins in the sewer
-	elif solo and not loaded and level.has_method("begin_story"):
+	elif mode != "join" and not loaded and level.has_method("begin_story"):
 		level.call("begin_story") ## without the intro the first quest starts at once

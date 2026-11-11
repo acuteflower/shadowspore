@@ -10,6 +10,15 @@ const LOOKS: Dictionary = {
 	## the lumberjack's cabin (art: tools/art_cabin.py): small, overgrown, no chimney, no light of its own
 	"cabin": {"dir": "res://assets/interior/cabin/", "picture": "cabin.png", "glow": "cabin_glow.png", "door": "cabin_door.png", "frame": Vector2i(160, 156), "feet": 132, "door_at": Vector2(65, 88),
 			"exit": 24.0, "colliders": [Rect2(-42, -22, 84, 20), Rect2(-52, -10, 10, 10), Rect2(42, -10, 10, 10)], "chimney": Vector2.INF, "lights": false},
+	## the lake witch's stilt house at the south shore of the Hexenwald lake (art: tools/art_lake_hut.py, docs/seehexe_konzept.md): bone wood, reed roof, a lens
+	## window that throws teal light on the yard, crystal wind chimes under the eave; its own night lights (`lamps`), a teal-tinged smoke thread and the spill
+	"lake": {"dir": "res://assets/interior/lake_hut/", "picture": "lake_hut.png", "glow": "lake_hut_glow.png", "door": "lake_hut_door.png", "frame": Vector2i(248, 160), "feet": 124,
+			"door_at": Vector2(110, 80), "exit": 28.0, "colliders": [Rect2(-48, -24, 48, 20), Rect2(0, -26, 58, 28)], "chimney": Vector2.INF, "lights": false,
+			"smoke": Vector2(31, -100), "smoke_tint": Color(0.56, 0.66, 0.68), "spill": "lake_hut_window_light.png",
+			"lamps": [[Vector2(26, 14), 50, 0.66, Color("78f4e6")], [Vector2(-30, 0), 22, 0.4, Color("ff9a50")], [Vector2(0, 8), 34, 0.5, Color("78f4e6")],
+					[Vector2(-30, -60), 40, 0.55, Color("78f4e6")]],
+			"hangs": [["chimes.png", Vector2(-62, -46), 3.0, 2.5], ["chimes.png", Vector2(26, -40), 3.0, 2.5]], "perches": [-20.0, 22.0], "perch_height": 90.0,
+			"sounds": [["res://assets/audio/lake_hut/chimes.wav", Vector2(0, -50), -14.0, 220.0]]},
 }
 
 var art: String = "hut" ## which of LOOKS
@@ -73,10 +82,10 @@ func _ready() -> void:
 	doorway.prompt_height = 52.0
 	doorway.position = Vector2(0, 4)
 	add_child(doorway)
-	for x: float in ([-62.0, 10.0, 62.0] if art == "hut" else []): ## birds on the ridge (the renewed one has a vane, the chimney stands left of the middle)
+	for x: float in ([-62.0, 10.0, 62.0] if art == "hut" else (look.get("perches", []) as Array)): ## birds on the ridge (the renewed one has a vane, the chimney stands left of the middle)
 		var perch: RoofPerch = RoofPerch.new()
 		perch.host = self
-		perch.perch_height = 85.0
+		perch.perch_height = float(look.get("perch_height", 85.0))
 		perch.position = Vector2(x, 3.0)
 		add_child(perch)
 	exit_position = global_position + Vector2(0, float(look.exit))
@@ -131,6 +140,30 @@ func _ready() -> void:
 		_window_light = window_light
 		add_child(window_light)
 		_load_spill(dir + "hut_window_light.png")
+	if look.has("smoke"):
+		_add_smoke(look.smoke as Vector2, look.get("smoke_tint", Color(0.62, 0.58, 0.7)) as Color)
+	if look.has("spill"):
+		_load_spill(dir + String(look.spill))
+	for lamp: Array in look.get("lamps", []) as Array: ## [position, radius, energy, colour]
+		var light: NightLight = NightLight.new()
+		light.position = lamp[0] as Vector2
+		light.radius = int(lamp[1])
+		light.squash = 0.6
+		light.base_energy = float(lamp[2])
+		light.glow_color = lamp[3] as Color
+		light.pulse = 0.2
+		add_child(light)
+	for loop: Array in look.get("sounds", []) as Array: ## [file, position, volume dB, reach px]: quiet positional loops (the wind chimes)
+		var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+		player.stream = load(String(loop[0])) as AudioStream
+		player.position = loop[1] as Vector2
+		player.volume_db = float(loop[2])
+		player.max_distance = float(loop[3])
+		player.autoplay = true
+		player.finished.connect(func() -> void: player.play())
+		add_child(player)
+	for hang: Array in look.get("hangs", []) as Array: ## [file, position (px from the feet), pivot row, sway amount]: wind chimes and the like under the eave
+		_hang(dir + String(hang[0]), hang[1] as Vector2, float(hang[2]), float(hang[3]))
 	if not yard_props.is_empty():
 		var yard: HutYard = HutYard.new()
 		yard.name = "Yard"
@@ -208,6 +241,28 @@ func set_renewed(on: bool) -> void:
 		_window_light.radius = 56
 		_window_light.base_energy = 0.62
 		_window_light.pulse = 0.3
+
+
+## A thin thread of smoke rising from a chimney (`at`, px from the feet), tinted.
+func _add_smoke(at: Vector2, tint: Color) -> void:
+	var smoke: CPUParticles2D = CPUParticles2D.new()
+	smoke.position = at
+	smoke.z_index = 4
+	smoke.amount = 14
+	smoke.lifetime = 5.0
+	smoke.preprocess = 5.0
+	smoke.direction = Vector2(0.3, -1.0)
+	smoke.spread = 10.0
+	smoke.gravity = Vector2(2.5, -1.5)
+	smoke.initial_velocity_min = 6.0
+	smoke.initial_velocity_max = 11.0
+	smoke.scale_amount_min = 1.4
+	smoke.scale_amount_max = 3.0
+	var fade: Gradient = Gradient.new()
+	fade.colors = PackedColorArray([Color(tint, 0.0), Color(tint, 0.45), Color(tint.darkened(0.25), 0.0)])
+	fade.offsets = PackedFloat32Array([0.0, 0.2, 1.0])
+	smoke.color_ramp = fade
+	add_child(smoke)
 
 
 ## A picture that hangs from a bracket and sways with the wind (rows below `pivot` slide in whole pixels, `sway_rows.gdshader`).
@@ -314,5 +369,5 @@ func _watch_for_player() -> void:
 		var player: Player = node as Player
 		if player == null or not player.is_multiplayer_authority() or player.quests == null:
 			continue
-		if String(player.quests.current().get("step_id", "")) == "find_lumberjack" and player.global_position.distance_to(global_position) < 340.0:
+		if player.quests.active_step_id("lumberjack") == "find_lumberjack" and player.global_position.distance_to(global_position) < 340.0:
 			player.quests.set_flag("cabin_near")

@@ -225,6 +225,16 @@ func _extra() -> int:
 	return maxi(_living().size() - 1, 0)
 
 
+## The players he can aim at: alive, near, and not veiled by Nebelschleier (docs/magie_konzept.md). Everything that picks a target or a
+## spot to strike uses this; the wipe check, the player-count scaling, the pressure waves and pillar choice keep `_living()`.
+func _seen() -> Array[Player]:
+	var out: Array[Player] = []
+	for player: Player in _living():
+		if not player.veiled():
+			out.append(player)
+	return out
+
+
 ## Players who are alive and near the arena.
 func _living() -> Array[Player]:
 	var tick: int = Engine.get_physics_frames()
@@ -549,7 +559,7 @@ func _host_step(delta: float) -> void:
 		_gap -= delta
 		if boss.state == SkyCleaver.State.PERCHED:
 			var close: bool = false
-			for player: Player in _living():
+			for player: Player in _seen():
 				if player.global_position.distance_to(boss.global_position) < _num("blast", "trigger_range"):
 					close = true
 			_near_t = _near_t + delta if close else maxf(_near_t - delta * 2.0, 0.0)
@@ -636,7 +646,7 @@ func _choose() -> void:
 				return
 			_rpc_act.rpc(Act.GLUT, _pick.randi(), thrown.global_position, Vector2.ZERO, int(thrown.name), hs)
 		"splitter":
-			if _living().is_empty():
+			if _seen().is_empty():
 				_gap = 1.0
 				return
 			_rpc_act.rpc(Act.SPLITTER, _pick.randi(), Vector2.ZERO, Vector2.ZERO, 0, hs)
@@ -657,7 +667,7 @@ func _choose() -> void:
 
 
 func _pick_target() -> Player:
-	var living: Array[Player] = _living()
+	var living: Array[Player] = _seen()
 	if living.is_empty():
 		return null
 	var choices: Array[Player] = []
@@ -1138,13 +1148,13 @@ func _end_shot_if_idle() -> void:
 
 ## Host: the aim locks shortly before the release: everybody learns where.
 func _host_lock() -> void:
-	var living: Array[Player] = _living()
+	var living: Array[Player] = _seen()
 	if living.is_empty():
 		_rpc_lock.rpc(PackedVector2Array([boss.look_point if boss.look_point.is_finite() else boss.centre()]))
 		return
 	var points: PackedVector2Array = PackedVector2Array()
 	var primary: Player = _by_id(_last_target)
-	if primary == null or primary.health.current <= 0.0:
+	if primary == null or primary.health.current <= 0.0 or primary.veiled():
 		primary = living[0]
 	points.append(primary.global_position)
 	if act == Act.SHOT or act == Act.GLUT:
@@ -1473,8 +1483,8 @@ func _drive_dive(delta: float) -> void:
 func _host_dive_step(delta: float) -> void:
 	var d: Dictionary = _sp("dive")
 	var target: Player = _by_id(int(_dive["target"]))
-	if target == null or target.health.current <= 0.0:
-		var living: Array[Player] = _living()
+	if target == null or target.health.current <= 0.0 or target.veiled(): ## Nebelschleier: he loses her and takes another, or strikes where he was going
+		var living: Array[Player] = _seen()
 		if living.is_empty():
 			_commit_dive_host(_dive["pos"] as Vector2, _dive["pos"] as Vector2)
 			return
@@ -1690,7 +1700,7 @@ func _start_splitter() -> void:
 
 func _host_splitter(i: int) -> void:
 	var s: Dictionary = _sp("splitter")
-	var living: Array[Player] = _living()
+	var living: Array[Player] = _seen()
 	if living.is_empty():
 		return
 	var who: Player = living[(i + _split_first) % living.size()]
@@ -1774,7 +1784,7 @@ func _mark_cast() -> void:
 	_kick_wing(0, 1.0)
 	_kick_wing(1, 1.0)
 	_sound("feather_launch", _base_pos, 2.0, 0.8)
-	if player == null or player.health.current <= 0.0:
+	if player == null or player.health.current <= 0.0 or player.veiled(): ## a veiled one: the feather finds nobody
 		_mark_end = _t + 0.6
 		_at(_mark_end, _end_act)
 		return
@@ -1794,7 +1804,7 @@ func _mark_begin() -> void:
 	field.clear_marks()
 	_mark["begun"] = true
 	_mark_end = _t + total + float(m["recover"])
-	if player == null or player.health.current <= 0.0:
+	if player == null or player.health.current <= 0.0 or player.veiled():
 		_mark_end = _t + 0.6
 		_at(_mark_end, _end_act)
 		return
@@ -1811,7 +1821,7 @@ func _mark_begin() -> void:
 func _host_mark_lock() -> void:
 	var player: Player = _by_id(int(_mark["target"]))
 	var p: Vector2 = boss.centre()
-	if player != null and player.health.current > 0.0:
+	if player != null and player.health.current > 0.0 and not player.veiled():
 		p = player.global_position
 	elif (_mark["point"] as Vector2).is_finite():
 		p = _mark["point"] as Vector2
@@ -2036,8 +2046,8 @@ func _drive_chase(delta: float) -> void:
 func _host_chase_step(delta: float) -> void:
 	var c: Dictionary = _sp("chase")
 	var target: Player = _by_id(int(_chase["target"]))
-	if target == null or target.health.current <= 0.0:
-		var living: Array[Player] = _living()
+	if target == null or target.health.current <= 0.0 or target.veiled():
+		var living: Array[Player] = _seen()
 		if living.is_empty():
 			_commit_host(_chase["pos"] as Vector2)
 			return
@@ -2091,10 +2101,10 @@ func _rpc_track(pos: Vector2) -> void:
 ## Host: he has reached the one he followed. In phase 2, with company, a shadow double of the ring forms round the nearest other player.
 func _commit_host(pos: Vector2) -> void:
 	var twin: Vector2 = Vector2.INF
-	if phase >= 1 and _living().size() > 1:
+	if phase >= 1 and _seen().size() > 1:
 		var main: Player = _by_id(int(_chase["target"]))
 		var best: float = 1e9
-		for player: Player in _living():
+		for player: Player in _seen():
 			if player == main:
 				continue
 			var d: float = player.global_position.distance_to(pos)

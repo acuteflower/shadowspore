@@ -69,7 +69,8 @@ func _open_page(next: Page) -> void:
 		Page.CONFIRM_NEW:
 			_rows.append_array([{"id": "new_yes", "label": "JA, NEU BEGINNEN"}, {"id": "back", "label": "ZURÜCK"}])
 		Page.MULTI:
-			_rows.append_array([{"id": "host", "label": "SPIEL HOSTEN"}, {"id": "join_page", "label": "BEITRETEN"}, {"id": "back", "label": "ZURÜCK"}])
+			var host_label: String = "KOOP FORTSETZEN" if SaveGame.exists(SaveGame.COOP_PATH) else "SPIEL HOSTEN"
+			_rows.append_array([{"id": "host", "label": host_label}, {"id": "join_page", "label": "BEITRETEN"}, {"id": "back", "label": "ZURÜCK"}])
 		Page.JOIN:
 			_rows.append_array([{"id": "addr", "label": "ADRESSE", "kind": "field"}, {"id": "join", "label": "VERBINDEN"}, {"id": "back", "label": "ZURÜCK"}])
 		Page.SETTINGS:

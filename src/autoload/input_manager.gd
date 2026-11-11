@@ -18,6 +18,7 @@ var build_open: bool = false
 
 ## True while the map (M) is open: the heroine stands still and the move keys pan the map.
 var map_open: bool = false
+var journal_open: bool = false
 
 ## Full-screen skill graph; kept true through its closing animation.
 var skills_open: bool = false
@@ -39,7 +40,7 @@ func _input(event: InputEvent) -> void:
 
 
 func move_vector() -> Vector2:
-	return Vector2.ZERO if map_open or (skills_open or progress_open) or freecam_open else map_pan_vector()
+	return Vector2.ZERO if map_open or journal_open or skills_open or progress_open or freecam_open else map_pan_vector()
 
 
 func skills_pressed() -> bool:

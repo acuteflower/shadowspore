@@ -33,7 +33,7 @@ const TABS: Array[Dictionary] = [
 ]
 const CONTROLS: Array[Array] = [
 	["BEWEGEN", "", "WASD"], ["SPRINTEN", "sprint", ""], ["SCHATTENSCHRITT", "shadow_step", ""],
-	["SCHLEICHEN", "sneak", ""], ["INVENTAR", "inventory", ""], ["KARTE", "map", ""], ["BENUTZEN", "interact", ""],
+	["SCHLEICHEN", "sneak", ""], ["INVENTAR", "inventory", ""], ["KARTE", "map", ""], ["TAGEBUCH", "quest_journal", ""], ["BENUTZEN", "interact", ""],
 ]
 
 var _player: Node
@@ -124,7 +124,7 @@ func _set_open(open: bool) -> void:
 		_tp_text = ""
 		_bloom_x = float(TABS[0]["x"])
 		_armed = ""
-		_save_info = SaveGame.info()
+		_save_info = SaveGame.info(SaveGame.path_for(get_tree())) if _can_save() else {}
 		_refresh_footer()
 		_build_items()
 		_paused_here = multiplayer.get_peers().is_empty() ## alone: time stands still
@@ -201,12 +201,14 @@ func _build_items() -> void:
 			_add(0, "slider", "SCHÜTTELN", "shake")
 			_add(0, "button", "FÄHIGKEITEN (%s)" % _key_of("skills"), "", {"action": "skills"}) ## the skill graph: the same view as F / Start
 			_add(0, "button", "FORTSCHRITT (%s)" % _key_of("progress"), "", {"action": "progress"}) ## the road of levels: the same view as P
+			_add(0, "button", "ELLIES TAGEBUCH", "", {"action": "journal"})
 			_add(1, "heading", "SPIEL")
 			_add(1, "toggle", "SCHADENSZAHLEN", "numbers")
 			_add(1, "toggle", "POSITION", "position")
 			_add(1, "toggle", "EIGENER CURSOR", "cursor") ## the pixel cursor (GameCursor); off = the system pointer
 			_add(1, "button", "WETTER-EFFEKTE: %s" % ["AUS", "REDUZIERT", "VOLL"][clampi(int(GameSettings.get_value("weather_fx")), 0, 2)], "", {"action": "weather_fx"})
 			_add(1, "toggle", "BLITZE SANFT", "flash_soft") ## accessibility: weaker flashes, no bolt drawing
+			_add(1, "toggle", "TAGEBUCH OHNE BEWEGUNG", "journal_still")
 			_add(1, "choice", "SPRACHE", "language", {"soon": true, "text": "DEUTSCH"})
 			_add(1, "heading", "STEUERUNG")
 			for row: Array in CONTROLS:
@@ -242,9 +244,13 @@ func _build_items() -> void:
 				_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
 				_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
 				_add(0, "button", "ALLE TRÄNKE (ALLE STUFEN)", "", {"action": "potions_all"})
+				_add(0, "button", "ZAUBERSTÄBE + ALLE KRISTALLE", "", {"action": "magic_all"}) ## docs/magie_konzept.md: the Hexenulmenstab and every crystal of every tier
 				_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
 				_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
 				_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
+				_add(0, "button", "ZUR SEEHEXE", "", {"action": "lake_witch"}) ## docs/seehexe_konzept.md: in front of her house at the Hexenwald lake
+				_add(0, "button", "SEEHEXE: QUEST STARTEN", "", {"action": "lake_witch_quest"}) ## the entry quest from the start, the ring asleep (host)
+				_add(0, "button", "SEEHEXE BEKANNT", "", {"action": "lake_witch_known"}) ## the ring awake, the quest done, the staff in the bag (host)
 				_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
 				_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
 				_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
@@ -615,6 +621,13 @@ func _run_action(action: String) -> void:
 			if not road._opening:
 				_set_open(true)
 				_failed_flash = 2.5
+		"journal":
+			var journal: QuestJournal = get_parent().get_node("QuestJournal") as QuestJournal
+			_set_open(false)
+			journal.open()
+			if not InputManager.journal_open:
+				_set_open(true)
+				_failed_flash = 2.5
 		"xp_100", "level_up": ## dev: XP through the normal path (host); the reward still has to be collected in the Fortschritt window
 			var earner: Player = _player as Player
 			if earner == null or not multiplayer.is_server():
@@ -785,6 +798,19 @@ func _run_action(action: String) -> void:
 				var def: Dictionary = items[id] as Dictionary
 				if String(def.get("kind", "")) == "talisman" and collector.inventory.count_item(id) == 0 and not TalismanRules.worn_ids(collector.inventory.equipment).has(id):
 					collector.inventory.give(id, 1)
+		"magic_all": ## the Hexenulmenstab (once) and two of every crystal and gem of every tier into the bag (host)
+			var mage: Player = _player as Player
+			if mage == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			for staff_id: String in ["staff_hag_elm", "staff_bone_fork"]: ## the Hexenulmenstab and the Bleichgabel (docs/magie_konzept.md 17)
+				if not mage.inventory.has_item(staff_id):
+					mage.inventory.give(staff_id, 1)
+			var all_items: Dictionary = DataRegistry.table("items")
+			for id: String in all_items:
+				var kind: String = String((all_items[id] as Dictionary).get("kind", ""))
+				if kind == "crystal" or kind == "gem":
+					mage.inventory.give(id, 2)
 		"potions_all": ## every potion of every tier into the bag (host), 5 of each
 			var brewer: Player = _player as Player
 			if brewer == null or not multiplayer.is_server():
@@ -807,6 +833,20 @@ func _run_action(action: String) -> void:
 				return
 			if wearer.inventory.count_item("clarity_earrings") == 0 and not TalismanRules.worn_ids(wearer.inventory.equipment).has("clarity_earrings"):
 				wearer.inventory.give("clarity_earrings", 1)
+		"lake_witch_quest", "lake_witch_known": ## docs/seehexe_konzept.md 8: the entry quest from the start / all of it done
+			var story: LakeWitchStory = get_tree().get_first_node_in_group("lake_witch_story") as LakeWitchStory
+			if story == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if action == "lake_witch_quest":
+				story.debug_start()
+			else:
+				story.debug_known()
+			_set_open(false)
+		"lake_witch": ## in front of the lake witch's door
+			if _player is Player:
+				(_player as Player).request_teleport(Vector2(738, 936) * 16.0 + Vector2(8, 40))
+				_set_open(false)
 		"hexenwald": ## into the middle of the Hexenwald
 			if _player is Player:
 				(_player as Player).request_teleport(Vector2(826, 880) * 16.0)
@@ -879,9 +919,12 @@ func _run_action(action: String) -> void:
 
 func _reset_and_restart() -> void:
 	_armed = ""
-	SaveGame.delete()
+	if not _can_save():
+		return
+	var path: String = SaveGame.path_for(get_tree())
+	SaveGame.delete(path)
 	_set_open(false)
-	GameLauncher.launch(get_tree(), {"mode": "new"}) ## a new game: the intro plays (no menu in between)
+	GameLauncher.launch(get_tree(), {"mode": "host" if path == SaveGame.COOP_PATH else "new"})
 
 
 func _arm(action: String) -> void:
@@ -908,7 +951,7 @@ func _footer_click(index: int) -> void:
 
 func _do_save(then_quit: bool) -> void:
 	if SaveGame.save(get_tree()):
-		_save_info = SaveGame.info()
+		_save_info = SaveGame.info(SaveGame.path_for(get_tree()))
 		_saved_flash = 2.0
 		if then_quit:
 			_begin_quit()
@@ -1368,7 +1411,7 @@ func _draw_row(item: Dictionary, p: float, void_level: float) -> void:
 	if bool(item.get("soon", false)):
 		var width: int = PixelText.width(String(item["label"]))
 		_text("BALD", Vector2(base + 14.0 + width + 5.0, rect.position.y + (rect.size.y - 7.0) / 2.0), Color(UiStyle.TEXT_DIM, 0.45), p)
-	if kind == "button" and bool(item.get("risky", false)) and not SaveGame.exists():
+	if kind == "button" and bool(item.get("risky", false)) and not SaveGame.exists(SaveGame.path_for(get_tree())):
 		var plate_w: float = PixelText.width(String(item["label"])) + 12.0
 		_text("KEIN SPIELSTAND", Vector2(base + 14.0 + plate_w + 6.0, rect.position.y + 5.0), Color(UiStyle.TEXT_DIM, 0.5), p)
 

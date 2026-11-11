@@ -160,7 +160,7 @@ func _process(delta: float) -> void:
 
 ## The settlers' question (the shop's "works only at the bench" note, production): she is at work whenever she is at one of her working spots.
 func is_working() -> bool:
-	return _clip in ["stir", "craft", "counter"]
+	return _clip in ["stir", "craft", "counter", "grind", "carve", "basin"]
 
 
 # ---------- E ----------
@@ -168,6 +168,8 @@ func is_working() -> bool:
 func prompt() -> String:
 	if _talking or InputManager.ui_blocking or _town == null or _clip == "walk":
 		return ""
+	if _quest_talk(_town.local_player()) != "":
+		return "SPRECHEN"
 	if _town.board != null and not _town.board.finishable(sid, _town.local_player()).is_empty():
 		return "AUFTRAG ABGEBEN"
 	var talked: bool = int((_town.residents.get(sid, {}) as Dictionary).get("talked", -1)) == TimeManager.day
@@ -188,6 +190,13 @@ func interact(player: Player) -> void:
 	_talking = true
 	_turned = 4.0
 	_sector = Adventurer.sector_of(player.global_position - global_position)
+	var talk: String = _quest_talk(player)
+	if talk != "": ## a quest step wants this talk (the lake witch's meeting): the dialogue instead of the shop
+		var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+		if world != null:
+			await world.play_story_dialogue(player, talk)
+		_talking = false
+		return
 	if _town.board != null and not _town.board.finishable(sid, player).is_empty(): ## the end of a board notice: report to the one who gave it
 		var thanks: String = _town.board.report(sid, player)
 		var box: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
@@ -205,6 +214,20 @@ func interact(player: Player) -> void:
 	if spec.has("shop") and is_inside_tree():
 		ShopWindow.open(get_tree(), player, _town, String(spec.shop))
 	_talking = false
+
+
+## The dialogue a running quest step of `player` wants with her (the step's `talk_to` is her id, `talk` the dialogue), or "".
+func _quest_talk(player: Player) -> String:
+	if player == null or player.quests == null:
+		return ""
+	var table: Dictionary = DataRegistry.table("quests")
+	for quest_id: String in player.quests.active_ids():
+		var step_id: String = player.quests.active_step_id(quest_id)
+		for raw: Variant in (table.get(quest_id, {}) as Dictionary).get("steps", []) as Array:
+			var step: Dictionary = raw as Dictionary
+			if String(step.get("id", "")) == step_id and String(step.get("talk_to", "")) == sid:
+				return String(step.get("talk", ""))
+	return ""
 
 
 ## `quest_actors`: where she stands, for a quest step whose `actor` is her id.

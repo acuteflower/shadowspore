@@ -58,6 +58,7 @@ var sheathed: bool = false ## set by the player while sneaking: the weapon fades
 var aim_dir: Vector2 = Vector2.RIGHT ## direction of the current swing
 var rod_pose: Vector3 = Vector3.INF ## fishing: how the rod points (forward, side, lift) relative to where she faces, from the body clip; INF = resting pose
 var always_drawn: bool = false ## a rod stays in the hand (it is no weapon: no swings, never put away)
+var _staff: bool = false ## a magic staff is in her hand (docs/magie_konzept.md): its crystals are drawn by StaffCrystals
 var held_weapon: String = "": ## item id shown in the hand, synced by the owner
 	set(value):
 		held_weapon = value
@@ -144,6 +145,10 @@ func _ready() -> void:
 	_stamina = get_node_or_null("../StaminaComponent") as StaminaComponent
 	_talismans = get_node_or_null("../TalismanComponent") as TalismanComponent
 	_skills = get_node_or_null("../SkillTreeComponent") as SkillTreeComponent
+	var crystals: StaffCrystals = StaffCrystals.new() ## the stones in a held magic staff (docs/magie_konzept.md)
+	crystals.name = "StaffCrystals"
+	crystals.attack = self
+	_weapon.get_parent().add_child(crystals)
 	_refresh_weapon()
 
 
@@ -287,6 +292,26 @@ func can_charge() -> bool:
 		return false
 	var cfg: Dictionary = HeavyRules.config(DataRegistry.get_entry("items", held_weapon))
 	return String(cfg.get("kind", "")) == HeavyRules.KIND_CHARGE and (_stamina == null or HeavyRules.can_start(cfg, _stamina.current))
+
+
+## A magic staff is in her hand (docs/magie_konzept.md).
+func holds_staff() -> bool:
+	return _staff
+
+
+## A point on the held item `px` along its shaft from the grip (item picture px), in the frame of the `Hand` node (StaffCrystals draws there).
+func blade_point(px: float) -> Vector2:
+	return _weapon.position + Vector2.from_angle(_blade_angle) * _blade_length * px
+
+
+## A point of the held item off its shaft: `along` px from the grip, `across` px to the side (+ = downwards in the item picture, which points
+## right), in the frame of the `Hand` node. The foreshortening only shortens the length (the Bleichgabel's two prongs, StaffCrystals).
+func item_point(along: float, across: float) -> Vector2:
+	return blade_point(along) + Vector2.from_angle(_blade_angle + PI * 0.5) * across
+
+## How visible the held item is right now (0 hidden .. 1).
+func weapon_alpha() -> float:
+	return _weapon_alpha if _weapon != null and _weapon.visible else 0.0
 
 
 ## Where the far end of the held item is (world px): a rod's tip, where the line starts. `length_px` = grip to tip in the item picture.
@@ -965,7 +990,8 @@ static func _stack_of(weapon_id: String, refine_level: int) -> Dictionary:
 
 func _refresh_weapon() -> void:
 	var def: Dictionary = DataRegistry.get_entry("items", held_weapon)
-	always_drawn = String(def.get("tool", "")) == "rod"
+	always_drawn = String(def.get("tool", "")) == "rod" or String(def.get("tool", "")) == "staff" ## a rod or a staff is no weapon: no swings, never put away
+	_staff = String(def.get("tool", "")) == "staff"
 	if _weapon == null:
 		return
 	_has_weapon = not def.is_empty()

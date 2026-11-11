@@ -26,7 +26,7 @@ func prompt() -> String:
 	var player: Player = _local_player()
 	if gone or player == null or player.quests == null or player.story_lock or InputManager.ui_blocking:
 		return ""
-	if String(player.quests.current().get("step_id", "")) != String(spec.get("step", "")) or player.quests.has_flag(String(spec.flag)):
+	if not player.quests.has_active_step(String(spec.get("step", ""))) or player.quests.has_flag(String(spec.flag)):
 		return ""
 	return String(spec.get("verb", "ENTFERNEN"))
 

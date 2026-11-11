@@ -168,6 +168,13 @@ func _run() -> void:
 	_check(landed[0], "touched_down never fired")
 	_check(_fight.clones_on() == 0, "a clone in phase 1")
 	print("  entrance ok")
+	_player.effects.apply("veil", 3.0, 1.0) ## Nebelschleier: she cannot aim at a veiled player, who still counts as alive
+	await _wait(8)
+	_check(_fight._seen().is_empty() and _fight._living().size() == 1 and _fight._pick_target() == null and _fight._by_seen(int(_player.name)) == null, "a veiled player can still be aimed at")
+	_player.effects.clear("veil")
+	await _wait(8)
+	_check(_fight._pick_target() == _player, "the witch does not find her again after the veil")
+	print("  veil ok")
 
 	for act: String in ACTS[0]:
 		if not await _play_act(act):

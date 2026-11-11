@@ -194,6 +194,17 @@ func _run() -> void:
 	if not await _until(func() -> bool: return _fight.mode == MornathFight.Mode.ACTING or _fight.mode == MornathFight.Mode.MOVING, 60 * 8):
 		return _fail("the fight did not go on in the second phase")
 	print("second phase goes on")
+	# --- Nebelschleier: a veiled player cannot be picked, but still counts as alive (no reset)
+	_player.effects.apply("veil", 3.0, 1.0)
+	await _wait(8)
+	if not _check(_player.veiled() and _fight._seen().is_empty() and _fight._living().size() == 1 and _fight._pick_target() == null, "a veiled player can still be aimed at (seen %d living %d)" % [_fight._seen().size(), _fight._living().size()]):
+		return
+	_player.effects.clear("veil")
+	await _wait(8)
+	if not _check(_fight._pick_target() == _player, "the boss does not find her again after the veil"):
+		return
+	print("veil: the boss loses a veiled player and finds her again")
+
 	if not await _phase_two():
 		return
 

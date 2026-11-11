@@ -4,6 +4,9 @@ extends WorldProp
 ## stones, most of all along the shores, and glow caps (mushrooms in groups of 1 to 5, the variant is the
 ## amount) that glow at night. After a few days a new one lies there again. What it shows, gives and
 ## bursts into comes from the `pickup` block of its kind in data/plants.json.
+## `night_only` (the lake's Seeglimmer, docs/seehexe_konzept.md 6): it only shows, glows and can be picked while the night is deep enough.
+
+const NIGHT_SHOWN: float = 0.45 ## night_amount from which a night-only find is there
 
 const PICK_BURST: Array[Color] = [Color("c4c2da"), Color("9a98b8")]
 const REGROW_BURST: Array[Color] = [Color("d9c8ff"), Color("78f4e6")]
@@ -16,11 +19,12 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 	_sprite.hframes = int(_spec.columns)
 	_sprite.vframes = 1
 	_sprite.frame = variant
-	_sprite.visible = not gone
-	_sync_glow(not gone)
+	var there: bool = not gone and _shown_now()
+	_sprite.visible = there
+	_sync_glow(there)
 	var light: Dictionary = _spec.get("light", {})
 	if not light.is_empty():
-		_set_light(not gone, Color(String(light.color)), int(light.radius), float(light.energy)) ## a pool of light while it stands
+		_set_light(there, Color(String(light.color)), int(light.radius), float(light.energy)) ## a pool of light while it stands
 	if fx == "pick":
 		Sfx.at(self, "item_pickup" if String(_spec.pickup.get("item", "")) == "stone" else "pluck", global_position, -3.0)
 		_burst(4 + int(_spec.pickup.get("amount", [1])[variant] if _spec.pickup.has("amount") else 0), _burst_colors(), 30.0, Vector2(0, -_height * 0.5))
@@ -30,8 +34,22 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 		set_focused(_prompt_node.visible)
 
 
+func _shown_now() -> bool:
+	return not bool(_spec.get("night_only", false)) or MineManager.night_at(self, TimeManager.night_amount()) >= NIGHT_SHOWN
+
+
+var _was_shown: bool = true
+
+
+func set_night(amount: float) -> void:
+	super.set_night(amount)
+	if bool(_spec.get("night_only", false)) and _sprite != null and _shown_now() != _was_shown:
+		_was_shown = _shown_now()
+		apply_state(state, "")
+
+
 func prompt() -> String:
-	if bool(state.get("p", 0)):
+	if bool(state.get("p", 0)) or not _shown_now():
 		return ""
 	return String((_spec.pickup as Dictionary).prompt)
 

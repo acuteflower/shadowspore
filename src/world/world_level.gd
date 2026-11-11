@@ -318,6 +318,17 @@ func _add_ground_decals() -> Dictionary:
 		add_child(hut)
 		(get_node("Interiors") as Interiors).register_entrance(hut.interior_id, hut)
 		_clear_around(clear, hut.position + Vector2(0, -10), int(hut_spec.get("clear_radius", 8)))
+		if hut_spec.has("ring"): ## ward stones round the house (the lake witch's, docs/seehexe_konzept.md 3.3)
+			var ring: WardRing = WardRing.new()
+			ring.name = "WardRing_" + String(hut_spec.id)
+			ring.setup(String(hut_spec.id), hut_spec.ring as Dictionary, hut.position)
+			add_child(ring)
+			for stone: Array in ring.stones:
+				_clear_around(clear, ring.position + (stone[0] as Vector2), 1)
+			if String(hut_spec.id) == "lake_hut": ## the lake witch's entry quest "Der Ring am See"
+				var story: LakeWitchStory = LakeWitchStory.new()
+				story.setup(hut, ring)
+				add_child(story)
 	for quarry_spec: Dictionary in DataRegistry.table("ground").get("quarries", []) as Array: ## the quarry where the knight is mining
 		var quarry: Quarry = Quarry.new()
 		var qtile: Array = quarry_spec.tile as Array
@@ -865,20 +876,20 @@ func debug_jump_gustav() -> void:
 
 ## A loaded save that stopped in the middle of the wake-up starts it again.
 func resume_story(player: Player) -> void:
-	if player.quests != null and String(player.quests.current().get("step_id", "")) == "wake":
+	if player.quests != null and player.quests.active_step_id("find_help") == "wake":
 		start_wake(player)
-	elif player.quests != null and String(player.quests.current().get("step_id", "")) == "meet":
+	elif player.quests != null and player.quests.active_step_id("find_help") == "meet":
 		start_knight_meet(player) ## a save that stopped in the middle of the meeting plays it again
-	elif player.quests != null and String(player.quests.current().get("step_id", "")) == "follow_knight":
+	elif player.quests != null and player.quests.active_step_id("find_help") == "follow_knight":
 		start_knight_walk(player)
-	elif player.quests != null and String(player.quests.current().get("step_id", "")) in ["sit_fire", "sleep"]:
+	elif player.quests != null and player.quests.active_step_id("find_help") in ["sit_fire", "sleep"]:
 		place_knight("fire") ## a save from the evening: he sits by the fire
 	elif player.quests != null and player.quests.has_flag("day2_started"):
 		place_knight("door")
-	if player.quests != null and String(player.quests.current().get("step_id", "")) == "kill_spider":
+	if player.quests != null and player.quests.active_step_id("lumberjack") == "kill_spider":
 		start_cabin_spider(player, true) ## a save from in the fight: a spider rises again when she is inside
 	if player.quests != null:
-		var gustav_step: String = String(player.quests.current().get("step_id", ""))
+		var gustav_step: String = player.quests.active_step_id("gustav_rescue")
 		var wagon: GustavWagon = _wagon()
 		if wagon != null and player.quests.has_flag("wagon_opened"):
 			wagon.set_open(true, false) ## the door stays open once she has freed him
@@ -890,7 +901,7 @@ func resume_story(player: Player) -> void:
 			start_gustav_escort(player)
 		elif gustav_step == "welcome":
 			start_gustav_welcome(player)
-	if player.quests != null and String(player.quests.current().get("step_id", "")) == "report_back" and not player.inventory.has_item("axe_basic"):
+	if player.quests != null and player.quests.active_step_id("lumberjack") == "report_back" and not player.inventory.has_item("axe_basic"):
 		player.inventory.give("axe_basic", 1) ## a save from between dropping and picking up the axe: never soft-locked without it
 	var hut_room: Interior = (get_node("Interiors") as Interiors).interior("hut")
 	if hut_room != null and player.quests != null: ## a save from while the hut was being renewed: what is gone stays gone
@@ -900,7 +911,7 @@ func resume_story(player: Player) -> void:
 				spot.apply_gone()
 		if hut_room.tree != null and player.quests.has_flag("hut_tree_felled"):
 			(hut_room.tree as HutTree).set_felled(true)
-	if player.quests != null and String(player.quests.current().get("step_id", "")) == "rebuild_finale":
+	if player.quests != null and player.quests.active_step_id("rebuild_hut") == "rebuild_finale":
 		start_hut_finale(player) ## a save from just before the building: it starts again
 	if player.quests != null and player.quests.has_flag("rebuild_done"):
 		_apply_renewed(true) ## the hut stays mended
@@ -1024,7 +1035,7 @@ func _watch_wood_handover() -> void:
 	var quarry: Quarry = get_node_or_null("Quarry_quarry") as Quarry
 	if player == null or quarry == null or not player.is_multiplayer_authority() or player.quests == null or player.story_lock or InputManager.ui_blocking:
 		return
-	if String(player.quests.current().get("step_id", "")) != "rebuild_tasks" or player.quests.has_flag("rebuild_wood_delivered") or player.inventory.count_item("wood") < 20:
+	if player.quests.active_step_id("rebuild_hut") != "rebuild_tasks" or player.quests.has_flag("rebuild_wood_delivered") or player.inventory.count_item("wood") < 20:
 		return
 	if player.global_position.distance_to(quarry.knight.global_position) < 90.0:
 		_wood_busy = true

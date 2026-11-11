@@ -1,0 +1,41 @@
+{
+  "find_help": {
+    "steps": {
+      "find_knight": "Er war gestern hier. Irgendwo. Ich wünschte, ich hätte ihn nach seinem Namen gefragt."
+    },
+    "milestones": {
+      "wake": "Ich bin in einer fremden Hütte aufgewacht. Jemand hat mich bis hierher getragen.",
+      "meet": "Valdric. Jetzt weiß ich endlich, wie er heißt."
+    },
+    "finished": "Ein Platz am Feuer. Ich hab erst gemerkt, wie kalt mir war, als ich saß."
+  },
+  "lumberjack": {
+    "finished": "In der Holzfällerhütte ist wieder Ruhe. Ich glaube, ich rieche das nasse Holz immer noch."
+  },
+  "rebuild_hut": {
+    "steps": {
+      "rebuild_tasks": "Ein Baum im Wohnzimmer. Die Vögel hätten nichts dagegen. Ich hätte lieber ein Dach."
+    },
+    "milestones": {
+      "rebuild_tasks": "Das Holz liegt bereit. Baum und Pilze sind raus. Drinnen ist plötzlich richtig Platz."
+    },
+    "sketch_after": "rebuild_tasks",
+    "sketch": "roof",
+    "finished": "Das Dach hält. Und wenn es regnet, kann ich drinnen sitzen bleiben. Das ist neu."
+  },
+  "town_start": {
+    "finished": "Der Lichtpfosten steht. Von draußen sieht man jetzt, wo man hinmuss."
+  },
+  "gustav_rescue": {
+    "milestones": {
+      "free_gustav": "Die Wagentür ist endlich offen. Er hat mir geantwortet.",
+      "escort": "Wir haben es bis ins Licht geschafft. Ich glaube, ich hab erst da wieder richtig geatmet."
+    },
+    "sketch_after": "free_gustav",
+    "sketch": "wheel",
+    "finished": "Er hat aus dem Wagen geklopft. Gut, dass ich stehen geblieben bin."
+  },
+  "town_workshop": {
+    "finished": "Die Werkstatt steht, und ich hab meine eigene Spitzhacke. Gustav hat mich zweimal nachmessen lassen."
+  }
+}

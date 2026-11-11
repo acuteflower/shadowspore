@@ -3,7 +3,8 @@ extends Node
 ## The state of the quest board (docs/questtafel_konzept.md): the notices that hang and who took which. One child of the `TownManager` (`town.board`), created in the
 ## same place on every peer so the RPCs find each other. The host decides (rolling new notices at sunrise, taking, counting kills, paying), everyone mirrors; the whole
 ## table travels in the town's snapshot (`export_state` / `import_state`) and is saved with it. Rules without nodes: `BoardRules`. The window: `QuestBoardWindow`.
-## `taken`: notice id (String) -> {peer id (String) -> {n: kills so far, done}}. Peer ids are not stable between sessions, so only the host's own entries are saved.
+## `taken`: notice id -> owner -> attempt. On the host, guests have durable private owner keys.
+## Network snapshots translate those keys back to the connected peers' IDs.
 
 signal changed ## the table changed on this peer (a notice came or went, somebody took or finished one)
 signal result(text: String, good: bool) ## the answer to the local player's request
@@ -11,6 +12,10 @@ signal result(text: String, good: bool) ## the answer to the local player's requ
 var town: TownManager
 var offers: Array[Dictionary] = []
 var taken: Dictionary = {}
+var _archive: Dictionary = {} ## owner -> Array of terminal attempts, independent of the posted offers
+var world_id: String = ""
+var _guest_players: Dictionary = {} ## host-owned bag and reward balances, persisted with the board
+var _departed_peers: Dictionary = {} ## departed contributors can still count for this night's bounty
 var next_id: int = 1
 var _story_posted: Dictionary = {} ## story entry id -> true
 var _story_clock: float = 0.0
@@ -28,12 +33,16 @@ func setup(owner_town: TownManager) -> void:
 	town = owner_town
 	_rng.randomize()
 	if multiplayer.is_server():
+		world_id = Crypto.new().generate_random_bytes(16).hex_encode()
 		TimeManager.day_started.connect(_on_day_started)
+		NetworkManager.peer_left.connect(_remember_guest)
 
 
 func _exit_tree() -> void:
 	if TimeManager.day_started.is_connected(_on_day_started):
 		TimeManager.day_started.disconnect(_on_day_started)
+	if NetworkManager.peer_left.is_connected(_remember_guest):
+		NetworkManager.peer_left.disconnect(_remember_guest)
 
 
 # ---------- questions ----------
@@ -51,7 +60,76 @@ func offer_of(id: int) -> Dictionary:
 
 
 func entry_of(id: int, peer: int) -> Dictionary:
-	return ((taken.get(str(id), {}) as Dictionary).get(str(peer), {}) as Dictionary)
+	return ((taken.get(str(id), {}) as Dictionary).get(_owner(peer), {}) as Dictionary)
+
+
+func archived_for(peer: int) -> Array:
+	return _archive.get(_owner(peer), []) as Array
+
+
+func story_quests_for(peer: int) -> Array[String]:
+	var ids: Array[String] = []
+	for offer: Dictionary in offers:
+		if String(offer.k) == BoardRules.STORY and not entry_of(int(offer.id), peer).is_empty():
+			ids.append(String(offer.q))
+	return ids
+
+
+func _owner(peer: int) -> String:
+	var guest: String = NetworkManager.guest_owner(peer) if multiplayer.is_server() else ""
+	return guest if guest != "" else str(peer)
+
+
+func _peer_of(owner: String) -> int:
+	return int(owner) if owner.is_valid_int() else NetworkManager.guest_peer(owner)
+
+
+func _remember_guest(peer: int) -> void:
+	_capture_guest(peer)
+	var owner: String = NetworkManager.guest_owner(peer)
+	if owner != "":
+		_departed_peers[peer] = owner
+
+
+func _capture_guest(peer: int) -> void:
+	var owner: String = NetworkManager.guest_owner(peer)
+	var player: Player = _player_of(peer)
+	if owner != "" and player != null:
+		_guest_players[owner] = SaveGame.guest_economy(player)
+
+
+func restore_guest(player: Player) -> void:
+	var peer: int = player.name.to_int()
+	_departed_peers.erase(peer)
+	var saved: Dictionary = _guest_players.get(_owner(peer), {})
+	if not saved.is_empty():
+		SaveGame.restore_guest_economy(player, saved)
+
+
+func _archive_entry(offer: Dictionary, entry: Dictionary, owner: String, status: String, day: int, have: int = 0) -> void:
+	var records: Array = _archive.get(owner, [])
+	var giver: String = String(offer.g)
+	records.append({
+		"oid": int(offer.id), "attempt": int(entry.get("attempt", 1)), "status": status, "kind": String(offer.k),
+		"title": BoardRules.goal_text(offer), "text": String(offer.txt), "giver": String(town.settler_spec(giver).get("name", giver.to_upper())),
+		"have": BoardRules.progress(offer, entry, have), "need": int(offer.n),
+		"day": day, "due": BoardRules.entry_due(offer, entry),
+	})
+	_archive[owner] = records
+
+
+func _expire_entry(offer: Dictionary, entry: Dictionary, owner: String, message: String) -> void:
+	var peer: int = _peer_of(owner)
+	var player: Player = _player_of(peer)
+	var have: int = have_of(offer, player)
+	if player == null and String(offer.k) == BoardRules.FETCH:
+		var saved: Dictionary = _guest_players.get(owner, {})
+		for stack: Dictionary in saved.get("slots", []) as Array:
+			if String(stack.get("id", "")) == String(offer.t):
+				have += int(stack.count)
+	_archive_entry(offer, entry, owner, "expired", TimeManager.day, have)
+	(taken[str(offer.id)] as Dictionary).erase(owner)
+	_reply(peer, message, false)
 
 
 ## What the bag of `player` holds for a fetch notice (0 for the other kinds).
@@ -83,7 +161,7 @@ func running_for(peer: int) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for offer: Dictionary in offers:
 		var entry: Dictionary = entry_of(int(offer.id), peer)
-		if not entry.is_empty() and not bool(entry.get("done", false)) and String(offer.k) != BoardRules.STORY:
+		if BoardRules.entry_active(offer, entry, TimeManager.day, TimeManager.time_of_day):
 			out.append(offer)
 	return out
 
@@ -91,9 +169,11 @@ func running_for(peer: int) -> Array[Dictionary]:
 # ---------- host: the days ----------
 
 func _on_day_started(day: int) -> void:
+	var lapsed: bool = _lapse_entries(day)
 	if not is_ready():
+		if lapsed:
+			_broadcast()
 		return
-	_lapse_entries(day)
 	var ran_out: int = 0
 	for offer: Dictionary in offers:
 		if int(offer.e) == day and String(offer.k) != BoardRules.STORY:
@@ -109,7 +189,7 @@ func _on_day_started(day: int) -> void:
 	while fresh < BoardRules.limit("new_per_day") and _simple_count() < _simple_cap():
 		if _rng.randf() > float(post.get("chance", 1.0)):
 			break
-		var offer: Dictionary = BoardRules.roll(_rng, town.residents, _plain_hanging(), day, next_id)
+		var offer: Dictionary = BoardRules.roll(_rng, town.met_residents(), _plain_hanging(), day, next_id)
 		if offer.is_empty():
 			break
 		_maybe_rush(offer)
@@ -154,7 +234,7 @@ func post_occasions(ctx: Dictionary) -> int:
 			break
 		var occ: Dictionary = item.occ as Dictionary
 		var giver: String = String(occ.giver)
-		if not town.residents.has(giver) or int((town.residents[giver] as Dictionary).get("trust", 0)) < int(occ.get("min_trust", 0)):
+		if not town.has_met(giver) or int((town.residents[giver] as Dictionary).get("trust", 0)) < int(occ.get("min_trust", 0)):
 			continue
 		if _giver_count(giver) > BoardRules.limit("per_giver") or _occasion_hangs(String(occ.id)):
 			continue
@@ -207,7 +287,7 @@ func _rush_free() -> bool:
 ## A plain fetch notice may be upgraded to a rush notice by chance, from enough trust, when none hangs.
 func _maybe_rush(offer: Dictionary) -> void:
 	var cfg: Dictionary = BoardRules.urgent_cfg()
-	if String(offer.k) != BoardRules.FETCH or not _rush_free() or not town.residents.has(String(offer.g)):
+	if String(offer.k) != BoardRules.FETCH or not _rush_free() or not town.has_met(String(offer.g)):
 		return
 	if int((town.residents[String(offer.g)] as Dictionary).get("trust", 0)) < int(cfg.get("min_trust", 20)):
 		return
@@ -233,16 +313,17 @@ func _held(id: int) -> bool:
 
 
 ## Host, at sunrise: entries whose own deadline has come are dropped, their owner is told.
-func _lapse_entries(day: int) -> void:
+func _lapse_entries(day: int) -> bool:
+	var moved: bool = false
 	for offer: Dictionary in offers:
 		var sheet: Dictionary = taken.get(str(offer.id), {}) as Dictionary
-		for peer_key: String in sheet.keys():
-			var entry: Dictionary = sheet[peer_key] as Dictionary
-			var due: int = BoardRules.entry_due(offer, entry)
-			if bool(entry.get("done", false)) or due < 0 or day < due:
+		for owner: String in sheet.keys():
+			var entry: Dictionary = sheet[owner] as Dictionary
+			if bool(entry.get("done", false)) or not BoardRules.entry_expired(offer, entry, day, TimeManager.time_of_day):
 				continue
-			sheet.erase(peer_key)
-			_reply(int(peer_key), "AUFTRAG VERFALLEN", false)
+			_expire_entry(offer, entry, owner, "AUFTRAG VERFALLEN")
+			moved = true
+	return moved
 
 
 ## Host: dev and tests post one by hand (template id, giver).
@@ -273,8 +354,6 @@ func _physics_process(delta: float) -> void:
 
 ## Host, once a second: a rush notice that dusk has reached is gone, with the entries of those who still carried it.
 func check_rush() -> void:
-	if not is_ready():
-		return
 	var gone: Array[int] = []
 	for offer: Dictionary in offers:
 		if BoardRules.urgent_over(offer, TimeManager.day, TimeManager.time_of_day):
@@ -282,10 +361,12 @@ func check_rush() -> void:
 	if gone.is_empty():
 		return
 	for id: int in gone:
+		var offer: Dictionary = offer_of(id)
 		var sheet: Dictionary = taken.get(str(id), {}) as Dictionary
-		for peer_key: String in sheet.keys():
-			if not bool((sheet[peer_key] as Dictionary).get("done", false)):
-				_reply(int(peer_key), "EILZETTEL VERFALLEN", false)
+		for owner: String in sheet.keys():
+			var entry: Dictionary = sheet[owner] as Dictionary
+			if not bool(entry.get("done", false)):
+				_expire_entry(offer, entry, owner, "EILZETTEL VERFALLEN")
 		_remove(id)
 	_broadcast()
 
@@ -303,7 +384,7 @@ func _check_story() -> void:
 		var entry: Dictionary = raw as Dictionary
 		if _story_posted.has(String(entry.id)):
 			continue
-		if BoardRules.story_due(entry, quests, player.quests.is_finished, player.quests.has_flag):
+		if BoardRules.story_due(entry, quests, player.quests.is_finished, player.quests.has_flag, player.progress.level):
 			_story_posted[String(entry.id)] = true
 			offers.append(BoardRules.make_story(entry, TimeManager.day, next_id))
 			next_id += 1
@@ -336,16 +417,30 @@ func _rpc_accept(id: int) -> void:
 
 
 func request_finish(id: int) -> void:
+	var attempt: int = int(entry_of(id, multiplayer.get_unique_id()).get("attempt", 1))
 	if multiplayer.is_server():
-		_host_finish(multiplayer.get_unique_id(), id)
+		_host_finish(multiplayer.get_unique_id(), id, attempt)
 	else:
-		_rpc_finish.rpc_id(1, id)
+		_rpc_finish.rpc_id(1, id, attempt)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _rpc_finish(id: int) -> void:
+func _rpc_finish(id: int, attempt: int) -> void:
 	if multiplayer.is_server():
-		_host_finish(multiplayer.get_remote_sender_id(), id)
+		_host_finish(multiplayer.get_remote_sender_id(), id, attempt)
+
+
+func request_abandon(id: int, attempt: int) -> void:
+	if multiplayer.is_server():
+		_host_abandon(multiplayer.get_unique_id(), id, attempt)
+	else:
+		_rpc_abandon.rpc_id(1, id, attempt)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_abandon(id: int, attempt: int) -> void:
+	if multiplayer.is_server():
+		_host_abandon(multiplayer.get_remote_sender_id(), id, attempt)
 
 
 func _player_of(peer: int) -> Player:
@@ -382,8 +477,16 @@ func report(giver: String, player: Player) -> String:
 	var ready: Array[Dictionary] = finishable(giver, player)
 	if ready.is_empty():
 		return ""
+	var requested: bool = false
 	for offer: Dictionary in ready:
+		var bonus: Dictionary = offer.get("b", {})
+		var take: int = int(offer.n) if String(offer.k) == BoardRules.FETCH else 0
+		if not bonus.is_empty() and not player.inventory.exchange_items(String(offer.t), take, String(bonus.id), int(bonus.n), true):
+			continue
 		request_finish(int(offer.id))
+		requested = true
+	if not requested:
+		return "Mach erst Platz für deine Belohnung."
 	var lines: Array = BoardRules.thanks()
 	return String(lines[randi() % lines.size()]) if not lines.is_empty() else ""
 
@@ -400,8 +503,17 @@ func _host_accept(peer: int, id: int) -> void:
 	if not BoardRules.is_hanging(offer, TimeManager.day):
 		_reply(peer, "DER ZETTEL IST ABGELAUFEN", false)
 		return
+	var attempt: int = 1
+	var due: int = BoardRules.due_for(offer, TimeManager.day)
+	var records: Array = archived_for(peer)
+	for i: int in range(records.size() - 1, -1, -1):
+		var old: Dictionary = records[i] as Dictionary
+		if int(old.oid) == id:
+			attempt = int(old.attempt) + 1
+			due = int(old.due)
+			break
 	var sheet: Dictionary = taken.get(str(id), {}) as Dictionary
-	sheet[str(peer)] = {"n": 0, "done": false, "due": BoardRules.due_for(offer, TimeManager.day)}
+	sheet[_owner(peer)] = {"n": 0, "done": false, "due": due, "attempt": attempt}
 	taken[str(id)] = sheet
 	if String(offer.k) == BoardRules.STORY:
 		if peer == multiplayer.get_unique_id():
@@ -412,7 +524,7 @@ func _host_accept(peer: int, id: int) -> void:
 	_broadcast()
 
 
-func _host_finish(peer: int, id: int) -> void:
+func _host_finish(peer: int, id: int, attempt: int) -> void:
 	var player: Player = _player_of(peer)
 	var offer: Dictionary = offer_of(id)
 	if player == null or offer.is_empty():
@@ -422,28 +534,57 @@ func _host_finish(peer: int, id: int) -> void:
 		_reply(peer, "MELDE DICH BEIM AUFTRAGGEBER", false)
 		return
 	var entry: Dictionary = entry_of(id, peer)
-	if entry.is_empty():
-		_reply(peer, "ERST ANNEHMEN", false)
+	if entry.is_empty() or int(entry.get("attempt", 1)) != attempt:
+		_reply(peer, "AUFTRAG NICHT MEHR OFFEN", false)
 		return
 	if bool(entry.get("done", false)):
 		_reply(peer, "SCHON ERLEDIGT", false)
+		return
+	if BoardRules.entry_expired(offer, entry, TimeManager.day, TimeManager.time_of_day):
+		_expire_entry(offer, entry, _owner(peer), "AUFTRAG VERFALLEN")
+		_broadcast()
 		return
 	var have: int = have_of(offer, player)
 	if not BoardRules.can_finish(offer, entry, have):
 		_reply(peer, "NOCH NICHT GENUG" if String(offer.k) == BoardRules.FETCH else "NOCH NICHT ERLEDIGT", false)
 		return
-	if String(offer.k) == BoardRules.FETCH and not player.inventory.remove_item(String(offer.t), int(offer.n)):
+	var bonus: Dictionary = offer.get("b", {})
+	var take: int = int(offer.n) if String(offer.k) == BoardRules.FETCH else 0
+	if not bonus.is_empty():
+		if not player.inventory.exchange_items(String(offer.t), take, String(bonus.id), int(bonus.n)):
+			_reply(peer, "TASCHE VOLL: MACH PLATZ FÜR DIE BELOHNUNG", false)
+			return
+	elif take > 0 and not player.inventory.remove_item(String(offer.t), take):
 		_reply(peer, "NOCH NICHT GENUG", false)
 		return
 	entry["done"] = true
-	(taken[str(id)] as Dictionary)[str(peer)] = entry
+	var owner: String = _owner(peer)
+	(taken[str(id)] as Dictionary)[owner] = entry
+	_archive_entry(offer, entry, owner, "finished", TimeManager.day)
 	player.progress.award(int(offer.c), int(offer.x))
 	_add_trust(String(offer.g), int(offer.tr))
-	var bonus: Dictionary = offer.get("b", {}) as Dictionary
-	if not bonus.is_empty():
-		player.inventory.give(String(bonus.id), int(bonus.n))
 	_reply(peer, "ERLEDIGT", true)
 	_honor_count(peer, offer)
+	_broadcast()
+
+
+func _host_abandon(peer: int, id: int, attempt: int) -> void:
+	var player: Player = _player_of(peer)
+	var offer: Dictionary = offer_of(id)
+	var entry: Dictionary = entry_of(id, peer)
+	if player == null or offer.is_empty() or entry.is_empty() or bool(entry.get("done", false)) or int(entry.get("attempt", 1)) != attempt:
+		_reply(peer, "AUFTRAG NICHT MEHR OFFEN", false)
+		return
+	if String(offer.k) == BoardRules.STORY:
+		_reply(peer, "HAUPTGESCHICHTE KANN NICHT AUFGEGEBEN WERDEN", false)
+		return
+	var owner: String = _owner(peer)
+	if BoardRules.entry_expired(offer, entry, TimeManager.day, TimeManager.time_of_day):
+		_expire_entry(offer, entry, owner, "AUFTRAG VERFALLEN")
+	else:
+		_archive_entry(offer, entry, owner, "abandoned", TimeManager.day, have_of(offer, player))
+		(taken[str(id)] as Dictionary).erase(owner)
+		_reply(peer, "AUFTRAG AUFGEGEBEN", true)
 	_broadcast()
 
 
@@ -478,7 +619,7 @@ func check_bounty() -> void:
 		return
 	var giver: String = String(BoardRules.bounty_cfg().get("giver", "valdric"))
 	if offer.is_empty():
-		if TimeManager.is_night() or not town.residents.has(giver):
+		if TimeManager.is_night() or not town.has_met(giver):
 			return ## the poster goes up in the morning
 		offer = BoardRules.make_bounty(mark, giver, TimeManager.day, next_id)
 		next_id += 1
@@ -510,21 +651,22 @@ func check_bounty() -> void:
 ## Host: the marked one fell. Whoever took the poster and ever hurt it has it done; whoever took it and did not is released; the name goes into the honour board.
 func _on_bounty_fell(mark: Dictionary, peers: Array) -> void:
 	var day: int = TimeManager.day
+	var contributors: Array[String] = []
+	for peer: int in peers:
+		contributors.append(String(_departed_peers.get(peer, _owner(peer))))
 	for offer: Dictionary in offers:
 		if not BoardRules.is_bounty(offer) or String(offer.bn) != String(mark.name):
 			continue
 		var sheet: Dictionary = taken.get(str(offer.id), {}) as Dictionary
-		for peer_key: String in sheet.keys():
-			var entry: Dictionary = sheet[peer_key] as Dictionary
+		for owner: String in sheet.keys():
+			var entry: Dictionary = sheet[owner] as Dictionary
 			if bool(entry.get("done", false)):
 				continue
-			if peers.has(int(peer_key)):
+			if contributors.has(owner):
 				entry["n"] = 1
-				sheet[peer_key] = entry
-				_reply(int(peer_key), "%s IST GEFALLEN: MELDE ES VALDRIC" % String(mark.name), true)
+				_reply(_peer_of(owner), "%s IST GEFALLEN: MELDE ES VALDRIC" % String(mark.name), true)
 			else:
-				sheet.erase(peer_key)
-				_reply(int(peer_key), "%s FIEL OHNE DICH" % String(mark.name), false)
+				_expire_entry(offer, entry, owner, "%s FIEL OHNE DICH" % String(mark.name))
 		taken[str(offer.id)] = sheet
 		offer["e"] = day ## it no longer hangs
 	(honor.fallen as Array).append({"name": String(mark.name), "species": String(mark.species), "day": day, "nights": int(mark.nights)})
@@ -542,12 +684,12 @@ func honor_done() -> int:
 func stats_of(peer: int) -> Dictionary:
 	if peer == 0:
 		return (honor.town as Dictionary) if not (honor.town as Dictionary).is_empty() else BoardRules.blank_stats()
-	return ((honor.peers as Dictionary).get(str(peer), BoardRules.blank_stats())) as Dictionary
+	return ((honor.peers as Dictionary).get(_owner(peer), BoardRules.blank_stats())) as Dictionary
 
 
 ## The title this player wears ("" = none), as its display name.
 func title_name(peer: int) -> String:
-	var id: String = String((honor.titles as Dictionary).get(str(peer), ""))
+	var id: String = String((honor.titles as Dictionary).get(_owner(peer), ""))
 	return String(BoardRules.title_of(id).get("name", "")) if id != "" else ""
 
 
@@ -557,9 +699,10 @@ func _honor_count(peer: int, offer: Dictionary) -> void:
 		honor["town"] = BoardRules.blank_stats()
 	BoardRules.count_done(honor.town as Dictionary, offer)
 	var peers: Dictionary = honor.peers as Dictionary
-	if not peers.has(str(peer)):
-		peers[str(peer)] = BoardRules.blank_stats()
-	BoardRules.count_done(peers[str(peer)] as Dictionary, offer)
+	var owner: String = _owner(peer)
+	if not peers.has(owner):
+		peers[owner] = BoardRules.blank_stats()
+	BoardRules.count_done(peers[owner] as Dictionary, offer)
 	for id: String in _earned_titles(peer):
 		if not before.has(id):
 			_reply(peer, "NEUER TITEL: %s" % String(BoardRules.title_of(id).name), true)
@@ -592,7 +735,7 @@ func _host_title(peer: int, id: String) -> void:
 	if id != "" and not _earned_titles(peer).has(id):
 		_reply(peer, "NOCH NICHT VERDIENT", false)
 		return
-	(honor.titles as Dictionary)[str(peer)] = id
+	(honor.titles as Dictionary)[_owner(peer)] = id
 	_broadcast()
 
 
@@ -608,10 +751,10 @@ func note_kill(player: Player, species: String) -> void:
 		if String(offer.get("win", "")) == "night" and not TimeManager.is_night():
 			continue ## a night hunt only counts at night
 		var entry: Dictionary = entry_of(int(offer.id), peer)
-		if entry.is_empty() or bool(entry.get("done", false)) or int(entry.get("n", 0)) >= int(offer.n):
+		if entry.is_empty() or bool(entry.get("done", false)) or BoardRules.entry_expired(offer, entry, TimeManager.day, TimeManager.time_of_day) or int(entry.get("n", 0)) >= int(offer.n):
 			continue
 		entry["n"] = int(entry.get("n", 0)) + 1
-		(taken[str(offer.id)] as Dictionary)[str(peer)] = entry
+		(taken[str(offer.id)] as Dictionary)[_owner(peer)] = entry
 		moved = true
 	if moved:
 		_broadcast()
@@ -620,7 +763,7 @@ func note_kill(player: Player, species: String) -> void:
 func _reply(peer: int, text: String, good: bool) -> void:
 	if peer == multiplayer.get_unique_id():
 		result.emit(text, good)
-	else:
+	elif multiplayer.get_peers().has(peer):
 		_rpc_result.rpc_id(peer, text, good)
 
 
@@ -644,7 +787,7 @@ func _start_quest(quest_id: String) -> void:
 
 func _broadcast() -> void:
 	changed.emit()
-	_rpc_state.rpc(export_all())
+	_rpc_state.rpc(export_state(true))
 
 
 @rpc("authority", "call_remote", "reliable")
@@ -653,15 +796,22 @@ func _rpc_state(data: Dictionary) -> void:
 	changed.emit()
 
 
-func export_all() -> Dictionary:
-	return {"offers": offers.duplicate(true), "taken": taken.duplicate(true), "next_id": next_id, "story": _story_posted.keys(), "occ": occasion_last.duplicate(), "honor": honor.duplicate(true)}
-
-
 func _apply(data: Dictionary) -> void:
+	world_id = String(data.get("world", world_id))
 	offers.clear()
 	for raw: Variant in data.get("offers", []) as Array:
 		offers.append(_clean(raw as Dictionary))
 	taken = (data.get("taken", {}) as Dictionary).duplicate(true)
+	_archive = (data.get("archive", {}) as Dictionary).duplicate(true)
+	if not data.has("archive"):
+		for offer: Dictionary in offers:
+			var sheet: Dictionary = taken.get(str(offer.id), {})
+			for owner: String in sheet:
+				var entry: Dictionary = sheet[owner]
+				if String(offer.k) != BoardRules.STORY and bool(entry.get("done", false)):
+					_archive_entry(offer, entry, owner, "finished", -1)
+	if multiplayer.is_server() and data.has("guest_players"):
+		_guest_players = (data.guest_players as Dictionary).duplicate(true)
 	next_id = int(data.get("next_id", 1))
 	occasion_last.clear()
 	for key: String in (data.get("occ", {}) as Dictionary):
@@ -715,27 +865,42 @@ func _clean(raw: Dictionary) -> Dictionary:
 	return offer
 
 
-## `snapshot`: for a joining peer, everybody's entries; a save only keeps the host's own (peer ids are not stable between sessions).
+## Persistent owner keys and guest economies stay on the host. The wire uses current peer IDs.
 func export_state(snapshot: bool = false) -> Dictionary:
-	var data: Dictionary = export_all()
-	if snapshot:
-		return data
-	var mine: String = str(multiplayer.get_unique_id())
-	var honor_mine: Dictionary = {"town": (honor.town as Dictionary).duplicate(true), "peers": {}, "titles": {}, "fallen": (honor.fallen as Array).duplicate(true)}
-	if (honor.peers as Dictionary).has(mine):
-		(honor_mine.peers as Dictionary)[mine] = (honor.peers as Dictionary)[mine]
-	if (honor.titles as Dictionary).has(mine):
-		(honor_mine.titles as Dictionary)[mine] = (honor.titles as Dictionary)[mine]
-	data["honor"] = honor_mine
 	var kept: Dictionary = {}
 	for key: String in taken:
-		var entry: Variant = (taken[key] as Dictionary).get(mine)
-		if entry != null:
-			kept[key] = {mine: entry}
-	data["taken"] = kept
+		var entries: Dictionary = _export_owners(taken[key] as Dictionary, snapshot)
+		if not entries.is_empty():
+			kept[key] = entries
+	var honors: Dictionary = honor.duplicate(true)
+	honors["peers"] = _export_owners(honor.peers as Dictionary, snapshot)
+	honors["titles"] = _export_owners(honor.titles as Dictionary, snapshot)
+	var data: Dictionary = {
+		"offers": offers.duplicate(true), "taken": kept, "next_id": next_id,
+		"story": _story_posted.keys(), "occ": occasion_last.duplicate(),
+		"honor": honors, "archive": _export_owners(_archive, snapshot), "world": world_id,
+	}
+	if not snapshot:
+		for peer: int in multiplayer.get_peers():
+			_capture_guest(peer)
+		data["guest_players"] = _guest_players.duplicate(true)
 	return data
+
+
+func _export_owners(values: Dictionary, snapshot: bool) -> Dictionary:
+	var out: Dictionary = {}
+	for owner: String in values:
+		if snapshot:
+			var peer: int = _peer_of(owner)
+			if peer != 0:
+				out[str(peer)] = values[owner]
+		elif owner == str(multiplayer.get_unique_id()) or owner.begins_with("guest:"):
+			out[owner] = values[owner]
+	return out.duplicate(true)
 
 
 func import_state(data: Dictionary) -> void:
 	_apply(data)
+	if multiplayer.is_server():
+		_lapse_entries(TimeManager.day)
 	changed.emit()

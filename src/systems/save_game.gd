@@ -1,15 +1,20 @@
 class_name SaveGame
 extends RefCounted
-## One save file (user://save.json) for singleplayer: the clock, the local player (position, health,
+## Separate solo and hosted saves: the clock, the local player (position, health,
 ## money, XP, bag and equipment) and the state of the world's props (picked, felled, ...). The host
 ## saves; `load_into` restores it right after the world is built. Enemies and drops are not saved.
 
 const PATH: String = "user://save.json"
+const COOP_PATH: String = "user://coop_save.json"
 const VERSION: int = 1
 
 
-static func exists() -> bool:
-	return FileAccess.file_exists(PATH)
+static func path_for(tree: SceneTree) -> String:
+	return COOP_PATH if tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer else PATH
+
+
+static func exists(path: String = PATH) -> bool:
+	return FileAccess.file_exists(path)
 
 
 static func delete(path: String = PATH) -> bool:
@@ -20,15 +25,16 @@ static func delete(path: String = PATH) -> bool:
 
 
 ## When and where the game was last saved: {saved_at, day, time}; empty without a save.
-static func info() -> Dictionary:
-	var data: Dictionary = _read()
+static func info(path: String = PATH) -> Dictionary:
+	var data: Dictionary = _read(path)
 	return {} if data.is_empty() else {"saved_at": int(data.get("saved_at", 0)), "day": int(data.get("day", 0)), "time": float(data.get("time", 0.0))}
 
 
-static func save(tree: SceneTree, path: String = PATH) -> bool:
+static func save(tree: SceneTree, path: String = "") -> bool:
 	var player: Player = _local_player(tree)
 	if player == null or not tree.root.multiplayer.is_server():
 		return false
+	var target: String = path if path != "" else path_for(tree)
 	player.inventory.stow_held() ## a stack on the cursor goes back into the bag first
 	var position: Vector2 = player.climb.save_position()
 	var data: Dictionary = {
@@ -45,9 +51,10 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 			"skill_tree": (player.get_node("SkillTreeComponent") as SkillTreeComponent).export_data(),
 			"slots": player.inventory.slots,
 			"equipment": player.inventory.equipment,
+			"raw_rolls": player.inventory.hidden, ## what the raw stones in the bag hide (Ilva's LÄUTERN)
 			"bandaged": player.bandaged,
 			"quests": player.quests.export_data() if player.quests != null else {},
-			"board_local": player.tracked.export_data() if player.tracked != null else {}, ## which board notices she has read / does not follow
+			"board_local": player.tracked.export_data() if player.tracked != null else {}, ## journal focus, page and read notices
 		},
 	}
 	var world: Node = tree.get_first_node_in_group("world")
@@ -61,7 +68,7 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	if mines != null:
 		data["mine"] = mines.export_state() ## opened chests, mended lifts, depth, kills; the mined rocks are in "things"
 	var town: TownManager = tree.get_first_node_in_group("town") as TownManager
-	if town != null and town.founded:
+	if town != null and (town.founded or tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer):
 		data["town"] = town.export_state() ## the pieces, the stock, the ways, the residents (docs/town.md)
 	var night: NightDirector = tree.get_first_node_in_group("night_director") as NightDirector
 	if night != null:
@@ -69,6 +76,11 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and waystones.awake_count() > 0:
 		data["waystones"] = waystones.export_state() ## the awakened goddess statues (docs/waystones.md)
+	var rings: Dictionary = {}
+	for node: Node in tree.get_nodes_in_group("ward_rings"):
+		rings[(node as WardRing).id] = (node as WardRing).export_state()
+	if not rings.is_empty():
+		data["ward_rings"] = rings ## the ward stones round the lake witch's house: awake or out (docs/seehexe_konzept.md)
 	var witch: WitchArena = tree.get_first_node_in_group("witch_arena") as WitchArena
 	if witch != null and (witch.released or witch.opened):
 		data["witch"] = witch.export_state() ## Morwenna was released: the Rabenbaum stays free (docs/enemies/boss_mora.md)
@@ -83,15 +95,19 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
 		if discovery.is_reveal_all():
 			data["map_before"] = Marshalls.raw_to_base64(discovery.export_before()) ## the fog from before the developer's whole-map reveal
-	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	var pending: String = target + ".tmp"
+	var file: FileAccess = FileAccess.open(pending, FileAccess.WRITE)
 	if file == null:
 		return false
 	file.store_string(JSON.stringify(data))
-	return true
+	file.flush()
+	var written: bool = file.get_error() == OK
+	file.close()
+	return written and DirAccess.rename_absolute(pending, target) == OK
 
 
-static func load_into(tree: SceneTree, path: String = PATH) -> bool:
-	var data: Dictionary = _read(path)
+static func load_into(tree: SceneTree, path: String = "") -> bool:
+	var data: Dictionary = _read(path if path != "" else path_for(tree))
 	var player: Player = _local_player(tree)
 	if data.is_empty() or player == null:
 		return false
@@ -121,6 +137,7 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	player.progress.award(0, 0)
 	(player.get_node("SkillTreeComponent") as SkillTreeComponent).import_data(saved.get("skill_tree", {}) as Dictionary)
 	_restore_stacks(player.inventory, saved)
+	player.inventory.import_hidden(saved.get("raw_rolls", {}) as Dictionary)
 	player.set_bandaged(bool(saved.get("bandaged", false)))
 	player.sync_wound_visuals()
 	if player.quests != null and saved.has("quests"):
@@ -144,6 +161,10 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and data.has("waystones"):
 		waystones.import_state(data.waystones as Dictionary)
+	for ring_id: Variant in (data.get("ward_rings", {}) as Dictionary):
+		var ring: WardRing = WardRing.by_id(tree, String(ring_id))
+		if ring != null:
+			ring.import_state(bool((data.ward_rings as Dictionary)[ring_id]))
 	var witch: WitchArena = tree.get_first_node_in_group("witch_arena") as WitchArena
 	if witch != null and data.has("witch"):
 		witch.import_state(data.witch as Dictionary)
@@ -170,6 +191,30 @@ static func _restore_stacks(inventory: InventoryComponent, saved: Dictionary) ->
 	for slot_name: String in inventory.equipment:
 		inventory.equipment[slot_name] = _stack(equipment.get(slot_name, {}))
 	inventory.changed.emit()
+
+
+## Host-side guest state used by board delivery and rewards. A joining client requests
+## the restored inventory and balances through the normal player-component snapshots.
+static func guest_economy(player: Player) -> Dictionary:
+	var skills: SkillTreeComponent = player.get_node("SkillTreeComponent") as SkillTreeComponent
+	return {
+		"slots": player.inventory.slots.duplicate(true), "equipment": player.inventory.equipment.duplicate(true),
+		"held": player.inventory.held.duplicate(true), "raw_rolls": player.inventory.hidden.duplicate(true), "xp": player.progress.xp, "copper": player.progress.copper,
+		"claimed": player.progress.claimed, "skill_tree": skills.export_data(),
+	}
+
+
+static func restore_guest_economy(player: Player, saved: Dictionary) -> void:
+	player.progress.xp = int(saved.get("xp", 0))
+	player.progress.copper = int(saved.get("copper", 0))
+	player.progress.claimed = clampi(int(saved.get("claimed", 1)), 1, maxi(player.progress.level, 1))
+	player.progress.apply_stats(false)
+	player.progress.changed.emit()
+	var skills: SkillTreeComponent = player.get_node("SkillTreeComponent") as SkillTreeComponent
+	skills.import_data(saved.get("skill_tree", {}) as Dictionary)
+	player.inventory.held = _stack(saved.get("held", {}))
+	_restore_stacks(player.inventory, saved)
+	player.inventory.import_hidden(saved.get("raw_rolls", {}) as Dictionary)
 
 
 ## JSON turns counts into floats: back to a clean stack.

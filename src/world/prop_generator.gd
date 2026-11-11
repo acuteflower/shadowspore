@@ -46,14 +46,16 @@ const LAYERS: Array[Dictionary] = [
 	{"id": 30, "name": "witch_ore", "cell": 22, "reach": 4},
 	{"id": 31, "name": "bloom_drift", "cell": 21, "reach": 9},
 	{"id": 32, "name": "boulder_nook", "cell": 33, "reach": 7},
+	{"id": 33, "name": "lake_stones", "cell": 5, "reach": 3},
 ]
 const WITCH_KINDS: Array[String] = ["hag_tree", "bone_tree", "thorn_hedge", "grave_candle", "witch_hat", "toad_cap", "ghost_fern", "mandrake", "curse_rock", "hex_shrub", "witch_broom"] ## the Hexenwald's own plant world (tools/art_hexenwald.py): grows only where the biome is `bare` of the meadow's
-const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail"] ## may grow at the water's edge
+const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail", "lake_glimmer", "lake_moonstone"] ## may grow at the water's edge
+const LAKE_KINDS: Array[String] = ["lake_glimmer", "lake_moonstone"] ## the lake witch's raw stones (docs/seehexe_konzept.md 6): only on the shores of the Hexenwald's waters
 const TREE_KINDS: Array[String] = ["tree", "willow", "blossom", "birch", "hag_tree", "bone_tree"] ## what has a trunk and a crown
 const WITCH_SHARED: Array[String] = ["bush"] ## meadow plants the Hexenwald shares: only along its fringe, deeper in every "bush" becomes one of its own (`_hex_bush`)
 const WITCH_CLEARING: int = 15 ## percent of the witch_wood cells that are a clearing with a witches' ring instead of a wood (`_in_clearing`)
 const WITCH_CLEARING_R: float = 7.5 ## tiles: no tree or bush grows that close to a clearing's middle
-const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "iron_rock": 3.05, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3, "hag_tree": 4.0, "bone_tree": 3.6, "curse_rock": 3.05, "thorn_hedge": 2.0, "ghost_fern": 0.3, "grave_candle": 0.25, "witch_hat": 0.25, "toad_cap": 0.1, "mandrake": 0.2, "hex_shrub": 1.9, "witch_broom": 1.8} ## mushrooms give way to everything, so they never change what else stands where
+const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "iron_rock": 3.05, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3, "hag_tree": 4.0, "bone_tree": 3.6, "curse_rock": 3.05, "thorn_hedge": 2.0, "ghost_fern": 0.3, "grave_candle": 0.25, "witch_hat": 0.25, "toad_cap": 0.1, "mandrake": 0.2, "hex_shrub": 1.9, "witch_broom": 1.8, "lake_glimmer": -1.0, "lake_moonstone": -1.0} ## mushrooms give way to everything, so they never change what else stands where
 const BED_RX: Array[float] = [40.0, 48.0, 56.0, 64.0, 72.0, 80.0] ## px, the gravel beds (assets/props/stonebed.png)
 const BED_FLATTEN: float = 0.64
 const GAP: float = 3.0 ## px kept free between footprints
@@ -389,6 +391,9 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 		"witch_wood", "witch_tree", "witch_flora", "witch_patch", "witch_ore":
 			if is_bare(Vector2i(floori(center.x), floori(center.y))):
 				_witch(String(layer.name), found, rng, center, wild)
+		"lake_stones": ## Seeglimmer right at the waterline (it shows at night), Seemondstein further up the dry shore
+			if is_bare(Vector2i(floori(center.x), floori(center.y))):
+				_lake_stones(found, rng, center)
 	## Pure: a cluster depends only on its key, the seed and the static world inputs (set once before any chunk, and `_cache` is
 	## cleared on terrain edits), so a cleared entry is simply computed again with the same result.
 	if _cache.size() >= CACHE_LIMIT: _cache.clear()
@@ -533,6 +538,25 @@ func _water_gap(at: Vector2) -> float:
 func _near_water(at: Vector2) -> float:
 	var gap: float = _water_gap(at)
 	return 0.0 if gap == INF else 1.0 - smoothstep(8.0, 100.0, gap)
+
+
+## The lake stones of one cell: 1-3 Seeglimmer where the water laps (4..26 px from it), or 1-2 Seemondsteine on the dry shore (34..110 px).
+func _lake_stones(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2) -> void:
+	var gap: float = _water_gap(center)
+	if gap == INF:
+		return
+	var kind: String = ""
+	if gap <= 30.0 and rng.randf() < 0.45:
+		kind = "lake_glimmer"
+	elif gap >= 30.0 and gap <= 110.0 and rng.randf() < 0.22:
+		kind = "lake_moonstone"
+	if kind.is_empty():
+		return
+	for _i: int in rng.randi_range(1, 3 if kind == "lake_glimmer" else 2):
+		var at: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.0, 1.4)
+		var spot: float = _water_gap(at)
+		if (kind == "lake_glimmer" and spot >= 4.0 and spot <= 26.0) or (kind == "lake_moonstone" and spot >= 34.0 and spot <= 110.0):
+			_add(found, rng, kind, _weighted(rng, kind), at, -1.0)
 
 
 ## A clump of one waterside plant, 2-5 plants, each checked against the water again: marsh gold close, iris in the middle, mint far.
@@ -873,7 +897,7 @@ func _add(found: Array[Dictionary], rng: RandomNumberGenerator, kind: String, va
 		return
 	if TREE_KINDS.has(kind) and tree_free_cells.has(cell):
 		return
-	if is_bare(cell) != WITCH_KINDS.has(kind) and not (is_bare(cell) and WITCH_SHARED.has(kind)): ## the Hexenwald carries its own plants (and the plain bushes of the meadow); its plants grow nowhere else
+	if is_bare(cell) != (WITCH_KINDS.has(kind) or LAKE_KINDS.has(kind)) and not (is_bare(cell) and WITCH_SHARED.has(kind)): ## the Hexenwald carries its own plants (and the plain bushes of the meadow); its plants grow nowhere else
 		return
 	if (float(_sdf[cell.y * tile + cell.x]) - 128.0) / 8.0 < float(plant.edge_margin):
 		return

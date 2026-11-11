@@ -1,0 +1,65 @@
+{
+  "frame": [
+    76,
+    96
+  ],
+  "feet": [
+    38,
+    80
+  ],
+  "frames": 56,
+  "rows": 8,
+  "clips": {
+    "idle": {
+      "start": 0,
+      "count": 4,
+      "fps": 4
+    },
+    "walk": {
+      "start": 4,
+      "count": 6,
+      "fps": 7
+    },
+    "grind": {
+      "start": 10,
+      "count": 6,
+      "fps": 7,
+      "strike": 3
+    },
+    "carve": {
+      "start": 16,
+      "count": 6,
+      "fps": 6
+    },
+    "basin": {
+      "start": 22,
+      "count": 8,
+      "fps": 5
+    },
+    "counter": {
+      "start": 30,
+      "count": 4,
+      "fps": 3
+    },
+    "talk": {
+      "start": 34,
+      "count": 6,
+      "fps": 5
+    },
+    "listen": {
+      "start": 40,
+      "count": 4,
+      "fps": 4
+    },
+    "point": {
+      "start": 44,
+      "count": 6,
+      "fps": 6
+    },
+    "give": {
+      "start": 50,
+      "count": 6,
+      "fps": 5
+    }
+  }
+}

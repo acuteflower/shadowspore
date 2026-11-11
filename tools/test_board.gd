@@ -251,6 +251,24 @@ func _run() -> void:
 	_check(board.offers.size() >= 1 and board.offers.size() <= BoardRules.limit("simple"), "sunrise hangs notices up to the limit (%d)" % board.offers.size())
 	for offer: Dictionary in board.offers:
 		_check(town.residents.has(String(offer.g)), "a resident gave %s" % String(offer.tx))
+	# strangers give nothing: Esma and Ilva stand in the book but the player has never talked to them
+	town._rpc_resident("witch", {"trust": 80, "talked": -1}, false)
+	town._rpc_resident("lake_witch", {"trust": 80, "talked": -1}, false)
+	_check(not town.has_met("witch") and not town.has_met("lake_witch") and town.has_met("gustav") and town.has_met("valdric"), "only people the player has met (or the story introduced) are known")
+	_check(not town.met_residents().has("witch") and town.met_residents().has("gustav"), "the board sees only the known ones")
+	var stranger_seen: bool = false
+	for i: int in 40:
+		board.offers.clear()
+		board._rng.seed = 900 + i
+		board._on_day_started(TimeManager.day + 10 + i)
+		for offer: Dictionary in board.offers:
+			if String(offer.g) == "witch" or String(offer.g) == "lake_witch":
+				stranger_seen = true
+	_check(not stranger_seen, "a stranger never hangs a notice (40 mornings)")
+	town._host_talk("witch")
+	_check(town.has_met("witch"), "the first talk makes the stranger known")
+	town._rpc_resident("witch", {"trust": 0, "talked": -1}, false)
+	town._rpc_resident("lake_witch", {"trust": 0, "talked": -1}, false)
 	# a fetch notice, by hand
 	board.offers.clear()
 	board.taken.clear()
@@ -383,26 +401,19 @@ func _run() -> void:
 	var listed_ids: Array[String] = []
 	for item: Dictionary in tracked.entries():
 		listed_ids.append(String(item.id))
-	_check(listed_ids.has("board:%d" % open_id), "an accepted notice is an entry of the quest branch")
-	var first: Dictionary = tracked.entries()[0]
-	_check(String(first.source) == "story" if player.quests.current().size() > 0 else true, "the story quest comes first")
+	_check(listed_ids.has("board:%d" % open_id), "an accepted notice is an entry of the journal")
+	_check(String(tracked.focused().get("source", "")) == "story", "story is focused by default")
 	tracked.toggle_track(open_id)
-	var still: bool = false
-	for item: Dictionary in tracked.entries():
-		still = still or int(item.get("oid", -1)) == open_id
-	var all_of: bool = false
-	for item: Dictionary in tracked.board_entries(true):
-		all_of = all_of or int(item.oid) == open_id
-	_check(not still and all_of and not tracked.is_tracked(open_id), "not following hides it from the branch but keeps it listed")
+	_check(int(tracked.focused().get("oid", -1)) == open_id, "following gives the notice the single focus")
 	tracked.toggle_track(open_id)
-	_check(tracked.is_tracked(open_id), "following again")
+	_check(tracked.focused().is_empty() and not tracked.board_entries().is_empty(), "clearing focus keeps the notice in the journal")
 	_check(not tracked.is_seen(open_id) or true, "seen flag readable")
 	tracked.mark_seen([open_id])
 	var tracked_saved: Dictionary = tracked.export_data()
 	tracked.import_data({})
 	_check(not tracked.is_seen(open_id), "import replaces the lists")
 	tracked.import_data(tracked_saved)
-	_check(tracked.is_seen(open_id), "the lists survive a round trip")
+	_check(tracked.is_seen(open_id) and tracked.focused().is_empty(), "seen notices and an explicitly empty focus survive a round trip")
 	# a taken notice outlives the board's posting, then lapses on its own
 	var held_id: int = board.debug_post("any_berry", "gustav")
 	var held: Dictionary = board.offer_of(held_id)
@@ -665,5 +676,201 @@ func _run() -> void:
 	_check((board.honor.fallen as Array).size() == 1 and board.honor_done() >= 1 and board.title_name(peer) == "NAMENSJÄGER", "the honour board survives a round trip")
 	var saved_honor: Dictionary = (board.export_state() as Dictionary).honor as Dictionary
 	_check((saved_honor.titles as Dictionary).has(str(peer)) and (saved_honor.peers as Dictionary).has(str(peer)), "a save keeps the host's own title and counters")
+	await _journal_rules(player, board, spot, story_id)
 	print("BOARD OK" if _ok else "BOARD FAILED")
 	get_tree().quit(0 if _ok else 1)
+
+
+func _journal_rules(player: Player, board: BoardManager, spot: Vector2, story_id: int) -> void:
+	var quests: QuestComponent = player.quests
+	var tracked: TrackedQuests = player.tracked
+	var peer: int = player.name.to_int()
+	quests.import_data({"active": {"rebuild_hut": 0, "board_test": 0}, "flags": {"hud_unlocked": true}})
+	tracked.import_data({})
+	var story: String = "story:rebuild_hut"
+	var fetch: int = board.debug_post("gustav_wood", "gustav")
+	var hunt: int = board.debug_post("valdric_spider", "valdric")
+	var fetch_key: String = "board:%d" % fetch
+	var hunt_key: String = "board:%d" % hunt
+	player.global_position = spot
+	board.request_accept(fetch)
+	board.request_accept(hunt)
+	var open_ids: Array[String] = []
+	for row: Dictionary in tracked.entries():
+		open_ids.append(String(row.id))
+	_check(story in open_ids and "story:board_test" in open_ids and fetch_key in open_ids and hunt_key in open_ids, "all active stories and both board jobs appear together")
+	_check(String(tracked.focused().get("id", "")) == story, "accepting jobs leaves the current story focused")
+	board.request_abandon(story_id, 1)
+	_check(quests.is_active("board_test") and not board.entry_of(story_id, peer).is_empty(), "even the host's abandon request cannot discard a story notice")
+
+	var journal: QuestJournal = player._hud.get_node("QuestJournal") as QuestJournal
+	var key: InputEventKey = InputEventKey.new()
+	key.physical_keycode = KEY_J
+	key.pressed = true
+	Input.parse_input_event(key)
+	Input.flush_buffered_events()
+	_check(journal.visible and get_tree().paused and InputManager.journal_open and InputManager.ui_blocking, "J opens the journal and pauses solo play")
+	var selected: int = -1
+	for i: int in journal._rows.size():
+		if String(journal._rows[i].id) == hunt_key:
+			selected = i
+	if selected >= 0:
+		journal._select(selected)
+		_check(String(tracked.focused().get("id", "")) == story, "reading a different entry keeps the focus")
+		journal._toggle_focus()
+	_check(String(tracked.focused().get("id", "")) == hunt_key, "the journal changes the shared focus")
+	var vine: QuestVine = player._hud.get_node("QuestVine") as QuestVine
+	_check(vine._main_id == hunt_key, "the HUD follows the journal selection")
+	var tracked_save: Dictionary = tracked.export_data()
+	tracked.import_data({})
+	tracked.import_data(tracked_save)
+	_check(String(tracked.focused().get("id", "")) == hunt_key and tracked.journal_page == hunt_key, "the focus and reading position survive saving")
+	await _frames(20)
+	_check(is_equal_approx(journal._art.opening, 1.0) and journal._page.size.x <= 225.0, "the book opens to its native spread with readable page bounds")
+	journal._set_filter(1)
+	_check(journal._rows.size() == 2 and String(journal._rows[0].source) == "story", "the story filter shows just the two active story entries")
+	journal._set_filter(0)
+	for i: int in journal._rows.size():
+		if String(journal._rows[i].id) == story:
+			journal._select(i)
+	var map: MapWindow = player._hud.get_node("MapWindow") as MapWindow
+	journal._show_on_map()
+	_check(not journal.visible and map._quest_preview == story and String(tracked.focused().get("id", "")) == hunt_key, "map preview shows the reading selection while retaining the hunt focus")
+	map._set_open(false)
+	await _frames(2)
+	_check(journal.visible and journal._selected_id == story and get_tree().paused, "returning from the map restores the reading position")
+	for i: int in journal._rows.size():
+		if String(journal._rows[i].id) == hunt_key:
+			journal._select(i)
+
+	board.note_kill(player, "shadow_spider")
+	var due: int = int(board.entry_of(hunt, peer).get("due", -1))
+	var coins: int = player.progress.copper
+	var wood: int = player.inventory.count_item("wood")
+	board.taken[str(hunt)]["99999"] = {"n": 1, "done": false, "due": due}
+	journal._ask_abandon()
+	_check(not journal._pending.is_empty(), "abandoning a journal entry asks for confirmation")
+	journal._cancel_abandon()
+	_check(not board.entry_of(hunt, peer).is_empty(), "canceling keeps the order")
+	journal._ask_abandon()
+	journal._abandon()
+	_check(board.entry_of(hunt, peer).is_empty() and int(board.entry_of(hunt, 99999).get("n", 0)) == 1, "abandon affects only the requesting player")
+	_check(player.progress.copper == coins and player.inventory.count_item("wood") == wood, "abandon takes no money or goods")
+	_check(_archived(board, peer, hunt, "abandoned") and String(tracked.focused().get("id", "")) == story, "abandon archives the attempt and restores story focus")
+	board.request_accept(hunt)
+	var second: Dictionary = board.entry_of(hunt, peer)
+	_check(int(second.get("attempt", 0)) == 2 and int(second.get("due", -1)) == due and int(second.get("n", -1)) == 0, "retaking resets progress but keeps the original deadline")
+	board.request_abandon(hunt, 1)
+	_check(not board.entry_of(hunt, peer).is_empty(), "a stale confirmation cannot abandon a later attempt")
+	journal._switch_tab(1)
+	_check(not journal._rows.is_empty() and not journal._actions.visible and journal._art.turn == 0.0, "the archive turns a page and has no active actions")
+	journal._request_close()
+	await _frames(16)
+	_check(not get_tree().paused and not InputManager.journal_open and not InputManager.ui_blocking, "closing restores solo time and world input")
+	GameSettings.set_value("journal_still", true)
+	journal.open()
+	journal._switch_tab(0)
+	_check(journal._art.opening == 1.0 and journal._art.turn == 1.0, "reduced motion presents the book and the new register instantly")
+	journal._request_close()
+	_check(not journal.visible and not get_tree().paused, "reduced motion releases input and pause immediately")
+	GameSettings.set_value("journal_still", false)
+
+	var need: int = int(board.offer_of(fetch).n)
+	player.inventory.remove_item("wood", player.inventory.count_item("wood"))
+	player.inventory.give("wood", need)
+	tracked.focus(fetch_key)
+	_check(bool(tracked.focused().get("ready", false)), "the delivery can be handed in with enough wood")
+	player.inventory.remove_item("wood", 1)
+	_check(not bool(tracked.focused().get("ready", true)), "spending wood makes the delivery incomplete again")
+	player.inventory.give("wood", 1)
+	map._set_open(true)
+	await _frames(4)
+	map._set_open(false)
+	var gustav: Node2D = board.town.person_node("gustav")
+	player.global_position = gustav.global_position
+	board.offer_of(fetch)["b"] = {"id": "void_slag", "n": 1}
+	var bag_before: Array = player.inventory.slots.duplicate(true)
+	for slot: int in InventoryComponent.SIZE:
+		player.inventory.slots[slot] = {"id": "wood", "count": need + 1}
+	var packed_wood: int = player.inventory.count_item("wood")
+	_check(board.report("gustav", player) == "Mach erst Platz für deine Belohnung.", "Gustav explains why the ready delivery needs to wait")
+	board.request_finish(fetch)
+	_check(player.inventory.count_item("wood") == packed_wood and player.progress.copper == coins and not bool(board.entry_of(fetch, peer).get("done", false)), "a bonus that cannot fit leaves delivery goods, reward balance and quest unchanged")
+	player.inventory.slots.assign(bag_before)
+	var slag_before: int = player.inventory.count_item("void_slag")
+	board.request_finish(fetch)
+	board.request_finish(fetch)
+	_check(_archived(board, peer, fetch, "finished") and player.inventory.count_item("wood") == 0, "delivery consumes the goods and records completion once")
+	_check(player.progress.copper == coins + int(board.offer_of(fetch).c) and player.inventory.count_item("void_slag") == slag_before + 1, "repeated delivery pays the copper and bonus only once")
+
+	var valdric: Node2D = board.town.person_node("valdric")
+	player.global_position = valdric.global_position
+	for i: int in int(board.offer_of(hunt).n):
+		board.note_kill(player, "shadow_spider")
+	board._host_finish(peer, hunt, 1)
+	_check(not bool(board.entry_of(hunt, peer).get("done", false)), "a delayed hand-in cannot complete a later attempt")
+	TimeManager.day = due
+	board.request_finish(hunt)
+	_check(_archived(board, peer, hunt, "expired") and player.progress.copper == coins + int(board.offer_of(fetch).c), "a ready quest cannot be paid at the deadline before cleanup")
+	board.import_state(JSON.parse_string(JSON.stringify(board.export_state())) as Dictionary)
+	_check(_archived(board, peer, hunt, "abandoned") and _archived(board, peer, hunt, "expired") and _archived(board, peer, fetch, "finished"), "all three archive outcomes survive a disk-format round trip")
+
+	quests.import_data({"active": {"find_help": 3}, "active_steps": {"find_help": "find_knight"}})
+	_check(quests.active_step_id("find_help") == "find_fallen_knight", "legacy forest save resumes at the fallen knight")
+	quests.import_data({"active": {"find_help": 13}, "active_steps": {"find_help": "find_knight"}, "flags": {"woke_up": true}})
+	_check(quests.active_step_id("find_help") == "find_knight" and float(quests.current().search) > 0.0, "legacy post-hut save resumes at the search area")
+	_check(quests.completed_step_ids("find_help").has("wake") and not quests.completed_step_ids("find_help").has("meet"), "the restored story cursor gives the journal only the milestones already reached")
+	quests.import_data({"active": {"gustav_rescue": 5, "board_test": 0}, "active_steps": {"gustav_rescue": "gustav_meet"}, "done": ["rebuild_hut", "town_start"]})
+	for entry: Dictionary in tracked.entries():
+		if String(entry.id) == "story:gustav_rescue":
+			_check(String(entry.get("sketch", "")) == "wheel" and (entry.memories as Array).size() == 2 and not "bis ins Licht" in String((entry.memories as Array)[1]), "the journal shows the two latest memories and the sketch for the opened wagon")
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--journal-capture="):
+			await _capture_journal(arg.trim_prefix("--journal-capture="), player, board, spot, journal)
+
+
+## Optional renderer QA after the rules test, with a normal story and two board entries.
+func _capture_journal(folder: String, player: Player, board: BoardManager, spot: Vector2, journal: QuestJournal) -> void:
+	player.quests.import_data({"active": {"rebuild_hut": 0}, "flags": {"hud_unlocked": true}})
+	player.tracked.import_data({})
+	player.health.heal_full()
+	player.sync_wound_visuals()
+	board.taken.clear()
+	player.global_position = spot
+	var fetch: int = board.debug_post("gustav_wood", "gustav")
+	var hunt: int = board.debug_post("valdric_spider", "valdric")
+	board.request_accept(fetch)
+	board.request_accept(hunt)
+	player.inventory.give("wood", 7)
+	player.tracked.focus("board:%d" % fetch)
+	journal.open()
+	await _frames(2)
+	await _capture(folder.path_join("tagebuch-einband.png"))
+	await _frames(20)
+	await _capture(folder.path_join("tagebuch-auftrag.png"))
+	journal._ask_abandon()
+	await _frames(3)
+	await _capture(folder.path_join("tagebuch-aufgeben.png"))
+	journal._cancel_abandon()
+	for i: int in journal._rows.size():
+		if String(journal._rows[i].source) == "story":
+			journal._select(i)
+			break
+	await _frames(19)
+	await _capture(folder.path_join("tagebuch-geschichte.png"))
+	journal._switch_tab(1)
+	await _frames(5)
+	await _capture(folder.path_join("tagebuch-umblattern.png"))
+	journal.close()
+
+
+func _capture(path: String) -> void:
+	await RenderingServer.frame_post_draw
+	_check(get_viewport().get_texture().get_image().save_png(path) == OK, "rendered " + path.get_file())
+
+
+func _archived(board: BoardManager, peer: int, id: int, status: String) -> bool:
+	for row: Dictionary in board.archived_for(peer):
+		if int(row.oid) == id and String(row.status) == status:
+			return true
+	return false

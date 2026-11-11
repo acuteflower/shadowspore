@@ -817,5 +817,193 @@
    ]
   },
   "shop": "witch_counter"
+ },
+ "lake_witch": {
+  "name": "ILVA",
+  "title": "SEEHEXE",
+  "art": "lake_witch",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "lake_witch",
+  "_note": "docs/seehexe_konzept.md. The name ILVA is a PROPOSAL; lines are PLACEHOLDERS for the dialogue writer (docs/prompts/dialogue_writer.md)",
+  "hub": [
+   176,
+   124
+  ],
+  "spots": {
+   "counter": {
+    "at": [
+     214,
+     192
+    ],
+    "face": [
+     0,
+     1
+    ],
+    "clip": "counter"
+   },
+   "grind": {
+    "at": [
+     234,
+     154
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "grind"
+   },
+   "carve": {
+    "at": [
+     54,
+     160
+    ],
+    "face": [
+     0,
+     1
+    ],
+    "clip": "carve"
+   },
+   "basin": {
+    "at": [
+     144,
+     138
+    ],
+    "face": [
+     0,
+     1
+    ],
+    "clip": "basin"
+   },
+   "shelf": {
+    "at": [
+     140,
+     96
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "idle",
+    "via_hub": true
+   },
+   "potions": {
+    "at": [
+     244,
+     98
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "idle",
+    "via_hub": true
+   },
+   "hearth": {
+    "at": [
+     92,
+     120
+    ],
+    "face": [
+     -1,
+     -1
+    ],
+    "clip": "listen",
+    "via_hub": true
+   }
+  },
+  "schedule": [
+   [
+    0.2,
+    0.3,
+    "basin"
+   ],
+   [
+    0.3,
+    0.42,
+    "counter"
+   ],
+   [
+    0.42,
+    0.52,
+    "grind"
+   ],
+   [
+    0.52,
+    0.62,
+    "counter"
+   ],
+   [
+    0.62,
+    0.7,
+    "carve"
+   ],
+   [
+    0.7,
+    0.8,
+    "counter"
+   ],
+   [
+    0.8,
+    0.88,
+    "hearth"
+   ],
+   [
+    0.88,
+    0.98,
+    "basin"
+   ],
+   [
+    0.98,
+    0.1,
+    "shelf"
+   ],
+   [
+    0.1,
+    0.2,
+    "potions"
+   ]
+  ],
+  "chat": {
+   "spot": {
+    "counter": [
+     "Leg die Steine aufs Samt. Nicht werfen, sie merken sich das.",
+     "Na, was hat der See dir heute gegeben?"
+    ],
+    "grind": [
+     "Psst. Hör hin, er singt gleich.",
+     "Drei Stimmen werden eine. So geht Schleifen."
+    ],
+    "carve": [
+     "Hexenulme ist stur. Aber sie hält, was man ihr anvertraut.",
+     "Esmas Silber, mein Holz. Ohne uns beide zaubert hier keiner."
+    ],
+    "basin": [
+     "Nachts wachsen sie. Morgens hole ich sie heraus, ganz sachte.",
+     "Nicht hineingreifen. Das Wasser ist älter als ich."
+    ],
+    "hearth": [
+     "Tee? Er schmeckt nach Schilf. Man gewöhnt sich dran.",
+     "Setz dich. Die Steine laufen nicht weg."
+    ],
+    "shelf": [
+     "Irgendwo hier war ein Splitter, der nach Regen klingt."
+    ],
+    "potions": [
+     "Die Fläschchen sind von Esma. Frag mich nicht, was drin ist."
+    ]
+   },
+   "night": [
+    "Hörst du den Rand? Er knirscht heute.",
+    "Bleib im Ring, Kind. Draußen ist die Nacht hungrig."
+   ],
+   "any": [
+    "Die Leere drückt, und der See macht Licht daraus. Ein guter Tausch, meistens.",
+    "Du riechst nach Wiese und Angst. Beides vergeht.",
+    "Ich bin nicht alt. Ich bin nur lange hier."
+   ]
+  },
+  "shop": "lake_counter"
  }
 }

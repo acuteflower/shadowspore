@@ -11,6 +11,8 @@ const PAPER: Color = Color("140e24")
 
 var _quests: QuestComponent
 var _dialogue: DialogueBox
+var _tracked: TrackedQuests
+var _journal_hint_started: bool = false
 var _hint: String = ""
 var _grow: float = 0.0
 var _time: float = 0.0
@@ -32,9 +34,10 @@ func _ready() -> void:
 	add_to_group("hint_card")
 
 
-func bind(quests: QuestComponent, dialogue: DialogueBox) -> void:
+func bind(quests: QuestComponent, dialogue: DialogueBox, tracked: TrackedQuests) -> void:
 	_quests = quests
 	_dialogue = dialogue
+	_tracked = tracked
 	quests.changed.connect(_refresh)
 	quests.step_done.connect(func(_q: String, _s: int) -> void: _bloom = 1.0 if _hint != "" else 0.0)
 	_refresh()
@@ -93,6 +96,10 @@ func _process(delta: float) -> void:
 	if wanted:
 		_age += delta
 	wanted = wanted and _age < SHOW_SECONDS
+	if not wanted and _event_left <= 0.0 and not _journal_hint_started and _tracked != null and not _tracked.journal_opened and _quests.has_flag("hud_unlocked") and not _dialogue.is_active():
+		_journal_hint_started = true
+		_hint = "journal"
+		_event_left = 10.0
 	if _event_left > 0.0:
 		_event_left -= delta
 		wanted = not _dialogue.is_active()
@@ -102,6 +109,11 @@ func _process(delta: float) -> void:
 	_grow = move_toward(_grow, 1.0 if wanted else 0.0, delta / (1.1 if wanted else 0.8))
 	_bloom = move_toward(_bloom, 0.0, delta * 0.8)
 	var using_key: bool = InputManager.map_open if _hint == "map" else InputManager.sneak_held()
+	if _hint == "journal":
+		using_key = InputManager.journal_open
+		if using_key:
+			_event_left = 0.0
+			_bloom = 1.0
 	_live = move_toward(_live, 1.0 if using_key else 0.0, delta * 6.0)
 	if _hint == "map" and InputManager.map_open and _wanted():
 		_bloom = 1.0 ## the map is open: the card blooms and withers
@@ -130,11 +142,14 @@ func _draw() -> void:
 	if _hint == "mist":
 		_draw_mist_hint()
 		return
-	if _hint == "board":
-		_draw_board_hint()
+	if _hint in ["board", "journal"]:
+		_draw_notice_hint(_hint == "journal")
 		return
 	if _hint == "craft":
 		_draw_craft_hint()
+		return
+	if _hint in ["socket", "cast"]:
+		_draw_staff_hint(_hint == "cast")
 		return
 	if _hint != "sneak" and _hint != "map":
 		return
@@ -257,7 +272,7 @@ func _draw_swim_hint() -> void:
 	PixelText.draw(self, "KEIN BLINK IM WASSER.", Vector2i(at + Vector2(9, 51)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 
 
-func _draw_board_hint() -> void:
+func _draw_notice_hint(journal: bool) -> void:
 	var g: float = _grow * _grow * (3 - 2 * _grow)
 	var void_level: float = VineStyle.void_amount()
 	var curve: Callable = func(x: float) -> float: return 6 + sin(x * 0.06) * 1.5
@@ -268,12 +283,13 @@ func _draw_board_hint() -> void:
 	var at: Vector2 = Vector2(10, roundf(22 - (1 - g) * 20))
 	var fade: float = clampf((g - 0.6) / 0.4, 0, 1)
 	VineStyle.paper(self, Rect2(at, Vector2(WIDTH - 22, HEIGHT - 26)), fade, void_level)
-	PixelText.draw(self, "QUESTTAFEL", Vector2i(at + Vector2(9, 8)), Color(VineStyle.WARM_GLOW, fade), VineStyle.OUTLINE)
-	var cap_w: int = VineStyle.key_cap(self, at + Vector2(9, 20), _action_label("interact"), fade, 0.0, void_level)
-	PixelText.draw(self, "LIEST DIE ZETTEL.", Vector2i(at + Vector2(9 + cap_w + 6, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
-	PixelText.draw(self, "WAS DU ANNIMMST, STEHT", Vector2i(at + Vector2(9, 40)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
-	PixelText.draw(self, "IM ZWEIG. MELDE DICH", Vector2i(at + Vector2(9, 49)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
-	PixelText.draw(self, "BEIM AUFTRAGGEBER.", Vector2i(at + Vector2(9, 58)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "ELLIES TAGEBUCH" if journal else "QUESTTAFEL", Vector2i(at + Vector2(9, 8)), Color(VineStyle.WARM_GLOW, fade), VineStyle.OUTLINE)
+	var key: String = "J" if journal else _action_label("interact")
+	var cap_w: int = VineStyle.key_cap(self, at + Vector2(9, 20), key, fade, _live if journal else 0.0, void_level)
+	PixelText.draw(self, "ÖFFNET DAS BUCH." if journal else "LIEST DIE ZETTEL.", Vector2i(at + Vector2(9 + cap_w + 6, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	var lines: PackedStringArray = PackedStringArray(["WÄHLE EINEN EINTRAG.", "DEIN FOKUS ERSCHEINT", "AM QUEST-AST."] if journal else ["ANGENOMMENE AUFTRÄGE", "STEHEN IM TAGEBUCH.", "ABGABE BEIM AUFTRAGGEBER."])
+	for i: int in lines.size():
+		PixelText.draw(self, lines[i], Vector2i(at + Vector2(9, 40 + i * 9)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 
 
 func _draw_mist_hint() -> void:
@@ -398,3 +414,23 @@ func _action_label(action: String) -> String:
 			var key: InputEventKey = event as InputEventKey
 			return OS.get_keycode_string(key.physical_keycode if key.physical_keycode != 0 else key.keycode).to_upper()
 	return "?"
+
+## The lake witch's lesson (quest "Der Ring am See", docs/seehexe_konzept.md 8): putting the stones into the staff, then the first spell.
+func _draw_staff_hint(cast: bool) -> void:
+	var g: float = _grow * _grow * (3 - 2 * _grow)
+	var void_level: float = VineStyle.void_amount()
+	var curve: Callable = func(x: float) -> float: return 6 + sin(x * 0.06) * 1.5
+	VineStyle.branch(self, 0, WIDTH - 12, curve, 4, void_level, 12, _time, g)
+	VineStyle.foliage(self, 0, WIDTH - 12, curve, 5, 130, void_level, 12, _time, g)
+	if g < 0.6:
+		return
+	var at: Vector2 = Vector2(10, roundf(22 - (1 - g) * 20))
+	var fade: float = clampf((g - 0.6) / 0.4, 0, 1)
+	VineStyle.paper(self, Rect2(at, Vector2(WIDTH - 22, HEIGHT - 26)), fade, void_level)
+	PixelText.draw(self, "ZAUBERN" if cast else "STEINE EINSETZEN", Vector2i(at + Vector2(9, 8)), Color(VineStyle.WARM_GLOW, fade), VineStyle.OUTLINE)
+	var key: String = _action_label("action_primary") if cast else "LMT"
+	var cap_w: int = VineStyle.key_cap(self, at + Vector2(9, 20), key, fade, 0.0, void_level)
+	PixelText.draw(self, "MIT DEM STAB IN DER HAND" if cast else "STEIN AUF DEN STAB", Vector2i(at + Vector2(9 + cap_w + 6, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	var lines: PackedStringArray = PackedStringArray(["DEN STAB IN DER HOTBAR", "WÄHLEN. LEUCHTET DER", "KRISTALL, IST ER BEREIT."] if cast else ["IM RUCKSACK: STEIN NEHMEN,", "AUF DEN STAB KLICKEN.", "RMT AUF DEN STAB: HERAUS."])
+	for i: int in lines.size():
+		PixelText.draw(self, lines[i], Vector2i(at + Vector2(9, 40 + i * 9)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)

@@ -4943,5 +4943,480 @@
    }
   ],
   "resident": "witch"
+ },
+ "lake_hut": {
+  "title": "Haus der Seehexe",
+  "dir": "res://assets/interior/lake_hut/",
+  "size": [
+   288,
+   264
+  ],
+  "floor": [
+   16,
+   72,
+   256,
+   176
+  ],
+  "front_y": 226,
+  "ambient": {
+   "day": "#bcc4d8",
+   "night": "#3a3a64"
+  },
+  "entry": [
+   144,
+   214
+  ],
+  "exit_door": {
+   "id": "door",
+   "pos": [
+    144,
+    244
+   ],
+   "leaf": [
+    120,
+    208
+   ]
+  },
+  "shell": [
+   {
+    "tex": "floor.png",
+    "pos": [
+     16,
+     72
+    ],
+    "z": -6
+   },
+   {
+    "tex": "wall.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "side.png",
+    "pos": [
+     0,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "side.png",
+    "pos": [
+     272,
+     0
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "runes.png",
+    "pos": [
+     64,
+     96
+    ],
+    "z": -5,
+    "glow": true
+   },
+   {
+    "tex": "moonchart.png",
+    "pos": [
+     180,
+     10
+    ],
+    "z": -4,
+    "glow": true
+   }
+  ],
+  "walls": [
+   [
+    16,
+    48,
+    256,
+    28
+   ],
+   [
+    0,
+    40,
+    24,
+    212
+   ],
+   [
+    264,
+    40,
+    24,
+    212
+   ],
+   [
+    0,
+    236,
+    120,
+    30
+   ],
+   [
+    168,
+    236,
+    120,
+    30
+   ],
+   [
+    120,
+    258,
+    48,
+    10
+   ]
+  ],
+  "props": [
+   {
+    "id": "fireplace",
+    "tex": "fireplace.png",
+    "pos": [
+     64,
+     82
+    ],
+    "feet": 100,
+    "glow": "fireplace_glow.png",
+    "solid": [
+     64,
+     14,
+     -32,
+     -12
+    ]
+   },
+   {
+    "id": "stonewall",
+    "tex": "stonewall.png",
+    "pos": [
+     140,
+     80
+    ],
+    "feet": 70,
+    "glow": "stonewall_glow.png",
+    "solid": [
+     84,
+     12,
+     -42,
+     -10
+    ],
+    "light": {
+     "color": "#78f4e6",
+     "radius": 44,
+     "energy": 0.45
+    }
+   },
+   {
+    "id": "potions",
+    "tex": "potions.png",
+    "pos": [
+     246,
+     82
+    ],
+    "feet": 84,
+    "glow": "potions_glow.png",
+    "solid": [
+     56,
+     12,
+     -28,
+     -10
+    ],
+    "light": {
+     "color": "#b48cff",
+     "radius": 46,
+     "energy": 0.5
+    }
+   },
+   {
+    "id": "grind",
+    "tex": "grind.png",
+    "pos": [
+     234,
+     140
+    ],
+    "feet": 40,
+    "glow": "grind_glow.png",
+    "solid": [
+     56,
+     14,
+     -28,
+     -12
+    ]
+   },
+   {
+    "id": "basin",
+    "tex": "basin.png",
+    "frames": 4,
+    "frame": 0,
+    "pos": [
+     144,
+     162
+    ],
+    "feet": 66,
+    "glow": "basin_glow.png",
+    "solid": [
+     52,
+     16,
+     -26,
+     -13
+    ],
+    "light": {
+     "color": "#78f4e6",
+     "radius": 90,
+     "energy": 1.1
+    }
+   },
+   {
+    "id": "carve",
+    "tex": "carve.png",
+    "pos": [
+     54,
+     176
+    ],
+    "feet": 36,
+    "glow": "carve_glow.png",
+    "solid": [
+     64,
+     12,
+     -32,
+     -10
+    ]
+   },
+   {
+    "id": "counter",
+    "tex": "counter.png",
+    "pos": [
+     214,
+     210
+    ],
+    "feet": 36,
+    "glow": "counter_glow.png",
+    "solid": [
+     52,
+     12,
+     -26,
+     -10
+    ]
+   },
+   {
+    "id": "astrolabe",
+    "tex": "astrolabe.png",
+    "pos": [
+     196,
+     112
+    ],
+    "feet": 62,
+    "glow": "astrolabe_glow.png",
+    "solid": [
+     14,
+     8,
+     -7,
+     -6
+    ]
+   },
+   {
+    "id": "chair",
+    "tex": "chair.png",
+    "pos": [
+     104,
+     110
+    ],
+    "feet": 48,
+    "solid": [
+     18,
+     8,
+     -9,
+     -6
+    ]
+   },
+   {
+    "id": "candles_a",
+    "tex": "candles.png",
+    "pos": [
+     96,
+     140
+    ],
+    "feet": 22,
+    "glow": "candles_glow.png",
+    "light": {
+     "color": "#ffb060",
+     "radius": 34,
+     "energy": 0.6
+    }
+   },
+   {
+    "id": "candles_b",
+    "tex": "candles.png",
+    "pos": [
+     196,
+     170
+    ],
+    "feet": 22,
+    "glow": "candles_glow.png",
+    "light": {
+     "color": "#ffb060",
+     "radius": 30,
+     "energy": 0.5
+    }
+   },
+   {
+    "id": "candles_c",
+    "tex": "candles.png",
+    "pos": [
+     258,
+     186
+    ],
+    "feet": 22,
+    "glow": "candles_glow.png",
+    "light": {
+     "color": "#ffb060",
+     "radius": 28,
+     "energy": 0.45
+    }
+   },
+   {
+    "id": "broom",
+    "tex": "broom.png",
+    "pos": [
+     176,
+     222
+    ],
+    "feet": 54
+   },
+   {
+    "id": "barrel",
+    "tex": "barrel.png",
+    "pos": [
+     34,
+     212
+    ],
+    "feet": 36,
+    "solid": [
+     20,
+     10,
+     -10,
+     -8
+    ]
+   },
+   {
+    "id": "pots",
+    "tex": "pots.png",
+    "pos": [
+     94,
+     222
+    ],
+    "feet": 24
+   }
+  ],
+  "anims": [
+   {
+    "id": "fire",
+    "tex": "fire.png",
+    "frames": 6,
+    "pos": [
+     64,
+     80
+    ],
+    "feet": 28,
+    "fps": 9.0,
+    "unlit": true
+   }
+  ],
+  "hanging": [
+   {
+    "id": "herbs",
+    "tex": "herbs.png",
+    "glow": "herbs_glow.png",
+    "pos": [
+     92,
+     20
+    ],
+    "sway": 0.05,
+    "speed": 0.8
+   },
+   {
+    "id": "mobile",
+    "tex": "mobile.png",
+    "pos": [
+     144,
+     16
+    ],
+    "sway": 0.07,
+    "speed": 0.5,
+    "light": {
+     "color": "#b48cff",
+     "radius": 40,
+     "energy": 0.4,
+     "drop": 40
+    }
+   },
+   {
+    "id": "crystals_a",
+    "tex": "hang_crystals.png",
+    "glow": "hang_crystals_glow.png",
+    "pos": [
+     204,
+     22
+    ],
+    "sway": 0.06,
+    "speed": 0.7,
+    "light": {
+     "color": "#78f4e6",
+     "radius": 46,
+     "energy": 0.55,
+     "drop": 36
+    }
+   },
+   {
+    "id": "crystals_b",
+    "tex": "hang_crystals.png",
+    "glow": "hang_crystals_glow.png",
+    "pos": [
+     40,
+     26
+    ],
+    "sway": 0.05,
+    "speed": 0.9
+   }
+  ],
+  "decals": [],
+  "lights": [
+   {
+    "pos": [
+     64,
+     98
+    ],
+    "color": "#ff9a4a",
+    "radius": 100,
+    "squash": 0.75,
+    "energy": 1.0,
+    "flicker": 0.24
+   },
+   {
+    "pos": [
+     144,
+     150
+    ],
+    "color": "#78f4e6",
+    "radius": 120,
+    "squash": 0.75,
+    "energy": 0.9
+   },
+   {
+    "pos": [
+     200,
+     110
+    ],
+    "color": "#cfe8ff",
+    "radius": 60,
+    "squash": 0.8,
+    "energy": 0.45,
+    "day": true
+   }
+  ],
+  "rays": [],
+  "resident": "lake_witch"
  }
 }

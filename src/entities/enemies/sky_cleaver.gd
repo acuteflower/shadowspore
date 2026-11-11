@@ -331,7 +331,7 @@ func _look_angle() -> float:
 	var best: Player
 	var best_distance: float = float((_def["perch"] as Dictionary)["look_range"])
 	for player: Player in Player.all:
-		if player.health.current <= 0.0:
+		if player.health.current <= 0.0 or player.veiled(): ## Nebelschleier: his eyes do not find her
 			continue
 		var distance: float = player.global_position.distance_to(global_position)
 		if distance < best_distance:

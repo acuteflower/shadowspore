@@ -4,6 +4,88 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.8.1 Beta] – 2026-11-12
+### 🏆 Schätze aus dem Licht: Drei Beutetruhen-Klassen, Ketten-Reliquiare & Boss-Himmelsstürze
+
+![Das legendäre Glutreliquiar in allen 9 Öffnungsstufen](assets/props/chests/chest_legendary.png)
+
+> 📜 ***Aus einem ledergebundenen Ordensbuch in Valdrics Truhe, daneben eine alte Seite aus den Schriften der Wächterin:***  
+> *„Nur die Würdigsten durchtrennen die Leere-Ketten eines echten Glutreliquiars. Innen ruht jenes karmesinrote Samtfutter unseres alten Ordens, behütet von zwei Wachskerzen und einem Sonnenherz aus reinem Bernstein. Doch seit den jüngsten Erschütterungen kehrt etwas Unerwartetes zurück: Fällt ein gewaltiges Schattenwesen wie Mornath oder die gefallene Spiegelhexe, zerstreuen sich seine Schätze nicht länger achtlos im Staub – eine blendende Lichtsäule trägt den Reliquienschrein direkt vom Himmel herab vor die Füße der Sieger!“*
+
+---
+
+> [!IMPORTANT]
+> **So erlebt ihr die neuen Beutetruhen direkt in V0.8.1:**  
+> Sowohl **Mornath (Sky Cleaver)** als auch **Morwenna (die Spiegelhexe)** lassen **`2,8 s`** nach ihrem Fall jetzt ein prachtvolles, legendäres **Glutreliquiar** in einer Lichtsäule niedergehen – gefüllt mit sämtlichen Bossschätzen, Reliquien und zusätzlichen Truhen-Ziehungen! *(Frei platzierte Schatztruhen in der Wildnis sowie zugehörige Rätsel folgen in kommenden Updates.)*
+
+> [!TIP]
+> **Das Beste kommt zuletzt – und wartet 5 Minuten!**  
+> Jede Truhe wirft ihre Schätze nach Seltenheit sortiert nacheinander aus dem Deckel (*das wertvollste Stück zuletzt!*) und gewährt ganze **`300 s` (5 Minuten)** Zeit zum Einsammeln. Im Koop spendiert jede Truhe zudem **`+1` Extra-Ziehung** pro weiterem Verbündeten innerhalb von **`200 px`**!
+
+---
+
+### 🌟 Die Großen Highlights
+
+#### 1. 🪙 Drei Beutetruhen-Klassen mit einzigartiger Öffnungs-Inszenierung
+Vom bemoosten Wanderer-Kasten bis zum magisch gefesselten Ordensschrein verfügt jede Seltenheitsstufe über maßgefertigte Pixel-Art, eigene Lichtwirkung und ein spürbares Öffnungsritual:
+
+* **Wurzelkiste (Gewöhnlich):** Verwittrtes Pflaumenholz, rostige Eisenbänder, ein kleines Vorhängeschloss, zartes Moos und ein schwach glimmender Teal-Pilz.
+  * *Öffnen (`E` antippen):* Das Schloss springt auf, der Deckel knarrt empor – gefüllt mit **`15–45` Kupfer**, **`10 XP`**, `2–3` gewöhnlichen Wildfunden (Beeren, Heilkräuter, Eisenerz, Seile, Saatgut, kleine Tränke) und mit `30 %` Chance auf einen ungewöhnlichen Fund (Barren, Harz, Stufe-2-Trank, *Silberkette* oder einen ersten *Stufe-1-Kristall*)!
+
+![Die gewöhnliche Wurzelkiste](assets/props/chests/chest_common.png)
+
+* **Mondsiegeltruhe (Selten):** Schieferblaues Eisenholz mit blauen Stahlbeschlägen, violettem Samt im Inneren und einem kalten blauen **Mondstein-Siegel**, während kristalline Splitter an der Rückseite emporwachsen.
+  * *Öffnen (`E` halten für `0,9 s` – „SIEGEL BRECHEN“):* Ein leuchtender Runenring füllt sich am Boden, ehe das Siegel in blaue Splitter birst und Mondfunken gen Himmel spiralen! Garantiert **`70–160` Kupfer**, **`35 XP`**, **1 garantierten seltenen Fund** (*Stufe-3-Kristall/Verstärker*, *Stufe-4-Trank*, *Stufe-2-Spezialtrank*, *Schattenkern* oder *Wuchtreif*), `2–3` seltene Materialien (*Fluchsilber*, *Stufe-2-Kristalle*, *Eisenplatten*) und `1–2` gewöhnliche Vorräte!
+
+![Die seltene Mondsiegeltruhe](assets/props/chests/chest_rare.png)
+
+* **Glutreliquiar (Legendär):** Schwarzer Lack und feinstes Goldfiligran auf einem Steinsockel, gekrönt von zwei Kerzen, dem *Sonnenherz* aus Bernstein und karmesinrotem Samt – fest umschlossen von **violett-schwarzen Leere-Ketten**!
+  * *Öffnen (`E` halten für `1,6 s` – „FESSELN LÖSEN“):* Die Ketten glühen von Violett zu hellem Gold, sprengen mit klirrendem Funkenflug auseinander, das *Sonnenherz* blitzt grell auf, und eine **Lichtsäule** samt Schockring sowie Münzfontäne schleudert die Reichtümer empor! Enthält **`350–700` Kupfer**, **`110 XP`**, **1 garantierten epischen Fund** (*Stufe-4-Kristall/Verstärker*, *Stufe-5-Tränke*, *Stufe-3-Spezialtrank*), **`35 %` Chance auf 1 legendären Fund** (**Stufe-5-*Sternstein* / *Krone*** oder *Schweigtropfen*), `1` weiteren seltenen Fund plus edelste Materialien (*Schattenkerne*, *Leereslacke*, *Eisenplatten*, *Fluchsilber*).
+
+<details>
+<summary>💎 <b>Beute-Almanach: Alle Truhenwerte, Haltezeiten & Garantien im Überblick (Klicken zum Entfalten)</b></summary>
+
+| Truhentyp | Seltenheit | Interaktion | Kupfer & XP | Garantierte Beute-Highlights |
+|---|---|---|---|---|
+| **Wurzelkiste** | Gewöhnlich | `E` antippen (`0,0 s`) | `15–45` Kupfer / `10 XP` | `2–3×` Wildvorräte + `30 %` Chance auf Barren / Stufe-1-Kristall |
+| **Mondsiegeltruhe** | Selten | `E` halten (`0,9 s`) | `70–160` Kupfer / `35 XP` | **`1×` Seltener Fund** (Stufe-3-Kristall, Stufe-4-Trank, *Wuchtreif*) + `2–3×` seltene Mats |
+| **Glutreliquiar** | Legendär | `E` halten (`1,6 s`) | `350–700` Kupfer / `110 XP` | **`1×` Epischer Fund** (Stufe-4-Kristall/Trank) + **`35 %` Legendärer Fund** (Stufe-5-*Sternstein*/*Krone*, *Schweigtropfen*) + `1×` Seltener Fund |
+
+*(Hinweis: Geschmiedete Waffen, Boss-Reliquien wie die Rissfeder sowie Moras Spiegelscherbe erscheinen niemals zufällig in regulären Beutetruhen.)*
+
+</details>
+
+---
+
+#### 2. ☄️ Boss-Reliquiare: Spektakulärer Himmelssturz nach Mornath & Morwenna
+Statt wertvolle Bossbeute nach dem Todesstoß lose im Gras zu verstreuen, belohnt V0.8.1 eure Siege ab sofort mit einer imposanten Ankunft aus dem Licht:
+
+* **Verzögerter Himmelssturz (`2,8 s`):** Kurz nach der Todesanimation von **Mornath (Sky Cleaver)** oder **Morwenna (die Spiegelhexe)** durchschneidet eine gigantische Lichtsäule den Himmel, und ein legendäres **Glutreliquiar** kracht mit Schockring, Staubwolke und Kamerabeben zu Boden!
+* **Durchdachte Landepunkte & Rückkämpfe:** *Mornaths* Truhe landet gezielt südlich des Sonnensiegels (sodass das Replay-Hologramm jederzeit frei begehbar bleibt), *Morwennas* direkt an ihrem Fallort. Auch jeder wiederholte **Rückkampf über ein Hologramm** beschert erneut ein volles Reliquiar!
+* **Prall gefüllt & Gesichert:** Jedes Boss-Reliquiar vereint alle klassischen Bossschätze, **`1×` garantierten seltenen Bonusfund + `1–2×` seltene Zusatzmaterialien**, schüttet Kupfer/XP zuverlässig an alle beteiligten Kämpfer aus (selbst wenn ein Verbündeter kurz zuvor fiel) und entlässt exklusive **Boss-Reliquien** (*Rissfeder*, *Moras Spiegelscherbe*) ganz am Ende persönlich für ihren rechtmäßigen Finder! Ungeöffnete Bosstruhen werden im Spielstand gesichert; geleerte Exemplare verblassen nach **`45 s`**.
+
+---
+
+### ⚖️ Balance & Spielwerte auf einen Blick
+
+| Status | Bereich / Parameter | Vorher (V0.8.0) | Jetzt (V0.8.1) | Auswirkung im Spiel |
+|---|---|---|---|---|
+| 🟣 `NEU` | **Beutetruhen (3 Klassen)** | Keine Beutetruhen | **Wurzelkiste, Mondsiegeltruhe, Glutreliquiar** | Abgestufte Öffnungsrituale, garantierte Kristalle & Effekte |
+| 🔵 `REWORK` | **Boss-Beute (Mornath / Morwenna)** | Lose Items am Boden | **Legendäres Glutreliquiar (`2,8 s` Himmelssturz)** | Inkl. `1× rare_finds` + `1–2× rare_mats` & Reliquien-Finale |
+| 🟢 `BUFF` | **Liegezeit von Truhenbeute** | Standard-Dropdauer | **`300 s` (5 Minuten)** | Kein Stress beim Sortieren und Teilen nach schweren Kämpfen |
+| 🟢 `BUFF` | **Koop-Beute-Skalierung** | Feste Drop-Anzahl | **`+1` Ziehung pro Verbündetem (`200 px`)** | Gemeinsame Schatzsuche lohnt sich ohne Beutekürzung |
+
+---
+
+### 🔮 Sneak Peek: „Prüfungen der Wächterin“
+*„Unter uralten Bäumen, auf verbrannten Leere-Narben und vor verwitterten Steinzirkeln wurden bereits erste geheimnisvolle Sonnenuhren, Runenstelen, Spinnenhain-Schreine und silberberingte Hortkrähen gesichtet... Noch ruhen diese uralten **Prüfungen der Wächterin** still im Schatten – doch schon bald werden sie jene Abenteurer herausfordern, die Wind, Licht, Schattenschritt und Stille meistern!“*
+
+✦ ──────────────── ❖ ──────────────── ✦  
+*Im Glanz goldener Lichtsäulen und gesprengter Ketten,*  
+**Euer Shadowspore-Entwicklerteam 🏆✨**
+
+---
+
 ## [V0.8.0 Beta] – 2026-11-11
 ### ✨ Kristall, Seehexe & Federkiel: Magiesystem mit 50 Kristallen, Bleichgabel-Stab, Ilvas Seegrenze & das neue Quest-Tagebuch
 

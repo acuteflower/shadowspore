@@ -87,6 +87,9 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	var relics: BossRelics = BossRelics.of(tree)
 	if relics != null:
 		data["relics"] = relics.export_state() ## boss kills per player and the relics not picked up yet (docs/rissfeder.md)
+	var chests: LootChests = LootChests.of(tree)
+	if chests != null:
+		data["chests"] = chests.export_state() ## opened loot chests and the bosses' chests not opened yet (docs/beutetruhen_konzept.md)
 	var pets: PetRegistry = PetRegistry.of(tree)
 	if pets != null and not (pets.export_state()["bonds"] as Dictionary).is_empty():  ## (the birds' records only exist with a bond)
 		data["pets"] = pets.export_state() ## the bonds with wild birds (docs/pet_konzept.md)
@@ -171,6 +174,9 @@ static func load_into(tree: SceneTree, path: String = "") -> bool:
 	var relics: BossRelics = BossRelics.of(tree)
 	if relics != null and data.has("relics"):
 		relics.import_state(data.relics as Dictionary)
+	var chests: LootChests = LootChests.of(tree)
+	if chests != null and data.has("chests"):
+		chests.import_state(data.chests as Dictionary)
 	var pets: PetRegistry = PetRegistry.of(tree)
 	if pets != null and data.has("pets"):
 		pets.import_state(data.pets as Dictionary)

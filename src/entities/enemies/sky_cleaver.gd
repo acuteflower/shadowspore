@@ -673,6 +673,14 @@ func arena_middle() -> Vector2:
 	return arena_origin + Vector2(float(at[0]), float(at[1]))
 
 
+## Where his Glutreliquiar comes down after the kill (DropComponent `chest`, docs/beutetruhen_konzept.md): on the floor south of the sigil, so the
+## hologram that calls him again stays free; he usually dies in the air over a pillar.
+func chest_spot() -> Vector2:
+	if arena_origin == Vector2.ZERO:
+		return global_position
+	return arena_middle() + Vector2(0, 44)
+
+
 ## The feather barriers of the arena's ways down (data/ground.json arenas[].boss.barriers): [{id, solid [w, h], feathers [[x, y] relative to the middle tile]}].
 func barrier_spec() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

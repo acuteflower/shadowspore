@@ -714,7 +714,8 @@
      "first": 1.0,
      "chance": 0.15
     }
-   ]
+   ],
+   "chest": {"tier": "legendary", "delay": 2.8, "bonus": [{"pool": "rare_finds", "count": [1, 1]}, {"pool": "rare_mats", "count": [1, 2]}]}
   },
   "audio": {
    "wing_soft": "res://assets/audio/sky_cleaver_wing_soft.wav",
@@ -1037,7 +1038,8 @@
      "first": 1.0,
      "chance": 0.15
     }
-   ]
+   ],
+   "chest": {"tier": "legendary", "delay": 2.8, "bonus": [{"pool": "rare_finds", "count": [1, 1]}, {"pool": "rare_mats", "count": [1, 2]}]}
   },
   "audio": {
    "beam": "res://assets/audio/morwenna/beam.wav",

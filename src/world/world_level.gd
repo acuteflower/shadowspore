@@ -165,6 +165,9 @@ func _fill_ground() -> void:
 	var relics: BossRelics = BossRelics.new() ## what the bosses leave to one player alone (docs/rissfeder.md)
 	relics.name = "BossRelics"
 	add_child(relics)
+	var loot_chests: LootChests = LootChests.new() ## the loot chests of the wild and the bosses' Glutreliquiare (docs/beutetruhen_konzept.md)
+	loot_chests.name = "LootChests"
+	add_child(loot_chests)
 	var pets: PetRegistry = PetRegistry.new() ## the bond with wild crows and ravens (docs/pet_konzept.md)
 	pets.name = "PetRegistry"
 	add_child(pets)

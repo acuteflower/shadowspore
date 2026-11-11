@@ -254,6 +254,10 @@ func _build_items() -> void:
 				_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
 				_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
 				_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
+				_add(0, "button", "TRUHE: GEWÖHNLICH", "", {"action": "chest:common"}) ## a test chest in front of her (docs/beutetruhen_konzept.md, not saved)
+				_add(0, "button", "TRUHE: SELTEN", "", {"action": "chest:rare"})
+				_add(0, "button", "TRUHE: LEGENDÄR", "", {"action": "chest:legendary"})
+				_add(0, "button", "TRUHE: BOSS-ANKUNFT", "", {"action": "chest:legendary:arrive"}) ## falls out of a pillar of light like a boss's chest
 			if multiplayer.is_server():
 				var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
 				_add(0, "heading", "KARTE")
@@ -570,6 +574,17 @@ func _run_action(action: String) -> void:
 			var kind: String = String((foods[item] as Dictionary).get(species, ""))
 			if kind == "loves" or kind == "likes":
 				feeder.inventory.give(item, 20 if kind == "loves" else 10)
+		return
+	if action.begins_with("chest:"): ## dev: a loot chest a little in front of her (host decides)
+		var chests: LootChests = LootChests.of(get_tree())
+		if chests == null or not (_player is Player):
+			_failed_flash = 2.5
+			return
+		var hero: Player = _player as Player
+		var parts: PackedStringArray = action.split(":")
+		var ahead: Vector2 = Vector2.from_angle(hero.facing.angle()) if hero.facing.length() > 0.1 else Vector2.DOWN
+		chests.request_dev(parts[1], hero.global_position + ahead * 40.0, parts.size() > 2)
+		_set_open(false)
 		return
 	if action.begins_with("weather:"):
 		if WeatherManager.current == null or not multiplayer.is_server():

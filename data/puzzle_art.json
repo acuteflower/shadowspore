@@ -1,0 +1,122 @@
+{
+	"stele": {
+		"frame": [
+			28,
+			48
+		],
+		"ground": 42,
+		"frames": 6,
+		"rune": [
+			-0.7,
+			-12.7
+		]
+	},
+	"sundial": {
+		"frame": [
+			40,
+			40
+		],
+		"ground": 32,
+		"frames": 1,
+		"tip": [
+			1.5,
+			-15.6
+		],
+		"foot": [
+			0.0,
+			-5.1
+		]
+	},
+	"trial_stone": {
+		"frame": [
+			28,
+			34
+		],
+		"ground": 29,
+		"frames": 2,
+		"eye": [
+			-1.0,
+			-6.1
+		]
+	},
+	"lantern_post": {
+		"frame": [
+			32,
+			52
+		],
+		"ground": 46,
+		"frames": 2,
+		"flame": [
+			6.6,
+			-17.1
+		]
+	},
+	"shrine_small": {
+		"frame": [
+			40,
+			44
+		],
+		"ground": 38,
+		"frames": 2,
+		"flame": [
+			-0.2,
+			-5.2
+		]
+	},
+	"shrine_big": {
+		"frame": [
+			52,
+			60
+		],
+		"ground": 52,
+		"frames": 2,
+		"flame": [
+			-0.2,
+			-5.2
+		],
+		"bell": [
+			0.3,
+			-15.3
+		]
+	},
+	"mound": {
+		"frame": [
+			32,
+			22
+		],
+		"ground": 16,
+		"frames": 1
+	},
+	"twig": {
+		"frame": [
+			18,
+			12
+		],
+		"ground": 8,
+		"frames": 6
+	},
+	"hoard_crow": {
+		"frame": [
+			32,
+			32
+		],
+		"ground": 26,
+		"frames": 1,
+		"perch": [
+			0.6,
+			-10.5
+		]
+	},
+	"hoard_raven": {
+		"frame": [
+			40,
+			48
+		],
+		"ground": 42,
+		"frames": 1,
+		"perch": [
+			7.3,
+			-18.1
+		]
+	}
+}

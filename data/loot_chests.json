@@ -1,0 +1,165 @@
+{
+	"settings": {
+		"reach": 34,
+		"share_radius": 200,
+		"drop_life": 300,
+		"fade_after": 45
+	},
+	"tiers": {
+		"common": {
+			"name": "WURZELKISTE",
+			"rarity": "common",
+			"prompt": "ÖFFNEN",
+			"hold": 0.0,
+			"copper": [15, 45],
+			"xp": 10,
+			"burst": 0.52,
+			"stagger": 0.13,
+			"pop": 60,
+			"draws": [
+				{"pool": "wild_common", "count": [2, 3]},
+				{"pool": "wild_uncommon", "count": [1, 1], "chance": 0.3}
+			],
+			"extra": "wild_common",
+			"per_player": 1
+		},
+		"rare": {
+			"name": "MONDSIEGELTRUHE",
+			"rarity": "rare",
+			"prompt": "SIEGEL BRECHEN",
+			"hold": 0.9,
+			"copper": [70, 160],
+			"xp": 35,
+			"burst": 1.02,
+			"stagger": 0.18,
+			"pop": 110,
+			"banner": "SELTENER FUND",
+			"draws": [
+				{"pool": "rare_finds", "count": [1, 1]},
+				{"pool": "rare_mats", "count": [2, 3]},
+				{"pool": "wild_common", "count": [1, 2]}
+			],
+			"extra": "rare_mats",
+			"per_player": 1
+		},
+		"legendary": {
+			"name": "GLUTRELIQUIAR",
+			"rarity": "legendary",
+			"prompt": "FESSELN LÖSEN",
+			"hold": 1.6,
+			"copper": [350, 700],
+			"xp": 110,
+			"burst": 1.62,
+			"stagger": 0.22,
+			"pop": 170,
+			"banner": "LEGENDÄRER FUND",
+			"draws": [
+				{"pool": "epic_finds", "count": [1, 1]},
+				{"pool": "legend_finds", "count": [1, 1], "chance": 0.35},
+				{"pool": "rare_finds", "count": [1, 1]},
+				{"pool": "legend_mats", "count": [1, 2]},
+				{"pool": "rare_mats", "count": [1, 2]}
+			],
+			"extra": "rare_mats",
+			"per_player": 1
+		}
+	},
+	"pools": {
+		"wild_common": [
+			{"id": "dusk_berry", "w": 10, "n": [2, 4]},
+			{"id": "ember_berry", "w": 6, "n": [2, 3]},
+			{"id": "wound_leaf", "w": 6, "n": [1, 3]},
+			{"id": "glow_cap", "w": 6, "n": [2, 4]},
+			{"id": "rope", "w": 5, "n": [1, 2]},
+			{"id": "plank", "w": 4, "n": [2, 4]},
+			{"id": "stone", "w": 3, "n": [3, 6]},
+			{"id": "iron_ore", "w": 5, "n": [1, 3]},
+			{"id": "moonbell", "w": 3, "n": [1, 2]},
+			{"id": "void_splinter", "w": 3, "n": [1, 2]},
+			{"id": "vial_empty", "w": 3, "n": [1, 2]},
+			{"id": "tuber_seed", "w": 2, "n": [1, 3]},
+			{"id": "potion_heal_1", "w": 4, "n": [1, 1]},
+			{"id": "potion_stamina_1", "w": 3, "n": [1, 1]}
+		],
+		"wild_uncommon": [
+			{"id": "iron_ingot", "w": 5, "n": [1, 2]},
+			{"id": "resin", "w": 4, "n": [1, 2]},
+			{"id": "willow_thread", "w": 3, "n": [1, 2]},
+			{"id": "potion_heal_2", "w": 4, "n": [1, 1]},
+			{"id": "potion_stamina_2", "w": 3, "n": [1, 1]},
+			{"id": "gem_tinder_1", "w": 1, "n": [1, 1]},
+			{"id": "gem_haze_1", "w": 1, "n": [1, 1]},
+			{"id": "gem_hunger_1", "w": 1, "n": [1, 1]},
+			{"id": "crystal_banish_1", "w": 1, "n": [1, 1]},
+			{"id": "crystal_roots_1", "w": 1, "n": [1, 1]},
+			{"id": "silver_chain", "w": 1, "n": [1, 1]}
+		],
+		"rare_mats": [
+			{"id": "iron_plate", "w": 5, "n": [1, 2]},
+			{"id": "iron_ingot", "w": 4, "n": [2, 3]},
+			{"id": "potion_heal_3", "w": 4, "n": [1, 2]},
+			{"id": "potion_stamina_3", "w": 2, "n": [1, 1]},
+			{"id": "curse_silver", "w": 2, "n": [1, 2]},
+			{"id": "void_bloom", "w": 3, "n": [1, 2]},
+			{"id": "mist_lily", "w": 3, "n": [1, 2]},
+			{"id": "moon_parasol", "w": 2, "n": [1, 2]},
+			{"id": "crystal_embers_2", "w": 1, "n": [1, 1]},
+			{"id": "crystal_veil_2", "w": 1, "n": [1, 1]},
+			{"id": "gem_lens_2", "w": 1, "n": [1, 1]},
+			{"id": "gem_wild_2", "w": 1, "n": [1, 1]}
+		],
+		"rare_finds": [
+			{"id": "crystal_banish_3", "w": 2, "n": [1, 1]},
+			{"id": "crystal_roots_3", "w": 2, "n": [1, 1]},
+			{"id": "crystal_embers_3", "w": 2, "n": [1, 1]},
+			{"id": "crystal_veil_3", "w": 2, "n": [1, 1]},
+			{"id": "crystal_maw_3", "w": 2, "n": [1, 1]},
+			{"id": "gem_tinder_3", "w": 2, "n": [1, 1]},
+			{"id": "gem_haze_3", "w": 2, "n": [1, 1]},
+			{"id": "gem_hunger_3", "w": 2, "n": [1, 1]},
+			{"id": "potion_heal_4", "w": 3, "n": [1, 2]},
+			{"id": "potion_ashen_2", "w": 2, "n": [1, 1]},
+			{"id": "potion_clarity_2", "w": 2, "n": [1, 1]},
+			{"id": "potion_wisp_2", "w": 2, "n": [1, 1]},
+			{"id": "shadow_core", "w": 2, "n": [1, 1]},
+			{"id": "wuchtreif", "w": 1, "n": [1, 1]}
+		],
+		"epic_finds": [
+			{"id": "crystal_banish_4", "w": 2, "n": [1, 1]},
+			{"id": "crystal_roots_4", "w": 2, "n": [1, 1]},
+			{"id": "crystal_embers_4", "w": 2, "n": [1, 1]},
+			{"id": "crystal_veil_4", "w": 2, "n": [1, 1]},
+			{"id": "crystal_maw_4", "w": 2, "n": [1, 1]},
+			{"id": "gem_tinder_4", "w": 2, "n": [1, 1]},
+			{"id": "gem_haze_4", "w": 2, "n": [1, 1]},
+			{"id": "gem_hunger_4", "w": 2, "n": [1, 1]},
+			{"id": "gem_lens_4", "w": 2, "n": [1, 1]},
+			{"id": "gem_wild_4", "w": 2, "n": [1, 1]},
+			{"id": "potion_heal_5", "w": 3, "n": [1, 1]},
+			{"id": "potion_stamina_5", "w": 2, "n": [1, 1]},
+			{"id": "potion_ashen_3", "w": 1, "n": [1, 1]},
+			{"id": "potion_clarity_3", "w": 1, "n": [1, 1]},
+			{"id": "potion_wisp_3", "w": 1, "n": [1, 1]}
+		],
+		"legend_finds": [
+			{"id": "crystal_banish_5", "w": 1, "n": [1, 1]},
+			{"id": "crystal_roots_5", "w": 1, "n": [1, 1]},
+			{"id": "crystal_embers_5", "w": 1, "n": [1, 1]},
+			{"id": "crystal_veil_5", "w": 1, "n": [1, 1]},
+			{"id": "crystal_maw_5", "w": 1, "n": [1, 1]},
+			{"id": "gem_tinder_5", "w": 1, "n": [1, 1]},
+			{"id": "gem_haze_5", "w": 1, "n": [1, 1]},
+			{"id": "gem_hunger_5", "w": 1, "n": [1, 1]},
+			{"id": "gem_lens_5", "w": 1, "n": [1, 1]},
+			{"id": "gem_wild_5", "w": 1, "n": [1, 1]},
+			{"id": "schweigtropfen", "w": 2, "n": [1, 1]}
+		],
+		"legend_mats": [
+			{"id": "shadow_core", "w": 4, "n": [1, 2]},
+			{"id": "void_slag", "w": 3, "n": [1, 2]},
+			{"id": "iron_plate", "w": 3, "n": [2, 3]},
+			{"id": "curse_silver", "w": 2, "n": [2, 3]}
+		]
+	},
+	"placed": []
+}

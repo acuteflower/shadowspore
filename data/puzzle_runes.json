@@ -1,0 +1,54 @@
+{
+	"order": [
+		"mond",
+		"wurzel",
+		"auge",
+		"flamme",
+		"welle",
+		"feder"
+	],
+	"runes": {
+		"mond": [
+			".XXX.",
+			"XX...",
+			"X....",
+			"XX...",
+			".XXX."
+		],
+		"wurzel": [
+			"..X..",
+			"..X..",
+			".XXX.",
+			"X.X.X",
+			"X.X.X"
+		],
+		"auge": [
+			"..X..",
+			".X.X.",
+			"X.X.X",
+			".X.X.",
+			"..X.."
+		],
+		"flamme": [
+			"..X..",
+			".XX..",
+			".XXX.",
+			"XX.XX",
+			".XXX."
+		],
+		"welle": [
+			"X..X.",
+			".XX.X",
+			".....",
+			"X..X.",
+			".XX.X"
+		],
+		"feder": [
+			"....X",
+			"...XX",
+			"..XX.",
+			".XX..",
+			"X...."
+		]
+	}
+}

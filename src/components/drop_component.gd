@@ -36,6 +36,11 @@ func _roll() -> void:
 	var xp: int = roundi(int(loot.get("xp", 0)) * factor)
 	var ids: PackedInt32Array = []
 	var winners: Array[Player] = _winners(String(loot.get("award", "killer")))
+	var chest: Dictionary = loot.get("chest", {}) as Dictionary
+	var chests: LootChests = LootChests.of(get_tree())
+	if not chest.is_empty() and chests != null: ## a boss: its spoils wait in a chest that comes down out of the light (docs/beutetruhen_konzept.md)
+		_to_chest(chests, chest, loot, enemy, winners, copper, xp)
+		return
 	for player: Player in winners:
 		player.progress.award(copper, xp)
 		ids.append(player.name.to_int())
@@ -69,8 +74,38 @@ func _winners(award: String) -> Array[Player]:
 	return found
 
 
+## Host: everything this enemy leaves goes into a chest of `chest.tier` (plus `chest.bonus` draws from data/loot_chests.json's pools).
+func _to_chest(chests: LootChests, chest: Dictionary, loot: Dictionary, enemy: Node2D, winners: Array[Player], copper: int, xp: int) -> void:
+	var found: Dictionary = {}
+	for stack: Dictionary in roll_entries(loot.get("items", []) as Array):
+		found[String(stack.id)] = int(found.get(String(stack.id), 0)) + int(stack.count)
+	var bonus: Dictionary = {"draws": chest.get("bonus", []) as Array}
+	for stack: Dictionary in LootRules.roll(bonus, DataRegistry.table("loot_chests").get("pools", {}) as Dictionary, chests.rng):
+		found[String(stack.id)] = int(found.get(String(stack.id), 0)) + int(stack.count)
+	var items: Array = []
+	for id: String in found:
+		items.append({"id": id, "count": int(found[id])})
+	var who: Array = []
+	for player: Player in winners:
+		who.append(player.name.to_int())
+	var spot: Vector2 = enemy.global_position
+	if enemy.has_method("chest_spot"):
+		spot = enemy.call("chest_spot") as Vector2
+	var held: Dictionary = {"copper": copper, "xp": xp, "winners": who, "items": items, "relics": loot.get("relics", []) as Array}
+	chests.boss_chest(String(enemy.get("enemy_id")), String(chest.get("tier", "legendary")), spot, held, float(chest.get("delay", 2.6)))
+
+
 func _drop_items(entries: Array, origin: Vector2) -> void:
 	spawn_drops(get_tree(), entries, origin)
+
+
+## Rolls `entries` ([{id, chance, min, max}]) into stacks [{id, count}] without dropping them (a boss's chest holds them).
+static func roll_entries(entries: Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry: Dictionary in entries:
+		if randf() <= float(entry.get("chance", 1.0)):
+			out.append({"id": String(entry.id), "count": randi_range(int(entry.get("min", 1)), int(entry.get("max", 1)))})
+	return out
 
 
 ## Host only: rolls `entries` ([{id, chance, min, max}]) and lets the items pop out around `origin`.

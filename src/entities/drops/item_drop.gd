@@ -29,6 +29,9 @@ const BAYER: Array = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 
 @export var refine_pity: int = 0 ## ... and its Glut
 var sockets: Dictionary = {} ## host only: the crystals of a thrown staff ("sp" / "gm", docs/magie_konzept.md), handed back on pickup
 @export var launch: Vector2 = Vector2.ZERO ## horizontal speed of the pop
+@export var rise: float = 0.0 ## px it starts above the ground (out of a chest's mouth, LootChests)
+@export var pop: float = 0.0 ## extra upward speed of the pop (a chest flings its loot high)
+@export var life: float = LIFETIME ## seconds before it fades (chest loot lies longer)
 
 var _age: float = 0.0
 var _height: float = 0.0
@@ -66,7 +69,8 @@ func _ready() -> void:
 	_rarity_color = Items.rarity_color(_stack)
 	_rarity_index = DataRegistry.table("rarities").keys().find(String(def.get("rarity", "common")))
 	_velocity = launch
-	_vz = 130.0 + launch.length() * 0.8
+	_vz = 130.0 + launch.length() * 0.8 + pop
+	_height = rise
 
 
 func _physics_process(delta: float) -> void:
@@ -93,7 +97,7 @@ func _physics_process(delta: float) -> void:
 
 
 func _host_tick() -> void:
-	if _age >= LIFETIME and story_id == "":
+	if _age >= life and story_id == "":
 		queue_free()
 		return
 	if not _landed or _age < PICKUP_DELAY:
@@ -210,7 +214,7 @@ func _near_local_player() -> bool:
 
 
 func _draw() -> void:
-	if _age > LIFETIME - BLINK_TIME and int(_age * 8.0) % 2 == 0:
+	if _age > life - BLINK_TIME and story_id == "" and int(_age * 8.0) % 2 == 0:
 		return
 	var lift: float = _height + 7.0 + (sin(_age * 3.0) * 1.5 if _landed else 0.0) + sin(_hop * PI) * 6.0
 	_ellipse(6.0, 2.5, Color(0, 0, 0, 0.3), 1.0)

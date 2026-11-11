@@ -4,6 +4,158 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.7.1 Beta] – 2026-11-11
+### 🕳️ Risse in der Leere & Gedächtnis der Stadt: Schattenschritt, Schwarzes Brett-Ausbau, Steckbriefe, Dreistufige Gangarten & Hexenwaldsee
+
+![Ellies neuer Schattenschritt durch den Leere-Riss](docs/img/ellie_shadow_step.gif)
+
+> 📜 ***Gefunden zwischen frischer Morgentau-Tinte am Schwarzen Brett:***  
+> *„Kaum bricht die Dämmerung durch den Frühnebel, rascheln am Dorfplatz schon die ersten Pergamente im Morgenwind. Eine kleine Knospe über dem rechten Pfosten pocht wie ein Herz aus Licht – ein Eilbrief vom Zimmermeister! Nach dem letzten Unwetter klaffen Lücken in der Palisade, und am linken Rand nagelt jemand mit zitternder Hand einen neuen Steckbrief an: ‚DER KLOTZ‘ hat die Nacht überlebt und schleicht noch irgendwo im Süden. Eine Krähe flattert auf die Dachschindeln herab, zupft ein vergilbtes Blatt von gestern vom Brett und verschwindet im Himmel über dem neuen See im Hexenwald...“*
+
+---
+
+> [!IMPORTANT]
+> **Fähigkeiten-Umbau („Schattenschritt“ ersetzt „Schattenblink“):**  
+> Der bisherige *Schattenblink* wurde archiviert und durch den neuen **Schattenschritt** (`Alt` / Gamepad `B`) abgelöst. Der dritte Talentzweig im Fähigkeitsgraphen trägt ab sofort den Namen **LEERE** – bestehende Spielstände werden beim Laden automatisch auf den neuen Skill übertragen!
+
+> [!TIP]
+> **Taktik-Tipp zum Ausweichen:**  
+> Der *Schattenschritt* bricht sofort jeden Schwertschlag, jede aufgeladene Attacke (kostenlos!) und selbst Ernte- oder Trank-Animationen ab. Wer dabei eine Richtung hält, nimmt sein volles Tempo – selbst einen laufenden Sprint – nahtlos mit durch den Leere-Riss!
+
+---
+
+### 🌟 Die Großen Highlights
+
+#### 1. 🕳️ Neue Leere-Fähigkeit: Der Schattenschritt (`Alt` / Gamepad `B`)
+Die erste und zentrale Technik des **LEERE**-Zweigs ersetzt den bisherigen Blink durch einen reaktionsschnellen, wuchtig inszenierten Ausweichschritt:
+
+* **Sofortiger Ausweichschritt:** Ellie reißt einen zackigen Riss in die Luft und schlüpft geradlinig **`54 px`** weit in Laufrichtung – oder im Stand direkt auf den Mauszeiger zu (stoppt sicher vor Wänden; bei unter `12 px` Platz wird kein Schritt verbraucht).
+* **Wahrer Abbruch („True Dodge Cancel“):** Kann aus absolut jeder Aktion heraus aktiviert werden – bricht laufende Schwertkombos in jeder Phase, aufgeladene Angriffe (ohne Verlust), Pflücken, Essen und Trinken sofort ab. Nach dem Schritt ist das Schwert umgehend wieder bereit.
+* **Schutzfenster & Schwung:** Während Auflösung und Rematerialisierung gewährt der Schritt **`0,26 s`** Unverwundbarkeit gegenüber direkten Treffern (anhaltende Effekte wie Gift oder Brand ticken normal weiter). Bei gehaltener Lauftaste sprintet oder läuft Ellie ohne Verzögerung am Zielort weiter.
+* **Kosten & Talisman-Synergie:** Kostet **`14 + Level` Ausdauer** (`15` auf Stufe 1) bei **`0,8 s`** Abklingzeit. Talismane mit der Eigenschaft **SCHRITTPAUSE** (wie die legendäre *Rissfeder* mit `-30 %` Cooldown und `+40 %` Sturzflug-Bonusschaden) verstärken direkt den Schattenschritt.
+* **Spektakuläre Riss-Optik:** Beim Absprung löst sich Ellie von ihrer Vorderkante aus mit Glitch-Streifen pixelweise in einen violett glühenden Leere-Riss auf, hinterlässt einen zerfallenden Bodenring samt Schattenfleck und materialisiert sich auf der Gegenseite wieder.
+
+<details>
+<summary>🎞️ <b>Zeitlupen-Studie: Pixel-Auflösung & Leere-Riss im Detail (Klicken zum Entfalten)</b></summary>
+
+![Zeitlupen-Studie Schattenschritt](docs/img/ellie_shadow_step_slow.gif)
+
+</details>
+
+---
+
+#### 2. 📜 Großer Ausbau des Schwarzen Bretts: „Das Gedächtnis der Stadt“
+Das Schwarze Brett auf dem Dorfplatz erwacht endgültig zum Leben und reagiert ab sofort aktiv auf Vorräte, Wetter, Mondphasen, Übergriffe und erledigte Heldentaten:
+
+* **Eine lebendige Tafel:**
+  * **Neuigkeiten-Knospe:** Über dem rechten Pfosten leuchtet und atmet eine kleine Knospe. Ungelesene Aushänge lassen sie schnell pulsieren, Funken aufsteigen und ihr Nachtlicht heller scheinen (*Türkis* normal, *Gold* Story-Siegel, *Rot* Eil- oder Steckbrief). Sobald ihr das Brett öffnet oder **`2 s`** davor steht, gelten die Zettel als gelesen.
+  * **Alternde Pergamente (4 Stufen):** Normale Zettel vergilben über die Tage (`+40 %`), werfen am unteren Rand Wellen, bekommen Eselsohren, verblassende Tinte und hängen am letzten Tag schief am Nagel (Story-Siegel altern nie).
+  * **Wind, Regen & die Brett-Krähe:** Windböen lassen Zettelecken flattern; bei Regen weicht das Papier blaugrau durch und die Tinte verläuft (unter dem Brettdach besser geschützt). Abgelaufene Zettel bleiben kurz als „Geister“ hängen, bis eine Dorfkrähe auf dem Dach landet und sie abzupft – oder der Wind sie hinabweht.
+  * **Direktes Melden beim Auftraggeber:** Fertige Aufträge werden ab sofort direkt beim jeweiligen Bewohner abgegeben (`110 px` Reichweite) – auch bei **Esma** im Hexenturm! Zudem gewährt jeder angenommene Zettel eine **persönliche Frist von mindestens 2 Tagen**, selbst wenn er draußen am Brett abläuft.
+* **6 Reaktive Stadt-Anlässe (mit *Warum*-Vermerk):**
+  * **Lager-Mangel („DAS LAGER IST LEER“):** Sinken Holz (`< 20`), Faser (`< 6`) oder Stein (`< 10`), bittet Gustav gezielt um Nachschub (`+20 %` Lohn).
+  * **Nach dem Sturm („WEGEN DES STURMS“):** Nach Unwettern hängen morgens Eilaufträge für Reparaturholz.
+  * **Nach dem Vorstoß („NACH DEM VORSTOSS“):** Kamen Monster bis ans Dorflicht heran, benennt Valdric den betroffenen Sektor samt Himmelsrichtung und Art für eine Vergeltungsjagd (`+40 %` Lohn).
+  * **Neumond-Nachtjagd („NEUMOND“):** Bei Neumond startet Valdric ab Tag 3 Jagden auf `4–6` Wesen (`+50 %` Lohn), die **ausschließlich bei Nacht** zählen!
+  * **Vollmond-Blüte („VOLLMOND“):** Esma sucht seltene Nachtblüten wie *Mondglocken* und *Nebellilien* (`+40 %` Lohn).
+  * **Feuchte Tage („ES HAT GEREGNET“):** Nach zwei Regentagen fragt Esma nach frisch sprießenden Pilzen (`+20 %` Lohn).
+* **Eilzettel mit rotem Wachssiegel:** Laufen noch am **selben Abend vor der Dämmerung** ab (max. `1` gleichzeitig, aus Sturm-Anlässen oder mit `12 %` Aufwertungschance ab Vertrauen `20`), zahlen dafür **doppeltes Kupfer, doppelte XP, doppeltes Vertrauen** und ein **garantiertes Bonus-Item**!
+* **Steckbriefe & „Gezeichnete“ Elites:**
+  * Überlebt ein nächtlicher Elite den Morgengrauen-Rückzug (`7 s` Flucht), verbrennt er nicht länger, sondern entkommt mit eigenem Namen (z. B. *„Der Klotz“*, *„Brecher vom Rand“*, *„Steinschulter“*)!
+  * In späteren Elite-Nächten kehrt er mit **`+10 %` extra Lebenspunkten je überlebter Nacht** (bis maximal `3` Nächte) zurück.
+  * Am linken Brett-Pfosten hängt ein eigener **Steckbrief mit Tintenskizze und Strichliste**. Jeder Koop-Spieler, der den Steckbrief angenommen und den Gezeichneten im Kampf **mindestens einmal getroffen** hat, erhält den vollen Lohn (`420+` Kupfer, `+20 %` je überlebte Nacht, `90 XP`, `+12` Vertrauen und sicher `void_slag`)!
+* **Ehrentafel, Dankband & Wachsende Tafel:**
+  * Neuer dritter Reiter **EHRENTAFEL** im Brettfenster mit Stadt- und Spielerzählern, Verewigung gefallener Gezeichneten sowie **7 freischaltbaren Titeln**, die ihr aktiv tragen könnt (auch im Pausenmenü unter *STADT* sichtbar!).
+  * **Das Dankband:** Unter dem Brett pendelt eine Schnur mit den letzten **`12`** bunten Dankeszetteln der Stadt.
+  * **Wachsende Tafel:** Bei **25, 50 und 100** erledigten Stadtaufträgen wächst die maximale Anzahl einfacher Aushänge jeweils um **`+1`** (bis zu `6` Plätze) – sichtbar gekrönt durch eine neue Laterne, ein zweites Schindelpaar und ein Ehrenschild!
+
+<details>
+<summary>🏆 <b>Übersicht: Alle 7 freischaltbaren Ehrentitel (Klicken zum Entfalten)</b></summary>
+
+| Titel | Bedingung | Kategorie |
+|---|---|---|
+| **HANDLANGER** | `5` abgeschlossene Tafel-Aufträge | Allgemeine Aufträge |
+| **VERLÄSSLICH** | `15` abgeschlossene Tafel-Aufträge | Allgemeine Aufträge |
+| **RÜCKGRAT DER STADT** | `40` abgeschlossene Tafel-Aufträge | Allgemeine Aufträge |
+| **DUNKELRÄUMER** | `30` über die Tafel erlegte Kreaturen | Jagd-Aufträge |
+| **EILBOTE** | `5` rechtzeitig erfüllte Eilzettel | Eilaufträge |
+| **NAMENSJÄGER** | `1` besiegter Gezeichneter | Steckbriefe |
+| **JEDERMANNS FREUND** | Aufträge für `4` verschiedene Bewohner erledigt | Dorfgemeinschaft |
+
+</details>
+
+---
+
+#### 3. 🧭 Quest-Ast & Weltkarten-Integration
+Angenommene Aushänge vom Schwarzen Brett fügen sich jetzt nahtlos ins HUD und die Weltkarte ein:
+
+* **Mehrere Quests im HUD-Zweig:** Unter der Hauptquest hängen ab sofort bis zu **3 angenommene Tafel-Zettel als eigene kleine Nebenzweige** mit Farbkodierung (Creme für Beschaffung, Rot für Jagd, leuchtendes Türkis bei Abgabebereitschaft) und Zähler (`7/12`); überzählige Zettel werden als `+N` gebündelt. Bei Eilzetteln tickt rund um die Knospe ein roter **Frist-Ring**. Gibt es keine Story-Quest, übernimmt der oberste Zettel selbst den großen Hauptzweig! Im Reiter *ANGENOMMEN* bestimmt ihr per **`E` (`VERFOLGEN`)**, welche Zettel im HUD sichtbar sind.
+* **Dynamische Kartenmarker:**
+  * **Fertige Aufträge:** Zeigen direkt auf dem jeweiligen Auftraggeber (wandert mit!) ein angepinntes Zettel-Symbol samt „MELDEN <Name>“ und Richtungspfeilen am Kartenrand.
+  * **Such- & Fundbereiche:** Gestrichelte goldene Ringe markieren Wuchsgebiete für Vollmond-Pflanzen (z. B. *Mondglocke* & *Nebellilie* im Nebelwald), rote Ringe das gemeldete Einsatzgebiet nach einem nächtlichen Vorstoß.
+  * **Steckbrief-Fadenkreuz:** Ein pulsierendes **magenta Fadenkreuz** und ein **`40 m` Suchkreis** weisen euch zum letzten Sichtort des entkommenen Gezeichneten!
+* **Kulante Wegpunkt-Erkennung:** Bei normalen *Erreichen*-Questzielen genügt nun auch ein nahes Vorbeistreifen (innerhalb des doppelten Radius beim Weitergehen), damit der Schritt zuverlässig fortschreitet.
+
+---
+
+#### 4. 🌊 Welt-Erweiterung: Der Hexenwald-See & neue Flussläufe
+Die Nordwest-Region des Hexenwalds wurde um natürliche Gewässer erweitert, ohne bestehende Spielstände zu brechen:
+
+* **Neuer Binnensee („Hexenwald-See“):** Ein malerischer, rund **`28 × 24` Kacheln** großer Waldsee (ca. `2.100` Kacheln Fläche) liegt nun eingebettet auf Ebene 0 im Hexenwald – komplett mit vierstufiger Türkis-/Blau-Tiefenschattierung und Uferglanz auf der Weltkarte.
+* **Zwei neue Flussverbindungen:** Ein nördlicher Zufluss schließt die Lücke zwischen dem Süd-Bogen des Nordflusses und dem Westfluss nahe des Hexenturms, während ein zweiter Lauf den neuen Hexenwald-See nach Norden entwässert.
+* **Entspanntes Durchwaten von Bächen:** Schmale Bäche und flache Furten durchwatet Ellie nun bequem (erst nach **`56 px`** Strecke oder **`1,0 s`** Verweilen in tiefem Wasser wechselt sie ins Schwimmen; Seen werden wie gewohnt geschwommen). Außerdem verbleibt beim Klettern oder Ausstieg ans Ufer kein hartnäckiger Schwimmring mehr.
+
+---
+
+#### 5. 🏃 Dreistufiges Gangarten-System, Animations-Politur & Welt-Optik
+Ellies Bewegung und die Spielwelt fühlen sich spürbar dynamischer, geschmeidiger und stimmungsvoller an:
+
+* **Gehen, Joggen & Sprinten (`104 → 124 px/s`):**
+  * Ellie erhält einen eigenen **dritten Gang – das aufrechte Joggen** – und ein erhöhtes **Sprint-Spitzentempo von `124 px/s`**.
+  * Welcher Zyklus läuft, bestimmt ab sofort ihre **echte, aktuelle Geschwindigkeit**! Wird sie im dichten Hexenwald-Nebel, auf zähem Untergrund oder verwundet gebremst, joggt sie natürlich statt unrealistisch auf der Stelle zu sprinten. Beim Stehenbleiben schwingt ihr Schritt sanft bis zum Füßeschluss (`0,22 s`) aus.
+
+![Dreistufige Gangarten: Gehen, Joggen und Sprinten](docs/img/ellie_gaits.gif)
+
+* **Überarbeitetes Gehen & Schleichen:** Der normale Gehzyklus wurde beruhigt (kein unnatürliches Hinken mehr), und beim Schleichen sinkt die Oberkörper-Neigung von `0,44` auf **`0,27`** – so bleiben Ellies Kopf und Pony aufrecht im Blickfeld statt vornüber zu hängen.
+
+![Überarbeiteter Gehzyklus Vorher vs. Nachher](docs/img/ellie_walk_before_after.gif)
+
+![Aufrechterer Schleichgang Vorher vs. Nachher](docs/img/ellie_sneak_before_after.gif)
+
+* **Animiertes HUD-Wettericon:** Neben der Tageszeit-Anzeige erscheint ab sofort **immer** ein eigenes lebendiges Pixel-Wettericon (rotierende Sonne, Mondsichel, treibende Nebelbänke, fliegende Sturmböen, dynamisch dichter Regen oder aufzuckender Blitz).
+* **Weichere Wolken & lebendige Regentropfen:** Wolkendecken schmiegen sich mit geschmeidigen Rändern statt harten Dither-Punkten in den Himmel; Regentropfen auf Flüssen, Seen und Pfützen variieren Größe, Reichweite und Häufigkeit deutlich stärker zwischen Nieselregen und Starkregen.
+* **Einheitliche Pixeldichte & Klee-Save-Fix:** Krummholz auf Höhenzügen und nachgesäte Wildpflanzen behalten exakt die einheitliche Pixelgröße der gesamten Spielwelt. Zudem werden ausgeschnittene Kleefeld-Stellen beim Laden eines Spielstands nun wieder fehlerfrei wiederhergestellt.
+
+---
+
+### ⚖️ Balance & Spielwerte auf einen Blick
+
+| Status | Bereich / Parameter | Vorher (V0.7.0) | Jetzt (V0.7.1) | Auswirkung im Spiel |
+|---|---|---|---|---|
+| 🔵 `REWORK` | **Ausweichfähigkeit (LEERE)** | Schattenblink (`Leertaste`) | **Schattenschritt (`Alt` / `B`)** | `54 px`, `0,8 s` CD, `14 + Lvl` Ausdauer, `0,26 s` Schutz & Abbruch |
+| 🟢 `BUFF` | **Sprint-Geschwindigkeit** | `104 px/s` | **`124 px/s`** | Spürbar flinkeres Entkommen und Überqueren großer Lichtungen |
+| 🟣 `NEU` | **Jog-Zyklus (Dreistufig)** | Nur Gehen & Sprint | **Gehen / Joggen / Sprinten** | Animation passt sich echter Geschwindigkeit im Nebel/Schlamm an |
+| 🔵 `REWORK` | **Schleich-Haltung (Torso)** | Neigung `0,44` | **Neigung `0,27`** | Aufrechterer Kopf und ruhigerer Schleicher-Gang |
+| 🟢 `BUFF` | **Bäche durchwaten** | Sofortiges Schwimmen | **Ab `56 px` / `1,0 s` tiefem Wasser** | Kurze Bäche und schmale Furten lassen sich direkt durchwaten |
+| 🟣 `NEU` | **Stadt-Anlässe (Brett)** | Reine Zufallszettel | **6 reaktive Welt-Anlässe** | Lagerlücken, Sturm, Vorstöße, Neumond (`+50 %`), Vollmond & Regen |
+| 🟣 `NEU` | **Eilzettel & Persönliche Frist** | Keine Eilzettel; Aushang-Ende | **Dämmerungs-Frist (2x Lohn) + min. `2 T`** | Doppelte Belohnung & garantierter Extra-Drop am Brett |
+| 🟣 `NEU` | **Steckbriefe (Gezeichnete)** | Elites verbrennen morgens | **Fliehen (`+10 %` HP/Nacht), `420+` Kupfer** | Eigener Steckbrief, Fadenkreuz & Belohnung für jeden Treffer |
+| 🟣 `NEU` | **Ehrentafel & Wachstum** | Max. `4` einfache Zettel | **7 Titel, Dankband, bis `6` Plätze** | Brett wächst bei `25 / 50 / 100` erfüllten Stadtaufträgen |
+| 🟣 `NEU` | **HUD & Karten-Marker** | Nur Hauptquest sichtbar | **Bis `3` Nebenzweige & Marker** | Fundbereiche, Einsatzkreise, Auftraggeber-Pins & Fadenkreuz |
+| 🟣 `NEU` | **Hexenwald-See & Flüsse** | Kein Binnensee dort | **`28 × 24` See + 2 neue Flussarme** | Neuer Anlaufpunkt und natürliche Gewässer-Verbindung im Forst |
+| 🟢 `BUFF` | **Wetter-Icon & Wolken** | Nur Text bei Unwetter | **Ständiges Pixel-Icon & weiche Wolken** | Klares Wetter-Feedback direkt an der Uhr ohne Dither-Härte |
+
+---
+
+### 🔮 Sneak Peek: Was erwartet euch als Nächstes?
+*„Mit dem neuen Hexenwald-See füllen sich auch die versteckten Wasseradern westlich des Dorfes – doch tief unter dem Uferschlamm glüht noch immer unbekanntes Erz. Während Valdric seine neuesten Steckbriefe sammelt, bereitet sich ein völlig überarbeitetes Kapitel-System für kommende Abenteuer vor...“*
+
+✦ ──────────────── ❖ ──────────────── ✦  
+*Durch Schattenrisse und klare Fluten,*  
+**Euer Shadowspore-Entwicklerteam 🕳️📜**
+
+---
+
 ## [V0.7.0 Beta] – 2026-11-11
 ### 🌾 Ernte, Sturm & Spiegelscherben: Ackerbau, Dynamische Wetterfronten, Schwarzes Brett, Boss Morwenna & Leere-Alchemie
 

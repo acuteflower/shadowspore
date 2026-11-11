@@ -5,27 +5,28 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.6.2 Beta – „Echo der Zerrissenen“
+## 🚀 Aktuelle Version: V0.7.0 Beta – „Ernte, Sturm & Spiegelscherben“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.6.2 Beta:
-* **Boss 2 – Morwenna, die Spiegelhexe:** Die gefallene Großhexe am monumentalen Rabenbaum im Schieferkessel! Unberechenbare Glitch-Mechanik mit Micro-Stutter, zweistimmiger Sprachüberlagerung und permanenten Glitch-Klonen (überwacht von kreisenden Raben).
-* **Höhenstufen-Verdeckung & Relief-Schatten:** Echtes `ReliefOverhang`-System – Klippen und Felsplateaus verdecken darunterstehende Figuren perspektivisch korrekt und werfen saubere Schattensäume.
-* **Mornath-Arena & Schockwellen-Rework:** Vollständig überarbeitete Schockwellen-Geometrie (`ShockRing`) mit radialer Segmentierung, geglättete Brandflächen (`PixelFlames`) und geschärfte Risswände.
-* **Kontextsensitiver Cursor & Schadenszahlen-Overhaul:** 5 dynamische Cursor-Glyphen (Fernkampf, Ernte, Klettern, Vogel-Interaktion, Nahkampf) und bogenförmig federnde Schadenszahlen mit Crit-Hervorhebung.
-* **Lebendige Wildnis & Schritt-Partikel:** Bären, Kaninchen und Krähen reagieren auf Nachtphasen und Fackellicht; Stiefelschritte erzeugen materialspezifische Staub-, Wasser- und Schlammeffekte.
-* **Atmosphärische Abgründe (Void Edge):** Brodelnde Leere-Zungen und schwebende Partikel säumen die Kanten der schwebenden Inselwelt.
+### Highlights von V0.7.0 Beta:
+* **Ackerbau & Farming-System (Kategorie ACKER):** Gustav schaltet die Scholle frei! Brecht den Boden mit der Hacke, pflanzt Knollenkeime, Glutmöhren, Nachtrüben und Wundblätter, gießt Beete mit der Gießkanne und sichert euch den Ernte-Pflegebonus.
+* **Dynamisches Wettersystem & Himmelsfronten:** 10 dynamische Wetterlagen von strahlendem Sonnenschein bis zu tosenden Gewittern. Echte Wolkenschatten wandern über die Welt, Blitze erhellen die Nacht, und Regen gießt automatisch eure Felder.
+* **Schwarzes Brett (Quest-Tafel im Dorf):** Der neue Mittelpunkt für Bürger-Aufträge, Kopfgelder und dörfliche Liefermissionen.
+* **Voll spielbarer Bosskampf – Morwenna, die Spiegelhexe:** Besiegt die gefallene Großhexe am Großen Rabenbaum! Vollständiges 3-Phasen-Gefecht mit Glitch-Klonen, Klon-Tausch, Spiegelscherben-Käfig und Karussell-Angriffen.
+* **Erweiterte Alchemie (Spezial- & Leere-Sude):** Braut Aschenhaut (Feuer-Immunität), Klarblick (Nebel- und Illusionsschutz), Irrlichtsud (Schattenbann) und Leere-Tränke mit bis zu 75 % Lebensraub.
+* **Animations-Overhaul & Kampf-Polishing:** Komplett neu geglättete Animationszyklen für Laufen, Sprinten, Schleichen, Schwimmen und die 5-Stufen-Schwertkombo mit wuchtigem Hit-Feedback.
 
 ---
 
 ## 🗺️ Kern-Features
 * **Host-Authoritatives Multiplayer-System:** Nahtloses Zusammenspiel von bis zu 4 Spielern (ENet / Godot Multiplayer).
 * **Dorfaufbau („Licht ist Land“):** Gebäude wachsen Pixel für Pixel (`build_pixels.gdshader`), getrampelte Pfade entstehen organisch zwischen Türen.
-* **Lebendige Dorfbewohner:** Echte Tagesabläufe für Valdric, Gustav und Torben.
+* **Lebendige Dorfbewohner & Quests:** Echte Tagesabläufe für Valdric, Gustav und Torben sowie dynamische Anschläge am Schwarzen Brett.
+* **Ackerbau & Selbstversorgung:** Felder bestellen, Saatgut züchten, Feuchtigkeitszyklen pflegen und Wundkräuter ernten.
 * **Waffen-Veredelung (+1 bis +15):** Bei Torben dem Schmied mit Anschmieden, Härten und Leerenschmieden.
-* **Dynamisches Beleuchtungs- und Wettersystem:** Globale Baumkronen-Deckungsmaske (`DaylightField`), weltverankerte Wolken und stimmungsvolle Lichtschäfte.
-* **Mehrphasige Bosskämpfe:** Mornath (Sky Cleaver) mit 3 herausfordernden Phasen, Zorn-Mechanik und Feuer-Arena.
+* **Dynamisches Beleuchtungs- und Wettersystem:** Globale Baumkronen-Deckungsmaske (`DaylightField`), 10 Wetterfronten, weltverankerte Wolken und Gewitterblitze.
+* **Mehrphasige Bosskämpfe:** Mornath (Sky Cleaver) und Morwenna (Spiegelhexe) mit herausfordernden Phasen, Glitch-Mechanik und dynamischen Arenen.
 
 ---
 

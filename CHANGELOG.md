@@ -4,6 +4,130 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.7.0 Beta] – 2026-11-11
+### 🌾 Ernte, Sturm & Spiegelscherben: Ackerbau, Dynamische Wetterfronten, Schwarzes Brett, Boss Morwenna & Leere-Alchemie
+
+![Die Spiegelhexe Morwenna](docs/img/morwenna.png)
+
+> 📜 ***Aus einem durchnässten Brief von Gustav an der Dorfpforte:***  
+> *„Wer hätte gedacht, dass aus dem Schlamm dieser einsamen Lichtung einmal etwas sprießen würde? Die ersten Beete sind gehackt, und der Knollenkeim streckt zarte Blätter dem Himmel entgegen. Doch blickt nach Süden, Freunde... Über dem Hexenwald braut sich ein Sturm zusammen. Der Himmel verfärbt sich giftgrün, Blitze zucken durch die Ulmen und die Raben kreischen wie besessen um ihren alten Baum. Haltet eure Gießkannen bereit, wetzt die Sicheln und werft einen Blick auf das neue Schwarze Brett am Dorfplatz – es gibt viel zu tun, ehe die Nacht hereinbricht!“*
+
+---
+
+> [!WARNING]
+> **Wetterwarnung & Sturmnacht:**  
+> Bei Starkregen und Gewitter dunkelt die Welt merklich ab. Regentage wässern eure Felder zwar automatisch, doch im Schutz des Donnergrollens schleichen Schattenkreaturen leiser heran. Bringt eure Ernte rechtzeitig ins Trockene!
+
+> [!TIP]
+> **Taktiker-Hinweis zur Ernte:**  
+> Wer seine Beete ununterbrochen jede Nacht wässert, erhält bei der Ernte den begehrten *Pflege-Bonus* (+1 zusätzlicher Ertrag). Wundblatt-Pflanzen müssen nach dem Pflücken nicht neu gesät werden – sie wachsen von selbst alle zwei Nächte nach!
+
+---
+
+### 🌟 Die Großen Highlights
+
+#### 1. 🌾 Ackerbau & Farming-System (Die Kategorie ACKER)
+Die Selbstversorgung des Dorfes erreicht eine völlig neue Dimension: Gustav schaltet nach der Fertigung der ersten Werkzeuge die neue Bau-Kategorie **ACKER** frei!
+
+* **Scholle brechen mit der Hacke:** Mit der geschmiedeten Hacke brecht ihr den rohen Erdboden in gehackte Ackerfurchen auf. Durch mehrmaliges Harken hält die Furche länger vor dem Verwildern.
+* **Dynamische Feld-Verschmelzung:** Platzierte 3x3-Felder verschmelzen an den Kanten nahtlos miteinander zu zusammenhängenden Großäckern mit bröseligen Rändern und feinen Krümeln.
+* **Wildsamen & Aussaat:** Beim Pflücken von Wildpflanzen erhaltet ihr nun wertvolles Saatgut:
+  * **Knollenkeim (45 % Chance bei Erdknollen):** Gedeiht in 4 Nächten zu 2–3 schmackhaften Knollen.
+  * **Glutmöhrensamen (50 % Chance bei Glutbeeren):** Wächst in 5 Nächten heran und leuchtet bei Nacht mit feurigem Glanz auf dem Feld.
+  * **Nachtrübensamen (50 % Chance bei Nachtrüben):** Reift in 6 Nächten zu schimmernden Rüben heran.
+  * **Wundblattsamen (40 % Chance bei Wundblättern):** Benötigt nur 3 Nächte und wächst danach alle 2 Nächte automatisch nach!
+* **Gießen & Feuchtigkeits-Glanz:** Mit der Gießkanne versorgt ihr die Saat mit lebenswichtigem Wasser. Nasse Erde färbt sich tiefdunkel und glitzert in der Sonne. Nur gewässerte Beete wachsen über Nacht weiter.
+
+<details>
+<summary>📖 <b>Farming-Almanach: Wachstumszyklen & Pflege (Klicken zum Entfalten)</b></summary>
+
+| Feldfrucht | Saatgut | Wachstumsdauer | Ertrag | Besonderheit |
+|---|---|---|---|---|
+| **Erdknolle** | Knollenkeim | 4 Nächte (1-1-2) | 2–3 Knollen | 35 % Chance auf Samenrückgabe |
+| **Glutmöhre** | Glutmöhrensamen | 5 Nächte (1-2-2) | 1–2 Möhren | Leuchtet nachts auf dem Acker |
+| **Nachtrübe** | Nachtrübensamen | 6 Nächte (2-2-2) | 1–2 Rüben | Hohe Nährkraft für Alchemie |
+| **Wundblatt** | Wundblattsamen | 3 Nächte (1-1-1) | 1–2 Blätter | Wächst alle 2 Nächte nach (`regrow`) |
+
+</details>
+
+---
+
+#### 2. ⛈️ Dynamisches Wettersystem & Himmelsdynamik
+Das Wetter zieht als lebendige Kraft über Shadowspore und formt Umwelt, Sicht und Gameplay.
+
+* **10 Dynamische Wetterlagen:** Von strahlendem *Klar* und sonnigem *Heiter* über *Nieselregen*, gleichmäßigen *Regen*, prasselnden *Starkregen*, peitschenden *Sturmwind* bis hin zu dichten *Nebelbänken* und tosenden *Gewittern*.
+* **Räumliche Wolkenfelder & wandernde Schatten:** Echte Wolkendecken treiben mit der Windrichtung über die Kontinente und werfen scharfe, wandernde Wolkenschatten auf Wiesen und Klippen.
+* **Atmosphärische Gewitter & Blitze:** Bei Unwettern zucken reale Blitze vom Himmel, erhellen für Sekundenbruchteile das Land und lassen Doppelblitze aufzucken. Im Hexenwald leuchten Blitze in giftigem Smaragdgrün!
+* **Unterstand & Lebenswelt:** Dichte Baumkronen spenden natürlichen Regenschutz. Flüsse und Seen bilden Regenkringel, und Regentage gießen automatisch jedes angelegte Feld im Dorf!
+* **Einfluss auf die Jagd:** Starkregen und Sturm dämpfen Geräusche (Monster-Alarmreichweite sinkt um bis zu 40 %), während seltene Gewitterfische bei Unwetter an die Wasseroberfläche drängen.
+
+---
+
+#### 3. 📋 Das Schwarze Brett (Quest-Tafel im Dorf)
+Auf dem Dorfplatz kann nun das monumentale **Schwarze Brett** (`quest_board`) errichtet werden.
+* **Bürger-Aufträge & Kopfgelder:** Anschläge von Gustav, Valdric und Torben bieten Belohnungen für Ressourcenlieferungen, Monsterjagden und Erkundungen.
+* **Fortschritt & Aushänge:** Neue Zettel und Pergamente flattern dynamisch im Wind und informieren über anstehende Events und Welt-Meilensteine.
+
+---
+
+#### 4. 🪞 Voll spielbar: Bosskampf gegen Morwenna, die Spiegelhexe
+Der zweite Story-Boss erwacht im Schieferkessel am Großen Rabenbaum zu vollem Leben!
+
+* **Vollständiges 3-Phasen-Gefecht:**
+  * **Phase 1:** Harzschnitt-Kombos, wendige Schatten-Finten und zeitversetzte Wurzelspeere aus dem Boden.
+  * **Phase 2 („Der Spiegel zerbricht“):** Zersplitterung der Maske, Scheren-Zangenangriffe und erste permanente Glitch-Klone, die im Takt mit Morwenna zuschlagen.
+  * **Phase 3 („Die Hexenstunde“):** Morwenna entfesselt zwei Klone gleichzeitig, sperrt das Areal mit Fluchspiegel-Käfigen ab und startet rotierende Karussell-Angriffe.
+* **Die Raben als Verbündete:** Fliegt Morwenna im Glitch-Swap auf eine andere Position, kreischen die Raben in den Baumkronen zielsicher über dem echten Original!
+* **Legendäre Beute:** *Moras Spiegelscherbe* (`mora_shard`) für Alchemie und Veredelung sowie Replay-Hologramm zur Wiederholung des Kampfes.
+
+---
+
+#### 5. 🧪 Erweiterte Alchemie: Spezial- & Leere-Sude
+Esmas Kessel im Hexenwald bietet ab sofort Zugriff auf 4 mächtige Spezial-Tranklinien in je 3 Reifegraden:
+* **Aschenhaut (I–III):** Reduziert erlittenen Feuerschaden um 40 % bis 60 %; Stufe III macht 60 Sekunden lang völlig immun gegen brennenden Boden.
+* **Klarblick (I–III):** Bis zu 120 Sekunden absoluter Schutz vor Halluzinationen im Nebel; Pflückpflanzen funkeln golden und Schattenmonster verraten sich durch glühende Augen.
+* **Irrlichtsud (I–III):** Beschwört ein treues Irrlicht herauf, das die Dunkelheit bannt und Schattenmonster zurückscheucht (steigert im Gegenzug die Aufmerksamkeit der Nacht).
+* **Leere-Trank (I–III):** Reißt für bis zu 7 Sekunden eine Mini-Leere um Ellie auf – massiver Void-Schaden gegen umstehende Feinde mit bis zu 75 % Lebensraub!
+
+---
+
+#### 6. ⚔️ Animationen & Gameplay-Feinschliff
+Alle Charakter-Animationen wurden von Grund auf überarbeitet und auf maximale Flüssigkeit poliert.
+
+![Flüssige Schwertkombo](docs/img/ellie_combo_before_after.gif)
+
+* **Dynamischer Vorher-Nachher-Sprung:** Ob Laufen, Sprinten, Schleichen, Brustschwimmen, Kraulen oder die 5-Stufen-Schwertkombo – Übergänge greifen geschmeidig ineinander.
+* **Präzises Hit-Feedback:** Schläge fühlen sich wuchtiger an, Waffenschweife ziehen sauber durch die Luft und Trefferzonen passen sich pixelgenau an.
+
+---
+
+### ⚖️ Balance & Spielwerte auf einen Blick
+
+| Status | Bereich / Parameter | Vorher | Jetzt (V0.7.0) | Auswirkung im Spiel |
+|---|---|---|---|---|
+| 🟣 `NEU` | **Ackerbau-Kategorie ACKER** | Keine | **Freischaltbar bei Gustav** | Felder, Hacke, Gießkanne & 4 Saatgut-Arten |
+| 🟣 `NEU` | **Ernte-Pflegebonus** | – | **+1 Extra-Ertrag (`ripe_bonus`)** | Belohnt tägliches Wässern ohne Aussetzer |
+| 🟣 `NEU` | **Wundblatt-Nachwachsen** | Einmalige Ernte | **Alle 2 Nächte (`regrow: 2`)** | Dauerhafte Heilkräuterquelle auf dem Acker |
+| 🟣 `NEU` | **Dynamisches Wettersystem** | Starres Licht | **10 Wetterlagen & ziehende Wolken** | Von Sonnenschein bis Unwetter mit Blitzen |
+| 🟢 `BUFF` | **Feld-Bewässerung bei Regen** | Manuell mit Kanne | **100 % automatisch gegossen** | Regentage sparen Zeit und Gießkannenschwünge |
+| 🟢 `BUFF` | **Schleichen bei Unwetter** | 100 % Alarm | **Bis zu -40 % Alarmreichweite** | Monster hören Schritte bei Regen und Sturm schlechter |
+| 🟣 `NEU` | **Gewitter-Angeln** | Standardfische | **Spezielle Gewitter-Beißrate (0.85)** | Seltene Fische drängen bei Sturm an die Oberfläche |
+| 🟣 `NEU` | **Schwarzes Brett (Dorf)** | – | **Errichtbar für Quests & Kopfgelder** | Zentraler Anlaufpunkt für Bürger-Aufträge |
+| 🟣 `NEU` | **Bosskampf Morwenna** | Nur Konzept | **Vollständig spielbar (3 Phasen)** | Glitch-Klone, Klon-Tausch & Spiegelscherben |
+| 🟣 `NEU` | **Spezial-Tränke (4 Linien)** | Nur Heilung/Ausdauer | **Aschenhaut, Klarblick, Irrlicht & Leere** | Bis zu 75 % Lebensraub und Feuer-Immunität |
+| 🟢 `BUFF` | **Charakter-Animationen** | Starre Frames | **Komplett geglättete Animations-Loops** | Spürbar flüssigeres Laufen, Schwimmen & Kämpfen |
+
+---
+
+### 🔮 Sneak Peek: Was erwartet euch als Nächstes?
+*„Unter dem tiefen Grollen der Gewitterfront hallt ein metallischer Klang aus dem Westen wider. Gustav hat alte Grubenpläne entrollt, und Torben bereitet schwere Spitzhacken vor: Das Tor zu den **Alten Tiefenminen** steht kurz vor der Öffnung... Macht eure Laternen bereit!“*
+
+✦ ──────────────── ❖ ──────────────── ✦  
+*Mit leuchtenden Sporen und geschärften Klingen,*  
+**Euer Shadowspore-Entwicklerteam 🌿⚔️**
+
+---
+
 ## [V0.6.2 Beta] – 2026-11-10
 ### 🪞 Echo der Zerrissenen: Boss-Enthüllung Morwenna, Höhenstufen-Verdeckung, Mornath-Arena-Polishing & Kampffeinschliff
 

@@ -4,6 +4,153 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.8.0 Beta] – 2026-11-11
+### ✨ Kristall, Seehexe & Federkiel: Magiesystem mit 50 Kristallen, Bleichgabel-Stab, Ilvas Seegrenze & das neue Quest-Tagebuch
+
+![Atlas aller 50 Zauber- und Verstärkerkristalle](docs/img/crystals.png)
+
+> 📜 ***Aus einem Brief von Ilva der Seehexe an Esma, verschlossen mit getrocknetem Seeschilf:***  
+> *„Alte Freundin – spürst du das Zittern im Wasser bis hoch in deinen Turm? Die Leere drückt härter gegen mein Südufer als je zuvor, und unter den Kiefern des Westsees pressen die Schatten das Licht tief in den Grund, bis die ersten Steine wieder singen. Zwei deiner Fluchsilber-Bänder liegen auf meiner Schnitzbank bereit: eines für die Hexenulme, und eines für jene widerspenstige Gabel aus Bleichholz. Schick mir den Schützling vorbei, sobald der Spiegel zerbrochen ist – und sag dem kleinen Silberkopf, sie soll sich alles sauber aufschreiben, ehe der Nebel es frisst!“*
+
+---
+
+> [!IMPORTANT]
+> **So startet ihr in die Magie (Freischaltung):**  
+> Nach dem Sieg über die Spiegelhexe (*Morwenna*-Quest abgeschlossen) und ab **Charakterstufe 10** hängt am Schwarzen Brett der goldene Story-Aushang *„AM WESTSEE BRENNT KEIN LICHT“*. Er weist euch über den neuen *Seepfad* in den tiefen Westen zu Ilvas Pfahlhaus am Hexenwald-See!
+
+> [!TIP]
+> **Taktik-Tipp – Doppelzinken & Nebeltarnung:**  
+> Kombiniert auf der seltenen **Bleichgabel** zwei gegensätzliche Schulen (z. B. *Glutschwarm* + *Leerenschlund*): Wirkt ihr die zweite Zinke binnen **`3 s`** per Rechtsklick nach dem Linksklick, löst der **GABELSCHLAG (Zwiespalt)** mit ganzen **`x1,5` Verstärkung** aus! Und ein *Nebelschleier* entzieht euch im Gefecht sogar den Blicken von **Mornath** und **Morwenna**!
+
+---
+
+### 🌟 Die Großen Highlights
+
+#### 1. ✨ Neues Magiesystem: 5 Elementar-Schulen, 50 Kristalle & 2 Zauberstäbe
+Magie zieht als eigenständiges, flexibles Kampfsystem in Shadowspore ein – **ohne klassische Manaleiste**! Jeder eingesetzte Kristall speichert die Magie selbst, leuchtet an der Stabspitze und lädt sich nach dem Wirken eigenständig wieder auf:
+
+* **Zauberkristalle & Verstärkerkristalle (je 5 Seltenheitsstufen):**
+  * **Zauberkristalle** (*SPLITTER → SCHERBE → KRISTALL → HERZSTEIN → STERNSTEIN*) sind spitz, natürlich gewachsen und in ihrer Schulfarbe gesättigt; **Verstärkerkristalle** (*ROHSCHLIFF → TROPFEN → LINSE → FACETTE → KRONE*) sind rund, milchig geschliffen mit silberweißer Gravur.
+  * Auf **Stufe III** und **Stufe V** schaltet jeder Stein eine mächtige Sondereigenschaft frei!
+  * **Sockeln im Inventar:** Klickt einen Kristall im Inventar direkt auf den Zauberstab in der Hotbar; ein Rechtsklick entnimmt ihn wieder (zurück in die Tasche – entnommene Kristalle starten beim erneuten Einsetzen wieder leer). Der *Schattenschritt* bricht jede Zauberanimation sofort ab!
+* **Zwei Zauberstäbe mit eigenem Stil:**
+  * **Hexenulmenstab (Gewöhnlich):** Die gedrehte Wurzel aus Hexenulme trägt `1` Zauberfassung und `1` Verstärkerfassung (alle 5 Stufen). Wird in Ilvas Einstiegsquest geschmiedet oder aus `4× Hexenulme`, `2× Fluchsilber` und `1× Seeglimmer` hergestellt.
+  * **Bleichgabel (Selten, ab Vertrauen `30` bei Ilva):** Der erste **Doppelzinken-Stab**! Beide Zinken tragen je eine eigene Zauber- und Verstärkerfassung (`LMT` wirkt die lange Zinke, `RMT` die kurze – jede lädt separat):
+    * **GABELSCHLAG:** Wirkt ihr die zweite Zinke innerhalb von **`3 s`** nach der ersten, entfaltet ihr Zauber **`x1,25`** Stärke!
+    * **GLEICHKLANG:** Zwei Kristalle derselben Schule laden **`15 %` schneller**!
+    * **ZWIESPALT:** Gegensätzliche Schulen (*Licht ↔ Leere*, *Wurzel ↔ Glut*, *Licht ↔ Nebel*) laden zwar `10 %` langsamer, katapultieren den *Gabelschlag* aber auf vernichtende **`x1,5`**!
+* **Welt-Interaktion der Magie:** *Licht*-Zauber verursachen `+50 %` Schaden gegen Schattenwesen (während *Leere* an ihnen `-50 %` anrichtet); kein Zauber verletzt unschuldige Wildtiere oder Mitspieler. Alle Zauber werfen Zielhilfen am Cursor (im Nebel des Hexenwalds können Halluzinationen falsche Ladebereitschaften vorgaukeln!).
+
+<details>
+<summary>🔮 <b>Grimoire: Alle 5 Zauberkristalle & 5 Verstärkerkristalle mit Stufen-Perks (Klicken zum Entfalten)</b></summary>
+
+| Zauberkristall | Schule | Wirkung (Stufe I → V) | Stufe III (Meilenstein) | Stufe V (Meisterwerk) |
+|---|---|---|---|---|
+| **Bannlicht** | **LICHT** | `36–56 px` Lichtschein um Ellie für `5–10 s`; `6–17 DPS` gegen Schatten (`18–12 s` CD) | **BANNKREIS:** Gilt nachts als echter Lichtschutz-Kreis | **SONNENKERN:** Stößt alle `2 s` einen `0,9x` Lichtring aus |
+| **Wurzelgrund** | **WURZEL** | `30–46 px` Wurzelkreis bis `110 px` weit für `6–11 s`; heilt **`2–4,5 %` LP/s** (`24–15 s` CD) | **DORNEN:** Peitscht Schatten im Kreis (`3–5` Schaden/s) | **LEBENSBLÜTE:** Überheilt über Max-LP & löscht Brennen |
+| **Glutschwarm** | **GLUT** | `1–5` zielsuchende Splitter (`140–180 px`), `9–20` Schaden (mehrfach aufs selbe Ziel **`x1,5`**!) + Brand `3–7 DPS` (`9–7,5 s` CD) | **FUNKENSPRUNG:** Bei Tod springt das Feuer `64 px` weiter | **GLUTHERZ:** Letzter Splitter explodiert im `30 px` Glutring |
+| **Nebelschleier** | **NEBEL** | `4–8,5 s` Tarnung für gewählten Spieler (`170 px`) oder sich selbst; Spinnen, Brecher & **Bosse** verlieren Ziel (`30–22 s` CD) | **IRRSPUR:** Hinterlässt `3 s` Trugbild-Lockvogel | **SCHLEIERKREIS:** Vernebelt auch Verbündete in `40 px` |
+| **Leerenschlund** | **LEERE** | Kostet **`10–7 %` Max-LP**; saugt `2,2–3,1 s` im `44–62 px` Kreis (`48–74 px/s`), beißt für `18–50` Schaden & **`4–6 %` Heilung/Opfer** (`16–12 s` CD) | **SATTER SCHLUND:** Ab `3+` Opfern doppeltes Ladetempo | **LEERER STERN:** Verschlingt Feinde `< 20 %` LP für 2x Heilung |
+
+| Verstärker | Familie | Passende Schulen | Bonus (Stufe I → V) | Stufe III | Stufe V |
+|---|---|---|---|---|---|
+| **Brennglas** | Licht | Licht | Brand-Schaden **`+15–60 %`** | **WEITER SCHEIN:** `+15 %` Radius | **NACHBRAND:** `2,0x` finale Flammen-Detonation |
+| **Wildwuchs** | Wurzel | Wurzel | Wirkdauer **`+15–60 %`** | **WEITE WURZELN:** `+15 %` Radius | **BLÜTENSCHLUSS:** `+8 %` Heilstoß beim Verblühen |
+| **Zunder** | Glut | Glut | Brand-DPS & -Dauer **`+15–60 %`** | **FUNKENFLUG:** `+1` extra Splitter | **AUFLODERN:** Doppelter Schaden auf bereits Brennende! |
+| **Dunst** | Nebel | Nebel | Schleier-Dauer **`+15–60 %`** | **FLÜCHTIG:** `-15 %` Abklingzeit | **NEBELWAND:** `34 px` Schutz-Nebelwolke bleibt `+4 s` |
+| **Hunger** | Leere | Leere | Lebensrückfluss **`+15–60 %`** | **WEITER SCHLUND:** `+15 %` Sog-Radius | **ZWEITER BISS:** Schnappt nach `0,5 s` nochmal zu (50 %) |
+
+</details>
+
+---
+
+#### 2. 🧝‍♀️ Die Seehexe Ilva, ihr Pfahlhaus am Westsee & Das Rohstein-Handwerk
+Am äußersten Westrand des Hexenwalds öffnet sich ein völlig neuer Handlungsort zwischen Wasser und Leere:
+
+* **Ilvas Pfahlhaus am Hexenwald-See:** Über den neuen *Seepfad* erreicht ihr das schiefe Bleichholz-Pfahlhaus am Südufer – bewacht von **9 Bannsteinen** in einem **`250 px`** großen Lichtring. Sobald der Bannsteinring erwacht ist, respektiert die Nacht ihn als sicheren Hafen, und innerhalb des Rings trübt **keinerlei Halluzination** mehr den Blick!
+* **Innenraum & Atmosphäre:** Draußen plätschert der Steg samt Kahn und Tret-Schleifrad; drinnen erwarten euch ein leuchtendes **Resonanzbecken** voller wachsender Kristalle, Schnitzbank, Schleiftisch, Kristallwand, Astrolabium und Mondphasen-Mobile.
+* **Einstiegsquest „Der Ring am See“:** Klopft an Ilvas verriegelte Tür, füttert die drei rissigen Bannsteine mit frischem *Seeglimmer*, schlagt einen Schatten-Hinterhalt am Ufer zurück, erlebt den Bau eures ersten *Hexenulmenstabs* und besteht eure erste Magie-Prüfung!
+* **Neue Sammel-Rohsteine:**
+  * **Seeglimmer (`lake_glimmer`):** Glimmt ausschließlich **nachts** im flachen Uferwasser des Hexenwald-Sees (auch selten beim Angeln am Haken – Vorsicht vor dem lauernden *Lichtfischer*!) und verbirgt bereits beim Fund einen geheimen **Zauberkristall** (Stufen I–IV)!
+  * **Seemondstein (`lake_moonstone`):** Glitzert **tagsüber** zwischen den Uferkieseln und verbirgt einen geheimen **Verstärkerkristall**!
+* **Ilvas Handwerkskunst (*LÄUTERN*, *SCHLIFF*, *STÄBE*, *KAUFEN/VERKAUFEN*):**
+  * **LÄUTERN (Kostenlos!):** Ilva wäscht eure gesammelten Rohsteine gebührenfrei im Seebecken rein und enthüllt per schimmernder *Enthüllungskarte*, welcher Kristall seit dem Fund in ihnen schlummerte!
+  * **SCHLIFF (3 → 1 Veredelung):** Verschmelzt **`3` identische Kristalle oder Verstärker** mit Zusatzmaterialien und Kupfer garantiert ohne Fehlschlag zur nächsthöheren Stufe – so schmiedet ihr ab Vertrauen `60` mit *Schattenkernen* und *Moras Spiegelscherbe* sogar legendäre **Sternsteine** und **Kronen (Stufe V)**!
+
+<details>
+<summary>🔨 <b>Schliff-Tabelle: Kristall-Aufwertung (Stufe II → V bei Ilva) (Klicken zum Entfalten)</b></summary>
+
+| Zielstufe | Seltenheit | Bedarf (Kristall / Verstärker) | Materialbedarf | Kupfer | Benötigtes Vertrauen |
+|---|---|---|---|---|---|
+| **II (Scherbe / Tropfen)** | Ungewöhnlich | `3×` Stufe I | `2× Seeglimmer` / `2× Seemondstein` | `40` / `35` | `0` |
+| **III (Kristall / Linse)** | Selten | `3×` Stufe II | `3× Rohstein` + `2× Leerensplitter` | `120` / `110` | `20` |
+| **IV (Herzstein / Facette)** | Episch | `3×` Stufe III | `4× Rohstein` + `2× Schattenkern` | `320` / `300` | `40` |
+| **V (Sternstein / Krone)** | Legendär | `3×` Stufe IV | `3× Schattenkern` + `1× Moras Spiegelscherbe` | `800` / `760` | `60` |
+
+</details>
+
+---
+
+#### 3. 📖 Das Neue Quest-Tagebuch (`J`) & Einzel-Fokus
+Das bisherige HUD-Zweigsystem weicht einem stimmungsvoll illustrierten, aufschlagbaren **Quest-Tagebuch (`J`)**:
+
+* **Zwei Reiter & Filter:** Blättert per `Q` / `E` oder Klick zwischen **OFFEN** und dem vollständigen **ARCHIV** (inklusive Filtern nach *Alle*, *Geschichte* und *Aufträge*). Wer mag, schaltet in den Einstellungen das *Tagebuch ohne Animation* direkt ein.
+* **Ellies Gedanken & Skizzen:** Zu Story-Meilensteinen (Erwachen, Valdrics Name, Hüttenreparatur, Gustavs Rettung, Werkstatt) notiert Ellie eigene Erinnerungen samt handgezeichneten Skizzen direkt ins Buch; Tafel-Aufträge erscheinen inklusive angepinntem Originalzettel, Lohnübersicht und exakter Frist!
+* **Klarer Einzel-Fokus:** Statt vieler überlagernder Nebenzweige heftet ihr das Lesezeichen per **FOKUSSIEREN** auf genau eine aktive Aufgabe. Genau dieser Fokus erscheint im HUD-Questzweig sowie mit **KARTE** direkt als Sprungpunkt auf der Weltkarte. Angenommene Tafel-Zettel lassen sich zudem über **AUFGEBEN** sauber abbrechen, ohne bereits gesammelte Güter zu verlieren.
+
+---
+
+#### 4. 🎭 Großes Charakter-Porträt-Overhaul
+Die Gesichter von Shadowspore erstrahlen im einheitlichen, handabgestimmten **`103 × 153` Pixel-Art-Format**:
+
+![Die neuen Charakterporträts: Torben, Maren, Esma und Morwenna](docs/img/portraits_hf.png)
+
+* **Neue Dialogporträts:** **Torben**, **Esma (Nebelhexe)** und **Morwenna** erhalten brandneue Charakterporträts im Dialogfenster!
+* **Überarbeitete Klassiker:** **Maren** wurde komplett neu gestaltet; der **Ritter / Valdric** tritt in Version 3 an, und **Ellie** erhält ihr verfeinertes Porträt `v4` (inklusive eigenem Verwundet-Zustand).
+
+<details>
+<summary>🖼️ <b>Charakter-Parade: Alle wichtigen Figuren im Direktvergleich (Klicken zum Entfalten)</b></summary>
+
+![Alle Figuren im Direktvergleich](docs/img/character_sheets/all_front.png)
+
+</details>
+
+---
+
+#### 5. 🎒 Einklappbare Hotbar, Getrennte Koop-Spielstände & Welt-Politur
+* **Automatisch einklappende Hotbar:** Nach **`6,5 s`** ohne Slotwechsel sinken die Hotbar-Slots sanft nach unten ein (`24 px` tiefer, `34 px` schmaler je Seite), sodass ihr deutlich mehr Sicht auf Kämpfe und Landschaft habt – Level/XP sowie Gesundheits- und Ausdauerranken bleiben immer sichtbar. Jedes Umschalten, Inventaröffnen, neue Item oder gehaltene Stack entfaltet sie in **`0,08 s`** wieder!
+* **Getrennte Solo- & Koop-Spielstände + Treue Gast-Identität:** Wer eine Mehrspieler-Partie hostet (*KOOP FORTSETZEN*), speichert ab sofort in einem eigenen Koop-Spielstand – euer Solo-Abenteuer bleibt unangetastet! Zudem besitzen beitretende Freunde nun eine feste Identität: Inventar, angelegte Kristalle, XP, Kupfer, Talente, Rohstein-Würfe, Tafel-Aufträge und eigene Tagebuch-Seiten bleiben beim erneuten Beitreten erhalten.
+* **Schwarzes Brett – Kennenlernen-Regel:** Nur Bewohner, mit denen ihr bereits persönlich gesprochen habt (z. B. Esma oder Ilva erst nach eurem Besuch), hängen reguläre Tagesaufträge, Anlässe oder Steckbriefe auf; bei noch unbekannten Story-Absendern steht *„UNBEKANNT“*.
+* **Schwimmen im Hexenwald-See:** Tiefes Wasser löst die Schwimm-Animation im Zuge des neuen Sees und der nächtlichen Seeglimmer-Suche jetzt wieder direkt ohne Wat-Schwelle aus.
+
+---
+
+### ⚖️ Balance & Spielwerte auf einen Blick
+
+| Status | Bereich / Parameter | Vorher (V0.7.1) | Jetzt (V0.8.0) | Auswirkung im Spiel |
+|---|---|---|---|---|
+| 🟣 `NEU` | **Magiesystem & Stäbe** | Keine Zauberstäbe | **5 Schulen (50 Steine), `2` Stäbe** | Kristalle in Hotbar-Stäben laden sich selbst ohne Mana auf |
+| 🟣 `NEU` | **Doppelzinken-Stab (Bleichgabel)** | Nur Einzelstab-Konzept | **`2` Zinken (`x1,25` / `x1,5` Kombo)** | *Gleichklang* (`-15 %` CD) oder *Zwiespalt* (`x1,5` Gabelschlag) |
+| 🟣 `NEU` | **Schauplatz & NPC: Seehexe Ilva** | Nur leerer See im Westen | **Pfahlhaus, `250 px` Bannring & Quest** | `Seepfad`, sicherer Bannring gegen Nebel, *Läutern* & *Schliff* |
+| 🟣 `NEU` | **Sammel-Rohsteine (See)** | Keine Ufer-Steine | **`Seeglimmer` (Nacht) & `Seemondstein` (Tag)** | Verbergen vorbestimmte Kristalle I–IV zum kostenlosen *Läutern* |
+| 🔵 `REWORK` | **Boss-Verhalten bei Nebeltarnung** | Greifen Spieler immer an | **Mornath & Morwenna verlieren Ziel** | *Nebelschleier* unterbricht gezielte Verfolgung & Angriffe |
+| 🟣 `NEU` | **Quest-Tagebuch (`J`)** | Mehrere HUD-Nebenzweige | **Vollwertiges Buch + `ARCHIV` + Fokus** | Ellies Skizzen/Gedanken, Auftragszettel, Einzel-Fokus & Abbrechen |
+| 🟣 `NEU` | **Charakter-Porträts** | Teilweise ohne Bild | **Neue Bilder für Torben, Esma, Morwenna, Maren, Valdric, Ellie** | Einheitlicher `103 × 153` Pixel-Art-Look in Dialogen |
+| 🟢 `BUFF` | **Einklappbare Hotbar** | Immer voller Rahmen | **Faltet nach `6,5 s` um `24 px` ein** | Mehr freie Sicht im Gefecht & bei Erkundungen (`0,08 s` Aufklappzeit) |
+| 🟢 `BUFF` | **Koop-Speicherung & Identität** | Geteilter Save / Gäste flüchtig | **Separater Koop-Save & feste Gäste** | Gast-Inventare, Talente, Kristalle & Tagebuch überdauern Neustarts |
+| 🔵 `REWORK` | **Brett-Bekanntheit & Tiefwasser** | Jeder Bewohner hängt Zettel; `56 px` Wat-Schwelle | **Erst ab Kennenlernen; direktes Schwimmen** | Verhindert Spoiler-Zettel & passt zum tiefen Hexenwald-See |
+
+---
+
+### 🔮 Sneak Peek: Was erwartet euch als Nächstes?
+*„In Ilvas Kristallwand spiegelt sich längst mehr als nur Wasserlicht – tiefe Adern von unbekanntem Quarz schimmern auch tief unter dem alten Steinbruch. Während sich eure ersten Zauberstäbe im Schein des Bannrings erwärmen, warten in den Schächten des Westens ganz neue Rohkristalle darauf, dem Felsen entrissen zu werden...“*
+
+✦ ──────────────── ❖ ──────────────── ✦  
+*Mit singenden Kristallen und frischer Tinte,*  
+**Euer Shadowspore-Entwicklerteam ✨📜**
+
+---
+
 ## [V0.7.1 Beta] – 2026-11-11
 ### 🕳️ Risse in der Leere & Gedächtnis der Stadt: Schattenschritt, Schwarzes Brett-Ausbau, Steckbriefe, Dreistufige Gangarten & Hexenwaldsee
 

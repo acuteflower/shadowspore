@@ -37,7 +37,7 @@ def ints(rig) -> list:
 def sheets():
     """{name: (cols, rows, [frame args])} in sprite-frame order (row-major)."""
     out = {}
-    # main: rows = crouch * 8 + sector, columns = walk, run, idle
+    # main: rows = crouch * 8 + sector, columns = walk, run, idle, jog
     frames = []
     for crouch in (False, True):
         for sector in range(8):
@@ -47,6 +47,8 @@ def sheets():
                 frames.append((sector, i / h.RUN_FRAMES, "walk" if crouch else "run", crouch, None))
             for i in range(h.IDLE_FRAMES):
                 frames.append((sector, i / h.IDLE_FRAMES, "idle", crouch, None))
+            for i in range(h.JOG_FRAMES):
+                frames.append((sector, i / h.JOG_FRAMES, "walk" if crouch else "jog", crouch, None))
     out["main"] = (h.COLS, 16, frames)
     # attack: per sector steps x leg variants x keyframes
     frames = []

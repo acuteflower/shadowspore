@@ -3,13 +3,17 @@ extends Control
 ## The current quest, top right under the money: a thin branch grows out of the right edge, a glowing bud hangs at its tip, under it the title (gold)
 ## with the distance to the goal (teal) and the task in light text, typed out letter by letter. When a step is done the bud flares, sparks fly and
 ## the old text withers away before the next one is written; with no quest the branch withdraws. At night the void creeps in from the tip.
+## It shows `TrackedQuests.entries()`: the story quest, or (without one) the first quest-board notice the player took, as the main branch; the other notices hang under it as
+## small twigs (a bud, the goal with its count, a stub of bark at the edge), up to three, then "+N". A twig grows out when a notice is taken, flares when it is handed in and fades when it runs out.
 
 const LENGTH: float = 150.0
 const BRANCH_Y: float = 8.0
 const LINE_CHARS: int = 34
 const TYPE_RATE: float = 38.0 ## letters per second
+const MAX_SHOWN: int = 4 ## the main entry and up to three twigs
 
 var _quests: QuestComponent
+var _tracked: TrackedQuests
 var _player: Node2D
 var _time: float = 0.0
 var _grow: float = 0.0 ## 0..1, the branch's length
@@ -25,6 +29,13 @@ var _target: Vector2 = Vector2.INF
 var _search: float = 0.0 ## radius in tiles of a search area (the map shows it): the goal is no exact place
 var _has_quest: bool = false
 var _tasks: Array = [] ## the jobs of a "tasks" step: {text, done, have, need, counter}
+var _main_id: String = ""
+var _last_twigs: Array[Dictionary] = []
+var _twigs: Array[Dictionary] = [] ## entries hanging under the main one (at most MAX_SHOWN - 1)
+var _extra: int = 0 ## entries beyond what is shown
+var _twig_grow: Dictionary = {} ## entry id -> 0..1, how far a twig has grown out
+var _dying: Array[Dictionary] = [] ## {entry, t, done}: twigs that left the list, fading
+var _done_ids: Dictionary = {} ## entry id -> true for entries that were handed in (their twig flares instead of just fading)
 
 
 func _ready() -> void:
@@ -33,18 +44,47 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
-func bind(player: Node, quests: QuestComponent) -> void:
+func bind(player: Node, quests: QuestComponent, tracked: TrackedQuests = null) -> void:
 	_player = player as Node2D
 	_quests = quests
+	_tracked = tracked
+	if _tracked == null: ## without the list (a test): a plain one over the story quest alone
+		_tracked = TrackedQuests.new()
+		_tracked.quests = quests
+		add_child(_tracked)
+	_tracked.changed.connect(_refresh.bind(false))
 	quests.changed.connect(_refresh.bind(false))
 	quests.step_done.connect(func(_q: String, _s: int) -> void:
 		_flare = 1.0
 		_sparks = 1.0)
+	_tracked.finished.connect(func(id: String) -> void:
+		_done_ids[id] = true
+		if id == _main_id:
+			_flare = 1.0
+			_sparks = 1.0)
 	_refresh(true)
 
 
 func _refresh(instant: bool) -> void:
-	var now: Dictionary = _quests.current()
+	var list: Array[Dictionary] = _tracked.entries()
+	var now: Dictionary = list[0] if not list.is_empty() else {}
+	_main_id = String(now.get("id", ""))
+	_twigs = []
+	for i: int in range(1, mini(list.size(), MAX_SHOWN)):
+		_twigs.append(list[i])
+	_extra = maxi(list.size() - MAX_SHOWN, 0)
+	var live: Dictionary = {}
+	for twig: Dictionary in _twigs:
+		live[String(twig.id)] = true
+		if not _twig_grow.has(String(twig.id)):
+			_twig_grow[String(twig.id)] = 1.0 if instant else 0.0
+	for key: String in _twig_grow.keys():
+		if not live.has(key):
+			_twig_grow.erase(key)
+			for old: Dictionary in _last_twigs:
+				if String(old.id) == key:
+					_dying.append({"entry": old, "t": 0.0, "done": _done_ids.has(key)})
+	_last_twigs = _twigs.duplicate()
 	_has_quest = not now.is_empty()
 	_target = now.get("target", Vector2.INF) as Vector2
 	_search = float(now.get("search", 0.0))
@@ -81,7 +121,13 @@ func _process(delta: float) -> void:
 			_typed = 0.0
 	elif _grow > 0.6:
 		_typed = minf(_typed + TYPE_RATE * delta, float(_text.length()))
-	visible = _grow > 0.0
+	for key: String in _twig_grow.keys():
+		_twig_grow[key] = move_toward(float(_twig_grow[key]), 1.0, delta * 2.4)
+	for i: int in range(_dying.size() - 1, -1, -1):
+		_dying[i]["t"] = float(_dying[i].t) + delta
+		if float(_dying[i].t) > 1.0:
+			_dying.remove_at(i)
+	visible = _grow > 0.0 or not _dying.is_empty()
 	queue_redraw()
 
 
@@ -154,6 +200,61 @@ func _draw() -> void:
 	if int(_typed) < _text.length() and int(_time * 6.0) % 2 == 0 and not lines.is_empty(): ## a blinking bud where the writing goes on
 		var last: int = lines.size() - 1
 		draw_rect(Rect2(right - PixelText.width(lines[last]) - 4, 40 + last * 9, 2, 2), Color(UiStyle.ACCENT, text_alpha))
+	_draw_twigs(task_y + 6, maxf(text_alpha, 0.0), right)
+
+
+## The other quests: one line each under the main entry. A bark stub at the edge, a bud (cream for a fetch, red for a hunt, teal when it can be handed in), the goal and its count.
+func _draw_twigs(top: int, alpha: float, right: int) -> void:
+	var y: int = top
+	for twig: Dictionary in _twigs:
+		var grown: float = float(_twig_grow.get(String(twig.id), 1.0))
+		_draw_twig(twig, y, alpha * grown, right, (1.0 - grown) * 26.0, 0.0, false)
+		y += 11
+	for gone: Dictionary in _dying:
+		var t: float = float(gone.t)
+		_draw_twig(gone.entry as Dictionary, y, alpha * (1.0 - t), right, t * 8.0, t, bool(gone.done))
+		y += 11
+	if _extra > 0:
+		var more: String = "+%d" % _extra
+		PixelText.draw(self, more, Vector2i(right - PixelText.width(more), y + 1), Color(UiStyle.TEXT_DIM, alpha * 0.8), Color(VineStyle.OUTLINE, alpha))
+
+
+func _draw_twig(twig: Dictionary, y: int, alpha: float, right: int, slide: float, burst: float, handed_in: bool) -> void:
+	if alpha <= 0.01:
+		return
+	var ready: bool = bool(twig.ready)
+	var label: String
+	if ready:
+		label = "%s > %s" % [String(twig.label), String(twig.giver_name)]
+	else:
+		label = "%s %d/%d" % [String(twig.label), int(twig.have), int(twig.need)]
+	var kind: Color = Color("d0566a") if String(twig.kind) == BoardRules.KILL else Color("e8dcc0")
+	var urgent: bool = not ready and int(twig.days_left) >= 0 and int(twig.days_left) <= 1
+	var tone: Color = UiStyle.ACCENT if ready else (Color("e0788a") if urgent else UiStyle.TEXT_DIM)
+	var width: int = PixelText.width(label)
+	var x: int = right - width + int(slide)
+	draw_rect(Rect2(int(size.x) - 9 + slide, y + 2, 9, 4), Color(VineStyle.OUTLINE, alpha)) ## the stub of bark at the edge
+	draw_rect(Rect2(int(size.x) - 9 + slide, y + 3, 9, 2), Color(VineStyle.BARK, alpha))
+	draw_rect(Rect2(int(size.x) - 9 + slide, y + 3, 9, 1), Color(VineStyle.BARK_LIGHT, alpha * 0.8))
+	PixelText.draw(self, label, Vector2i(x, y), Color(tone, alpha * (1.0 if ready else 0.95)), Color(VineStyle.OUTLINE, alpha))
+	var bud: Vector2 = Vector2(x - 6, y + 1)
+	if bool(twig.get("urgent", false)) and not ready: ## the clock of a rush notice: a ring round the bud that eats itself up and flickers red in the last fifth
+		var left: float = float(twig.get("urgent_left", 1.0))
+		var flicker: float = 1.0 if left > 0.2 else (0.55 + 0.45 * sin(_time * 14.0))
+		var steps: int = 16
+		for s: int in steps:
+			if float(s) / float(steps) > left:
+				break
+			var angle: float = -PI / 2.0 + float(s) * TAU / float(steps)
+			draw_rect(Rect2(roundf(bud.x + 1.0 + cos(angle) * 5.0), roundf(bud.y + 1.0 + sin(angle) * 5.0), 1, 1), Color("e0788a", alpha * flicker))
+	draw_rect(Rect2(bud - Vector2.ONE, Vector2(5, 5)), Color(VineStyle.OUTLINE, alpha * 0.9))
+	draw_rect(Rect2(bud, Vector2(3, 3)), Color(UiStyle.ACCENT if ready else kind, alpha))
+	if ready:
+		VineStyle.glow(self, bud + Vector2(1, 1), 5.0 + 1.5 * sin(_time * 4.0), UiStyle.ACCENT, 0.45 * alpha)
+	if handed_in and burst > 0.0: ## handed in: a ring of sparks leaves the bud
+		for k: int in 6:
+			var angle: float = float(k) * TAU / 6.0 + burst * 2.0
+			draw_rect(Rect2(roundf(bud.x + 1.0 + cos(angle) * burst * 12.0), roundf(bud.y + 1.0 + sin(angle) * burst * 12.0), 1, 1), Color(UiStyle.ACCENT, (1.0 - burst) * alpha))
 
 
 func _wither_alpha() -> float:

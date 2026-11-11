@@ -730,9 +730,10 @@ func _draw_details() -> void:
 ## The detail line of a skill: data text, or live numbers where the game knows them.
 func _detail_line(id: String) -> String:
 	var node: Dictionary = _skills.node(id)
-	if id == "shadow_blink":
-		var blink: BlinkComponent = _player.get_node("BlinkComponent") as BlinkComponent
-		return "REICHWEITE %d / ABKLINGZEIT %d S" % [roundi(blink.blink_range), roundi(blink.cooldown)]
+	if id == "shadow_step":
+		var player: Player = _player as Player
+		if player != null and player.stepper != null:
+			return "%s / REICHWEITE %d / %.1f S / %d AUSDAUER" % [VineStyle.key_name("shadow_step", "ALT"), roundi(player.step_range), player.stepper.cooldown, roundi(player.step_cost())]
 	if id == "sneak":
 		var stealth: StealthComponent = _player.get_node_or_null("StealthComponent") as StealthComponent
 		if stealth != null:

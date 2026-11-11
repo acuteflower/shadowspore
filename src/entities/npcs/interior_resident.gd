@@ -168,6 +168,8 @@ func is_working() -> bool:
 func prompt() -> String:
 	if _talking or InputManager.ui_blocking or _town == null or _clip == "walk":
 		return ""
+	if _town.board != null and not _town.board.finishable(sid, _town.local_player()).is_empty():
+		return "AUFTRAG ABGEBEN"
 	var talked: bool = int((_town.residents.get(sid, {}) as Dictionary).get("talked", -1)) == TimeManager.day
 	return "HANDELN" if talked and spec.has("shop") else "ANSPRECHEN"
 
@@ -186,6 +188,13 @@ func interact(player: Player) -> void:
 	_talking = true
 	_turned = 4.0
 	_sector = Adventurer.sector_of(player.global_position - global_position)
+	if _town.board != null and not _town.board.finishable(sid, player).is_empty(): ## the end of a board notice: report to the one who gave it
+		var thanks: String = _town.board.report(sid, player)
+		var box: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
+		if box != null and thanks != "":
+			await box.speak(String(spec.get("name", sid)), thanks)
+		_talking = false
+		return
 	var fresh_day: bool = int((_town.residents.get(sid, {}) as Dictionary).get("talked", -1)) != TimeManager.day
 	if fresh_day:
 		_town.request_talk(sid)

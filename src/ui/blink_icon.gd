@@ -7,7 +7,7 @@ extends Control
 const WIDTH: int = 28
 const HEIGHT: int = 44
 const ANCHOR_X: float = 14.0
-const ACTION: String = "blink"
+const ACTION: String = "shadow_step"
 
 const DIM: Color = Color("3a1f66")
 const BRIGHT: Color = Color("9b5cff")
@@ -23,7 +23,7 @@ const GLYPH: PackedStringArray = [
 	"...X...",
 ]
 
-var _blink: BlinkComponent
+var _blink: ShadowStepComponent
 var _key: String = ""
 var _press: float = 0.0
 var _ring: float = 0.0 ## 1 -> 0 after becoming ready
@@ -36,7 +36,7 @@ func _ready() -> void:
 	size = Vector2(WIDTH, HEIGHT)
 
 
-func bind(blink: BlinkComponent) -> void:
+func bind(blink: ShadowStepComponent) -> void:
 	_blink = blink
 	_key = _hotkey()
 	blink.cooldown_changed.connect(_on_cooldown)

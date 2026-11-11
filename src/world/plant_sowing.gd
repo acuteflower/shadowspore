@@ -197,8 +197,9 @@ func _spawn(cell: Vector2i, fresh: bool, chunk: WorldLevel.Chunk = null) -> void
 		thing.create_tween().tween_property(thing, "modulate:a", 1.0, 0.6)
 
 
-func _size(entry: Dictionary) -> float:
-	return clampf(0.6 + 0.4 * float(TimeManager.day - int(entry.d)) / GROW_DAYS, 0.6, 1.0)
+## Sown plants are always drawn at full size: shrinking a sprite would give it finer pixels than every other plant (the pixel density stays the same everywhere).
+func _size(_entry: Dictionary) -> float:
+	return 1.0
 
 
 func _refresh_sizes() -> void:

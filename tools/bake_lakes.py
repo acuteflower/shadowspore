@@ -49,6 +49,32 @@ def enclosed_components(land):
     return lakes, sorted(entries, key=lambda entry: -entry['area_tiles'])
 
 
+def pond_mask(ponds, shape, land, relief):
+    """Inland lakes drawn by hand (data/lakes.json `ponds`): a wobbly ellipse in tiles, on open flat floor only."""
+    mask = np.zeros(shape, dtype=bool)
+    entries = []
+    yy, xx = np.mgrid[:shape[0], :shape[1]]
+    for pond in ponds:
+        cx, cy = pond['center']
+        rx, ry = pond['radius']
+        rng = np.random.default_rng(pond.get('seed', 1))
+        amps = rng.uniform(0.03, 0.09, 4)
+        phases = rng.uniform(0, 6.283, 4)
+        dx, dy = (xx + .5 - cx) / rx, (yy + .5 - cy) / ry
+        angle = np.arctan2(dy, dx)
+        edge = 1 + sum(a * np.sin(angle * (k + 2) + p) for k, (a, p) in enumerate(zip(amps, phases)))
+        local = np.hypot(dx, dy) < edge
+        wet = np.argwhere(local)
+        ok = land[local].all() and not (relief[local][:, 1] & 15).any() and not relief[local][:, 0].any()
+        assert ok, f"pond {pond['id']} lies on cliffs, other levels or the coast"
+        mask |= local
+        lo, hi = wet.min(axis=0)[::-1], wet.max(axis=0)[::-1]
+        entries.append({'id': pond['id'], 'area_tiles': int(local.sum()),
+                        'bounds': [int(lo[0]), int(lo[1]), int(hi[0] - lo[0] + 1), int(hi[1] - lo[1] + 1)],
+                        'center': [cx * T, cy * T], 'inland': True})
+    return mask, entries
+
+
 def distance(mask):
     """Same 3/4 chamfer metric as bake_land_sdf.gd, vectorized along each row."""
     result = np.where(mask, 1 << 20, 0).astype(np.int32)
@@ -86,6 +112,10 @@ def bake():
     original = np.asarray(Image.open(ROOT / 'assets/world/land_sdf.png').convert('L'))
     land = original >= 128
     lakes, entries = enclosed_components(land)
+    relief_all = np.asarray(Image.open(ROOT / 'assets/world/relief.png'))
+    ponds, pond_entries = pond_mask(cfg.get('ponds', []), land.shape, land, relief_all)
+    lakes = lakes | ponds
+    entries = entries + pond_entries  # appended: the indices of the void lakes stay as they were
     to_lake = np.where(lakes, -distance(lakes), distance(~lakes))
     lake_sdf = np.clip(np.rint(128 + to_lake * 8), 0, 255).astype('uint8')
     filled = land | lakes
@@ -107,7 +137,7 @@ def bake():
         for sx, sy in candidates:
             for dx, dy in ((0, 1), (1, 0), (-1, 0), (0, -1)):
                 dry_x, dry_y = sx+dx, sy+dy
-                if not land[dry_y, dry_x] or relief[dry_y, dry_x, 1] & 15:
+                if not land[dry_y, dry_x] or lakes[dry_y, dry_x] or relief[dry_y, dry_x, 1] & 15:
                     continue
                 if relief[dry_y, dry_x, 0] != 0:
                     continue

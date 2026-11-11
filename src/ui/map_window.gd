@@ -554,6 +554,7 @@ func _draw_overlay() -> void:
 	_ways.draw(_overlay, _scale, fade, _time, size, [_present_tile, _present_ring, _present_age] if _present_ring > 0.0 else [])
 	_pet_marks.draw(_overlay, _scale, fade, _time, size, get_tree())
 	_draw_quest(fade)
+	_draw_board_marks(fade)
 	_draw_pins(fade)
 	_draw_presence(fade)
 	_draw_frame(fade, void_level)
@@ -691,6 +692,65 @@ func _draw_quest(fade: float) -> void:
 	_overlay.draw_rect(Rect2(at - Vector2(1, 1), Vector2(3, 3)), Color(VineStyle.PETAL, fade))
 	if _scale > 0.4:
 		_text_centered(String(now.title), at + Vector2(0, 9), Color(tone, 0.95), fade)
+
+
+## The quest-board notices the player took (`TrackedQuests`): a pinned paper with a pulsing ring where something can be done about them. Today that is the giver once the goods
+## or kills are there (the mark follows the settler); a chevron at the edge points to it off screen. The story quest keeps its golden bloom (`_draw_quest`).
+func _draw_board_marks(fade: float) -> void:
+	var tracked: TrackedQuests = (_player.get("tracked") as TrackedQuests) if _player != null else null
+	if tracked == null:
+		return
+	for entry: Dictionary in tracked.board_entries(false):
+		var area: Vector3 = entry.get("area", Vector3.INF) as Vector3
+		if area != Vector3.INF:
+			_draw_notice_area(area, String(entry.area_name), bool(entry.get("urgent", false)), String(entry.kind) == BoardRules.KILL, fade, bool(entry.get("bounty", false)))
+		var goal: Vector2 = entry.target as Vector2
+		if goal == Vector2.INF or goal.x >= Interiors.POCKET_X0:
+			continue
+		var at: Vector2 = _to_screen(goal / 16.0)
+		var tone: Color = Color("78f4e6")
+		if not _on_screen(at, 4.0):
+			_draw_pointer(at, tone, fade)
+			continue
+		var wave: float = fposmod(_time * 0.8 + float(int(entry.oid)) * 0.37, 1.0)
+		VineStyle.glow(_overlay, at, 12.0, tone, 0.38 * fade * (0.8 + 0.2 * sin(_time * 3.0)))
+		VineStyle.ring(_overlay, at, 3 + int(wave * 10.0), Color(tone, (1.0 - wave) * 0.8 * fade), 0.7)
+		var corner: Vector2 = (at - Vector2(3, 3)).round()
+		_overlay.draw_rect(Rect2(corner - Vector2.ONE, Vector2(9, 8)), Color(VineStyle.OUTLINE, 0.9 * fade)) ## the paper, pinned
+		_overlay.draw_rect(Rect2(corner, Vector2(7, 6)), Color(BoardNotes.KILL_PAPER if String(entry.kind) == BoardRules.KILL else BoardNotes.FETCH_PAPER, fade))
+		_overlay.draw_rect(Rect2(corner + Vector2(1, 2), Vector2(4, 1)), Color(BoardNotes.INK, 0.75 * fade))
+		_overlay.draw_rect(Rect2(corner + Vector2(1, 4), Vector2(3, 1)), Color(BoardNotes.INK, 0.75 * fade))
+		_overlay.draw_rect(Rect2(corner + Vector2(3, 0), Vector2.ONE), Color(BoardNotes.PIN, fade))
+		if _scale > 0.4:
+			_text_centered("MELDEN %s" % String(entry.giver_name), at + Vector2(0, 10), Color(tone, 0.95), fade)
+
+
+## A quest-board notice's place on the map as a ring of dashes: the hunting ground of a report (red) or where a plant grows (gold). No dot: nobody says where exactly.
+func _draw_notice_area(area: Vector3, label: String, rush: bool, hunt: bool, fade: float, bounty: bool = false) -> void:
+	var at: Vector2 = _to_screen(Vector2(area.x, area.y) / 16.0)
+	var radius: float = area.z / 16.0 * _scale
+	if radius < 5.0 or not _on_screen(at, radius):
+		return
+	var tone: Color = Color("e0788a") if (rush or hunt) else VineStyle.WARM_GLOW
+	if bounty: ## a wanted poster: the magenta of the shadow creatures, a crosshair where it was seen last
+		tone = Color("d640c8")
+		var beat: float = 0.65 + 0.35 * sin(_time * 3.0)
+		var middle: Vector2 = at.round()
+		for k: int in range(3, 9):
+			for dir: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
+				_overlay.draw_rect(Rect2(middle + dir * float(k), Vector2.ONE), Color(tone, 0.9 * fade * beat))
+		_overlay.draw_rect(Rect2(middle, Vector2.ONE), Color(Color.WHITE, 0.8 * fade))
+	var steps: int = clampi(int(radius * 3.0), 36, 900)
+	var march: int = int(_time * 5.0)
+	for s: int in steps:
+		if (s + march) % 8 > 3:
+			continue
+		var angle: float = float(s) * TAU / float(steps)
+		var p: Vector2 = (at + Vector2(cos(angle), sin(angle)) * (radius + sin(angle * 5.0 + _time) * 0.8)).round()
+		if _on_screen(p, 2.0):
+			_overlay.draw_rect(Rect2(p, Vector2.ONE), Color(tone, 0.8 * fade))
+	if label != "" and _scale > 0.3:
+		_text_centered(label, at - Vector2(0, radius + 8.0), Color(tone, 0.9), fade)
 
 
 ## The search area of a quest step (the goal is somewhere inside, nobody knows where): a ragged ring of marching dashes in the warm gold of the quest bloom,

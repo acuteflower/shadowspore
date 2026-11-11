@@ -102,6 +102,7 @@ func _target(step: Dictionary) -> Vector2:
 
 
 var _task_clock: float = 0.0
+var _closest: Dictionary = {} ## "quest/step" -> her closest approach to a reach goal so far (px)
 var _task_signature: String = ""
 
 
@@ -114,8 +115,23 @@ func _physics_process(delta: float) -> void:
 		var step: Dictionary = _step(quest_id)
 		if in_transit:
 			break
-		if String(step.get("type", "")) == "reach" and _player.global_position.distance_to(_target(step)) <= float(step.get("radius", 4)) * 16.0:
-			_advance(quest_id)
+		if String(step.get("type", "")) == "reach":
+			var goal: Vector2 = _target(step)
+			var dist: float = _player.global_position.distance_to(goal)
+			var reach: float = float(step.get("radius", 4)) * 16.0
+			var key: String = "%s/%s" % [quest_id, String(step.get("id", ""))]
+			if dist <= reach:
+				_closest.erase(key)
+				_advance(quest_id)
+				continue
+			# Walking past a little beside the goal counts too: once she came within twice the radius and now moves away again, the step is done.
+			if goal != Vector2.INF and not step.has("search") and not step.has("actor"):
+				var best: float = float(_closest.get(key, INF))
+				if dist < best:
+					_closest[key] = dist
+				elif best <= reach * 2.0 and dist > best + 40.0:
+					_closest.erase(key)
+					_advance(quest_id)
 	_task_clock -= delta
 	if _task_clock <= 0.0:
 		_task_clock = 0.25

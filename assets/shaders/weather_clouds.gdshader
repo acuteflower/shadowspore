@@ -37,11 +37,10 @@ void fragment() {
 	vec2 w = floor(world_origin + UV * view_px + 0.001); // the art pixel of the world under this fragment
 	vec2 q = w + height + 0.5; // where in the cloud field this cloud stands
 	float th = cloud_thick(q);
-	float b = n_bayer(w);
 	vec4 out_color = vec4(0.0);
 	if (th > 0.0) {
 		float edge = smoothstep(0.0, 0.22, th);
-		if (edge >= b * 0.85 + 0.06) {
+		if (edge > 0.02) {
 			vec2 toward = normalize(light_dir);
 			float d0 = cloud_density(q);
 			float d_l = cloud_density(q + toward * 5.0);
@@ -57,7 +56,7 @@ void fragment() {
 			col = mix(col, vec3(0.58, 0.60, 0.66) * (0.7 + 0.12 * float(step_i)), smoothstep(0.6, 1.0, cover) * 0.5);
 			col = mix(col, col * vec3(0.40, 0.42, 0.58), clamp(storm * 0.95, 0.0, 1.0));
 			float a = alpha_max * (0.62 + 0.38 * smoothstep(0.1, 0.8, th)) * (1.0 + 0.3 * storm);
-			out_color = vec4(col * ambient, a * visibility);
+			out_color = vec4(col * ambient, a * visibility * edge); // the rim fades out softly (no dither dots)
 		}
 	}
 	if (out_color.a <= 0.0 && cover < 0.62) {
@@ -68,8 +67,8 @@ void fragment() {
 		float perp = dot(qc, vec2(-wd.y, wd.x));
 		float n = n_fbm(vec2(along / 360.0, perp / 34.0) + 7.0);
 		float streak = smoothstep(0.60, 0.76, n) * (1.0 - smoothstep(0.30, 0.62, cover));
-		if (streak > b * 0.9 + 0.1) {
-			out_color = vec4(mix(vec3(0.96, 0.97, 1.0), vec3(1.0, 0.86, 0.68), golden * 0.6) * ambient, 0.20 * visibility);
+		if (streak > 0.02) {
+			out_color = vec4(mix(vec3(0.96, 0.97, 1.0), vec3(1.0, 0.86, 0.68), golden * 0.6) * ambient, 0.20 * visibility * streak);
 		}
 	}
 	COLOR = out_color;

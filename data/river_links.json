@@ -1,0 +1,23 @@
+{
+  "_doc": "Hand-authored river links (tiles), baked by tools/bake_river_links.py on top of rivers_baked.json. The first point is where the water comes from, the last where it flows to. {\"snap\": [x, y]} = the nearest node of an existing river (takes over its width).",
+  "links": [
+    {
+      "id": "hex_link_north",
+      "_note": "The southern bend of the northern river feeds the head of the river that runs west to the coast; passes just west of the quest tile (776, 770).",
+      "points": [{"snap": [770, 758]}, [775, 765], [773, 775], [770, 782], [760, 786], {"snap": [750, 784]}],
+      "radius": [23, 18],
+      "flow": 0.9,
+      "basin": 0,
+      "meander": [9, 130, 0.0]
+    },
+    {
+      "id": "hex_link_lake",
+      "_note": "Outflow of the Hexenwald lake (lakes.json ponds) north to the western river's corner.",
+      "points": [[734, 890], [733, 872], [727, 855], [719, 838], {"snap": [715, 824]}],
+      "radius": [17, 18],
+      "flow": 0.9,
+      "basin": 0,
+      "meander": [11, 170, 1.3]
+    }
+  ]
+}

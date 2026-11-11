@@ -539,6 +539,8 @@ func _local_player() -> Player:
 func prompt() -> String:
 	if not visible or _arrive_t >= 0.0 or _talking or InputManager.ui_blocking or town == null or not town.residents.has(sid):
 		return ""
+	if _has_report():
+		return "AUFTRAG ABGEBEN"
 	return "HANDWERK" if is_working() and int((town.residents[sid] as Dictionary).get("talked", -1)) == TimeManager.day else "ANSPRECHEN"
 
 
@@ -568,8 +570,22 @@ func _order_waits() -> bool:
 	return false
 
 
+## Has the local player a finished notice from this settler (quest board), ready to report?
+func _has_report() -> bool:
+	return town.board != null and not town.board.finishable(sid, _local_player()).is_empty()
+
+
 func interact(player: Player) -> void:
 	if _talking or not town.residents.has(sid):
+		return
+	if town.board != null and not town.board.finishable(sid, player).is_empty(): ## the end of a board notice: report to the one who gave it
+		_talking = true
+		_sector = Adventurer.sector_of(player.global_position - global_position)
+		var thanks: String = town.board.report(sid, player)
+		var box: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
+		if box != null and thanks != "":
+			await box.speak(String(spec.name), thanks)
+		_talking = false
 		return
 	if spec.has("chat") and not (spec.has("shop") and (is_working() or _order_waits())):
 		_chat(player) ## a talker with a shop (Torben) only chats while he is away from his bench

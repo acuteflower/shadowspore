@@ -24,20 +24,21 @@ func _run() -> void:
 	add_child(player)
 	player.set_physics_process(false)
 	var sheet: Image = player._sprite.texture.get_image()
-	check(sheet.get_size() == Vector2i(768, 896), "main sheet keeps its expected frame layout")
-	check(player._rig_hand.size() == 256 and player._rig_shoulder.size() == 256, "all main-sheet hand and shoulder points load")
+	check(sheet.get_size() == Vector2i(1056, 896), "main sheet keeps its expected frame layout")
+	check(player._rig_hand.size() == 352 and player._rig_shoulder.size() == 352, "all main-sheet hand and shoulder points load")
 	for sector: int in 8:
 		var direction: Vector2 = Vector2.RIGHT.rotated(float(sector) * PI / 4.0)
 		player.facing = direction
 		player.velocity = direction * player.sprint_speed
 		player.sprinting = true
+		player._gait = 2
 		player._sector = sector
 		var masks: Array[PackedByteArray] = []
 		for phase: int in 6:
 			player._walk_time = float(phase)
 			player._last_step = phase
 			player._animate(0.0)
-			check(player._sprite.frame == sector * 16 + 6 + phase, "sector %d jog phase %d selects the correct sprite" % [sector, phase])
+			check(player._sprite.frame == sector * Player.SHEET_COLS + 6 + phase, "sector %d jog phase %d selects the correct sprite" % [sector, phase])
 			var mask: PackedByteArray = PackedByteArray()
 			for y: int in range(5, 43):
 				for x: int in 48:
@@ -54,7 +55,26 @@ func _run() -> void:
 	player._walk_time = 0.0
 	player._last_step = -1
 	player._animate(0.1)
-	check(is_equal_approx(player._walk_time, player.jog_fps * 0.1), "jog animation follows its configured speed")
+	check(is_equal_approx(player._walk_time, 1.0 + player.jog_fps * 0.1), "sprint animation sets off from the push-off frame at its configured speed")
+	# A sprint throttled below sprint speed (Hexenwald mist, slow ground) switches to the jog cycle after a short hold, keeping the stride.
+	player.velocity = Vector2.RIGHT * player.sprint_speed * 0.72
+	for i: int in 4:
+		player._animate(0.05)
+	check(player._gait == 1 and player._sprite.frame - player._sector * Player.SHEET_COLS >= Player.JOG_COL, "a throttled sprint plays the jog cycle")
+	player.velocity = Vector2.RIGHT * player.max_speed
+	for i: int in 4:
+		player._animate(0.05)
+	check(player._gait == 0, "walking speed falls back to the walk cycle")
+	# Stopping mid-stride finishes the step before the idle loop.
+	player.velocity = Vector2.RIGHT * player.max_speed
+	player._walk_time = 2.9
+	player._animate(0.02)
+	player.velocity = Vector2.ZERO
+	player._animate(0.02)
+	check(player._last_step >= 0 and player._sprite.frame - player._sector * Player.SHEET_COLS < Player.IDLE_COL, "a stopping stride runs on for a moment")
+	for i: int in 20:
+		player._animate(0.02)
+	check(player._last_step == -1, "the stride settles into the idle loop")
 	player.velocity = Vector2.ZERO
 	player._idle_time = 0.0
 	player._animate(0.3)

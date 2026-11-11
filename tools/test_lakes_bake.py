@@ -13,8 +13,13 @@ original = np.asarray(Image.open(ROOT/'assets/world/land_sdf.png').convert('L'))
 outer = np.asarray(Image.open(ROOT/'assets/world/outer_sdf.png').convert('L'))
 lake_sdf = np.asarray(Image.open(ROOT/'assets/world/lakes_sdf.png').convert('L'))
 mask = lake_sdf < 128
-assert len(lakes['lakes']) == 8 and int(mask.sum()) == sum(lake['area_tiles'] for lake in lakes['lakes'])
-assert not np.any(mask & (original >= 128)), 'Lake replaces existing land'
+ponds = [lake for lake in lakes['lakes'] if lake.get('inland')]
+assert len(lakes['lakes']) == 8 + len(ponds) == 9 and int(mask.sum()) == sum(lake['area_tiles'] for lake in lakes['lakes'])
+pond_zone = np.zeros_like(mask)
+for pond in ponds:
+    x, y, w, h = pond['bounds']
+    pond_zone[y:y+h, x:x+w] = True
+assert not np.any(mask & (original >= 128) & ~pond_zone), 'Lake replaces existing land'
 assert not np.any(mask[[0, -1]]) and not np.any(mask[:, [0, -1]]), 'Exterior void became lake'
 assert np.all(outer[mask] >= 128), 'Void still cuts through a lake'
 assert np.array_equal(outer[(original < 128) & ~mask], original[(original < 128) & ~mask]), 'Exterior coastline changed'

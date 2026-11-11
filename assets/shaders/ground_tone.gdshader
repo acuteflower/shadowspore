@@ -237,20 +237,25 @@ void fragment() {
 				if (depth < 0.12) { c.rgb = mix(c.rgb, vec3(0.86, 0.92, 0.98), 0.20 * (1.0 - g_night * 0.6)); }
 				vec2 rc = floor(px / 11.0);
 				float rh = hash(rc + vec2(7.0, 3.0));
-				if (rh < 0.55 * rl) {
-					float ph = fract(TIME * 0.9 + rh * 17.0);
+				// every cell may drop a ring once per cycle; how often one does follows the rain (drizzle: now and then, downpour: nearly always)
+				float cyc = TIME * 0.9 + rh * 17.0;
+				float ph = fract(cyc);
+				float act = hash(rc + vec2(floor(cyc) * 1.37 + 5.0, 29.0));
+				if (act < clamp(1.05 * pow(rl, 0.85), 0.0, 0.95)) {
 					vec2 centre = (rc + 0.25 + 0.5 * vec2(hash(rc + 1.0), hash(rc + 2.0))) * 11.0;
 					vec2 dv = (px + 0.5 - centre) * vec2(1.0, 1.6); // rings lie flat on the ground (3/4 view)
 					float rd = length(dv);
-					if (ph < 0.85 && abs(rd - ph * 5.5) < 0.72) { c.rgb = mix(c.rgb, vec3(0.92, 0.96, 1.0), 0.6 * (1.0 - ph)); }
+					float reach = 4.2 + 2.0 * rl; // harder rain throws wider rings
+					if (ph < 0.85 && abs(rd - ph * reach) < 0.72) { c.rgb = mix(c.rgb, vec3(0.92, 0.96, 1.0), (0.45 + 0.25 * rl) * (1.0 - ph)); }
 				}
 			}
 		}
 		if (pm < 0.5 && rl > 0.05) {
 			vec2 sc = floor(px / 10.0);
 			float sh = hash(sc + vec2(23.0, 5.0));
-			if (sh < 0.16 * rl) {
-				float sp = fract(TIME * 2.2 + sh * 11.0);
+			float scyc = TIME * 2.2 + sh * 11.0;
+			if (sh < 0.3 * rl && hash(sc + vec2(floor(scyc) * 1.91, 43.0)) < clamp(1.4 * rl, 0.0, 1.0)) {
+				float sp = fract(scyc);
 				vec2 at = floor(vec2(hash(sc + 4.0), hash(sc + 9.0)) * 8.0) + 1.0;
 				vec2 lp = px - sc * 10.0;
 				if (sp < 0.34) {

@@ -47,6 +47,7 @@ static func save(tree: SceneTree, path: String = PATH) -> bool:
 			"equipment": player.inventory.equipment,
 			"bandaged": player.bandaged,
 			"quests": player.quests.export_data() if player.quests != null else {},
+			"board_local": player.tracked.export_data() if player.tracked != null else {}, ## which board notices she has read / does not follow
 		},
 	}
 	var world: Node = tree.get_first_node_in_group("world")
@@ -124,6 +125,8 @@ static func load_into(tree: SceneTree, path: String = PATH) -> bool:
 	player.sync_wound_visuals()
 	if player.quests != null and saved.has("quests"):
 		player.quests.import_data(saved.quests as Dictionary)
+	if player.tracked != null and saved.has("board_local"):
+		player.tracked.import_data(saved.board_local as Dictionary)
 	var world: Node = tree.get_first_node_in_group("world")
 	if world != null and world.has_method("import_things"):
 		world.call("import_things", data.get("things", {}))

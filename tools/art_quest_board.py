@@ -40,7 +40,7 @@ def quest_board():
         x = -10.0 + 10.0 * (k % 3)
         y = 28.5 - 8.0 * (k // 3)
         m.ell(V(x, y + 3.0, z + 2.5), (0.5, 0.5, 0.4), t.IRON)
-    m.ell(V(22.5, 36.0, z + 2.9), (0.8, 0.8, 0.8), h.TEAL, kind="emit")  # a glowing bud
+    m.ell(V(22.5, 36.0, z + 2.9), (0.9, 0.9, 0.9), t.BARK_D)  # the knob where the live bud hangs (BoardNotes draws the glow, it breathes and pulses)
     for _ in range(6):
         m.ell(V(rng.uniform(-23, 23), 39.6, z + rng.uniform(-2, 2.5)), (rng.uniform(1.4, 3.0), 0.45, 1.1), t.MOSS_L if rng.random() < 0.6 else t.MOSS)
     arr = to_array(hut_lib.render(m, 56, 56, 50))

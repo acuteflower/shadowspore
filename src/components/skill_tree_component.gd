@@ -7,6 +7,7 @@ signal changed
 signal explored(id: String)
 signal learned(id: String)
 
+const RENAMED: Dictionary = {"shadow_blink": "shadow_step"} ## node ids of older saves -> their successor (the blink was archived for the shadow step)
 var _discovered: Array[String] = []
 var _learned: Array[String] = []
 
@@ -205,6 +206,7 @@ func import_data(data: Dictionary) -> void:
 	_learned.clear()
 	var incoming: Variant = data.get("discovered", [])
 	if incoming is Array:
+		incoming = (incoming as Array).map(func(value: Variant) -> Variant: return RENAMED.get(value, value)) ## older saves
 		for _pass: int in definitions().size():
 			for value: Variant in incoming:
 				if value is String and can_explore(String(value)):

@@ -80,11 +80,15 @@ void fragment() {
             if (rl > 0.03) {
                 vec2 rc = floor(pixel / 9.0);
                 float rh = hash21(rc + 311.0);
-                if (rh < 0.75 * rl) {
-                    float ph = fract(g_water_time * 0.9 + rh * 13.0);
+                // once per cycle a cell may drop a ring; how often follows the rain (drizzle: sparse, downpour: nearly every cycle)
+                float cyc = g_water_time * 0.9 + rh * 13.0;
+                float ph = fract(cyc);
+                float act = hash21(rc + vec2(floor(cyc) * 1.37 + 5.0, 29.0));
+                if (act < clamp(1.05 * pow(rl, 0.85), 0.0, 0.95)) {
                     vec2 centre = (rc + 0.2 + 0.6 * vec2(hash21(rc + 5.0), hash21(rc + 9.0))) * 9.0;
                     float rd = distance(pixel + 0.5, centre);
-                    if (ph < 0.9 && abs(rd - ph * 4.5) < 0.7) { color = mix(color, vec3(0.80, 0.90, 0.95), 0.6 * (1.0 - ph)); }
+                    float reach = 3.6 + 1.8 * rl; // harder rain throws wider rings
+                    if (ph < 0.9 && abs(rd - ph * reach) < 0.7) { color = mix(color, vec3(0.80, 0.90, 0.95), (0.45 + 0.25 * rl) * (1.0 - ph)); }
                 }
             }
         }

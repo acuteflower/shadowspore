@@ -48,6 +48,13 @@ var _memory: Dictionary = {} ## sector (int) -> {"b": breaches, "d": defended}: 
 var _radii: PackedFloat32Array = PackedFloat32Array() ## per sector: how far the light reaches from the middle of the town
 var _radii_age: float = 1000.0
 var _fear_calm: float = 0.0
+signal bounty_fell(mark: Dictionary, hitters: Array) ## a marked creature was killed: its name and the peers who ever hurt it (the quest board pays them)
+
+var marked: Dictionary = {} ## the one that survived a night (docs/questtafel_ausbau_konzept.md 2.7): {name, species, nights, pos [x, y], day}. Saved. Empty = nobody is marked
+var _return_night: int = -1 ## the night the marked one's return was rolled
+var _return_ok: bool = false
+var _seen: Dictionary = {} ## this night: creature instance id -> {id, pos} for everyone who came to the edge of the light (the quest board's report)
+var _report: Dictionary = {} ## the last night that ended: {night, intruders, species, compass, pos [x, y]} (saved)
 var _water: Array[Dictionary] = [] ## the creatures of the water (Lichtfischer): {node, key, cost}; they have no NightBehavior, they fish where they were born
 var _water_wait: float = 0.0
 
@@ -151,7 +158,7 @@ func export_state() -> Dictionary:
 	var memory: Dictionary = {}
 	for sector: Variant in _memory:
 		memory[str(sector)] = (_memory[sector] as Dictionary).duplicate()
-	return {"memory": memory, "stage_seen": _stage_seen}
+	return {"memory": memory, "stage_seen": _stage_seen, "report": _report.duplicate(true), "marked": marked.duplicate(true)}
 
 
 func import_state(data: Dictionary) -> void:
@@ -161,6 +168,11 @@ func import_state(data: Dictionary) -> void:
 		var rec: Dictionary = memory[sector] as Dictionary
 		_memory[int(String(sector))] = {"b": float(rec.get("b", 0.0)), "d": float(rec.get("d", 0.0))}
 	_stage_seen = String(data.get("stage_seen", ""))
+	_report = (data.get("report", {}) as Dictionary).duplicate(true)
+	marked = (data.get("marked", {}) as Dictionary).duplicate(true)
+	if not marked.is_empty():
+		marked["nights"] = int(marked.get("nights", 1))
+		marked["day"] = int(marked.get("day", 0))
 
 
 # ---------------------------------------------------------------------------------- the tick
@@ -190,6 +202,8 @@ func tick() -> void:
 		_evidence_tick(players)
 		_scout_tick()
 		_courage_tick()
+		_report_tick()
+		_track_marked()
 	else:
 		_day(players)
 	_lure_tick(players, progress)
@@ -215,6 +229,7 @@ func _begin_night() -> void:
 	_breather.clear()
 	_evidence.clear()
 	_noise.clear()
+	_seen.clear()
 	_decay_memory()
 	special = NightRules.special_for(int(_world._map.world_seed), _night_id)
 	_hunters_left = int(NightRules.special_spec(special).get("hunters", 0))
@@ -222,6 +237,7 @@ func _begin_night() -> void:
 
 ## The morning: the night's reward for a group that held (a banner and a little XP), and every creature turns for the dark.
 func _end_night() -> void:
+	_report = _make_report()
 	if active() and not _ledger.is_empty():
 		var rewarded: bool = false
 		for key: String in _ledger:
@@ -538,6 +554,11 @@ func _on_killed(entry: Dictionary) -> void:
 	var node: Node = entry.node as Node
 	if behavior.remnant or not is_instance_valid(node):
 		return
+	if String(entry.get("name", "")) != "" and not marked.is_empty() and String(marked.name) == String(entry.name):
+		var fallen: Dictionary = marked.duplicate(true)
+		var peers: Array = (node.get_node("HealthComponent") as HealthComponent).hitters.keys()
+		marked.clear()
+		bounty_fell.emit(fallen, peers)
 	var town: TownManager = _world.town() as TownManager
 	if town != null and town.founded and bool(entry.get("breached", false)) == false:
 		var at: Vector2 = (node as Node2D).global_position
@@ -593,6 +614,55 @@ func _prune() -> void:
 	_live = keep
 
 
+# ---------------------------------------------------------------------------------- the night's report
+
+## While the night runs: who came up to the edge of the light (within `report_px` of the lit ground), remembered once each.
+func _report_tick() -> void:
+	var town: TownManager = _world.town() as TownManager
+	if town == null or not town.founded:
+		return
+	var reach: float = float((NightRules.config().get("report", {}) as Dictionary).get("edge_px", 48.0))
+	for entry: Dictionary in _live:
+		if not is_instance_valid(entry.node) or (entry.nb as NightBehavior).remnant:
+			continue
+		var at: Vector2 = (entry.node as Node2D).global_position
+		if town.light_depth(at) > -reach:
+			_seen[(entry.node as Node).get_instance_id()] = {"id": String(entry.id), "pos": at}
+
+
+## The night as a few facts for the board: how many came to the light, of which kind most, from which side.
+func _make_report() -> Dictionary:
+	var town: TownManager = _world.town() as TownManager
+	if _seen.is_empty() or town == null or not town.founded:
+		return {"night": _night_id, "intruders": 0}
+	var kinds: Dictionary = {}
+	var sides: Dictionary = {}
+	for key: Variant in _seen:
+		var rec: Dictionary = _seen[key] as Dictionary
+		kinds[String(rec.id)] = int(kinds.get(String(rec.id), 0)) + 1
+		var side: String = BoardRules.compass(((rec.pos as Vector2) - town.center).angle())
+		var group: Dictionary = sides.get(side, {"n": 0, "sum": Vector2.ZERO}) as Dictionary
+		group["n"] = int(group.n) + 1
+		group["sum"] = (group.sum as Vector2) + (rec.pos as Vector2)
+		sides[side] = group
+	var species: String = ""
+	for id: String in kinds:
+		if species == "" or int(kinds[id]) > int(kinds[species]):
+			species = id
+	var compass: String = ""
+	for side: String in sides:
+		if compass == "" or int((sides[side] as Dictionary).n) > int((sides[compass] as Dictionary).n):
+			compass = side
+	var best: Dictionary = sides[compass] as Dictionary
+	var centre: Vector2 = (best.sum as Vector2) / float(best.n)
+	return {"night": _night_id, "intruders": _seen.size(), "species": species, "compass": compass, "pos": [centre.x, centre.y]}
+
+
+## What the last night left to tell (read by the quest board at sunrise): {night, intruders, species, compass, pos}. Empty before the first night.
+func last_night_report() -> Dictionary:
+	return _report
+
+
 # ---------------------------------------------------------------------------------- the elite of a new moon
 
 ## A new moon at the top of the ladder brings one big one, late in the night.
@@ -600,6 +670,12 @@ func _elite_due(progress: float) -> bool:
 	var cfg: Dictionary = NightRules.config().elite as Dictionary
 	if _elite_done or not bool(stage().elite) or progress < float(cfg.progress) or progress > float(window_cfg().spawn_end_progress):
 		return false
+	if not marked.is_empty() and not marked_out():
+		if _return_night != _night_id: ## the marked one comes back on some nights, always on a new moon: rolled once a night
+			_return_night = _night_id
+			_return_ok = _rng.randf() < float(BoardRules.bounty_cfg().get("return_chance", 0.5))
+		if _return_ok:
+			return true
 	return NightRules.moon_dark(TimeManager.moon_phase()) >= float((NightRules.config().omens as Dictionary).new_moon_dark)
 
 
@@ -616,13 +692,67 @@ func _spawn_elite(key: String, members: Array[Player], entry: Dictionary) -> voi
 		return
 	var spec: Dictionary = NightRules.special_spec(special)
 	var strength: float = group_strength(members)
-	var enemy: Node2D = _spawn(String(cfg.species), spot.pos as Vector2, strength * float(cfg.health) * float(spec.health), NightRules.damage_scale(strength) * float(cfg.damage) * float(spec.damage), key, float(cfg.cost), false)
+	var species: String = String(cfg.species)
+	var scar: float = 1.0 ## a marked one is tougher with every night it survived
+	var name: String = ""
+	var nights: int = 0
+	if not marked.is_empty() and not marked_out():
+		species = String(marked.species)
+		name = String(marked.name)
+		nights = int(marked.nights)
+		scar = 1.0 + float(BoardRules.bounty_cfg().get("health_per_night", 0.1)) * float(nights)
+	var enemy: Node2D = _spawn(species, spot.pos as Vector2, strength * float(cfg.health) * float(spec.health) * scar, NightRules.damage_scale(strength) * float(cfg.damage) * float(spec.damage), key, float(cfg.cost), false)
 	if enemy == null:
 		return
 	(enemy.get("night") as NightBehavior).courage = 0.9 ## it fears nothing
 	entry.spent = float(entry.spent) + float(cfg.cost)
 	_elite_done = true
-	(_world.town() as TownManager).banner(String(cfg.notice), "")
+	var live: Dictionary = _live.back() as Dictionary
+	live["elite"] = true
+	live["name"] = name
+	live["nights"] = nights
+	live["flee"] = 0.0
+	(_world.town() as TownManager).banner(("%s IST ZURÜCK" % name) if name != "" else String(cfg.notice), "")
+
+
+## Is the marked one out in the night right now (a live entry carries its name)?
+func marked_out() -> bool:
+	if marked.is_empty():
+		return false
+	for entry: Dictionary in _live:
+		if String(entry.get("name", "")) == String(marked.name) and is_instance_valid(entry.node):
+			return true
+	return false
+
+
+## The name for a creature that survives its first night.
+func _bounty_name() -> String:
+	var names: Array = BoardRules.bounty_cfg().get("names", ["DER GEZEICHNETE"]) as Array
+	return String(names[_rng.randi() % names.size()])
+
+
+## An elite that was not killed by the morning flees into the dark: nobody finds its body, but the town remembers it (a poster hangs, it returns).
+func _survive(entry: Dictionary) -> void:
+	var node: Node2D = entry.node as Node2D
+	var cfg: Dictionary = BoardRules.bounty_cfg()
+	var name: String = String(entry.get("name", ""))
+	if name == "":
+		name = _bounty_name()
+	var nights: int = mini(int(entry.get("nights", 0)) + 1, int(cfg.get("max_nights", 3)))
+	var at: Vector2 = node.global_position
+	marked = {"name": name, "species": String(entry.id), "nights": nights, "pos": [at.x, at.y], "day": TimeManager.day}
+	_live.erase(entry)
+	node.queue_free()
+
+
+## Remembers where the named one walks (the poster's map mark follows it).
+func _track_marked() -> void:
+	if marked.is_empty():
+		return
+	for entry: Dictionary in _live:
+		if String(entry.get("name", "")) == String(marked.name) and is_instance_valid(entry.node):
+			var at: Vector2 = (entry.node as Node2D).global_position
+			marked["pos"] = [at.x, at.y]
 
 
 # ---------------------------------------------------------------------------------- where they come from
@@ -778,10 +908,16 @@ func _burn() -> void:
 	_burn_clock = 0.0
 	var sun: float = TimeManager.sun_amount()
 	var wound: Dictionary = NightRules.config().dawn as Dictionary
+	var fled: Array[Dictionary] = []
 	for entry: Dictionary in _live:
 		var behavior: NightBehavior = entry.nb as NightBehavior
 		var node: Node2D = entry.node as Node2D
 		var fraction: float = 0.0
+		if bool(entry.get("elite", false)) and behavior.retreat and not behavior.remnant:
+			entry["flee"] = float(entry.get("flee", 0.0)) + 1.0 ## the big one does not burn: it runs for the dark and is gone
+			if float(entry.flee) >= float(BoardRules.bounty_cfg().get("flee_seconds", 7.0)):
+				fled.append(entry)
+			continue
 		if behavior.remnant:
 			if sun > 0.05 and not _in_shade(node.global_position):
 				fraction = float((NightRules.config().remnants as Dictionary).sun_wound) * sun
@@ -792,6 +928,9 @@ func _burn() -> void:
 		var health: HealthComponent = node.get_node("HealthComponent") as HealthComponent
 		node.set_meta("burned", true)
 		health.take_damage(maxf(1.0, health.max_health * fraction), node.global_position, 0.0, 0)
+	for entry: Dictionary in fled:
+		if is_instance_valid(entry.node):
+			_survive(entry)
 
 
 # ---------------------------------------------------------------------------------- the base seen from the dark: sectors and memory

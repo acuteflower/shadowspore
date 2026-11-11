@@ -15,6 +15,7 @@ var town: TownManager
 var _clock: float = 0.0
 var _next_bird: float = 20.0
 var _fox_night: int = -1
+var _board_bird: float = -1.0 ## seconds until the crow for the board's fallen papers is sent (-1 = none)
 var _ages: Dictionary = {} ## instance id -> seconds alive
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -34,6 +35,11 @@ func _process(delta: float) -> void:
 	if town == null or not town.founded or InputManager.ui_blocking:
 		return
 	_age(step)
+	if _board_bird >= 0.0:
+		_board_bird -= step
+		if _board_bird < 0.0:
+			_board_bird = -1.0
+			_board_visit_now()
 	var night: float = TimeManager.night_amount()
 	_next_bird -= step
 	if night < 0.15 and _next_bird <= 0.0:
@@ -126,6 +132,35 @@ func _bird_visit() -> void:
 		var bird: WildCorvid = birds.spawn_visitor(species, point, "town")
 		if bird != null:
 			bird._take_wing(false, false, false, true) ## straight to a roof
+			return
+
+
+## A notice of the quest board ran out at sunrise: a crow is sent for it a little later (the board pieces carry a perch on their roof, `BoardNotes` lets it take the paper).
+## Only in daylight and when somebody is about to see it; the notice is gone in the table either way.
+func board_visit(_papers: int) -> void:
+	_board_bird = _rng.randf_range(35.0, 110.0)
+
+
+func _board_visit_now() -> void:
+	if not _watched() or TimeManager.night_amount() > 0.15:
+		return
+	var birds: CorvidPopulation = _population("CorvidPopulation") as CorvidPopulation
+	if birds == null or birds.visitors().size() >= 3:
+		return
+	var targets: Array[RoofPerch] = []
+	for perch: RoofPerch in _perches():
+		if perch.host != null and perch.host.is_in_group("quest_board_piece"):
+			targets.append(perch)
+	if targets.is_empty():
+		return
+	var goal: Vector2 = targets[_rng.randi() % targets.size()].global_position
+	for attempt: int in 14:
+		var point: Vector2 = goal + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(SPAWN_RING.x - 120.0, SPAWN_RING.y - 120.0)
+		if not _alive_players_far(point, 260.0):
+			continue
+		var bird: WildCorvid = birds.spawn_visitor("crow", point, "town")
+		if bird != null:
+			bird._take_wing(false, false, false, true)
 			return
 
 

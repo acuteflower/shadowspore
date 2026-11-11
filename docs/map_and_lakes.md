@@ -22,6 +22,15 @@ Editor-Platzierungen werden über einen Fingerabdruck des eigentlichen Kartenlay
 
 Die alten Leere-Rechtecke und violetten Leere-Lichter entfallen an Seen. Für die äußere Küste bleiben sie erhalten. Ein Seegrund wird nicht als Bau- oder Landtierfläche behandelt; Gegnernavigation darf flache, geladene Ufer nutzen und lehnt Tiefwasser ab.
 
+## Flussverbindungen und der Hexenwald-See
+
+Ohne die Karte, das Relief oder die Fluss-Bakes neu zu erzeugen, hängen zwei handgezeichnete Zusätze an der Welt (Hexenwald, Nordwestrand):
+
+- `data/river_links.json` + `py -3 tools/bake_river_links.py [--check]`: Verbindungsflüsse als Polylinien in Kacheln (`{"snap": [x, y]}` = nächster Knoten eines vorhandenen Flusses, übernimmt dessen Breite). Sie werden als getaggte Kanten/Segmente/Furten (`link`) an `rivers_baked.json` angehängt; nur die berührten 512-px-Chunks werden mit dem unveränderten Raster-Code neu geschrieben (alle anderen bleiben byte-gleich). Wiederholbar, ersetzt frühere Links. Prüft, dass jeder Punkt auf ebenem, wandfreiem Boden und nicht an der Küste liegt. `hex_link_north` leitet den südlichen Bogen des nördlichen Flusses zum Kopf des Westflusses (verläuft knapp westlich des Questziels (776, 770)); `hex_link_lake` führt vom See nach Norden zur Ecke des Westflusses.
+- `data/lakes.json` `ponds`: Binnenseen auf Land (`center`/`radius` in Kacheln, wackelige Ellipse, `seed`). `bake_lakes.py` nimmt sie in `lakes_sdf.png` und `data/lakes_baked.json` auf (Eintrag mit `inland: true`, hinten angehängt, damit die Indizes der Leeren-Seen gleich bleiben). `hexenwald_lake`: Mitte (734, 908), 28 x 24 Kacheln, ca. 2100 Kacheln, vollständig auf Hexenwald-Ebene-0-Boden.
+
+Reihenfolge nach Änderungen: `bake_river_links.py` -> `bake_lakes.py` (schreibt auch die Kartenschattierung) -> `Godot --headless --path . --import`. Test: `py -3 tools/test_river_links.py`, außerdem `test_lakes_bake.py`, `test_rivers_bake.py`, `test_map_water.py`, `tools/test_lakes.tscn`.
+
 ## Weltkarte
 
 `tools/bake_map_water.py` mittelt die echten gemeinsamen Wasserfelder auf ein Pixel pro Tile. `map_water.png` speichert Flächenanteil (R), echte Wassertiefe (G) und die Kartenschattierung der Seen (B: 0 außerhalb, 0,12 am Ufer, 1 am tiefsten Punkt jedes Beckens). Die Kartenschattierung folgt der gesamten Seeform mit vier abgestuften Türkis-/Blautönen. Sie verändert die physische Tiefe nicht. Eine feine, von links oben beleuchtete Uferkante, eine gebrochene innere Kontur und wenige ortsfeste, ruhig schimmernde Wellenzeichen ergänzen die Seen. Mipmaps halten kleine Zuflüsse in der Übersicht sichtbar. Derselbe Atlas zeigt Seen, Flüsse und Furten unter dem vorhandenen Entdeckungsnebel. Die äußere Küstenlinie kommt aus `outer_sdf.png`, sodass Seen keinen Leere-Rand mehr tragen. Der Ortsleser unterscheidet SEE und FLUSS.

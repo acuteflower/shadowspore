@@ -13,7 +13,7 @@
 		"charge_speed": {"label": "AUFLADETEMPO", "unit": "percent", "min": 0, "max": 0.6},
 		"alarm": {"label": "ALARMREICHWEITE", "unit": "percent", "min": -0.75, "max": 0.5, "lower_better": true},
 		"absorb": {"label": "SCHADEN GESCHLUCKT", "unit": "percent", "min": 0, "max": 0.5},
-		"blink_cooldown": {"label": "BLINZELPAUSE", "unit": "percent", "min": -0.6, "max": 0.5, "lower_better": true},
+		"blink_cooldown": {"label": "SCHRITTPAUSE", "unit": "percent", "min": -0.6, "max": 0.5, "lower_better": true},
 		"corvid_calm": {"label": "KRÄHENGUNST", "unit": "percent", "min": 0, "max": 0.9}
 	},
 	"perks": {

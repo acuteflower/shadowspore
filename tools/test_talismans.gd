@@ -345,9 +345,9 @@ func _art() -> void:
 		var rows: int = int(entry.get("rows", 0))
 		check(cols > 0 and texture != null and texture.get_width() == cols * 48 and texture.get_height() == rows * 56 and (entry.get("data", []) as Array).size() == cols * rows * TalismanArt.STRIDE, "%s: %d x %d frames of points match the sheet" % [key, cols, rows])
 	var main: Texture2D = load("res://assets/characters/player.png") as Texture2D
-	var south: PackedInt32Array = TalismanArt.frame_data(main, 2 * 16 + 12) ## sector S, idle
-	var north: PackedInt32Array = TalismanArt.frame_data(main, 6 * 16 + 12)
-	var west: PackedInt32Array = TalismanArt.frame_data(main, 4 * 16 + 12)
+	var south: PackedInt32Array = TalismanArt.frame_data(main, 2 * 22 + 12) ## sector S, idle
+	var north: PackedInt32Array = TalismanArt.frame_data(main, 6 * 22 + 12)
+	var west: PackedInt32Array = TalismanArt.frame_data(main, 4 * 22 + 12)
 	check(south.size() == 16 and south[10] > 80 and south[11] > 80 and north[10] < -80 and north[11] < -80, "facing: the torso and head face the camera from the south, away from it from the north")
 	check(west[12] * west[13] < 0 and absi(west[12] - west[13]) > 100, "from the side one ear faces the camera, the other away")
 	check(south[4] / 10 == 0 and south[5] < south[1] * -1 + 400, "the pendant hangs on the chest (below the collar points)")
@@ -426,13 +426,13 @@ func _rissfeder() -> void:
 	health.current = health.max_health
 	health._invulnerable_until_msec = 0
 
-	# the blink cooldown and the dive
-	var plain: float = hero.blink.cooldown
-	hero.blink.start_cooldown()
-	check(near(hero.blink.total, plain), "without the feather the blink cooldown is %f" % plain)
+	# the shadow step's cooldown (it took over the archived blink's) and the dive
+	var plain: float = hero.stepper.cooldown
+	hero.stepper.start_cooldown()
+	check(near(hero.stepper.total, plain), "without the feather the step cooldown is %f" % plain)
 	wear("rissfeder")
-	hero.blink.start_cooldown()
-	check(near(hero.blink.total, plain * 0.7), "with it the blink cooldown is 70 %% (%f)" % hero.blink.total)
+	hero.stepper.start_cooldown()
+	check(near(hero.stepper.total, plain * 0.7), "with it the step cooldown is 70 %% (%f)" % hero.stepper.total)
 	check(near(hero.talismans.dive_factor(), 1.0), "no dive window before a blink")
 	hero.talismans.note_blink()
 	check(near(hero.talismans.dive_factor(), 1.4) and hero.talismans.dive_left > 2.9, "after a blink the next blow does +40 %%")

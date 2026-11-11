@@ -3,7 +3,7 @@
   "branches": {
     "combat": {"name": "KAMPF", "color": "e6c468"},
     "movement": {"name": "BEWEGUNG", "color": "78f4e6"},
-    "shadow": {"name": "SCHATTEN", "color": "b06bff"}
+    "shadow": {"name": "LEERE", "color": "b06bff"}
   },
   "nodes": {
     "sword_combo": {"name": "DREIKLANG", "branch": "combat", "pos": [-150, 28], "root": true, "icon": "combo3", "description": "Deine Schwertkombo mit Linksklick.", "detail": "VORHAND / RÜCKHAND / STOSS"},
@@ -15,9 +15,9 @@
     "wall_climb": {"name": "KLETTERN", "branch": "movement", "pos": [66, 51], "parent": "sprint", "unlock": true, "cost": 1, "icon": "climb", "description": "Zieh dich auf höhere Felsabsätze.", "detail": "AN DER WAND %s DRÜCKEN / NUR AUFWÄRTS"},
     "movement_echo_a": {"name": "UNGEFORMTES ECHO I", "branch": "movement", "pos": [52, -6], "parent": "sprint", "placeholder": true},
     "movement_echo_b": {"name": "UNGEFORMTES ECHO II", "branch": "movement", "pos": [0, -124], "parent": "movement_echo_a", "placeholder": true},
-    "shadow_blink": {"name": "SCHATTENBLINK", "branch": "shadow", "pos": [150, 28], "root": true, "icon": "rift", "description": "Springe durch den Schatten in Blickrichtung.", "detail": "BESTEHENDE FÄHIGKEIT"},
-    "shadow_echo_a": {"name": "UNGEFORMTES ECHO I", "branch": "shadow", "pos": [112, -76], "parent": "shadow_blink", "placeholder": true},
-    "shadow_echo_b": {"name": "UNGEFORMTES ECHO II", "branch": "shadow", "pos": [230, -48], "parent": "shadow_blink", "placeholder": true},
+    "shadow_step": {"name": "SCHATTENSCHRITT", "branch": "shadow", "pos": [150, 28], "root": true, "icon": "rift", "description": "Tritt durch die Leere: ein kurzer Ausweichschritt, der alles unterbricht.", "detail": "ALT / IN LAUFRICHTUNG ODER ZUM CURSOR"},
+    "shadow_echo_a": {"name": "UNGEFORMTES ECHO I", "branch": "shadow", "pos": [112, -76], "parent": "shadow_step", "placeholder": true},
+    "shadow_echo_b": {"name": "UNGEFORMTES ECHO II", "branch": "shadow", "pos": [230, -48], "parent": "shadow_step", "placeholder": true},
     "shadow_echo_c": {"name": "UNGEFORMTES ECHO III", "branch": "shadow", "pos": [240, -116], "parent": "shadow_echo_b", "placeholder": true}
   }
 }

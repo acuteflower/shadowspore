@@ -470,6 +470,28 @@ func cancel_charge() -> void:
 		_charge_cancel.rpc()
 
 
+## Owner only: the shadow step tears her out of whatever the weapon is doing (a swing in any phase, a charge, the right-click chain):
+## it stops on every peer, and the host's pending hit scan finds the swing idle, so no blow lands. Nothing is paid.
+func cancel_action() -> void:
+	_alt_stage = 0
+	_alt_buffer_msec = 0
+	if _charging:
+		_charge_cancel.rpc()
+	if _phase != Phase.IDLE:
+		_swing_cancel.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _swing_cancel() -> void:
+	_phase = Phase.IDLE
+	_time = 0.0
+	_freeze = 0.0
+	_combo_index = 0
+	_burst_done = true
+	_server_combo_index = 0
+	_server_ready_msec = 0 ## the host lets her swing again right after the step
+
+
 ## Owner only: a hit while charging breaks it and costs a little stamina.
 func interrupt_charge() -> void:
 	if not _charging:

@@ -32,7 +32,7 @@ const TABS: Array[Dictionary] = [
 	{"id": "dev", "name": "ENTWICKLER", "x": 150.0, "sealed": false},
 ]
 const CONTROLS: Array[Array] = [
-	["BEWEGEN", "", "WASD"], ["SPRINTEN", "sprint", ""], ["BLINKEN", "blink", ""],
+	["BEWEGEN", "", "WASD"], ["SPRINTEN", "sprint", ""], ["SCHATTENSCHRITT", "shadow_step", ""],
 	["SCHLEICHEN", "sneak", ""], ["INVENTAR", "inventory", ""], ["KARTE", "map", ""], ["BENUTZEN", "interact", ""],
 ]
 
@@ -405,6 +405,12 @@ func _build_town_page() -> void:
 		reach = maxf(reach, Vector2(c.x, c.y).distance_to(town.center) + c.z)
 	_add(0, "info", "LICHT REICHT", "", {"text": "%d KACHELN" % int(reach / 16.0)})
 	_add(0, "info", "GEGRÜNDET", "", {"text": "TAG %d" % (town.founded_day + 1)})
+	if town.board != null: ## what the quest board remembers (docs/questtafel_ausbau_konzept.md 2.8)
+		var me: int = multiplayer.get_unique_id()
+		_add(0, "info", "ERLEDIGTE ZETTEL", "", {"text": str(town.board.honor_done())})
+		var title: String = town.board.title_name(me)
+		if title != "":
+			_add(0, "info", "TITEL", "", {"text": title})
 	_add(0, "heading", "VERWALTUNG")
 	_add(0, "button", "BAUEN", "", {"action": "town_build"})
 	_add(0, "button", "ABREISSEN", "", {"action": "town_demolish"})

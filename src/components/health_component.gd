@@ -28,6 +28,7 @@ var ward: Callable = Callable() ## host: a talisman's last wing beat (Rissfeder)
 var god_mode: bool = false ## dev cheat (host): no damage, no ticks, no kill
 var overheal_left: float = 0.0 ## seconds until overheal starts to drain (counted on every peer, set by heals)
 var last_attacker: int = 0 ## peer id of the player who hit last (host only), for credit on a kill
+var hitters: Dictionary = {} ## host only: peer id -> true for everyone who ever hurt it (the quest board's wanted posters count for all of them)
 var _invulnerable_until_msec: int = 0
 var _regens: Array[Dictionary] = [] ## host: {per, left} (heal `per` every second for `left` more seconds)
 var _regen_clock: float = 0.0
@@ -46,6 +47,7 @@ func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0
 	_invulnerable_until_msec = now + int(invulnerable_seconds * 1000.0)
 	if source != 0:
 		last_attacker = source
+		hitters[source] = true
 	if armor > 0.0:
 		amount = maxf(roundf(amount * LevelRewards.damage_factor(armor) * 10.0) / 10.0, 0.1)
 	if absorb > 0.0:
@@ -62,6 +64,7 @@ func take_survivable(amount: float, from: Vector2, knockback: float, source: int
 	_invulnerable_until_msec = Time.get_ticks_msec() + int(invulnerable_seconds * 1000.0)
 	if source != 0:
 		last_attacker = source
+		hitters[source] = true
 	_notify.rpc(taken, from, knockback, current - taken)
 
 
@@ -71,6 +74,7 @@ func take_tick(amount: float, source: int = 0) -> void:
 		return
 	if source != 0:
 		last_attacker = source
+		hitters[source] = true
 	if absorb > 0.0:
 		amount = maxf(amount * (1.0 - absorb), 0.05)
 	_notify_tick.rpc(amount, _warded(maxf(current - amount, floor_value)))

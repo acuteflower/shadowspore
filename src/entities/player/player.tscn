@@ -86,7 +86,7 @@ script = ExtResource("20_climb")
 [node name="Sprite2D" type="Sprite2D" parent="."]
 material = SubResource("ShaderMaterial_flash")
 texture = ExtResource("2_tex")
-hframes = 16
+hframes = 22
 vframes = 16
 offset = Vector2(0, -23)
 

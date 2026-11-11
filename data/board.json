@@ -1,7 +1,49 @@
 {
  "piece": "quest_board",
  "reach": 150.0,
- "limits": {"simple": 4, "per_giver": 1, "new_per_day": 2},
+ "giver_reach": 110.0,
+ "personal": {"min_days": 2},
+ "age": {"stages": [0.35, 0.7, 0.9], "yellow": 0.4},
+ "thanks": ["DAS IST ES. DANKE DIR.", "GENAU, WAS ICH BRAUCHTE. DEIN LOHN.", "GUTE ARBEIT. SO GEHT DAS."],
+ "limits": {"simple": 4, "per_giver": 1, "new_per_day": 2, "occasions": 2},
+ "urgent": {"copper": 2.0, "xp": 2.0, "trust": 2.0, "until": 0.8, "max_hanging": 1, "upgrade_chance": 0.12, "min_trust": 20},
+ "occasions": [
+  {"id": "low_stock", "kind": "fetch", "giver": "gustav", "min_day": 2, "cooldown": 3, "pay": 1.2, "why": "DAS LAGER IST LEER",
+   "when": {"stock_below": {"wood": 20, "plant_fiber": 6, "stone": 10}}, "templates": {"wood": "gustav_wood", "plant_fiber": "gustav_fiber", "stone": "gustav_stone"}},
+  {"id": "after_storm", "kind": "fetch", "giver": "gustav", "cooldown": 6, "pay": 1.0, "urgent": true, "why": "WEGEN DES STURMS",
+   "when": {"storm_yesterday": true}, "template": "gustav_wood", "text": "DER STURM HAT VIEL ZERRISSEN. {count} {item} ZUM FLICKEN, SOLANGE ES HELL IST."},
+  {"id": "after_raid", "kind": "kill", "giver": "valdric", "cooldown": 2, "pay": 1.4, "why": "NACH DEM VORSTOSS", "count_extra": 2,
+   "when": {"intruders": 1}, "template": "valdric_spider", "text": "{species} AM RAND IM {side}. RÄUM SIE AUS DEM WEG, BEVOR SIE ZURÜCKKOMMEN."},
+  {"id": "new_moon_hunt", "kind": "kill", "giver": "valdric", "cooldown": 8, "min_day": 3, "pay": 1.5, "window": "night", "why": "NEUMOND",
+   "when": {"moon": 0}, "template": "valdric_spider", "count": [4, 6], "text": "NEUMOND. HEUTE NACHT WERDEN ES MEHR. {count}X {species}, NUR NACHTS ZÄHLT ES."},
+  {"id": "full_moon_bloom", "kind": "fetch", "giver": "witch", "cooldown": 8, "pay": 1.4, "why": "VOLLMOND",
+   "when": {"moon": 4}, "template": "witch_bell", "text": "VOLLMOND! {count} {item}, WENN SIE OFFEN STEHEN."},
+  {"id": "damp_days", "kind": "fetch", "giver": "witch", "cooldown": 5, "pay": 1.2, "why": "ES HAT GEREGNET",
+   "when": {"wet_days": 2}, "template": "witch_cap", "text": "DER REGEN TREIBT DIE PILZE. {count} {item} FÜR MICH?"}
+ ],
+ "bounty": {
+  "giver": "valdric", "names": ["DER KLOTZ", "BRECHER VOM RAND", "STEINSCHULTER", "DER LANGE SCHATTEN", "KNOCHENBRECHER"],
+  "health_per_night": 0.1, "max_nights": 3, "return_chance": 0.6, "flee_seconds": 7.0, "search_px": 640,
+  "copper": 420, "copper_per_night": 0.2, "xp": 90, "trust": 12, "loot": {"id": "void_slag", "n": 1},
+  "seen_every": 6.0, "why": "GEZEICHNET",
+  "text": "{name} KAM {nights}X DURCH DIE NACHT. ER TRÄGT DIE NARBEN. WER IHN ZU FALL BRINGT, DEM ZAHLT DIE STADT."
+ },
+ "honor": {
+  "milestones": [25, 50, 100], "dankband": 12,
+  "titles": [
+   {"id": "handlanger", "name": "HANDLANGER", "need": {"done": 5}},
+   {"id": "verlaesslich", "name": "VERLÄSSLICH", "need": {"done": 15}},
+   {"id": "rueckgrat", "name": "RÜCKGRAT DER STADT", "need": {"done": 40}},
+   {"id": "dunkelraeumer", "name": "DUNKELRÄUMER", "need": {"kills": 30}},
+   {"id": "eilbote", "name": "EILBOTE", "need": {"rush": 5}},
+   {"id": "namensjaeger", "name": "NAMENSJÄGER", "need": {"bounty": 1}},
+   {"id": "jedermann", "name": "JEDERMANNS FREUND", "need": {"givers": 4}}
+  ]
+ },
+ "hints": {
+  "moonbell": {"name": "NEBELWALD", "area": [699, 655, 95]},
+  "mist_lily": {"name": "NEBELWALD", "area": [699, 655, 95]}
+ },
  "post": {"chance": 0.8},
  "lifetime": [3, 5],
  "templates": [

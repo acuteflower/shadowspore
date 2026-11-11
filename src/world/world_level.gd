@@ -1971,8 +1971,7 @@ func _create_thing(cell: Vector2i, prop_kind: String, variant: int, extra: Dicti
 	var thing: WorldProp = scene.instantiate() as WorldProp
 	thing.setup(self, cell, prop_kind, variant)
 	thing.position = PropGenerator.position_of(cell)
-	if extra.has("scale"): ## Krummholz on the high levels: smaller and more swept by the wind
-		thing.scale = Vector2.ONE * float(extra.scale)
+	if extra.has("scale"): ## Krummholz on the high levels: more swept by the wind. The sprite is never scaled: a shrunken sprite would have finer pixels than everything else.
 		thing.wind_boost = 1.0 + 3.0 * (1.0 - float(extra.scale))
 	return thing
 
@@ -2009,6 +2008,13 @@ func import_things(saved: Dictionary) -> void:
 		for field: String in (saved[key] as Dictionary):
 			var value: Variant = (saved[key] as Dictionary)[field]
 			state[field] = int(value) if value is float else value ## JSON has only floats
+		if state.has("pts"): ## cut spots of a clover field: JSON turned the Vector2s into strings "(x, y)"
+			var pts: Array = []
+			for point: Variant in (state["pts"] as Array):
+				var v: Variant = str_to_var("Vector2" + String(point)) if point is String else point
+				if v is Vector2:
+					pts.append(v)
+			state["pts"] = pts
 		if key.begins_with("h:"):
 			_harvest_states[key.trim_prefix("h:")] = state
 			continue

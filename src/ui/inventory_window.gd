@@ -303,7 +303,7 @@ func _draw_hero(fade: float, void_level: float) -> void:
 	var top_left: Vector2 = HERO_FEET - HERO_FEET_IN_FRAME * 2.0 + Vector2(0, -roundf(sin(_time * 1.5) * 1.0) - (1.0 - p) * 24.0)
 	draw_texture_rect_region(HERO_SHEET, Rect2(top_left, Vector2(HERO_FRAME) * 2.0), source, Color(1, 1, 1, p * fade))
 	if p * fade > 0.6: ## her necklace and earrings (the bracelet sits on the sword arm, which the sheet does not hold)
-		TalismanArt.draw_worn(self, self, TalismanRules.worn_ids(_inventory.equipment), TalismanArt.frame_data(HERO_SHEET, _hero_sector * 16 + frame), top_left + HERO_FEET_IN_FRAME * 2.0, 2.0, _time, 0.6)
+		TalismanArt.draw_worn(self, self, TalismanRules.worn_ids(_inventory.equipment), TalismanArt.frame_data(HERO_SHEET, _hero_sector * 22 + frame), top_left + HERO_FEET_IN_FRAME * 2.0, 2.0, _time, 0.6)
 
 
 func _draw_tag(text: String, at: Vector2, delay: float, _void_level: float) -> void:

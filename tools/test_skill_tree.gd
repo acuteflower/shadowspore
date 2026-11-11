@@ -296,10 +296,10 @@ func _run() -> void:
 	await capture("roots")
 	window._select("sprint")
 	await capture("sprint")
-	window._select("shadow_blink")
+	window._select("shadow_step")
 	await capture("blink")
 	if DisplayServer.get_name() != "headless":
-		window._center = window._pos("shadow_blink")
+		window._center = window._pos("shadow_step")
 		window._zoom = 1.65
 		window._zoom_target = 1.65
 		await capture("zoomed")

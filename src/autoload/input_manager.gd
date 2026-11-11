@@ -180,6 +180,11 @@ func blink_pressed() -> bool:
 	return not (skills_open or progress_open) and not freecam_open and Input.is_action_just_pressed("blink")
 
 
+## Alt (gamepad B): the shadow step, a short evasive step through the void.
+func shadow_step_pressed() -> bool:
+	return not (skills_open or progress_open) and not freecam_open and not ui_blocking and not build_open and Input.is_action_just_pressed("shadow_step")
+
+
 func aim_world_position() -> Vector2:
 	var vp: Viewport = get_viewport()
 	return vp.get_canvas_transform().affine_inverse() * vp.get_mouse_position()

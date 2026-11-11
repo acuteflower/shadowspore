@@ -43,8 +43,11 @@ def jobs():
                 elif col < hero.WALK_FRAMES + hero.RUN_FRAMES:
                     mode = 'walk' if crouch else 'run'
                     t = (col - hero.WALK_FRAMES) / hero.RUN_FRAMES
-                else:
+                elif col < hero.WALK_FRAMES + hero.RUN_FRAMES + hero.IDLE_FRAMES:
                     mode, t = 'idle', (col - hero.WALK_FRAMES - hero.RUN_FRAMES) / hero.IDLE_FRAMES
+                else:  # the jog (crouched rows: the sneak again, she cannot jog crouched)
+                    mode = 'walk' if crouch else 'jog'
+                    t = (col - hero.WALK_FRAMES - hero.RUN_FRAMES - hero.IDLE_FRAMES) / hero.JOG_FRAMES
                 yield ('main', row, col, sector, t, mode, crouch, None)
     for sector in range(8):
         for step, poses in enumerate(hero.ATTACK_POSES):

@@ -16,12 +16,15 @@ const RUN_DUST_MIN_SPEED: float = 40.0 ## px/s
 const BODY_CENTER: Vector2 = Vector2(0, -24) ## aim origin, relative to the feet
 ## Facing sector 0 = east, counting clockwise (screen y points down): E SE S SW W NW N NE.
 ## Sheet (assets/characters/player.png): one row per sector, rows 8-15 are the crouched copies.
-## Columns 0-5 are the walk cycle, 6-11 the sprint cycle (contacts at 0 and 3 of each), 12-15 the idle loop.
+## Columns 0-5 are the walk cycle, 6-11 the sprint cycle (contacts at 0 and 3 of each), 12-15 the idle loop, 16-21 the jog cycle
+## (crouched rows: the sneak again). Which cycle plays follows the real speed (`_pick_gait`), so a throttled sprint jogs.
 ## The sword combo has its own sheet (player_attack.png): one row per sector; per attack (forehand, backhand,
 ## thrust) 7 leg variants (0 = planted stance, 1-6 = the walk cycle's phases) x 6 keyframes.
 const WALK_FRAMES: int = 6
 const RUN_COL: int = 6
 const IDLE_COL: int = 12
+const JOG_COL: int = 16
+const GAIT_SETTLE: float = 0.22 ## seconds a stopping stride may take to bring the feet under her before the idle loop
 const IDLE_FRAMES: int = 4
 const ATTACK_SHEET: Texture2D = preload("res://assets/characters/player_attack.png")
 const ATTACK_FRAMES: int = 6
@@ -92,6 +95,17 @@ const EAT_USE_TIME: float = 0.48 ## eating: the berry reaches her mouth (EatEffe
 const DRINK_SHEET_ID: int = 16 ## `_use_sheet` number of the potion sheet (15 is the wall climb)
 const DRINK_SHEET: Texture2D = preload("res://assets/characters/player_drink.png") ## tools/art_hero3d.py drinkonly: a potion in one draught, 12 frames x 7 leg variants
 const DRINK_BLOOD: Texture2D = preload("res://assets/characters/player_drink_blood.png")
+## The void blink (Space, BlinkComponent, play_blink/_try_blink, blink_fx) is ARCHIVED: replaced by the shadow step (Alt), the void branch's
+## first ability. Its code, effects and sounds stay; set this to true to bring it back.
+const BLINK_ENABLED: bool = false
+const STEP_SHEET_ID: int = 17 ## `_use_sheet` number of the shadow step
+const STEP_SHEET: Texture2D = preload("res://assets/characters/player_step.png") ## tools/art_hero_step.py: 8 frames per sector, both arms baked
+const STEP_BLOOD: Texture2D = preload("res://assets/characters/player_step_blood.png")
+const STEP_FRAMES: int = 8
+const STEP_GONE: float = 0.1 ## the shadow step's clock: fully dissolved here (frames 0-3 before), and she is moved to the far end
+const STEP_BACK: float = 0.13 ## ... she starts to condense out of the rift (frames 4-7 after)
+const STEP_FORM: float = 0.08 ## ... and needs this long to be whole again
+const STEP_END: float = 0.32 ## ... back in her own animation
 const DRINK_SECONDS: float = 0.6 ## drinking is quick (docs/alchemie_konzept.md): the 12 frames play in 0.6 s
 const DRINK_USE_TIME: float = 0.30 ## the draught: the potion takes effect (DrinkEffect.EFFECT)
 const DRINK_BREAK_KNOCKBACK: float = 100.0 ## only a blow this heavy knocks the vial from her lips (the potion is kept)
@@ -100,16 +114,23 @@ const WOUND_ENTER: float = 0.10 ## wounded at this share of the maximum health o
 const WOUND_LEAVE: float = 0.13 ## ... and recovered above this share (so regeneration does not flicker it)
 const WOUND_SPEED: float = 0.58 ## walking speed while wounded
 const WOUND_PALE_FROM: float = 0.8 ## the blood loss starts to show below this share of health
-const SHEET_COLS: int = 16
+const SHEET_COLS: int = 22
 
 @export var max_speed: float = 62.0 ## px/s
 @export var acceleration: float = 700.0 ## px/s²
 @export var friction: float = 900.0 ## px/s²
 @export var walk_fps: float = 13.0 ## walk frames per second at max_speed (6 frames = 1 cycle = 2 steps)
 @export var jog_fps: float = 15.0 ## sprint-cycle frames per second at sprint_speed
+@export var trot_fps: float = 14.0 ## jog-cycle frames per second halfway between max_speed and sprint_speed
+@export var jog_from: float = 1.12 ## the jog starts above this share of max_speed ...
+@export var sprint_from: float = 0.86 ## ... and turns into the sprint above this share of sprint_speed (a throttled sprint jogs)
 @export var sneak_speed: float = 42.0 ## px/s while sneaking (Ctrl or C)
+@export_group("Shadow step")
+@export var step_range: float = 54.0 ## px the shadow step carries her (Alt; stops short at walls)
+@export var step_stamina: float = 14.0 ## base stamina of one step; `step_cost()` adds 1 per level (not enough: no step)
+@export var step_grace: float = 0.26 ## seconds from the push-off no blow can touch her (dissolved and condensing; damage over time still ticks)
 @export_group("Sprint")
-@export var sprint_speed: float = 104.0 ## px/s while sprinting
+@export var sprint_speed: float = 124.0 ## px/s while sprinting
 @export var burst_speed: float = 260.0 ## px/s right after pressing sprint, decays into sprint_speed
 @export var burst_cost: float = 20.0 ## stamina, paid once on press
 @export var sprint_cost_per_sec: float = 12.0 ## stamina while sprinting
@@ -117,6 +138,18 @@ const SHEET_COLS: int = 16
 var facing: Vector2 = Vector2.DOWN ## synced
 
 var _walk_time: float = 0.0
+var _gait: int = 0 ## 0 walk, 1 jog, 2 sprint: the cycle on screen (all share `_walk_time`, so a change never breaks the stride)
+var _gait_hold: float = 0.0 ## a new gait must be asked for this long before it shows (no flicker at a speed border)
+var _cadence: float = 0.0 ## cycle frames per second, eased so a change of pace or gait never jumps
+var _settle: float = 0.0 ## time spent finishing a stride after stopping
+var _step_t: float = -1.0 ## the running shadow step's clock, -1 when none
+var _step_from: Vector2
+var _step_to: Vector2
+var _step_dir: Vector2 = Vector2.RIGHT
+var _step_moved: bool = false
+var _step_heard: bool = false
+var stepper: ShadowStepComponent ## the shadow step's cooldown (created in _ready; the HUD's skill crystal shows it)
+var _step_carry: float = 0.0 ## the speed she had going in: with a direction held she comes out of the void at it (a sprint goes on)
 var _idle_time: float = 0.0
 var _standby_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _standby_wait: float = -1.0
@@ -198,6 +231,7 @@ var _slows: Dictionary = {} ## instance id of whatever slows her (a bush) -> spe
 var _focus: Interactable ## what E would use right now
 var _hotbar: Hotbar ## the local HUD's hotbar: which slot E eats from
 var quests: QuestComponent ## the owner's quests (null on other peers)
+var tracked: TrackedQuests ## story quest + taken quest-board notices as one list for the HUD branch and the map (null on other peers)
 var wounded: bool = false ## at 10 % health or less (until 13 %): slow, limping, no sprint, a red border on the HUD, on every peer
 var _wound: float = 0.0 ## how much blood she has lost, 0..1, drives her look (eased towards the health)
 var _limp_dip: float = 0.0
@@ -251,6 +285,9 @@ func _exit_tree() -> void:
 
 func _ready() -> void:
 	add_to_group("players")
+	stepper = ShadowStepComponent.new()
+	stepper.name = "ShadowStepComponent"
+	add_child(stepper)
 	_standby_rng.randomize()
 	_load_rig()
 	var rest: RestComponent = RestComponent.new()
@@ -299,6 +336,10 @@ func _ready() -> void:
 		quests = QuestComponent.new()
 		quests.name = "QuestComponent"
 		add_child(quests)
+		tracked = TrackedQuests.new()
+		tracked.name = "TrackedQuests"
+		add_child(tracked)
+		tracked.setup(self, quests)
 		quests.story_event.connect(func(event_name: String) -> void:
 			var story_world: Node = get_tree().get_first_node_in_group("world")
 			if event_name == "ambush:crossroad" and story_world is WorldLevel:
@@ -456,6 +497,123 @@ func _try_blink() -> void:
 		return
 	blink.start_cooldown()
 	play_blink.rpc(start, global_position)
+
+
+## Alt: a short straight step through the void, the way she is walking, or towards the cursor (or where she looks) when she stands.
+## Stops short at walls; too short a way is no step at all. True when it started.
+func _try_shadow_step(input_dir: Vector2) -> bool:
+	var way: Vector2 = input_dir.normalized()
+	if way == Vector2.ZERO:
+		way = InputManager.aim_vector(global_position + BODY_CENTER).normalized() if InputManager.using_mouse else facing.normalized()
+	if way == Vector2.ZERO:
+		way = facing.normalized()
+	var hit: KinematicCollision2D = move_and_collide(way * step_range, true)
+	var travel: Vector2 = way * step_range if hit == null else hit.get_travel()
+	if travel.length() < 12.0:
+		return false
+	if not stamina.spend(step_cost()):
+		return false ## out of breath: the void does not take her
+	stepper.start_cooldown()
+	attack.cancel_action() ## out of the swing or the charge, no blow lands
+	_step_carry = velocity.length() ## a sprint is not broken: she keeps it through the void
+	facing = way
+	velocity = Vector2.ZERO
+	play_shadow_step.rpc(global_position, global_position + travel, way)
+	return true
+
+
+## Stamina one shadow step costs: 14 + 1 per level (level 1 = 15).
+func step_cost() -> float:
+	return step_stamina + float(progress.level)
+
+
+## The shadow step on every peer: she dips, pushes off, dissolves into the void from her leading edge, is put down at `to` and condenses
+## out of the same void (`_animate_step`, `ShadowStepFx`, `hit_flash.gdshader` step_*).
+@rpc("authority", "call_local", "reliable")
+func play_shadow_step(from: Vector2, to: Vector2, way: Vector2) -> void:
+	_cancel_standby()
+	_busy = false ## picking, eating, drinking: broken off, their moment never comes
+	_step_t = 0.0
+	_step_from = from
+	_step_to = to
+	_step_dir = way.normalized() if way != Vector2.ZERO else Vector2.RIGHT
+	_step_moved = false
+	_step_heard = false
+	if multiplayer.is_server():
+		health.grant_grace(step_grace) ## the host decides hits: while she is in the void nothing reaches her
+	talismans.note_blink() ## Rissfeder: the next blow within a few seconds dives in harder (it was the blink's perk)
+	var fx: ShadowStepFx = ShadowStepFx.new()
+	get_tree().current_scene.add_child(fx)
+	fx.setup(from, to, _step_dir, STEP_GONE, STEP_BACK)
+	Sfx.at(self, "step_out", from, -3.0)
+
+
+## One frame of the shadow step: her sheet frame, the dissolve / condense in the shader, a little slide along the step, the move itself.
+func _animate_step(delta: float) -> void:
+	_step_t += delta
+	var t: float = _step_t
+	var material: ShaderMaterial = _sprite.material as ShaderMaterial
+	if t >= STEP_END or (t >= STEP_BACK + STEP_FORM and velocity.length() > 5.0): ## every peer: moving on (synced velocity) skips the landing
+		_finish_step()
+		return
+	_sector = posmod(roundi(_step_dir.angle() / (PI / 4.0)), 8)
+	var i: int
+	if t < STEP_GONE:
+		i = clampi(int(t / STEP_GONE * 4.0), 0, 3)
+	elif t < STEP_BACK:
+		i = 3
+	else:
+		i = clampi(4 + int((t - STEP_BACK) / (STEP_END - STEP_BACK) * 4.0), 4, 7)
+	_use_sheet(STEP_SHEET_ID)
+	_sprite.frame = _sector * STEP_FRAMES + i
+	if t < STEP_BACK:
+		material.set_shader_parameter("step_mode", 1)
+		material.set_shader_parameter("step_amt", clampf((t - 0.012) / (STEP_GONE - 0.012), 0.0, 1.0))
+	elif t < STEP_BACK + STEP_FORM:
+		material.set_shader_parameter("step_mode", 2)
+		material.set_shader_parameter("step_amt", clampf((t - STEP_BACK) / STEP_FORM, 0.0, 1.0))
+	else:
+		material.set_shader_parameter("step_mode", 0)
+	material.set_shader_parameter("step_dir", _step_dir)
+	material.set_shader_parameter("step_seed", floorf(t * 30.0))
+	var slide: Vector2
+	if t < STEP_BACK:
+		var k: float = clampf(t / STEP_GONE, 0.0, 1.0)
+		slide = _step_dir * 8.0 * k * k ## the push carries her into the rift
+	else:
+		var k: float = clampf((t - STEP_BACK) / 0.12, 0.0, 1.0)
+		slide = -_step_dir * 7.0 * (1.0 - k) * (1.0 - k) ## she comes out of it still moving and settles
+	_sprite.position = (Vector2(0.0, _sink) + slide).round()
+	if not _step_moved and t >= STEP_GONE:
+		_step_moved = true
+		global_position = _step_to ## every peer: hidden in the void, so the jump is never seen (the synchronizer agrees a moment later)
+	if not _step_heard and t >= STEP_BACK - 0.03:
+		_step_heard = true
+		Sfx.at(self, "step_in", _step_to, -3.0)
+	_set_step_extras(false)
+
+
+## The step is over: shader clean, sprite back in place, arm and jewellery shown again.
+func _finish_step() -> void:
+	if _step_t < 0.0:
+		return
+	_step_t = -1.0
+	if not _step_moved:
+		_step_moved = true
+		global_position = _step_to
+	(_sprite.material as ShaderMaterial).set_shader_parameter("step_mode", 0)
+	_sprite.position = Vector2(0.0, _sink)
+	_set_step_extras(true)
+
+
+## The game-drawn sword arm and the worn jewellery cannot dissolve with her: they are hidden for the step (the sheet carries both arms).
+func _set_step_extras(on: bool) -> void:
+	var arm_node: Node2D = attack.get_node_or_null("Hand") as Node2D
+	if arm_node != null:
+		arm_node.visible = on
+	for child: Node in _sprite.get_children():
+		if child is TalismanLayer:
+			(child as CanvasItem).visible = on
 
 
 ## Dev menu: jumps to a place (the owner moves herself; the synchronizer tells the others).
@@ -718,6 +876,17 @@ func _update_run_dust() -> void:
 
 
 func _move(delta: float) -> void:
+	if _step_t >= 0.0: ## the shadow step owns her until she has condensed again ...
+		var held: Vector2 = InputManager.move_vector()
+		if _step_t < STEP_BACK + STEP_FORM or held == Vector2.ZERO:
+			velocity = Vector2.ZERO
+			return
+		_finish_step() ## ... then, with a direction held, she runs straight on at the speed she had (the landing pose is skipped)
+		velocity = held.normalized() * maxf(_step_carry, max_speed * (WOUND_SPEED if wounded else 1.0))
+	## Alt breaks everything she is doing (a swing in any phase, a charge, picking, eating, a gesture): a real dodge
+	if InputManager.shadow_step_pressed() and stepper.is_ready() and swim == 0 and not (fishing != null and fishing.locks_movement()) and bool(_surface.get("allow_blink", true)):
+		if _try_shadow_step(InputManager.move_vector()):
+			return
 	var eating: bool = _busy and (_busy_kind == "eat" or _busy_kind.begins_with("drink")) ## eating and drinking, unlike picking, go on while she walks
 	if fishing != null and fishing.locks_movement(): ## a fish is on the line: she braces and stands still
 		velocity = velocity.move_toward(Vector2.ZERO, friction * 2.0 * delta)
@@ -745,7 +914,7 @@ func _move(delta: float) -> void:
 	else:
 		sprinting = false
 
-	if InputManager.blink_pressed() and blink.is_ready() and not _busy and swimming == 0 and bool(_surface.get("allow_blink", true)):
+	if BLINK_ENABLED and InputManager.blink_pressed() and blink.is_ready() and not _busy and swimming == 0 and bool(_surface.get("allow_blink", true)):
 		_try_blink()
 
 	stealth.sneaking = InputManager.sneak_held() and not sprinting and not _busy and not charging and swimming == 0
@@ -801,7 +970,7 @@ func _update_charge() -> bool:
 		return false
 	var blocked: bool = _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0 or swim > 0
 	if attack.is_charging():
-		if blocked or InputManager.blink_pressed():
+		if blocked or InputManager.shadow_step_pressed():
 			attack.cancel_charge()
 			return false
 		var aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER) if InputManager.using_mouse else Vector2.ZERO
@@ -1283,6 +1452,43 @@ func _swim_effects(delta: float, clips: Dictionary, idx: int, total: int) -> voi
 
 
 ## Picks the sheet frame: walk or sprint cycle while moving, idle loop while standing.
+## The gait the speed asks for (0 walk, 1 jog, 2 sprint) and the switch to it after a short hold. Every peer decides it from the
+## synced velocity, so a sprint throttled by mist, a slow surface or a heavy load jogs everywhere alike; sneaking always walks.
+func _pick_gait(delta: float, sprint_held: bool) -> void:
+	var speed: float = velocity.length()
+	var want: int = 0
+	if not stealth.sneaking and swim == 0:
+		var margin: float = 4.0 * (1.0 if _gait == 0 else -1.0) ## hysteresis: leaving a gait needs a few px/s more than entering it
+		if speed >= sprint_speed * sprint_from + (4.0 if _gait < 2 else -4.0) and (sprint_held or speed > sprint_speed * 1.05):
+			want = 2
+		elif speed >= max_speed * jog_from + margin:
+			want = 1
+	if want == _gait:
+		_gait_hold = 0.0
+		return
+	_gait_hold += delta
+	if _gait_hold >= 0.08:
+		_gait = want
+		_gait_hold = 0.0
+
+
+## Cycle frames per second for the gait on screen, scaled by the real speed (slow surfaces slow the legs too).
+func _gait_cadence() -> float:
+	var speed: float = velocity.length()
+	match _gait:
+		2:
+			return jog_fps * clampf(speed / maxf(sprint_speed, 0.01), 0.6, 1.65)
+		1:
+			return trot_fps * clampf(speed / maxf((max_speed + sprint_speed) * 0.5, 0.01), 0.7, 1.4)
+	return walk_fps * clampf(speed / maxf(max_speed, 0.01), 0.5, 2.0)
+
+
+## True near the two passing frames of a cycle (1.5 and 4.5), where her feet are under her: a stride may end there.
+static func _feet_together(phase: float) -> bool:
+	var u: float = fposmod(phase, 3.0)
+	return absf(u - 1.6) < 0.45
+
+
 func _animate(delta: float) -> void:
 	if climb.active():
 		_cancel_standby()
@@ -1293,6 +1499,11 @@ func _animate(delta: float) -> void:
 		return
 	if _sheet == CLIMB_SHEET:
 		_sprite.position.x = 0.0
+	if _step_t >= 0.0:
+		_animate_step(delta)
+		return
+	if _sheet == STEP_SHEET_ID:
+		_sprite.position.x = 0.0
 	var angle: float = facing.angle() / (PI / 4.0)
 	if absf(wrapf(angle - float(_sector), -4.0, 4.0)) > 0.62: ## hysteresis: no flicker on sector borders
 		_sector = posmod(roundi(angle), 8)
@@ -1302,22 +1513,33 @@ func _animate(delta: float) -> void:
 	var col: int
 	if moving:
 		var direction: float = -1.0 if velocity.dot(facing) < 0.0 else 1.0 ## walking backwards plays in reverse
-		var pace: float = clampf(velocity.length() / max_speed, 0.5, 2.0)
-		var animation_fps: float = walk_fps
-		if running: ## the relaxed jog follows actual speed, including slowed surfaces
-			pace = clampf(velocity.length() / maxf(sprint_speed, 0.01), 0.25, 1.65)
-			animation_fps = jog_fps
+		if _last_step < 0 and _settle <= 0.0:
+			_walk_time = 1.0 ## setting off: the first frame is the push-off, not a wide-legged stride out of the idle stance
+			_cadence = 0.0
+		_settle = 0.0
+		_pick_gait(delta, running)
+		var target_fps: float = _gait_cadence()
+		_cadence = target_fps if _cadence <= 0.0 else lerpf(_cadence, target_fps, 1.0 - exp(-10.0 * delta))
 		var limp_k: float = 1.0 + 0.6 * sin(TAU * _walk_time / float(WALK_FRAMES) + 0.6) if wounded else 1.0 ## the good leg swings quickly, the bad one is dragged
-		_walk_time = fposmod(_walk_time + direction * animation_fps * pace * limp_k * delta, float(WALK_FRAMES))
+		_walk_time = fposmod(_walk_time + direction * _cadence * limp_k * delta, float(WALK_FRAMES))
 		var step: int = int(_walk_time)
-		col = (RUN_COL if running else 0) + step
+		col = [0, JOG_COL, RUN_COL][_gait] + step
 		if step != _last_step and step % (WALK_FRAMES / 2) == 0: ## the two contact frames of the cycle
 			_on_step()
 		_last_step = step
 		_idle_time = 0.0
+	elif _last_step >= 0 and _settle < GAIT_SETTLE and not _feet_together(_walk_time):
+		## stopping mid-stride: the cycle runs on (at least at walking pace) until the feet pass under her, then the idle loop takes over
+		_settle += delta
+		_walk_time = fposmod(_walk_time + maxf(_cadence, walk_fps) * delta, float(WALK_FRAMES))
+		col = [0, JOG_COL, RUN_COL][_gait] + int(_walk_time)
 	else:
 		_walk_time = 0.0
 		_last_step = -1
+		_settle = 0.0
+		_gait = 0
+		_gait_hold = 0.0
+		_cadence = 0.0
 		_idle_time = fposmod(_idle_time + IDLE_FPS * (0.6 if wounded else 1.0) * delta, float(IDLE_FRAMES)) ## slow, heavy breathing when wounded
 		col = IDLE_COL + int(_idle_time)
 	var was_standby: bool = _standby_clip >= 0
@@ -1348,6 +1570,11 @@ func _animate(delta: float) -> void:
 	if not fish_frame_ok:
 		attack.rod_pose = Vector3.INF
 	var swim_drawn: bool = _animate_swim(delta)
+	# The ring of water behind her lives only in the water or on the way out; the climb-out clip can end before its fade did, or the shake takes over.
+	if _swim_water != null and _swim_water.intensity > 0.0 and swim == 0 and _swim_exit_t < 0.0:
+		_swim_water.intensity = 0.0
+		_swim_water.queue_redraw()
+		_swim_water._back.queue_redraw()
 	if swim_drawn:
 		shoulder = Vector2(0.0, -30.0) ## the sheet already shows both arms; the sword arm is hidden below
 		hand = Vector2(0.0, -22.0)
@@ -1436,7 +1663,7 @@ func _animate(delta: float) -> void:
 		_feed_fx.clear()
 	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, _sink + _limp_dip)
 	attack.rig_hand = hand + Vector2(-_sprite.skew * hand.y, _sink + _limp_dip)
-	attack.carrying = running and not attack.is_swinging()
+	attack.carrying = moving and _gait == 2 and not attack.is_swinging() ## the blade trails back only in the real sprint
 	attack.sheathed = stealth.sneaking or _busy or swim_drawn ## sneaking, picking and swimming put the weapon away
 	var arm_node: Node2D = attack.get_node_or_null("Hand") as Node2D
 	if arm_node != null and arm_node.visible == swim_drawn:
@@ -1784,7 +2011,7 @@ func _use_sheet(sheet: int) -> void:
 		_sprite.offset = Vector2(0.0, -23.0)
 	if _swim_under != null:
 		_swim_under.visible = sheet == 13
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", STEP_BLOOD if sheet == STEP_SHEET_ID else WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
 	match sheet:
 		CLIMB_SHEET:
 			_sprite.texture = WallClimb.SHEET
@@ -1813,6 +2040,10 @@ func _use_sheet(sheet: int) -> void:
 		1:
 			_sprite.texture = ATTACK_SHEET
 			_sprite.hframes = ATTACK_COLS
+			_sprite.vframes = 8
+		STEP_SHEET_ID:
+			_sprite.texture = STEP_SHEET
+			_sprite.hframes = STEP_FRAMES
 			_sprite.vframes = 8
 		DRINK_SHEET_ID:
 			_sprite.texture = DRINK_SHEET

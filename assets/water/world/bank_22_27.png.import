@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cphw0liipd4pg"
-path="res://.godot/imported/quest_board_glow.png-9e3820de8eaec7f07bec7dc5ad5280c0.ctex"
+uid="uid://c4rtja4njr5pb"
+path="res://.godot/imported/bank_22_27.png-196d39c609768973a996303b361e4e32.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/town/quest_board_glow.png"
-dest_files=["res://.godot/imported/quest_board_glow.png-9e3820de8eaec7f07bec7dc5ad5280c0.ctex"]
+source_file="res://assets/water/world/bank_22_27.png"
+dest_files=["res://.godot/imported/bank_22_27.png-196d39c609768973a996303b361e4e32.ctex"]
 
 [params]
 

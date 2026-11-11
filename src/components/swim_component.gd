@@ -13,6 +13,9 @@ var blend: float = 0.0 ## 0 wading .. 1 swimming, eased over `blend_seconds`
 
 var _body: CharacterBody2D
 var _since: float = 0.0
+var _deep_dist: float = 0.0 ## px walked through deep water without swimming yet (a brook is waded, a lake is swum)
+var _deep_idle: float = 0.0 ## seconds standing in deep water without swimming yet
+var _last_pos: Vector2 = Vector2.INF
 var _scan: float = 0.0
 var _excepted: Dictionary = {} ## instance id -> StaticBody2D
 
@@ -26,7 +29,18 @@ func setup(body: CharacterBody2D) -> void:
 func step(delta: float, amount: float, water: bool, allowed: bool, moving: bool, sprint_held: bool, stamina: StaminaComponent, wounded: bool) -> int:
 	_since += delta
 	tired = SwimRules.next_tired(tired, stamina.current, stamina.max_stamina)
-	var want: bool = water and SwimRules.wants_swim(active, amount) and (allowed or active) ## a swimmer is never thrown out of the water by a ban, it only keeps her from starting
+	var here: Vector2 = _body.global_position if _body != null else Vector2.ZERO
+	var moved: float = 0.0 if _last_pos == Vector2.INF else minf(here.distance_to(_last_pos), 40.0)
+	_last_pos = here
+	if active or not water or amount < float(SwimRules.cfg()["exit_amount"]):
+		_deep_dist = 0.0
+		_deep_idle = 0.0
+	elif amount >= float(SwimRules.cfg()["enter_amount"]):
+		_deep_dist += moved
+		_deep_idle = _deep_idle + delta if moved < 0.2 else 0.0
+	var wade: Dictionary = SwimRules.cfg().get("wade_through", {}) as Dictionary
+	var committed: bool = active or _deep_dist >= float(wade.get("distance", 0.0)) or _deep_idle >= float(wade.get("idle_time", 0.0))
+	var want: bool = water and committed and SwimRules.wants_swim(active, amount) and (allowed or active) ## a swimmer is never thrown out of the water by a ban, it only keeps her from starting
 	if want != active and _since >= float(SwimRules.cfg()["min_state_time"]):
 		active = want
 		_since = 0.0

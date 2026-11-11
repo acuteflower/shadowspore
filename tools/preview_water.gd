@@ -60,9 +60,9 @@ func _run() -> void:
 		props.add_child(sprite)
 	var hero: Sprite2D = Sprite2D.new()
 	hero.texture = load("res://assets/characters/player.png") as Texture2D
-	hero.hframes = 16
+	hero.hframes = 22
 	hero.vframes = 16
-	hero.frame = 2 * 16 + 12
+	hero.frame = 2 * 22 + 12
 	hero.centered = false
 	hero.offset = Vector2(-24, -51)
 	hero.position = Vector2(291, 177)

@@ -24,12 +24,12 @@ Die Questtafel ist ein Stadtstück (`quest_board`, Rolle `board`). Auf ihr häng
 2. **Host, bei jedem Sonnenaufgang** (`TimeManager.day_started`): abgelaufene Zettel verschwinden, dann würfelt `BoardRules.roll` bis zu `new_per_day` neue (Chance `post.chance`), solange weniger als `limits.simple` Siedler-Zettel hängen. Ein Bewohner hat höchstens `per_giver` offene Zettel. Nur Bewohner (`TownManager.residents`) geben Zettel aus, `min_day` und `min_trust` der Vorlage beschränken.
 3. **Annehmen** (E an der Tafel, im Fenster): der Host trägt den Spieler ein (`taken[id][peer]`), bei Story-Zetteln startet er die Quest beim Besitzer.
 4. **Fortschritt**: `fetch` zählt die Tasche des Spielers (Anzeige 7/12), `kill` zählt Tode, die der Spieler als Letzter verursacht (`DropComponent._roll` ruft `BoardManager.note_kill`), nur nach dem Annehmen.
-5. **Abgeben** (E an der Tafel, Knopf ABGEBEN/ABHOLEN, innerhalb `reach` der Tafel): der Host prüft, nimmt die Ware, zahlt aus (`ProgressComponent.award`, Vertrauen, Gegenstand) und markiert den Zettel für diesen Spieler als erledigt. Für andere hängt er weiter bis zum Ablauf.
+5. **Melden beim Auftraggeber** (nicht an der Tafel): ist ein angenommener Zettel erfüllt, zeigt der Siedler, der ihn aufgehängt hat, beim Ansprechen "AUFTRAG ABGEBEN" (`Settler`/`InteriorResident`, `BoardManager.finishable/report`). E dort: der Host prüft, dass der Spieler höchstens `giver_reach` (110 px) beim Siedler steht (`_near_giver`, `TownManager.person_node`, gilt auch für Esma in ihrem Turm), nimmt die Ware, zahlt aus (`ProgressComponent.award`, Vertrauen, Gegenstand) und markiert den Zettel für diesen Spieler als erledigt; der Siedler dankt mit einer Zeile aus `thanks`. Für andere hängt der Zettel weiter bis zum Ablauf. Das Fenster zeigt in ANGENOMMEN nur den Stand (Tag "MELDEN" bei fertigen), dort gibt es keinen Abgeben-Knopf.
 
 ## 4. Daten (`data/board.json`)
 
 ```
-piece, reach (px um die Tafel zum Abgeben), limits {simple, per_giver, new_per_day},
+piece, reach (px um die Tafel zum Annehmen), giver_reach (px um den Siedler zum Melden), thanks [Dankzeilen], limits {simple, per_giver, new_per_day},
 post {chance}, lifetime [min_tage, max_tage],
 templates [{id, kind "fetch"|"kill", givers [ids] (leer = jeder Bewohner), item | species, count [min, max],
             copper_each [min, max], xp_each, trust, min_day, min_trust, bonus {id, n, chance}, text}]
@@ -40,7 +40,7 @@ story [{id, quest, giver, title, text, after, flag}]
 ## 5. Netzwerk und Speichern
 
 Der Host hält die Wahrheit (`BoardManager`, Kind von `TownManager`, Knoten `Board`), jeder Peer eine Kopie.
-- Client → Host: `_rpc_accept(id)`, `_rpc_finish(id)`.
+- Client → Host: `_rpc_accept(id)`, `_rpc_finish(id)` (Melden, Host prüft die Nähe zum Auftraggeber).
 - Host → alle: `_rpc_state(offers, taken)` (gesamt, selten), `_rpc_result(peer, id, text, ok)` für die Rückmeldung, `_rpc_start_quest(quest)` an den Besitzer.
 - Gespeichert wird in `town.board` (`offers`, `taken` mit den Schlüsseln des Host-Spielers `"1"`, `next_id`, `posted_story`). Beigetretene Mitspieler behalten ihre angenommenen Zettel nur für die laufende Sitzung (Peer-ID ist nicht stabil).
 
@@ -50,7 +50,7 @@ Das gebaute Brett zeigt seine Zettel direkt in der Welt (`BoardNotes`, zwei Kind
 
 ## 6. Fenster (`QuestBoardWindow`, Unterklasse von `BoardWindow`)
 
-Reiter: AUSHANG (alle Zettel, die man noch nicht erledigt hat; Story-Zettel oben mit Siegel), ANGENOMMEN (laufende mit Fortschritt). Detail: Auftraggeber, Text, Ware/Fortschritt, Belohnungschips, Restzeit. Knöpfe: ANNEHMEN, ABGEBEN.
+Reiter: AUSHANG (alle Zettel, die man noch nicht erledigt hat; Story-Zettel oben mit Siegel), ANGENOMMEN (laufende mit Fortschritt). Detail: Auftraggeber, Text, Ware/Fortschritt, Belohnungschips, Restzeit. Knopf: ANNEHMEN (im Reiter ANGENOMMEN keiner, gemeldet wird beim Auftraggeber).
 
 ## 7. Nicht gebaut / offen
 

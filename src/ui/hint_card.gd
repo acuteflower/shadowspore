@@ -56,6 +56,15 @@ func notify_swim() -> void:
 	_event_left = 12.0
 
 
+## First time a notice hangs on the quest board and she is near it (flag board_hint_seen, once per save).
+func notify_board() -> void:
+	if _quests == null or _quests.has_flag("board_hint_seen"):
+		return
+	_quests.set_flag("board_hint_seen")
+	_hint = "board"
+	_event_left = 14.0
+
+
 ## First breath of the Hexenwald's mist (flag mist_hint_seen, once per save).
 func notify_mist() -> void:
 	if _quests == null or _quests.has_flag("mist_hint_seen"):
@@ -120,6 +129,9 @@ func _draw() -> void:
 		return
 	if _hint == "mist":
 		_draw_mist_hint()
+		return
+	if _hint == "board":
+		_draw_board_hint()
 		return
 	if _hint == "craft":
 		_draw_craft_hint()
@@ -243,6 +255,25 @@ func _draw_swim_hint() -> void:
 	PixelText.draw(self, "KRAULEN: SCHNELL", Vector2i(at + Vector2(9 + cap_w + 6, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 	PixelText.draw(self, "DAS KOSTET AUSDAUER.", Vector2i(at + Vector2(9, 42)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 	PixelText.draw(self, "KEIN BLINK IM WASSER.", Vector2i(at + Vector2(9, 51)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+
+
+func _draw_board_hint() -> void:
+	var g: float = _grow * _grow * (3 - 2 * _grow)
+	var void_level: float = VineStyle.void_amount()
+	var curve: Callable = func(x: float) -> float: return 6 + sin(x * 0.06) * 1.5
+	VineStyle.branch(self, 0, WIDTH - 12, curve, 4, void_level, 12, _time, g)
+	VineStyle.foliage(self, 0, WIDTH - 12, curve, 5, 130, void_level, 12, _time, g)
+	if g < 0.6:
+		return
+	var at: Vector2 = Vector2(10, roundf(22 - (1 - g) * 20))
+	var fade: float = clampf((g - 0.6) / 0.4, 0, 1)
+	VineStyle.paper(self, Rect2(at, Vector2(WIDTH - 22, HEIGHT - 26)), fade, void_level)
+	PixelText.draw(self, "QUESTTAFEL", Vector2i(at + Vector2(9, 8)), Color(VineStyle.WARM_GLOW, fade), VineStyle.OUTLINE)
+	var cap_w: int = VineStyle.key_cap(self, at + Vector2(9, 20), _action_label("interact"), fade, 0.0, void_level)
+	PixelText.draw(self, "LIEST DIE ZETTEL.", Vector2i(at + Vector2(9 + cap_w + 6, 24)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "WAS DU ANNIMMST, STEHT", Vector2i(at + Vector2(9, 40)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "IM ZWEIG. MELDE DICH", Vector2i(at + Vector2(9, 49)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
+	PixelText.draw(self, "BEIM AUFTRAGGEBER.", Vector2i(at + Vector2(9, 58)), Color(UiStyle.TEXT, fade), VineStyle.OUTLINE)
 
 
 func _draw_mist_hint() -> void:

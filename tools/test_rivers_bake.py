@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 ROOT=Path(__file__).resolve().parents[1]
-d=json.loads((ROOT/'data/rivers_baked.json').read_text());cfg=json.loads((ROOT/'data/rivers.json').read_text())
+d=json.loads((ROOT/'data/rivers_baked.json').read_text());links=[e for e in d['edges'] if 'link' in e];d['edges']=[e for e in d['edges'] if 'link' not in e];cfg=json.loads((ROOT/'data/rivers.json').read_text())
 parent={tuple(e['a']):tuple(e['b']) for e in d['edges']};out={tuple(e['a']):e for e in d['edges']};roots={tuple(b['outlet']):b for b in d['basins']}
 checks=0
 for e in d['edges']:
@@ -48,7 +48,7 @@ for record in d['chunks'].values():
  checks+=1
 # Finite differences at graph joins catch the former near-right-angle seams.
 starts={};ends={}
-for segment in d['segments']:
+for segment in [s for s in d['segments'] if 'link' not in s]:
  a,b=np.array(segment['a']),np.array(segment['b']);direction=(b-a)/np.linalg.norm(b-a)
  starts.setdefault(tuple(a),[]).append(direction);ends.setdefault(tuple(b),[]).append(direction)
 for point,ds in ends.items():

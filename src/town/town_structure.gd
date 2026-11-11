@@ -28,6 +28,7 @@ var _glow: Sprite2D
 var _pad: Sprite2D
 var _light: NightLight
 var _light_base: float = 0.0
+var attention: float = 0.0 ## 0..1, set by the quest board's notes: unread notices make its bud light shine further
 var _flicker: float = 0.0
 var _body: StaticBody2D
 var _hammer_clock: float = 0.0
@@ -131,6 +132,7 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	for part: Dictionary in _parts:
 		_add_layer(part.sprite as Sprite2D, float(part.from), float(part.to), part.sway != null)
 	if String(_spec.get("role", "")) == "board":
+		add_to_group("quest_board_piece")
 		_make_board_notes()
 	add_to_group("night_lights")
 	_update_lamp_k()
@@ -601,7 +603,7 @@ func _process(delta: float) -> void:
 		_sparks.emitting = burning
 	if _light != null and _flicker > 0.0 and _light.visible:
 		var level: float = lerpf(0.4, 1.0, _active) if _spec.has("smoke") else 1.0 ## the forge sinks to embers when nobody tends it
-		_light.base_energy = _light_base * level * _lamp_k * (1.0 - _flicker * (0.5 + 0.5 * sin(_time * 11.0 + float(id)) * sin(_time * 4.3 + 1.0)))
+		_light.base_energy = _light_base * (1.0 + attention * 1.2) * level * _lamp_k * (1.0 - _flicker * (0.5 + 0.5 * sin(_time * 11.0 + float(id)) * sin(_time * 4.3 + 1.0)))
 	if progress < TownManager.PROGRESS_FULL:
 		queue_redraw()
 		if Time.get_ticks_msec() - _last_gain_msec < 700:

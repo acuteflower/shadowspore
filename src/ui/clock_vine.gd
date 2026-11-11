@@ -159,8 +159,82 @@ func _draw_text(now: float, night: float, tone: Color) -> void:
 		var tile: Vector2i = Vector2i((_player.global_position / 16.0).floor())
 		var where: String = "X %d  Y %d" % [tile.x, tile.y]
 		PixelText.draw(self, where, Vector2i(int(CLOCK_POS.x) + 19 - PixelText.width(where) / 2, 54), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.6), 0.75), VineStyle.OUTLINE)
-	var sky: WeatherManager = WeatherManager.current ## the weather, only when it is not plain sunshine
-	if sky != null and not (sky.state_id in ["clear", "fair"]):
-		var sky_word: String = sky.display_name()
-		var row: int = 65 if bool(GameSettings.get_value("position")) and _player != null else 54
-		PixelText.draw(self, sky_word, Vector2i(int(CLOCK_POS.x) + 19 - PixelText.width(sky_word) / 2, row), Color(Color(0.66, 0.80, 0.95).lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.5), 0.85), VineStyle.OUTLINE)
+	_draw_weather(night, word)
+
+
+## The weather as a little pixel picture right of the phase word (always shown): sun or moon, clouds, rain that falls by its amount, bolt, wind, fog.
+func _draw_weather(night: float, word: String) -> void:
+	var sky: WeatherManager = WeatherManager.current
+	var id: String = sky.state_id if sky != null else "clear"
+	var rain: float = sky.rain if sky != null else 0.0
+	var storm: float = sky.storm if sky != null else 0.0
+	var gloom: float = clampf((sky.cloud if sky != null else 0.0) * 0.7 + storm * 0.4, 0.0, 1.0)
+	var o: Vector2 = Vector2(float(int(CLOCK_POS.x) + 19 + PixelText.width(word) / 2 + 7), 40.0)
+	var light: Color = Color("eef3ff").lerp(Color("8c93b8"), gloom).lerp(Color("a7a4d4"), night * 0.6)
+	var shade: Color = Color("b3c3e0").lerp(Color("5d6488"), gloom).lerp(Color("6e6ca0"), night * 0.6)
+	var sun_up: bool = night < 0.5
+	match id:
+		"clear", "fair":
+			_icon_sun_or_moon(o + Vector2(4, 4), night, sun_up)
+			if id == "fair":
+				_icon_cloud(o + Vector2(4, 4), light, shade, 0.55)
+		"broken":
+			_icon_sun_or_moon(o + Vector2(2, 3), night, sun_up, 0.7)
+			_icon_cloud(o + Vector2(1, 2), light, shade)
+		"fog":
+			for k: int in 4:
+				var shift: float = roundf(sin(_time * 0.8 + float(k) * 1.7) * 1.0)
+				draw_rect(Rect2(o.x + 1.0 + (k % 2) * 2.0 + shift, o.y + 1.0 + k * 2.0, 6, 1), Color(light, 0.9 - 0.1 * k))
+		"gale":
+			for k: int in 3:
+				var run: float = fmod(_time * 7.0 + float(k) * 3.0, 14.0)
+				draw_rect(Rect2(o.x + run - 3.0, o.y + 1.0 + k * 3.0, 4 if k != 1 else 3, 1), Color(light, 0.9 * clampf(1.0 - absf(run - 6.0) / 8.0, 0.0, 1.0)))
+		_:
+			_icon_cloud(o + Vector2(1, 0), light, shade)
+			if rain > 0.02:
+				var drops: int = clampi(1 + int(rain * 5.0), 1, 5) ## more drops, and quicker, the harder it rains
+				for k: int in drops:
+					var fall: float = fmod(_time * (3.0 + 7.0 * rain) + VineStyle.rand(k + 50) * 6.0 + float(k) * 1.3, 4.0)
+					draw_rect(Rect2(o.x + 1.0 + k * 2.0, o.y + 5.0 + floorf(fall), 1, 1), Color(0.62, 0.82, 1.0, 1.0 - fall / 4.5))
+			if storm > 0.35 and fmod(_time, 2.3) < 0.9:
+				var bolt: Color = Color(1.0, 0.92, 0.5)
+				for p: Vector2i in [Vector2i(5, 4), Vector2i(4, 5), Vector2i(5, 5), Vector2i(4, 6), Vector2i(3, 7)]:
+					draw_rect(Rect2(o.x + p.x, o.y + p.y, 1, 1), bolt)
+
+
+func _icon_sun_or_moon(c: Vector2, night: float, sun_up: bool, big: float = 1.0) -> void:
+	if sun_up:
+		var r: int = 2 if big > 0.9 else 1
+		for dy: int in range(-r, r + 1):
+			for dx: int in range(-r, r + 1):
+				if dx * dx + dy * dy <= r * r + 1:
+					draw_rect(Rect2(c.x + dx, c.y + dy, 1, 1), (SUN_LIGHT if dx + dy < 0 else SUN) * Color(1, 1, 1, 1.0 - night))
+		for k: int in 8:
+			var angle: float = _time * 0.8 + k * TAU / 8.0
+			var reach: float = (r + 2.0) + (0.5 if k % 2 == 0 else 0.0)
+			draw_rect(Rect2(roundf(c.x + cos(angle) * reach), roundf(c.y + sin(angle) * reach), 1, 1), Color(SUN_LIGHT, (0.9 if big > 0.9 else 0.6) * (1.0 - night)))
+	else:
+		for dy: int in range(-2, 3):
+			for dx: int in range(-2, 3):
+				if dx * dx + dy * dy <= 5 and (dx - 1) * (dx - 1) + (dy + 1) * (dy + 1) > 3:
+					draw_rect(Rect2(c.x + dx, c.y + dy, 1, 1), Color(MOON, night))
+		var tw: float = 0.5 + 0.5 * sin(_time * 3.0)
+		draw_rect(Rect2(c.x + 3.0, c.y - 3.0, 1, 1), Color(MOON, night * tw))
+
+
+## A 9 x 4 pixel cloud with an ink outline, lit on top; `puff` < 1 draws a smaller puff of it.
+func _icon_cloud(p: Vector2, light: Color, shade: Color, puff: float = 1.0) -> void:
+	var rows: PackedStringArray = PackedStringArray(["..XXX....", ".XXXXXX..", "XXXXXXXXX", ".XXXXXXX."])
+	if puff < 0.9:
+		rows = PackedStringArray([".XX..", "XXXXX", ".XXX."])
+		p += Vector2(2, 3)
+	for pass_i: int in 2:
+		for y: int in rows.size():
+			for x: int in rows[y].length():
+				if rows[y][x] != "X":
+					continue
+				if pass_i == 0:
+					for d: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+						draw_rect(Rect2(p.x + x + d.x, p.y + y + d.y, 1, 1), Color(VineStyle.OUTLINE, 0.9))
+				else:
+					draw_rect(Rect2(p.x + x, p.y + y, 1, 1), light if y < rows.size() - 2 else shade)

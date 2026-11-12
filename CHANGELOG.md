@@ -4,6 +4,113 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.8.2 Beta] – 2026-11-12
+### ⚔️ Klingen, Krähen & wilde Pfade: 3D-Waffenphysik, erste Welt-Rätsel, Schmied Torben & Hexenwald-Fauna
+
+![Silhouetten-Ladescreen: Ellie & Begleiter auf der Flucht vor der Void-Spinne](docs/img/loading_screen_v2.gif)
+
+> *Nördlich der Lichtung hallt dumpfer Stahl auf nackten Fels. Zwischen schwelenden Erzadern kämpft der Schmied Torben allein gegen die schleichende Dunkelheit – während auf verschlungenen Waldpfaden scheue Irrlichter aus alten Steinschalen steigen, beringte Krähen glänzende Schätze hüten und Ellies Klinge zum ersten Mal mit echtem Gewicht durch die Nacht schneidet.*
+
+---
+
+> [!IMPORTANT]
+> **Die Prüfungen der Wächterin beginnen!** In V0.8.2 erwachen die ersten drei Welt-Rätsel zum Leben: Folgt der scheuen **Irrlichtspur**, gewinnt das Vertrauen der **Hortkrähe** und handelt mit dem alten **Raben am Westhang**. Gleichzeitig bekommt Ellie ein komplett neues **3D-Griff- und Schwung-System**, ein organisches **Lianen-Inventar**, **Sprechblasen** direkt in der Welt und mit **Torben** ihren lang erwarteten Dorfschmied!
+
+---
+
+### 🗡️ 1. 3D-Griff-System & echte Waffenphysik (`🔵 REWORK` `🟣 NEU`)
+
+![3D-Griff-System & Schwungbögen im Vorher-Nachher-Vergleich](docs/img/griff_system.png)
+
+Schluss mit steif gedrehten 2D-Waffen! Ellies rechte Hand und jede geführte Waffe oder jedes Werkzeug bewegen sich jetzt im **echten 3D-Raum** – nahtlos abgestimmt auf ihr Charaktermodell, ihre Blickrichtung und Licht/Schatten der Spielwelt:
+
+* **Zwei-Knochen-Arm im Pixel-Look (`🔵 REWORK`):** Ellies Schwertarm wird mit Schulterkappe, pflaumenfarbenem Ärmel, schwarzer Leder-Armschiene samt violettem Leuchtband und Handschuh exakt wie ihr linker Arm gezeichnet – inklusive Hit-Flash, Nässe, Nebelschleier und Tageslicht-Stimmung.
+* **Spürbares Gewicht & Feder-Trägheit (`🟣 NEU`):** Im Ruhezustand reagiert die Waffe über eine gedämpfte Feder auf Ellies Bewegungen und Drehungen. Jede Kategorie hat eigene Haltungen für **Tragen**, **Bereit** (direkt nach einem Hieb) und **Sprinten** – Spitzhacke und Hacke ruhen lässig über der Schulter, die Sichel tief, die Gießkanne aufrecht am Henkel.
+* **Kreuzende X-Hiebe & Überkopf-Schläge (`🟣 NEU`):** Vorhand und Rückhand schneiden als gekreuztes **X** durch den 3D-Raum (`48°` / `-42°` Neigung), während schwere Werkzeuge (Axt, Spitzhacke, Hacke) wuchtig über den Kopf geschwungen werden. Die Schwungspur und abfliegende Funken folgen exakt der Bahn der Klingenspitze!
+
+---
+
+### 🧭 2. Die ersten Welt-Rätsel: Irrlichtspur, Hortkrähe & Rabenhandel (`🟣 NEU`)
+
+<details open>
+<summary><b>✨ Drei Geheimnisse abseits der Wege – klicke für alle Details & Fundorte</b></summary>
+
+#### 🌿 Irrlichtspur – *Nördlich der Hütte*
+![Irrlichtspur bis zur Lichtsäule mit Wurzelkiste](docs/img/wisp_trail.png)
+* Aus einer moosbewachsenen Steinschale löst sich ein scheues, blau schimmerndes **Irrlicht** und schwebt auf geschwungenen Bahnen durch den Pass entlang der Leere.
+* **Ruhig bleiben!** Das Irrlicht fliegt knapp schneller als Ellies Gehtempo (und deutlich gemächlicher beim Schleichen), aber langsamer als ihr Sprint. Wer zu hastig stürmt, erschreckt es – es huscht voran, und verlischt es ganz, kehrt es nach **`7 s`** in die Schale zurück.
+* Am versteckten Ziel hinter dem Hügel vollführt es eine leuchtende Spirale, stürzt herab, lässt einen Ring aus Leuchtblumen erblühen und ruft in einer Lichtsäule eine **Wurzelkiste** herbei.
+
+#### 🪶 Die Hortkrähe – *Östlich vom Fluss*
+![Hortkrähe auf alten Stümpfen und ausbrechende Wurzelkiste](docs/img/crow_hoard.png)
+* Eine einzelne Krähe mit kleinem **Silberring am Bein** wacht auf einem verwitterten Stumpf. Nähert euch langsam mit **Sonnenkernen** oder **Samenflocken** in der Hand und haltet still!
+* Nach dem Füttern krächzt sie zweimal, fliegt im weiten Bogen zu einem verborgenen **Erdhaufen** und scharrt dort, bis ihr aufschließt.
+* Mit `E` („AUSGRABEN“) oder drei gezielten Hieben eurer **Hacke** bricht eine **Wurzelkiste** unter Erdbrocken und Rissen direkt aus dem Boden!
+
+#### 🦅 Der Rabenhandel – *Selten, am Westhang*
+![Rabenhandel am Bleichbaum mit silberspitzigen Federn](docs/img/raven_trade.png)
+* An einem knorrigen **Bleichbaum** westlich des Flusses sitzt ein alter, stolzer Rabe mit einem Ring aus Rabenstahl – und er will kein Vogelfutter, sondern **etwas Glänzendes**!
+* Über `E` („ANBIETEN“) öffnet ihr ein eigenes Tauschfenster. Gefällt ihm euer Stück (**Seeglimmer, Mondstein, Silberkette, Eisenbarren, Moras Splitter oder Kristalle**), behält er **1 Stück als Pfand** und fliegt über **drei Stationen** um den Hügel. Hebt jede herabflatternde **schwarze Feder mit Silberspitze** auf! *(Lehnt er ein unscheinbares Geschenk dreimal am Tag ab, dreht er euch bis zum nächsten Morgen den Rücken zu.)*
+* Am Ziel bricht eine **Mondsiegeltruhe** aus der Erde – inklusive eurem hinterlegten Pfand!
+
+</details>
+
+> [!TIP]
+> **Flüssigeres Truhen-Aufräumen:** Bereits geöffnete Beutetruhen lösen sich nun schon nach **`10 s`** (statt bisher `45 s`) wieder auf – und alle drei Truhen-Klassen zeigen beim Öffnen neu gestaltete, animierte Innenleben-Details (geflicktes Leinen, Sternenkarten-Futter, Münzstapel & Samt).
+
+---
+
+### 🔨 3. Schmied Torben & die erweiterte Questtafel (`🟣 NEU` `🔵 REWORK`)
+
+* **Hammerschlage im Norden (`🟣 NEU`):** Sobald eure **Questtafel** steht, ruft euch ein neuer Aushang in den Norden: Findet Torben an seinem Eisenvorkommen, wehrt gemeinsam einen Schatten-Hinterhalt ab, sammelt Holz, Kiesel, Bretter und Eisenerz, errichtet die **Schmiede** im Dorf und schmelzt euren ersten **Eisenbarren**!
+* **Torben als Dorfbewohner (`🟣 NEU`):** Nach Abschluss zieht der wortkarge Schmied dauerhaft ins Dorf ein – mit eigenen Gesprächen, Schmiede-Angeboten und täglichen Aufträgen an der Questtafel (**Eisenerz**, **Feuerholz** & **Schattenspinnen-Jagd**).
+* **Klare Story-Kette an der Questtafel (`🔵 REWORK`):** Die Werkbank-Quest leitet nun nahtlos in den Bau der **Questtafel** über, und die großen Boss-Abenteuer (**Spiegelhexe**, **Mornath**, **Seehexe**) erscheinen jetzt sauber gestaffelt als goldene Story-Aushänge auf dem Brett!
+
+---
+
+### 🌿 4. Neues Lianen-Inventar, „Licht gegen Leere“-Menü & Welt-Sprechblasen (`🔵 REWORK` `🟣 NEU`)
+
+* **Organisches Lianen-Inventar (`🔵 REWORK`):** Öffnet ihr euren Rucksack, ranken lebendige Zweige ins Bild! Auf der linken Seite steht **Ellie in ihrem Ritualkreis** und folgt mit dem Blick eurem Mauszeiger:
+  * **Talismane** hängen als funkelnde Anhänger an einer Girlande über ihrem Kopf.
+  * **Rüstung** & **Hand-Ausrüstung** baumeln an zwei seitlichen Lianen.
+  * **Rucksack-Plätze** wachsen als belegte Äste von rechts herein – leere Felder zeigen klare Piktogramme, passende Slots leuchten beim Ziehen auf, und jedes Item schimmert in seiner Seltenheitsfarbe.
+* **Silhouetten-Ladescreen (`🟣 NEU`):** Beim Spielstart wandern Ellie und zwei zufällig gewählte Begleiter (aus **Valdric**, **Gustav** und **Torben**) als helle Silhouetten über einen scrollenden Steinpfad – bis die echte **Void-Spinne** die Gruppe aus dem Bild jagt und die Iris in die Spielwelt aufspringt.
+* **Hauptmenü „Licht gegen Leere“ (`🔵 REWORK`):** Die alte Rankentafel weicht einem dynamischen Schattenkampf: Leere-Tentakel und funkelnde Augenpaare drängen zum Lagerfeuer, während alle `14 s` Schockwellen und Glutstöße die Dunkelheit zurückschleudern und die Menüpunkte als leuchtende Lichtschrift aus dem Feuer steigen.
+* **Sprechblasen direkt über den Figuren (`🟣 NEU`):** Story-Szenen und Gespräche abseits von Vollbild-Porträts schweben jetzt als elegante **Sprechblasen direkt über Ellie, den Siedlern oder Wegweisern** in der Spielwelt!
+
+---
+
+### 🐾 5. Lebendiger Hexenwald & belebte Flussufer (`🟣 NEU` `🔵 REWORK`)
+
+![Neue Wald- und Hexenwald-Tiere](docs/img/woodland_animals.png)
+![Neue Flussufer-Tiere inklusive Otter](docs/img/water_animals.png)
+
+* **Hexenwald- & Waldbewohner (`🟣 NEU`):** Durch die Wälder streifen ab sofort **Wildschweine** (samt gestreiften Frischlingen), scheue **Luchse**, kletternde **Eichhörnchen**, geheimnisvolle **Hexenziegen** (mit Zicklein) und **Hexenkröten**. In den Baumkronen und Stämmen sind zudem **Spechte** (die rhythmisch hämmern!), **Eichelhäher** und **Rotkehlchen** unterwegs.
+* **Neuer Flussbewohner & feinere Tier-KI (`🟣 NEU` `🔵 REWORK`):** Am Wasser tummeln sich nun flinke **Otter** in kleinen Gruppen; **Reiher** und **Enten** erhielten detailliertere Animationen und eine verfeinerte Flucht- und Alarmwahrnehmung.
+* **Dichtere Flora & faire Eröffnungsregeln (`🟢 BUFF` `🟡 FIX`):** Wildbüsche, Beerensträucher und Bäume erhielten frische Wuchs-Varianten; während des verwundeten Nacht-Intros vor der Hütte bleiben Heilpflanzen und Sträucher jetzt konsequent gesperrt, damit die Eröffnungssequenz ihre volle Spannung behält.
+
+---
+
+### ⚖️ Vorher → Nachher: Die wichtigsten Neuerungen im Überblick
+
+| Bereich | Vorher (V0.8.1 Beta) | Nachher (V0.8.2 Beta) |
+| :--- | :--- | :--- |
+| **Waffen & Werkzeug** | 2D-Sprite um die Hand gedreht, 2-px-Linienarm | Echtes 3D-Griff-System mit 2-Knochen-Arm, Schulter-Haltung, Feder-Trägheit & X-Schwungbögen |
+| **Inventar** | Klassisches Raster-Menü | Organische Zweig-, Girlanden- & Lianen-Ansicht mit Ritualkreis-Ellie & Piktogrammen |
+| **Welt-Rätsel** | Konzept & erste Prop-Assets | **Irrlichtspur**, **Hortkrähe** & **Rabenhandel** komplett spielbar |
+| **Schmied & Progression** | Schmiede nur vorbereitet | **Torben**-Quest im Norden, Schmiede-Bau, Eisenbarren & Story-Aushänge ab Questtafel |
+| **Dialoge & Menüs** | Vollbild-Box & Ranken-Menü | In-World-Sprechblasen, Silhouetten-Ladescreen & „Licht gegen Leere“-Hauptmenü |
+| **Truhen-Auflösung** | `45 s` nach dem Öffnen | `10 s` nach dem Öffnen (+ animierte Truhen-Innenleben) |
+
+---
+
+> [!WARNING]
+> **Bekannte Ecken & Kanten dieser Beta:**
+> * Im automatisierten Quest-Durchlauf für Torben schlägt der Headless-Testskript-Lauf aktuell noch fehl (u. a. durch eine fehlende Fels-Textur im Lager-Prop und abweichende Bau-Prüfungen im Testskript). Im normalen Spielablauf stehen die Quests bereit – meldet uns gern, falls euch am Nordlager etwas auffällt!
+> * Weitere **Prüfungen der Wächterin** (*Runenreihe*, *Schweigender Hain*, *Rissläufer*, *Die letzte Laterne*) befinden sich bereits in Vorbereitung und folgen in den nächsten Updates.
+
+✦ ──────────────── ❖ ──────────────── ✦
+
 ## [V0.8.1 Beta] – 2026-11-12
 ### 🏆 Schätze aus dem Licht: Drei Beutetruhen-Klassen, Ketten-Reliquiare & Boss-Himmelsstürze
 

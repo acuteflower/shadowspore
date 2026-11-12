@@ -5,11 +5,20 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.8.1 Beta – „Schätze aus dem Licht“
+## 🚀 Aktuelle Version: V0.8.2 Beta – „Klingen, Krähen & wilde Pfade“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.8.1 Beta:
+### Highlights von V0.8.2 Beta:
+* **3D-Griff-System & echte Waffenphysik:** Ellies rechte Hand und alle Waffen/Werkzeuge bewegen sich jetzt im echten 3D-Raum – mit 2-Knochen-Arm im Pixel-Art-Stil, spürbarer Feder-Trägheit, eigenen Trage-/Bereit-/Sprint-Haltungen (Spitzhacke & Hacke über der Schulter) und X-förmigen Schwungbögen.
+* **Die ersten Welt-Rätsel:** Entdeckt die scheue **Irrlichtspur** nördlich der Hütte, folgt der beringten **Hortkrähe** östlich vom Fluss zu ihrem Erdversteck und tauscht mit dem alten **Raben am Westhang** Glänzendes gegen seine vergrabene Mondsiegeltruhe.
+* **Schmied Torben & Questtafel-Fortschritt:** Nach dem Bau der **Questtafel** ruft euch eine neue Story-Quest in den Norden, wo ihr **Torben** gegen die Schatten helft, die **Schmiede** errichtet und ihn samt neuer Tagesaufträge ins Dorf holt.
+* **Lianen-Inventar, Silhouetten-Ladescreen & „Licht gegen Leere“:** Ein organisches Zweig- und Lianen-Inventar mit Ritualkreis-Ellie, schwebende In-World-Sprechblasen, ein animierter Silhouetten-Ladescreen mit der Void-Spinne sowie ein dynamisches Hauptmenü voller Schockwellen und Funken.
+* **Lebendiger Hexenwald & Flussufer:** Neue Wildtiere (**Wildschwein**, **Luchs**, **Eichhörnchen**, **Hexenziege**, **Hexenkröte**, **Specht**, **Eichelhäher**, **Rotkehlchen** & **Otter**) bereichern Wälder und Gewässer.
+
+---
+
+### Vorherige Highlights (V0.8.1 Beta – „Schätze aus dem Licht“):
 * **Drei neue Beutetruhen-Klassen:** **Wurzelkiste** (Gewöhnlich, Schloss öffnen), **Mondsiegeltruhe** (Selten, `0,9 s` Siegel brechen) und **Glutreliquiar** (Legendär, `1,6 s` Leere-Ketten sprengen) – je mit eigenen Pixel-Art-Animationen, gestaffeltem Schatzregen (*das Beste zuletzt!*) und garantiertem Kristall-/Trank-Fund.
 * **Spektakulärer Boss-Himmelssturz:** **Mornath** und **Morwenna** lassen `2,8 s` nach ihrem Tod ein legendäres **Glutreliquiar** in einer gigantischen Lichtsäule niederstürzen – inklusive ihrer kompletten Beute, Reliquien (*Rissfeder*, *Moras Spiegelscherbe*) und Bonus-Ziehungen (auch bei Rückkämpfen via Hologramm!).
 * **Faire Koop-Beute & lange Liegezeit:** Truhen skalieren um **`+1` Extra-Ziehung** je nahem Mitspieler (`200 px` Radius), teilen Kupfer/XP gerecht unter allen Siegerinnen auf und lassen gedroppten Loot volle **`300 s` (5 Minuten)** liegen. Ungeöffnete Bosstruhen werden im Spielstand gesichert.

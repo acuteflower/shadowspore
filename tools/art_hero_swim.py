@@ -197,9 +197,11 @@ def shake(i, n=10):
 def floating(i, n=6):
     u = i / n
     s = 2 * math.pi * u
-    return pose(-1.45, 3.0 + 0.5 * math.sin(s), lean=0.0, twist=0.05 * math.sin(s), legs=((-0.05, 0.15), (0.05, 0.2)),
-                hl=fsd(6.0 + math.sin(s), 9.0, 3.0), hr=fsd(5.0 - math.sin(s), -9.0, 3.0), droop=0.2, head_yaw=0.15 * math.sin(s),
-                hair=(0.0, 1.0, 0.0), spread=2.0, curl=1.0, pole_l=(0.8, 0.0, -0.3), pole_r=(-0.8, 0.0, -0.3))
+    p = pose(-1.45, 3.0 + 0.5 * math.sin(s), lean=0.0, twist=0.05 * math.sin(s), legs=((-0.05, 0.15), (0.05, 0.2)),
+             hl=fsd(6.0 + math.sin(s), 9.0, 3.0), hr=fsd(5.0 - math.sin(s), -9.0, 3.0), droop=0.2, head_yaw=0.15 * math.sin(s),
+             hair=(0.0, 1.0, 0.0), spread=2.0, curl=1.0, pole_l=(0.8, 0.0, -0.3), pole_r=(-0.8, 0.0, -0.3))
+    p["eyes_closed"] = 1.0
+    return p
 
 
 FUNCS = {"tread": tread, "breast": breast, "crawl": crawl, "enter": enter, "t2b": t2b, "b2c": b2c, "dive": dive, "shake": shake, "float": floating}

@@ -66,7 +66,7 @@ SIT_LEGS = ((0.0, 1.5), (0.0, 1.55))  # thighs flat on the mattress, the lower l
 def sleep_pose(k):
     """k 0..1 round the breathing loop."""
     b = 0.5 - 0.5 * math.cos(2 * math.pi * k)
-    return W(**LYING, pz=0.55 * b, lean=0.02 + 0.035 * b, twist=-0.22, hand_l=(3.6, 25.5, 5.0), hand_r=(-3.8, 24.5, 4.5), hair=(0.0, 0.0, 0.3 * b))
+    return W(**LYING, pz=0.55 * b, lean=0.02 + 0.035 * b, twist=-0.22, hand_l=(3.6, 25.5, 5.0), hand_r=(-3.8, 24.5, 4.5), hair=(0.0, 0.0, 0.3 * b), eyes_closed=1.0)
 
 
 def awake_pose(k):

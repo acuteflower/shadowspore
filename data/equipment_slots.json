@@ -2,41 +2,54 @@
 	"main_hand": {
 		"name": "Waffe",
 		"accepts": "main_hand",
-		"short": "WAF"
+		"short": "WAF",
+		"group": "hand",
+		"glyph": [".....##", "....##.", "#..##..", ".###...", ".##....", "#..#..."]
 	},
 	"head": {
 		"name": "Kopf",
 		"accepts": "head",
-		"short": "KOP"
+		"short": "KOP",
+		"group": "armor",
+		"glyph": [".#####.", "#######", "#######", "##...##", "##...##", "#.....#"]
 	},
 	"chest": {
 		"name": "Brust",
 		"accepts": "chest",
-		"short": "BRU"
+		"short": "BRU",
+		"group": "armor",
+		"glyph": ["##...##", "#######", "#######", ".#####.", ".#####.", ".#####."]
 	},
 	"legs": {
 		"name": "Beine",
 		"accepts": "legs",
-		"short": "BEI"
+		"short": "BEI",
+		"group": "armor",
+		"glyph": [".#####.", ".#####.", ".##.##.", ".##.##.", ".##.##.", ".##.##."]
 	},
 	"feet": {
 		"name": "Füße",
 		"accepts": "feet",
-		"short": "FUE"
+		"short": "FUE",
+		"group": "armor",
+		"glyph": [".##....", ".##....", ".##....", ".####..", ".######", ".######"]
 	},
 	"talisman_1": {
 		"name": "Talisman",
 		"accepts": "talisman",
-		"short": "TAL"
+		"short": "TAL",
+		"group": "charm"
 	},
 	"talisman_2": {
 		"name": "Talisman",
 		"accepts": "talisman",
-		"short": "TAL"
+		"short": "TAL",
+		"group": "charm"
 	},
 	"talisman_3": {
 		"name": "Talisman",
 		"accepts": "talisman",
-		"short": "TAL"
+		"short": "TAL",
+		"group": "charm"
 	}
 }

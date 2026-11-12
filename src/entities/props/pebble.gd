@@ -49,7 +49,7 @@ func set_night(amount: float) -> void:
 
 
 func prompt() -> String:
-	if bool(state.get("p", 0)) or not _shown_now():
+	if opening_locked() or bool(state.get("p", 0)) or not _shown_now():
 		return ""
 	return String((_spec.pickup as Dictionary).prompt)
 

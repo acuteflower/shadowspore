@@ -258,6 +258,14 @@ func _build_items() -> void:
 				_add(0, "button", "TRUHE: SELTEN", "", {"action": "chest:rare"})
 				_add(0, "button", "TRUHE: LEGENDÄR", "", {"action": "chest:legendary"})
 				_add(0, "button", "TRUHE: BOSS-ANKUNFT", "", {"action": "chest:legendary:arrive"}) ## falls out of a pillar of light like a boss's chest
+				_add(0, "button", "IRRLICHT: ZUR SCHALE", "", {"action": "wisp_go"}) ## to the wisp trail's bowl (docs/raetsel_konzept.md 1)
+				_add(0, "button", "IRRLICHT ZURÜCKSETZEN", "", {"action": "wisp_reset"}) ## host: the trail open again, its chest gone
+				_add(0, "button", "HORTKRÄHE: ZUM BAUM", "", {"action": "crow_go"}) ## to the crow's hoard snag (docs/raetsel_konzept.md 4)
+				_add(0, "button", "HORTKRÄHE ZURÜCKSETZEN", "", {"action": "crow_reset"}) ## host: the hoard hidden again, its chest gone
+				_add(0, "button", "SONNENKERNE + HACKE", "", {"action": "crow_kit"}) ## host: crow food and a hoe for the hoard
+				_add(0, "button", "RABE: ZUM BAUM", "", {"action": "raven_go"}) ## to the raven's snag (docs/raetsel_konzept.md 4, rare)
+				_add(0, "button", "RABE ZURÜCKSETZEN", "", {"action": "raven_reset"})
+				_add(0, "button", "GLIMMER + STEIN FÜR DEN RABEN", "", {"action": "raven_kit"}) ## host: a pawn it likes and a plain stone it refuses
 			if multiplayer.is_server():
 				var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
 				_add(0, "heading", "KARTE")
@@ -862,6 +870,29 @@ func _run_action(action: String) -> void:
 			if _player is Player:
 				(_player as Player).request_teleport(Vector2(738, 936) * 16.0 + Vector2(8, 40))
 				_set_open(false)
+		"wisp_go", "wisp_reset", "crow_go", "crow_reset", "crow_kit", "raven_go", "raven_reset", "raven_kit": ## the trials (docs/raetsel_konzept.md)
+			var trials: Puzzles = Puzzles.of(get_tree())
+			var kinds: Dictionary = {"wisp": "wisp", "crow": "crow_hoard", "raven": "raven_trade"}
+			var first: String = "" if trials == null else trials.first_of(String(kinds[action.get_slice("_", 0)]))
+			if first == "" or not (_player is Player):
+				_failed_flash = 2.5
+				return
+			if action.ends_with("_reset") or action.ends_with("_kit"):
+				if not multiplayer.is_server():
+					_failed_flash = 2.5
+					return
+				if action == "raven_kit":
+					(_player as Player).inventory.give("lake_glimmer", 2)
+					(_player as Player).inventory.give("stone", 3)
+				elif action == "crow_kit":
+					(_player as Player).inventory.give("sun_seed", 10)
+					if not (_player as Player).inventory.has_item("hoe_basic"):
+						(_player as Player).inventory.give("hoe_basic", 1)
+				else:
+					trials.debug_reset(first)
+			else:
+				(_player as Player).request_teleport(trials.trial_spot(first))
+			_set_open(false)
 		"hexenwald": ## into the middle of the Hexenwald
 			if _player is Player:
 				(_player as Player).request_teleport(Vector2(826, 880) * 16.0)

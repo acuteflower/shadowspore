@@ -47,13 +47,11 @@ func _process(delta: float) -> void:
 	visible = true
 	_time += delta
 	var phase: float = fposmod(_time, PERIOD)
-	var lub: float = exp(-phase * 9.0)
-	var dub: float = 0.7 * exp(-(phase - 0.28) * 11.0) if phase > 0.28 else 0.0
 	if phase < _last_phase and _on and _grow > 0.4 and not get_tree().paused:
 		_sound.play()
 	_last_phase = phase
 	var eased: float = _grow * _grow * (3.0 - 2.0 * _grow)
 	_material.set_shader_parameter("grow", eased)
-	_material.set_shader_parameter("beat", maxf(lub, dub) * eased)
+	_material.set_shader_parameter("phase", phase) ## the shader runs the lub-dub itself, a little later deeper in
 	_material.set_shader_parameter("time", _time)
 	_material.set_shader_parameter("flash", _flash)

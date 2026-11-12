@@ -56,9 +56,6 @@ func _rise() -> void:
 	if not _talked:
 		_talked = true
 		await _wait(1.3) ## the rift opens, the claws come through
-		for child: Node in _player.get_children():
-			var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
-			if box != null:
-				box.start("cabin_spider")
-				await box.finished
-				break
+		var runner: BubbleRunner = BubbleRunner.find(_player)
+		if runner != null:
+			await runner.play("cabin_spider", _player)

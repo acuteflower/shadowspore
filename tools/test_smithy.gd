@@ -43,7 +43,7 @@ func _ready() -> void:
 	check(float((spec.foot as Array)[0]) > float((TownRules.piece("workshop").foot as Array)[0]), "the smithy is broader than the workshop")
 	var settlers: Dictionary = DataRegistry.table("settlers")
 	var torben: Dictionary = settlers.get("torben", {}) as Dictionary
-	check(String(torben.get("home", "")) == "smithy" and not bool(torben.get("enabled", true)), "Torben lives in the smithy and is not enabled yet")
+	check(String(torben.get("home", "")) == "smithy" and bool(torben.get("enabled", false)) and String((torben.get("arrive", {}) as Dictionary).get("story", "")) == "tb_met", "Torben lives in the smithy and joins after his story")
 	for name: String in ["work", "bellows", "quench", "watch", "rest"]:
 		var at2: Array = ((torben.spots as Dictionary)[name] as Dictionary).at as Array
 		var in_x: bool = absf(float(at2[0])) <= float(frame[0]) * 0.5

@@ -21,12 +21,9 @@ func _wait(seconds: float) -> void:
 
 
 func _dialogue(id: String) -> void:
-	for child: Node in _player.get_children():
-		var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
-		if box != null:
-			box.start(id)
-			await box.finished
-			return
+	var runner: BubbleRunner = BubbleRunner.find(_player)
+	if runner != null:
+		await runner.play(id, _story.knight)
 
 
 func _release() -> void:

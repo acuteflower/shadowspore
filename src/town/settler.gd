@@ -76,6 +76,8 @@ func setup(owner_town: TownManager, settler_id: String, fresh: bool) -> void:
 			if node is Node2D:
 				taken_at = (node as Node2D).global_position
 				node.queue_free()
+	elif String(spec.get("takes_over", "")) == "story_torben" and town.world != null:
+		taken_at = town.world.take_torben()
 	var plan: Dictionary = plan_at(TimeManager.time_of_day)
 	var target: Vector2 = _plan_position(plan).pos as Vector2
 	global_position = target
@@ -597,15 +599,14 @@ func interact(player: Player) -> void:
 		town.request_talk(sid)
 		var tiers: Array = spec.get("talk", []) as Array
 		if not tiers.is_empty():
-			var box: DialogueBox = DialogueBox.find(player)
-			if box != null:
-				box.start(String((tiers[trust_tier()] as Dictionary).dialogue))
-				await box.finished
+			var dlg_id: String = String((tiers[trust_tier()] as Dictionary).dialogue)
+			var runner: BubbleRunner = BubbleRunner.find(player)
+			if runner != null:
+				await runner.play(dlg_id, self)
 	elif not is_working():
 		var barks: Array = spec.get("barks", []) as Array
-		var speech: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
-		if speech != null and not barks.is_empty():
-			speech.speak(String(spec.name), String(barks[randi() % barks.size()]))
+		if not barks.is_empty():
+			say(String(barks[randi() % barks.size()]), 2.8)
 	if (is_working() or (_order_waits() and visible)) and spec.has("shop"): ## at the bench, or on a break when a finished piece waits for you
 		ShopWindow.open(get_tree(), player, town, String(spec.shop))
 	_talking = false
@@ -619,9 +620,9 @@ func _chat(player: Player) -> void:
 	if int((town.residents[sid] as Dictionary).get("talked", -1)) != TimeManager.day:
 		town.request_talk(sid)
 	var line: String = _chat_line(player)
-	var speech: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
-	if speech != null and line != "":
-		await speech.speak(String(spec.name), line)
+	var runner: BubbleRunner = BubbleRunner.find(player)
+	if runner != null and line != "":
+		await runner.say_line(String(spec.name), line, self)
 	_talking = false
 
 

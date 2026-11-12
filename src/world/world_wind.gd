@@ -100,6 +100,9 @@ func _contacts(delta: float) -> void:
 	actors.append_array(get_tree().get_nodes_in_group("predators"))
 	actors.append_array(get_tree().get_nodes_in_group("wildlife"))
 	actors.append_array(get_tree().get_nodes_in_group("woodland_mammals"))
+	for node: Node in get_tree().get_nodes_in_group("corvids"):
+		if node is Node2D and float(node.get("_height")) < 2.0:
+			actors.append(node)
 	var details: Array[Node] = get_tree().get_nodes_in_group("meadow_details")
 	for actor: Node in actors:
 		var body: Node2D = actor as Node2D

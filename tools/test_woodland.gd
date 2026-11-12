@@ -80,6 +80,15 @@ func _run() -> void:
 	doe._safe_time = 4.0
 	doe._think()
 	_check(doe.mood == WoodlandMammal.Mood.ALERT, "Deer did not recover cautiously after safety")
+	doe._elapsed = 2.0
+	doe._think()
+	_check(doe.mood == WoodlandMammal.Mood.BARK, "Recovered adult deer did not give its warning bark (Schrecken)")
+	doe._process(0.0)
+	_check(doe._sprite.hframes == 52 and doe._sprite.vframes == 32 and doe._sprite.frame % 52 in range(40, 46), "Deer 52-col Schrecken frame mismatch")
+	doe._issue(WoodlandMammal.Mood.SLEEP, 2.0)
+	doe._danger = false
+	doe.hear_external_alarm(Vector2(60, 0))
+	_check(doe.mood == WoodlandMammal.Mood.STAND_UP, "Bedded deer did not rise on external sentinel alarm")
 	doe.queue_free()
 	fawn.queue_free()
 	await get_tree().physics_frame
@@ -128,6 +137,15 @@ func _run() -> void:
 	fox._elapsed = 1.0
 	fox._think()
 	_check(fox.mood == WoodlandMammal.Mood.FORAGE, "Fox did not inspect the ground after its pounce")
+	fox._move_action(WoodlandMammal.Mood.STALK, Vector2(28, 0), 1.2)
+	fox._elapsed = 0.5
+	fox._advance()
+	fox._process(0.0)
+	_check(fox._sprite.hframes == 52 and fox._sprite.vframes == 32 and fox._sprite.frame % 52 in range(46, 52), "Fox 52-col crouched stalk frame mismatch")
+	fox._elapsed = fox._duration
+	fox._advance()
+	fox._think()
+	_check(fox.mood == WoodlandMammal.Mood.LISTEN, "Stalking fox did not pause to listen before pouncing")
 	var rabbit: WildRabbit = load("res://src/entities/player/../wildlife/wild_rabbit.tscn").instantiate() as WildRabbit
 	rabbit.name = "ObservingRabbit"
 	rabbit.position = fox.position + Vector2(40, 0)
@@ -166,7 +184,118 @@ func _run() -> void:
 	hedgehog._process(0.0)
 	_check(hedgehog._sprite.frame % 44 == 43, "Startled sleeping hedgehog briefly opened instead of staying curled")
 	hedgehog.queue_free()
+	await get_tree().physics_frame
+
+	# Boar sounder: 52x32 sheet, striped piglet queue, rooting, and bluff-charge deterrence against a fox!
+	player.position = Vector2(500, 0)
+	TimeManager.time_of_day = 0.5
+	var sow: WoodlandMammal = _make("boar", Vector2.ZERO, "LeadSow", 0)
+	var piglet: WoodlandMammal = _make("boar", Vector2(70, 20), "Piglet", 2)
+	await get_tree().physics_frame
+	_check(sow._sprite.hframes == 52 and sow._sprite.vframes == 32 and piglet.is_piglet(), "Boar 52x32 sheet or piglet flag mismatch")
+	piglet._boar_life()
+	_check(piglet._moving and piglet._end.distance_to(sow.position) < piglet.position.distance_to(sow.position), "Piglet did not follow lead sow")
+	piglet._settle(piglet.position, WoodlandMammal.Mood.WALK)
+	var intruder_fox: WoodlandMammal = _make("fox", Vector2(46, 0), "IntruderFox", 0)
+	await get_tree().physics_frame
+	sow._sense()
+	intruder_fox._sense()
+	_check(sow.mood in [WoodlandMammal.Mood.CHASE, WoodlandMammal.Mood.BARK], "Adult boar did not stand/charge against a nearby fox")
+	_check(intruder_fox.mood in [WoodlandMammal.Mood.ALERT, WoodlandMammal.Mood.FLEE], "Fox ignored a tough adult boar")
+	sow.queue_free()
+	piglet.queue_free()
+	intruder_fox.queue_free()
+	await get_tree().physics_frame
+
+	# Lynx: 52x24 sheet, apex hunter group, triggers roe deer Schrecken & makes fox yield
+	var lynx: WoodlandMammal = _make("lynx", Vector2.ZERO, "ApexLynx", 0)
+	var wary_doe: WoodlandMammal = _make("deer", Vector2(115, 0), "WaryDoe", 0)
+	await get_tree().physics_frame
+	_check(lynx._sprite.hframes == 52 and lynx._sprite.vframes == 24 and lynx.is_in_group("apex_hunters"), "Lynx 52x24 sheet or apex_hunters group missing")
+	wary_doe._sense()
+	_check(wary_doe.mood == WoodlandMammal.Mood.ALERT and wary_doe._bark_pending, "Roe deer did not prepare Schrecken upon sensing apex lynx")
+	lynx.queue_free()
+	wary_doe.queue_free()
+	await get_tree().physics_frame
+
+	# Squirrel: 52x32 sheet, vertical trunk climb height, spruce-cone gnawing, and sentinel alarm broadcast
+	var squirrel: WoodlandMammal = _make("squirrel", Vector2.ZERO, "RedSquirrel", 0)
+	var listening_doe: WoodlandMammal = _make("deer", Vector2(85, 0), "ListeningDoe", 0)
+	await get_tree().physics_frame
+	_check(squirrel._sprite.hframes == 52 and squirrel._sprite.vframes == 32, "Squirrel 52x32 sheet mismatch")
+	squirrel._climb_action(WoodlandMammal.Mood.CLIMB, Vector2.ZERO, 0.6, 0.0, 28.0)
+	squirrel._elapsed = 0.3
+	squirrel._process(0.0)
+	_check(squirrel._climb_height > 10.0 and squirrel._sprite.position.y < -10.0 and squirrel._sprite.frame % 52 in range(46, 52), "Squirrel vertical trunk climb pose/height failed")
+	squirrel._settle(Vector2.ZERO, WoodlandMammal.Mood.CLIMB, 28.0)
+	squirrel._issue(WoodlandMammal.Mood.SPECIAL, 2.5)
+	squirrel._elapsed = 0.6
+	squirrel._process(0.0)
+	_check(squirrel._sprite.frame % 52 in range(38, 46), "Squirrel cone-gnaw frame mismatch")
+	player.position = Vector2(36, 0)
+	await get_tree().physics_frame
+	squirrel._sense()
+	_check(squirrel.mood == WoodlandMammal.Mood.BARK and listening_doe.mood == WoodlandMammal.Mood.ALERT, "Perched squirrel did not scold and alert nearby deer")
+	squirrel.queue_free()
+	listening_doe.queue_free()
+	await get_tree().physics_frame
+
+	# Hexenwald Billy Goat: 52x32 sheet, eerie watcher stare at medium range, dramatic hind-leg rear-up when crowded
+	var goat: WoodlandMammal = _make("hex_goat", Vector2.ZERO, "HexGoat", 0)
+	player.position = Vector2(82, 0)
+	await get_tree().physics_frame
+	goat._sense()
+	_check(goat.mood == WoodlandMammal.Mood.ALERT and not goat._moving, "Hexenwald goat fled instead of watching eerily at medium range")
+	player.position = Vector2(26, 0)
+	await get_tree().physics_frame
+	goat._sense()
+	goat._process(0.0)
+	_check(goat.mood == WoodlandMammal.Mood.REAR and goat._sprite.frame % 52 in range(40, 46), "Crowded Hexenwald billy goat did not rear up onto hind legs")
+	goat.queue_free()
+	await get_tree().physics_frame
+
+	# Hexenwald Giant Toad: 52x24 sheet, parabolic hop lift, defensive puff-up, vocal sac croak, sticky tongue-lash
+	var toad: WoodlandMammal = _make("hex_toad", Vector2.ZERO, "HexToad", 0)
+	player.position = Vector2(54, 0)
+	await get_tree().physics_frame
+	toad._sense()
+	toad._process(0.0)
+	_check(toad.mood == WoodlandMammal.Mood.ALERT and toad._sprite.frame % 52 in range(18, 22), "Hexenwald toad did not puff up defensively")
+	player.position = Vector2(1000, 1000)
+	toad._danger = false
+	toad._move_action(WoodlandMammal.Mood.WALK, Vector2(14, 0), 0.5)
+	toad._elapsed = 0.25
+	toad._advance()
+	toad._process(0.0)
+	_check(toad._sprite.position.y < -1.0 and toad._sprite.frame % 52 in range(10, 18), "Hexenwald toad hop lacks parabolic arc")
+	toad._settle(toad.position, WoodlandMammal.Mood.WALK)
+	toad._issue(WoodlandMammal.Mood.BARK, 1.2)
+	toad._elapsed = 0.5
+	toad._process(0.0)
+	_check(toad._sprite.frame % 52 in range(38, 44), "Hexenwald toad vocal-sac croak frame mismatch")
+	toad._issue(WoodlandMammal.Mood.SPECIAL, 0.85)
+	toad._elapsed = 0.4
+	toad._process(0.0)
+	_check(toad._sprite.frame % 52 in range(44, 52), "Hexenwald toad sticky tongue-lash frame mismatch")
+	toad.queue_free()
 	player.queue_free()
+	await get_tree().physics_frame
+
+	# Eagle-Owl (Uhu): 62x24 64px sheet, daytime camouflage sleep outside vs awake phantom owl in Hexenwald
+	var owl: WildMeadowBird = load("res://src/entities/wildlife/wild_meadow_bird.tscn").instantiate() as WildMeadowBird
+	owl.name = "TestEagleOwl"
+	owl.species = "owl"
+	owl.appearance = 0
+	add_child(owl)
+	owl.set_physics_process(false)
+	TimeManager.time_of_day = 0.5
+	owl.state = WildCorvid.State.ROOST
+	owl._process(0.0)
+	_check(owl._sprite.hframes == 62 and owl._sprite.vframes == 24 and owl._rest_time() and owl._sprite.frame % 62 in range(58, 62), "Daytime Eagle-Owl did not use 62-col bark-camouflage roost")
+	owl.witch = true
+	owl.appearance = 2
+	_check(not owl._rest_time(), "Hexenwald phantom Eagle-Owl should stay awake in eternal twilight")
+	owl.queue_free()
 	await get_tree().physics_frame
 
 	# Ground movement cannot tunnel through a prop even when a route becomes blocked after planning.
@@ -250,13 +379,14 @@ func _run() -> void:
 	var insects: ButterflyPopulation = world.get_node("Wildlife/MeadowInsects") as ButterflyPopulation
 	insects.set_process(false)
 	print("Initial woodland residents: %d; butterflies: %d" % [population._residents.get_child_count(), insects._butterflies.get_child_count()])
-	_check(population._residents.get_child_count() <= 10 and insects._butterflies.get_child_count() <= 16, "New wildlife budgets exceeded")
+	_check(population._residents.get_child_count() <= 28 and insects._butterflies.get_child_count() == 0, "Curated wildlife budgets exceeded or butterflies still spawning")
 	for node: Node in population._residents.get_children():
 		var resident: WoodlandMammal = node as WoodlandMammal
 		resident.set_physics_process(false)
+		_check(resident.species in ["deer", "fox", "boar", "lynx", "squirrel", "badger", "hex_goat", "hex_toad"], "Unapproved woodland species spawned in live world: %s" % resident.species)
 		_check(world._fauna_habitat(resident.home, resident.species), "Woodland resident spawned outside its habitat")
 		if resident.is_fawn():
-			_check(resident._adult() != null, "World spawned an orphaned fawn")
+			_check(resident._adult() != null, "World spawned an orphaned fawn or piglet")
 	for node: Node in insects._butterflies.get_children():
 		var insect: MeadowButterfly = node as MeadowButterfly
 		insect.set_physics_process(false)

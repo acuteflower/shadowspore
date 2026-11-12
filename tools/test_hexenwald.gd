@@ -164,8 +164,9 @@ func _run() -> void:
 	_check(float(crow_deep["chunk_chance"]) > float(crow_base["chunk_chance"]) * 2.0 and int(crow_deep["group_max"]) > int(crow_base["group_max"]) and int(crow_deep["max_loaded"]) > int(crow_base["max_loaded"]), "deep inside: higher chance, bigger flocks, higher cap")
 	_check(float(CorvidPopulation.local_spec("raven", 1.0)["chunk_chance"]) > float(DataRegistry.get_entry("wildlife", "raven")["chunk_chance"]) * 2.0, "ravens too")
 	var floor_point: Vector2 = Vector2(CENTRE) * 16.0 + Vector2(8, 8)
-	_check(world._bird_habitat(floor_point, "crow") and world._bird_habitat(floor_point, "raven"), "the Hexenwald floor is a crow and raven habitat")
-	_check(not world._bird_habitat(floor_point, "owl") and not world._bird_habitat(floor_point, "hoopoe"), "owls and hoopoes stay out for now")
+	_check(world._bird_habitat(floor_point, "crow") and world._bird_habitat(floor_point, "raven") and world._bird_habitat(floor_point, "owl"), "the Hexenwald floor is a crow, raven and eagle-owl habitat")
+	_check(not world._bird_habitat(floor_point, "hoopoe"), "meadow hoopoes stay out of the Hexenwald")
+	_check(world._fauna_habitat(floor_point, "hex_goat") and world._fauna_habitat(floor_point, "hex_toad") and not world._fauna_habitat(Vector2(HUT) * 16.0, "hex_goat") and not world._fauna_habitat(Vector2(HUT) * 16.0, "hex_toad"), "hex_goat and hex_toad live exclusively in the Hexenwald")
 	var corvids: CorvidPopulation = world.get_node("Wildlife/Corvids") as CorvidPopulation
 	var witch_birds: Dictionary = {}
 	var flocks: int = 0

@@ -194,23 +194,23 @@ func interact(player: Player) -> void:
 	if talk != "": ## a quest step wants this talk (the lake witch's meeting): the dialogue instead of the shop
 		var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 		if world != null:
-			await world.play_story_dialogue(player, talk)
+			await world.play_story_dialogue(player, talk, self)
 		_talking = false
 		return
 	if _town.board != null and not _town.board.finishable(sid, player).is_empty(): ## the end of a board notice: report to the one who gave it
 		var thanks: String = _town.board.report(sid, player)
-		var box: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
-		if box != null and thanks != "":
-			await box.speak(String(spec.get("name", sid)), thanks)
+		var runner: BubbleRunner = BubbleRunner.find(player)
+		if runner != null and thanks != "":
+			await runner.say_line(String(spec.get("name", sid)), thanks, self)
 		_talking = false
 		return
 	var fresh_day: bool = int((_town.residents.get(sid, {}) as Dictionary).get("talked", -1)) != TimeManager.day
 	if fresh_day:
 		_town.request_talk(sid)
 		var line: String = _chat_line()
-		var speech: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
-		if speech != null and line != "":
-			await speech.speak(String(spec.get("name", sid)), line)
+		var runner: BubbleRunner = BubbleRunner.find(player)
+		if runner != null and line != "":
+			await runner.say_line(String(spec.get("name", sid)), line, self)
 	if spec.has("shop") and is_inside_tree():
 		ShopWindow.open(get_tree(), player, _town, String(spec.shop))
 	_talking = false

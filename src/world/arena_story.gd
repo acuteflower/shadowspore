@@ -108,10 +108,7 @@ func _outro(player: Player) -> void:
 		knight.dissolve()
 	await get_tree().create_timer(3.4, true, false, true).timeout
 	if is_instance_valid(player) and player.health.current > 0.0 and Geometry2D.is_point_in_polygon(player.global_position, poly):
-		for child: Node in player.get_children():
-			var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
-			if box != null:
-				box.start("mornath_end")
-				await box.finished
-				break
+		var runner: BubbleRunner = BubbleRunner.find(player)
+		if runner != null:
+			await runner.play("mornath_end")
 	_outro_running = false

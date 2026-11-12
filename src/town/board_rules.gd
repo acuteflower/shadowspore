@@ -423,8 +423,13 @@ static func story_due(entry: Dictionary, quests: Dictionary, finished: Callable,
 		return false
 	if level < int(entry.get("min_level", 0)):
 		return false
-	var after: String = String(entry.get("after", ""))
-	if after != "" and not bool(finished.call(after)):
+	var after: Variant = entry.get("after", "")
+	if after is Array:
+		for req: Variant in after as Array:
+			var qid: String = String(req)
+			if qid != "" and not bool(finished.call(qid)):
+				return false
+	elif String(after) != "" and not bool(finished.call(String(after))):
 		return false
 	var needed: String = String(entry.get("flag", ""))
 	return needed == "" or bool(flag.call(needed))

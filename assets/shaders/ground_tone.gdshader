@@ -69,44 +69,47 @@ float fbm(vec2 p) {
 	return vnoise(p) * 0.58 + vnoise(p * 2.07 + 7.3) * 0.28 + vnoise(p * 4.1 - 3.1) * 0.14;
 }
 
-// A scattering of little blades and tufts: returns how many ramp steps this pixel moves (0 = none).
-// The grid cells are 4 x 6 px, a cell holds at most one blade (sometimes with a short one beside it)
-// whose foot is inside it. Light blades are lit along their whole length, dark ones sit in the turf.
+// World-space sculpted 2-blade grass tufts layered over the cel-cushioned tile turf so the ground
+// matches the crisp pixel-art foliage clusters of bushes, trees and rocks without noisy grain or grid seams.
 int blade_shift(vec2 px, float macro, float wear) {
-	vec2 cell = floor(vec2(px.x / 4.0, px.y / 6.0));
+	vec2 cell = floor(vec2(px.x / 7.0, px.y / 7.0));
 	float h = hash(cell + vec2(3.0, 1103.0));
-	float density = (0.34 + 0.24 * smoothstep(0.55, 0.3, macro)) * (1.0 - smoothstep(0.15, 0.7, wear)); // trodden ground grows few blades
+	float density = (0.40 + 0.18 * smoothstep(0.64, 0.24, macro)) * (1.0 - smoothstep(0.15, 0.7, wear));
 	if (h > density) {
 		return 0;
 	}
 	float h2 = hash(cell + vec2(2909.0, 9.0));
 	float h3 = hash(cell + vec2(5021.0, 7717.0));
 	float h4 = hash(cell + vec2(941.0, 4441.0));
-	float foot_x = floor(cell.x * 4.0) + 1.0 + floor(h2 * 2.0);
-	float foot_y = cell.y * 6.0 + 4.0 + floor(h4 * 2.0);
-	float height = 2.0 + floor(h3 * 3.0); // 2 to 4
-	bool dark = h4 > 0.55;
-	float sway = floor(sin(TIME * 1.3 + cell.x * 0.7 + cell.y * 0.4) * 0.6 + 0.5);
-	float up = foot_y - px.y; // 0 at the foot, growing upwards
+	float foot_x = cell.x * 7.0 + 2.0 + floor(h2 * 3.0);
+	float foot_y = cell.y * 7.0 + 4.0 + floor(h4 * 2.0);
+	float height = 3.0 + floor(h3 * 2.0); // 3 to 4 px crisp curved tuft
+	bool dark = h4 > 0.70;
+	float dir = h3 > 0.5 ? 1.0 : -1.0;
+	float sway = floor(sin(TIME * 1.3 + cell.x * 0.7 + cell.y * 0.4) * 0.55 + 0.5);
+	float up = foot_y - px.y;
+	// Grounded 2px root tuck right under the tuft
+	if (up == 0.0 && (px.x == foot_x || px.x == foot_x + 1.0)) {
+		return -1;
+	}
 	for (int i = 0; i < 2; i++) {
-		float blade_h = i == 0 ? height : height - 1.0; // the second blade is the short one beside it
-		if ((i == 1 && h2 < 0.7) || blade_h < 2.0) {
+		float blade_h = i == 0 ? height : height - 1.0;
+		if ((i == 1 && h2 < 0.25) || blade_h < 2.0) {
 			continue;
 		}
-		if (up < 0.0 || up >= blade_h) {
+		if (up < 1.0 || up >= blade_h) {
 			continue;
 		}
-		float lean = up >= blade_h - 1.0 ? sway : 0.0;
-		if (px.x != foot_x + float(i) + lean) {
+		float bx = i == 0
+			? foot_x + (up >= 2.0 ? dir : 0.0) + (up >= blade_h - 1.0 ? sway : 0.0)
+			: foot_x + 1.0 + (up >= 2.0 ? -dir : 0.0);
+		if (px.x != bx) {
 			continue;
-		}
-		if (up == 0.0) {
-			return -2; // the foot sits in shadow
 		}
 		if (up == blade_h - 1.0) {
-			return dark ? 1 : 3; // the tip catches the light
+			return dark ? 1 : (i == 0 ? 2 : 1);
 		}
-		return dark ? -2 : 2;
+		return dark ? -1 : 1;
 	}
 	return 0;
 }
@@ -142,7 +145,7 @@ void fragment() {
 		float macro = fbm(px / patch_size + vec2(3.7, 1.9));
 		float mist = fbm(px / mist_size + vec2(effect_time * 0.016, effect_time * 0.007) * mist_speed + vec2(11.0, 5.0));
 		float day = g_day_strength; // golden hour has its own light budget
-		float shift = 0.0; // in palette steps, now fractional
+		float shift = 0.0;
 		float spot = 0.0;
 		float lit = 1.0 - 0.85 * gloom; // little sun reaches the Hexenwald
 		shift += lit * smoothstep(0.62 - 0.08 * sun - SOFT, 0.62 - 0.08 * sun + SOFT, macro); // sunlit meadow (wider at midday)
@@ -161,21 +164,25 @@ void fragment() {
 			// dappled light: patches of sun that reach the shaded ground through the boughs, drifting with the wind
 			shift += day_dapple(px) * day_cover(px) * day * 0.7 * (1.0 - 0.8 * gloom);
 		}
-		float f = clamp(float(idx) + shift, 0.0, 5.0); // fractional ramp position: blend two neighbouring greens
+		// Keep headroom in sunlit patches so cel-cushioned tile tufts (idx 0..4) never clamp flat into solid #a8dc8c!
+		float eff_shift = clamp(shift * 0.56, -1.65, 1.42);
+		// Broad bush-scale turf swell breaks tile repetition while keeping tile cushions & mini-tufts razor-sharp
+		float swell = (fbm(px / 24.0 + vec2(5.0, 13.0)) - 0.5) * 0.42;
+		float f = clamp(float(idx) + eff_shift + swell, 0.0, 5.0);
 		int lo = int(floor(f));
 		int hi = min(lo + 1, 5);
 		c.rgb = mix(ramp(lo, gloom), ramp(hi, gloom), fract(f));
-		if (idx >= 1 && idx <= 4) {
-			tip = blade_shift(px, macro, wear); // the blades stay crisp: whole palette steps, one pixel wide
+		if (idx >= 0 && idx <= 4) {
+			tip = blade_shift(px, macro, wear);
 			if (tip != 0) {
 				c.rgb = ramp(clamp(int(floor(f + 0.5)) + tip, 0, 5), gloom);
 			}
 		}
-		if (wear > 0.02) { // trodden earth: dithered earth pixels that grow denser with the wear
+		if (wear > 0.02) { // trodden earth: dithered cool-violet to packed dry earth
 			float earthy = smoothstep(0.12, 0.8, wear);
 			if (hash(px + vec2(811.0, 17.0)) < earthy * 1.15) {
 				float tone = fbm(px / 5.0 + vec2(2.0, 9.0));
-				c.rgb = mix(c.rgb, mix(vec3(0.33, 0.27, 0.21), vec3(0.58, 0.48, 0.36), clamp(tone * 1.3 + 0.08 * shift, 0.0, 1.0)), 0.85);
+				c.rgb = mix(c.rgb, mix(vec3(0.30, 0.24, 0.28), vec3(0.57, 0.49, 0.41), clamp(tone * 1.3 + 0.08 * eff_shift, 0.0, 1.0)), 0.85);
 			}
 		}
 		if (g_night > 0.0) {
@@ -183,23 +190,22 @@ void fragment() {
 			float luma = dot(c.rgb, vec3(0.30, 0.59, 0.11));
 			c.rgb = mix(c.rgb, vec3(luma * 1.08, luma * 0.78, luma * 1.38), 0.16 * g_night);
 		}
-		if (spot > 0.0) { // a spot of full sun: warm, near white highlight above the palette's top green
-			c.rgb = mix(c.rgb, mix(vec3(1.0, 0.98, 0.78), vec3(1.0, 0.80, 0.45), golden), 0.20 * day * spot * smoothstep(3.0, 4.0, f));
+		if (spot > 0.0) { // subtle sunlit warmth on the upper steps without flattening turf contrast
+			c.rgb = mix(c.rgb, mix(vec3(0.96, 0.98, 0.80), vec3(1.0, 0.82, 0.48), golden), 0.10 * day * spot * smoothstep(3.2, 4.6, f));
 		}
-		if (shift < 0.0) {
-			c.rgb = mix(c.rgb, vec3(0.20, 0.22, 0.40), (0.16 + 0.16 * gloom) * clamp(-shift, 0.0, 1.0)); // shade leans cool violet (more in the Hexenwald)
+		if (eff_shift < 0.0) {
+			c.rgb = mix(c.rgb, vec3(0.14, 0.18, 0.38), (0.20 + 0.16 * gloom) * clamp(-eff_shift, 0.0, 1.1));
 		}
-		// colour drifts: the meadow is not one green. Broad, slow regions lean lime-yellow (sunny leas) or blue-teal (cool hollows), and sunlit
-		// patches take a warm cast, so the day has more colour than the six palette greens alone; the Hexenwald keeps its own ramp.
+		// subtle regional blue-teal hollows and gently sun-warmed clearings (never neon lime-yellow)
 		float region = fbm(px / 340.0 + vec2(91.0, 17.0)) - 0.5;
-		float warm = clamp(shift, 0.0, 2.0) * 0.5;
-		vec3 cast = vec3(1.0 + 0.30 * region, 1.0 + 0.05 * region, 1.0 - 0.45 * region);
-		cast = mix(cast, cast * vec3(1.08, 1.02, 0.82), warm * (0.35 + 0.65 * sun));
+		float warm = clamp(eff_shift, 0.0, 1.5) * 0.45;
+		vec3 cast = vec3(1.0 + 0.14 * region, 1.0 + 0.03 * region, 1.0 - 0.20 * region);
+		cast = mix(cast, cast * vec3(1.05, 1.02, 0.88), warm * (0.35 + 0.65 * sun));
 		c.rgb *= mix(vec3(1.0), cast, 1.0 - gloom);
-		if (tip == 3 && g_dew > 0.0 && hash(px + vec2(3301.0, 77.0)) > 0.5) {
+		if (tip >= 2 && g_dew > 0.0 && hash(px + vec2(3301.0, 77.0)) > 0.62) {
 			// morning dew: a blade tip now and then catches a pale glint
 			float tw = step(0.6, fract(effect_time * 0.25 + hash(px) * 9.0));
-			c.rgb = mix(c.rgb, vec3(0.93, 1.0, 0.93), 0.85 * g_dew * tw);
+			c.rgb = mix(c.rgb, vec3(0.92, 1.0, 0.95), 0.85 * g_dew * tw);
 		}
 	}
 	if (g_wet > 0.01) {

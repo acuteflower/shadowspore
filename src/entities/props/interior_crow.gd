@@ -49,7 +49,7 @@ func _ready() -> void:
 	_build = 0 ## the same crow every time: the great one of the opening is drawn in its plumage
 	_sprite = Sprite2D.new()
 	_sprite.texture = SHEET
-	_sprite.hframes = 50
+	_sprite.hframes = 62
 	_sprite.vframes = 48
 	_sprite.centered = false
 	_sprite.offset = Vector2(-24, -35)
@@ -193,4 +193,4 @@ func _sit(delta: float, gap: float) -> void:
 
 func _show(col: int, sector: int = SIDE) -> void:
 	_sector = sector
-	_sprite.frame = (_build * 8 + sector) * 50 + col
+	_sprite.frame = (_build * 8 + sector) * 62 + col

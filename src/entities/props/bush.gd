@@ -133,6 +133,8 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 
 
 func prompt() -> String:
+	if opening_locked():
+		return ""
 	if _spec.has("pickup") and not is_depleted() and not bool(state.get("p", 0)):
 		return String((_spec.pickup as Dictionary).prompt)
 	if _critter != null and LeafCritter.can_catch(self):

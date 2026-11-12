@@ -1,49 +1,61 @@
 #!/usr/bin/env python3
-"""Draws the fir trees (art_spruce.py), their stump and young stages, the axe, wood and resin (stdlib only):
-  assets/props/tree.png          4 firs (small 84 px, medium 124, large 164, giant 192), 4 rows of 112x200 frames, feet at
-                                 (56, 196), the rows lie exactly on top of each other: 0 trunk + roots + shadow, 1 crown,
-                                 2 crown glow, 3 trunk glow (the glow rows hold only the emissive parts, the game draws
-                                 them unshaded and brighter at night). The big ones have a bare trunk under the crown
-                                 (you can walk under it); the game fades the crown when someone walks behind it
-  assets/props/tree_growth.png   stump (small), stump (large), sapling, young tree: 112x200 frames, same feet
-  assets/items/axe_basic.png, wood.png, resin.png      icons 16x16
-  assets/items/axe_basic_held.png                      34x19, grip at (4, 9)"""
+"""Draws the fir trees (art_spruce.py), their stump and young stages, wood and resin (stdlib only):
+  assets/props/tree.png          6 firs (small 84 px .. ancient matriarch 180 px, giant 192 px), 4 rows of 112x200 frames,
+                                 feet at (56, 196), the rows lie exactly on top of each other: 0 trunk + roots + shadow,
+                                 1 crown, 2 crown glow, 3 trunk glow.
+  assets/props/tree_growth.png   stump (small), stump (large), sapling, young tree (padded to 6 columns)
+  assets/items/wood.png, resin.png   icons 16x16"""
 import math
 import pathlib
-import random
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from art_bush import TWIG, BAYER, bezier, blank, check_icon, stroke  # noqa: E402
-from art_stone import STEEL, VIO, VIO_L, TEAL, TEAL_L, wrap  # noqa: E402
+from art_bush import TWIG, bezier, blank, check_icon, stroke  # noqa: E402
+from art_stone import STEEL, VIO_L, wrap  # noqa: E402
 import art_spruce  # noqa: E402
 from gen_art import CLEAR, ROOT, hexc, noise, outline_pass, write_png  # noqa: E402
 
 CW, CH = 112, 200
 FEET_X, FEET_Y = 56, 196
-OUT = hexc("0b1620")
+OUT = hexc("14182c")
+OUT_LEAF = hexc("122228")
+OUT_WARM = hexc("241836")
+OUT_PALE = hexc("1e1c36")
 ICON_OUT = hexc("1b1a2e")
-BARK = [hexc(c) for c in ("1e1626", "3a2c40", "5a4556", "8a6f78", "b79b94")]
-SHADOW = (8, 14, 26)
+BARK = [hexc(c) for c in ("1c1428", "362840", "58445a", "886c7c", "b69a94")]
+SHADOW = (10, 14, 28)
 WOOD = [hexc(c) for c in ("6a4a3a", "9a6f50", "c79a68", "e6c494")]  # cut wood: shade .. light
 AMBER = [hexc(c) for c in ("6f4a10", "b48a38", "e6c468", "fff0b0")]
-
-MOSS = [hexc(c) for c in ("2f624e", "3e7d56", "55985f")]
+MOSS = [hexc(c) for c in ("2c6250", "3e7e5a", "589a64")]
 
 
 def to_pixels(layer):
     return [[c if c is not None else CLEAR for c in row] for row in layer]
 
 
+def _outline_for(px, y):
+    """Material-tinted 1px dark outline: cool slate-teal on foliage, soft plum-indigo on warm/pale blossoms, deep violet-ink on bark/base."""
+    r, g, b, _a = px
+    if y >= FEET_Y - 6:
+        return hexc("16132c")
+    if r > g + 22 and r > 110:
+        return OUT_WARM
+    if r > 175 and g > 155 and b > 170:
+        return OUT_PALE
+    if g > r + 10:
+        return OUT_LEAF
+    return OUT
+
+
 def finish(trunk, crown, shadow_w):
-    """Adds the ground shadow to the trunk layer and a dark outline around the whole tree."""
+    """Adds the ground shadow to the trunk layer and a material-tinted dark outline around the whole tree."""
     t, c = to_pixels(trunk), to_pixels(crown)
-    for y in range(CH):  # soft shadow on the ground
+    for y in range(CH):
         for x in range(CW):
-            d = ((x + 0.5 - FEET_X) / shadow_w) ** 2 + ((y + 0.5 - (FEET_Y + 1.0)) / 3.2) ** 2
+            d = ((x + 0.5 - FEET_X) / shadow_w) ** 2 + ((y + 0.5 - (FEET_Y + 1.0)) / 3.3) ** 2
             if d < 1.0 and t[y][x][3] == 0 and c[y][x][3] == 0:
-                t[y][x] = (*SHADOW, 120 if d < 0.5 else 70)
-    cs, ts = [row[:] for row in c], [row[:] for row in t]  # read the originals: an outline must not feed on itself
+                t[y][x] = (*SHADOW, 116 if d < 0.48 else 64)
+    cs, ts = [row[:] for row in c], [row[:] for row in t]
     solid = lambda x, y: 0 <= x < CW and 0 <= y < CH and (cs[y][x][3] == 255 or ts[y][x][3] == 255)  # noqa: E731
     for y in range(CH):
         for x in range(CW):
@@ -52,7 +64,8 @@ def finish(trunk, crown, shadow_w):
             hit = [(a, b) for a, b in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)) if solid(a, b)]
             if hit:
                 a, b = hit[0]
-                (c if cs[b][a][3] == 255 else t)[y][x] = OUT
+                src_px = cs[b][a] if cs[b][a][3] == 255 else ts[b][a]
+                (c if cs[b][a][3] == 255 else t)[y][x] = _outline_for(src_px, y)
     return t, c
 
 
@@ -76,12 +89,13 @@ def stump(radius, seed):
                 if abs(dx) <= hw:
                     lit = 0.5 - 0.5 * dx / max(hw, 1.0)
                     t[y][x] = BARK[int(max(0, min(4, lit * 4.0 + (noise(x, y, seed) / 255.0 - 0.5) * 0.9)))]
+                    if y > FEET_Y - 5 and dx < 1 and noise(x, y, seed + 17) > 155:
+                        t[y][x] = MOSS[1 if lit > 0.45 else 0]
     return finish(t, [[None] * CW for _ in range(CH)], radius + 6)
 
 
 # ------------------------------------------------------------------ items
 def polygon(px, pts, shade):
-    """Fills a polygon; shade(x, y) -> colour."""
     n = len(pts)
     for y in range(len(px)):
         for x in range(len(px[0])):
@@ -97,7 +111,7 @@ def polygon(px, pts, shade):
                 px[y][x] = shade(x, y)
 
 
-AXE_HEAD = [(21.0, 10.6), (25.2, 10.6), (26.4, 8.0), (28.8, 4.2), (27.0, 2.0), (24.0, 1.2), (21.0, 2.0), (19.2, 4.4), (21.8, 8.0)]  # blade up (-y), poll down
+AXE_HEAD = [(21.0, 10.6), (25.2, 10.6), (26.4, 8.0), (28.8, 4.2), (27.0, 2.0), (24.0, 1.2), (21.0, 2.0), (19.2, 4.4), (21.8, 8.0)]
 AXE_POLL = [(21.0, 10.4), (25.0, 10.4), (25.0, 12.8), (21.0, 12.8)]
 
 
@@ -113,17 +127,16 @@ def draw_axe(px, rot=0.0, scale=1.0, origin=(0.0, 0.0)):
     inv = lambda x, y: ((x + 0.5 - origin[0]) / scale * c + (y + 0.5 - origin[1]) / scale * s_, -(x + 0.5 - origin[0]) / scale * s_ + (y + 0.5 - origin[1]) / scale * c + 9.0)  # noqa: E731
     polygon(px, [tr(p) for p in AXE_HEAD], lambda x, y: axe_shade(*inv(x, y)))
     polygon(px, [tr(p) for p in AXE_POLL], lambda x, y: STEEL[1] if inv(x, y)[0] < 23 else STEEL[0])
-    for x in range(len(px[0])):  # a bright cutting edge along the blade's far side
+    for x in range(len(px[0])):
         for y in range(len(px)):
             if px[y][x][3] and px[y][x][:3] in [tuple(c_[:3]) for c_ in STEEL]:
                 q = inv(x, y)
                 if q[1] < 4.0 and q[0] > 20.5 and (q[0] - 24.0) ** 2 / 20.0 + (q[1] - 3.0) ** 2 / 4.0 > 0.6:
                     px[y][x] = STEEL[3]
-    stroke(px, [tr((22.4 + k * 0.4, 9.0)) for k in range(5)], 1.8 * scale, 1.8 * scale, [STEEL[0], STEEL[0], STEEL[1]])  # the eye
+    stroke(px, [tr((22.4 + k * 0.4, 9.0)) for k in range(5)], 1.8 * scale, 1.8 * scale, [STEEL[0], STEEL[0], STEEL[1]])
 
 
 def held_axe():
-    """34x19, grip at (4, 9): a long handle with a flared blade on the leading side (up), a poll on the other."""
     px = blank(34, 19)
     draw_axe(px, 0.0, 1.0, (3.0, 9.0))
     wrap(px, [(4 + i, 9.0 + (-1 if i % 2 else 1)) for i in range(7)])
@@ -140,13 +153,12 @@ def icon_axe():
 
 
 def icon_wood():
-    """A short log lying diagonally: bark side and a cut end with rings."""
     px = blank(16, 16)
-    stroke(px, bezier((4.8, 11.6), (7.6, 8.6), (10.4, 5.4), n=24), 3.0, 3.0, BARK[1:])  # bark body
-    for t in range(0, 24, 3):  # bark grooves
+    stroke(px, bezier((4.8, 11.6), (7.6, 8.6), (10.4, 5.4), n=24), 3.0, 3.0, BARK[1:])
+    for t in range(0, 24, 3):
         x, y = 5.5 + t * 0.24, 10.8 - t * 0.24
         px[int(y)][int(x)] = BARK[0]
-    stroke(px, [(11.2, 4.6)], 3.0, 3.0, WOOD[1:])  # the cut end
+    stroke(px, [(11.2, 4.6)], 3.0, 3.0, WOOD[1:])
     stroke(px, [(11.2, 4.6)], 1.5, 1.5, [WOOD[2], WOOD[2], WOOD[3]])
     px[4][11] = WOOD[0]
     check_icon("wood", px)
@@ -154,49 +166,63 @@ def icon_wood():
 
 
 def icon_resin():
-    """A drop of amber with a glint."""
     px = blank(16, 16)
     stroke(px, [(8.0, 9.8)], 4.3, 4.3, AMBER[:3])
     stroke(px, bezier((8.0, 5.6), (8.0, 4.2), (8.0, 2.8), n=8), 2.1, 0.5, AMBER[:3])
     px[7][6], px[6][6], px[7][7] = AMBER[3], AMBER[3], AMBER[3]
     px[11][10] = hexc("8a4a10")
-    px[12][9] = VIO_L  # a violet shimmer deep inside
+    px[12][9] = VIO_L
     check_icon("resin", px)
     return outline_pass(px, ICON_OUT)
 
 
 def lit_layers(parts, shadow_w):
-    """Trunk and crown of a spruce() result as pixels, with ground shadow and outline."""
     return finish(parts["trunk"], parts["crown"], shadow_w)
+
+
+def check_bounds(label, lit):
+    bad = []
+    for i, (t, c) in enumerate(lit):
+        for name, layer in (("trunk", t), ("crown", c)):
+            pts = [(x, y) for y, row in enumerate(layer) for x, px in enumerate(row) if px[3]]
+            if pts and (min(y for x, y in pts) < 1 or min(x for x, y in pts) < 1 or max(x for x, y in pts) > CW - 2):
+                bad.append(f"{label} variant {i} {name}: top {min(y for x, y in pts)}, x {min(x for x, y in pts)}..{max(x for x, y in pts)}")
+    assert not bad, "cut off at frame edge:\n" + "\n".join(bad)
 
 
 def main():
     props, items = ROOT / "props", ROOT / "items"
-    out = [[CLEAR] * (CW * 4) for _ in range(CH * 4)]
+    n = len(art_spruce.VARIANTS)
+    out = [[CLEAR] * (CW * n) for _ in range(CH * 4)]
+    lit_all = []
     for i, spec in enumerate(art_spruce.VARIANTS):
         parts = art_spruce.spruce(spec, 11 + i * 9)
-        t, c = lit_layers(parts, spec["width"] / 2.4 + 4)
+        t, c = lit_layers(parts, spec["width"] / 2.3 + 4)
+        lit_all.append((t, c))
         for y in range(CH):
             out[y][i * CW:(i + 1) * CW] = t[y]
             out[CH + y][i * CW:(i + 1) * CW] = c[y]
             out[CH * 2 + y][i * CW:(i + 1) * CW] = to_pixels(parts["glow_crown"])[y]
             out[CH * 3 + y][i * CW:(i + 1) * CW] = to_pixels(parts["glow_trunk"])[y]
-    write_png(props / "tree.png", CW * 4, CH * 4, out)
+    check_bounds("spruce", lit_all)
+    write_png(props / "tree.png", CW * n, CH * 4, out)
+
     growth = []
     for radius in (5.0, 9.0):
-        t, c = stump(radius, 3)
+        t, _c = stump(radius, 3)
         growth.append(t)
     for spec, seed in ((art_spruce.SAPLING, 70), (art_spruce.YOUNG, 71)):
         t, c = lit_layers(art_spruce.spruce(spec, seed, extras=False), spec["width"] / 2 + 2)
         growth.append([[c[y][x] if c[y][x][3] else t[y][x] for x in range(CW)] for y in range(CH)])
-    out = [[CLEAR] * (CW * 4) for _ in range(CH)]
+    growth += [[[CLEAR] * CW for _ in range(CH)]] * max(0, n - 4)
+    out = [[CLEAR] * (CW * len(growth)) for _ in range(CH)]
     for i, g in enumerate(growth):
         for y in range(CH):
             out[y][i * CW:(i + 1) * CW] = g[y]
-    write_png(props / "tree_growth.png", CW * 4, CH, out)
-    for name, px in (("wood", icon_wood()), ("resin", icon_resin())):  # the axe is drawn by tools/art_weapons.py
+    write_png(props / "tree_growth.png", CW * len(growth), CH, out)
+    for name, px in (("wood", icon_wood()), ("resin", icon_resin())):
         write_png(items / f"{name}.png", 16, 16, px)
-    print("firs, stump and growth stages, wood and resin written")
+    print(f"firs ({n} variants), stump and growth stages, wood and resin written")
 
 
 if __name__ == "__main__":

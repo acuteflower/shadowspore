@@ -27,9 +27,10 @@ func _run() -> void:
 	var items: Dictionary = DataRegistry.table("items")
 	# ---- data and art
 	var snapper: Dictionary = plants.snapper
+	var snap_cols: int = int(snapper.columns)
 	var sheet: Texture2D = load(String(snapper.texture)) as Texture2D
-	check(sheet.get_size() == Vector2(120, 102) and (load(String(snapper.glow)) as Texture2D).get_size() == sheet.get_size(), "snapper sheet is 3 x 3 frames of 40 x 34 with a matching glow sheet")
-	check((load(String(snapper.stripped)) as Texture2D).get_size() == Vector2(120, 34), "snapper has cut stalks")
+	check(sheet.get_size() == Vector2(40 * snap_cols, 102) and (load(String(snapper.glow)) as Texture2D).get_size() == sheet.get_size(), "snapper sheet is %d x 3 frames of 40 x 34 with a matching glow sheet" % snap_cols)
+	check((load(String(snapper.stripped)) as Texture2D).get_size() == Vector2(40 * snap_cols, 34), "snapper has cut stalks")
 	for item: String in ["shimmer_beetle", "leaf_caterpillar", "leaf_snail"]:
 		check(items.has(item) and (load(String(items[item].icon)) as Texture2D).get_size() == Vector2(16, 16), "%s is an item with a 16x16 icon" % item)
 		check((DataRegistry.table("fishing").baits as Dictionary).has(item), "%s is river bait" % item)
@@ -99,13 +100,13 @@ func _run() -> void:
 	add_child(thing)
 	TimeManager.time_of_day = 0.5
 	thing._process(0.1)
-	check(thing._sprite.frame == 0 + 3 * 2 and not thing._open, "the Fangblume is a closed bud by day")
+	check(thing._sprite.frame == 0 + snap_cols * 2 and not thing._open, "the Fangblume is a closed bud by day")
 	TimeManager.time_of_day = 0.95
 	thing._process(0.1)
 	check(thing._sprite.frame == 0 and thing._open, "the Fangblume opens at night")
 	thing.play_fx("snap", thing.global_position)
 	thing._process(0.05)
-	check(thing._snap_t > 0.0 and thing._sprite.frame == 3, "the jaws begin to shut when it snaps")
+	check(thing._snap_t > 0.0 and thing._sprite.frame == snap_cols, "the jaws begin to shut when it snaps")
 	for _i: int in 30:
 		thing._process(0.05)
 	check(thing._snap_t < 0.0 and thing._sprite.frame == 0, "after the snap it opens again")

@@ -3,7 +3,7 @@ extends CharacterBody2D
 ## Ground-foraging corvids with flock alarms, watch turns, social spacing and real tree perches.
 ## Host chooses complete actions. Reliable packets replay motion and height on peers, including joins.
 
-enum State { IDLE, PECK, WALK, PREEN, WATCH, SOCIAL, FLY, ROOST, FEED } ## FEED: eating from a hand (docs/pet_konzept.md)
+enum State { IDLE, PECK, WALK, PREEN, WATCH, SOCIAL, FLY, ROOST, FEED, HOP } ## FEED: eating from a hand (docs/pet_konzept.md)
 
 var species: String = "crow":
 	set(value):
@@ -54,7 +54,7 @@ var _observe_cool: float = 0.0
 const CALL_SFX: Dictionary = {
 	"crow": ["crow_caw_a", "crow_caw_b"],
 	"raven": ["raven_croak", "raven_call"],
-	"owl": ["owl_screech"],
+	"owl": ["owl_hoot"],
 	"hoopoe": ["hoopoe_call"],
 }
 var _calls: Array[AudioStream] = []
@@ -85,7 +85,7 @@ func _ready() -> void:
 		_ring = Sprite2D.new()
 		_ring.name = "Ring"
 		_ring.texture = load("res://assets/wildlife/pet_marks.png") as Texture2D
-		_ring.hframes = 50
+		_ring.hframes = 62
 		_ring.vframes = 48
 		_ring.centered = false
 		_ring.offset = Vector2(-24, -35)
@@ -105,7 +105,16 @@ func _ready() -> void:
 func _load_species() -> void:
 	_spec = DataRegistry.get_entry("wildlife", species)
 	if _sprite != null and _spec.has("texture"):
-		_sprite.texture = load(String(_spec["texture"])) as Texture2D
+		var tex_path: String = String(_spec["texture"])
+		_sprite.texture = load(tex_path) as Texture2D
+		var default_cols: int = 50 if tex_path.ends_with("meadow_birds.png") else 62
+		_sprite.hframes = int(_spec.get("sheet_cols", default_cols))
+		_sprite.vframes = int(_spec.get("builds", 6)) * 8
+		if _spec.has("feet"):
+			var f: Array = _spec["feet"]
+			_sprite.offset = -Vector2(float(f[0]), float(f[1]))
+		else:
+			_sprite.offset = Vector2(-24, -35)
 	_calls.clear()
 	var set_ids: Array = CALL_SFX.get(species, []) ## the Higgsfield set (assets/audio/sfx) where it has the species, else the old placeholders
 	for i: int in 2:
@@ -222,18 +231,33 @@ func fly_to(goal: Vector2) -> bool:
 
 
 func _process(_delta: float) -> void:
+	var cols: int = _sprite.hframes
 	var col: int = 0
+	var hop_arc: float = 0.0
 	match state:
 		State.PECK:
-			col = 4 + int(_elapsed * 5.0) % 6
+			col = 4 + int(_elapsed * 5.2) % 6
 		State.FEED:
 			col = 4 + int(_elapsed * 6.5) % 6 ## pecking at the offered food
 		State.WALK:
 			col = 10 + int(_elapsed * 9.0) % 6
+		State.HOP:
+			var ht: float = clampf(_elapsed / maxf(_duration, 0.1), 0.0, 1.0)
+			col = (54 + mini(3, int(ht * 4.0))) if cols >= 62 else (10 + int(_elapsed * 9.0) % 6)
+			hop_arc = sin(ht * PI) * (0.0 if _height_from != _height_to else 2.8)
 		State.PREEN, State.SOCIAL:
 			col = 16 + int(_elapsed * 4.5) % 6
-		State.WATCH, State.ROOST:
+		State.WATCH:
 			col = 22 + int(_elapsed * 2.2) % 4
+		State.ROOST:
+			var weather_node: Node = get_tree().get_first_node_in_group("weather")
+			var sleepy_roost: bool = rider == 0 and (_rest_time() or (weather_node != null and float(weather_node.get("rain")) > 0.42))
+			if cols >= 62 and sleepy_roost:
+				col = 58 + int(_elapsed * 1.5) % 4
+			elif cols >= 62:
+				col = (22 + int(_elapsed * 2.2) % 4) if fmod(_elapsed, 5.2) < 3.0 else (int(_elapsed * 2.4) % 4)
+			else:
+				col = 22 + int(_elapsed * 2.2) % 4
 		State.FLY:
 			var t: float = clampf(_elapsed / _duration, 0.0, 1.0)
 			var takeoff: float = float(_spec.get("takeoff_fraction", 0.18))
@@ -243,7 +267,7 @@ func _process(_delta: float) -> void:
 			elif t > landing:
 				col = 38 + mini(5, int((t - landing) / (1.0 - landing) * 6.0))
 			elif t > float(_spec.get("glide_from", 0.45)) and t < float(_spec.get("glide_to", 0.62)):
-				col = 34 ## a short glide between wing beats
+				col = (50 + int(_elapsed * 4.0) % 4) if cols >= 62 else 34 ## soaring / intermittent flap-glide
 			else:
 				col = 30 + int(_elapsed * float(_spec["flap_fps"])) % 8
 		_:
@@ -252,8 +276,8 @@ func _process(_delta: float) -> void:
 		col = 26 + int(_call_pose * 10.0) % 4
 	var build: int = int(_spec["build_offset"]) + clampi(appearance, 0, 2)
 	var sector: int = posmod(roundi(facing / (PI / 4.0)), 8)
-	_sprite.frame = (build * 8 + sector) * 50 + col
-	_sprite.position.y = -roundf(_height)
+	_sprite.frame = (build * 8 + sector) * cols + col
+	_sprite.position.y = -roundf(_height + hop_arc)
 	_sprite.z_index = 5 if state == State.FLY and _height > 16.0 else 0
 	if rider != 0:
 		_sprite.z_index = 1 ## in front of the player it sits on
@@ -273,8 +297,9 @@ func _draw_shadow() -> void:
 	if not _perch_path.is_empty() and state != State.FLY:
 		return
 	var fade: float = clampf(1.0 - _height / 280.0, 0.12, 1.0)
+	var s_rad: float = 7.4 if species == "owl" else (7.0 if species == "raven" else (3.3 if species == "robin" else (4.3 if species == "woodpecker" else 5.0)))
 	_shadow.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0 - minf(_height / 400.0, 0.4), 0.3))
-	_shadow.draw_circle(Vector2.ZERO, 7.0 if species == "raven" else 5.0, Color(0.03, 0.025, 0.07, 0.23 * fade))
+	_shadow.draw_circle(Vector2.ZERO, s_rad, Color(0.03, 0.025, 0.07, 0.23 * fade))
 
 
 func _sense() -> void:
@@ -290,17 +315,27 @@ func _sense() -> void:
 			return
 	var nearest: float = INF
 	var flush: bool = false
+	var nearest_hunter: bool = false
 	var candidates: Array[Node] = []
 	candidates.append_array(Player.all)
 	candidates.append_array(get_tree().get_nodes_in_group("predators"))
 	candidates.append_array(get_tree().get_nodes_in_group("wildlife_hunters"))
+	candidates.append_array(get_tree().get_nodes_in_group("apex_hunters"))
+	if species in ["crow", "raven"] and _height > 12.0 and not TimeManager.is_night():
+		for other_bird: Node in get_tree().get_nodes_in_group("corvids"):
+			if other_bird is WildCorvid and (other_bird as WildCorvid).species == "owl":
+				candidates.append(other_bird)
 	for node: Node in candidates:
 		var actor: Node2D = node as Node2D
-		if actor == null:
+		if actor == null or actor == self:
 			continue
 		var alert: float = float(_spec["alert_range"])
 		var flee: float = float(_spec["flee_range"])
 		var noisy: bool = false
+		var is_owl_target: bool = actor is WildCorvid and (actor as WildCorvid).species == "owl"
+		var is_hunter: bool = node.is_in_group("wildlife_hunters") or node.is_in_group("apex_hunters") or is_owl_target
+		if species == "owl" and is_hunter and _height > 12.0:
+			continue
 		if actor is Player:
 			var player: Player = actor as Player
 			if player.health.current <= 0.0:
@@ -334,10 +369,13 @@ func _sense() -> void:
 		if _height < 20.0 and not noisy and not get_world_2d().direct_space_state.intersect_ray(ray).is_empty():
 			continue
 		_danger = true
-		flush = flush or noisy or distance < flee
+		var hunter_safe_perch: bool = is_hunter and _height > 14.0 and species in ["crow", "raven"]
+		if not hunter_safe_perch:
+			flush = flush or noisy or distance < flee
 		if distance < nearest:
 			nearest = distance
 			_threat = actor.global_position
+			nearest_hunter = hunter_safe_perch
 	if _danger:
 		_caution_left = float(_spec["calm_seconds"])
 		if flush:
@@ -346,6 +384,9 @@ func _sense() -> void:
 			if state != State.WATCH:
 				_set_mood(State.WATCH, _range("watch_seconds"))
 			facing = (_threat - global_position).angle()
+			if (nearest_hunter or species == "jay") and _call_left > 2.5:
+				_call_left = _rng.randf_range(0.4, 1.4)
+				_request_call(true)
 
 
 func _think() -> void:
@@ -369,8 +410,12 @@ func _think() -> void:
 		return
 	if witch and _observe():
 		return
+	var weather_node: Node = get_tree().get_first_node_in_group("weather")
+	var rainy: bool = weather_node != null and float(weather_node.get("rain")) > 0.42
 	if not _perch_path.is_empty():
-		if _rng.randf() < 0.6:
+		if rainy and _rng.randf() < 0.85:
+			_set_mood(State.ROOST if _rng.randf() < 0.72 else State.PREEN, _range("roost_seconds") * 0.5)
+		elif _rng.randf() < 0.62:
 			_set_mood(State.PREEN if _rng.randf() < 0.45 else State.WATCH, _range("preen_seconds"))
 		else:
 			_take_wing(false, false, true)
@@ -379,21 +424,39 @@ func _think() -> void:
 	for node: Node in neighbours:
 		var other: WildCorvid = node as WildCorvid
 		if other != self and other.state != State.FLY and other._height < 1.0 and global_position.distance_to(other.global_position) < float(_witch_value("personal_space", _spec["personal_space"])):
-			if other.species == "raven" or species == "crow":
-				_walk((global_position - other.global_position).normalized())
+			var away: Vector2 = (global_position - other.global_position).normalized()
+			if other.species == "raven" and species == "crow":
+				# Ravens hold dominant ground rank: crows yield with a quick two-footed sidestep hop!
+				_hop_step(away)
+				return
+			elif species == other.species:
+				if _rng.randf() < 0.55:
+					_hop_step(away)
+				else:
+					_walk(away)
 				return
 	var roll: float = _rng.randf()
-	if roll < float(_spec["relocate_chance"]):
-		if _take_wing(false):
+	var relocate_p: float = 0.28 if rainy else float(_spec["relocate_chance"])
+	if roll < relocate_p:
+		if _take_wing(false, true, false, rainy):
 			return
-	if roll < 0.45:
+	if roll < 0.46:
 		var center: Vector2 = _flock_center()
 		var direction: Vector2 = (center - global_position).normalized() if global_position.distance_to(center) > float(_witch_value("flock_pull", 80.0)) else Vector2.from_angle(_rng.randf() * TAU)
-		_walk(direction)
-	elif roll < 0.45 + float(_spec["social_chance"]) and _socialise(neighbours):
+		if _rng.randf() < 0.28:
+			_hop_step(direction)
+		else:
+			_walk(direction)
+	elif roll < 0.46 + float(_spec["social_chance"]) and _socialise(neighbours):
 		return
 	else:
-		_set_mood(State.PECK if _rng.randf() < 0.72 else State.PREEN, _range("peck_seconds"))
+		var forage_roll: float = _rng.randf()
+		if forage_roll < 0.68:
+			_set_mood(State.PECK, _range("peck_seconds"))
+		elif forage_roll < 0.86:
+			_set_mood(State.PREEN, _range("preen_seconds"))
+		else:
+			_set_mood(State.WATCH, _range("watch_seconds") * 0.65)
 
 
 ## A number of the species' `witch_forest` block (data/wildlife.json) while this bird lives in the Hexenwald, else `fallback`.
@@ -566,6 +629,20 @@ func _walk(direction: Vector2) -> void:
 	_set_mood(State.IDLE, 0.5)
 
 
+func _hop_step(direction: Vector2, custom_distance: float = -1.0) -> void:
+	if _sprite == null or _sprite.hframes < 62:
+		_walk(direction)
+		return
+	var distance: float = custom_distance if custom_distance > 0.0 else (_range("hop_distance") if _spec.has("hop_distance") else _rng.randf_range(9.0, 15.0))
+	for angle: float in [0.0, 0.55, -0.55, 1.15, -1.15]:
+		var step: Vector2 = direction.rotated(angle) * distance
+		if not test_move(global_transform, step) and _can_land(global_position + step):
+			var duration: float = clampf(distance / (float(_spec["walk_speed"]) * 1.45), 0.24, 0.42)
+			_act.rpc(State.HOP, duration, step.angle(), global_position, global_position + step, Vector2.ZERO, 0.0, 0.0, 0.0, "", 0.0)
+			return
+	_set_mood(State.IDLE, 0.4)
+
+
 func _can_land(point: Vector2) -> bool:
 	if companion_peer != 0 and _population.has_method("can_land_companion"):
 		return bool(_population.call("can_land_companion", point, self))
@@ -646,7 +723,17 @@ func _request_call(alarm: bool) -> void:
 	if _population.has_method("authorize_call") and not bool(_population.call("authorize_call", flock_id)):
 		return
 	_play_call.rpc(_rng.randi_range(0, 1), _rng.randf_range(0.94, 1.04))
-	if not alarm:
+	if alarm:
+		for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
+			if node.has_method("hear_external_alarm"):
+				node.call("hear_external_alarm", _threat if _threat != Vector2.ZERO else global_position)
+		if species == "jay":
+			var alarm_origin: Vector2 = _threat if _threat != Vector2.ZERO else global_position
+			for node: Node in get_tree().get_nodes_in_group("wildlife"):
+				var r: Node2D = node as Node2D
+				if r != null and r.global_position.distance_to(global_position) < 155.0 and r.has_method("hear_alarm"):
+					r.call("hear_alarm", alarm_origin)
+	else:
 		for node: Node in get_tree().get_nodes_in_group("corvids"):
 			var partner: WildCorvid = node as WildCorvid
 			if partner != self and partner.flock_id == flock_id and partner._call_left > 4.0 and _rng.randf() < 0.25:
@@ -684,7 +771,7 @@ func _act(mood: int, duration: float, direction: float, start: Vector2, end: Vec
 	_cruise = cruise
 	_perch_path = perch
 	_height = from_height
-	_moving = state in [State.WALK, State.FLY]
+	_moving = state in [State.WALK, State.HOP, State.FLY]
 	if state == State.FLY and elapsed < 0.05 and species != "owl":
 		Sfx.at(self, "wing_flap", start, -6.0, 0.08, 240.0)
 	if not _moving:
@@ -707,7 +794,11 @@ func _advance() -> void:
 			facing = tangent.angle()
 		global_position = next
 	else:
-		if multiplayer.is_server() and move_and_collide(next - global_position) != null:
+		if _height_from != _height_to:
+			_height = lerpf(_height_from, _height_to, progress)
+		if not _perch_path.is_empty():
+			global_position = next
+		elif multiplayer.is_server() and move_and_collide(next - global_position) != null:
 			_finish.rpc(global_position, 0.0, "")
 			return
 		elif not multiplayer.is_server():

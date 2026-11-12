@@ -165,6 +165,8 @@ func _on_built(piece: String, _id: int) -> void:
 	var player: Player = local_player()
 	if player != null and player.quests != null:
 		player.quests.set_flag("built_" + piece)
+	if piece == "quest_board" and board != null and multiplayer.is_server():
+		board.check_story_now()
 	if player != null and TownRules.piece(piece).has("fuel"):
 		notice.emit("E AM PFOSTEN: ANZÜNDEN", true) ## a new lamp post is cold until somebody lights it
 
@@ -853,7 +855,7 @@ func debug_build_all(with_torben: bool = false) -> void:
 		(structures[id] as Dictionary).b = TimeManager.day - 6 ## the checkpoint town has stood a while: its wear is already there
 	for sid: String in settler_ids():
 		var settler: Dictionary = settler_spec(sid)
-		if not bool(settler.get("enabled", true)) and not (with_torben and sid == "torben"):
+		if (not bool(settler.get("enabled", true)) or sid == "torben") and not (with_torben and sid == "torben"):
 			continue
 		var arrive: Dictionary = settler.get("arrive", {}) as Dictionary
 		if not residents.has(sid) and has_built(String(arrive.get("needs", ""))):
@@ -2095,6 +2097,11 @@ func _host_craft(recipe_id: String, peer: int) -> void:
 			var box: Node = get_tree().get_first_node_in_group("speech_box")
 			if box != null and box.has_method("play"):
 				box.call("play", "pickaxe_made") ## Gustav's remark at the first pickaxe
+		if recipe_id == "iron_ingot" and not player.quests.has_flag("ingot_remarked"):
+			player.quests.set_flag("ingot_remarked")
+			var box2: Node = get_tree().get_first_node_in_group("speech_box")
+			if box2 != null and box2.has_method("play"):
+				box2.call("play", "ingot_made")
 
 
 ## Host: the town learns something (`unlocks`), everybody hears it once. "farming" makes the fields buildable (docs/farming.md).

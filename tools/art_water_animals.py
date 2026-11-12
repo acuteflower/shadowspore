@@ -428,9 +428,11 @@ def duck(v, kind, t):
     return m
 
 
+import art_heron
+
 # ====================================================================== sheets
 SPECIES = {
-    'heron': dict(size=64, ground=54, builds=2, fn=heron, blocks=[('idle', 0, 4), ('hunch', 4, 4), ('wade', 8, 8), ('strike', 16, 6), ('catch', 22, 4), ('preen', 26, 4), ('fly', 30, 8), ('takeoff', 38, 6), ('land', 44, 6)]),
+    'heron': dict(size=64, ground=54, builds=art_heron.BUILDS_N, fn=heron, blocks=art_heron.BLOCKS),
     'frog': dict(size=32, ground=24, builds=2, fn=frog, blocks=[('idle', 0, 4), ('croak', 4, 4), ('hop', 8, 6), ('swim', 14, 6)]),
     'kingfisher': dict(size=32, ground=24, builds=1, fn=kingfisher, blocks=[('perch', 0, 4), ('look', 4, 4), ('dive', 8, 6), ('fly', 14, 6), ('catch', 20, 4)]),
     'duck': dict(size=40, ground=31, builds=3, fn=duck, blocks=[('float', 0, 4), ('paddle', 4, 6), ('dabble', 10, 6), ('preen', 16, 4), ('fly', 20, 8), ('takeoff', 28, 6)]),
@@ -438,6 +440,12 @@ SPECIES = {
 
 
 def render(name, v, d, col):
+    if name == 'heron':
+        return art_heron.frame(v, d, col)
+    art.SS, art.SCALE = 3, 1.
+    art.TIDY_EYES = False
+    art.DECAL_WEIGHT = {3: 3.0, 4: 2.6, 5: 1.6}
+    art.ink_color = lambda mat: hexc('1c1a28')
     spec = SPECIES[name]
     art.FW = art.FH = spec['size']
     art.GROUND_ROW = float(spec['ground'])

@@ -53,24 +53,26 @@ func _run() -> void:
 	var sun: Flora = (load(String(plants.sunbloom.scene)) as PackedScene).instantiate() as Flora
 	sun.setup(world, Vector2i(6, 6), "sunbloom", 1)
 	add_child(sun)
+	var sun_cols: int = int(plants.sunbloom.columns)
 	TimeManager.time_of_day = 0.3
 	sun._pose()
-	check(sun._sprite.frame == 1 + 3 * 0, "sun flower looks east in the morning")
+	check(sun._sprite.frame == 1 + sun_cols * 0, "sun flower looks east in the morning")
 	TimeManager.time_of_day = 0.5
 	sun._row = -1
 	sun._pose()
-	check(sun._sprite.frame == 1 + 3 * 1, "sun flower looks up at noon")
+	check(sun._sprite.frame == 1 + sun_cols * 1, "sun flower looks up at noon")
 	TimeManager.time_of_day = 0.95
 	sun._row = -1
 	sun._pose()
-	check(sun._sprite.frame == 1 + 3 * 3 and sun.prompt() == "", "sun flower closes at night and cannot be picked")
+	check(sun._sprite.frame == 1 + sun_cols * 3 and sun.prompt() == "", "sun flower closes at night and cannot be picked")
 	var lily: Flora = (load(String(plants.mist_lily.scene)) as PackedScene).instantiate() as Flora
+	var lily_cols: int = int(plants.mist_lily.columns)
 	lily.setup(world, Vector2i(9, 9), "mist_lily", 1)
 	add_child(lily)
 	TimeManager.time_of_day = 0.5
 	lily._row = -1
 	lily._pose()
-	check(lily._sprite.frame == 1 + 3 and lily.prompt() == "" and (lily._pollen == null or not lily._pollen.emitting), "lily is closed by day and cannot be picked")
+	check(lily._sprite.frame == 1 + lily_cols and lily.prompt() == "" and (lily._pollen == null or not lily._pollen.emitting), "lily is closed by day and cannot be picked")
 	TimeManager.time_of_day = 0.95
 	lily._row = -1
 	lily._pose()

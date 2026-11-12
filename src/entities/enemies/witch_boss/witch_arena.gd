@@ -422,8 +422,6 @@ func _watch_quest() -> void:
 		if not player.is_multiplayer_authority() or player.quests == null:
 			continue
 		var quests: QuestComponent = player.quests
-		if not quests.is_active(QUEST) and not quests.is_finished(QUEST) and quests.is_finished("town_workshop") and player.progress.level >= QUEST_LEVEL:
-			quests.start(QUEST)
 		var step: String = quests.active_step_id(QUEST) if quests.is_active(QUEST) else ""
 		if not _asked_open and not opened and (quests.is_finished(QUEST) or step in OPEN_STEPS):
 			_asked_open = true

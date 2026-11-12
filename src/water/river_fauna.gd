@@ -2,6 +2,7 @@ class_name RiverFauna
 extends Node2D
 ## Authority-only population; bounded home chunks make unloading unambiguous.
 var rivers: WorldRivers
+var enabled_kinds: Array[String] = ["heron", "otter", "duck"]
 var _active: Dictionary = {}
 var _pending: Array[Vector2i] = []
 var _fields: Dictionary = {}
@@ -53,8 +54,9 @@ func valid_route(animal: RiverAnimal, end: Vector2, curve: Vector2) -> bool:
 		if not bounds.has_point(point): return false
 		if animal.kind in ["shoal", "brook", "strider"] and field.x > -2.0: return false
 		if animal.kind == "frog" and field.x > 10.0: return false
-		if animal.kind == "duck" and (field.x > -3.0 or field.y > 0.75): return false
+		if animal.kind == "duck" and (field.x < -24.0 or field.x > 8.5 or field.y > 0.78): return false
 		if animal.kind == "heron" and (field.x < -10.0 or field.x > 16.0 or field.y > 0.55): return false
+		if animal.kind == "otter" and (field.x < -22.0 or field.x > 12.0 or field.y > 0.88): return false
 		if animal.kind == "dragonfly" and field.x > 14.0: return false
 	return true
 ## A flight needs only the animal's own chunk (everything below it is air).
@@ -97,6 +99,17 @@ func scare_fish(at: Vector2, radius: float) -> void:
 		if animal.kind in ["shoal", "brook", "frog"] and animal.position.distance_to(at) < radius:
 			animal.startle(at)
 
+## Playful otter splashes alert or flush nearby stalking herons and swimming ducks.
+func disturb_herons(at: Vector2, radius: float) -> void:
+	for animal: RiverAnimal in animals.get_children():
+		if animal.kind in ["heron", "duck"] and not animal.is_queued_for_deletion():
+			var d: float = animal.position.distance_to(at)
+			if d < 24.0:
+				animal.startle(at)
+			elif animal.kind == "heron" and d < radius and animal.mode == RiverAnimal.Mode.REST:
+				animal._threat = at
+				animal._alert_left = 1.8
+
 func cover_target(home: Vector2) -> Vector2:
 	for node: Node in get_tree().get_nodes_in_group("river_cover"):
 		var rock: Node2D = node as Node2D
@@ -116,7 +129,7 @@ func _populate(cell: Vector2i) -> void:
 	var settings: Dictionary = DataRegistry.table("river_animals")
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(settings["seed"])))
-	for kind: String in ["shoal", "brook", "frog", "strider", "dragonfly", "heron", "kingfisher", "duck"]:
+	for kind: String in enabled_kinds:
 		var spec: Dictionary = settings[kind]
 		if count(kind) >= int(spec["cap"]): continue
 		if rng.randf() > float(spec.get("chance", 1.0)): continue
@@ -129,6 +142,7 @@ func _populate(cell: Vector2i) -> void:
 			if kind == "brook": valid = field.x < -8.0 and field.y > 0.45
 			if kind in ["frog", "dragonfly"]: valid = field.x > 1.0 and field.x < 8.0
 			if kind == "heron": valid = field.x > -6.0 and field.x < 10.0 and field.y < 0.45
+			if kind == "otter": valid = field.x > -14.0 and field.x < 8.0 and field.y < 0.72
 			if kind == "kingfisher": valid = field.x > 1.0 and field.x < 9.0
 			if kind == "duck": valid = field.x < -12.0 and field.y > 0.1 and field.y < 0.65 and rivers.field_at(at + Vector2(14, 0)).x < -9.0 and rivers.field_at(at - Vector2(14, 0)).x < -9.0
 			if valid:
@@ -149,7 +163,10 @@ func _populate(cell: Vector2i) -> void:
 			if at.distance_to(player.global_position) < float(spec["fear"]) + 20.0: near_player = true
 		if near_player: continue
 		var family: bool = kind == "duck" and rng.randf() < 0.5 ## a hen with ducklings or a lone drake pair
+		var otter_pair: bool = kind == "otter" and rng.randf() < 0.65
 		var group: int = int(spec["group"]) if (kind != "duck" or family) else 2
+		if kind == "otter":
+			group = 2 if otter_pair else 1
 		for member: int in group:
 			if count(kind) >= int(spec["cap"]) or animals.get_child_count() >= int(settings["max_total"]): break
 			var point: Vector2 = at + Vector2(member * 3.0, member * 2.0)

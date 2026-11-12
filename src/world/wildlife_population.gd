@@ -39,9 +39,6 @@ func chunk_loaded(cell: Vector2i) -> void:
 		return
 	$Corvids.chunk_loaded(cell)
 	$Woodland.chunk_loaded(cell)
-	$Bears.chunk_loaded(cell)
-	$MeadowInsects.chunk_loaded(cell)
-	$SmallResidents.chunk_loaded(cell)
 	_active[cell] = true
 	if not _populations.has(cell) and not _pending.has(cell):
 		_pending.append(cell)

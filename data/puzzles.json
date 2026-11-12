@@ -1,0 +1,89 @@
+{
+	"_doc": "Trials of the Wächterin (docs/raetsel_konzept.md). `wisp` = tuning of every wisp trail (px, px/s, seconds). `placed`: the trials in the world; a wisp trail has `tile` (the bowl), `route` (tiles: the first point is the bowl, the last is where it sinks into the ground, checked flat level-0 land away from water and the void), `stops` (route indices where it hovers and waits for her), `linger` (stops where it circles something curious first), `tier` (the chest). `crow` = tuning of the crow's hoard; a hoard has `tile` (the crow's snag), `variant` (0 lightning stump, 1 ring stump, 2 crooked stump, 3 rock; default by its id) and `mound` (where it hid its finds). `raven` = tuning of the raven trade (`likes` = what it takes as a pawn); a trade also has `stations` (tiles where it drops a feather).",
+	"wisp": {
+		"wake_range": 58.0,
+		"beckon": 92.0,
+		"wait_range": 150.0,
+		"lost_range": 340.0,
+		"lost_time": 12.0,
+		"scare_range": 30.0,
+		"scare_range_sneak": 18.0,
+		"loud_range": 70.0,
+		"cruise": 68.0,
+		"sneak_factor": 0.68,
+		"accel": 90.0,
+		"dart": 1.4,
+		"dart_skip": 1,
+		"press_boost": 0.1,
+		"shy_limit": 3,
+		"respawn": 7.0,
+		"height": 15.0,
+		"linger_time": 2.6
+	},
+	"crow": {
+		"lure_range": 115.0,
+		"still_speed": 6.0,
+		"rate_loves": 0.5,
+		"rate_likes": 0.3,
+		"decay": 0.3,
+		"spook_range": 140.0,
+		"spook_cool": 5.0,
+		"too_close": 9.0,
+		"rush_speed": 46.0,
+		"leave_range": 130.0,
+		"offer_distance": 22.0,
+		"offer_time": 30.0,
+		"lead_speed": 64.0,
+		"show_range": 52.0,
+		"dig_reach": 48.0,
+		"digs": 3
+	},
+	"raven": {
+		"lure_range": 115.0,
+		"still_speed": 6.0,
+		"rate": 0.35,
+		"decay": 0.3,
+		"spook_range": 140.0,
+		"spook_cool": 6.0,
+		"too_close": 9.0,
+		"rush_speed": 46.0,
+		"leave_range": 130.0,
+		"offer_distance": 24.0,
+		"offer_time": 40.0,
+		"lead_speed": 66.0,
+		"feather_wait": 60.0,
+		"resume_range": 70.0,
+		"junk_limit": 3,
+		"dig_reach": 48.0,
+		"digs": 3,
+		"likes": ["lake_glimmer", "lake_moonstone", "silver_chain", "iron_ingot", "mora_shard", "crystal_banish_1", "crystal_roots_1", "crystal_embers_1", "crystal_veil_1", "crystal_maw_1"]
+	},
+	"placed": [
+		{
+			"id": "wisp_nordweg",
+			"kind": "wisp",
+			"tier": "common",
+			"tile": [796, 647],
+			"route": [[796, 647], [797, 634], [797, 621], [796, 608], [797, 596], [802, 586], [809, 579], [818, 575], [827, 575], [834, 580], [839, 588]],
+			"stops": [2, 4, 6, 8, 10],
+			"linger": [4]
+		},
+		{
+			"id": "hoard_flussufer",
+			"kind": "crow_hoard",
+			"tier": "common",
+			"tile": [826, 701],
+			"variant": 0,
+			"mound": [857, 709]
+		},
+		{
+			"id": "raben_westhang",
+			"kind": "raven_trade",
+			"tier": "rare",
+			"tile": [688, 641],
+			"variant": 0,
+			"stations": [[667, 650], [676, 670], [651, 698]],
+			"mound": [641, 713]
+		}
+	]
+}

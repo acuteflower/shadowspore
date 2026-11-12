@@ -31,7 +31,7 @@
      674
     ],
     "radius": 3,
-    "event": "dialogue:spiders_intro",
+    "event": "bark:spiders_intro",
     "hint": "sneak"
    },
    {
@@ -131,7 +131,7 @@
      676
     ],
     "search": 50,
-    "event": "dialogue:where_knight",
+    "event": "story:where_knight",
     "hint": "map"
    },
    {
@@ -193,7 +193,7 @@
      490
     ],
     "search": 40,
-    "event": "dialogue:day2_morning"
+    "event": "story:day2_morning"
    },
    {
     "id": "enter_cabin",
@@ -414,15 +414,104 @@
     "flag": "workshop_done",
     "event": "story:workshop_done"
    },
-   {
-    "id": "ws_pickaxe",
-    "text": "STELLE EINE SPITZHACKE HER",
-    "type": "flag",
-    "flag": "crafted_pickaxe",
-    "hint": "craft"
-   }
-  ]
- },
+    {
+     "id": "ws_pickaxe",
+     "text": "STELLE EINE SPITZHACKE HER",
+     "type": "flag",
+     "flag": "crafted_pickaxe",
+     "hint": "craft"
+    }
+   ],
+   "next": "town_board"
+  },
+  "town_board": {
+   "title": "DIE QUESTTAFEL",
+   "steps": [
+    {
+     "id": "bd_intro",
+     "text": "SPRICH MIT GUSTAV",
+     "type": "flag",
+     "flag": "board_intro_done",
+     "event": "story:board_intro"
+    },
+    {
+     "id": "bd_gather",
+     "text": "MATERIAL FÜR DIE QUESTTAFEL",
+     "type": "tasks",
+     "tasks": [
+      {"id": "wood", "text": "HOLZ SAMMELN", "kind": "stock", "item": "wood", "count": 8},
+      {"id": "fiber", "text": "FASERN SCHNEIDEN", "kind": "stock", "item": "plant_fiber", "count": 2}
+     ]
+    },
+    {
+     "id": "bd_build",
+     "text": "BAUE DIE QUESTTAFEL",
+     "type": "flag",
+     "flag": "built_quest_board",
+     "hint": "build"
+    },
+    {
+     "id": "bd_open",
+     "text": "SIEH AN DIE QUESTTAFEL",
+     "type": "flag",
+     "flag": "opened_quest_board"
+    }
+   ]
+  },
+  "torben_smithy": {
+   "title": "HAMMERSCHLÄGE IM NORDEN",
+   "steps": [
+    {
+     "id": "tb_find",
+     "text": "SUCHE DEN SCHMIED IM NORDEN",
+     "type": "flag",
+     "flag": "tb_camp_reached",
+     "tile": [791, 639],
+     "search": 18
+    },
+    {
+     "id": "tb_fight",
+     "text": "WEHRE DIE SCHATTEN AB",
+     "type": "flag",
+     "flag": "tb_ambush_done",
+     "tile": [791, 639]
+    },
+    {
+     "id": "tb_meet",
+     "text": "SPRICH MIT DEM SCHMIED",
+     "type": "flag",
+     "flag": "tb_met",
+     "actor": "story_torben"
+    },
+    {
+     "id": "tb_gather",
+     "text": "MATERIAL FÜR DIE SCHMIEDE",
+     "type": "tasks",
+     "tasks": [
+      {"id": "wood", "text": "HOLZ SAMMELN", "kind": "stock", "item": "wood", "count": 16},
+      {"id": "stone", "text": "KIESEL SAMMELN", "kind": "stock", "item": "stone", "count": 30},
+      {"id": "plank", "text": "BRETTER SÄGEN", "kind": "stock", "item": "plank", "count": 6},
+      {"id": "iron_ore", "text": "EISENERZ ABBAUEN", "kind": "stock", "item": "iron_ore", "count": 8}
+     ]
+    },
+    {
+     "id": "tb_build",
+     "text": "BAUE DIE SCHMIEDE",
+     "type": "flag",
+     "flag": "built_smithy",
+     "hint": "build",
+     "event": "story:tb_gather_done"
+    },
+    {
+     "id": "tb_ingot",
+     "text": "SCHMELZE EINEN EISENBARREN",
+     "type": "flag",
+     "flag": "crafted_iron_ingot",
+     "hint": "craft",
+     "event": "story:tb_smithy_done"
+    }
+   ]
+  },
  "take_broom": {
   "title": "DER PERSONALRAUM",
   "steps": [
@@ -450,7 +539,7 @@
 },
  "spiegelhexe": {
   "title": "DIE SPIEGELHEXE",
-  "_doc": "docs/enemies/boss_mora.md section 8. Started by WitchArena (town_workshop finished, level 5).",
+  "_doc": "docs/enemies/boss_mora.md section 8. Unlocked at the Quest Board from level 5 once all prior main quests through torben_smithy are done.",
   "steps": [
    {
     "id": "sh_valdric",
@@ -596,7 +685,6 @@
  },
  "lake_witch": {
   "title": "DER RING AM SEE",
-  "_note": "docs/seehexe_konzept.md 8; texts are PLACEHOLDERS",
   "steps": [
    {
     "id": "lw_lake",

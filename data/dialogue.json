@@ -60,6 +60,7 @@
   ]
  },
  "ambush_start": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "ELLIE",
@@ -70,6 +71,7 @@
   ]
  },
  "rescue": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "???",
@@ -88,6 +90,7 @@
   ]
  },
  "wake_inner": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "ELLIE",
@@ -152,6 +155,7 @@
   ]
  },
  "knight_meet_a": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "???",
@@ -178,6 +182,7 @@
   ]
  },
  "knight_meet_b": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "ELLIE",
@@ -333,6 +338,7 @@
   ]
  },
  "fire_a": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "ELLIE",
@@ -351,6 +357,7 @@
   ]
  },
  "fire_b": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "ELLIE",
@@ -401,6 +408,7 @@
   ]
  },
  "wake_day2": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "ELLIE",
@@ -423,6 +431,7 @@
   ]
  },
  "fire_c": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "???",
@@ -743,6 +752,7 @@
   ]
  },
  "finale_outside": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "???",
@@ -769,6 +779,7 @@
   ]
  },
  "finale_inside": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "???",
@@ -809,6 +820,7 @@
   ]
  },
  "finale_work": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "???",
@@ -827,6 +839,7 @@
   ]
  },
  "finale_end": {
+  "fullscreen": true,
   "lines": [
    {
     "speaker": "ELLIE",
@@ -1145,7 +1158,157 @@
   "lines": [
    {
     "speaker": "GUSTAV",
-    "text": "Gut gemacht, Wirbelwind."
+    "text": "Gut gemacht, Wirbelwind!"
+   }
+  ]
+ },
+ "board_intro": {
+  "flag": "board_intro_done",
+  "lines": [
+   {
+    "speaker": "GUSTAV",
+    "text": "Ellie, Kleines! Drei Leute im Dorf, und ich verlier schon wieder den Zettel mit den Maßangaben!"
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Welchen Zettel? Der hinter deinem anderen Ohr?"
+   },
+   {
+    "speaker": "GUSTAV",
+    "text": "...Der auch! Wir brauchen ein ordentliches Brett auf dem Platz. Eine Tafel für alle Aufträge!"
+   },
+   {
+    "speaker": "VALDRIC",
+    "text": "Kein schlechter Einfall. So sieht jeder auf einen Blick, wo es brennt. Drück B und stell die Questtafel auf."
+   }
+  ]
+ },
+ "tb_ambush_start": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Schatten. Weg da."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Gleich drei Stück — hinter dem Felsen!"
+   }
+  ]
+ },
+ "tb_ambush_clear": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Hm. Nicht schlecht."
+   }
+  ]
+ },
+ "tb_meet": {
+  "flag": "tb_met",
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Schartig."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Mein Schwert?! Es hat dir eben den Rücken freigehalten!"
+   },
+   {
+    "speaker": "TORBEN",
+    "text": "Trotzdem schartig. Ich bin Torben."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Ellie. Im Süden steht unsere Siedlung. Mit Licht, Dach und Werkstatt."
+   },
+   {
+    "speaker": "TORBEN",
+    "text": "Siedlung? ... Schmiede fehlt."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Wir bauen eine, wenn du sie übernimmst."
+   },
+   {
+    "speaker": "TORBEN",
+    "text": "Bau die Esse. Ich komme."
+   }
+  ]
+ },
+ "tb_gather_done": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Gut. Bauen."
+   }
+  ]
+ },
+ "tb_smithy_done": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Steht gerade. Gut."
+   },
+   {
+    "speaker": "TORBEN",
+    "text": "Zwei Erz, ein Holz. Schmelzen."
+   }
+  ]
+ },
+ "ingot_made": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Sauberer Guss."
+   }
+  ]
+ },
+ "torben_talk_a": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Klinge hält?"
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Bis jetzt ja. Solange ich sie nicht an Steine schlage."
+   },
+   {
+    "speaker": "TORBEN",
+    "text": "Gut."
+   }
+  ]
+ },
+ "torben_talk_b": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Mehr Erz. Besseres Eisen."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Du bist heute aber gesprächig."
+   },
+   {
+    "speaker": "TORBEN",
+    "text": "Reicht jetzt."
+   }
+  ]
+ },
+ "torben_talk_c": {
+  "lines": [
+   {
+    "speaker": "TORBEN",
+    "text": "Nimm. Selber geschmiedet."
+   },
+   {
+    "speaker": "TORBEN",
+    "text": "Nicht verlieren."
+   },
+   {
+    "speaker": "ELLIE",
+    "text": "Ich pass gut darauf auf, Torben."
    }
   ]
  },

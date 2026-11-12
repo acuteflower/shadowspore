@@ -15,6 +15,9 @@ var _peer: int = 0
 static func open(tree: SceneTree, for_player: Player, for_town: TownManager, _at: Vector2 = Vector2.INF) -> QuestBoardWindow:
 	if tree.get_first_node_in_group("board_window") != null or for_town.board == null:
 		return null
+	if for_player != null and for_player.quests != null:
+		for_player.quests.set_flag("opened_quest_board")
+	for_town.board.check_story_now()
 	var window: QuestBoardWindow = QuestBoardWindow.new()
 	tree.root.add_child(window)
 	window.setup_board(for_player, for_town)

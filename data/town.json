@@ -793,7 +793,7 @@
   },
   "quest_board": {
    "name": "QUESTTAFEL",
-   "needs": "lamp_post",
+   "needs": "workshop",
    "category": "living",
    "texture": "quest_board",
    "frame": [

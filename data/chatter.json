@@ -219,6 +219,33 @@
    ]
   },
   {
+   "event": "built:quest_board",
+   "lines": [
+    [
+     "gustav",
+     "Endlich! Jetzt verlier ich keinen Zettel mehr! Glaube ich."
+    ]
+   ]
+  },
+  {
+   "event": "built:smithy",
+   "lines": [
+    [
+     "torben",
+     "Steht gerade. Gut."
+    ]
+   ]
+  },
+  {
+   "event": "joined:torben",
+   "lines": [
+    [
+     "valdric",
+     "Ein Schmied am Feuer. Jetzt halten unsere Klingen."
+    ]
+   ]
+  },
+  {
    "event": "night_survived",
    "lines": [
     [

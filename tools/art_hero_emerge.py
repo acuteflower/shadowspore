@@ -46,12 +46,12 @@ DURATION = 10.0
 
 
 def Q(twist=0.0, lean=0.0, pz=0.0, dy=0.0, pitch=0.0, shift=(0.0, 0.0, 0.0), legs=((0.0, 0.04), (0.0, 0.04)), hand_r=REST_R, hand_l=REST_L,
-      hair=(0.0, 0.0, 0.0), droop=0.0, flare=0.0, pole_l=(0.8, -0.6, -0.3), pole_r=(-0.8, -0.6, -0.3), cut=False, anchor=(0.0, 0.0)):
+      hair=(0.0, 0.0, 0.0), droop=0.0, flare=0.0, pole_l=(0.8, -0.6, -0.3), pole_r=(-0.8, -0.6, -0.3), cut=False, anchor=(0.0, 0.0), eyes_closed=0.0):
     """One key pose of the intro. Model units (about px / 0.92), she faces +z (east on screen). dy/pz move the upper body, pitch turns the
     whole body about the pelvis (prone), shift moves everything afterwards, hands are targets in the model's space before pitch."""
     d = hero.P(twist, lean, pz, ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)), hand_r, hand_l, hair, flare)
     d.update({"leg_angles": legs, "dy": dy, "pitch": pitch, "shift": shift, "both_arms": True, "droop": droop, "pole_l": pole_l, "pole_r": pole_r,
-              "cut": 1.0 if cut else 0.0, "anchor": anchor})
+              "cut": 1.0 if cut else 0.0, "anchor": anchor, "eyes_closed": float(eyes_closed)})
     return d
 
 

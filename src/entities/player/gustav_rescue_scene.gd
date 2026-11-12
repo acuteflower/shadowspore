@@ -118,9 +118,6 @@ func _meet() -> void:
 
 
 func _talk(id: String) -> void:
-	for child: Node in _player.get_children():
-		var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
-		if box != null:
-			box.start(id)
-			await box.finished
-			return
+	var runner: BubbleRunner = BubbleRunner.find(_player)
+	if runner != null:
+		await runner.play(id, _wagon.gustav)

@@ -1,0 +1,50 @@
+{
+	"_doc": "How Ellie holds things (docs/griff_system.md, GripRig + AttackComponent._update_pose). styles: per item kind `edge` (the working side of the held picture: +1 its lower, -1 its upper side; it leads every swing and the tool is mirrored, never turned upside down, when it points left), `upright` (always keep the picture's top up) and three rest poses: ready (up to `ready_for` seconds after a swing or charge), carry (relaxed) and sprint. hand = where the fist goes relative to her natural hanging hand [forward, right, up] in px; dir = where the item points [degrees from her facing toward her right hand, degrees above the horizon]. The item is chosen by its `grip` key in items.json, else its `tool`, else sword. swings: per weapon class the shape of a blow in 3D: tilt = how far the plane of a forehand (from her right) leans up on her right side (0 flat sweep, 90 overhead chop), tilt_back the same for a backhand (negative = it comes down from her left: forehand and backhand cross as an X), pitch = extra degrees at the moment it passes the aim, cock / follow = radians the blade goes beyond the arc's ends before and after, over = how far it overshoots in the recovery, top_down = always from above whatever the sweep, blocks = overrides per combo block. spring: the weight of the item at rest (omega = stiffness, damping < 1 overshoots a little, inertia = how much the fist's acceleration swings the tip).",
+	"spring": {"omega": 19.0, "damping": 0.6, "inertia": 0.0006, "max_dt": 0.034, "ready_for": 2.2, "blend": 4.5},
+	"styles": {
+		"sword": {
+			"ready": {"hand": [2.6, 0.4, 2.6], "dir": [22, 26]},
+			"carry": {"hand": [0.9, 0.9, 0.6], "dir": [26, -40]},
+			"sprint": {"hand": [-1.2, 0.9, 1.0], "dir": [160, -24]}
+		},
+		"axe": {
+			"edge": -1,
+			"ready": {"hand": [2.2, 0.4, 2.2], "dir": [12, 42]},
+			"carry": {"hand": [0.9, 0.9, 0.4], "dir": [14, -52]},
+			"sprint": {"hand": [-0.8, 0.9, 0.8], "dir": [165, -30]}
+		},
+		"pickaxe": {
+			"ready": {"hand": [2.2, 0.3, 2.6], "dir": [8, 52]},
+			"carry": {"hand": [2.6, -1.4, 6.4], "dir": [172, 48]},
+			"sprint": {"hand": [2.4, -1.4, 6.6], "dir": [176, 44]}
+		},
+		"hoe": {
+			"edge": 1,
+			"ready": {"hand": [2.2, 0.3, 2.4], "dir": [6, 48]},
+			"carry": {"hand": [2.6, -1.4, 6.4], "dir": [170, 50]},
+			"sprint": {"hand": [2.4, -1.4, 6.6], "dir": [175, 46]}
+		},
+		"sickle": {
+			"edge": 1,
+			"ready": {"hand": [2.6, 0.5, 2.2], "dir": [34, 6]},
+			"carry": {"hand": [1.0, 0.9, 0.5], "dir": [36, -46]},
+			"sprint": {"hand": [-0.8, 0.9, 0.8], "dir": [158, -36]}
+		},
+		"can": {
+			"upright": true,
+			"ready": {"hand": [1.8, 0.6, 1.6], "dir": [4, -6]},
+			"carry": {"hand": [0.8, 0.9, 0.4], "dir": [6, -14]},
+			"sprint": {"hand": [0.2, 0.9, 0.6], "dir": [0, -22]}
+		}
+	},
+	"swings": {
+		"default": {"tilt": 20, "tilt_back": -20, "pitch": 0, "cock": 0.5, "follow": 0.3, "over": 0.22, "top_down": false},
+		"sword_1h": {"tilt": 48, "tilt_back": -42, "pitch": 0, "cock": 1.0, "follow": 0.35, "over": 0.25, "blocks": {"3": {"tilt_back": 55, "cock": 0.8}, "4": {"tilt": 8, "cock": 0.35, "follow": 0.15, "over": 0.12}}},
+		"sword_rift": {"like": "sword_1h"},
+		"sickle_1h": {"tilt": -8, "tilt_back": -8, "pitch": -16, "cock": 0.2, "follow": 0.35, "over": 0.25},
+		"axe_1h": {"tilt": 55, "pitch": -14, "cock": 1.0, "follow": 0.25, "over": 0.12, "top_down": true},
+		"pickaxe_1h": {"tilt": 78, "pitch": -24, "cock": 1.35, "follow": 0.2, "over": 0.08, "top_down": true},
+		"hoe_1h": {"tilt": 82, "pitch": -34, "cock": 1.3, "follow": 0.15, "over": 0.06, "top_down": true},
+		"can_1h": {"tilt": 0, "tilt_back": 0, "pitch": -34, "cock": 0.25, "follow": 0.25, "over": 0.15}
+	}
+}

@@ -412,6 +412,8 @@ func _grove(found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector
 		var at: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * radius * t
 		var v: float = t + rng.randf() * 0.3
 		var variant: int = ((3 if rng.randf() < 0.5 else 2) if v < 0.25 else (2 if v < 0.55 else (1 if v < 0.85 else 0)))
+		if variant >= 2 and int(v * 1000.0) % 3 == 0:
+			variant += 2
 		var before: int = found.size()
 		_add(found, rng, "tree", variant, at, 0.0, true, _young_for(at, t))
 		trees += found.size() - before
@@ -638,7 +640,10 @@ func _tree_variant(rng: RandomNumberGenerator, kind: String, t: float) -> int:
 	if kind != "tree":
 		return _weighted(rng, kind)
 	var v: float = t + rng.randf() * 0.3
-	return (3 if rng.randf() < 0.5 else 2) if v < 0.25 else (2 if v < 0.55 else (1 if v < 0.85 else 0))
+	var base: int = (3 if rng.randf() < 0.5 else 2) if v < 0.25 else (2 if v < 0.55 else (1 if v < 0.85 else 0))
+	if base >= 2 and int(v * 1000.0) % 3 == 0:
+		return base + 2
+	return base
 
 
 ## One to three willows with glow caps between their roots.

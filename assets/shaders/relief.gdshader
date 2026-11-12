@@ -30,22 +30,26 @@ const float TILE = 16.0;
 const float WALL = 32.0; // px a wall is tall
 const int STAIRS = 3;
 
-const vec3 LINE = vec3(0.106, 0.102, 0.180);
-const vec3 SHADOW = vec3(0.035, 0.02, 0.11);
+const vec3 LINE = vec3(0.0863, 0.0824, 0.1647);
+const vec3 SHADOW = vec3(0.0392, 0.0275, 0.1255);
 const vec3 GRASS[6] = vec3[6](
 	vec3(0.1333, 0.2824, 0.2353), vec3(0.1843, 0.3843, 0.3059), vec3(0.2431, 0.4902, 0.3373),
 	vec3(0.3333, 0.5961, 0.3725), vec3(0.4863, 0.7255, 0.4275), vec3(0.6588, 0.8627, 0.5490));
+// Canonical twilight-slate stone ramp (synced with tools/art_stone.py: cool violet-indigo shade -> lavender-slate glint)
 const vec3 STONE[6] = vec3[6](
-	vec3(0.1843, 0.1804, 0.2784), vec3(0.2980, 0.2941, 0.4078), vec3(0.4314, 0.4275, 0.5569),
-	vec3(0.6039, 0.5961, 0.7216), vec3(0.7686, 0.7608, 0.8549), vec3(0.8941, 0.8863, 0.9490));
+	vec3(0.1098, 0.1020, 0.2039), vec3(0.1804, 0.1647, 0.3216), vec3(0.2784, 0.2627, 0.4353),
+	vec3(0.4000, 0.3725, 0.5804), vec3(0.5412, 0.5137, 0.7216), vec3(0.7843, 0.7608, 0.8941));
+// Dressed twilight ashlar masonry (slightly warmer weathered slate than raw cliff rock)
 const vec3 MASON[6] = vec3[6](
-	vec3(0.1686, 0.1647, 0.25), vec3(0.251, 0.2471, 0.3608), vec3(0.3529, 0.3451, 0.4706),
-	vec3(0.4784, 0.4706, 0.5961), vec3(0.6157, 0.6078, 0.7216), vec3(0.7647, 0.7569, 0.8471));
+	vec3(0.0980, 0.0902, 0.1765), vec3(0.1608, 0.1490, 0.2706), vec3(0.2431, 0.2275, 0.3686),
+	vec3(0.3451, 0.3255, 0.4824), vec3(0.4706, 0.4471, 0.6078), vec3(0.6353, 0.6118, 0.7569));
+// Cool twilight violet-umber forest loam (harmonized with bake_ground.py & root flora, never orange mud)
 const vec3 EARTH[6] = vec3[6](
-	vec3(0.1647, 0.1216, 0.1804), vec3(0.2902, 0.2078, 0.1843), vec3(0.4196, 0.2980, 0.2275),
-	vec3(0.5608, 0.4157, 0.2980), vec3(0.7098, 0.5529, 0.3843), vec3(0.8314, 0.6980, 0.5137));
+	vec3(0.0941, 0.0706, 0.1412), vec3(0.1686, 0.1255, 0.2000), vec3(0.2627, 0.1922, 0.2549),
+	vec3(0.3686, 0.2745, 0.3176), vec3(0.4863, 0.3765, 0.4000), vec3(0.6235, 0.5098, 0.5137));
 const vec3 VIOLET[4] = vec3[4](
-	vec3(0.2902, 0.1647, 0.5412), vec3(0.4784, 0.3020, 0.8784), vec3(0.6902, 0.4196, 1.0), vec3(0.9020, 0.8157, 1.0));
+	vec3(0.2706, 0.1529, 0.5216), vec3(0.4784, 0.3020, 0.8784), vec3(0.6902, 0.4196, 1.0), vec3(0.9098, 0.8314, 1.0));
+const vec3 TEAL_ACCENT = vec3(0.3020, 0.8157, 0.8000);
 const vec3 MAGENTA = vec3(1.0, 0.31, 0.85);
 const float BAYER[16] = float[16](0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0);
 
@@ -163,96 +167,175 @@ vec3 side(int style, float x, vec2 p) {
 vec3 wall_color(vec2 p, float dy, int style, vec3 tint) {
 	vec3 col;
 	if (style == 0) {
-		// grass embankment: fine vertical grain, lighter up top, a few tufts, earth only at the foot
-		float grain = vnoise(vec2(p.x * 1.1, p.y * 0.09));
-		float blotch = vnoise(p * 0.15 + 4.0);
-		float shade = 3.3 - dy / WALL * 1.7 + (grain - 0.5) * 2.0 + (blotch - 0.5) * 1.2 + (bayer(p) - 0.5) * 0.8;
+		// grass embankment: dense overlapping turf cushions & blade ribs (bush-level detail), twilight loam at the foot
+		float wave = sin(p.x * 0.16 + floor(dy / 7.5) * 2.1) * 1.6 + (vnoise(vec2(p.x * 0.09, 4.0)) - 0.5) * 3.2;
+		float tier_y = dy + wave;
+		float tier = floor(tier_y / 7.5);
+		float within = tier_y - tier * 7.5;
+		float rib = sin((p.x + tier * 3.0) * 1.45 - within * 0.35) * 0.55;
+		float tuft = vnoise(vec2(p.x * 0.38 + tier * 3.7, dy * 0.16));
+		float blotch = vnoise(p * 0.10 + 4.0);
+		float shade = 3.45 - dy / WALL * 1.65 + (tuft - 0.5) * 1.55 + rib + (blotch - 0.5) * 0.85;
+		if (within < 1.7) shade += 0.75; // sunlit upper crest of each overlapping turf cushion
+		else if (within > 5.8) shade -= 0.95; // crisp dark grass crease underneath each turf cushion
+		shade += (bayer(p) - 0.5) * 0.68;
 		col = grass(int(floor(shade)), tint);
-		float soil = vnoise(p * vec2(0.3, 0.25) + 11.0) + (dy - 26.0) * 0.09;
-		if (soil > 0.78) col = EARTH[clamp(int(floor(1.2 + (soil - 0.78) * 6.0)), 1, 2)];
-		vec2 tc = floor(p / vec2(3.0, 4.0));
-		if (hash21(tc + 9.0) > 0.92 && mod(p.x, 3.0) < 1.0 && mod(p.y, 4.0) < 2.0) col = grass(5, tint);
-		if (hash21(tc + 2.0) > 0.95 && mod(p.y, 4.0) < 1.0) col = grass(0, tint);
+		// cool violet-umber forest loam peeking out near the foot with a tucked dark-grass overhang fringe
+		float soil = vnoise(p * vec2(0.22, 0.20) + 11.0) + (dy - 24.0) * 0.085;
+		if (soil > 0.76) {
+			int ei = clamp(int(floor(1.6 + (soil - 0.76) * 5.2 + (bayer(p) - 0.5) * 0.7)), 1, 3);
+			col = EARTH[ei];
+		} else if (soil > 0.65) {
+			col = grass(soil > 0.70 ? 0 : 1, tint);
+		}
 	} else if (style == 2) {
-		// masonry: courses of bricks, mossy joints
-		float course = floor(p.y / 5.0);
-		float off = mod(course, 2.0) * 4.0;
-		float bx = floor((p.x + off) / 8.0);
-		vec2 bp = vec2(mod(p.x + off, 8.0), mod(p.y, 5.0));
-		float bh = hash21(vec2(bx, course));
-		float tone = 2.2 + bh * 1.6 - dy / WALL * 0.7;
-		if (bp.y >= 1.0 && bp.y < 2.0 && bp.x >= 1.0) tone += 0.9;
-		if (bp.x < 1.0 || bp.y < 1.0) tone = 0.5 + bh * 0.6;
-		tone += (bayer(p) - 0.5) * 0.5;
+		// hand-hewn ruin & town ashlar masonry: varied block widths, chiseled top-left bevels, recessed mortar, moss cushions
+		float course = floor(p.y / 6.0);
+		float cy = mod(p.y, 6.0);
+		float bw = 10.0 + floor(hash21(vec2(course, 17.0)) * 5.0); // 10..14 px wide stones per course
+		float off = mod(course, 2.0) * floor(bw * 0.5) + floor(hash21(vec2(course, 3.0)) * 3.0);
+		float bx = floor((p.x + off) / bw);
+		float cx = mod(p.x + off, bw);
+		bool merged = hash21(vec2(floor(bx * 0.5), course + 91.0)) > 0.76 && mod(bx, 2.0) > 0.5;
+		float stone_id = merged ? bx - 1.0 : bx;
+		float bh = hash21(vec2(stone_id, course));
+		bool mortar_h = cy < 1.0;
+		bool mortar_v = cx < 1.0 && !merged;
+		float tone = 2.35 + bh * 1.45 - dy / WALL * 0.65 + (vnoise(p * 0.22 + 9.0) - 0.5) * 0.45;
+		if (mortar_h || mortar_v) {
+			tone = 0.35 + bh * 0.65;
+		} else {
+			// top-left chiseled bevel highlight & lower-right shaded chamfer
+			if ((cy < 2.0 && cx >= 1.0) || (cx < 2.0 && !merged && cy < 4.5)) tone += 0.95;
+			if (cy >= 5.0 || cx >= bw - 1.0) tone -= 0.55;
+			if (cy < 2.0 && cx < 2.0 && hash21(vec2(stone_id + 5.0, course)) > 0.72) tone -= 0.9; // weathered corner chip
+		}
+		tone += (bayer(p) - 0.5) * 0.55;
 		col = rock(2, int(floor(tone)));
-		if (hash21(vec2(bx, course + 30.0)) > 0.84 && bp.y < 3.0 && bp.x >= 1.0) col = mix(col, grass(2, tint), 0.85);
+		// rounded organic moss cushions nestled in damp mortar joints
+		float mh = hash21(vec2(stone_id, course + 30.0));
+		if (mh > 0.78) {
+			float mlen = 2.0 + floor(mh * 4.0);
+			float mdx = abs(cx - bw * 0.35);
+			if (mdx < mlen && cy < 2.6 - mdx * 0.35) {
+				int gi = cy < 1.2 ? 3 : 2;
+				if (cx < bw * 0.35 && cy < 1.2) gi = 4;
+				col = grass(gi, tint);
+			} else if (mdx < mlen && cy < 3.4 - mdx * 0.35) {
+				col = rock(2, 0);
+			}
+		}
 	} else {
-		// rock: wavy strata of slabs, cracks between them; crystal veins or void cracks on top
-		float wob = (vnoise(vec2(p.x * 0.07, floor(p.y / 6.0))) - 0.5) * 6.0;
+		// natural fractured cliff rock: stepped strata, faceted left/right planes (like rock.png), deep indigo crevices
+		float wob = (vnoise(vec2(p.x * 0.055, floor(p.y / 8.0) * 1.7)) - 0.5) * 7.5;
 		float yy = p.y + wob;
-		float layer = floor(yy / 6.0);
-		float within = yy - layer * 6.0;
-		float tone = 2.0 + hash21(vec2(layer, 5.0)) * 1.8 - dy / WALL * 0.9 + (vnoise(p * 0.3) - 0.5) * 0.8;
-		if (within < 1.0) tone += 1.1;
-		else if (within >= 5.0) tone -= 1.0;
-		float slab = floor((p.x + layer * 5.0) / 7.0);
-		if (hash21(vec2(slab, layer)) > 0.78 && mod(p.x + layer * 5.0, 7.0) < 1.0) tone -= 1.7;
-		tone += (bayer(p) - 0.5) * 0.7;
+		float layer = floor(yy / 8.0);
+		float within = yy - layer * 8.0;
+		float fw = 11.0 + floor(hash21(vec2(layer, 13.0)) * 7.0); // 11..17 px wide rock facets
+		float shift_x = p.x + layer * 6.0 + (vnoise(vec2(layer * 2.3, p.y * 0.08)) - 0.5) * 4.0;
+		float slab = floor(shift_x / fw);
+		float fx = mod(shift_x, fw);
+		float sh = hash21(vec2(slab, layer));
+		float ridge = fw * (0.38 + 0.28 * hash21(vec2(slab + 19.0, layer))); // dihedral ridge splitting lit left & shaded right face
+		float tone = 2.25 + sh * 1.45 - dy / WALL * 0.85 + (vnoise(p * 0.24) - 0.5) * 0.55;
+		tone += fx < ridge ? 0.45 : -0.38; // top-left directional planar facet
+		if (within < 1.35) tone += fx < ridge ? 1.25 : 0.85; // crisp lit upper ledge cap
+		else if (within >= 6.8) tone -= 1.25; // recessed overhang shadow under stratum
+		if (fx < 1.0 && sh > 0.32) tone -= 1.65; // stepped vertical dihedral fissure
+		else if (abs(fx - ridge) < 0.7 && within < 5.5 && sh > 0.45) tone += 0.45; // subtle facet arris highlight
+		tone += (bayer(p) - 0.5) * 0.65;
 		col = rock(style, int(floor(tone)));
-		if ((style == 1 || style == 5) && within < 1.5 && vnoise(p * 0.11 + 3.0) > 0.64) col = grass(int(floor(2.0 + hash21(p) * 2.0)), tint);
+		// mossy shelf cushions along natural rock ledges
+		if ((style == 1 || style == 5) && within < 2.3 && vnoise(p * 0.095 + 3.0) > 0.58) {
+			int mg = within < 1.1 ? (fx < ridge ? 4 : 3) : 2;
+			col = grass(mg, tint);
+		} else if ((style == 1 || style == 5) && within >= 2.3 && within < 3.2 && vnoise((p - vec2(0.0, 1.0)) * 0.095 + 3.0) > 0.58) {
+			col = rock(style, 0);
+		}
 		if (style == 3) {
 			float d = p.x * 0.6 + p.y * 0.35 + vnoise(p * 0.15) * 7.0;
 			float vein = abs(fract(d / 11.0) - 0.5);
-			if (vein < 0.03) col = VIOLET[3];
+			if (vein < 0.028) col = mix(VIOLET[3], TEAL_ACCENT, step(0.82, hash21(floor(p * 0.5) + 13.0)) * 0.35);
 			else if (vein < 0.055) col = VIOLET[2];
-			else if (vein < 0.08 && hash21(p) > 0.4) col = VIOLET[1];
+			else if (vein < 0.082 && bayer(p) > 0.35) col = VIOLET[1];
+			else if (vein < 0.105) col = mix(col, VIOLET[0], 0.55);
 			vec2 sc = floor(p / 13.0);
-			vec2 sh = vec2(hash21(sc + 3.0), hash21(sc + 8.0));
-			if (sh.x > 0.9) { // a shard of crystal
-				vec2 k = abs(p - (sc * 13.0 + 3.0 + sh * 7.0));
-				if (k.x + k.y * 0.5 < 2.6 && k.y < 4.0) col = mix(VIOLET[2], VIOLET[3], step(0.5, 1.0 - k.x * 0.6));
+			vec2 csh = vec2(hash21(sc + 3.0), hash21(sc + 8.0));
+			if (csh.x > 0.9) { // a faceted crystal shard
+				vec2 k = p - (sc * 13.0 + 3.0 + csh * 7.0);
+				vec2 ak = abs(k);
+				if (ak.x + ak.y * 0.5 < 2.6 && ak.y < 4.0) {
+					col = k.x < 0.0 ? VIOLET[3] : VIOLET[2];
+				}
 			}
 		} else if (style == 4) {
 			float crack = abs(vnoise(p * vec2(0.11, 0.07) + 2.0) - 0.5);
-			if (crack < 0.018) col = MAGENTA * (0.55 + 0.35 * sin(time * 1.6 + p.x * 0.07) + night * 0.2);
-			else if (crack < 0.03) col = VIOLET[0];
+			if (crack < 0.018) col = MAGENTA * (0.58 + 0.34 * sin(time * 1.6 + p.x * 0.07) + night * 0.2);
+			else if (crack < 0.034) col = VIOLET[0];
 		}
 	}
 	return col;
 }
 
-// what every wall gets on top of its style: light patches, stones set into it, vines, flowers, grass at the foot
+// what every wall gets on top of its style: sunlit/shaded patches, embedded cobbles, swaying ivy tendrils, tiny cliff blooms
 vec3 wall_life(vec2 p, float dy, int style, vec3 col, vec3 tint) {
-	col *= 0.88 + 0.26 * vnoise(p * 0.045 + 7.0); // big sunlit and shaded patches
-	// stones set into the wall
-	vec2 sc = floor(p / vec2(15.0, 11.0));
+	col *= 0.89 + 0.24 * vnoise(p * 0.042 + 7.0); // broad sunlit and shaded wall patches
+	// faceted twilight cobbles set into natural embankments & cliffs
+	vec2 sc = floor(p / vec2(16.0, 12.0));
 	vec2 sh = vec2(hash21(sc + 41.0), hash21(sc + 77.0));
-	if (sh.x > (style == 0 ? 0.88 : 0.93) && style != 2) {
-		vec2 c = (sc + vec2(0.2 + 0.6 * sh.y, 0.3 + 0.4 * sh.x)) * vec2(15.0, 11.0);
-		vec2 k = (p + 0.5 - c) / vec2(3.0 + 3.0 * sh.y, 2.0 + 1.5 * sh.x);
+	if (sh.x > (style == 0 ? 0.87 : 0.93) && style != 2) {
+		vec2 c = (sc + vec2(0.22 + 0.56 * sh.y, 0.32 + 0.38 * sh.x)) * vec2(16.0, 12.0);
+		vec2 k = (p + 0.5 - c) / vec2(3.0 + 2.8 * sh.y, 2.0 + 1.4 * sh.x);
 		float r = dot(k, k);
 		if (r < 1.0) {
-			float lit = clamp(0.5 - (k.x + k.y) * 0.35 + (hash21(p) - 0.5) * 0.25, 0.0, 1.0);
-			col = STONE[clamp(int(floor(1.0 + lit * 3.6)), 0, 5)];
-			if (r > 0.6 && (k.x + k.y) > 0.0) col = STONE[0];
-			if (r < 0.2 && lit > 0.6) col = STONE[4];
-			if (k.y < -0.45 && hash21(p + 3.0) < 0.75) col = grass(2 + int(floor(hash21(p) * 3.0)), tint); // moss on top
-		} else if (r < 1.5 && k.y > 0.0) {
-			col *= 0.7; // its shadow
+			float lit = clamp(0.54 - (k.x * 0.42 + k.y * 0.36) + (bayer(p) - 0.5) * 0.22, 0.0, 1.0);
+			col = STONE[clamp(int(floor(1.0 + lit * 4.2)), 0, 5)];
+			if (r > 0.62 && (k.x + k.y) > 0.1) col = STONE[0];
+			if (k.y < -0.42 && sh.y > 0.3) col = grass(k.x < 0.0 ? 4 : 3, tint); // moss cushion on upper cap
+		} else if (r < 1.45 && (k.x * 0.3 + k.y) > 0.15) {
+			col = mix(col * 0.66, LINE, 0.22); // tucked socket shadow
 		}
 	}
-	// vines and roots hanging from the lip
-	float vcol = floor(p.x / 3.0);
-	float vh = hash21(vec2(vcol, 11.0));
-	if (vh > 0.8 && mod(p.x, 3.0) >= 1.0 && mod(p.x, 3.0) < 2.0 && dy < 5.0 + hash21(vec2(vcol, 12.0)) * 20.0) {
-		col = style == 0 ? EARTH[clamp(int(floor(hash21(vec2(p.y, vcol)) * 3.0)), 0, 2)] : grass(1 + int(floor(hash21(vec2(p.y * 0.5, vcol)) * 2.0)), tint);
-	} else if (vh > 0.8 && mod(p.y + vcol * 3.0, 5.0) < 1.0 && dy < 5.0 + hash21(vec2(vcol, 12.0)) * 20.0) {
-		col = grass(3, tint); // a leaf
+	// organic swaying ivy tendrils & hanging roots (replaces rigid mod(p.x, 3.0) barcode stripes)
+	if (style != 4) {
+		float vcol = floor(p.x / 7.0);
+		float vh = hash21(vec2(vcol, 11.0));
+		if (vh > (style == 2 ? 0.82 : 0.75)) {
+			float vlen = 7.0 + hash21(vec2(vcol, 12.0)) * 17.0;
+			if (dy < vlen) {
+				float sway = sin(dy * 0.34 + vh * 6.283) * 1.15;
+				float stem_x = vcol * 7.0 + 3.0 + sway;
+				float dx = p.x - stem_x;
+				float taper = 1.0 - dy / vlen;
+				bool leaf_node = mod(floor(dy + vcol * 2.0), 3.0) < 1.0 && dy < vlen - 1.5;
+				float reach = leaf_node ? (0.85 + taper * 1.15) : (0.55 + taper * 0.55);
+				if (abs(dx) <= reach) {
+					if (style == 0 && vh > 0.90 && dy > 10.0) {
+						col = EARTH[dx < 0.0 ? 3 : 1]; // slender rootlet on earthen slopes
+					} else {
+						int gi = dx < -0.15 ? (dy < 5.0 ? 4 : 3) : (dx > 0.35 ? 1 : 2);
+						col = grass(gi, tint);
+					}
+				} else if (dx > reach && dx <= reach + 1.0 && dy > 2.0) {
+					col *= 0.78; // soft contact shadow to the right of the tendril
+				}
+			}
+		}
 	}
-	// flowers and tufts in the grass
-	if (style == 0 || style == 1) {
-		vec2 fc = floor(p / vec2(8.0, 6.0));
-		if (hash21(fc + 5.0) > 0.955 && mod(p.x, 8.0) < 1.0 && mod(p.y, 6.0) < 1.0) col = hash21(fc) > 0.5 ? vec3(0.78, 0.66, 1.0) : vec3(0.98, 0.93, 0.78);
+	// delicate 3-pixel cliff wildflower clusters with tiny leaf tuck (never isolated 1px dots)
+	if ((style == 0 || style == 1) && dy > 4.0 && dy < WALL - 7.0) {
+		vec2 fc = floor(p / vec2(11.0, 9.0));
+		float fh = hash21(fc + 5.0);
+		if (fh > 0.93) {
+			vec2 fp = mod(p, vec2(11.0, 9.0)) - vec2(4.0 + floor(hash21(fc + 2.0) * 3.0), 3.0 + floor(hash21(fc + 8.0) * 3.0));
+			bool violet_kind = hash21(fc) > 0.48;
+			vec3 hi = violet_kind ? vec3(0.84, 0.76, 0.98) : vec3(0.96, 0.94, 0.86);
+			vec3 sh_c = violet_kind ? vec3(0.58, 0.46, 0.86) : vec3(0.82, 0.76, 0.68);
+			if ((fp.x == 0.0 && fp.y == -1.0) || (fp.x == -1.0 && fp.y == 0.0)) col = hi;
+			else if (fp.x == 0.0 && fp.y == 0.0) col = vec3(0.94, 0.82, 0.48);
+			else if (fp.x == 1.0 && fp.y == 0.0) col = sh_c;
+			else if (fp.x == 0.0 && fp.y == 1.0) col = grass(1, tint);
+		}
 	}
 	return col;
 }
@@ -300,31 +383,44 @@ vec4 wall_glow_pixel(vec2 p, float dist, int style) {
 	return vec4(col, a * 0.85);
 }
 
-// a wall pixel: surface, the plateau's grass hanging over the top, grass blades at the foot, outlines at the ends
+// a wall pixel: surface, scalloped plateau turf overhanging the top, curved grass blades at the foot, soft outlines at the ends
 vec4 wall_pixel(vec2 p, float dist, int style, vec3 tint) {
 	float dy = dist - 1.0;
 	vec3 col = wall_color(p, dy, style, tint);
 	col = wall_life(p, dy, style, col, tint);
-	// grass spills over rock and masonry from the lip in ragged tongues
-	float tongue = style == 0 ? 0.0 : (vnoise(vec2(p.x * 0.17, 3.0)) - 0.42) * 16.0 * (style == 1 || style == 5 ? 1.0 : 0.5);
-	if (dy < tongue + (hash21(vec2(p.x, 5.0)) - 0.5) * 3.0) col = grass(2 + int(floor(hash21(p) * 2.6)), tint);
-	float jag = (style == 0 ? 2.0 : 1.0) + floor(hash21(vec2(floor(p.x / 2.0), 1.0)) * (style == 0 ? 4.0 : 3.0));
-	if (dy < jag) {
-		col = grass(dy < 1.0 ? 5 : (dy < 2.0 ? 4 : 3), tint);
-		if (style == 4) col = mix(col, MAGENTA, 0.35);
-	} else if (dy < jag + 3.0) {
-		col *= 0.62 + 0.13 * (dy - jag); // shade under the overhang
+	// scalloped turf cushions spilling over rock and masonry from the plateau lip
+	float scallop = sin(p.x * 0.42 + floor(p.x / 9.0) * 1.7) * 1.4;
+	float tongue = style == 0 ? 0.0 : max(0.0, (vnoise(vec2(p.x * 0.14, 3.0)) - 0.40) * 14.0 * (style == 1 || style == 5 ? 1.0 : 0.48) + scallop * 0.6);
+	float jag = (style == 0 ? 2.5 : 1.5) + floor(hash21(vec2(floor(p.x / 3.0), 1.0)) * (style == 0 ? 3.0 : 2.5));
+	float lip_reach = max(jag, tongue);
+	if (dy < lip_reach) {
+		float crown = dy / max(lip_reach, 1.0);
+		int gi = dy < 1.0 ? 5 : (crown < 0.48 ? 4 : (crown < 0.80 ? 3 : 2));
+		if (mod(p.x, 3.0) >= 2.0 && dy >= 1.0) gi = max(gi - 1, 1); // subtle blade separation in overhang
+		col = grass(gi, tint);
+		if (style == 4) col = mix(col, VIOLET[0], 0.55);
+	} else if (dy < lip_reach + 3.0) {
+		float sh_t = (dy - lip_reach) / 3.0;
+		col = mix(mix(col * 0.56, LINE, 0.24), col, sh_t); // cool indigo cast shadow under the turf overhang
 	}
-	// the foot: darker, then grass blades growing up over it so it melts into the ground
-	if (dy >= WALL - 5.0) {
-		float blade = floor(hash21(vec2(p.x, 8.0)) * 4.0) + (vnoise(vec2(p.x * 0.2, 9.0)) - 0.5) * 3.0;
-		float below = WALL - 1.0 - dy; // 0 at the last row
-		if (below < blade) col = grass(1 + int(floor(hash21(vec2(p.x, p.y)) * 3.0)), tint);
-		else if (below < 1.0) col = hash21(vec2(p.x, 2.0)) < 0.6 ? LINE : col * 0.5;
-		else col *= 0.7;
+	// the foot: cool tucked crease & clustered grass blades growing up over the cliff base so it melts into the meadow
+	if (dy >= WALL - 6.0) {
+		float tuft_cell = floor(p.x / 3.0);
+		float tuft_h = floor(hash21(vec2(tuft_cell, 8.0)) * 3.5) + (vnoise(vec2(p.x * 0.18, 9.0)) - 0.45) * 3.2;
+		float lx = mod(p.x, 3.0);
+		float blade = max(0.0, tuft_h - abs(lx - 1.0) * 0.9);
+		float below = WALL - 1.0 - dy; // 0 at the bottom row
+		if (below < blade) {
+			int fg = below > blade - 1.2 ? 3 : (lx < 1.5 ? 2 : 1);
+			col = grass(fg, tint);
+		} else if (below < 1.0) {
+			col = bayer(p) < 0.65 ? LINE : mix(col * 0.48, LINE, 0.45);
+		} else {
+			col = mix(col * 0.72, LINE, 0.15 * (1.0 - below / 5.0));
+		}
 	}
-	// the ends of the wall
-	if (hash21(p) < 0.85 && (up_dist(p + vec2(-1.0, 0.0)) > WALL || up_dist(p + vec2(1.0, 0.0)) > WALL)) col = mix(col, LINE, 0.85);
+	// the left/right ends of the wall
+	if (bayer(p) < 0.88 && (up_dist(p + vec2(-1.0, 0.0)) > WALL || up_dist(p + vec2(1.0, 0.0)) > WALL)) col = mix(col, LINE, 0.82);
 	return vec4(col, 1.0);
 }
 
@@ -345,7 +441,7 @@ vec4 ramp(vec2 p, vec2 l, Tile c, vec3 tint, bool side) {
 	float prog = (depth - float(row) - l.y / 16.0) / depth; // 1 at the top of the slope, 0 at its foot
 	float cx = float(cpos) * 16.0 + l.x; // 0..48 across the ramp
 	float meander = (vnoise(vec2(p.y * 0.09, 5.0)) - 0.5) * 6.0;
-	float edge_n = (vnoise(p * vec2(0.3, 0.45) + 2.0) - 0.5) * 6.0 + (hash21(p) - 0.5) * 1.5;
+	float edge_n = (vnoise(p * vec2(0.26, 0.38) + 2.0) - 0.5) * 5.5 + (bayer(p) - 0.5) * 1.2;
 	float half_w = 10.0 + (1.0 - prog) * 9.0 + edge_n;
 	float dist = abs(cx - 24.0 - meander);
 	vec4 col = vec4(0.0);
@@ -356,32 +452,33 @@ vec4 ramp(vec2 p, vec2 l, Tile c, vec3 tint, bool side) {
 		if (cover > 0.1) {
 			float dy = l.y + 16.0 * float(row);
 			vec3 w = wall_life(p, dy, c.style, wall_color(p, dy, c.style, tint), tint);
-			w *= 0.92 + 0.08 * smoothstep(half_w, half_w + 4.0, dist); // only a whisper of shade beside the slope
-			if (cover < 0.3) w = mix(grass(2 + int(floor(hash21(p) * 2.0)), tint), w, smoothstep(0.1, 0.3, cover));
+			w *= 0.92 + 0.08 * smoothstep(half_w, half_w + 4.0, dist);
+			if (cover < 0.3) w = mix(grass(2 + int(floor(bayer(p) * 2.0)), tint), w, smoothstep(0.1, 0.3, cover));
 			col = vec4(w, 1.0);
 		}
 	} else {
 		float centre = 1.0 - dist / half_w; // 1 on the worn middle
-		float n = vnoise(p * vec2(0.5, 0.4));
-		float tone = 2.2 + (n - 0.5) * 2.6 + vnoise(p * 0.18 + 9.0) * 0.8 + centre * 0.9 + (hash21(p) - 0.5) * 0.9 + (prog - 0.5) * 0.4;
+		float n = vnoise(p * vec2(0.32, 0.28));
+		float tone = 2.3 + (n - 0.5) * 2.1 + vnoise(p * 0.14 + 9.0) * 0.7 + centre * 0.85 + (bayer(p) - 0.5) * 0.75 + (prog - 0.5) * 0.45;
 		vec3 base;
 		if (c.style == 0) {
-			// a grassy slope that carries the wall's own greens: lighter towards the top, only a faint worn strip of earth
-			float g = 2.0 + prog * 0.9 + (n - 0.5) * 1.6 + (hash21(p) - 0.5) * 0.8;
+			// grassy slope carrying the meadow greens, with soft twilight-earth wear tracks along the centre
+			float g = 2.1 + prog * 0.9 + (n - 0.5) * 1.5 + (bayer(p) - 0.5) * 0.65;
 			base = grass(int(floor(g)), tint);
-			float worn = centre * (vnoise(p * vec2(0.35, 0.6) + 4.0) - 0.35);
-			if (worn > 0.3 && hash21(p + 9.0) < 0.5) base = mix(base, EARTH[3], 0.45);
+			float worn = centre * (vnoise(p * vec2(0.28, 0.45) + 4.0) - 0.32);
+			if (worn > 0.28 && bayer(p) < 0.65) base = mix(base, EARTH[3], 0.52);
 		} else {
-			base = rock(c.style, int(floor(tone - 0.4)));
+			base = rock(c.style, int(floor(tone - 0.35)));
 			float rut = abs(sin((cx - 24.0 - meander) * 0.55));
 			if (centre > 0.25 && rut > 0.97) base *= 0.82;
-			if (hash21(floor(p * 0.5) + 31.0) > 0.975) base = STONE[2 + int(floor(hash21(p) * 2.0))]; // pebbles
+			vec2 peb = floor(p / 2.0);
+			if (hash21(peb + 31.0) > 0.965) base = STONE[mod(p.x, 2.0) < 1.0 ? 4 : 2]; // 2px shaded pebbles
 		}
 		float rim = (half_w - dist);
-		if (c.style != 0 && rim < 3.0 && hash21(p + 5.0) > 0.35 + rim * 0.2) base = grass(2 + int(floor(hash21(p + 1.0) * 3.0)), tint); // grass creeping onto the path
-		float fade = prog < 0.3 ? (prog / 0.3) : 1.0; // the foot melts into the ground
-		if (side && prog > 0.7) fade = min(fade, (1.0 - prog) / 0.3 + 0.1); // and a path over a plain edge melts into the high ground too
-		col = vec4(base, fade * 1.15 > hash21(p + 17.0) ? 1.0 : 0.0);
+		if (c.style != 0 && rim < 3.0 && bayer(p) > 0.28 + rim * 0.22) base = grass(2 + int(floor(bayer(p + 1.0) * 2.0)), tint);
+		float fade = prog < 0.3 ? (prog / 0.3) : 1.0;
+		if (side && prog > 0.7) fade = min(fade, (1.0 - prog) / 0.3 + 0.1);
+		col = vec4(base, fade * 1.12 > bayer(p) ? 1.0 : 0.0);
 	}
 	return col;
 }
@@ -391,36 +488,41 @@ vec4 path_scatter(vec2 p, vec2 l, Tile a, bool above) {
 	float centre_x = floor(p.x / 16.0) * 16.0 - float((a.geom >> 4) & 3) * 16.0 + 24.0 + (vnoise(vec2(p.y * 0.09, 5.0)) - 0.5) * 6.0;
 	float d = abs(p.x + 0.5 - centre_x);
 	float away = above ? l.y / 16.0 : 1.0 - l.y / 16.0; // 0 at the ramp, 1 at the far side of the tile
-	float chance = (1.0 - away) * smoothstep(17.0, 6.0, d + away * 8.0) * 0.9;
+	float chance = (1.0 - away) * smoothstep(17.0, 6.0, d + away * 8.0) * 0.85;
 	vec4 col = vec4(0.0);
-	if (hash21(p + 23.0) < chance) col = vec4(a.style == 0 ? EARTH[2 + int(floor(hash21(p) * 3.0))] : rock(a.style, 2 + int(floor(hash21(p) * 2.0))), 1.0);
+	if (hash21(floor(p * 0.5) + 23.0) < chance && bayer(p) < chance * 1.2) {
+		int step_i = 2 + int(floor(bayer(p + 3.0) * 2.0));
+		col = vec4(a.style == 0 ? EARTH[step_i] : rock(a.style, step_i), 1.0);
+	}
 	return col;
 }
 
-// forest stairs: logs set into the slope as risers, trodden earth treads with moss, grass and roots at the sides
+// woodland stone slab stairs: mossy twilight-slate slabs set into the grassy bank, lit from top-left
 vec4 forest_steps(vec2 p, vec2 l, Tile c, vec3 tint) {
 	int cpos = (c.geom >> 4) & 3;
 	float cx = float(cpos) * 16.0 + l.x; // 0..48 across
 	float sy = floor(l.y / 4.0);
 	float yy = l.y - sy * 4.0;
-	float edge = min(cx, 48.0 - cx); // distance to the nearest side of the stairs
-	float ragged = 2.0 + floor(hash21(vec2(p.y, 3.0)) * 3.0) + (vnoise(vec2(p.y * 0.2, 4.0)) - 0.5) * 3.0;
-	if (edge < ragged - 1.0 && hash21(p + 8.0) < 0.6) return vec4(0.0); // melts into the meadow
+	float edge = min(cx, 48.0 - cx);
+	float ragged = 2.0 + floor(hash21(vec2(floor(p.y * 0.5), 3.0)) * 3.0) + (vnoise(vec2(p.y * 0.2, 4.0)) - 0.5) * 3.0;
+	if (edge < ragged - 1.0 && bayer(p) < 0.65) return vec4(0.0); // melts into the meadow
 	vec3 col;
 	if (edge < ragged) {
-		// the bank beside the steps: the same greens as the slope, no outline
-		col = grass(2 + int(floor(hash21(p) * 3.0)), tint);
-		if (hash21(floor(p * 0.5) + 6.0) > 0.88) col = grass(4, tint);
+		col = grass(2 + int(floor(bayer(p) * 2.0)), tint);
+		if (hash21(floor(p * 0.5) + 6.0) > 0.86) col = grass(4, tint);
 	} else if (yy < 2.0) {
-		// the tread: a flat stone slab, moss-grown, lit from above
-		col = STONE[yy < 1.0 ? 3 : 2] * vec3(0.78, 0.92, 0.82);
-		col *= 0.93 + 0.14 * hash21(vec2(floor((p.x + sy * 7.0) / 6.0), sy));
-		if (vnoise(p * 0.25 + sy * 7.0) > 0.52 && hash21(p + 2.0) > 0.35) col = grass(2 + int(floor(hash21(p + 1.0) * 3.0)), tint);
+		// sunlit stone slab tread with per-slab variation & creeping moss cushions
+		float slab_x = floor((p.x + sy * 7.0) / 9.0);
+		float sh = hash21(vec2(slab_x, sy));
+		int ti = yy < 1.0 ? (sh > 0.55 ? 4 : 3) : (sh > 0.45 ? 3 : 2);
+		col = STONE[ti];
+		if (mod(p.x + sy * 7.0, 9.0) < 1.0) col = STONE[1];
+		if (vnoise(p * 0.22 + sy * 7.0) > 0.56) col = grass(yy < 1.0 ? 3 : 2, tint);
 	} else {
-		// the riser: the shaded face of the slab, a dark joint underneath
-		col = STONE[yy < 3.0 ? 1 : 0] * vec3(0.8, 0.9, 0.85);
-		if (mod(p.x + sy * 5.0, 14.0) < 1.0) col = STONE[0];
-		if (yy >= 3.0 && vnoise(p * 0.3 + sy) > 0.6) col = grass(1, tint); // moss in the joint
+		// shaded slab riser with deep indigo joint underneath
+		col = STONE[yy < 3.0 ? 1 : 0];
+		if (mod(p.x + sy * 7.0, 9.0) < 1.0) col = STONE[0];
+		if (yy >= 3.0 && vnoise(p * 0.28 + sy) > 0.58) col = grass(1, tint);
 	}
 	return vec4(col, 1.0);
 }
@@ -434,12 +536,14 @@ vec4 steps(vec2 p, vec2 l, Tile c, vec3 tint, bool rough) {
 	float yy = ly - sy * 4.0;
 	vec3 col;
 	int style = c.style == 0 ? 2 : c.style;
+	float slab_x = floor((p.x + sy * 4.0) / 9.0);
+	float sh = hash21(vec2(slab_x, sy));
 	if (yy < 2.0) col = rock(style, yy < 1.0 ? 4 : 3); // the tread, lit
 	else col = rock(style, yy < 3.0 ? 2 : 1); // the riser, shaded
-	col *= 0.92 + hash21(vec2(floor((p.x + sy * 3.0) / 8.0), sy)) * 0.14;
-	float joint = mod(p.x + sy * 3.0, 8.0);
-	if (yy >= 2.0 && joint < 1.0) col *= 0.75;
-	if (rough && hash21(p * 0.5 + sy) > 0.93) col = grass(2, tint);
+	col *= 0.93 + sh * 0.13;
+	float joint = mod(p.x + sy * 4.0, 9.0);
+	if (yy >= 2.0 && joint < 1.0) col *= 0.72;
+	if (rough && vnoise(p * 0.3 + sy) > 0.68) col = grass(2, tint);
 	// the ends: low walls (stairs) or the natural rock around the steps
 	bool left = cpos == 0 && l.x < 3.0;
 	bool right = cpos == 2 && l.x >= 13.0;
@@ -448,7 +552,7 @@ vec4 steps(vec2 p, vec2 l, Tile c, vec3 tint, bool rough) {
 		col = rock(style, inner < 1.0 ? 0 : (inner < 2.0 ? 2 : 3));
 		if (c.geom % 4 == 0 && l.y < 3.0) col = rock(style, 4);
 	}
-	if (l.y >= 15.0 && c.geom % 4 == ((c.geom >> 2) & 3) && hash21(vec2(p.x, 6.0)) < 0.9) col = LINE;
+	if (l.y >= 15.0 && c.geom % 4 == ((c.geom >> 2) & 3) && bayer(p) < 0.88) col = LINE;
 	return vec4(col, 1.0);
 }
 
@@ -457,17 +561,17 @@ vec4 steps(vec2 p, vec2 l, Tile c, vec3 tint, bool rough) {
 vec4 floor_pixel(vec2 p, vec3 tint, float up) {
 	int home = lev(p);
 	vec4 col = vec4(0.0);
-	if (home > 0) col = vec4(1.0, 0.97, 0.82, 0.045 * float(home)); // higher ground catches a little more light
+	if (home > 0) col = vec4(1.0, 0.97, 0.86, 0.042 * float(home)); // higher ground catches a gentle sunlit lift
 	if (up > WALL && up < 99.0) { // the foot of a wall: its shadow falls down and a little right
 		float reach = 11.0;
 		float k = up - WALL;
-		if (k <= reach && (1.0 - k / reach) > bayer(p) * 0.9) col = vec4(SHADOW, 0.6);
+		if (k <= reach && (1.0 - k / reach) > bayer(p) * 0.9) col = vec4(SHADOW, 0.58);
 	}
 	for (int k = 1; k <= 9; k++) {
 		float fk = float(k);
 		if (lev(p - vec2(fk, 0.0)) > home) { // a plateau to the west: its side, then its shadow
 			if (fk <= 3.0) col = vec4(side(tile_at(p - vec2(fk, 0.0)).style, fk - 1.0, p), 1.0);
-			else if ((1.0 - (fk - 3.0) / 6.0) > bayer(p) * 0.9) col = vec4(SHADOW, 0.5);
+			else if ((1.0 - (fk - 3.0) / 6.0) > bayer(p) * 0.9) col = vec4(SHADOW, 0.48);
 			break;
 		}
 		if (k <= 3 && lev(p + vec2(fk, 0.0)) > home) { // a plateau to the east, lit on this side
@@ -486,21 +590,23 @@ vec4 floor_pixel(vec2 p, vec3 tint, float up) {
 			float reach = 11.0;
 			float strength = 1.0 - (fk - 1.0) / reach;
 			if (strength > bayer(p) * 0.85) {
-				col = vec4(SHADOW, fk <= 2.0 ? 0.70 : 0.52);
+				col = vec4(SHADOW, fk <= 2.0 ? 0.66 : 0.50);
 			}
 			break;
 		}
 	}
-	// lips of the high ground
+	// sculpted turf lips along the high ground's north, west (lit) and east (shaded) rims
 	for (int k = 1; k <= 3; k++) {
 		float fk = float(k);
-		float keep = fk < 3.0 || bayer(p) > 0.4 ? 1.0 : 0.0;
+		float keep = fk < 3.0 || bayer(p) > 0.38 ? 1.0 : 0.0;
 		if (lev(p - vec2(0.0, fk)) < home || lev(p - vec2(fk, 0.0)) < home) {
-			col = vec4(fk < 2.0 ? (hash21(p) < 0.55 ? LINE : grass(1, tint)) : (fk < 3.0 ? grass(4 + int(hash21(p + 3.0) * 2.0), tint) : grass(3, tint)), keep);
+			vec3 rim_c = fk < 2.0 ? (bayer(p) < 0.55 ? LINE : grass(1, tint)) : (fk < 3.0 ? grass(bayer(p + 2.0) > 0.45 ? 5 : 4, tint) : grass(3, tint));
+			col = vec4(rim_c, keep);
 			break;
 		}
 		if (lev(p + vec2(fk, 0.0)) < home) {
-			col = vec4(fk < 2.0 ? (hash21(p) < 0.55 ? LINE : grass(0, tint)) : (fk < 3.0 ? grass(1, tint) : grass(2, tint)), keep);
+			vec3 rim_c = fk < 2.0 ? (bayer(p) < 0.55 ? LINE : grass(0, tint)) : (fk < 3.0 ? grass(1, tint) : grass(2, tint));
+			col = vec4(rim_c, keep);
 			break;
 		}
 	}

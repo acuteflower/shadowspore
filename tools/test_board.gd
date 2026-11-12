@@ -194,6 +194,7 @@ func _run() -> void:
 	_rules()
 	(TownRules.piece("lamp_post") as Dictionary)["build_seconds"] = 0.5
 	(TownRules.piece("quest_board") as Dictionary)["build_seconds"] = 0.5
+	(TownRules.piece("workshop") as Dictionary)["build_seconds"] = 0.5
 	var world: WorldLevel = load("res://src/world/world_level.tscn").instantiate() as WorldLevel
 	add_child(world)
 	await _frames(2)
@@ -205,10 +206,11 @@ func _run() -> void:
 	player.quests.set_flag("rebuild_done")
 	await _frames(100)
 	_check(town.founded and town.board != null, "the town is founded and has a board manager")
-	player.inventory.give("wood", 60)
-	player.inventory.give("plant_fiber", 20)
+	player.inventory.give("wood", 80)
+	player.inventory.give("stone", 20)
+	player.inventory.give("plant_fiber", 30)
 	player.inventory.give("glow_cap", 4)
-	_check(not town.is_unlocked("quest_board"), "the board waits for the lamp post")
+	_check(not town.is_unlocked("quest_board"), "the board waits for the workshop")
 	var lamp_at: Vector2 = _find_site(town, "lamp_post", hut.position + Vector2(60, 100))
 	town.request_place("lamp_post", lamp_at, false)
 	await _frames(3)
@@ -216,7 +218,18 @@ func _run() -> void:
 		await get_tree().process_frame
 		if town.has_built("lamp_post"):
 			break
-	_check(town.has_built("lamp_post") and town.is_unlocked("quest_board"), "the lamp post opens the board")
+	_check(town.has_built("lamp_post") and not town.is_unlocked("quest_board"), "the lamp post alone does not unlock the board yet")
+	town.add_story_resident("gustav")
+	await _frames(3)
+	_check(town.residents.has("gustav"), "Gustav lives in the town")
+	var shop_at: Vector2 = _find_site(town, "workshop", hut.position + Vector2(0, 130))
+	town.request_place("workshop", shop_at, false)
+	await _frames(3)
+	for i: int in 300:
+		await get_tree().process_frame
+		if town.has_built("workshop"):
+			break
+	_check(town.has_built("workshop") and town.is_unlocked("quest_board"), "the workshop opens the board")
 	_check(not town.board.is_ready(), "no board built yet: nothing may be posted")
 	town.board._on_day_started(TimeManager.day + 1)
 	_check(town.board.offers.is_empty(), "no notices without a built board")
@@ -233,9 +246,6 @@ func _run() -> void:
 	var board: BoardManager = town.board
 	var view: TownStructure = town.view_of(board_id)
 	_check(view != null and view.get_node_or_null("Notes") != null and view.get_node_or_null("SealNotes") != null, "the built board pins its notices on the panel (paper and seals)")
-	town.add_story_resident("gustav")
-	await _frames(3)
-	_check(town.residents.has("gustav"), "Gustav lives in the town")
 	var peer: int = player.name.to_int()
 	var spot: Vector2 = town.rect_of(board_id).get_center() + Vector2(0, 24)
 	player.global_position = spot

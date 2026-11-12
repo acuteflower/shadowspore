@@ -243,29 +243,50 @@ def hedgehog(v,kind,t):
 BUILDERS={'deer':deer,'badger':badger,'fox':fox,'hedgehog':hedgehog}
 
 def frame(species,v,d,col):
+    if species=='deer':
+        import art_deer
+        return art_deer.frame(v,d,col)
+    if species=='fox':
+        import art_fox
+        return art_fox.frame(v,d,col)
+    art.FW,art.FH,art.GROUND_ROW,art.SS,art.SCALE=W,H,52.,3,1.
+    art.TIDY_EYES=False
+    art.DECAL_WEIGHT={3:3.2,4:3.,5:1.8}
+    art.ink_color=lambda mat:hexc('332a37' if mat!=3 else '201d2b')
     kind,start,n=next(x for x in BLOCKS if x[1]<=col<x[1]+x[2]);materials(species,v)
     m=BUILDERS[species](v,kind,(col-start)/n)
     depth,code=art.render(m.transform(math.pi/2-d*math.pi/4,0))
     return np.array([[CLEAR if c[3]<255 else c for c in row] for row in art.to_pixels(depth,code)],np.uint8)
 
 def main():
-    picks=[(0,0),(1,0),(2,0),(4,0),(6,0),(0,6),(0,12),(0,19),(0,25),(0,31),(0,35),(0,43)]
-    only='--preview-only' in sys.argv;preview=np.zeros((12*H,len(picks)*W,4),np.uint8)
-    selected=set(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--species=')),','.join(BUILDERS)).split(','))
-    for si,species in enumerate(BUILDERS):
-        sheet=None if only or species not in selected else np.zeros((24*H,COLS*W,4),np.uint8)
-        for v in range(3):
-            for d in range(8):
-                for col in range(COLS):
-                    if sheet is None and (d,col) not in picks:continue
-                    px=frame(species,v,d,col)
-                    if sheet is not None:
-                        y=(v*8+d)*H;x=col*W;sheet[y:y+H,x:x+W]=px
-                    if(d,col) in picks:
-                        x=picks.index((d,col))*W;y=(si*3+v)*H;preview[y:y+H,x:x+W]=px
-            print(species,v+1,'/3',flush=True)
-        if sheet is not None:save_png(ROOT/f'assets/wildlife/{species}.png',sheet)
+    import art_deer,art_fox
+    picks_map={
+        'deer':[(0,0),(1,0),(2,0),(4,0),(6,0),(0,7),(0,14),(1,21),(0,27),(0,34),(1,37),(0,41),(0,48)],
+        'fox':[(0,0),(1,0),(2,0),(4,0),(6,0),(0,6),(0,12),(2,19),(0,24),(0,31),(1,35),(0,43),(0,48)],
+        'badger':[(0,0),(1,0),(2,0),(4,0),(6,0),(0,6),(0,12),(0,19),(0,25),(0,31),(0,35),(0,43)],
+        'hedgehog':[(0,0),(1,0),(2,0),(4,0),(6,0),(0,6),(0,12),(0,19),(0,25),(0,31),(0,35),(0,43)],
+    }
+    only='--preview-only' in sys.argv
+    selected=set(next((a.split('=',1)[1] for a in sys.argv if a.startswith('--species=')),','.join(('deer','fox'))).split(','))
+    if not only:
+        if 'deer' in selected:art_deer.main()
+        if 'fox' in selected:art_fox.main()
+    preview_species=[('deer',4),('fox',4)]
+    max_cols=max(len(picks_map[s]) for s,_ in preview_species)
+    preview=np.zeros((sum(b for _,b in preview_species)*H,max_cols*W,4),np.uint8)
+    row_y=0
+    for species,builds_n in preview_species:
+        picks=picks_map[species]
+        for v in range(builds_n):
+            for ci,(d,col) in enumerate(picks):
+                preview[row_y*H:(row_y+1)*H,ci*W:(ci+1)*W]=frame(species,v,d,col)
+            row_y+=1
+        if not only and species in ('badger','hedgehog') and species in selected:
+            sheet=np.zeros((24*H,COLS*W,4),np.uint8)
+            for v in range(3):
+                for d in range(8):
+                    for col in range(COLS):
+                        y=(v*8+d)*H;x=col*W;sheet[y:y+H,x:x+W]=frame(species,v,d,col)
+            save_png(ROOT/f'assets/wildlife/{species}.png',sheet)
     save_png(ROOT/'docs/img/woodland_animals.png',preview)
-    from art_badger_den import build as den_art
-    save_png(ROOT/'assets/wildlife/badger_den.png',den_art())
 if __name__=='__main__':main()

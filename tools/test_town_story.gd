@@ -67,9 +67,10 @@ func _run() -> void:
 	player.request_teleport(knight_at + Vector2(20, 10))
 	await _frames(30)
 	_check(_step(player) == "town_intro", "reaching Valdric starts the talk (%s)" % _step(player))
-	var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	_check(box != null and box.is_active(), "the dialogue opens")
-	box._end()
+	var bubbles: BubbleRunner = BubbleRunner.find(player)
+	_check(bubbles != null and bubbles.is_active(), "the dialogue opens")
+	if bubbles != null:
+		bubbles.skip_all()
 	await _frames(5)
 	_check(quests.has_flag("town_intro_done") and not player.inventory.has_item("sickle_basic") and not player.inventory.has_item("pickaxe_basic"), "Valdric hands over no tools any more (Gustav gives the sickle, the pickaxe is made at his bench)")
 	_check(_step(player) == "build_lamp" and String(quests.current().hint) == "build", "next: a lamp post, with the build lesson (%s)" % _step(player))
@@ -84,9 +85,8 @@ func _run() -> void:
 	await _frames(240)
 	_check(town.has_built("lamp_post") and quests.has_flag("built_lamp_post"), "the lamp post is built")
 	_check(quests.is_finished("town_start") and _step(player) in ["rescue_valdric", "rescue_call"], "the lamp post hands over to Gustav's rescue (%s)" % _step(player))
-	box = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	if box != null and box.is_active():
-		box._end() ## Valdric stands by: he sends her east at once
+	if bubbles != null and bubbles.is_active():
+		bubbles.skip_all() ## Valdric stands by: he sends her east at once
 		await _frames(5)
 	## Gustav's own story has its test (test_gustav_quest); here she starts at the workshop's list.
 	quests.import_data({"active": {"town_workshop": 1}, "active_steps": {"town_workshop": "ws_build"}, "done": ["find_help", "lumberjack", "rebuild_hut", "town_start", "gustav_rescue"], "flags": {"rebuild_done": true, "knows_adventurer": true, "hud_unlocked": true, "gustav_joined": true, "built_lamp_post": true}})
@@ -105,9 +105,8 @@ func _run() -> void:
 		if town.residents.has("gustav"):
 			break
 	_check(town.residents.has("gustav"), "Gustav is a resident")
-	box = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	if box != null and box.is_active():
-		box._end() ## Gustav's remark at the new bench
+	if bubbles != null and bubbles.is_active():
+		bubbles.skip_all() ## Gustav's remark at the new bench
 		await _frames(5)
 	_check(quests.has_flag("workshop_done") and _step(player) == "ws_pickaxe", "the bench talk leads to the pickaxe (%s)" % _step(player))
 	_check(town.level() >= 1, "the town has grown to a hamlet (worth %s)" % town.worth())

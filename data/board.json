@@ -61,10 +61,15 @@
   {"id": "any_beet", "kind": "fetch", "givers": [], "item": "night_beet", "count": [2, 4], "copper_each": [6, 9], "xp_each": 2, "trust": 3, "min_day": 2, "text": "{count} {item}, FRISCH GEZOGEN."},
   {"id": "any_silverling", "kind": "fetch", "givers": [], "item": "fish_silverling", "count": [1, 3], "copper_each": [8, 12], "xp_each": 3, "trust": 3, "text": "EIN ABENDESSEN: {count} {item}."},
   {"id": "any_trout", "kind": "fetch", "givers": [], "item": "fish_trout", "count": [1, 2], "copper_each": [14, 20], "xp_each": 5, "trust": 4, "min_day": 3, "bonus": {"id": "glow_cap", "n": 2, "chance": 0.4}, "text": "EINE {item}, WENN DIR DER FANG GLÜCKT."},
-  {"id": "any_eel", "kind": "fetch", "givers": [], "item": "fish_eel", "count": [1, 1], "copper_each": [30, 45], "xp_each": 10, "trust": 6, "min_day": 4, "bonus": {"id": "willow_thread", "n": 2, "chance": 0.6}, "text": "EINEN {item}. NUR BEI NACHT UND TIEFEM WASSER."}
+  {"id": "any_eel", "kind": "fetch", "givers": [], "item": "fish_eel", "count": [1, 1], "copper_each": [30, 45], "xp_each": 10, "trust": 6, "min_day": 4, "bonus": {"id": "willow_thread", "n": 2, "chance": 0.6}, "text": "EINEN {item}. NUR BEI NACHT UND TIEFEM WASSER."},
+  {"id": "torben_ore", "kind": "fetch", "givers": ["torben"], "item": "iron_ore", "count": [4, 8], "copper_each": [6, 10], "xp_each": 3, "trust": 4, "min_day": 3, "text": "{count} {item}. SCHNELL."},
+  {"id": "torben_wood", "kind": "fetch", "givers": ["torben"], "item": "wood", "count": [10, 18], "copper_each": [2, 4], "xp_each": 1, "trust": 3, "text": "GLUT KALT. {count} {item}."},
+  {"id": "torben_spider", "kind": "kill", "givers": ["torben"], "species": "shadow_spider", "count": [2, 4], "copper_each": [7, 11], "xp_each": 3, "trust": 4, "text": "{count}X {species}. NERVEN."}
  ],
  "story": [
-  {"id": "story_example", "quest": "board_example", "giver": "valdric", "title": "RUF DES RITTERS", "text": "VALDRIC HAT DIR ETWAS ZU SAGEN. KOMM, WENN DU BEREIT BIST.", "after": "town_start", "flag": ""},
-  {"id": "lake_witch_notice", "quest": "lake_witch", "giver": "lake_witch", "title": "AM WESTSEE BRENNT KEIN LICHT", "text": "DAS HAUS AM SEE IM WESTEN DES HEXENWALDS IST DUNKEL. WER WEISS, WAS DORT FEHLT?", "after": "spiegelhexe", "flag": "", "min_level": 10}
+  {"id": "torben_notice", "quest": "torben_smithy", "giver": "valdric", "title": "HAMMERSCHLÄGE IM NORDEN", "text": "NÖRDLICH DER LICHTUNG KLINGT EISEN AUF STEIN. JEMAND SCHLÄGT DORT ALLEIN ERZ. SIEH NACH, BEVOR DIE NACHT IHN FINDET.", "after": "town_board", "flag": ""},
+  {"id": "spiegelhexe_notice", "quest": "spiegelhexe", "giver": "valdric", "title": "GRÜNES LICHT IM SÜDEN", "text": "ÜBER DEM DÄMMERWALD IM SÜDEN BRENNT EIN TURMLICHT. DIE RABEN DORT WEICHEN NICHT. SPRICH MIT MIR, WENN DU BEREIT BIST.", "after": ["find_help", "lumberjack", "rebuild_hut", "town_start", "gustav_rescue", "town_workshop", "town_board", "torben_smithy"], "flag": "", "min_level": 5},
+  {"id": "mornath_notice", "quest": "mornath", "giver": "valdric", "title": "SCHREI ÜBER DEN SÄULEN", "text": "AUF DER HOHEN SÄULENEBENE IM NORDWESTEN LIEGT EINER MEINER BRÜDER. ETWAS GROSSES KREIST DORT OBEN.", "after": "spiegelhexe", "flag": "", "min_level": 8},
+  {"id": "lake_witch_notice", "quest": "lake_witch", "giver": "lake_witch", "title": "AM WESTSEE BRENNT KEIN LICHT", "text": "IM WESTEN DES HEXENWALDS SCHWEIGT DER BANNRING DER SEEHEXE. WENN IHR FEUER ERLISCHT, BRICHT DAS WASSER AUF.", "after": "spiegelhexe", "flag": "", "min_level": 10}
  ]
 }

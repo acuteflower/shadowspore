@@ -35,7 +35,15 @@ func _run() -> void:
 		rabbit.home = rabbit.position
 		rabbit.facing = [0.0, PI * 0.25, PI * 0.75, PI, PI * 0.5, -PI * 0.25][i]
 		world.get_node("Wildlife/Animals").add_child(rabbit)
-		rabbit._set_state(WildRabbit.State.GRAZE if i % 2 == 0 else WildRabbit.State.REST, 3.0 + i * 0.3)
+		var moods: Array[WildRabbit.State] = [
+			WildRabbit.State.GRAZE,
+			WildRabbit.State.LOOKOUT,
+			WildRabbit.State.SNIFF,
+			WildRabbit.State.GROOM,
+			WildRabbit.State.REST,
+			WildRabbit.State.GRAZE,
+		]
+		rabbit._set_state(moods[i], 4.0 + i * 0.3)
 	if not capture.is_empty():
 		for frame: int in 12:
 			await get_tree().physics_frame

@@ -43,10 +43,11 @@ func _run() -> void:
 	_check("far tile unseen before", not discovery.is_seen(far))
 	player.health.heal_full()
 	await _shot("0_dormant")
-	var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
+	var bubbles: BubbleRunner = BubbleRunner.find(player)
 	await get_tree().create_timer(0.9).timeout ## the first time she is this close: a small dialogue, once
-	_check("discovery dialogue opens", box.is_active() and player.quests.has_flag("waystone_seen"))
-	box._end()
+	_check("discovery dialogue opens", bubbles != null and bubbles.is_active() and player.quests.has_flag("waystone_seen"))
+	if bubbles != null:
+		bubbles.skip_all()
 	await get_tree().process_frame
 	statue.interact(player) ## E: she lays her palms on the stone, the statue wakes where they touch
 	await get_tree().create_timer(0.1).timeout

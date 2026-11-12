@@ -466,11 +466,12 @@ func _check_discovery(delta: float) -> void:
 			continue
 		if player.is_busy() or player.global_position.distance_to(global_position) > DISCOVER_RANGE:
 			continue
-		var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-		if box == null or box.is_active():
+		var runner: BubbleRunner = BubbleRunner.find(player)
+		var box: DialogueBox = DialogueBox.find(player)
+		if runner == null or runner.is_active() or (box != null and box.is_active()):
 			continue
 		player.quests.set_flag("waystone_seen")
-		box.start("waystone_discover")
+		runner.play("waystone_discover", player)
 
 
 ## Dotted ellipse of light round the plinth (awake) and the rings of force on the ground (while awakening and at the bloom).

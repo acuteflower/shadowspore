@@ -62,6 +62,12 @@ Ziel wie bei Genshins Siegel- und Zeiträtseln: kleine Aufgaben, über die man b
 | **Spiegelnebel** (Hexenwald) | Drei gleiche Truhen im Halluzinationsnebel, nur eine ist echt (die anderen sind Trugbilder und zerfallen). Die Ohrringe der Klarheit oder ein Klarblick-Trank zeigen die echte. | `hallucinated`, Talisman/Trank | selten |
 | **Die gefesselte Kammer** | Mehrstufig: drei kleine Rätsel einer Region (z. B. Glutschalen, Runenreihe, Leerenknoten) lösen je eine Kette eines Glutreliquiars an einem besonderen Ort. | alles | legendär |
 
+### Detailpass: Innenleben und Bewegung
+
+Die Truhen haben 16 Sprite-Posen inklusive Überschwingen und abschließender Ruhepose. Stoff und Beschläge auf der Deckelinnenseite bewegen sich mit dem Scharnier. Wurzelkiste: geflicktes Leinen mit Nähten, gefalteter Stoff, kleines Buch und rostiger Seitengriff. Mondsiegeltruhe: silbern eingefasstes Futter, verbundenes Sternbild, abgetrenntes Schriftrollenfach und Kristalle. Glutreliquiar: gestepptes weinrotes Futter, Goldpaspeln, Münzstapel, Perlenkette und Granatbrosche; dunkler Samt unter den Schätzen erhält deren Lesbarkeit. Die Inhalte sind dekorative Sprite-Details, keine Vorschau der gewürfelten Beute.
+
+Dezentes Kerzenflackern, Lichtreflexe am Rand und sechs beim Halten kreisende Mondsiegelfacetten ergänzen die vorhandenen Effekte. Generator: `tools/art_loot_chests.py`; Tag-/Nachtvorschau: `tools/preview_loot_chests.tscn`.
+
 ## 5. Ideen für später (nicht gebaut)
 
 - **Orte**: Truhen auf Plateaus ohne Aufgang (nur per Schattenschritt über eine Lücke), hinter einem Wasserfall, auf einem umgestürzten Stamm über dem Fluss, im Wipfel einer Schleierweide, unter einem Felsen, den man erst mit der Spitzhacke freilegt.

@@ -149,6 +149,8 @@ func _bird(at: Vector2, height: float, vel: Vector2, build: int, flap: float, al
 	var shadow: float = clampf(1.0 - height / 220.0, 0.25, 0.9)
 	draw_rect(Rect2(ground + Vector2(-3, 0), Vector2(7, 2)), Color(0, 0, 0, 0.22 * shadow * alpha))
 	var col: int = FLY_COL + int(floorf(_clock * 12.0 * fast + flap)) % FLY_FRAMES
+	if fast <= 1.05 and mood <= 0 and fmod(_clock * 0.42 + flap * 0.37, 1.0) > 0.56:
+		col = 50 + int(floorf(_clock * 3.5 + flap)) % 4
 	var row: int = build * 8 + _sector(vel)
 	var src: Rect2 = Rect2(Vector2(float(col), float(row)) * FRAME, FRAME)
 	draw_texture_rect_region(SHEET, Rect2(ground + Vector2(0, -roundf(height)) - FEET, FRAME), src, Color(1, 1, 1, alpha))

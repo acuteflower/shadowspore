@@ -194,6 +194,17 @@ func prompt_position() -> Vector2:
 	return Vector2(0, -_height - 8.0)
 
 
+## True while the opening runs (crawling out of the sewer until she wakes in Valdric's hut): nothing out there can be
+## picked, so she cannot heal herself on the way. The host asks its own `opening_over`; a client has no opening of its
+## own and reads the host's locked clock instead (the opening holds it at midnight, the wake-up unlocks it).
+func opening_locked() -> bool:
+	if level == null:
+		return false
+	if multiplayer.is_server():
+		return not level.opening_over
+	return TimeManager.locked
+
+
 ## Host: a weapon's hit scan found this prop.
 func harvest_hit(source: int) -> void:
 	level.harvest_hit(self, source)

@@ -49,29 +49,29 @@ func _process(delta: float) -> void:
 
 func _tick() -> void:
 	# Find enemies in radius and deal void damage
-	var world = get_tree().get_first_node_in_group("world")
+	var world: Node = get_tree().get_first_node_in_group("world")
 	if world == null:
 		return
-	var enemies = get_tree().get_nodes_in_group("enemies")
-	for enemy in enemies:
-		if not is_instance_valid(enemy):
+	var player: Node2D = get_tree().get_first_node_in_group("players") as Node2D
+	var enemies: Array[Node] = get_tree().get_nodes_in_group("enemies")
+	for enemy: Node in enemies:
+		if not is_instance_valid(enemy) or not (enemy is Node2D):
 			continue
-		var dist = enemy.global_position.distance_to(_centre)
+		var enemy_2d: Node2D = enemy as Node2D
+		var dist: float = enemy_2d.global_position.distance_to(_centre)
 		if dist <= _radius:
-			var damage = _dps * 0.5  # per tick
+			var damage: float = _dps * 0.5  # per tick
 			if enemy.has_method("take_damage"):
 				enemy.take_damage(damage, "void", 0)
 			# Lifesteal: heal player
-			var player = get_tree().get_first_node_in_group("players")
 			if player != null and player.has_method("heal"):
 				player.heal(damage * _lifesteal)
 			# Slow enemies
 			if _slow > 0.0 and enemy.has_method("apply_slow"):
 				enemy.apply_slow(_slow, 1.0)
 	# Self-damage to player
-	var player = get_tree().get_first_node_in_group("players")
 	if player != null and _self_dps > 0.0:
-		var dist = player.global_position.distance_to(_centre)
+		var dist: float = player.global_position.distance_to(_centre)
 		if dist <= _radius and player.has_method("take_damage"):
 			player.take_damage(_self_dps * 0.5, "void", 0)
 

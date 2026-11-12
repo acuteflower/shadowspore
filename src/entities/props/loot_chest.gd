@@ -1,7 +1,7 @@
 class_name LootChest
 extends Interactable
 ## A loot chest of the wild (docs/beutetruhen_konzept.md): Wurzelkiste (common), Mondsiegeltruhe (rare), Glutreliquiar (legendary).
-## Art `py -3 tools/art_loot_chests.py`: a sheet of COLS frames (0 locked, 1 unlocked and shut, 2..8 the lid opening) + a glow sheet, anchors in
+## Art `py -3 tools/art_loot_chests.py`: COLS frames (0 locked, 1 unlocked, opening/overshoot poses, last resting open) + a glow sheet, anchors in
 ## data/loot_chest_art.json. The state belongs to `LootChests` (host); this node shows it: E (a hold for rare and legendary: SIEGEL BRECHEN /
 ## FESSELN LÖSEN) -> Ellie stoops (`Player.begin_pick`) -> `LootChests.request_open`; `play_open` runs the tier's opening on every peer from one
 ## clock, so everyone sees the same: rattle, seal / chains, the lid with a damped swing, rays, a pillar of light, shards, links, coins, motes.
@@ -31,6 +31,7 @@ var id: String = ""
 var tier: String = "common"
 var flip: bool = false
 var arrive: bool = false ## set before it enters the tree: it comes down in a pillar of light
+var rise: bool = false ## with `arrive`: it breaks up out of the earth instead (a crow's hoard, docs/raetsel_konzept.md 4)
 var opened: bool = false
 
 var _art: Dictionary = {}
@@ -116,8 +117,11 @@ func _ready() -> void:
 	_set_col(0)
 	if arrive:
 		_arrive_t = 0.0
-		_body.position.y = -96.0
-		_body.modulate.a = 0.0
+		if rise:
+			_setup_rise()
+		else:
+			_body.position.y = -96.0
+			_body.modulate.a = 0.0
 
 
 # ---------------------------------------------------------------- anchors
@@ -264,7 +268,7 @@ func _process(delta: float) -> void:
 		_update_arrive(delta)
 	if _open_t >= 0.0 and _open_t < 6.0:
 		_open_t += delta
-		_update_open()
+		_update_open(delta)
 	else:
 		var target: float = _hold
 		_strain = move_toward(_strain, target, delta * 4.0)
@@ -317,7 +321,7 @@ func _once(name: String, at: float) -> bool:
 	return false
 
 
-func _update_open() -> void:
+func _update_open(delta: float) -> void:
 	var times: Dictionary = TIMES.get(tier, TIMES.common) as Dictionary
 	var t: float = _open_t
 	var lock_at: float = float(times.lock)
@@ -331,13 +335,13 @@ func _update_open() -> void:
 		var u: float = (t - lid_at) / float(times.swing)
 		var full: float = float(_lid[_cols - 1]) if _lid.size() >= _cols else 110.0
 		var angle: float = full * (1.0 - exp(-4.2 * u) * cos(7.5 * u)) if u < 2.2 else full
-		_set_col(_col_for(minf(angle, full)))
+		_set_col(_col_for(minf(angle, full + 10.0)))
 	# tension before the lock gives
 	if t < lock_at:
 		_strain = clampf(t / maxf(lock_at, 0.01), 0.0, 1.0) * (1.0 if tier != "common" else 0.4)
 		_body.position.x = roundf(sin(t * 62.0) * (0.5 + _strain * 1.6)) if tier != "common" or t > 0.04 else 0.0
 	else:
-		_strain = move_toward(_strain, 0.0, 0.05)
+		_strain = move_toward(_strain, 0.0, delta * 3.0)
 		_body.position.x = 0.0
 	match tier:
 		"common":
@@ -347,7 +351,7 @@ func _update_open() -> void:
 		_:
 			_open_legendary(t)
 	# inside light breathing out of the open chest for a while
-	if t > lid_at + 0.2 and randf() < 0.18:
+	if t > lid_at + 0.2 and randf() < 1.0 - exp(-12.0 * delta):
 		var m: Vector2 = mouth()
 		_part(m + Vector2(randf_range(-10, 10), randf_range(-2, 2)), Vector2(randf_range(-4, 4), -randf_range(12, 26)), _main.lerp(_light_col, randf() * 0.5), randf_range(0.8, 1.5), 0, -6.0)
 
@@ -469,6 +473,9 @@ func _banner() -> void:
 # ---------------------------------------------------------------- arriving out of the light
 
 func _update_arrive(delta: float) -> void:
+	if rise:
+		_update_rise(delta)
+		return
 	_arrive_t += delta
 	var t: float = _arrive_t
 	var fall: float = clampf((t - 0.18) / (LAND_AT - 0.18), 0.0, 1.0)
@@ -487,6 +494,153 @@ func _update_arrive(delta: float) -> void:
 	if t >= ARRIVE_TIME:
 		_body.position = Vector2.ZERO
 		_body.modulate.a = 1.0
+
+
+## Out of the earth (a crow's hoard): the ground trembles and bulges, cracks run out from the middle, then it bursts: clods and stones fly, the
+## chest shoots up out of the hole (its rows below the ground are cut away by `_cut`), hangs a moment, slams down, bounces once and stands in a
+## ring of torn earth.
+const RISE_BURST: float = 0.55
+const RISE_TOP: float = 0.74
+const RISE_LAND: float = 0.92
+const EARTH: Array[Color] = [Color("2e2228"), Color("45323a"), Color("66494a"), Color("8a6a5c")]
+const STONE_BITS: Array[Color] = [Color("565078"), Color("8880a8")]
+const RISE_DEPTH: float = 40.0
+
+var _cut: ShaderMaterial
+var _cracks: Array = [] ## [angle, length, seed]
+var _torn: Array = [] ## [offset, size, colour]: the clods left round the hole
+
+
+func _setup_rise() -> void:
+	var sh: Shader = Shader.new()
+	sh.code = "shader_type canvas_item;\nuniform float cut = 100000.0;\nvarying float ly;\nvoid vertex() { ly = VERTEX.y; }\nvoid fragment() { if (ly > cut) { discard; } }\n"
+	_cut = ShaderMaterial.new()
+	_cut.shader = sh
+	_body.material = _cut
+	_body.position.y = RISE_DEPTH
+	_cut.set_shader_parameter("cut", -RISE_DEPTH + 1.0)
+	_glow.visible = false
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = hash(id + "rise")
+	for i: int in 7:
+		_cracks.append([TAU * float(i) / 7.0 + rng.randf_range(-0.3, 0.3), rng.randf_range(14.0, 26.0), rng.randf() * 10.0])
+	var foot: Array = _art.get("foot", [26, 9]) as Array
+	var rx: float = float(foot[0]) * 0.5 + 5.0
+	for i: int in 26:
+		var a: float = rng.randf() * TAU
+		var r: float = rng.randf_range(0.8, 1.25)
+		_torn.append([Vector2(cos(a) * rx * r, sin(a) * rx * r * 0.42 + 1.0).round(), rng.randi_range(1, 3), EARTH[rng.randi() % EARTH.size()]])
+
+
+func _update_rise(delta: float) -> void:
+	_arrive_t += delta
+	var t: float = _arrive_t
+	var prev: float = t - delta
+	var foot: Array = _art.get("foot", [26, 9]) as Array
+	var half: float = float(foot[0]) * 0.5
+	if prev < 0.01:
+		_sound("chain_strain", -10.0, 0.55)
+	# the ground trembles, crumbs hop on it
+	if t < RISE_BURST:
+		var k: float = t / RISE_BURST
+		if int(t * 40.0) != int(prev * 40.0):
+			var a0: float = randf() * TAU
+			var r0: float = randf_range(2.0, half + 4.0) * k
+			_part(Vector2(cos(a0) * r0, sin(a0) * r0 * 0.4), Vector2(randf_range(-10, 10), randf_range(-45, -15) * (0.5 + k)), EARTH[randi() % EARTH.size()], 0.45, 0, 220.0, 3.0)
+		if int(t * 12.0) != int(prev * 12.0):
+			_shake(0.15 + 0.35 * k, 220.0) ## only a faint tremble
+	# the burst
+	if t >= RISE_BURST and prev < RISE_BURST:
+		_sound("boom", -3.0, 0.75)
+		_sound("thud_small", 0.0, 0.6)
+		_rings.append({"age": 0.0, "life": 0.55, "r": 40.0, "c": Color(0.55, 0.43, 0.38, 0.9)})
+		_rings.append({"age": 0.0, "life": 0.8, "r": 58.0, "c": Color(0.4, 0.32, 0.3, 0.6)})
+		for i: int in 46: ## clods and stones thrown high
+			var a: float = randf() * TAU
+			var sp: float = randf_range(25.0, 95.0)
+			var big: bool = randf() < 0.45
+			var col: Color = STONE_BITS[randi() % 2] if randf() < 0.15 else EARTH[randi() % EARTH.size()]
+			_part(Vector2(cos(a) * randf_range(0, half), sin(a) * 3.0 - 2.0), Vector2(cos(a) * sp, sin(a) * sp * 0.35 - randf_range(70, 170)), col, randf_range(0.7, 1.2), 2 if big else 0, 330.0, randf_range(2.0, 10.0))
+		for i: int in 18: ## a low ring of dust
+			var a2: float = randf() * TAU
+			_part(Vector2(cos(a2) * half, sin(a2) * 4.0), Vector2(cos(a2) * randf_range(40, 80), sin(a2) * randf_range(10, 22)), Color(0.62, 0.55, 0.5, 0.6), randf_range(0.5, 0.8), 0, -20.0)
+		_shake(1.6, 320.0)
+	# up out of the hole, a breath at the top, down again with a slam and one bounce
+	var y: float = RISE_DEPTH
+	if t >= RISE_BURST:
+		if t < RISE_TOP:
+			var u: float = (t - RISE_BURST) / (RISE_TOP - RISE_BURST)
+			y = lerpf(RISE_DEPTH, -14.0, 1.0 - pow(1.0 - u, 3.0))
+		elif t < RISE_LAND:
+			var u2: float = (t - RISE_TOP) / (RISE_LAND - RISE_TOP)
+			y = lerpf(-14.0, 0.0, u2 * u2)
+		else:
+			var u3: float = clampf((t - RISE_LAND) / 0.22, 0.0, 1.0)
+			y = -sin(u3 * PI) * 3.0
+		_body.rotation = sin(t * 23.0) * 0.06 * clampf((RISE_LAND - t) / 0.3, 0.0, 1.0)
+	else:
+		_body.position.x = roundf(sin(t * 70.0) * 0.6)
+	_body.position.y = roundf(y)
+	_cut.set_shader_parameter("cut", -_body.position.y + 1.0)
+	_glow.visible = t >= RISE_TOP
+	if t >= RISE_LAND and prev < RISE_LAND:
+		_sound("thud_small", 2.0, 0.8)
+		_rings.append({"age": 0.0, "life": 0.5, "r": 34.0, "c": Color(0.62, 0.55, 0.5, 0.8)})
+		for i: int in 16:
+			var a3: float = randf() * TAU
+			_part(Vector2(cos(a3) * half, sin(a3) * 4.0), Vector2(cos(a3) * randf_range(25, 50), sin(a3) * 8.0 - 10.0), Color(0.58, 0.5, 0.45, 0.8), randf_range(0.4, 0.7), 0, -12.0)
+		_shake(0.8, 260.0)
+	if t >= ARRIVE_TIME:
+		_body.position = Vector2.ZERO
+		_body.rotation = 0.0
+		_body.material = null
+		_glow.visible = true
+
+
+## The ground of a chest that broke out of the earth: cracks and a bulge before, a torn hole and clods after.
+func _draw_rise_ground() -> void:
+	var t: float = _arrive_t
+	var foot: Array = _art.get("foot", [26, 9]) as Array
+	var half: float = float(foot[0]) * 0.5
+	if t < RISE_BURST:
+		var k: float = t / RISE_BURST
+		var rx: float = (half + 4.0) * (0.3 + 0.7 * k)
+		for dy: int in range(-6, 4): ## the bulge of earth
+			for dx: int in range(-int(rx) - 1, int(rx) + 2):
+				var r: float = Vector2(dx / rx, dy / (rx * 0.42)).length()
+				if r <= 1.0:
+					var c: Color = EARTH[3] if dy < -int(rx * 0.2) else (EARTH[2] if r < 0.7 else EARTH[1])
+					_ground.draw_rect(Rect2(Vector2(dx, dy - roundf(2.0 * k * (1.0 - r))), Vector2.ONE), Color(c, 0.9 * minf(k * 3.0, 1.0)))
+		for cr: Array in _cracks: ## cracks running out of it
+			var length: float = float(cr[1]) * clampf(k * 1.3, 0.0, 1.0)
+			var dir: Vector2 = Vector2(cos(float(cr[0])), sin(float(cr[0])) * 0.42)
+			var j: int = 0
+			while j < int(length):
+				var wob: float = sin(j * 0.8 + float(cr[2])) * 1.0
+				var p: Vector2 = dir * (rx * 0.6 + j) + Vector2(-dir.y, dir.x).normalized() * wob
+				_ground.draw_rect(Rect2(p.round(), Vector2.ONE), Color(EARTH[0], 0.9))
+				j += 1
+		return
+	# the torn hole round its feet, darker inside, clods round the rim
+	var hx: float = half + 3.0
+	for dy2: int in range(-5, 5):
+		for dx2: int in range(-int(hx) - 1, int(hx) + 2):
+			var r2: float = Vector2(dx2 / hx, dy2 / (hx * 0.42)).length()
+			if r2 <= 1.0:
+				_ground.draw_rect(Rect2(Vector2(dx2, dy2 + 1), Vector2.ONE), Color(EARTH[0] if r2 < 0.75 else EARTH[1], 0.85))
+	for cr2: Array in _cracks:
+		var dir2: Vector2 = Vector2(cos(float(cr2[0])), sin(float(cr2[0])) * 0.42)
+		var j2: int = 0
+		while j2 < int(float(cr2[1]) * 0.7):
+			var wob2: float = sin(j2 * 0.8 + float(cr2[2])) * 1.0
+			var p2: Vector2 = dir2 * (hx + j2) + Vector2(-dir2.y, dir2.x).normalized() * wob2
+			_ground.draw_rect(Rect2(p2.round(), Vector2.ONE), Color(EARTH[0], 0.7 * (1.0 - float(j2) / float(cr2[1]))))
+			j2 += 1
+	for c2: Array in _torn:
+		var size: int = int(c2[1])
+		var col2: Color = c2[2] as Color
+		_ground.draw_rect(Rect2(c2[0] as Vector2, Vector2(size, maxi(1, size - 1))), col2)
+		_ground.draw_rect(Rect2((c2[0] as Vector2) + Vector2(0, maxi(1, size - 1)), Vector2(size, 1)), Color(EARTH[0], 0.8))
 
 
 # ---------------------------------------------------------------- ambient life
@@ -579,8 +733,9 @@ func _step_parts(delta: float) -> void:
 
 func _draw_fx() -> void:
 	var m: Vector2 = mouth()
+	_draw_details()
 	# the arriving pillar of light from the sky
-	if _arrive_t < ARRIVE_TIME:
+	if _arrive_t < ARRIVE_TIME and not rise:
 		var a: float = clampf(_arrive_t / 0.15, 0.0, 1.0) * clampf((ARRIVE_TIME - _arrive_t) / 0.6, 0.0, 1.0)
 		_column(Vector2(0, -4), 220.0, 3.0 + 6.0 * a, a, _main, _light_col)
 	# rare: a fan of moon rays out of the open chest
@@ -626,7 +781,39 @@ func _draw_fx() -> void:
 					_fx.draw_rect(Rect2(p - (q.v as Vector2).normalized().round(), Vector2.ONE), Color(c, alpha * 0.5))
 
 
+## Small material-specific accents; fixed pixel positions preserve the sprite's silhouette.
+func _draw_details() -> void:
+	if _arrive_t < ARRIVE_TIME or _vanish_t >= 0.0:
+		return
+	if tier == "legendary":
+		var index: int = 0
+		for candle: Vector2 in anchors("candles"):
+			var flicker: float = sin(_time * 9.0 + index * 2.3) + sin(_time * 15.0 + index)
+			var tip: Vector2 = candle + Vector2(roundf(flicker * 0.5), -roundf(1.0 + absf(flicker)))
+			_fx.draw_rect(Rect2(tip.round(), Vector2(1, 3)), Color(_main, 0.75))
+			_fx.draw_rect(Rect2(candle.round(), Vector2.ONE), Color(_light_col, 0.9))
+			index += 1
+	if opened:
+		return
+	var lock: Vector2 = anchor("lock") + _body.position
+	if tier == "rare" and _strain > 0.05:
+		# The moon seal resolves into six orbiting facets as pressure builds.
+		for i: int in 6:
+			var a: float = TAU * i / 6.0 + _time * 0.65
+			var radius: float = lerpf(11.0, 5.0, _strain)
+			var p: Vector2 = (lock + Vector2(cos(a), sin(a) * 0.7) * radius).round()
+			_fx.draw_rect(Rect2(p, Vector2.ONE), Color(_light_col, _strain * 0.85))
+	# A short, restrained glimmer follows the rim instead of floating above the wood.
+	var phase: float = fposmod(_time + absf(position.x) * 0.013, 5.0)
+	if phase < 0.65 and tier != "common":
+		var half: float = float((_art.get("foot", [26, 9]) as Array)[0]) * 0.32
+		var p: Vector2 = mouth() + Vector2(lerpf(-half, half, phase / 0.65), 3.0)
+		_fx.draw_rect(Rect2(p.round(), Vector2(2, 1)), Color(_light_col, sin(phase / 0.65 * PI) * 0.65))
+
+
 func _draw_ground() -> void:
+	if rise and arrive:
+		_draw_rise_ground()
 	var foot: Array = _art.get("foot", [26, 9]) as Array
 	var rx: float = float(foot[0]) * 0.5 + 8.0
 	var ry: float = rx * 0.4

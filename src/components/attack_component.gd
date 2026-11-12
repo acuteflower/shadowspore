@@ -24,15 +24,7 @@ const MOTE_COLORS: Array[Color] = [Color("f2f7ff"), Color("aac8ff"), Color("c9a8
 const MOTES_PER_SEC: float = 110.0
 const BURST_LIFE: float = 0.2 ## seconds the shock crescent at the end of a swing lasts
 const SPARK_TEXTURE: Texture2D = preload("res://assets/fx/puff.png")
-const DEPTH_SQUASH: float = 0.44 ## how much a direction toward the camera is shortened on screen
-const ARM_UPPER: float = 5.8 ## px, the sword arm drawn from the shoulder to the grip
-const ARM_FORE: float = 5.4
-const ARM_SLEEVE: Color = Color("503359")
-const ARM_SLEEVE_SHADE: Color = Color("30203c")
-const ARM_BRACER: Color = Color("241b3a")
-const ARM_BRACER_LIGHT: Color = Color("3b3058")
-const ARM_GLOVE: Color = Color("150f22")
-const ARM_CUFF: Color = Color("8a5cf0")
+const DEPTH_SQUASH: float = GripRig.SINP ## how much a direction toward the camera is shortened on screen (the hero renderer's camera)
 const ROT_ANGLES: int = 48 ## the held sprite is pre-rotated (tools/art_weapons.py): 48 steps around the circle,
 const ROT_LENGTHS: Array[float] = [0.4, 0.52, 0.64, 0.76, 0.88, 1.0] ## and 6 foreshortenings along the shaft (rows)
 const OUT_OF_COMBAT: float = 10.0 ## seconds after the last swing until the weapon is put away
@@ -54,6 +46,36 @@ var facing: Vector2 = Vector2.DOWN ## set by the player every frame
 var rig_shoulder: Vector2 = Vector2(-4.0, -31.0) ## right shoulder and natural hand, relative to the feet,
 var rig_hand: Vector2 = Vector2(-5.0, -21.0) ## from the current sheet frame (set by the player every frame)
 var carrying: bool = false ## sprinting: the blade trails behind the runner
+var body_dir: Vector2 = Vector2.DOWN ## the facing the body sheet shows (its sector), set by the player every frame: the item rests relative to it
+var free_hand: bool = true ## the main sheet plays (no clip owns the hand): the fist may leave the natural hand for the item's own hold (set by the player)
+var _dir: Vector3 = Vector3(1.0, 0.0, 0.0) ## where the held item points in GripRig space (docs/griff_system.md)
+var _yaw: float = 0.0 ## the same as compass angle and pitch, with their speeds: the resting item is a damped spring on these
+var _pitch: float = 0.0
+var _yaw_v: float = 0.0
+var _pitch_v: float = 0.0
+var _swing_from: Vector3 = Vector3(1.0, 0.0, 0.0) ## the item's direction when the current swing, blow or charge began
+var _shape: Dictionary = {} ## the current swing's shape (GripRig.swing_of)
+var _style: Dictionary = {} ## how the held item rests (GripRig.style_of)
+var _ready_k: float = 0.0 ## 0 relaxed carry .. 1 ready (just swung)
+var _sprint_k: float = 0.0
+var _free_k: float = 1.0 ## how much the item's own hold moves the fist away from the sheet's hand
+var _hold_k: float = 0.0 ## 0 empty hand .. 1 holding something visible
+var _hand_vel: Vector2 = Vector2.ZERO ## the fist's screen speed (its change swings the resting tip)
+var _prev_hand: Vector2 = Vector2.INF
+var _weapon_behind: bool = false
+var _arm_behind: bool = false
+var _theta_from: float = 0.0 ## the slash's sweep from its first to its current angle (the trail follows the real path)
+var _theta_head: float = 0.0
+var _shoulder3: Vector3 = Vector3.ZERO ## the arm as solved this frame (ArmPainter)
+var _elbow3: Vector3 = Vector3.ZERO
+var _wrist3: Vector3 = Vector3.ZERO
+var _fist3: Vector3 = Vector3.ZERO
+var _flip: bool = false ## the item is shown mirrored across its own axis (the other side of a tool with an edge: data/grips.json `edge`, `upright`)
+var _flip_wait: float = 0.0
+var _swing_flip: bool = false ## during a swing: mirrored so that the working edge leads
+var _arm_sort: Node2D ## the arm sorts on its own: a near arm can hold a blade that points behind her
+var _arm_key: PackedFloat32Array = PackedFloat32Array() ## the arm pose last painted
+var _skin: ShaderMaterial ## the player's sprite shader, mirrored onto the arm and the item (mirror_material)
 var sheathed: bool = false ## set by the player while sneaking: the weapon fades out, and in again for a swing
 var aim_dir: Vector2 = Vector2.RIGHT ## direction of the current swing
 var rod_pose: Vector3 = Vector3.INF ## fishing: how the rod points (forward, side, lift) relative to where she faces, from the body clip; INF = resting pose
@@ -117,6 +139,8 @@ var _alt_buffer_dir: Vector2 = Vector2.RIGHT
 var _server_alt_stage: int = 0 ## host: the same chain as the host saw it
 var _server_alt_until: int = 0
 var _blade_length: float = 1.0
+var _emit_kind: int = 0 ## the pose asks for motes this frame: 1 a cut, 2 a thrust
+var _last_tip: Vector2 = Vector2.ZERO ## the tip one frame ago (world px): motes fly on the way it moved
 var _tips: Array[Dictionary] = [] ## the heavy blow's path: {mid (world), tip (world), age}
 var _burst_life: float = BURST_LIFE
 var _burst_heavy: bool = false
@@ -142,6 +166,11 @@ func _ready() -> void:
 		inventory = get_node("../InventoryComponent") as InventoryComponent
 	_trail.draw.connect(_draw_trail)
 	_arm.draw.connect(_draw_arm)
+	_arm_sort = Node2D.new()
+	_arm_sort.name = "ArmSort"
+	add_child(_arm_sort)
+	move_child(_arm_sort, _hand.get_index() + 1)
+	_arm.reparent(_arm_sort, false)
 	_stamina = get_node_or_null("../StaminaComponent") as StaminaComponent
 	_talismans = get_node_or_null("../TalismanComponent") as TalismanComponent
 	_skills = get_node_or_null("../SkillTreeComponent") as SkillTreeComponent
@@ -398,6 +427,7 @@ func _alt_swing(dir: Vector2, weapon_id: String, stage: int, refine_level: int =
 	_charging = false
 	_phase = Phase.WINDUP
 	_time = 0.0
+	_swing_from = _dir
 	_trail_age = TRAIL_FADE
 	_trail_head = -float(step["arc"]) / 2.0
 	_thrust_progress = 0.0
@@ -537,6 +567,7 @@ func _charge_begin(weapon_id: String, chained: bool) -> void:
 	_charge_chained = chained
 	_charge_stage = 0
 	_charge_carry = 0.0
+	_swing_from = _dir
 	_play_sound("draw", -6.0)
 	charge_stage.emit(0)
 
@@ -577,6 +608,7 @@ func _heavy_swing(dir: Vector2, weapon_id: String, charge_time: float, chained: 
 	aim_dir = dir
 	_phase = Phase.WINDUP
 	_time = 0.0
+	_swing_from = _dir
 	_trail_age = TRAIL_FADE
 	_thrust_progress = 0.0
 	_burst_done = false
@@ -634,6 +666,9 @@ func _swing(dir: Vector2, weapon_id: String, step_index: int, refine_level: int 
 	_charging = false
 	_phase = Phase.WINDUP
 	_time = 0.0
+	_swing_from = _dir
+	_shape = GripRig.swing_of(String(def.get("weapon_class", "")), int(_step.get("block", -1)))
+	_swing_flip = _edge_leads()
 	_trail_age = TRAIL_FADE
 	_trail_head = -float(_step["arc"]) / 2.0
 	_thrust_progress = 0.0
@@ -995,6 +1030,7 @@ func _refresh_weapon() -> void:
 	if _weapon == null:
 		return
 	_has_weapon = not def.is_empty()
+	_style = GripRig.style_of(def)
 	_load_fx(def)
 	_weapon.visible = _has_weapon and _weapon_alpha > 0.01
 	if _has_weapon:
@@ -1037,213 +1073,351 @@ func _alt_chain_ended() -> void:
 	_alt_buffer_msec = 0
 
 
-## Rest: the hand holds the sword where the walk cycle puts it, blade forward (trailing behind
-## while sprinting). Swings: the hand follows the body animation (the player feeds `rig_hand` from the
-## attack keyframes); only the blade's angle and length come from here: cocked, sweep the arc (or drive
-## straight for a thrust), return. The arm is drawn from the shoulder to the grip, so the sword is
-## always in the hand.
+## The held item and the arm that holds it (docs/griff_system.md). Everything is solved in GripRig's 3D space and projected the way her body
+## sheets are rendered:
+## - the fist starts at the sheet's natural hand (rig_hand) and moves to the item's own hold (data/grips.json: ready, carry, sprint) while no
+##   clip owns the hand; swings, picking, eating, casting and fishing keep the sheet's hand;
+## - the arm is a two-bone solve from the rig shoulder to the fist with the renderer's arm lengths and elbow pole, painted by ArmPainter;
+## - the item points along a 3D direction. At rest a damped spring pulls it toward its hold, so it has weight: it lags behind the fist, swings
+##   round when she turns and settles with a small overshoot. Swings, blows and charges key it along real paths (a slash sweeps through a tilted
+##   plane round her and overshoots in the recovery, a chop comes over the head), and it foreshortens when it points at or away from the camera
+##   instead of spinning round the hand like a clock hand. Only the angle and the foreshortening reach the pre-rotated sprite.
 func _update_pose(delta: float) -> void:
-	var rest_dir: Vector2 = facing.normalized()
-	var side: Vector2 = rest_dir.rotated(PI / 2.0) ## toward her right hand
-	var rest_pos: Vector2 = rig_hand
-	var rest_blade: Vector2 = _rod_blade(rest_dir, side) if rod_pose.is_finite() else _rest_blade(rest_dir, side)
-	var ease_k: float = 1.0 - exp(-(30.0 if rod_pose.is_finite() else 16.0) * delta)
-	_rest_angle = lerp_angle(_rest_angle, rest_blade.angle(), ease_k)
-	_rest_length = lerpf(_rest_length, clampf(rest_blade.length(), 0.4, 1.0), ease_k)
-	var rest_angle: float = _rest_angle
-	var pos: Vector2 = rest_pos
-	var angle: float = rest_angle
-	var length: float = _rest_length
-	var behind: bool = rest_dir.y < -0.35 or side.y < -0.35 ## the right hand is on the far side
-	if _has_weapon and _charging:
-		var draw: float = HeavyRules.draw_progress(_charge_cfg, _charge_time)
-		var ease_draw: float = draw * draw * (3.0 - 2.0 * draw)
-		var power: float = charge_amount()
-		var blade: Vector2 = _chop_blade(lerpf(CHOP_PITCH_REST, CHOP_PITCH_UP, ease_draw), lerpf(0.2, CHOP_YAW_BACK, ease_draw))
-		var shiver: float = power * 0.05 * sin(_charge_time * 55.0) ## a held, straining blade trembles
-		angle = blade.angle() + shiver
-		length = lerpf(_rest_length, clampf(blade.length(), 0.4, 1.0), minf(ease_draw * 1.5, 1.0))
-		behind = aim_dir.y < -0.35
-	elif _has_weapon and _phase != Phase.IDLE and not _step.is_empty() and bool(_step.get("heavy", false)):
-		var aim_h: float = aim_dir.angle()
-		behind = aim_dir.y < -0.35
-		match _phase:
-			Phase.WINDUP:
-				var t: float = clampf(_time / float(_step["windup"]), 0.0, 1.0)
-				var pulled: Vector2 = _chop_blade(lerpf(_release_pitch, CHOP_PITCH_WIND, t), lerpf(_release_yaw, CHOP_YAW_WIND, t))
-				angle = pulled.angle()
-				length = clampf(pulled.length(), 0.4, 1.0)
-			Phase.ACTIVE:
-				var t: float = clampf(_time / float(_step["active"]), 0.0, 1.0)
-				var eased: float = pow(t, 1.5) ## a heavy blade starts slowly and arrives fast
-				var chop: Vector2 = _chop_blade(lerpf(CHOP_PITCH_WIND, CHOP_PITCH_END, eased), lerpf(CHOP_YAW_WIND, CHOP_YAW_END, eased))
-				angle = chop.angle()
-				length = clampf(chop.length(), 0.4, 1.0)
-				if t >= 0.85 and not _burst_done: ## the blow lands: a wide crescent and a puff of dust
-					_burst_done = true
-					_burst_age = 0.0
-					_burst_life = HEAVY_BURST_LIFE
-					_burst_heavy = true
-					_burst_thrust = false
-					_burst_angle = aim_h
-					_burst_center = global_position + BODY_CENTER
-					_impact_dust()
-				_emit_motes(angle, 1.0, false, delta)
-			Phase.RECOVERY:
-				var t: float = clampf(_time / float(_step["recovery"]), 0.0, 1.0)
-				var low: Vector2 = _chop_blade(CHOP_PITCH_END, CHOP_YAW_END)
-				var settle: float = t * t * (3.0 - 2.0 * t)
-				angle = lerp_angle(low.angle(), rest_angle, settle)
-				length = lerpf(clampf(low.length(), 0.4, 1.0), _rest_length, settle)
-	elif _has_weapon and _phase != Phase.IDLE and not _step.is_empty() and _step.has("diag"):
-		var path: Dictionary = _step["diag"] as Dictionary ## a diagonal slash: the blade comes over the shoulder and cuts down across her, seen in perspective
-		behind = aim_dir.y < -0.35
-		match _phase:
-			Phase.WINDUP:
-				var t: float = clampf(_time / float(_step["windup"]), 0.0, 1.0)
-				var cocked_blade: Vector2 = _chop_blade(float(path["pitch0"]), float(path["yaw0"]))
-				angle = lerp_angle(rest_angle, cocked_blade.angle(), t)
-				length = lerpf(_rest_length, clampf(cocked_blade.length(), 0.4, 1.0), t)
-			Phase.ACTIVE:
-				var t: float = clampf(_time / float(_step["active"]), 0.0, 1.0)
-				var eased: float = 1.0 - pow(1.0 - t, 3.0) ## fast start, soft end
-				var cut: Vector2 = _chop_blade(lerpf(float(path["pitch0"]), float(path["pitch1"]), eased), lerpf(float(path["yaw0"]), float(path["yaw1"]), eased))
-				angle = cut.angle()
-				length = clampf(cut.length(), 0.4, 1.0)
-				_emit_motes(angle, float(_step["sweep"]), false, delta)
-			Phase.RECOVERY:
-				var t: float = clampf(_time / float(_step["recovery"]), 0.0, 1.0)
-				var low: Vector2 = _chop_blade(float(path["pitch1"]), float(path["yaw1"]))
-				var settle: float = t * t * (3.0 - 2.0 * t)
-				angle = lerp_angle(low.angle(), rest_angle, settle)
-				length = lerpf(clampf(low.length(), 0.4, 1.0), _rest_length, settle)
-	elif _has_weapon and _phase != Phase.IDLE and not _step.is_empty():
-		var aim: float = aim_dir.angle()
-		var half: float = float(_step["arc"]) / 2.0
-		var sweep: float = float(_step["sweep"])
-		var cocked: float = -(half + 0.6) ## blade offsets from the aim, in sweep direction
-		var follow: float = half + 0.25
-		var thrust: bool = String(_step["style"]) == "thrust"
-		behind = aim_dir.y < -0.35
-		match _phase:
-			Phase.WINDUP:
-				var t: float = clampf(_time / float(_step["windup"]), 0.0, 1.0)
-				angle = lerp_angle(rest_angle, aim if thrust else aim + sweep * cocked, t)
-				length = lerpf(_rest_length, 1.0, t)
-			Phase.ACTIVE:
-				var t: float = clampf(_time / float(_step["active"]), 0.0, 1.0)
-				var eased: float = 1.0 - pow(1.0 - t, 3.0) ## fast start, soft end
-				if t >= 0.9 and not _burst_done: ## the swing lands: a shock crescent (a ring for a thrust) flashes out
-					_burst_done = true
-					_burst_age = 0.0
-					_burst_life = BURST_LIFE
-					_burst_heavy = false
-					_burst_thrust = thrust
-					_burst_angle = aim if thrust else aim + sweep * lerpf(cocked, follow, eased)
-					_burst_center = global_position + BODY_CENTER
-				if thrust:
-					angle = aim
-					length = 1.0
-					_thrust_progress = eased
-					_emit_motes(angle, 0.0, true, delta)
-				else:
-					var offset: float = lerpf(cocked, follow, eased)
-					angle = aim + sweep * offset
-					length = 1.0
-					_trail_head = clampf(offset, -half, half)
-					_emit_motes(angle, sweep, false, delta)
-			Phase.RECOVERY:
-				var t: float = clampf(_time / float(_step["recovery"]), 0.0, 1.0)
-				var end_angle: float = aim if thrust else aim + sweep * follow
-				angle = lerp_angle(end_angle, rest_angle, t)
-				length = lerpf(1.0, _rest_length, t)
-	pos = rig_shoulder + (pos - rig_shoulder).limit_length(ARM_UPPER + ARM_FORE - 0.6) ## the arm only reaches so far
-	_hand.position = Vector2(0, -HAND_SORT if behind else HAND_SORT)
+	var spring: Dictionary = GripRig.data().get("spring", {}) as Dictionary
+	var forward: Vector2 = body_dir.normalized() if body_dir.length() > 0.01 else Vector2.DOWN
+	var right: Vector2 = GripRig.right_of(forward)
+	var busy: bool = _phase != Phase.IDLE or _charging
+	var blend: float = float(spring.get("blend", 4.5))
+	_ready_k = move_toward(_ready_k, 1.0 if is_in_combat(float(spring.get("ready_for", 2.2))) else 0.0, blend * delta)
+	_sprint_k = move_toward(_sprint_k, 1.0 if carrying and not busy else 0.0, blend * 1.5 * delta)
+	_free_k = move_toward(_free_k, 1.0 if free_hand and not busy and not rod_pose.is_finite() else 0.0, (14.0 if busy or not free_hand else 6.0) * delta)
+	_hold_k = move_toward(_hold_k, 1.0 if _has_weapon and _weapon_alpha > 0.05 else 0.0, 5.0 * delta)
+	var hold: Array = _rest_hold()
+	var rest_dir: Vector3 = _rod_dir(forward, right) if rod_pose.is_finite() else GripRig.body_dir(forward, float(hold[1]), float(hold[2]))
+	_shoulder3 = GripRig.shoulder_3d(rig_shoulder, forward)
+	var natural: Vector3 = GripRig.hand_3d(rig_hand, _shoulder3, forward)
+	var fist_goal: Vector3 = natural + GripRig.body_offset(forward, right, hold[0] as Vector3) * (_free_k * _hold_k)
+	var solved: Array[Vector3] = GripRig.arm(_shoulder3, fist_goal, GripRig.pole(forward))
+	_elbow3 = solved[0]
+	_wrist3 = solved[1]
+	_fist3 = solved[2]
+	var grip: Vector2 = GripRig.screen(_fist3)
+	var hand_acc: Vector2 = Vector2.ZERO ## the fist's acceleration, smoothed (the sheets move it in whole pixels)
+	if delta > 0.0:
+		if _prev_hand.is_finite():
+			var smooth: float = 1.0 - exp(-10.0 * delta)
+			var vel: Vector2 = _hand_vel.lerp((grip - _prev_hand) / delta, smooth)
+			hand_acc = (vel - _hand_vel) / delta
+			_hand_vel = vel
+		_prev_hand = grip
+	_emit_kind = 0
+	var keyed: Variant = _keyed_dir(rest_dir) if _has_weapon else null
+	if keyed is Vector3:
+		_set_dir(keyed as Vector3, delta)
+	else:
+		_spring_to(rest_dir, hand_acc, delta, spring, rod_pose.is_finite())
+	var shown: Vector2 = GripRig.project_dir(_dir)
+	var angle: float = shown.angle()
+	var length: float = clampf(shown.length(), 0.4, 1.0)
+	_rest_angle = angle
+	_rest_length = length
+	# depth: the item and the arm each go in front of or behind her body (a near arm may hold a blade that points away)
+	var mid: Vector3 = _fist3 + _dir * 7.0
+	if mid.y < -1.4:
+		_weapon_behind = true
+	elif mid.y > 0.4:
+		_weapon_behind = false
+	var arm_mid: float = (_elbow3.y + _fist3.y) * 0.5
+	if arm_mid < -0.6:
+		_arm_behind = true
+	elif arm_mid > 0.0:
+		_arm_behind = false
+	_hand.position = Vector2(0, -HAND_SORT if _weapon_behind else HAND_SORT)
+	_arm_sort.position = Vector2(0, (-HAND_SORT if _arm_behind else HAND_SORT) + 0.01)
 	_blade_angle = angle
 	_blade_scale = length
-	_grip = pos
-	_weapon.position = (pos - _hand.position).round() + Vector2(0.5, 0.5) ## the middle of the glove's pixel
-	var step: int = roundi(wrapf(angle, 0.0, TAU) / TAU * float(ROT_ANGLES)) % ROT_ANGLES
+	_blade_length = length
+	_grip = grip
+	_weapon.position = (grip - _hand.position).round() + Vector2(0.5, 0.5) ## the middle of the glove's pixel
+	var flip: bool = _flip_for(angle, length, busy, delta)
+	var step: int = roundi(wrapf(-angle if flip else angle, 0.0, TAU) / TAU * float(ROT_ANGLES)) % ROT_ANGLES ## mirrored: the frame of the opposite angle, flipped back
 	var level: int = 0
 	for i: int in ROT_LENGTHS.size(): ## nearest foreshortening
 		if absf(ROT_LENGTHS[i] - length) < absf(ROT_LENGTHS[level] - length):
 			level = i
 	_weapon.frame = level * ROT_ANGLES + step
-	_blade_angle = angle
-	_blade_length = length
-	var busy: bool = _phase != Phase.IDLE or _charging
+	_weapon.flip_v = flip
+	if _emit_kind > 0:
+		_emit_motes(_emit_kind == 2, delta)
+	_last_tip = _grip_world() + _blade_vector()
 	_since_swing = 0.0 if busy else _since_swing + delta
 	var hide: bool = (sheathed or (_since_swing > OUT_OF_COMBAT and not always_drawn)) and not busy ## a swing always draws the weapon
 	_weapon_alpha = 1.0 if not hide and busy else move_toward(_weapon_alpha, 0.0 if hide else 1.0, 8.0 * delta)
 	_weapon.modulate.a = _weapon_alpha
 	_weapon.visible = _has_weapon and _weapon_alpha > 0.01
-	_arm.queue_redraw()
+	var arm_key: PackedFloat32Array = _arm_pose_key() ## the arm is painted again only when it moved (a worn bracelet shimmers: every frame)
+	if arm_key != _arm_key or (_talismans != null and _talismans.worn_id("bracelet") != ""):
+		_arm_key = arm_key
+		_arm.queue_redraw()
 
 
-## Where the blade points on screen when it stands `pitch` above the horizon (above 90 deg = leaning back) and `yaw` radians
-## from her aim toward her sword side, seen in the 3/4 perspective (same projection as the resting blade).
-func _chop_blade(pitch: float, yaw: float) -> Vector2:
+## Whether a tool with a working side is shown mirrored. The pre-rotated sprite can only turn, so a tool pointing left would show its other face
+## upside down (the watering can on its head, the axe's edge behind the haft). At rest it shows the mirror image when it points left, as a side
+## view from her other side would; the change waits for a moment when it hardly shows (near upright or foreshortened). During a swing the
+## working edge (`edge`: +1 the picture's lower side, -1 its upper side) leads the cut; `upright` tools (the can) always keep their top up.
+func _flip_for(angle: float, length: float, busy: bool, delta: float) -> bool:
+	var edge: int = int(_style.get("edge", 0))
+	var upright: bool = bool(_style.get("upright", false))
+	if edge == 0 and not upright:
+		_flip = false
+		return false
+	if busy and not upright and _phase != Phase.IDLE and not _step.has("diag") and not bool(_step.get("heavy", false)):
+		_flip = _swing_flip
+		_flip_wait = 0.0
+		return _flip
+	var left: bool = cos(angle) < 0.0
+	if left == _flip:
+		_flip_wait = 0.0
+	else:
+		_flip_wait += delta
+		if absf(cos(angle)) < 0.45 or length < 0.6 or _flip_wait > 0.25 or upright:
+			_flip = left
+			_flip_wait = 0.0
+	return _flip
+
+
+## Which way the current swing turns on the screen around its contact, and so whether the tool must be mirrored for its edge to lead.
+func _edge_leads() -> bool:
+	var edge: int = int(_style.get("edge", 0))
+	if edge == 0 or _step.is_empty() or String(_step["style"]) == "thrust":
+		return false
+	var aim: Vector2 = aim_dir.normalized() if aim_dir.length() > 0.01 else Vector2.RIGHT
+	var contact: Vector3 = GripRig.dir(aim.angle(), clampf(GripRig.aim_pitch(aim) + deg_to_rad(float(_shape.get("pitch", 0.0))), -1.05, 1.05))
+	var sweep: float = -1.0 if bool(_shape.get("top_down", false)) else float(_step["sweep"])
+	var tilt: float = _swing_tilt(sweep)
+	var before: Vector2 = GripRig.project_dir(GripRig.swing_dir(contact, aim, tilt, -sweep * 0.15))
+	var after: Vector2 = GripRig.project_dir(GripRig.swing_dir(contact, aim, tilt, sweep * 0.15))
+	var turning: int = 1 if before.cross(after) > 0.0 else -1 ## +1: the angle grows on the screen, the picture's lower side leads
+	return turning != edge
+
+
+## The hold her item rests in now: [fist offset (forward, right, up), radians toward her right, pitch], blended carry -> ready -> sprint.
+func _rest_hold() -> Array:
+	var carry: Array = _hold_of("carry")
+	var ready: Array = _hold_of("ready")
+	var sprint: Array = _hold_of("sprint")
+	var hand: Vector3 = (carry[0] as Vector3).lerp(ready[0] as Vector3, _ready_k).lerp(sprint[0] as Vector3, _sprint_k)
+	var yaw: float = lerp_angle(lerp_angle(float(carry[1]), float(ready[1]), _ready_k), float(sprint[1]), _sprint_k)
+	var pitch: float = lerpf(lerpf(float(carry[2]), float(ready[2]), _ready_k), float(sprint[2]), _sprint_k)
+	return [hand, yaw, pitch]
+
+
+func _hold_of(kind: String) -> Array:
+	var entry: Dictionary = _style.get(kind, {}) as Dictionary
+	var hand: Array = entry.get("hand", [0, 0, 0]) as Array
+	var aim: Array = entry.get("dir", [20, 20]) as Array
+	return [Vector3(float(hand[0]), float(hand[1]), float(hand[2])), deg_to_rad(float(aim[0])), deg_to_rad(float(aim[1]))]
+
+
+## A rod or a staff as its clip holds it: `rod_pose` = (forward, toward her right, up).
+func _rod_dir(forward: Vector2, right: Vector2) -> Vector3:
+	var ground: Vector2 = forward * rod_pose.x + right * rod_pose.y
+	var d: Vector3 = Vector3(ground.x, ground.y, rod_pose.z)
+	return d.normalized() if d.length() > 0.001 else GripRig.body_dir(forward, 0.0, 0.5)
+
+
+## Where a swing, a blow or a charge puts the item this frame, or null when it rests (then the spring moves it). Also asks for motes
+## (`_emit_kind`: 1 a cut, 2 a thrust) and lights the crescent where a swing lands.
+func _keyed_dir(rest_dir: Vector3) -> Variant:
+	if _charging:
+		var draw: float = HeavyRules.draw_progress(_charge_cfg, _charge_time)
+		var ease_draw: float = draw * draw * (3.0 - 2.0 * draw)
+		var shiver: float = charge_amount() * 0.05 * sin(_charge_time * 55.0) ## a held, straining blade trembles
+		var lifted: Vector3 = _chop_dir(lerpf(CHOP_PITCH_REST, CHOP_PITCH_UP, ease_draw) + shiver, lerpf(0.2, CHOP_YAW_BACK, ease_draw))
+		return _turn(_swing_from, lifted, _smooth(_charge_time / 0.14))
+	if _phase == Phase.IDLE or _step.is_empty():
+		return null
+	var aim: Vector2 = aim_dir.normalized() if aim_dir.length() > 0.01 else Vector2.RIGHT
+	var windup: float = clampf(_time / maxf(float(_step["windup"]), 0.001), 0.0, 1.0)
+	var active: float = clampf(_time / maxf(float(_step["active"]), 0.001), 0.0, 1.0)
+	var recovery: float = clampf(_time / maxf(float(_step["recovery"]), 0.001), 0.0, 1.0)
+	if bool(_step.get("heavy", false)):
+		match _phase:
+			Phase.WINDUP:
+				return _chop_dir(lerpf(_release_pitch, CHOP_PITCH_WIND, windup), lerpf(_release_yaw, CHOP_YAW_WIND, windup))
+			Phase.ACTIVE:
+				var eased: float = pow(active, 1.5) ## a heavy blade starts slowly and arrives fast
+				if active >= 0.85 and not _burst_done: ## the blow lands: a wide crescent and a puff of dust
+					_burst_done = true
+					_burst_age = 0.0
+					_burst_life = HEAVY_BURST_LIFE
+					_burst_heavy = true
+					_burst_thrust = false
+					_burst_angle = aim.angle()
+					_burst_center = global_position + BODY_CENTER
+					_impact_dust()
+				_emit_kind = 1
+				return _chop_dir(lerpf(CHOP_PITCH_WIND, CHOP_PITCH_END, eased), lerpf(CHOP_YAW_WIND, CHOP_YAW_END, eased))
+			_:
+				return _turn(_chop_dir(CHOP_PITCH_END, CHOP_YAW_END), rest_dir, _smooth(recovery))
+	if _step.has("diag"):
+		var path: Dictionary = _step["diag"] as Dictionary ## a diagonal slash: over the shoulder and down across her
+		var from: Vector3 = _chop_dir(float(path["pitch0"]), float(path["yaw0"]))
+		var to: Vector3 = _chop_dir(float(path["pitch1"]), float(path["yaw1"]))
+		match _phase:
+			Phase.WINDUP:
+				return _turn(_swing_from, from, _smooth(windup))
+			Phase.ACTIVE:
+				var cut: float = 1.0 - pow(1.0 - active, 3.0) ## fast start, soft end
+				_emit_kind = 1
+				return _chop_dir(lerpf(float(path["pitch0"]), float(path["pitch1"]), cut), lerpf(float(path["yaw0"]), float(path["yaw1"]), cut))
+			_:
+				return _turn(to, rest_dir, _smooth(recovery))
+	var thrust: bool = String(_step["style"]) == "thrust"
+	var contact: Vector3 = GripRig.dir(aim.angle(), clampf(GripRig.aim_pitch(aim) + deg_to_rad(float(_shape.get("pitch", 0.0))), -1.05, 1.05))
+	var half: float = float(_step["arc"]) / 2.0
+	var sweep: float = -1.0 if bool(_shape.get("top_down", false)) else float(_step["sweep"])
+	var tilt: float = _swing_tilt(sweep)
+	var theta0: float = -sweep * (half + float(_shape.get("cock", 0.5)))
+	var theta1: float = sweep * (half + float(_shape.get("follow", 0.3)))
+	match _phase:
+		Phase.WINDUP:
+			_theta_from = theta0
+			_theta_head = theta0
+			return _turn(_swing_from, contact if thrust else GripRig.swing_dir(contact, aim, tilt, theta0), _smooth(windup))
+		Phase.ACTIVE:
+			var eased: float = 1.0 - pow(1.0 - active, 2.2) ## the cut whips through and slows into the follow-through
+			var theta: float = lerpf(theta0, theta1, eased)
+			_theta_head = theta
+			if active >= 0.9 and not _burst_done: ## the swing lands: a shock crescent (a ring for a thrust) flashes out
+				_burst_done = true
+				_burst_age = 0.0
+				_burst_life = BURST_LIFE
+				_burst_heavy = false
+				_burst_thrust = thrust
+				_burst_angle = aim.angle() if thrust else aim.angle() + clampf(theta, -half, half)
+				_burst_center = global_position + BODY_CENTER
+			if thrust:
+				_thrust_progress = eased
+				_emit_kind = 2
+				return contact
+			_emit_kind = 1
+			return GripRig.swing_dir(contact, aim, tilt, theta)
+		_:
+			if thrust:
+				return _turn(contact, rest_dir, _smooth((recovery - 0.2) / 0.8))
+			var over: float = theta1 + signf(theta1 - theta0) * float(_shape.get("over", 0.2)) ## it does not stop dead: the follow-through carries on
+			if recovery < 0.3:
+				var k: float = recovery / 0.3
+				return GripRig.swing_dir(contact, aim, tilt, lerpf(theta1, over, 1.0 - (1.0 - k) * (1.0 - k)))
+			return _turn(GripRig.swing_dir(contact, aim, tilt, over), rest_dir, _smooth((recovery - 0.3) / 0.7))
+
+
+## How far the current swing's plane leans up on her right side: a forehand (sweep -1, from her right) uses `tilt`, a backhand `tilt_back`.
+func _swing_tilt(sweep: float) -> float:
+	return deg_to_rad(float(_shape.get("tilt" if sweep < 0.0 else "tilt_back", _shape.get("tilt", 20.0))))
+
+
+## The keyed direction becomes the state; its speed is kept, so the spring carries on from it when the swing hands over.
+func _set_dir(d: Vector3, delta: float) -> void:
+	var yaw: float = GripRig.yaw_of(d) if Vector2(d.x, d.y).length() > 0.05 else _yaw
+	var pitch: float = GripRig.pitch_of(d)
+	if delta > 0.0:
+		_yaw_v = clampf(wrapf(yaw - _yaw, -PI, PI) / delta, -24.0, 24.0) * clampf(cos(pitch) * 3.0, 0.0, 1.0)
+		_pitch_v = clampf((pitch - _pitch) / delta, -24.0, 24.0)
+	_yaw = yaw
+	_pitch = pitch
+	_dir = d.normalized()
+
+
+## The resting item: a damped spring on its compass angle and pitch toward `target`, pushed by the fist's acceleration (the tip lags).
+func _spring_to(target: Vector3, hand_acc: Vector2, delta: float, spring: Dictionary, fast: bool) -> void:
+	var omega: float = 34.0 if fast else float(spring.get("omega", 19.0))
+	var zeta: float = 1.0 if fast else float(spring.get("damping", 0.6))
+	var inertia: float = 0.0 if fast else float(spring.get("inertia", 0.0005))
+	var goal_yaw: float = GripRig.yaw_of(target) if Vector2(target.x, target.y).length() > 0.05 else _yaw
+	var goal_pitch: float = GripRig.pitch_of(target)
+	goal_pitch += clampf(hand_acc.y * inertia, -0.3, 0.3) ## the fist drops: the tip stays up a moment, and the other way round
+	goal_yaw += clampf(hand_acc.x * inertia * sin(_yaw), -0.3, 0.3)
+	var max_dt: float = float(spring.get("max_dt", 0.034))
+	var steps: int = clampi(ceili(delta / max_dt), 1, 8)
+	var h: float = delta / float(steps)
+	for i: int in steps:
+		var acc_yaw: float = omega * omega * wrapf(goal_yaw - _yaw, -PI, PI) - 2.0 * zeta * omega * _yaw_v
+		var acc_pitch: float = omega * omega * (goal_pitch - _pitch) - 2.0 * zeta * omega * _pitch_v
+		_yaw_v += acc_yaw * h
+		_pitch_v += acc_pitch * h
+		_yaw = wrapf(_yaw + _yaw_v * h, -PI, PI)
+		_pitch = clampf(_pitch + _pitch_v * h, -1.5, 1.5)
+	_dir = GripRig.dir(_yaw, _pitch)
+
+
+## From one direction to another along the shorter great circle (over the top when they point apart).
+static func _turn(a: Vector3, b: Vector3, u: float) -> Vector3:
+	u = clampf(u, 0.0, 1.0)
+	if a.dot(b) < -0.96:
+		var top: Vector3 = Vector3(0.0, 0.0, 1.0) if absf(a.z) < 0.9 else Vector3(a.y, -a.x, 0.0).normalized()
+		return a.slerp(top, u * 2.0) if u < 0.5 else top.slerp(b, u * 2.0 - 1.0)
+	return a.slerp(b, u).normalized()
+
+
+static func _smooth(t: float) -> float:
+	t = clampf(t, 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
+
+
+## Where the blade points when it stands `pitch` above the horizon (above 90 deg = leaning back) and `yaw` radians from her aim toward
+## her sword side.
+func _chop_dir(pitch: float, yaw: float) -> Vector3:
 	var ground: Vector2 = aim_dir.normalized().rotated(yaw) * cos(pitch)
-	var lift: float = sin(pitch)
-	return Vector2(ground.x, ground.y * DEPTH_SQUASH - lift * 0.9)
+	return Vector3(ground.x, ground.y, sin(pitch))
 
 
-## The rod as the fishing clip holds it: `rod_pose` = (forward, side, lift) in her own frame, seen in the 3/4 perspective.
-func _rod_blade(rest_dir: Vector2, side: Vector2) -> Vector2:
-	var ground: Vector2 = rest_dir * rod_pose.x + side * rod_pose.y
-	var lift: float = rod_pose.z
-	var length3d: float = maxf(sqrt(ground.length_squared() + lift * lift), 0.001)
-	return Vector2(ground.x, ground.y * DEPTH_SQUASH - lift * 0.9) / length3d
+## The arm's pose to a quarter pixel: when it is the same as last frame, last frame's painting still stands.
+func _arm_pose_key() -> PackedFloat32Array:
+	var key: PackedFloat32Array = PackedFloat32Array()
+	for p: Vector3 in [_shoulder3, _elbow3, _wrist3, _fist3]:
+		key.append(roundf(p.x * 4.0))
+		key.append(roundf(p.y * 4.0))
+		key.append(roundf(p.z * 4.0))
+	key.append(_arm_sort.position.y)
+	return key
 
 
-## Where the resting blade points on screen: seen in perspective, it leans forward and up (or
-## trails back and down while sprinting), so a blade pointing at the camera comes out short.
-func _rest_blade(rest_dir: Vector2, side: Vector2) -> Vector2:
-	var ground: Vector2 = rest_dir * 0.75 + side * 0.3
-	var lift: float = 0.55
-	if carrying:
-		ground = -rest_dir * 0.8 + side * 0.35
-		lift = -0.4
-	var length3d: float = sqrt(ground.length_squared() + lift * lift)
-	return Vector2(ground.x, ground.y * DEPTH_SQUASH - lift * 0.9) / length3d
+## Shows or hides the drawn arm and the held item together (the shadow step, swimming: those sheets carry both arms).
+func set_arm_shown(on: bool) -> void:
+	_hand.visible = on
+	if _arm_sort != null:
+		_arm_sort.visible = on
 
 
-## Her sword arm: a coat sleeve to the elbow, a dark bracer to the wrist, a glove on the grip. Pixel steps
-## instead of lines so it stays crisp at any angle.
+func arm_shown() -> bool:
+	return _hand.visible
+
+
+## The arm and the item wear the same shader as her sprite: pallor, wetness, the hit flash, the mist veil and the daylight grade fall on
+## them as on the sheet (blood and bandage stay off: their maps belong to the sheet).
+func mirror_material(source: Material) -> void:
+	var src: ShaderMaterial = source as ShaderMaterial
+	if src == null or src.shader == null:
+		return
+	if _skin == null or _skin.shader != src.shader:
+		_skin = ShaderMaterial.new()
+		_skin.shader = src.shader
+		_arm.material = _skin
+		_weapon.material = _skin
+	for key: StringName in [&"wound", &"soak", &"flash", &"flash_color", &"veil", &"veil_keep", &"veil_seed"]:
+		var value: Variant = src.get_shader_parameter(key)
+		if value != null:
+			_skin.set_shader_parameter(key, value)
+
+
+## Her sword arm, painted like her left one (ArmPainter); a worn bracelet sits on the violet band.
 func _draw_arm() -> void:
-	var origin: Vector2 = _hand.position
-	var shoulder: Vector2 = (rig_shoulder - origin).round()
-	var hand: Vector2 = (_grip - origin).round()
-	var elbow: Vector2 = _elbow(shoulder, hand).round()
-	_pixel_line(shoulder, elbow, ARM_SLEEVE, ARM_SLEEVE_SHADE)
-	_pixel_line(elbow, hand, ARM_BRACER, ARM_BRACER_LIGHT)
-	_arm.draw_rect(Rect2(elbow.lerp(hand, 0.62) - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), ARM_CUFF)
+	var drawn: Array[Vector2] = ArmPainter.paint(_arm, _arm_sort.position, _shoulder3, _elbow3, _wrist3, _fist3, 1.0)
 	var bracelet: String = _talismans.worn_id("bracelet") if _talismans != null else ""
-	if bracelet != "": ## the worn bracelet (Wuchtreif ...) takes the place of the cuff
-		TalismanArt.draw_bracelet(_arm, bracelet, elbow.lerp(hand, 0.62), hand - elbow, float(Time.get_ticks_msec()) / 1000.0)
-	_arm.draw_rect(Rect2(hand - Vector2(1.0, 1.0), Vector2(3.0, 3.0)), ARM_GLOVE)
-	_arm.draw_rect(Rect2(hand - Vector2(1.0, 1.0), Vector2(1.0, 1.0)), ARM_BRACER_LIGHT)
-
-
-func _pixel_line(from: Vector2, to: Vector2, color: Color, shade: Color) -> void:
-	var steps: int = maxi(1, ceili(from.distance_to(to)))
-	for i: int in steps + 1:
-		var p: Vector2 = from.lerp(to, float(i) / float(steps)).round()
-		_arm.draw_rect(Rect2(p - Vector2(1.0, 1.0), Vector2(2.0, 2.0)), shade)
-		_arm.draw_rect(Rect2(p - Vector2(1.0, 1.0), Vector2(1.0, 1.0)), color)
-
-
-## Two-bone solve: the elbow hangs low, like a relaxed arm.
-func _elbow(shoulder: Vector2, hand: Vector2) -> Vector2:
-	var to: Vector2 = hand - shoulder
-	var dist: float = clampf(to.length(), 1.0, ARM_UPPER + ARM_FORE - 0.01)
-	var dir: Vector2 = to.normalized() if to.length() > 0.01 else Vector2.DOWN
-	var along: float = (dist * dist + ARM_UPPER * ARM_UPPER - ARM_FORE * ARM_FORE) / (2.0 * dist)
-	var bend: float = sqrt(maxf(ARM_UPPER * ARM_UPPER - along * along, 0.0))
-	var perp: Vector2 = Vector2(-dir.y, dir.x)
-	var first: Vector2 = shoulder + dir * along + perp * bend
-	var second: Vector2 = shoulder + dir * along - perp * bend
-	return first if first.y >= second.y else second
+	if bracelet != "": ## the worn bracelet (Wuchtreif ...) takes the place of the band
+		TalismanArt.draw_bracelet(_arm, bracelet, drawn[0], drawn[1], float(Time.get_ticks_msec()) / 1000.0)
 
 
 ## The blade's trail: a wedge that grows with the sweep, brightest at the blade, fading afterwards.
@@ -1338,20 +1512,21 @@ func _draw_edge_glow() -> void:
 	_trail.draw_line(from.lerp(to, 0.25), to, Color(RefineStyle.GOLD, (0.22 + 0.22 * pulse) * _weapon_alpha), 1.0)
 
 
-## The blade sheds sparkles while it is in the air: they fly on along its path, rise a little and fade.
-func _emit_motes(angle: float, sweep: float, thrust: bool, delta: float) -> void:
+## The blade sheds sparkles while it is in the air: from its outer part, flying on the way the tip really moved, rising a little and fading.
+func _emit_motes(thrust: bool, delta: float) -> void:
 	_mote_carry += delta * MOTES_PER_SEC
-	var origin: Vector2 = global_position + BODY_CENTER
-	var along: Vector2 = Vector2.from_angle(angle)
+	var grip: Vector2 = _grip_world()
+	var blade: Vector2 = _blade_vector()
+	var along: Vector2 = blade.normalized() if blade.length() > 0.01 else aim_dir.normalized()
+	var moved: Vector2 = grip + blade - _last_tip
+	var flight: Vector2 = along if thrust or moved.length() < 0.5 else moved.normalized() ## the way the tip is moving
 	while _mote_carry >= 1.0:
 		_mote_carry -= 1.0
-		var radius: float = _reach * randf_range(0.8, 1.0)
-		var flight: Vector2 = along if thrust else along.rotated(sweep * PI / 2.0) ## the way the blade is moving
 		var kind: int = [0, 0, 0, 0, 0, 1][randi() % 6]
 		var color: Color = _fx_colors[1 + randi() % 2]
 		var speed: float = randf_range(18.0, 55.0)
 		var vel: Vector2 = flight * speed + along * randf_range(-12.0, 30.0) + Vector2(randf_range(-14.0, 14.0), randf_range(-14.0, 6.0))
-		_motes.append({"pos": origin + along * radius + along.rotated(PI / 2.0) * randf_range(-1.5, 1.5), "vel": vel, "age": 0.0, "life": randf_range(0.2, 0.42), "kind": kind, "color": color, "size": randf_range(0.8, 1.3)})
+		_motes.append({"pos": grip + blade * randf_range(0.6, 1.0) + along.rotated(PI / 2.0) * randf_range(-1.5, 1.5), "vel": vel, "age": 0.0, "life": randf_range(0.2, 0.42), "kind": kind, "color": color, "size": randf_range(0.8, 1.3)})
 	if _motes.size() > MAX_MOTES:
 		_motes = _motes.slice(_motes.size() - MAX_MOTES)
 
@@ -1424,29 +1599,32 @@ func _draw_burst() -> void:
 			_trail.draw_arc(center, radius, _burst_angle - half, _burst_angle + half, 14, color, 1.0)
 
 
+## The cut's trail: a ribbon along the path the tip really took through space (GripRig.swing_dir), seen from the fist where it is now,
+## thin and faint where the cut began, bright at the blade.
 func _draw_slash_trail(alpha: float) -> void:
-	var aim: float = aim_dir.angle()
-	var sweep: float = float(_step["sweep"])
-	var from_offset: float = -float(_step["arc"]) / 2.0
-	var span: float = _trail_head - from_offset
-	if span <= 0.02:
+	var span: float = _theta_head - _theta_from
+	if absf(span) <= 0.02:
 		return
+	var aim: Vector2 = aim_dir.normalized() if aim_dir.length() > 0.01 else Vector2.RIGHT
+	var contact: Vector3 = GripRig.dir(aim.angle(), clampf(GripRig.aim_pitch(aim) + deg_to_rad(float(_shape.get("pitch", 0.0))), -1.05, 1.05))
+	var tilt: float = _swing_tilt(-1.0 if bool(_shape.get("top_down", false)) else float(_step["sweep"]))
+	var length: float = Items.stat(_stack_of(held_weapon, held_refine), "reach", 24.0) * 0.8
 	var quad: PackedVector2Array = PackedVector2Array()
 	quad.resize(4)
+	var prev: Vector2 = GripRig.project_dir(GripRig.swing_dir(contact, aim, tilt, _theta_from))
 	for i: int in TRAIL_STEPS:
-		var k0: float = float(i) / TRAIL_STEPS
 		var k1: float = float(i + 1) / TRAIL_STEPS
-		var a0: float = aim + sweep * (from_offset + span * k0)
-		var a1: float = aim + sweep * (from_offset + span * k1)
-		var outer: float = _reach
-		var inner: float = _reach - lerpf(1.5, 9.0, k1)
+		var here: Vector2 = GripRig.project_dir(GripRig.swing_dir(contact, aim, tilt, _theta_from + span * k1))
+		var inner: float = length - lerpf(1.5, 9.0, k1)
 		var color: Color = _trail_edge.lerp(_trail_core, k1)
 		color.a = alpha * lerpf(0.1, 0.95, k1)
-		quad[0] = BODY_CENTER + Vector2.from_angle(a0) * inner
-		quad[1] = BODY_CENTER + Vector2.from_angle(a0) * outer
-		quad[2] = BODY_CENTER + Vector2.from_angle(a1) * outer
-		quad[3] = BODY_CENTER + Vector2.from_angle(a1) * inner
-		_trail.draw_colored_polygon(quad, color)
+		quad[0] = _grip + prev * inner
+		quad[1] = _grip + prev * length
+		quad[2] = _grip + here * length
+		quad[3] = _grip + here * inner
+		_draw_ribbon_triangle(quad[0], quad[1], quad[2], color)
+		_draw_ribbon_triangle(quad[0], quad[2], quad[3], color)
+		prev = here
 
 
 func _draw_thrust_trail(alpha: float) -> void:

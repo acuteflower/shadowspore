@@ -8,7 +8,8 @@ extends Node2D
 ## A joining peer gets the dev chests and the opened ones (`_rpc_snapshot`); the save file keeps the opened ids (`"chests"`, dev chests never).
 ## Bosses: an enemy whose loot block has `chest` leaves no scattered loot but a Glutreliquiar holding exactly its spoils (`boss_chest`, called by
 ## `DropComponent._roll`): it comes down in a pillar of light a moment after the kill, the copper, XP and relics go to the same winners when it is
-## opened. Such a chest is kept in the save until it is opened; opened boss and test chests fade away after `fade_after` seconds.
+## opened. Such a chest is kept in the save until it is opened. EVERY opened chest fades away `fade_after` (10) seconds later; a placed or trial chest
+## stays gone (its id stays in `_opened`, so it is never built again), boss and test chests are forgotten.
 ## Dev: `request_dev(tier, pos)` puts a test chest down (pause menu ENTWICKLER).
 
 const DEV_PREFIX: String = "dev_"
@@ -20,6 +21,7 @@ var _pools: Dictionary = {}
 var _chests: Dictionary = {} ## id -> LootChest
 var _opened: Dictionary = {} ## id -> true
 var _spawned: Dictionary = {} ## id -> [tier, pos, flip]: chests placed while playing (test chests, boss chests): every peer has them
+var _extra: Dictionary = {} ## host: id -> [stacks] that go into a chest of the world besides its roll (a trial's pawn)
 var _payload: Dictionary = {} ## host: id -> what a boss chest holds {enemy, copper, xp, winners: [peer ids], items: [{id, count}], relics: [...]}
 var _dev_count: int = 0
 var _serial: int = 0
@@ -68,6 +70,8 @@ func count() -> int:
 
 ## Every peer: a chest of `tier` stands at `pos` (world px of its feet) from now on. Ids must be unique and the same on every peer.
 func place(id: String, tier_name: String, pos: Vector2, flip: bool = false) -> LootChest:
+	if _opened.has(id) and not _spawned.has(id): ## an opened chest of the world has faded away for good
+		return null
 	if _chests.has(id) or not _tiers.has(tier_name):
 		return _chests.get(id) as LootChest
 	var node: LootChest = LootChest.new()
@@ -136,9 +140,15 @@ func _host_open(id: String, peer: int) -> void:
 			if player.health.current > 0.0 and player.global_position.distance_to(node.global_position) <= setting("share_radius", 200.0):
 				near.append(player)
 		items = LootRules.roll(spec, _pools, rng, near.size())
+		for extra: Variant in _extra.get(id, []) as Array: ## given back first, the rolled loot after it (the best still last)
+			items.push_front(extra as Dictionary)
+		_extra.erase(id)
 		get_tree().create_timer(burst).timeout.connect(func() -> void: _host_pay(id, spec, near))
-	if _spawned.has(id):
-		get_tree().create_timer(setting("fade_after", 45.0)).timeout.connect(func() -> void: _rpc_remove.rpc(id))
+	get_tree().create_timer(setting("fade_after", 10.0)).timeout.connect(func() -> void:
+		if _spawned.has(id):
+			_rpc_remove.rpc(id)
+		else:
+			_rpc_vanish.rpc(id))
 	var stagger: float = float(spec.get("stagger", 0.15))
 	for i: int in items.size():
 		var stack: Dictionary = items[i]
@@ -286,18 +296,63 @@ func _host_dev(tier_name: String, pos: Vector2, arrive: bool) -> void:
 @rpc("authority", "call_local", "reliable")
 func _rpc_place(id: String, tier_name: String, pos: Vector2, flip: bool, arrive: bool) -> void:
 	_spawned[id] = [tier_name, pos, flip]
-	if arrive and not _chests.has(id):
+	appear(id, tier_name, pos, arrive, flip)
+
+
+## Every peer (called by the caller on every peer, e.g. `Puzzles`): a chest that belongs to the world from now on (its opened state is saved like a
+## placed one); `arrive` = it comes down in a pillar of light. Nothing happens when the id stands already.
+## `rise`: with `arrive`, it breaks up out of the earth instead of falling out of the light.
+func appear(id: String, tier_name: String, pos: Vector2, arrive: bool, flip: bool = false, rise: bool = false) -> void:
+	if arrive and not _chests.has(id) and _tiers.has(tier_name) and not _opened.has(id):
 		var node: LootChest = LootChest.new()
 		node.name = "Chest_" + id
 		node.id = id
 		node.tier = tier_name
 		node.flip = flip
 		node.arrive = true
+		node.rise = rise
 		node.position = pos
 		add_child(node)
 		_chests[id] = node
 		return
 	place(id, tier_name, pos, flip)
+
+
+## Host: stacks that will spring out of chest `id` besides its rolled loot (saved until it is opened).
+func add_extra(id: String, stacks: Array) -> void:
+	if not stacks.is_empty():
+		_extra[id] = stacks.duplicate(true)
+
+
+## Every peer (dev): the chest is gone and was never opened.
+func forget(id: String) -> void:
+	_opened.erase(id)
+	_spawned.erase(id)
+	var node: LootChest = _chests.get(id) as LootChest
+	_chests.erase(id)
+	if node != null:
+		node.queue_free()
+
+
+## Every peer: an opened chest of the world fades and is gone; it stays opened (saved), so it is never built again.
+@rpc("authority", "call_local", "reliable")
+func _rpc_vanish(id: String) -> void:
+	var node: LootChest = _chests.get(id) as LootChest
+	_chests.erase(id)
+	if node != null:
+		node.vanish()
+
+
+## An opened chest that is already gone when the opened list arrives (save, snapshot): open boss/test chests show open, the others are removed.
+func _show_opened(id: String) -> void:
+	var node: LootChest = _chests.get(id) as LootChest
+	if node == null:
+		return
+	if _spawned.has(id):
+		node.set_open_instant()
+	else:
+		_chests.erase(id)
+		node.queue_free()
 
 
 ## Every peer: an opened boss or test chest fades and is gone.
@@ -326,9 +381,7 @@ func _rpc_snapshot(spawned: Array, opened: PackedStringArray) -> void:
 		_spawned[String(entry[0])] = [entry[1], entry[2], entry[3]]
 		place(String(entry[0]), String(entry[1]), entry[2] as Vector2, bool(entry[3]))
 	for id: String in opened:
-		var node: LootChest = _chests.get(id) as LootChest
-		if node != null:
-			node.set_open_instant()
+		_show_opened(id)
 
 
 # ---------------------------------------------------------------- save file
@@ -343,7 +396,10 @@ func export_state() -> Dictionary:
 		if _spawned.has(id) and not _opened.has(id):
 			var at: Vector2 = (_spawned[id] as Array)[1] as Vector2
 			bosses[id] = {"tier": String((_spawned[id] as Array)[0]), "at": [at.x, at.y], "load": _payload[id]}
-	return {"opened": ids, "boss": bosses}
+	var out: Dictionary = {"opened": ids, "boss": bosses}
+	if not _extra.is_empty():
+		out["extra"] = _extra.duplicate(true)
+	return out
 
 
 func import_state(data: Dictionary) -> void:
@@ -351,9 +407,10 @@ func import_state(data: Dictionary) -> void:
 	for id: Variant in data.get("opened", []) as Array:
 		ids.append(String(id))
 		_opened[String(id)] = true
-		var node: LootChest = _chests.get(String(id)) as LootChest
-		if node != null:
-			node.set_open_instant()
+		_show_opened(String(id))
+	var extras: Dictionary = data.get("extra", {}) as Dictionary
+	for key: Variant in extras:
+		_extra[String(key)] = extras[key] as Array
 	var bosses: Dictionary = data.get("boss", {}) as Dictionary
 	for key: Variant in bosses:
 		var entry: Dictionary = bosses[key] as Dictionary

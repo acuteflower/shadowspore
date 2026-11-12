@@ -188,6 +188,10 @@ func bind(player: Node) -> void:
 		speech.name = "SpeechBox"
 		add_child(speech)
 		speech.bind(player.quests, dialogue)
+		var bubbles: BubbleRunner = BubbleRunner.new() ## in-world overhead speech bubbles (falls back to SpeechBox)
+		bubbles.name = "BubbleRunner"
+		add_child(bubbles)
+		bubbles.bind(player, speech)
 		var hint: HintCard = HintCard.new() ## the sneaking tutorial card
 		hint.name = "HintCard"
 		add_child(hint)

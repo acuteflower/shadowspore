@@ -3,6 +3,7 @@ extends Node2D
 ## Sparse ground residents with stable homes. Tree-sort chain remains continuous through Residents.
 
 const CHUNK_PIXELS: float = 512.0
+var enabled_species: Array[String] = ["deer", "fox", "boar", "lynx", "squirrel", "badger", "hex_goat", "hex_toad"]
 var _seed: int = 0
 var _habitat: Callable
 var _active: Dictionary = {}
@@ -101,9 +102,99 @@ func _cover_score(point: Vector2) -> float:
 		if props != null:
 			for node: Node in props.get_children():
 				var prop: WorldProp = node as WorldProp
-				if prop != null and prop.kind in ["tree", "bush", "berry_bush"]:
+				if prop != null and prop.kind in ["tree", "bush", "berry_bush", "hex_shrub", "witch_broom"]:
 					nearest = minf(nearest, prop.global_position.distance_to(point))
 	return -nearest
+
+
+func _nearest_conifer_distance(point: Vector2) -> float:
+	var nearest: float = INF
+	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+		var tree: FirTree = node as FirTree
+		if tree != null and not tree.is_depleted() and tree.kind != "bone_tree":
+			nearest = minf(nearest, tree.global_position.distance_to(point))
+	return nearest
+
+
+func _nearest_log_distance(point: Vector2) -> float:
+	var nearest: float = INF
+	for log_node: FallenLog in get_tree().get_nodes_in_group("fallen_logs"):
+		nearest = minf(nearest, log_node.global_position.distance_to(point))
+	return nearest
+
+
+func _habitat_score(point: Vector2, species: String, rng: RandomNumberGenerator) -> float:
+	if species == "deer":
+		return rng.randf()
+	if species == "squirrel":
+		var tree_d: float = _nearest_conifer_distance(point)
+		if tree_d > 105.0 and tree_d < INF:
+			return -INF
+		if tree_d == INF:
+			return _cover_score(point)
+		return -tree_d + rng.randf() * 8.0
+	if species == "lynx":
+		var log_d: float = _nearest_log_distance(point)
+		var cover: float = _cover_score(point)
+		if cover < -95.0 and log_d > 110.0:
+			return -INF
+		return maxf(cover, -log_d) + rng.randf() * 6.0
+	if species == "boar":
+		var log_bonus: float = 18.0 if _nearest_log_distance(point) < 65.0 else 0.0
+		return _cover_score(point) + log_bonus + rng.randf() * 10.0
+	if species == "hex_goat":
+		if BiomeBlend.amount_at(point) < 0.30:
+			return -INF
+		return _cover_score(point) * 0.5 + rng.randf() * 16.0
+	if species == "hex_toad":
+		if BiomeBlend.amount_at(point) < 0.35:
+			return -INF
+		var best: float = 130.0
+		for spot: Node in get_tree().get_nodes_in_group("toad_spots"):
+			if spot is Node2D:
+				best = minf(best, (spot as Node2D).global_position.distance_to(point))
+		for log_node: FallenLog in get_tree().get_nodes_in_group("fallen_logs"):
+			best = minf(best, log_node.global_position.distance_to(point))
+		return -best + rng.randf() * 8.0
+	return _cover_score(point)
+
+
+func _choose_appearance(species: String, index: int, group_count: int, center: Vector2, rng: RandomNumberGenerator, spec: Dictionary) -> int:
+	var gloom: float = BiomeBlend.amount_at(center)
+	match species:
+		"deer":
+			var lead_doe: int = 3 if (gloom > 0.12 or rng.randf() < 0.25) else 0
+			var family_coats: Array[int] = [lead_doe, 2, 1]
+			return family_coats[index % family_coats.size()]
+		"fox":
+			return rng.rand_weighted(PackedFloat32Array([0.48, 0.20, 0.16, 0.16]))
+		"boar":
+			if group_count == 1:
+				return 1
+			if index == 0:
+				return 3 if (gloom > 0.12 or rng.randf() < 0.22) else 0
+			if index == 1:
+				return 2
+			if index == 2:
+				return 2 if rng.randf() < 0.65 else 1
+			return 1 if rng.randf() < 0.55 else 2
+		"lynx":
+			if gloom >= 0.35:
+				return 2
+			return rng.rand_weighted(PackedFloat32Array([0.55, 0.25, 0.20]))
+		"squirrel":
+			return rng.rand_weighted(PackedFloat32Array([0.48, 0.22, 0.14, 0.16]))
+		"badger":
+			if index > 0:
+				return 2
+			return 0 if rng.randf() < 0.65 else 1
+		"hex_goat":
+			if index > 0:
+				return 3 if rng.randf() < 0.68 else 2
+			return rng.rand_weighted(PackedFloat32Array([0.46, 0.26, 0.28, 0.0]))
+		"hex_toad":
+			return rng.rand_weighted(PackedFloat32Array([0.46, 0.32, 0.22]))
+	return rng.randi_range(0, int(spec.get("builds", 3)) - 1)
 
 
 func _populate(cell: Vector2i) -> void:
@@ -111,7 +202,7 @@ func _populate(cell: Vector2i) -> void:
 		return
 	var residents: Array[WoodlandMammal] = []
 	_families[cell] = residents
-	for species: String in ["deer", "badger", "fox", "hedgehog"]:
+	for species: String in enabled_species:
 		var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
 		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 		rng.seed = hash(Vector3i(cell.x, cell.y, _seed + hash(species)))
@@ -123,7 +214,7 @@ func _populate(cell: Vector2i) -> void:
 			var margin: float = float(spec["spawn_margin"])
 			var point: Vector2 = Vector2(cell) * CHUNK_PIXELS + Vector2(rng.randf_range(margin, CHUNK_PIXELS - margin), rng.randf_range(margin, CHUNK_PIXELS - margin))
 			if _spawn_safe(point, species):
-				var value: float = rng.randf() if species == "deer" else _cover_score(point)
+				var value: float = _habitat_score(point, species, rng)
 				if value > score:
 					score = value
 					center = point
@@ -134,7 +225,8 @@ func _populate(cell: Vector2i) -> void:
 		for i: int in count:
 			if _residents.get_child_count() >= int(spec["max_loaded"]) or _count(species) >= int(spec["max_species_loaded"]):
 				break
-			var point: Vector2 = center + Vector2(25.0 * i, 15.0 * i)
+			var spacing: Vector2 = Vector2(19.0 * i, 12.0 * i) if species in ["boar", "squirrel", "hex_toad"] else Vector2(25.0 * i, 15.0 * i)
+			var point: Vector2 = center + spacing
 			if not _spawn_safe(point, species):
 				continue
 			var scene: PackedScene = load(String(spec["scene"])) as PackedScene
@@ -142,7 +234,7 @@ func _populate(cell: Vector2i) -> void:
 			_serial += 1
 			animal.name = "Resident%d" % _serial
 			animal.species = species
-			animal.appearance = ([0, 2, 1][i] as int) if species == "deer" else rng.randi_range(0, 2)
+			animal.appearance = _choose_appearance(species, i, count, center, rng, spec)
 			animal.family_id = "%s_%d_%d" % [species, cell.x, cell.y]
 			animal.position = point
 			animal.home = center
@@ -150,7 +242,7 @@ func _populate(cell: Vector2i) -> void:
 			_residents.add_child(animal)
 			residents.append(animal)
 			spawned += 1
-			if bool(spec["nocturnal"]) and TimeManager.night_amount() < 0.4:
+			if bool(spec["nocturnal"]) and TimeManager.night_amount() < float(spec.get("awake_threshold", 0.4)):
 				animal._command.rpc(WoodlandMammal.Mood.HIDDEN if species == "badger" else WoodlandMammal.Mood.SLEEP, animal._range("sleep_seconds"), animal.facing, center if species == "badger" else point, center if species == "badger" else point, 0.0)
 		if species == "badger" and spawned > 0:
 			# A normal spawned scene, so joining peers see the same fixed den entrance.
@@ -158,7 +250,8 @@ func _populate(cell: Vector2i) -> void:
 			shelter.name = "Den%d" % _serial
 			shelter.position = center
 			$Shelters.add_child(shelter)
-			_shelters[cell] = shelter
+			var cell_shelters: Array = _shelters.get_or_add(cell, []) as Array
+			cell_shelters.append(shelter)
 
 
 ## A visitor of the town (TownCritters): one animal of `species` at `point` that goes to `to` and sniffs towards `look`. Null when the caps or the ground forbid it.
@@ -170,7 +263,7 @@ func spawn_visitor(species: String, point: Vector2, to: Vector2, look: Vector2) 
 	_serial += 1
 	animal.name = "Resident%d" % _serial
 	animal.species = species
-	animal.appearance = randi_range(0, 2)
+	animal.appearance = randi_range(0, int(spec.get("builds", 3)) - 1)
 	animal.family_id = "visit_%d" % _serial
 	animal.position = point
 	animal.home = point
@@ -203,7 +296,11 @@ func _collect() -> void:
 		if residents.is_empty() and not _active.has(home_cell):
 			_families.erase(home_cell)
 			if _shelters.has(home_cell):
-				var shelter: Node = _shelters[home_cell]
-				if is_instance_valid(shelter):
-					shelter.queue_free()
+				var entry: Variant = _shelters[home_cell]
+				if entry is Array:
+					for s: Variant in (entry as Array):
+						if is_instance_valid(s):
+							(s as Node).queue_free()
+				elif is_instance_valid(entry):
+					(entry as Node).queue_free()
 				_shelters.erase(home_cell)

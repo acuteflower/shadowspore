@@ -1,5 +1,5 @@
 """The objects of the trials of the Wächterin (docs/raetsel_konzept.md): rune steles, the sundial, the trial stone, lantern posts, the pilgrim
-shrines, the crows' hoard snags, the dirt mound and the snapping twigs. Same renderer as the loot chests (tools/art_loot_chests.py: oriented boxes +
+shrines, (the hoard perches of crow and raven are tools/art_hoard.py and art_hoard_raven.py), the dirt mound and the snapping twigs. Same renderer as the loot chests (tools/art_loot_chests.py: oriented boxes +
 art_hero3d ellipsoids, light from the top left, ink outline), the pale violet stone of the waystone statues with teal inlay.
     py -3 tools/art_puzzles.py [preview.png]
 Writes assets/props/puzzles/<name>.png (+ <name>_glow.png where something glows) and data/puzzle_art.json (frame, ground row, frames, anchors in px
@@ -242,13 +242,11 @@ SHEETS = {
     "shrine_big": ([lambda: shrine(True, False), lambda: shrine(True, True)], 52, 60, 52, (0, -1, 19, 6)),
     "mound": ([mound], 32, 22, 16, (0, -1, 10, 3)),
     "twig": ([lambda v=v: twig(v, False) for v in range(3)] + [lambda v=v: twig(v, True) for v in range(3)], 18, 12, 8, (0, 0, 1, 1)),
-    "hoard_crow": ([lambda: hoard(False)], 32, 32, 26, (0, -1, 9, 3)),
-    "hoard_raven": ([lambda: hoard(True)], 40, 48, 42, (0, -1, 10, 3)),
 }
 
 
 def build_all():
-    data = {}
+    data = json.loads(DATA.read_text(encoding="utf-8")) if DATA.exists() else {}  # keeps the keys of art_wisp.py and art_hoard.py
     previews = []
     OUT.mkdir(parents=True, exist_ok=True)
     for name, (builders, FW, FH, GR, shadow) in SHEETS.items():
@@ -277,8 +275,6 @@ def build_all():
     data["shrine_small"]["flame"] = c.screen((0, 6.6, 0.6), 40, 38)
     data["shrine_big"]["flame"] = c.screen((0, 6.6, 0.6), 52, 52)
     data["shrine_big"]["bell"] = c.screen((0, 18.0, -1.0), 52, 52)
-    data["hoard_crow"]["perch"] = c.screen((0.6, 12.6, -0.4), 32, 26)
-    data["hoard_raven"]["perch"] = c.screen((8.6, 24.0 * 0.98, 0.8), 40, 42)
     DATA.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
     RUNES_OUT.write_text(json.dumps({"order": RUNE_ORDER, "runes": RUNES}, indent="\t") + "\n", encoding="utf-8")
     return previews

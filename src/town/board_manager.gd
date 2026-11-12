@@ -27,6 +27,7 @@ var _night_hooked: bool = false
 var _bounty_clock: float = 0.0
 var _bounty_sent: Vector2 = Vector2.INF ## the last place of the marked one that went out to the peers
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _hooked_player: Player = null
 
 
 func setup(owner_town: TownManager) -> void:
@@ -371,6 +372,32 @@ func check_rush() -> void:
 	_broadcast()
 
 
+func check_story_now() -> void:
+	if multiplayer.is_server():
+		_check_story()
+
+
+func _hook_player_story(player: Player) -> void:
+	if player == null or player == _hooked_player:
+		return
+	_hooked_player = player
+	if player.quests != null:
+		if not player.quests.quest_finished.is_connected(_on_story_trigger_id):
+			player.quests.quest_finished.connect(_on_story_trigger_id)
+		if not player.quests.changed.is_connected(check_story_now):
+			player.quests.changed.connect(check_story_now)
+	if player.progress != null and not player.progress.level_changed.is_connected(_on_story_level_changed):
+		player.progress.level_changed.connect(_on_story_level_changed)
+
+
+func _on_story_trigger_id(_id: String) -> void:
+	check_story_now()
+
+
+func _on_story_level_changed(_lvl: int) -> void:
+	check_story_now()
+
+
 ## Host, once a second: a story notice hangs as soon as its condition holds for the host's own player (quests are local to their owner).
 func _check_story() -> void:
 	if not is_ready():
@@ -378,6 +405,7 @@ func _check_story() -> void:
 	var player: Player = town.local_player()
 	if player == null or player.quests == null:
 		return
+	_hook_player_story(player)
 	var quests: Dictionary = DataRegistry.table("quests")
 	var changed_any: bool = false
 	for raw: Variant in BoardRules.story_entries():

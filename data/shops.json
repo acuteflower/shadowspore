@@ -469,7 +469,6 @@
    }
   ],
   "lines": {
-   "_note": "PLACEHOLDER name and lines for the dialogue writer (docs/prompts/dialogue_writer.md)",
    "open": [
     "WAS DARF ES SEIN?",
     "KOMM NÄHER.",
@@ -850,7 +849,6 @@
    ]
   },
   "lines": {
-   "_note": "PLACEHOLDER lines for the dialogue writer",
    "open": [
     "Komm rein, der Nebel bleibt draußen.",
     "Ah. Die mit den nassen Stiefeln."

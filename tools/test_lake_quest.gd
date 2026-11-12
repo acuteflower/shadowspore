@@ -29,6 +29,10 @@ func _wait(seconds: float) -> void:
 
 ## Runs every dialogue that is open to its end.
 func _close_dialogue() -> void:
+	var bubbles: BubbleRunner = get_tree().get_first_node_in_group("bubble_runner") as BubbleRunner
+	if bubbles != null and bubbles.is_active():
+		bubbles.skip_all()
+		await _frames(2)
 	for _i: int in 200:
 		var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
 		if box == null or not box.is_active():

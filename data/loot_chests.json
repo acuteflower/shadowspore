@@ -3,7 +3,7 @@
 		"reach": 34,
 		"share_radius": 200,
 		"drop_life": 300,
-		"fade_after": 45
+		"fade_after": 10
 	},
 	"tiers": {
 		"common": {

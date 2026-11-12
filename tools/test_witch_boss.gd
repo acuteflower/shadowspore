@@ -120,11 +120,21 @@ func _run() -> void:
 	await _wait(150)
 	_check(_arena.stage == WitchArena.Stage.CALM and not _arena.opened, "the tree woke before the quest opened the hollow")
 	var quests: QuestComponent = _player.quests
-	_check(not quests.is_active("spiegelhexe"), "the quest started without the workshop / level 5")
-	quests._done.append("town_workshop")
+	_check(not quests.is_active("spiegelhexe"), "the quest started without the quest board / level 5")
 	_player.progress.award(0, 100000)
-	if not await _until(func() -> bool: return quests.active_step_id("spiegelhexe") == "sh_valdric", 90):
-		return _fail("the quest did not start at level %d" % _player.progress.level)
+	await _wait(10)
+	_check(not quests.is_active("spiegelhexe"), "Esma's quest no longer auto-starts without the quest board")
+	var notice: Dictionary = {}
+	for raw: Variant in BoardRules.story_entries():
+		if String((raw as Dictionary).id) == "spiegelhexe_notice":
+			notice = raw as Dictionary
+	var qtable: Dictionary = DataRegistry.table("quests")
+	_check(not notice.is_empty() and BoardRules.story_due(notice, qtable, func(q: String) -> bool: return q in ["find_help", "lumberjack", "rebuild_hut", "town_start", "gustav_rescue", "town_workshop", "town_board", "torben_smithy"], func(_f: String) -> bool: return false, _player.progress.level), "Esma's notice unlocks on the Quest Board at Lv 5 after Torben")
+	quests.start("spiegelhexe")
+	await _wait(4)
+	var bubbles: BubbleRunner = BubbleRunner.find(_player)
+	if bubbles != null and bubbles.is_active():
+		bubbles.skip_all()
 	print("  quest start ok (level %d)" % _player.progress.level)
 	var steps: Array = (DataRegistry.get_entry("quests", "spiegelhexe").steps as Array)
 	for k: int in steps.size():

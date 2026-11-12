@@ -104,10 +104,10 @@ func _run() -> void:
 		for sector: int in 8:
 			rabbit.appearance = variant
 			rabbit.facing = sector * PI / 4.0
-			for mood: int in [WildRabbit.State.REST, WildRabbit.State.GRAZE, WildRabbit.State.ALERT, WildRabbit.State.GROOM]:
+			for mood: int in WildRabbit.State.values():
 				rabbit.state = mood as WildRabbit.State
 				rabbit._process(0.0)
-				_check(rabbit._sprite.frame >= 0 and rabbit._sprite.frame < 1248, "Rabbit animation frame outside sheet")
+				_check(rabbit._sprite.frame >= 0 and rabbit._sprite.frame < 48 * WildRabbit.SHEET_COLUMNS, "Rabbit animation frame outside sheet")
 	player.queue_free()
 	rabbit.queue_free()
 	await get_tree().process_frame

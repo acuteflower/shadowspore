@@ -231,7 +231,7 @@ func is_depleted() -> bool:
 
 ## Blossom trees: E picks the blossoms (the crown shows green with a few left, back after a few days).
 func prompt() -> String:
-	if _spec.has("pickup") and not is_depleted() and not _picked():
+	if not opening_locked() and _spec.has("pickup") and not is_depleted() and not _picked():
 		return String((_spec.pickup as Dictionary).prompt)
 	return ""
 

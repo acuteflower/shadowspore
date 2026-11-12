@@ -135,8 +135,8 @@ func _run() -> void:
 				for mood: int in WildCorvid.State.values():
 					crow.state = mood as WildCorvid.State
 					crow._process(0.0)
-					_check(crow._sprite.frame >= 0 and crow._sprite.frame < 2400, "Bird frame outside atlas")
-					_check(crow._sprite.frame / 400 >= (3 if species == "raven" else 0), "Wrong species build")
+					_check(crow._sprite.frame >= 0 and crow._sprite.frame < 48 * 62, "Bird frame outside atlas")
+					_check(crow._sprite.frame / (8 * 62) >= (3 if species == "raven" else 0), "Wrong species build")
 	crow.queue_free()
 	companion.queue_free()
 	player.queue_free()
@@ -153,14 +153,14 @@ func _run() -> void:
 	population.set_process(false)
 	print("Initial corvid population: ", population._birds.get_child_count())
 	_check(population._birds.get_child_count() > 0, "Starting meadow contains no corvids")
-	_check(population._birds.get_child_count() <= 11, "Corvid population budget exceeded")
+	_check(population._birds.get_child_count() <= 22, "Corvid population budget exceeded")
 	for node: Node in population._birds.get_children():
 		var bird: WildCorvid = node as WildCorvid
 		bird.set_physics_process(false)
 		_check(world._bird_habitat(bird.home, bird.species), "Bird flock started outside habitat")
 	var tree: FirTree = null
 	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
-		if (node as FirTree).variant >= 1:
+		if (node as FirTree).variant >= 1 and (node as FirTree).kind != "bone_tree":
 			tree = node as FirTree
 			break
 	_check(tree != null, "Loaded tree perches missing")
@@ -177,8 +177,85 @@ func _run() -> void:
 			perch_tree.state = {"f": 1}
 			raven._sense()
 			_check(raven.state == WildCorvid.State.FLY, "Bird stayed on a felled tree")
+			perch_tree.state = {}
 		population.release_perch(raven)
 		_check(not population._claims.values().has(raven), "Perch reservation leaked")
+		TimeManager.unlock()
+		TimeManager.set_time(0.5)
+		# Woodpecker: 62x24 sheet, trunk perch clinging, vertical trunk hitch-hop, drumming, and Wellenflug!
+		var wp: WildMeadowBird = load("res://src/entities/wildlife/wild_meadow_bird.tscn").instantiate() as WildMeadowBird
+		wp.name = "TestWoodpecker"
+		wp.species = "woodpecker"
+		wp.position = tree.position + Vector2(-18, 8)
+		wp.home = wp.position
+		population._birds.add_child(wp)
+		wp.set_physics_process(false)
+		_check(wp._sprite.hframes == 62 and wp._sprite.vframes == 24, "Woodpecker 62x24 sheet mismatch")
+		var trunk_offer: Dictionary = population.choose_perch(wp, Vector2.INF)
+		_check(not trunk_offer.is_empty(), "Woodpecker found no trunk perch")
+		if not trunk_offer.is_empty():
+			wp._finish(trunk_offer["position"], trunk_offer["height"], trunk_offer["path"])
+			_check(wp._on_tree_trunk(), "Woodpecker did not enter trunk-clinging state")
+			var h0: float = wp._height
+			wp._trunk_hop_up(h0 + 5.5)
+			wp._elapsed = 0.26
+			wp._advance()
+			_check(wp._height > h0 + 4.0, "Woodpecker vertical trunk hitch-hop did not climb upward")
+			wp._set_mood(WildCorvid.State.PECK, 2.0)
+			wp._elapsed = 0.3
+			wp._process(0.016)
+			_check(wp._sprite.frame % 62 in range(4, 10), "Woodpecker bark-drumming frame mismatch")
+		population.release_perch(wp)
+		wp.queue_free()
+		# Jay ("Waldpolizei") & Robin ("Gärtner-/Wildschwein-Begleiter")
+		var jay: WildMeadowBird = load("res://src/entities/wildlife/wild_meadow_bird.tscn").instantiate() as WildMeadowBird
+		jay.name = "TestJay"
+		jay.species = "jay"
+		jay.position = tree.position + Vector2(36, 20)
+		jay.home = jay.position
+		population._birds.add_child(jay)
+		jay.set_physics_process(false)
+		var robin: WildMeadowBird = load("res://src/entities/wildlife/wild_meadow_bird.tscn").instantiate() as WildMeadowBird
+		robin.name = "TestRobin"
+		robin.species = "robin"
+		robin.position = tree.position + Vector2(64, 24)
+		robin.home = robin.position
+		population._birds.add_child(robin)
+		robin.set_physics_process(false)
+		for ring_r: int in range(1, 10):
+			var found_r: bool = false
+			for sec_r: int in 12:
+				var cand_r: Vector2 = tree.position + Vector2.from_angle(float(sec_r) * TAU / 12.0) * float(ring_r) * 18.0
+				if population.can_land(cand_r, robin) and population.can_land(cand_r + Vector2(-14, 0), robin):
+					robin.position = cand_r
+					robin.home = cand_r
+					found_r = true
+					break
+			if found_r:
+				break
+		_check(jay._sprite.hframes == 62 and jay._sprite.vframes == 24 and robin._sprite.hframes == 62 and robin._sprite.vframes == 24, "Jay or Robin 62x24 sheet mismatch")
+		var wpop: WoodlandPopulation = world.get_node("Wildlife/Woodland") as WoodlandPopulation
+		var boar: WoodlandMammal = load("res://src/entities/wildlife/woodland_mammal.tscn").instantiate() as WoodlandMammal
+		boar.name = "RootingBoar"
+		boar.species = "boar"
+		boar.position = robin.position + Vector2(-58, 0)
+		boar.home = boar.position
+		wpop._residents.add_child(boar)
+		boar.set_physics_process(false)
+		boar._issue(WoodlandMammal.Mood.FORAGE, 4.0)
+		await get_tree().physics_frame
+		_check(robin._find_soil_disturber().is_equal_approx(boar.global_position), "Robin did not notice rooting wild boar")
+		robin._elapsed = 5.0
+		robin._robin_life()
+		_check(robin._moving and robin._end.distance_to(boar.global_position) < robin.position.distance_to(boar.global_position), "Robin did not hop toward rooting boar")
+		jay.position = boar.position + Vector2(34, 0)
+		jay._threat = jay.global_position + Vector2(40, 0)
+		boar._issue(WoodlandMammal.Mood.REST, 4.0)
+		jay._request_call(true)
+		_check(boar.mood == WoodlandMammal.Mood.ALERT, "Jay Räätsch sentinel call did not alert nearby woodland mammal")
+		boar.queue_free()
+		jay.queue_free()
+		robin.queue_free()
 	world.queue_free()
 	await get_tree().process_frame
 	Terrain.relief = null

@@ -128,7 +128,8 @@ func _bird_visit() -> void:
 		var point: Vector2 = goal + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(SPAWN_RING.x, SPAWN_RING.y)
 		if not _alive_players_far(point, 340.0):
 			continue
-		var species: String = "raven" if _rng.randf() < 0.15 else "crow"
+		var roll_sp: float = _rng.randf()
+		var species: String = "robin" if roll_sp < 0.24 else ("raven" if roll_sp < 0.36 else "crow")
 		var bird: WildCorvid = birds.spawn_visitor(species, point, "town")
 		if bird != null:
 			bird._take_wing(false, false, false, true) ## straight to a roof

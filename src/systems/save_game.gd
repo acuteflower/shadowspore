@@ -90,6 +90,9 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	var chests: LootChests = LootChests.of(tree)
 	if chests != null:
 		data["chests"] = chests.export_state() ## opened loot chests and the bosses' chests not opened yet (docs/beutetruhen_konzept.md)
+	var puzzles: Puzzles = Puzzles.of(tree)
+	if puzzles != null and not puzzles.is_blank():
+		data["puzzles"] = puzzles.export_state() ## the solved trials of the Wächterin (docs/raetsel_konzept.md)
 	var pets: PetRegistry = PetRegistry.of(tree)
 	if pets != null and not (pets.export_state()["bonds"] as Dictionary).is_empty():  ## (the birds' records only exist with a bond)
 		data["pets"] = pets.export_state() ## the bonds with wild birds (docs/pet_konzept.md)
@@ -109,7 +112,7 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	return written and DirAccess.rename_absolute(pending, target) == OK
 
 
-static func load_into(tree: SceneTree, path: String = "") -> bool:
+static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -> bool:
 	var data: Dictionary = _read(path if path != "" else path_for(tree))
 	var player: Player = _local_player(tree)
 	if data.is_empty() or player == null:
@@ -177,6 +180,9 @@ static func load_into(tree: SceneTree, path: String = "") -> bool:
 	var chests: LootChests = LootChests.of(tree)
 	if chests != null and data.has("chests"):
 		chests.import_state(data.chests as Dictionary)
+	var puzzles: Puzzles = Puzzles.of(tree)
+	if puzzles != null and data.has("puzzles"):
+		puzzles.import_state(data.puzzles as Dictionary)
 	var pets: PetRegistry = PetRegistry.of(tree)
 	if pets != null and data.has("pets"):
 		pets.import_state(data.pets as Dictionary)
@@ -184,7 +190,7 @@ static func load_into(tree: SceneTree, path: String = "") -> bool:
 	if discovery != null and data.has("map"):
 		discovery.import_saved(Marshalls.base64_to_raw(String(data["map"])))
 		discovery.import_before(Marshalls.base64_to_raw(String(data.get("map_before", "")))) ## empty = no whole-map reveal active
-	if world != null and world.has_method("resume_story"):
+	if resume and world != null and world.has_method("resume_story"):
 		world.call_deferred("resume_story", player) ## a save that stopped in the middle of the wake-up plays it again
 	return true
 

@@ -419,21 +419,20 @@
    ]
   ],
   "chat": {
-   "_note": "PLACEHOLDER lines for the dialogue writer (docs/prompts/dialogue_writer.md): pools by quest step, by place, by night, of anything",
    "quest": {
     "town_night": [
      "Schlaf. Das Licht hält Wache, ich auch.",
      "Der Morgen kommt immer. Auch hier."
     ],
     "town_valdric": [
-     "Gut, dass du da bist. Ich hab etwas für dich."
+     "Gut, dass du da bist. Komm kurz her."
     ],
     "town_intro": [
-     "Nimm die Sachen. Sie sind für die Arbeit, nicht für den Kampf."
+     "Hör zu, bevor du losrennst."
     ],
     "build_lamp": [
      "Ein Lichtpfosten. Das Licht trägt weiter, als man denkt.",
-     "Stell ihn dahin, wo du abends gern stehst."
+     "Stell ihn dahin, wo wir nachts stehen."
     ],
     "rescue_valdric": [
      "Hörst du es auch? Von Osten. Komm her."
@@ -454,19 +453,28 @@
      "Bring ihn zum Licht. Ich warte am Feuer."
     ],
     "welcome": [
-     "Du bist zurück. Sprich mit uns beiden."
+     "Du bist zurück. Ein neuer Mann schadet uns nicht."
     ],
     "ws_gather": [
-     "Holz, Kiesel, Fasern. Die Sichel schneidet das Gras, das Holz kommt vom Baum."
+     "Holz, Kiesel, Fasern. Gustav wartet auf die Bank."
     ],
     "ws_build": [
-     "Eine Werkstatt ruft Handwerker. Bau sie, wo das Licht hinreicht."
+     "Eine Werkstatt ruft Handwerker. Bau sie im Licht."
     ],
     "ws_movein": [
-     "Er wartet an der neuen Bank."
+     "Er steht an der neuen Bank."
     ],
     "ws_pickaxe": [
-     "Probier die Werkbank. Gustav zeigt es dir."
+     "Probier die Werkbank. Die Hacke braucht nur Holz und Stein."
+    ],
+    "bd_build": [
+     "Ein Brett am Platz hält alle Aufträge sauber."
+    ],
+    "bd_open": [
+     "Sieh an die Tafel. Dort hängt von jetzt an alles."
+    ],
+    "tb_find": [
+     "Nördlich der Lichtung schlägt jemand Erz. Halt den Schild bereit."
     ]
    },
    "spot": {
@@ -511,15 +519,30 @@
   "name": "TORBEN",
   "title": "SCHMIED",
   "art": "torben",
-  "enabled": false,
+  "takes_over": "story_torben",
   "role": "smith",
   "home": "smithy",
   "arrive": {
    "needs": "smithy",
    "delay": 0.0,
-   "angle": 200.0,
-   "distance": 260.0
+   "angle": 340.0,
+   "distance": 240.0,
+   "story": "tb_met"
   },
+  "talk": [
+   {
+    "trust": 0,
+    "dialogue": "torben_talk_a"
+   },
+   {
+    "trust": 20,
+    "dialogue": "torben_talk_b"
+   },
+   {
+    "trust": 50,
+    "dialogue": "torben_talk_c"
+   }
+  ],
   "spots": {
    "work": {
     "of": "home",
@@ -635,7 +658,17 @@
    ]
   ],
   "chat": {
-   "_note": "PLACEHOLDER lines for the dialogue writer (docs/prompts/dialogue_writer.md, docs/characters/torben.md): he never says more than three to five words",
+   "quest": {
+    "tb_gather": [
+     "Holz, Stein, Bretter, Erz."
+    ],
+    "tb_build": [
+     "Bau die Esse."
+    ],
+    "tb_ingot": [
+     "Zwei Erz, ein Holz."
+    ]
+   },
    "spot": {
     "work": [
      "Hält.",
@@ -651,18 +684,23 @@
     "fire": [
      "Hm.",
      "Lass."
+    ],
+    "watch": [
+     "Ruhig heute."
     ]
    },
    "night": [
     "Hinter mich.",
+    "Bleib im Licht.",
     "Schlaf."
    ],
    "any": [
     "Was.",
     "Hält.",
+    "Klinge pflegen.",
     "Lass.",
-    "Zu heiß für dich.",
-    "Komm später."
+    "Mehr Erz.",
+    "Später."
    ]
   },
   "shop": "torben_forge"
@@ -675,7 +713,6 @@
   "away": true,
   "counts": false,
   "role": "witch",
-  "_note": "Name ESMA fixed by the user; lines are PLACEHOLDERS for the dialogue writer (docs/prompts/dialogue_writer.md)",
   "hub": [
    98,
    122
@@ -826,7 +863,6 @@
   "away": true,
   "counts": false,
   "role": "lake_witch",
-  "_note": "docs/seehexe_konzept.md. The name ILVA is a PROPOSAL; lines are PLACEHOLDERS for the dialogue writer (docs/prompts/dialogue_writer.md)",
   "hub": [
    176,
    124

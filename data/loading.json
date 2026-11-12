@@ -1,0 +1,50 @@
+{
+    "walk_speed":  46.0,
+    "sprint_speed":  210.0,
+    "spider_speed":  330.0,
+    "cast":  [
+                 {
+                     "id":  "ellie",
+                     "sheet":  "res://assets/characters/player.png",
+                     "frame":  [
+                                   48,
+                                   56
+                               ],
+                     "feet":  [
+                                  24,
+                                  51
+                              ],
+                     "walk":  [
+                                  0,
+                                  6
+                              ],
+                     "run":  [
+                                 6,
+                                 6
+                             ],
+                     "walk_stride":  4.77,
+                     "run_stride":  8.27
+                 },
+                 {
+                     "id":  "adventurer",
+                     "sheet":  "res://assets/characters/adventurer.png",
+                     "rig":  "adventurer_rig",
+                     "walk_stride":  5.0,
+                     "run_stride":  8.0
+                 },
+                 {
+                     "id":  "gustav",
+                     "sheet":  "res://assets/characters/gustav.png",
+                     "rig":  "gustav_rig",
+                     "walk_stride":  5.0,
+                     "run_stride":  8.5
+                 },
+                 {
+                     "id":  "torben",
+                     "sheet":  "res://assets/characters/torben.png",
+                     "rig":  "torben_rig",
+                     "walk_stride":  6.5,
+                     "run_stride":  10.0
+                 }
+             ]
+}

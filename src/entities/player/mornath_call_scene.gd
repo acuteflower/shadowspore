@@ -24,12 +24,9 @@ func _run() -> void:
 	_player.facing = (_story.hologram.global_position - _player.global_position).normalized()
 	if not _player.quests.has_flag("mornath_hologram_seen"):
 		_player.quests.set_flag("mornath_hologram_seen")
-		for child: Node in _player.get_children():
-			var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
-			if box != null:
-				box.start("mornath_again")
-				await box.finished
-				break
+		var runner: BubbleRunner = BubbleRunner.find(_player)
+		if runner != null:
+			await runner.play("mornath_again", _story.hologram)
 	_story.hologram.touched()
 	_player.add_shake(2.0)
 	await _wait(1.7)

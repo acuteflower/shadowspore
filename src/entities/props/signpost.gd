@@ -58,9 +58,9 @@ func prompt_position() -> Vector2:
 
 
 func interact(player: Player) -> void:
-	var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	if box == null or box.is_active():
+	var runner: BubbleRunner = BubbleRunner.find(player)
+	if runner == null or runner.is_active():
 		return
 	if flag != "" and player.quests != null:
-		box.finished.connect(func() -> void: player.quests.set_flag(flag), CONNECT_ONE_SHOT)
-	box.start(dialogue_id)
+		runner.finished.connect(func() -> void: player.quests.set_flag(flag), CONNECT_ONE_SHOT)
+	runner.play(dialogue_id, self)

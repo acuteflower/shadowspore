@@ -11,9 +11,10 @@ func _run() -> void:
 	player.quests.start("find_help")
 	player.quests.import_data({"active": {"find_help": 9}, "active_steps": {"find_help": "sign"}})
 	post.interact(player)
-	var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	ok = ok and box.is_active() and not player.quests.has_flag("read_sign")
-	box._end()
+	var bubbles: BubbleRunner = BubbleRunner.find(player)
+	ok = ok and bubbles != null and bubbles.is_active() and not player.quests.has_flag("read_sign")
+	if bubbles != null:
+		bubbles.skip_all()
 	ok = ok and player.quests.has_flag("read_sign")
 	print("SIGNPOST: ", "ok" if ok else "FAILED")
 	get_tree().quit(0 if ok else 1)

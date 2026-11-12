@@ -19,6 +19,11 @@ import sys
 import numpy as np
 
 from gen_art import CLEAR, ROOT, hexc, write_png
+import hero_face
+
+FACE_EYES = None  # set by frame(): where the model's eyes are in this frame (face_eyes), for hero_face
+LAST_EYES = None  # set automatically by render() from the "head" primitive so custom story/action scripts also place eyes accurately
+TIDY_EYES = True  # redraw the rendered eye blobs as fixed pixel eyes (hero_face.py); other characters with their own eye ramp are untouched
 
 FW, FH = 48, 56
 GROUND_ROW = 51.0
@@ -43,7 +48,7 @@ HAIR, SKIN, LEATHER, VIOLET, GOLD, LEGGING, EYE, MOUTH, BLUSH, CRYSTAL, TEAL, BO
 COAT = 13
 RAMPS = [
     ["8f84c2", "bdb3e4", "e9e3f7", "fffaf0"],  # hair: cool shade, warm white light
-    ["d79a88", "efc0a8", "f9dcc6", "fff1e4"],  # skin
+    ["d2a29c", "efc3b6", "fadfd2", "fff2e8"],  # skin: luminous porcelain-peach with cool rose-mauve shadow
     ["09060f", "150f22", "2c2347", "6a5aa6"],  # black leather
     ["34185e", "6636ad", "9468ee", "cbaaff"],  # violet trim / lining
     ["6f5020", "b48a38", "e6c468", "fff0b0"],  # gold
@@ -61,7 +66,13 @@ RAMPS = [[hexc(c) for c in ramp] for ramp in RAMPS]
 DECAL_WEIGHT = {EYE: 2.4, MOUTH: 2.0, BLUSH: 1.4, CRYSTAL: 1.8, TEAL: 1.6, GOLD: 1.3}
 
 
+def _is_ellie() -> bool:
+    return bool(TIDY_EYES and len(RAMPS) > EYE and [tuple(c[:3]) for c in RAMPS[EYE]] == hero_face.EYE)
+
+
 def ink_color(mat: int):
+    if mat == SKIN and _is_ellie():
+        return (0x52, 0x36, 0x44, 255)
     r, g, b, _ = RAMPS[mat][0]
     k = 0.5 if mat in (HAIR, SKIN) else 0.55
     return (int(r * k), int(g * k * 0.95), int(b * k), 255)
@@ -211,11 +222,35 @@ def to_blood(bl, code, band=None):
 
 # ------------------------------------------------------------------ rasteriser
 def shade_band(lam: np.ndarray, kind: str, mat: int) -> np.ndarray:
-    th = {HAIR: (-0.1, 0.18, 0.62), SKIN: (-0.2, 0.12, 0.55)}.get(mat, (0.06, 0.34, 0.7))
+    th = {HAIR: (-0.1, 0.18, 0.62), SKIN: (-0.28, 0.06, 0.52)}.get(mat, (0.06, 0.34, 0.7))
     return np.digitize(lam, th)
 
 
+def _eyes_from_head_prim(p: Prim) -> list:
+    """Screen-space eye descriptors [(x, y, facing, closed, up_x, up_y), ...] extracted directly from the transformed head Prim."""
+    closed = bool(int(round(p.tag)) & 1)
+    h_up = p.R @ np.array([0.0, 1.0, 0.0])
+    up_x = float(h_up[0])
+    up_y = float(-(h_up[1] * COSP - h_up[2] * SINP))
+    ez = math.sqrt(1.0 - 0.36 * 0.36 - 0.04 * 0.04)
+    out = []
+    for sx in (1.0, -1.0):
+        q_eye = np.array([sx * 0.36, -0.04, ez])
+        if p.clip is not None and not bool(p.clip(q_eye[None, :])[0]):
+            continue
+        ep = p.c + p.R @ (q_eye * p.r)
+        ex = FW / 2 + float(ep[0])
+        ey = GROUND_ROW - float(ep[1] * COSP - ep[2] * SINP)
+        edir = p.R @ np.array([sx * 0.36, 0.0, ez])
+        edir = edir / max(float(np.linalg.norm(edir)), 1e-9)
+        out.append((ex, ey, float(edir @ WHAT), closed, up_x, up_y))
+    return out
+
+
 def render(prims: list[Prim], yaw=None, dy=0.0, blood_transform=None):
+    global LAST_EYES
+    if _is_ellie():
+        LAST_EYES = None
     Hs, Ws = FH * SS, FW * SS
     depth = np.full((Hs, Ws), -1e9)
     code = np.full((Hs, Ws), -1, dtype=np.int16)
@@ -223,6 +258,8 @@ def render(prims: list[Prim], yaw=None, dy=0.0, blood_transform=None):
     bandage = np.zeros((Hs, Ws)) if yaw is not None else None
     ry_back = rot_y(-yaw) if yaw is not None else None
     for p in prims:
+        if p.kind == "head" and _is_ellie():
+            LAST_EYES = _eyes_from_head_prim(p)
         cx = FW / 2 + p.c[0]
         cy = GROUND_ROW - (p.c[1] * COSP - p.c[2] * SINP)
         rr = float(p.r.max()) + 0.4
@@ -265,9 +302,9 @@ def render(prims: list[Prim], yaw=None, dy=0.0, blood_transform=None):
             trim = (q[..., 1] < -0.5) if p.rot else py < p.tag  # a body turned prone: the hem is the strand's lower part
             mat = np.where(trim, VIOLET, mat).astype(np.int16)
         elif p.kind == "corset":
-            lace = (np.abs(q[..., 0]) < 0.11) & (q[..., 2] > 0.3)
-            mat = np.where(lace, VIOLET, mat).astype(np.int16)
-            band = np.where(lace, np.where((np.floor(q[..., 1] * 4.5) % 2) == 0, 3, 2), band)
+            lace = (np.abs(q[..., 0]) < 0.09) & (q[..., 2] > 0.45)
+            mat = np.where(lace, COAT, mat).astype(np.int16)
+            band = np.where(lace, np.where((np.floor(q[..., 1] * 4.0) % 2) == 0, np.minimum(band + 1, 3), band), band)
         elif p.kind == "emit":
             band = np.maximum(band, 2)
         codes = mat * 4 + band
@@ -291,6 +328,8 @@ def render(prims: list[Prim], yaw=None, dy=0.0, blood_transform=None):
 
 
 def paint_face(q, mat, band):
+    if _is_ellie():
+        return mat.astype(np.int16), band.astype(np.int16)
     x, y, z = q[..., 0], q[..., 1], q[..., 2]
     front = z > 0.35
     for sx in (-1, 1):
@@ -312,12 +351,13 @@ def paint_face(q, mat, band):
 
 def face_open(q):
     x, y, z = q[..., 0], q[..., 1], q[..., 2]
-    opening = (z > -0.05) & (y < 0.55 - 0.22 * np.abs(x) ** 1.2) & (np.abs(x) < 0.97)
+    opening = (z > 0.18 + 0.10 * y) & (y < 0.44 - 0.34 * (x * x))
     return (y > -0.28) & ~opening
 
 
 # ------------------------------------------------------------------ pixelise
 def to_pixels(depth, code):
+    ellie = _is_ellie()
     k = len(RAMPS) * 4
     sub = code.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
     dsub = depth.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
@@ -346,7 +386,7 @@ def to_pixels(depth, code):
             if v >= 0:
                 m, b = divmod(v, 4)
                 if ink[y, x] and m not in (EYE, MOUTH, BLUSH):
-                    b = 0
+                    b = max(b - 1, 1) if (ellie and m == SKIN) else 0
                 px[y][x] = RAMPS[m][b]
     # outline: transparent pixels touching a drawn one
     out = [row[:] for row in px]
@@ -367,6 +407,8 @@ def to_pixels(depth, code):
                 ey = (y + 0.5 - (GROUND_ROW + 0.5)) / 2.4
                 if ex * ex + ey * ey <= 1.0:
                     out[y][x] = (0, 0, 0, 70)
+    if ellie:  # Ellie only: clean hand-made pixel eyes (tools/hero_face.py)
+        out = hero_face.tidy_rows(out, FACE_EYES if FACE_EYES is not None else LAST_EYES)
     return out
 
 
@@ -831,7 +873,7 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             shift_x = 0.6 + 0.15 * sw
             sh_roll = -0.03 + 0.01 * sw
             twist = -0.05
-            head_yaw_free = 0.32 * math.sin(w - 0.4)
+            head_yaw_free = 0.16 * math.sin(w - 0.4)
     elif free and walking:  # calm and even (the old hip sway read as a limp): a small pelvis turn, the shoulders answer it, hardly any side shift
         amp = 1.3 if running else (0.55 if crouch else 1.0)
         pel_yaw = -0.10 * amp * cw
@@ -982,8 +1024,8 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         m.limb(hip, knee, 2.35, 1.75, LEGGING)
         m.limb(knee, ankle, 1.85, 1.2, BOOT)
         up = knee + (ankle - knee) * -0.28  # boot top sits above the knee
-        m.limb(up, knee, 2.05, 2.0, BOOT)
-        m.ell(up, (2.25, 0.6, 2.25), VIOLET, kind="emit")
+        m.limb(up, knee, 2.05, 1.98, BOOT)
+        m.ell(up, (2.15, 0.52, 2.15), BOOT)  # folded boot cuff
         fdir = np.array([0.0, -math.sin(shank) * 0.0, math.cos(shank)])
         if (free and walking) or sneak or walk_ik:  # the foot rolls: toes up at the heel strike, hanging while the leg swings through
             ph_leg = sneak_phase(side) if sneak else (w if side == 1 else w + math.pi)
@@ -997,11 +1039,11 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             heel = ankle + np.array([0.0, -2.2, -0.9])
             m.ell(heel + Rf @ np.array([0.0, 0.7, 2.2]), (1.55, 1.1, 2.7), BOOT, R=Rf)
             m.ell(heel, (1.45, 0.8, 1.1), BOOT)
-            m.ell(heel + Rf @ np.array([0.0, 2.7, 2.1]), (1.6, 0.35, 1.2), GOLD, kind="emit", R=Rf)
+            m.ell(heel + Rf @ np.array([0.0, 2.5, 1.8]), (1.45, 0.32, 1.1), LEATHER, R=Rf)
             continue
         m.ell(ankle + np.array([0.0, -1.5, 1.3]), (1.55, 1.1, 2.7), BOOT)
         m.ell(ankle + np.array([0.0, -2.2, -0.9]), (1.45, 0.8, 1.1), BOOT)
-        m.ell(ankle + np.array([0.0, 0.5, 1.2]), (1.6, 0.35, 1.2), GOLD, kind="emit")  # buckle
+        m.ell(ankle + np.array([0.0, 0.3, 1.0]), (1.45, 0.32, 1.1), LEATHER)  # ankle strap
 
     # --- torso
     m.off = body_off
@@ -1014,10 +1056,12 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         return base + tor @ (np.array(p, float) - base)
 
     m.ell(T((0, 29.8 + breath * 0.05, 0)), (2.85, 3.3, 2.3), LEATHER, kind="corset", R=TR)
-    m.ell(T((0, 34.2 + breath * 0.12, 0)), (3.7 + breath * 0.06, 4.1, 2.9 + breath * 0.05), LEATHER, kind="corset", R=TR)
+    m.ell(T((0, 34.2 + breath * 0.12, 0)), (3.65 + breath * 0.06, 4.05, 2.8 + breath * 0.05), LEATHER, kind="corset", R=TR)
     for sx in (-1, 1):
-        m.ell(T((sx * 1.85, 33.5 + breath * 0.15, 2.2)), (1.8, 1.8, 1.6), LEATHER)
-    m.ell(T((0, 36.8, 2.1)), (3.0, 0.9, 1.6), VIOLET, kind="emit", R=TR)  # neckline trim
+        m.ell(T((sx * 1.8, 33.6 + breath * 0.15, 2.1)), (1.75, 1.75, 1.55), LEATHER, R=TR)
+        # Fitted plum jacket lapels framing the V-neck (shoulder caps themselves sit on `sh` below)
+        m.ell(T((sx * 2.15, 36.2 + breath * 0.12, 1.45)), (1.25, 2.1, 1.35), COAT, R=TR)
+    m.ell(T((0, 35.8, -1.0)), (3.3, 3.2, 1.85), COAT, R=TR)  # plum jacket back panel
     # --- arms (her right arm is drawn by the game from the shoulder to the sword grip)
     m.rig = {}
     arm_pts = {}
@@ -1088,48 +1132,60 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         m.ell(wrist + 0.9 * d2, (1.0, 1.15, 1.0), LEATHER)
     m.rig.update(arm_pts)
     # --- neck, head
-    m.limb(T((0, 38.8, 0.0)), T((0, 42.0, 0.3)), 1.2, 1.1, SKIN)
-    m.ell(T((0, 40.2, 0.0)), (2.0, 0.9, 2.0), LEATHER)  # collar
-    m.ell(T((0, 41.3, 0.15)), (1.5, 0.45, 1.5), LEATHER)  # choker
-    m.ell(T((0, 41.2, 1.55)), (0.65, 0.65, 0.5), CRYSTAL, kind="emit")
+    m.limb(T((0, 36.8, 0.35)), T((0, 42.4, 0.35)), 1.48, 1.2, SKIN)
+    # Open plum stand-collar at the sides/back + slender plum choker with small violet crystal below the chin
+    for sx in (-1, 1):
+        m.ell(T((sx * 1.85, 39.2, -0.25)), (1.0, 0.85, 1.4), COAT, R=TR)
+    m.ell(T((0, 39.5, -1.05)), (2.0, 0.9, 1.05), COAT, R=TR)
+    m.ell(T((0, 39.4, 0.25)), (1.35, 0.32, 1.35), COAT, R=TR)  # soft dark-plum choker (never looks like a black mouth under chin)
+    m.ell(T((0, 39.1, 1.55)), (0.44, 0.44, 0.38), CRYSTAL, kind="emit", R=TR)
     bobh = 0.2 * breath
     head_yaw = float(pose.get("head_yaw", 0.0)) if pose else head_yaw_free
-    head_turn = rot_y(head_yaw)
+    head_tilt = (0.04 * math.sin(w + 1.0)) if (free and not walking) else 0.0
+    head_turn = rot_y(head_yaw) @ rot_z(head_tilt)
     if pose and pose.get("nod"):  # optional: the head tips about its own centre (negative = the face comes up: swimming with the head carried high)
         head_turn = rot_x(float(pose["nod"])) @ head_turn
+    elif pose and abs(float(pose.get("pitch", 0.0))) <= 0.35 and lean > 0.02:
+        # Upright leaning actions (attacks, cast, pick, pull, climb, sit, step): lift the neck naturally so her gaze stays forward instead of into the floor
+        counter = -min(0.65 * lean, 0.38)
+        head_turn = rot_x(counter) @ head_turn
+    head_R = (tor @ head_turn) if pose else (rot_y(twist + head_yaw) @ rot_z(head_tilt))
+    head_pivot = np.array([0.0, 45.4 + bobh, 0.55])
     def H(p):
-        pivot = np.array([0.0, 45.0 + bobh, 0.35])
-        if sneak:  # the prowl: the head stays upright on the leaning body (eyes forward), so the fringe and the hair do not tip over her face
-            return T(pivot) + rot_y(twist + head_yaw) @ (np.asarray(p, float) - pivot)
-        return T(pivot + head_turn @ (np.asarray(p, float) - pivot)) if (head_yaw or (pose and pose.get("nod"))) else T(p)
-    def HL(p, l):  # a point of the long hair: its root follows the nodding head, further down it follows the body only
+        return T(head_pivot) + head_R @ (np.asarray(p, float) - head_pivot)
+    def HL(p, l):  # a point of the long hair: its root follows the head, further down it follows the body so the mane drapes naturally
         a = H(p)
-        if not (pose and pose.get("nod")):
+        if not pose:
+            if sneak or sprint:
+                b = T(head_pivot) + rot_y(twist) @ (np.asarray(p, float) - head_pivot)
+                return a + (b - a) * min(1.0, 1.3 * l)
             return a
-        pv = np.array([0.0, 45.0 + bobh, 0.35])
-        b = T(pv + rot_y(head_yaw) @ (np.asarray(p, float) - pv))
+        b = T(head_pivot + rot_y(head_yaw) @ (np.asarray(p, float) - head_pivot))
         return a + (b - a) * min(1.0, 1.5 * l)
-    head_R = tor @ head_turn if pose else (rot_y(twist + head_yaw) if (twist or head_yaw) else None)  # free loops: the head only turns, it never nods with the lean
-    hc = H((0.0, 45.0 + bobh, 0.35))
-    Rhang = None  # sneaking: H already keeps the head and its hair upright
+    hc = H(head_pivot)
+    Rhang = None
 
-    def HH(p):  # sneaking: the long hair hangs by gravity, it does not lean over with the torso
+    def HH(p):
         return p if Rhang is None else hc + Rhang @ (np.asarray(p, float) - hc)
-    head_tilt = (0.06 * math.sin(w + 1.0)) if not walking else 0.0
-    m.ell(hc, (4.65, 5.1, 4.55), SKIN, kind="head", R=head_R)
+    head_tag = 1.0 if (pose and float(pose.get("eyes_closed", 0.0)) >= 0.5) else 0.0
+    m.ell(hc, (4.62, 5.02, 4.58), SKIN, kind="head", tag=head_tag, R=head_R)
+    m.ell(hc + head_R @ np.array([0.0, -0.45, 4.32]), (0.95, 1.05, 0.68), SKIN, R=head_R)  # subtle nose/midface contour in profile
     if pose:  # where food goes (for the game's eating effects), absolute like the other rig points
         m.rig["mouth"] = hc + head_R @ np.array([0.0, -1.7, 4.3]) + m.off
     # --- where jewellery hangs (docs/talisman_konzept.md; `tools/art_hero_jewelry.py` exports them per frame): the ear lobes, both sides of the collar, the
     # chest where a pendant hangs, and the directions the torso, the head, both ears and both collar points face (`m.facing`, for the game's visibility test)
-    hR = head_R if head_R is not None else np.eye(3)
-    m.rig["ear_a"] = hc + hR @ np.array([4.55, -1.4, -0.3]) + m.off
-    m.rig["ear_b"] = hc + hR @ np.array([-4.55, -1.4, -0.3]) + m.off
-    m.rig["neck_a"] = T((1.9, 39.9, 1.0)) + m.off
-    m.rig["neck_b"] = T((-1.9, 39.9, 1.0)) + m.off
-    m.rig["pendant"] = T((0.0, 35.2, 3.7)) + m.off
+    hR = head_R
+    m.rig["ear_a"] = hc + hR @ np.array([4.5, -1.2, -0.25]) + m.off
+    m.rig["ear_b"] = hc + hR @ np.array([-4.5, -1.2, -0.25]) + m.off
+    m.rig["neck_a"] = T((1.85, 39.5, 0.9)) + m.off
+    m.rig["neck_b"] = T((-1.85, 39.5, 0.9)) + m.off
+    m.rig["pendant"] = T((0.0, 35.4, 3.4)) + m.off
+    # the eyes and where they look: tools/hero_face.py draws clean pixel eyes there
+    ez = math.sqrt(1.0 - 0.36 * 0.36 - 0.04 * 0.04)
+    m.eyes = [(hc + hR @ np.array([sx * 0.36 * 4.62, -0.04 * 5.02, ez * 4.58]) + m.off, hR @ np.array([sx * 0.36, 0.0, ez]), bool(head_tag), hR @ np.array([0.0, 1.0, 0.0])) for sx in (1.0, -1.0)]
     m.facing = [tor @ np.array([0.0, 0.0, 1.0]), hR @ np.array([0.0, 0.0, 1.0]), hR @ np.array([1.0, 0.0, 0.0]), hR @ np.array([-1.0, 0.0, 0.0]), tor @ np.array([1.0, 0.0, 0.0]), tor @ np.array([-1.0, 0.0, 0.0])]
-    cap_c = hc + (head_R @ np.array([0.0, 0.45, -0.35]) if head_R is not None else np.array([0.0, 0.45, -0.35]))
-    m.ell(cap_c, (5.05, 5.5, 4.95), HAIR, kind="hair", tag=3.0, clip=face_open, R=head_R)
+    cap_c = hc + hR @ np.array([0.0, 0.46, -0.32])
+    m.ell(cap_c, (4.92, 5.32, 4.86), HAIR, kind="hair", tag=3.0, clip=face_open, R=head_R)
     # --- hair: fringe, side locks, long back hair with a travelling wave
     def hair_off(l: float, i: int, side_scale: float = 1.0):
         ph = i * 0.9
@@ -1186,18 +1242,21 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             z += hz * l ** 1.3
         return np.array([x, y, z])
 
-    for side in (-1, 1):  # centre parting: the fringe sweeps out to the temples and leaves the brow free
-        for j, (sx, drop) in enumerate(((1.0, 0.0), (2.2, 0.7), (3.4, 1.6))):
-            top = H((side * 0.5 - 0.25, 50.3, 1.4))
-            mid = H((side * (sx + 0.9), 48.3 - drop * 0.4, 3.6 - 0.3 * j))
-            end = H((side * (sx * 1.25 + 1.6), 46.6 - drop, 3.2 - 0.5 * j))
-            m.ribbon([top, mid, end + hair_off(0.15, j + side) * 0.3], [0.9, 0.95, 0.35], 0.75, HAIR, (0, 0, 1), tag=j * 2 + side)
-    for side in (-1, 1):  # long side locks framing the face
+    for side in (-1, 1):  # centre-parted curtain fringe tucked smoothly into the crown dome, framing the brow & outer temples
+        for j, (sx, drop, z_mid, z_end) in enumerate(((1.15, 0.0, 3.45, 2.55), (2.3, 0.5, 2.95, 1.85), (3.35, 1.05, 2.0, 0.85))):
+            top = H((side * 0.45, 49.55, 1.85))
+            mid = H((side * (sx + 0.9), 48.35 - drop * 0.35, z_mid))
+            end = H((side * (sx * 1.02 + 1.4), 46.95 - drop * 0.4, z_end))
+            m.ribbon([top, mid, end + hair_off(0.12, j + side) * 0.16], [0.78, 0.84, 0.32], 0.6, HAIR, (0, 0, 1), tag=j * 2 + side)
+    for side in (-1, 1):  # temple locks framing both sides of the face & neck while leaving cheek/profile open
         pts = []
         for k, l in enumerate(np.linspace(0, 1, 6)):
-            base = HL((side * (4.9 + 0.3 * l), 45.2 - 15.0 * l, 1.8 + 0.5 * l), l)
-            pts.append(HH(base + hair_off(l, 3 + side) * 0.7))
-        m.ribbon(pts, [1.15, 1.2, 1.15, 0.9, 0.5], 0.85, HAIR, (0, 0, 1), tag=7 + side)
+            lx = side * (4.75 - 0.30 * math.sin(math.pi * min(l * 0.9, 1.0)))
+            ly = 46.5 - 14.0 * l
+            lz = 0.52 + 0.85 * (l ** 1.45)
+            base = HL((lx, ly, lz), l)
+            pts.append(HH(base + hair_off(l, 3 + side) * 0.55))
+        m.ribbon(pts, [0.98, 1.02, 0.92, 0.72, 0.35], 0.62, HAIR, (0, 0, 1), tag=7 + side)
     back = [(-3.4, 1.0), (-2.2, 0.6), (-1.0, 0.0), (0.2, 0.4), (1.4, 0.0), (2.6, 0.7), (3.6, 1.1)]
     for i, (bx, extra) in enumerate(back):
         pts = []
@@ -1205,7 +1264,7 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         for l in np.linspace(0, 1, 9):
             spread = bx * (1.0 + 0.5 * l) + 0.35 * math.sin(3.0 * l + i) * l
             z = -3.0 - 0.9 * math.sin(math.pi * min(l * 1.3, 1.0)) - (0.35 + extra * 0.55) * l
-            at_y = 45.5 - (45.5 - y_end) * l
+            at_y = 45.8 - (45.8 - y_end) * l
             z -= min(max((28.0 - at_y) / 7.0, 0.0), 1.0) * (2.3 + 0.9 * mi)  # below the waist the hair hangs clear of the skirt
             p = HL((spread, at_y, z), l)
             pts.append(HH(p + hair_off(l, i)))
@@ -1215,12 +1274,11 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
     for side in (-1, 1):
         pts = []
         for l in np.linspace(0, 1, 7):
-            base = HL((side * (4.0 + 1.5 * l), 45.2 - 23.0 * l, -1.5 - 2.4 * l), l)
+            base = HL((side * (4.0 + 1.5 * l), 45.5 - 23.0 * l, -1.5 - 2.4 * l), l)
             pts.append(HH(base + hair_off(l, 9 + side * 2, 1.1)))
         m.ribbon(pts, [0.85, 1.0, 0.85, 0.55, 0.1], 0.6, HAIR, (0, 0, -1), tag=13 + side * 1.3)
-    # hair ornament: a small gold pin with a violet gem
-    m.ell(H((4.7, 48.0 + bobh, 0.8)), (0.5, 0.9, 0.5), GOLD, kind="emit")
-    m.ell(H((4.9, 47.0 + bobh, 0.9)), (0.55, 0.55, 0.55), CRYSTAL, kind="emit")
+    # hair ornament: small gold pin holding the temple lock back (sits cleanly inside the hair silhouette)
+    m.ell(H((3.85, 47.6, 2.35)), (0.48, 0.32, 0.38), GOLD, R=head_R)
     if pose and pose.get("mug"):  # optional: a clay mug with a glowing brew held at this point (absolute, like the hand targets); "mug_tilt" tips it towards her mouth
         mc = np.array(pose["mug"], float) - m.off
         Rm = rot_x(float(pose.get("mug_tilt", 0.0)))
@@ -1243,8 +1301,10 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
             p.R = Rg @ p.R
             p.rot = True
         low = 0.0 if pose.get("level") else min(float(p.c[1] - np.sqrt(((p.R[1, :] * p.r) ** 2).sum())) for p in m.prims)  # "level": no set-down, the pelvis stays at its height (swimming: the water plane is y = 0)
+        shift_v = np.array(pose.get("shift", (0.0, 0.0, 0.0)), float) + np.array([0.0, -low, 0.0])
         for p in m.prims:
-            p.c = p.c + np.array(pose.get("shift", (0.0, 0.0, 0.0)), float) + np.array([0.0, -low, 0.0])
+            p.c = p.c + shift_v
+        m.eyes = [(pivot + Rg @ (np.asarray(ep, float) - pivot) + shift_v, Rg @ en, ec, Rg @ eup) for ep, en, ec, eup in m.eyes]
         if pose.get("level"):  # the rig points (mouth, ears, hands) turn and move with the body
             for key, v in list(m.rig.items()):
                 m.rig[key] = pivot + Rg @ (np.asarray(v, float) - pivot) + np.array(pose.get("shift", (0.0, 0.0, 0.0)), float)
@@ -1256,6 +1316,21 @@ def project(model: Model, yaw: float, point) -> list[float]:
     """Feet-relative screen position (px, y down) of a model point, as the game places sprites."""
     p = rot_y(yaw) @ (np.asarray(point, float) + np.array([0.0, model.bob, 0.0])) * SCALE
     return [round(float(p[0]), 1), round(float(-(p[1] * COSP - p[2] * SINP)), 1)]
+
+
+def face_eyes(model: Model, yaw: float) -> list:
+    """Both eyes in frame pixels with how much each looks at the camera: [(x, y, facing, closed, up_x, up_y), ...] (for tools/hero_face.py)."""
+    Ry = rot_y(yaw)
+    out = []
+    for item in getattr(model, "eyes", []):
+        p, n = item[0], item[1]
+        closed = item[2] if len(item) > 2 else False
+        h_up = Ry @ item[3] if len(item) > 3 else np.array([0.0, 1.0, 0.0])
+        x, y = project(model, yaw, p)
+        up_x = float(h_up[0])
+        up_y = float(-(h_up[1] * COSP - h_up[2] * SINP))
+        out.append((FW / 2 + x, GROUND_ROW + y, float((Ry @ n) @ WHAT), closed, up_x, up_y))
+    return out
 
 
 def frame(sector: int, t: float, mode: str, crouch: bool, pose=None):
@@ -1273,7 +1348,12 @@ def frame(sector: int, t: float, mode: str, crouch: bool, pose=None):
         depth, code = render(model.transform(yaw, model.bob))
     rig = {k: project(model, yaw, v) for k, v in model.rig.items()}
     rig["jf"] = [round(float((rot_y(yaw) @ v) @ WHAT), 3) for v in getattr(model, "facing", [])]  # how much each part faces the camera (1 = straight at it)
-    return to_pixels(depth, code), rig
+    global FACE_EYES
+    FACE_EYES = LAST_EYES if LAST_EYES is not None else face_eyes(model, yaw)
+    try:
+        return to_pixels(depth, code), rig
+    finally:
+        FACE_EYES = None
 
 
 def paste(rows, cols: int, nrows: int):

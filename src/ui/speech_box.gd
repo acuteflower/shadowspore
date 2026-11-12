@@ -24,6 +24,7 @@ var _alpha: float = 1.0
 var _time: float = 0.0
 var _next_id: int = 0
 var _done_id: int = 0
+var _gen: int = 0
 var _dialogue: DialogueBox
 var _quests: QuestComponent
 
@@ -55,11 +56,43 @@ func speak(speaker: String, text: String, hold: float = -1.0) -> void:
 
 ## Plays the lines of data/dialogue.json `id` one after the other.
 func play(id: String) -> void:
+	var gen: int = _gen
 	for line: Dictionary in DataRegistry.get_entry("dialogue", id).get("lines", []) as Array:
+		if _gen != gen:
+			return
 		var speaker: String = String(line.get("speaker", "ELLIE"))
 		if line.has("known_flag") and _quests != null and _quests.has_flag(String(line.known_flag)): ## someone who has introduced himself shows his name
 			speaker = String(line.get("known_name", speaker))
 		await speak(speaker, String(line.text), float(line.get("hold", -1.0)))
+
+
+func advance_or_close() -> bool:
+	if _phase == 0:
+		return false
+	if _phase == 1:
+		_phase = 2
+		_t = 0.0
+		queue_redraw()
+		return true
+	var full: int = String(_current.get("text", "")).length()
+	if _phase == 2 and int(_typed) < full:
+		_typed = float(full)
+		queue_redraw()
+		return true
+	_phase = 0
+	_done_id = int(_current.get("id", _next_id))
+	line_done.emit()
+	queue_redraw()
+	return true
+
+
+func skip_all() -> void:
+	_gen += 1
+	_queue.clear()
+	_phase = 0
+	_done_id = _next_id
+	line_done.emit()
+	queue_redraw()
 
 
 func is_speaking() -> bool:

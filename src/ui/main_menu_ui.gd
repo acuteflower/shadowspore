@@ -1,15 +1,26 @@
 class_name MainMenuUi
 extends Control
-## The pages of the main menu (docs/hauptmenue_konzept.md): the five entries hang as name tags from one vine across the bottom of the camp, the other pages
-## (new game, multiplayer, join, settings) are bark-paper cards. Draws everything itself in the vine style; the controller (`MainMenu`) owns the world, the dark and the launch.
-## Mouse, keyboard (arrows, Enter/Space/E, Esc) and gamepad (ui_* actions) all work. `chosen(id, data)` fires for what leaves the menu: continue, new, host, join, quit.
+## The pages of the main menu (docs/hauptmenue_konzept.md): the entries are words of light in the shadow left of the camp. In the opening they rise
+## from the fire as embers, fly over in an arc and land letter by letter; the chosen one glows warm, slides out and carries a pulsing life spore.
+## The other pages (new game, multiplayer, join, settings) are bark-paper cards. Draws everything itself; the controller (`MainMenu`) owns the world,
+## the void and the launch. Mouse, keyboard (arrows, Enter/Space/E, Esc) and gamepad (ui_* actions) all work. `chosen(id, data)` fires for what leaves
+## the menu: continue, new, host, join, quit.
 
 signal chosen(id: String, data: Dictionary)
 
 enum Page { MAIN, CONFIRM_NEW, MULTI, JOIN, SETTINGS }
 
 const VIEW: Vector2 = Vector2(640.0, 360.0)
-const BRANCH_Y: float = 290.0
+const MENU_X: float = 50.0 ## left edge of the entries
+const MENU_Y: float = 186.0 ## top of the first entry
+const ROW_GAP: float = 23.0
+const TEXT_SCALE: float = 2.0
+const ROW_DELAY: float = 0.16 ## the rows rise one after the other
+const CHAR_DELAY: float = 0.032
+const FLIGHT: float = 0.85 ## seconds an ember flies from the fire to its letter
+const INTRO_DONE: float = 2.0 ## after this the entries are all there and take input
+const IDLE_INK: Color = Color("a497c4")
+const HOT_INK: Color = Color("fff0b0")
 const CARD_W: float = 262.0
 const ROW_H: float = 15.0
 const ADDRESS_CHARS: String = "0123456789.:-abcdefghijklmnopqrstuvwxyz"
@@ -18,16 +29,17 @@ const HINTS: Dictionary = {
 	"new": "EINE NEUE GESCHICHTE BEGINNT IM DUNKELN",
 	"multi": "ZU VIERT DURCH DIE NACHT",
 	"settings": "TON, BILD UND STEUERUNG",
-	"quit": "DAS FEUER BLEIBT AN",
+	"quit": "DIE LEERE WARTET SCHON",
 }
 const SLIDERS: Array = [["master", "GESAMT"], ["music", "MUSIK"], ["sfx", "EFFEKTE"], ["shake", "SCHÜTTELN"]]
 const TOGGLES: Array = [["fullscreen", "VOLLBILD"], ["vsync", "VSYNC"], ["cursor", "EIGENER CURSOR"], ["numbers", "SCHADENSZAHLEN"], ["position", "POSITION"]]
 
 var page: Page = Page.MAIN
-var intro: float = 0.0 ## seconds since the vine started to grow; the tags drop in one after the other
+var intro: float = 0.0 ## seconds since the entries started to rise from the fire
 var enabled: bool = false ## input is accepted
 var address: String = "127.0.0.1"
 var status: String = "" ## a line under the card (e.g. why a join failed)
+var fire_point: Vector2 = Vector2(468.0, 282.0) ## where the embers of the opening start, screen pixels
 
 var _time: float = 0.0
 var _rows: Array[Dictionary] = []
@@ -37,6 +49,9 @@ var _hover: int = -1
 var _last_mouse: Vector2 = Vector2(-1.0, -1.0)
 var _page_age: float = 0.0
 var _save_day: int = -1
+var _slide: Array[float] = [] ## per entry 0..1, how far the chosen one has slid out
+var _last_sel: int = -1
+var _sel_age: float = 0.0
 
 
 func _ready() -> void:
@@ -80,12 +95,12 @@ func _open_page(next: Page) -> void:
 				_rows.append({"id": pair[0], "label": pair[1], "kind": "toggle"})
 			_rows.append({"id": "back", "label": "FERTIG"})
 	_sel = 0
-	if page == Page.MAIN and SaveGame.exists():
-		_sel = 0
-	elif page == Page.MAIN:
-		_sel = 0
 	_hover = -1
 	_rects.clear()
+	_slide.clear()
+	_slide.resize(_rows.size())
+	_slide.fill(0.0)
+	_last_sel = -1
 	status = ""
 
 
@@ -109,6 +124,14 @@ func _lines() -> PackedStringArray:
 func _process(delta: float) -> void:
 	_time += delta
 	_page_age += delta
+	_sel_age += delta
+	if _sel != _last_sel:
+		if _last_sel >= 0 and enabled:
+			Sfx.ui(self, "ui_click", -12.0, 0.08)
+		_last_sel = _sel
+		_sel_age = 0.0
+	for i: int in _slide.size():
+		_slide[i] = move_toward(_slide[i], 1.0 if i == _sel and enabled else 0.0, delta * 7.0)
 	if not enabled:
 		GameCursor.set_hint(self, &"")
 		queue_redraw()
@@ -145,19 +168,19 @@ func _input(event: InputEvent) -> void:
 			return
 	if event.is_action_pressed("ui_cancel"):
 		if page != Page.MAIN:
+			Sfx.ui(self, "ui_back", -4.0)
 			_open_page(Page.MULTI if page == Page.JOIN else Page.MAIN)
 			get_viewport().set_input_as_handled()
 		return
-	var horizontal: bool = page == Page.MAIN
-	var back: StringName = &"ui_left" if horizontal else &"ui_up"
-	var forward: StringName = &"ui_right" if horizontal else &"ui_down"
-	if event.is_action_pressed(back) or (horizontal and event.is_action_pressed(&"ui_up")):
+	var back: StringName = &"ui_up"
+	var forward: StringName = &"ui_down"
+	if event.is_action_pressed(back):
 		_sel = posmod(_sel - 1, maxi(_rows.size(), 1))
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed(forward) or (horizontal and event.is_action_pressed(&"ui_down")):
+	elif event.is_action_pressed(forward):
 		_sel = posmod(_sel + 1, maxi(_rows.size(), 1))
 		get_viewport().set_input_as_handled()
-	elif not horizontal and (event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"ui_right")):
+	elif event.is_action_pressed(&"ui_left") or event.is_action_pressed(&"ui_right"):
 		if _sel < _rows.size():
 			var kind: String = String(_rows[_sel].get("kind", ""))
 			if kind == "slider":
@@ -265,46 +288,108 @@ func _draw() -> void:
 		_draw_card(void_level)
 
 
-func _branch_y(x: float) -> float:
-	return BRANCH_Y + sin(x * 0.021 + 1.3) * 2.5 + sin(x * 0.007) * 3.0
+func _row_y(i: int) -> float:
+	return MENU_Y + float(i) * ROW_GAP
 
 
-func _draw_main(void_level: float) -> void:
-	var reach: float = clampf(intro / 1.3, 0.0, 1.0)
-	if reach <= 0.0:
+## One letter at TEXT_SCALE with a crisp 1 px outline.
+func _glyph(ch: String, at: Vector2, ink: Color, outline: Color) -> void:
+	var zoom: Vector2 = Vector2(TEXT_SCALE, TEXT_SCALE)
+	if outline.a > 0.0:
+		for o: Vector2 in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1), Vector2(1, 1)]:
+			draw_set_transform(at + o, 0.0, zoom)
+			PixelText.draw(self, ch, Vector2i.ZERO, outline)
+	draw_set_transform(at, 0.0, zoom)
+	PixelText.draw(self, ch, Vector2i.ZERO, ink)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+func _bezier(a: Vector2, c: Vector2, b: Vector2, u: float) -> Vector2:
+	return a.lerp(c, u).lerp(c.lerp(b, u), u)
+
+
+## The pulsing life spore beside the chosen entry: a pixel diamond.
+func _spore_mark(center: Vector2, alpha: float) -> void:
+	var beat: float = TitleLogo.beat(_time * 0.9)
+	var r: int = 2 + (1 if beat > 0.35 else 0)
+	for dy: int in range(-r, r + 1):
+		for dx: int in range(-r, r + 1):
+			var d: int = absi(dx) + absi(dy)
+			if d > r:
+				continue
+			var c: Color = MenuEmbers.SPORE_CORE if d == 0 else (MenuEmbers.SPORE if d == 1 else MenuEmbers.SPORE_DIM)
+			draw_rect(Rect2(center + Vector2(dx, dy), Vector2.ONE), Color(c, alpha * (1.0 if d < r else 0.7)))
+	VineStyle.glow(self, center + Vector2(0.5, 0.5), 10.0, MenuEmbers.SPORE, alpha * (0.5 + 0.5 * beat))
+
+
+func _draw_main(_void_level: float) -> void:
+	if intro <= 0.0:
 		return
-	var y_of: Callable = _branch_y
-	VineStyle.branch(self, -4.0, VIEW.x + 4.0, y_of, 4, void_level, 0.0, _time, reach)
-	VineStyle.foliage(self, -4.0, VIEW.x + 4.0, y_of, 26, 11, void_level, 0.0, _time, reach)
-	var widths: Array[float] = []
-	var total: float = 0.0
-	for row: Dictionary in _rows:
-		var w: float = float(PixelText.width(String(row.label)) + 10)
-		widths.append(w)
-		total += w
-	var gap: float = 18.0
-	total += gap * float(maxi(_rows.size() - 1, 0))
-	var x: float = (VIEW.x - total) / 2.0
+	var advance: float = float(PixelText.ADVANCE) * TEXT_SCALE
 	_rects.clear()
 	for i: int in _rows.size():
-		var anchor: Vector2 = Vector2(x + widths[i] / 2.0, _branch_y(x + widths[i] / 2.0) + 1.0)
-		var p: float = clampf((intro - 0.5 - 0.14 * float(i)) / 0.7, 0.0, 1.0)
-		var active: bool = i == _sel and enabled
-		var lift: float = 3.0 if active else 0.0
-		var tone: Color = VineStyle.ACCENT_WARM
-		var rect: Rect2 = VineStyle.tab(self, String(_rows[i].label), anchor, p, lift, void_level * 0.6, _time, i, active, i == _hover, tone)
-		_rects.append(rect if p > 0.6 else Rect2())
-		if active:
-			VineStyle.bloom(self, Vector2(anchor.x, anchor.y - 3.0), p, _time, void_level * 0.6, tone)
-		x += widths[i] + gap
+		var label: String = String(_rows[i].label)
+		var slide: float = _slide[i] if i < _slide.size() else 0.0
+		var eased: float = slide * slide * (3.0 - 2.0 * slide)
+		var x0: float = MENU_X + roundf(9.0 * eased)
+		var y: float = _row_y(i)
+		var w: float = float(label.length()) * advance
+		var mid_y: float = y + 9.0 ## the middle of the letters' body
+		if eased > 0.01:
+			VineStyle.glow(self, Vector2(x0 + w * 0.45, mid_y), 46.0, VineStyle.ACCENT_WARM, 0.18 * eased)
+			_spore_mark(Vector2(x0 - 11.0, mid_y).round(), eased)
+			# a seam of light under the word, burning out to the right
+			var line_w: int = int(w * eased)
+			for k: int in range(0, line_w, 2):
+				var fall: float = 1.0 - float(k) / maxf(w, 1.0)
+				draw_rect(Rect2(x0 + float(k), y + 17.0, 2.0, 1.0), Color(VineStyle.ACCENT_WARM, 0.7 * fall * eased))
+		var shimmer: float = fmod(_sel_age * 16.0, float(label.length()) + 10.0) - 2.0 if eased > 0.5 else -99.0
+		var row_done: bool = true
+		for j: int in label.length():
+			var ch: String = label[j]
+			var target: Vector2 = Vector2(x0 + float(j) * advance, y)
+			var delay: float = ROW_DELAY * float(i) + CHAR_DELAY * float(j)
+			var p: float = clampf((intro - delay) / FLIGHT, 0.0, 1.0)
+			if p < 1.0:
+				row_done = false
+			if ch == " " or p <= 0.0:
+				continue
+			if p < 1.0:
+				# an ember flies from the fire in an arc to where its letter will stand
+				var u: float = p * p * (3.0 - 2.0 * p)
+				var seed_value: float = float(i * 31 + j * 7)
+				var start: Vector2 = fire_point + Vector2(sin(seed_value) * 6.0, cos(seed_value * 1.7) * 3.0)
+				var land: Vector2 = target + Vector2(3.0, 8.0)
+				var ctrl: Vector2 = Vector2(lerpf(start.x, land.x, 0.55), minf(start.y, land.y) - 60.0 - 24.0 * sin(seed_value * 0.9))
+				for k: int in 4:
+					var tu: float = u - float(k) * 0.045
+					if tu <= 0.0:
+						break
+					var at: Vector2 = _bezier(start, ctrl, land, tu).round()
+					var c: Color = MenuEmbers.EMBER_HOT if k == 0 else MenuEmbers.EMBER_MID.lerp(MenuEmbers.EMBER_COOL, float(k) / 3.0)
+					var sz: float = 2.0 if k == 0 else 1.0
+					draw_rect(Rect2(at, Vector2(sz, sz)), Color(c, (1.0 - float(k) * 0.25) * (1.0 - smoothstep(0.85, 1.0, p))))
+			var a: float = smoothstep(0.78, 1.0, p)
+			if a <= 0.0:
+				continue
+			var landed: float = intro - delay - FLIGHT
+			var ink: Color = IDLE_INK.lerp(VineStyle.ACCENT_WARM, eased)
+			if absf(float(j) - shimmer) < 1.0:
+				ink = HOT_INK
+			if landed >= 0.0 and landed < 0.35:
+				ink = HOT_INK.lerp(ink, landed / 0.35) ## a letter glows white-hot as it lands
+			_glyph(ch, target, Color(ink, a), Color(VineStyle.OUTLINE, a))
+		_rects.append(Rect2(MENU_X - 20.0, y - 2.0, w + 40.0, ROW_GAP - 2.0) if row_done else Rect2())
 	if enabled and _sel < _rows.size():
 		var text: String = String(HINTS.get(String(_rows[_sel].id), ""))
 		if String(_rows[_sel].id) == "continue" and _save_day >= 0:
 			text = "TAG %d - %s" % [_save_day + 1, text]
-		var hint_alpha: float = clampf(intro - 1.8, 0.0, 1.0)
-		PixelText.draw(self, text, Vector2i(int((VIEW.x - PixelText.width(text)) / 2.0), 331), Color(UiStyle.TEXT, 0.85 * hint_alpha), Color(VineStyle.OUTLINE, hint_alpha))
-	if not status.is_empty():
-		PixelText.draw(self, status, Vector2i(int((VIEW.x - PixelText.width(status)) / 2.0), 344), Color("ff7a7a"), Color(VineStyle.OUTLINE))
+		var shown: String = text.substr(0, int(_sel_age * 70.0)) ## types itself out
+		var hint_y: float = _row_y(_rows.size()) + 6.0
+		draw_rect(Rect2(MENU_X, hint_y - 5.0, 18.0, 1.0), Color(IDLE_INK, 0.5))
+		PixelText.draw(self, shown, Vector2i(int(MENU_X), int(hint_y)), Color(IDLE_INK, 0.9), Color(VineStyle.OUTLINE, 0.9))
+		if not status.is_empty():
+			PixelText.draw(self, status, Vector2i(int(MENU_X), int(hint_y + 11.0)), Color("ff7a7a"), Color(VineStyle.OUTLINE))
 
 
 func _draw_card(void_level: float) -> void:

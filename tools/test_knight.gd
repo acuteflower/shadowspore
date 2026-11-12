@@ -56,9 +56,10 @@ func _run() -> void:
 			player.inventory.request("equip",[i,"main_hand"])
 			break
 	guide._process(0)
-	var dialogue: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	check(dialogue.is_active() and dialogue._lines.size() >= 3, "new Ellie dialogue starts")
-	dialogue._end()
+	var bubbles: BubbleRunner = BubbleRunner.find(player)
+	check(bubbles != null and bubbles.is_active(), "new Ellie dialogue starts")
+	if bubbles != null:
+		bubbles.skip_all()
 	check(player.quests.has_flag("knight_dialogue_done"), "dialogue completion persists")
 	check(String(player.quests.current().get("hint","")) == "combo", "equip leads to combo tutorial")
 	guide.set_process(true)

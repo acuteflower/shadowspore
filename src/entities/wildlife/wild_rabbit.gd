@@ -3,9 +3,9 @@ extends CharacterBody2D
 ## Peaceful ambient wildlife. The host senses threats and chooses every hop; reliable packets
 ## animate the same complete hop on all peers. Ground collision applies even while visually airborne.
 
-enum State { REST, GRAZE, WANDER, ALERT, FLEE, RECOVER, GROOM }
+enum State { REST, SNIFF, GRAZE, WANDER, ALERT, LOOKOUT, THUMP, FLEE, RECOVER, GROOM }
 
-const SHEET_COLUMNS: int = 26
+const SHEET_COLUMNS: int = 44
 const DIRECTIONS: int = 8
 
 var appearance: int = 0
@@ -36,6 +36,10 @@ var _was_hopping: bool = false
 var _shadow: Node2D
 var _nearby_herd: Array[Vector2] = []
 var _nearby_herd_left: float = 0.0
+var _nearby_cover: Array[Vector2] = []
+var _flee_zig: int = 1
+var _forage_creep: bool = false
+var _look_turned: bool = false
 
 @onready var _sprite: Sprite2D = $Sprite2D
 
@@ -81,19 +85,27 @@ func _process(_delta: float) -> void:
 	var col: int = 0
 	if _hopping:
 		var t: float = clampf(_hop_time / _hop_duration, 0.0, 1.0)
-		col = 14 + mini(5, int(t * 6.0))
+		col = 24 + mini(5, int(t * 6.0))
 		_sprite.position.y = -roundf(sin(_travel(t) * PI) * _hop_height)
 	else:
 		_sprite.position.y = 0.0
 		match state:
 			State.GRAZE:
-				col = 4 + int(_state_time * 5.0) % 6
-			State.ALERT, State.RECOVER, State.FLEE:
-				col = 10 + int(_state_time * 3.0) % 4
+				col = 6 + int(_state_time * 5.2) % 8
+			State.ALERT, State.FLEE:
+				col = 14 + int(_state_time * 3.5) % 4
+			State.RECOVER:
+				col = (18 + int(_state_time * 3.6) % 6) if _state_time < _state_duration * 0.45 else (14 + int(_state_time * 3.2) % 4)
+			State.LOOKOUT:
+				col = 18 + int(_state_time * 3.6) % 6
 			State.GROOM:
-				col = 20 + int(_state_time * 5.0) % 6
+				col = 30 + int(_state_time * 5.0) % 6
+			State.REST:
+				col = 36 + int(_state_time * 1.8) % 4
+			State.THUMP:
+				col = 40 + mini(3, int(clampf(_state_time / maxf(_state_duration, 0.25), 0.0, 0.999) * 4.0))
 			_:
-				col = int(_state_time * 3.0) % 4
+				col = int(_state_time * 3.8) % 6
 	var sector: int = posmod(roundi(facing / (PI / 4.0)), DIRECTIONS)
 	_sprite.frame = (clampi(appearance, 0, 5) * DIRECTIONS + sector) * SHEET_COLUMNS + col
 	if _hopping or _was_hopping:
@@ -132,6 +144,7 @@ func _sense() -> void:
 	candidates.append_array(Player.all)
 	candidates.append_array(get_tree().get_nodes_in_group("predators"))
 	candidates.append_array(get_tree().get_nodes_in_group("wildlife_hunters"))
+	candidates.append_array(get_tree().get_nodes_in_group("apex_hunters"))
 	for candidate: Node in candidates:
 		var actor: Node2D = candidate as Node2D
 		if actor == null:
@@ -178,20 +191,26 @@ func _sense() -> void:
 			_threat = actor.global_position
 	if flee_now and _has_threat:
 		if state != State.FLEE:
+			_forage_creep = false
 			_set_state(State.FLEE, 0.0)
 			_alarm_neighbours()
-	elif _has_threat and state not in [State.FLEE, State.ALERT]:
+	elif _has_threat and state not in [State.FLEE, State.ALERT, State.THUMP]:
+		_forage_creep = false
 		_set_state(State.ALERT, float(_spec["alert_seconds"]))
-	if _has_threat and state == State.ALERT and not _hopping:
+	if _has_threat and state in [State.ALERT, State.THUMP] and not _hopping:
 		facing = (_threat - global_position).angle()
 
 
 func _alarm_neighbours() -> void:
 	for node: Node in get_tree().get_nodes_in_group("wildlife"):
 		var other: WildRabbit = node as WildRabbit
-		if other != null and other != self and other.state not in [State.FLEE, State.ALERT] and global_position.distance_to(other.global_position) < float(_spec["alarm_range"]):
+		if other != null and other != self and other.state not in [State.FLEE, State.ALERT, State.THUMP] and global_position.distance_to(other.global_position) < float(_spec["alarm_range"]):
 			other._threat = _threat
+			other.facing = (_threat - other.global_position).angle()
 			other._set_state(State.ALERT, float(_spec["alert_seconds"]))
+	for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
+		if node.has_method("hear_external_alarm"):
+			node.call("hear_external_alarm", _threat)
 
 
 func _think() -> void:
@@ -202,16 +221,48 @@ func _think() -> void:
 			elif _pause_left <= 0.0:
 				_try_hop((global_position - _threat).normalized(), true)
 		State.ALERT:
-			if _state_time >= _state_duration and not _has_threat:
+			if _has_threat and _state_time >= 0.48 and Time.get_ticks_msec() * 0.001 > _thump_cool:
+				_thump_cool = Time.get_ticks_msec() * 0.001 + 6.5
+				_alarm_neighbours()
+				_set_state(State.THUMP, 0.38)
+			elif _state_time >= _state_duration and not _has_threat:
 				_set_state(State.RECOVER, float(_spec["recover_seconds"]))
+		State.THUMP:
+			if _state_time >= _state_duration:
+				if _has_threat:
+					_set_state(State.ALERT, float(_spec["alert_seconds"]))
+				else:
+					_set_state(State.RECOVER, float(_spec["recover_seconds"]))
+		State.LOOKOUT:
+			if not _look_turned and _state_time >= _state_duration * 0.5:
+				_look_turned = true
+				var turn: float = _rng.randf_range(0.42, 0.72) * (-1.0 if _rng.randf() < 0.5 else 1.0)
+				facing = wrapf(facing + turn, -PI, PI)
+				_set_mood.rpc(State.LOOKOUT, maxf(0.4, _state_duration - _state_time), facing)
+				_look_turned = true
+			elif _state_time >= _state_duration:
+				_choose_idle()
 		State.WANDER:
 			if _hops_left <= 0:
-				_choose_idle()
+				if _forage_creep:
+					_forage_creep = false
+					_set_state(State.GRAZE, _range("graze_seconds"))
+				else:
+					_choose_idle()
 			elif _pause_left <= 0.0:
-				_try_hop(_wander_dir, false)
+				_try_hop(_wander_dir, false, _forage_creep)
 		_:
 			if _state_time >= _state_duration:
-				if _rng.randf() < 0.42:
+				if state == State.GRAZE and _rng.randf() < 0.42:
+					# Realistic lagomorph foraging creep: one tiny nibble-hop forward to fresh clover, then resume grazing.
+					_forage_creep = true
+					_wander_dir = Vector2.from_angle(facing + _rng.randf_range(-0.65, 0.65))
+					if global_position.distance_to(home) > float(_spec["home_radius"]):
+						_wander_dir = (home - global_position).normalized()
+					_hops_left = 1
+					_set_state(State.WANDER, 0.0)
+				elif _rng.randf() < 0.38:
+					_forage_creep = false
 					_wander_dir = Vector2.from_angle(_rng.randf() * TAU)
 					if global_position.distance_to(home) > float(_spec["home_radius"]):
 						_wander_dir = (home - global_position).normalized()
@@ -222,13 +273,45 @@ func _think() -> void:
 
 
 func _choose_idle() -> void:
+	var weather_node: Node = get_tree().get_first_node_in_group("weather")
+	var rain: float = float(weather_node.get("rain")) if weather_node != null else 0.0
+	var night: float = TimeManager.night_amount()
 	var roll: float = _rng.randf()
-	if roll < 0.55:
-		_set_state(State.GRAZE, _range("graze_seconds"))
-	elif roll < 0.72:
-		_set_state(State.GROOM, _range("groom_seconds"))
+	if rain >= 0.35 or night > 0.78:
+		# Rain or deep night: rabbits tuck into a warm low loaf near cover, staying extra watchful when awake.
+		if roll < 0.48:
+			_set_state(State.REST, _range("rest_seconds") * 1.35)
+		elif roll < 0.68:
+			_set_state(State.SNIFF, _range("sniff_seconds"))
+		elif roll < 0.84:
+			_set_state(State.GRAZE, _range("graze_seconds") * 0.8)
+		elif roll < 0.92:
+			_set_state(State.GROOM, _range("groom_seconds"))
+		else:
+			_set_state(State.LOOKOUT, _range("lookout_seconds"))
+	elif night >= 0.14 and night <= 0.65:
+		# Crepuscular peak (dawn & dusk): active meadow grazing and upright sentinel lookouts!
+		if roll < 0.56:
+			_set_state(State.GRAZE, _range("graze_seconds"))
+		elif roll < 0.72:
+			_set_state(State.LOOKOUT, _range("lookout_seconds"))
+		elif roll < 0.84:
+			_set_state(State.SNIFF, _range("sniff_seconds"))
+		elif roll < 0.94:
+			_set_state(State.GROOM, _range("groom_seconds"))
+		else:
+			_set_state(State.REST, _range("rest_seconds") * 0.8)
 	else:
-		_set_state(State.REST, _range("rest_seconds"))
+		if roll < 0.44:
+			_set_state(State.GRAZE, _range("graze_seconds"))
+		elif roll < 0.60:
+			_set_state(State.REST, _range("rest_seconds"))
+		elif roll < 0.74:
+			_set_state(State.SNIFF, _range("sniff_seconds"))
+		elif roll < 0.87:
+			_set_state(State.GROOM, _range("groom_seconds"))
+		else:
+			_set_state(State.LOOKOUT, _range("lookout_seconds"))
 
 
 func _set_state(next: State, duration: float) -> void:
@@ -241,27 +324,38 @@ func _set_mood(next: int, duration: float, direction: float) -> void:
 	_state_time = 0.0
 	_state_duration = duration
 	facing = direction
+	_look_turned = false
 	if state == State.FLEE:
 		_safe_time = 0.0
 		_pause_left = 0.0
+	elif state == State.THUMP:
+		Sfx.at(self, "rabbit_thump", global_position, -5.5, 0.06, 250.0)
 
 
-func _try_hop(direction: Vector2, fleeing: bool) -> void:
+func _try_hop(direction: Vector2, fleeing: bool, micro: bool = false) -> void:
 	if direction == Vector2.ZERO:
 		direction = Vector2.from_angle(_rng.randf() * TAU)
-	var distance: float = _range("flee_distance" if fleeing else "wander_distance")
+	var distance: float = _rng.randf_range(9.0, 15.0) if micro else _range("flee_distance" if fleeing else "wander_distance")
 	var best: Vector2 = Vector2.ZERO
 	var best_score: float = -INF
 	if _nearby_herd_left <= 0.0 or _nearby_herd.is_empty():
 		_nearby_herd_left = 0.5
 		_nearby_herd.clear()
-		var max_dist_sq: float = (distance + 20.0) * (distance + 20.0)
+		_nearby_cover.clear()
+		var max_dist_sq: float = (distance + 24.0) * (distance + 24.0)
 		for node: Node in get_tree().get_nodes_in_group("wildlife"):
 			if node != self and node is Node2D:
 				var pos: Vector2 = (node as Node2D).global_position
 				if global_position.distance_squared_to(pos) <= max_dist_sq:
 					_nearby_herd.append(pos)
-	for angle: float in [0.0, 0.6, -0.6, PI]:
+		for group_name: String in ["bird_perches", "fallen_logs"]:
+			for node: Node in get_tree().get_nodes_in_group(group_name):
+				var cover_node: Node2D = node as Node2D
+				if cover_node != null and global_position.distance_squared_to(cover_node.global_position) <= 13000.0:
+					_nearby_cover.append(cover_node.global_position)
+	if fleeing:
+		_flee_zig = -_flee_zig
+	for angle: float in [0.0, 0.42, -0.42, 0.78, -0.78, 1.35, -1.35, PI]:
 		var step: Vector2 = direction.rotated(angle) * distance
 		var end: Vector2 = global_position + step
 		if test_move(global_transform, step) or not _ground_safe(end) or not _ground_safe(global_position + step * 0.5):
@@ -269,10 +363,19 @@ func _try_hop(direction: Vector2, fleeing: bool) -> void:
 		var score: float = -absf(angle) * 8.0
 		if fleeing:
 			score += end.distance_to(_threat)
+			# Authentic "Haken schlagen": alternate lateral zig-zag bounds when fleeing across open ground!
+			if absf(angle - 0.42 * float(_flee_zig)) < 0.05:
+				score += 8.5
+			for cover_pos: Vector2 in _nearby_cover:
+				var cgap: float = end.distance_to(cover_pos)
+				if cgap >= 12.0 and cgap <= 36.0:
+					score += 6.0
 		for neighbour_pos: Vector2 in _nearby_herd:
 			var gap: float = end.distance_to(neighbour_pos)
 			if gap < 15.0:
 				score -= (15.0 - gap) * 2.0
+			elif not fleeing and gap < 48.0:
+				score += 1.5
 		if score > best_score:
 			best = end
 			best_score = score
@@ -281,7 +384,9 @@ func _try_hop(direction: Vector2, fleeing: bool) -> void:
 		if not fleeing:
 			_hops_left -= 1
 		return
-	_begin_hop.rpc(global_position, best, _range("flee_duration" if fleeing else "wander_duration"), float(_spec["flee_height"] if fleeing else _spec["wander_height"]), 0.0)
+	var hop_dur: float = _rng.randf_range(0.28, 0.36) if micro else _range("flee_duration" if fleeing else "wander_duration")
+	var hop_h: float = 2.6 if micro else float(_spec["flee_height"] if fleeing else _spec["wander_height"])
+	_begin_hop.rpc(global_position, best, hop_dur, hop_h, 0.0)
 	_hops_left -= 1
 
 

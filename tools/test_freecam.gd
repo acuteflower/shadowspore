@@ -45,7 +45,7 @@ func _run() -> void:
 	# Teleport field of the developer tab.
 	var menu: PauseMenu = player._hud.get_node("PauseMenu") as PauseMenu
 	menu._set_open(true)
-	menu._select_tab(3)
+	menu._select_tab(4)
 	var field: Dictionary = {}
 	for item: Dictionary in menu._items:
 		if String(item.get("kind", "")) == "field": field = item
@@ -65,32 +65,34 @@ func _run() -> void:
 	var tile: Vector2 = player.global_position / 16.0
 	check(absf(tile.x - 420.0) <= 17.0 and absf(tile.y - 610.0) <= 17.0, "she stands near tile 420, 610 (%s)" % tile)
 	menu._set_open(true)
-	menu._select_tab(3)
+	menu._select_tab(4)
 	menu._tp_text = "abc"
 	menu._run_action("teleport")
 	check(menu._failed_flash > 0.0, "garbage input fails")
 	# The developer page is taller than the screen: it scrolls.
 	menu._set_open(true)
-	menu._select_tab(3)
+	menu._select_tab(4)
 	menu.size = Vector2(640, 360)
 	menu._build_items()
-	check(menu._max_scroll() > 0.0, "developer page is taller than the screen (%s)" % menu._max_scroll())
 	var last: Dictionary = menu._items[0]
 	for item: Dictionary in menu._items: ## the lowest row of the page
 		if float(item["y"]) > float(last["y"]): last = item
+	var col: int = int(last["col"])
+	check(menu._max_scroll(col) > 0.0, "developer page is taller than the screen (%s)" % menu._max_scroll(col))
 	check(not menu._row_visible(last), "the last row starts off screen")
 	var wheel: InputEventMouseButton = InputEventMouseButton.new()
 	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
 	wheel.pressed = true
-	for i: int in 30:
+	wheel.position = Vector2(menu._column_x(col) + 10.0, 120.0)
+	for i: int in 60:
 		menu._gui_input(wheel)
-	check(is_equal_approx(menu._scroll, menu._max_scroll()), "wheel scrolls down to the end")
+	check(is_equal_approx(menu._scrolls[col], menu._max_scroll(col)), "wheel scrolls down to the end")
 	check(menu._row_visible(last), "the last row is reachable after scrolling")
 	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
-	for i: int in 30:
+	for i: int in 60:
 		menu._gui_input(wheel)
-	check(menu._scroll == 0.0, "wheel scrolls back to the top")
+	check(menu._scrolls[col] == 0.0, "wheel scrolls back to the top")
 	menu._select_tab(0)
-	check(menu._scroll == 0.0, "changing tab resets the scroll")
+	check(menu._scrolls[col] == 0.0, "changing tab resets the scroll")
 	print("FREECAM: %d failures" % failures)
 	get_tree().quit(1 if failures > 0 else 0)

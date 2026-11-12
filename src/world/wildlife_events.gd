@@ -85,7 +85,7 @@ func _choose_event() -> void:
 		if rabbit == null or rabbit.captured or not _eligible(rabbit): continue
 		if prefer_hunt:
 			for hunter: WoodlandMammal in hunters:
-				if not hunter._rest_hours() and not hunter._danger and not hunter._moving and _eligible(hunter) and hunter.global_position.distance_to(rabbit.global_position)<float(_spec["fox_hunt_range"]):
+				if not hunter._rest_hours() and not hunter._danger and not hunter._moving and hunter._climb_height < 0.5 and _eligible(hunter) and hunter.global_position.distance_to(rabbit.global_position)<float(_spec["fox_hunt_range"]):
 					if begin_event("fox_hunt",hunter,rabbit): return
 		if rabbit._has_threat or rabbit._hopping or rabbit.state==WildRabbit.State.FLEE: continue
 		for bird: WildCorvid in birds:
@@ -156,7 +156,7 @@ func _play() -> void:
 			else: finish_event("crow_stayed")
 			return
 		if distance<55.0 and not bird._moving and _next<=0.0:
-			bird._walk((bird.global_position-rabbit.global_position).normalized())
+			bird._hop_step((bird.global_position-rabbit.global_position).normalized())
 			_retreats += 1
 	else:
 		var partner: WildRabbit = _b as WildRabbit
@@ -202,7 +202,10 @@ func _hunt() -> void:
 	var end: Vector2 = fox.global_position+step
 	if fox._can_step(end) and fox._can_step(fox.global_position+step*0.5) and not fox.test_move(fox.global_transform,step):
 		fox._safe_time = 10.0
-		fox._move_action(WoodlandMammal.Mood.FLEE,end,maxf(0.2,step.length()/float(fox._spec["run_speed"])))
+		var close_stalk: bool = distance < 58.0
+		var hunt_mood: WoodlandMammal.Mood = WoodlandMammal.Mood.STALK if close_stalk else WoodlandMammal.Mood.CHASE
+		var speed: float = float(fox._spec.get("stalk_speed", 22.0)) * 1.4 if close_stalk else float(fox._spec["run_speed"])
+		fox._move_action(hunt_mood,end,maxf(0.2,step.length()/speed))
 	else:
 		finish_event("escaped")
 

@@ -1,145 +1,188 @@
 #!/usr/bin/env python3
-"""Two more mushrooms for the meadow's shade (stdlib only), frames 40x34 like the other plants (feet at (20, 31)):
-  assets/props/ember_morel.png      Glutmorchel: 3 stands of honeycomb-capped morels x 2 rows (whole, picked); warm ochre caps whose
-                                    dark pits glow like embers at night, cream stems
-  assets/props/moon_parasol.png     Mondschirm: 3 stands of tall parasol mushrooms x 2 rows (whole, picked); a wide pale-lilac cap with
-                                    fine radial fibres, a delicate ring on the stem and a rim of light; sheds spores when brushed
+"""Two woodland mushrooms for the meadow's shade (stdlib only), frames 40x34 (feet at (20, 31)):
+  assets/props/ember_morel.png      Glutmorchel: 5 stands of honeycomb-capped morels x 2 rows (whole, picked)
+  assets/props/moon_parasol.png     Mondschirm: 5 stands of tall pleated parasol mushrooms x 2 rows (whole, picked)
   every sheet has a `_glow` twin with only the emissive pixels
   assets/items/ember_morel.png, moon_parasol.png   icons 16x16
-`python3 tools/art_shrooms.py [preview.png]`"""
+Harmonized with Shadowspore's structured cel + Bayer shading, cool indigo-violet deep shadows,
+and adaptive material-tinted 1px outlines (never harsh pure black around pale parasol caps)."""
 import math
 import pathlib
 import random
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from art_brush import GRASS, Glow, blade, outline, put, sheet  # noqa: E402
-from art_bush import FH, FW, GROUND, blank, check_icon, clamp  # noqa: E402
-from art_flora import blob, finish, ramp  # noqa: E402
-from gen_art import ROOT, hexc, noise, outline_pass, write_png  # noqa: E402
+from art_brush import GRASS, Glow, blade, put, sheet  # noqa: E402
+from art_bush import BAYER, FH, FW, GROUND, bezier, blank, check_icon, clamp  # noqa: E402
+from art_flora import LEAFW, finish, ramp  # noqa: E402
+from gen_art import ROOT, hexc, outline_pass, write_png  # noqa: E402
 
-MOREL = ramp("2a1410", "5a2a18", "8a4a22", "c07a34", "e8aa58", "ffd68a")
-MSTEM = ramp("6a5a40", "a89870", "d8c898", "f4e8c0")
-EMBER_PIT, EMBER_HOT = hexc("ff8a38"), hexc("ffd070")
-PARA = ramp("3a3468", "6a64a4", "9c96cc", "cdc8ea", "f2f0fc")
-PGILL = ramp("2a2650", "4c467c", "7c76b0")
-PSTEM = ramp("5a5486", "8a84b8", "bcb6dc", "e6e2f6")
-PGLOW = hexc("d8ccff")
-SPORE = hexc("9af0e4")
+COLS = 5
+MOREL = ramp("261214", "52261c", "864826", "bc7636", "e6a85a", "ffd68c")
+MSTEM = ramp("584c44", "928472", "c8ba9c", "efe6cc")
+EMBER_PIT, EMBER_HOT = hexc("ff8a38"), hexc("ffd478")
+
+PARA = ramp("342e62", "5c5698", "908ac4", "c6c2e8", "f2f0fc")
+PGILL = ramp("24204c", "444076", "7472aa")
+PSTEM = ramp("4c487c", "7c78ae", "b4b0d8", "e6e4f6")
+PGLOW = hexc("9af0e4")
+PLILAC = hexc("d8ccff")
 
 MORELS = [
-    {"caps": [(20, 9, 6)], "spread": 6},
-    {"caps": [(15, 12, 7), (25, 8, 5)], "spread": 10},
-    {"caps": [(11, 8, 5), (18, 13, 7), (26, 9, 6), (31, 6, 4)], "spread": 14},
+    {"caps": [(20, 10, 6.2, 0.0)], "spread": 6},
+    {"caps": [(15, 12, 6.8, -0.8), (25, 8, 5.2, 1.0)], "spread": 10},
+    {"caps": [(13, 9, 5.4, -1.0), (20, 13, 7.0, 0.3), (27, 8, 5.0, 1.0)], "spread": 12},
+    {"caps": [(17, 14, 5.8, -0.9), (24, 11, 5.2, 1.1)], "spread": 9},  # tall slender torch-morels
+    {"caps": [(10, 8, 4.8, -1.2), (17, 13, 6.8, -0.3), (24, 10, 5.8, 0.8), (30, 7, 4.4, 1.2)], "spread": 14},
 ]
+
 PARASOLS = [
-    {"caps": [(20, 22, 15)], "spread": 6},
-    {"caps": [(15, 20, 14), (27, 13, 9)], "spread": 10},
-    {"caps": [(11, 14, 10), (20, 21, 13), (29, 11, 8)], "spread": 14},
+    {"caps": [(20, 21, 14, 0.4)], "spread": 7},
+    {"caps": [(15, 20, 13, -1.2), (26, 13, 9, 1.2)], "spread": 10},
+    {"caps": [(11, 14, 10, -1.3), (20, 22, 13, 0.3), (29, 11, 8, 1.2)], "spread": 13},
+    {"caps": [(17, 21, 14, -1.5), (26, 11, 5, 0.8)], "spread": 10, "bud": True},  # sweeping parasol + young drumstick bud
+    {"caps": [(10, 12, 8, -1.3), (17, 21, 12, -0.5), (24, 17, 11, 0.8), (30, 10, 7, 1.2)], "spread": 14},
 ]
 
 
-def stem_px(px, cx, y0, y1, w, ramp_, rng, seed):
-    for y in range(int(y1), int(y0) - 1, -1):
-        for dx in range(-int(w), int(w) + 1):
-            if abs(dx) > w:
+def stem_curved(px, cx, y_top, y_bot, w_base, lean, pal):
+    h = max(1, y_bot - y_top)
+    for y in range(int(y_bot), int(y_top) - 1, -1):
+        t = (y_bot - y) / h
+        xc = cx + lean * (t * t)
+        hw = w_base * (1.12 - 0.28 * t)
+        for dx in range(-int(hw) - 1, int(hw) + 2):
+            if abs(dx) > hw:
                 continue
-            lit = 0.6 - 0.55 * dx / max(w, 0.8)
-            v = lit * (len(ramp_) - 1) + (noise(int(cx) + dx, y, seed) / 255.0 - 0.5) * 0.7
-            put(px, int(round(cx)) + dx, y, ramp_[int(clamp(v, 0, len(ramp_) - 1))])
+            lit = 0.58 - 0.50 * dx / max(hw, 0.75) - (0.25 if t > 0.82 else 0.0)
+            lit += (BAYER[y % 4][int(abs(xc + dx)) % 4] / 16.0 - 0.5) * 0.22
+            put(px, int(round(xc + dx)), y, pal[int(clamp(lit * len(pal), 0, len(pal) - 1))])
 
 
-def morel(px, glow, cx, h, cap_w, rng, seed):
-    cap_h = int(h * 0.62)
-    stem_top = GROUND - int(h * 0.42)
-    stem_px(px, cx, stem_top, GROUND, 1.8 if h > 8 else 1.4, MSTEM, rng, seed)
-    cy = stem_top - cap_h * 0.5 + 1
-    for y in range(int(cy - cap_h * 0.5) - 1, stem_top + 3):
-        t = (y - (cy - cap_h * 0.5)) / max(cap_h, 1)
-        half = cap_w * (0.22 + 0.78 * math.sin(min(1.0, max(t, 0.0)) * math.pi * 0.62 + 0.25)) * 0.5 if t >= 0 else 0
-        for x in range(int(cx - half) - 1, int(cx + half) + 2):
-            dx = (x + 0.5 - cx) / max(half, 1.0)
-            if abs(dx) > 1.0 or t < 0 or t > 1.1:
+def morel(px, glow, cx, h, cap_w, lean, seed):
+    total_h = h + 9
+    cap_h = int(total_h * 0.60)
+    stem_top = GROUND - int(total_h * 0.44)
+    stem_curved(px, cx, stem_top, GROUND, 1.75 if h >= 10 else 1.35, lean * 0.6, MSTEM)
+    cap_cx = cx + lean * 0.8
+    cap_top = max(3, stem_top - cap_h + 2)
+    # Tapered ovoid-conical honeycomb cap with staggered organic pits & sculpted 3D ridges
+    for y in range(cap_top, stem_top + 2):
+        t = (y - cap_top) / max(cap_h, 1)
+        # Ovoid-conical profile: narrow rounded apex, widest at t=0.68, tucked rim at t=1.0
+        profile = math.sin(min(1.0, max(0.05, t ** 0.78)) * math.pi * 0.86)
+        half = (cap_w + 1.6) * 0.5 * (0.18 + 0.86 * profile)
+        for x in range(int(cap_cx - half) - 1, int(cap_cx + half) + 2):
+            dx = (x + 0.5 - cap_cx) / max(half, 0.9)
+            if abs(dx) > 1.0 or not (2 <= x < FW - 2):
                 continue
-            lit = 0.55 - 0.5 * dx - 0.25 * (t - 0.3)
-            lx = (x + (1 if (y // 3) % 2 else 0)) % 3
-            ly = y % 3
-            base = lit * 4.2 + 0.6
-            if lx == 1 and ly == 1:  # the pit
+            lit = 0.56 - 0.46 * dx - 0.22 * (t - 0.35)
+            # Staggered cellular honeycomb pattern (offset rows + subtle wave so it never looks like a stiff grid)
+            row_id = (y - cap_top) // 2
+            cell_x = (x + (row_id % 2) * 2 + seed) % 3
+            cell_y = (y - cap_top + (x % 2)) % 3
+            is_pit = (cell_x == 1 and cell_y == 1 and 0.14 < t < 0.92 and abs(dx) < 0.82)
+            if is_pit:
                 put(px, x, y, MOREL[0])
-                if noise(x, y, seed + 3) > 150:
+                if (x + y + seed) % 2 == 0:
                     glow.emit(px, x, y, MOREL[1], EMBER_PIT, 0)
-            elif lx == 1 or ly == 1:
-                put(px, x, y, MOREL[int(clamp(base - 1.2, 0, 5))])
             else:
-                put(px, x, y, MOREL[int(clamp(base + 0.4 + (noise(x, y, seed + 2) / 255.0 - 0.5) * 0.8, 0, 5))])
-    glow.emit(px, int(cx), int(cy - cap_h * 0.5), MOREL[4], EMBER_HOT, 1)  # the warm tip of the cap
+                ridge = 0.32 if (cell_x == 0 or cell_y == 0) else -0.08
+                idx = int(clamp((lit + ridge) * 5.2 + (BAYER[y % 4][x % 4] / 16.0 - 0.5) * 0.5, 1, 5))
+                put(px, x, y, MOREL[idx])
+    glow.emit(px, int(round(cap_cx)), cap_top + 1, MOREL[5], EMBER_HOT, 1)
 
 
 def make_morel(spec, seed, picked=False):
     rng = random.Random(seed)
     px, glow = blank(FW, FH), Glow()
-    for _ in range(4 + len(spec["caps"])):  # moss and short blades round the feet
-        blade(px, 20 + rng.uniform(-spec["spread"], spec["spread"]), GROUND, rng.uniform(1, 4), rng.uniform(-0.5, 0.5), 0.4, rng.choice((1, 2)), seed)
-    for cx, h, w in sorted(spec["caps"], key=lambda c: c[1]):
+    for _ in range(5 + len(spec["caps"])):
+        blade(px, 20 + rng.uniform(-spec["spread"] * 0.85, spec["spread"] * 0.85), GROUND, rng.uniform(1.5, 4.2), rng.uniform(-0.5, 0.5), 0.4, rng.choice((1, 2, 3)), seed)
+    for cx, h, w, lean in sorted(spec["caps"], key=lambda c: c[1]):
         if picked:
-            stem_px(px, cx, GROUND - 3, GROUND, 1.2, MSTEM, rng, seed)
-            put(px, cx, GROUND - 4, MSTEM[1])
+            stem_curved(px, cx, GROUND - 3, GROUND, 1.25, lean * 0.2, MSTEM)
+            put(px, int(round(cx)), GROUND - 4, MSTEM[3])
         else:
-            morel(px, glow, cx, h + 10, w + 2, rng, seed + cx)
+            morel(px, glow, cx, h, w, lean, seed + int(cx))
     return finish(px, spec["spread"], seed), glow.done()
 
 
-def parasol(px, glow, cx, h, w, rng, seed, lean):
-    top = GROUND - h
-    # stem with a slight bow and the delicate ring
-    for y in range(GROUND, top, -1):
-        t = (GROUND - y) / max(h, 1)
-        x = cx + lean * math.sin(t * 2.0)
-        for dx in (-1, 0, 1):
-            if abs(dx) == 1 and (y % 3 == 0 and t > 0.5):
-                continue
-            put(px, int(round(x)) + dx, y, PSTEM[3 if dx < 0 else (2 if dx == 0 else 1)])
-    ry_ = GROUND - int(h * 0.62)
-    for dx in range(-3, 4):
-        put(px, int(round(cx + lean * 1.2)) + dx, ry_ + (1 if abs(dx) > 1 else 0), PSTEM[3 if dx <= 0 else 2])
-    ccx = cx + lean * 2.0
-    # the gills under the cap's edge: fine alternating ribs
-    for dx in range(-int(w * 0.5), int(w * 0.5) + 1):
-        edge = (1.0 - (dx / (w * 0.5)) ** 2) ** 0.5
-        y1 = top + int(w * 0.16 * edge) + 1
-        for k in range(2):
-            put(px, int(ccx) + dx, y1 + k, PGILL[(abs(dx) + k) % 3])
-    # the cap: a wide, shallow cone, lit top left, with radial fibres
-    for y in range(int(top - w * 0.3), int(top + w * 0.22) + 1):
-        for x in range(int(ccx - w * 0.5) - 1, int(ccx + w * 0.5) + 2):
-            dx, dy = (x + 0.5 - ccx) / (w * 0.5), (y + 0.5 - top) / (w * 0.26)
+def parasol(px, glow, cx, h, w, lean, is_bud=False):
+    top = max(5, GROUND - h)
+    # Graceful S-curved slender stem + skirt annulus ring
+    pts = bezier((cx, GROUND), (cx - lean * 0.8, GROUND - h * 0.48), (cx + lean * 1.5, top + 1), n=max(12, h * 2))
+    for x, y in pts:
+        xi, yi = int(clamp(round(x), 3, FW - 4)), int(clamp(round(y), 3, GROUND))
+        put(px, xi - 1, yi, PSTEM[3])
+        put(px, xi, yi, PSTEM[2])
+        put(px, xi + 1, yi, PSTEM[0])
+    ring_pt = pts[int(len(pts) * 0.62)]
+    rx_i, ry_i = int(round(ring_pt[0])), int(round(ring_pt[1]))
+    for dx in (-2, -1, 0, 1, 2):
+        put(px, clamp(rx_i + dx, 3, FW - 4), ry_i + (1 if abs(dx) == 2 else 0), PSTEM[3 if dx <= 0 else 1])
+
+    ccx = clamp(pts[-1][0], 4 + w * 0.5, FW - 5 - w * 0.5)
+    if is_bud:
+        # Unopened ovoid drumstick parasol bud
+        for dy in range(-4, 3):
+            hw = 2.6 * math.sin(max(0.1, (dy + 4.5) / 7.5) * math.pi)
+            for dx in range(-int(hw) - 1, int(hw) + 2):
+                if abs(dx) <= hw:
+                    tone = 4 if dx < -0.5 and dy < 0 else (3 if dx <= 0 else (2 if dx < 1 else 1))
+                    put(px, int(round(ccx + dx)), top + dy, PARA[tone])
+        glow.emit(px, int(round(ccx)), top - 3, PARA[4], PLILAC, 1)
+        return
+
+    # Bioluminescent pleated gill underside
+    half_w = w * 0.5
+    for dx in range(-int(half_w), int(half_w) + 1):
+        edge = math.sqrt(max(0.0, 1.0 - (dx / max(half_w, 1.0)) ** 2))
+        y1 = top + int(w * 0.14 * edge) + 1
+        put(px, int(round(ccx)) + dx, y1, PGILL[(abs(dx)) % 3])
+        if abs(dx) < half_w - 1:
+            put(px, int(round(ccx)) + dx, y1 + 1, PGILL[(abs(dx) + 1) % 2])
+
+    # Wide shallow conical-bell cap with clean radial pleats & prominent central umbo
+    cap_ry = max(2.8, w * 0.27)
+    for y in range(int(top - cap_ry) - 1, int(top + w * 0.18) + 2):
+        for x in range(int(ccx - half_w) - 1, int(ccx + half_w) + 2):
+            dx = (x + 0.5 - ccx) / max(half_w, 1.0)
+            dy = (y + 0.5 - top) / cap_ry
             d = dx * dx + dy * dy
-            if d > 1.0 or dy > 0.85 - 0.5 * dx * dx:
+            if d > 1.0 or dy > 0.72 - 0.38 * dx * dx or not (2 <= x < FW - 2 and 2 <= y < GROUND - 2):
                 continue
-            ang = math.atan2(dy, dx)
-            fibre = 0.28 if int((ang + math.pi) * 9.0) % 2 == 0 else 0.0
-            lit = 0.55 - 0.42 * dx - 0.5 * (dy + 0.4) - fibre * 0.3 + (1.0 - d) * 0.25
-            put(px, x, y, PARA[int(clamp(lit * 4.2 + (noise(x, y, seed) / 255.0 - 0.5) * 0.6, 0, 4))])
-    put(px, int(ccx), int(top - w * 0.2), hexc("c8a8e0"))  # the soft umbo
-    put(px, int(ccx) + 1, int(top - w * 0.2), PARA[1])
-    for k in range(4):
-        glow.emit(px, int(ccx - w * 0.5 + 1 + k * (w - 2) / 3.0), int(top + 1 + (1 if 0 < k < 3 else 0)), None, PGLOW, 0)  # the rim of light
-    glow.emit(px, int(ccx), int(top - w * 0.12), PARA[3], hexc("ffffff"), 1)
+            ang = math.atan2(dy + 0.3, dx)
+            pleat = 0.10 * math.cos(ang * 12.0)
+            lit = 0.58 - 0.40 * dx - 0.45 * (dy + 0.32) + pleat + (1.0 - d) * 0.18
+            lit += (BAYER[y % 4][x % 4] / 16.0 - 0.5) * 0.22
+            put(px, x, y, PARA[int(clamp(lit * len(PARA), 0, len(PARA) - 1))])
+    # Sculpted darker lilac umbo crown at apex with crisp top-left gleam
+    umbo_y = max(2, int(round(top - cap_ry * 0.72)))
+    put(px, int(round(ccx)), umbo_y, PARA[1])
+    put(px, int(round(ccx)) + 1, umbo_y, PARA[0])
+    put(px, int(round(ccx)) - 1, umbo_y, PARA[4])
+    # Aqua-teal spore glow along gill rim + soft apex gleam
+    for k in range(3):
+        gx = int(clamp(round(ccx - half_w + 1.5 + k * (w - 3) / 2.0), 3, FW - 4))
+        gy = min(GROUND - 4, top + 2)
+        glow.emit(px, gx, gy, None, PGLOW, 0)
+    glow.emit(px, int(round(ccx)) - 1, umbo_y, PARA[4], PLILAC, 1)
 
 
 def make_parasol(spec, seed, picked=False):
     rng = random.Random(seed)
     px, glow = blank(FW, FH), Glow()
-    for _ in range(3 + len(spec["caps"])):
-        blade(px, 20 + rng.uniform(-spec["spread"], spec["spread"]), GROUND, rng.uniform(1, 4), rng.uniform(-0.5, 0.5), 0.4, rng.choice((1, 2)), seed)
-    for cx, h, w in sorted(spec["caps"], key=lambda c: c[1]):
+    for _ in range(4 + len(spec["caps"])):
+        blade(px, 20 + rng.uniform(-spec["spread"] * 0.85, spec["spread"] * 0.85), GROUND, rng.uniform(1.5, 4.2), rng.uniform(-0.5, 0.5), 0.4, rng.choice((1, 2, 3)), seed)
+    caps_sorted = sorted(enumerate(spec["caps"]), key=lambda item: item[1][1])
+    for idx, (cx, h, w, lean) in caps_sorted:
         if picked:
-            stem_px(px, cx, GROUND - 4, GROUND, 1.0, PSTEM, rng, seed)
-            put(px, cx - 1, GROUND - 3, PSTEM[3])
-            put(px, cx + 1, GROUND - 3, PSTEM[3])
+            stem_curved(px, cx, GROUND - 4, GROUND, 1.1, lean * 0.2, PSTEM)
+            put(px, int(round(cx)) - 1, GROUND - 3, PSTEM[3])
+            put(px, int(round(cx)) + 1, GROUND - 3, PSTEM[2])
         else:
-            parasol(px, glow, cx, h, w, rng, seed + cx, rng.uniform(-1.5, 1.5))
+            is_bud = bool(spec.get("bud") and idx == 1)
+            parasol(px, glow, cx, h, w, lean, is_bud=is_bud)
     return finish(px, spec["spread"], seed), glow.done()
 
 
@@ -151,8 +194,8 @@ def i_morel(px, g):
         t = (y - 2) / 7.0
         half = int(2.6 * (0.4 + 0.6 * math.sin(min(1, t) * 2.0)))
         for dx in range(-half, half + 1):
-            lx, ly = (dx + 8 + (1 if (y // 3) % 2 else 0)) % 3, y % 3
-            px[y][8 + dx] = MOREL[0] if (lx == 1 and ly == 1) else MOREL[3 if dx < 0 else 2]
+            lx, ly = (dx + 8 + (1 if (y // 2) % 2 else 0)) % 3, y % 3
+            px[y][8 + dx] = MOREL[0] if (lx == 1 and ly == 1) else MOREL[4 if dx < 0 else 2]
     px[3][8] = EMBER_HOT
 
 
@@ -169,8 +212,10 @@ def i_parasol(px, g):
 
 def main():
     props, items = ROOT / "props", ROOT / "items"
-    sheets = {"ember_morel": [make_morel(s, 1800 + i * 17, picked=r) for r in (False, True) for i, s in enumerate(MORELS)],
-              "moon_parasol": [make_parasol(s, 1900 + i * 19, picked=r) for r in (False, True) for i, s in enumerate(PARASOLS)]}
+    sheets = {
+        "ember_morel": [make_morel(s, 1800 + i * 17, picked=r) for r in (False, True) for i, s in enumerate(MORELS)],
+        "moon_parasol": [make_parasol(s, 1900 + i * 19, picked=r) for r in (False, True) for i, s in enumerate(PARASOLS)],
+    }
     bad = []
     for name, frames in sheets.items():
         for i, (base, glow) in enumerate(frames):
@@ -180,24 +225,14 @@ def main():
                     bad.append("%s frame %d: top %d, x %d..%d" % (name, i, min(y for x, y in pts), min(x for x, y in pts), max(x for x, y in pts)))
     assert not bad, "cut off at the frame edge:\n" + "\n".join(bad)
     for name, frames in sheets.items():
-        write_png(props / (name + ".png"), FW * 3, FH * 2, sheet([f[0] for f in frames], 3, 2))
-        write_png(props / (name + "_glow.png"), FW * 3, FH * 2, sheet([f[1] for f in frames], 3, 2))
+        write_png(props / (name + ".png"), FW * COLS, FH * 2, sheet([f[0] for f in frames], COLS, 2))
+        write_png(props / (name + "_glow.png"), FW * COLS, FH * 2, sheet([f[1] for f in frames], COLS, 2))
     for name, draw in (("ember_morel", i_morel), ("moon_parasol", i_parasol)):
         px = blank(16, 16)
         draw(px, None)
         check_icon(name, px)
         write_png(items / (name + ".png"), 16, 16, outline_pass(px, hexc("1b1a2e")))
-    print("morel and parasol written")
-    if len(sys.argv) > 1:
-        from PIL import Image
-        img = Image.new("RGBA", (FW * 3, FH * 4), (30, 50, 40, 255))
-        for r, (name, frames) in enumerate(sheets.items()):
-            for i, (b, g) in enumerate(frames):
-                for layer in (b, g):
-                    tile = Image.new("RGBA", (FW, FH))
-                    tile.putdata([c for row in layer for c in row])
-                    img.alpha_composite(tile, ((i % 3) * FW, (r * 2 + i // 3) * FH))
-        img.resize((img.width * 4, img.height * 4), Image.NEAREST).save(sys.argv[1])
+    print("morel and parasol (5 variants each) written")
 
 
 if __name__ == "__main__":

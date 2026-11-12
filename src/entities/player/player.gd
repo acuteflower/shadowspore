@@ -632,9 +632,7 @@ func _finish_step() -> void:
 
 ## The game-drawn sword arm and the worn jewellery cannot dissolve with her: they are hidden for the step (the sheet carries both arms).
 func _set_step_extras(on: bool) -> void:
-	var arm_node: Node2D = attack.get_node_or_null("Hand") as Node2D
-	if arm_node != null:
-		arm_node.visible = on
+	attack.set_arm_shown(on)
 	for child: Node in _sprite.get_children():
 		if child is TalismanLayer:
 			(child as CanvasItem).visible = on
@@ -1648,6 +1646,7 @@ func _animate(delta: float) -> void:
 	_sprite.position.y = _sink + _limp_dip
 	var shoulder: Vector2 = Vector2(-4.0, -31.0)
 	var hand: Vector2 = Vector2(-5.0, -21.0)
+	var free_hand: bool = false ## the main sheet plays: the held item may move the fist to its own hold (AttackComponent / GripRig)
 	if main_frame < _rig_hand.size():
 		shoulder = _rig_shoulder[main_frame]
 		hand = _rig_hand[main_frame]
@@ -1764,6 +1763,7 @@ func _animate(delta: float) -> void:
 	else:
 		_use_sheet(0)
 		_sprite.frame = main_frame
+		free_hand = not swim_drawn
 	if not (_busy and _busy_kind == "eat"):
 		_eat_fx.clear()
 	if not _drinking():
@@ -1773,12 +1773,14 @@ func _animate(delta: float) -> void:
 	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, _sink + _limp_dip)
 	attack.rig_hand = hand + Vector2(-_sprite.skew * hand.y, _sink + _limp_dip)
 	attack.carrying = moving and _gait == 2 and not attack.is_swinging() ## the blade trails back only in the real sprint
+	attack.body_dir = Vector2.from_angle(float(_sector) * PI / 4.0) ## the item rests relative to the facing the sheet shows, not the cursor
+	attack.free_hand = free_hand
+	attack.mirror_material(_sprite.material)
 	attack.sheathed = stealth.sneaking or (_busy and not _busy_kind.begins_with("cast_")) or swim_drawn ## sneaking, picking and swimming put the weapon away (a cast needs the staff)
 	if attack.holds_staff() and not fish_frame_ok:
 		attack.rod_pose = _staff_pose(moving)
-	var arm_node: Node2D = attack.get_node_or_null("Hand") as Node2D
-	if arm_node != null and arm_node.visible == swim_drawn:
-		arm_node.visible = not swim_drawn ## swim frames carry both arms
+	if attack.arm_shown() == swim_drawn:
+		attack.set_arm_shown(not swim_drawn) ## swim frames carry both arms
 
 
 ## The intro starts: normal HUD parts hide, the wound border and blood stay active.

@@ -227,7 +227,7 @@ func _hop(player: Player, distance: float) -> void:
 	for angle: float in [0.0, 0.5, -0.5]:
 		var step: Vector2 = direction.rotated(angle) * length
 		if not bird.test_move(bird.global_transform, step) and _ground_ok(bird.global_position + step):
-			bird._act.rpc(WildCorvid.State.WALK, maxf(0.4, length / float(bird._spec["walk_speed"]) * 1.25), step.angle(), bird.global_position, bird.global_position + step, Vector2.ZERO, 0.0, 0.0, 0.0, "", 0.0)
+			bird._act.rpc(WildCorvid.State.HOP, clampf(length / (float(bird._spec["walk_speed"]) * 1.35), 0.26, 0.44), step.angle(), bird.global_position, bird.global_position + step, Vector2.ZERO, 0.0, 0.0, 0.0, "", 0.0)
 			return
 	target_peer = 0
 

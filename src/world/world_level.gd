@@ -75,8 +75,10 @@ var _paused_builds: Dictionary = {} ## Vector2i -> ChunkBuild: half-prepared chu
 var _pending_commit: ChunkBuild ## committed ground waiting one frame for its props (see `_finish_commit`)
 var night: NightDirector ## host: spawns and steers the creatures of the night
 var knight_taken: bool = false ## Valdric is a settler (`take_knight`): the story actor stays hidden
+var torben_taken: bool = false ## Torben is a settler (`take_torben`): the story actor stays hidden
 var _town_node: TownManager ## the player's town (docs/town.md): what it has cleared stays cleared
 var _tiles: Dictionary
+var loading_in_steps: bool = false ## launcher pumps the existing cooperative stream while gameplay is paused
 
 @onready var _wildlife: WildlifePopulation = $Wildlife
 
@@ -168,6 +170,9 @@ func _fill_ground() -> void:
 	var loot_chests: LootChests = LootChests.new() ## the loot chests of the wild and the bosses' Glutreliquiare (docs/beutetruhen_konzept.md)
 	loot_chests.name = "LootChests"
 	add_child(loot_chests)
+	var puzzles: Puzzles = Puzzles.new() ## the trials of the Wächterin: the wisp trail so far (docs/raetsel_konzept.md)
+	puzzles.name = "Puzzles"
+	add_child(puzzles)
 	var pets: PetRegistry = PetRegistry.new() ## the bond with wild crows and ravens (docs/pet_konzept.md)
 	pets.name = "PetRegistry"
 	add_child(pets)
@@ -223,7 +228,8 @@ func _fill_ground() -> void:
 	night = NightDirector.new() ## the night (docs/nacht_monster_konzept.md): the host's director
 	night.setup(self)
 	add_child(night)
-	_stream(true)
+	if not loading_in_steps:
+		_stream(true)
 	fallen_knight = FallenKnight.new()
 	fallen_knight.name = "FallenKnight"
 	var knight_tile: Array = DataRegistry.get_entry("ground", "fallen_knight").get("tile", [501,685])
@@ -274,6 +280,8 @@ func _add_ground_decals() -> Dictionary:
 	var knight: Dictionary = DataRegistry.get_entry("ground", "fallen_knight")
 	var tile: Array = knight.get("tile", [501,685])
 	_clear_around(clear, Vector2(float(tile[0]), float(tile[1])) * 16 + Vector2(8,8), int(knight.get("clear_radius", 4)))
+	for spot: Array in Puzzles.clear_spots(): ## the wisp's bowl and the place where it sinks in stay free of generated plants
+		_clear_around(clear, spot[0] as Vector2, int(spot[1]))
 	for sign_spec: Dictionary in DataRegistry.table("ground").get("signposts", []) as Array: ## standard signposts (Signpost)
 		var post: Signpost = Signpost.new()
 		var stile: Array = sign_spec.tile as Array
@@ -347,6 +355,14 @@ func _add_ground_decals() -> Dictionary:
 		wagon.position = Vector2(float(wtile2[0]), float(wtile2[1])) * 16.0 + Vector2(8, 8)
 		add_child(wagon)
 		_clear_around(clear, wagon.position + Vector2(20, -6), int(wagon_spec.get("clear_radius", 12)))
+	for camp_spec: Dictionary in DataRegistry.table("ground").get("smith_camps", []) as Array: ## Torben's overworld iron outcrop (quest torben_smithy)
+		var camp: TorbenCamp = TorbenCamp.new()
+		var ctile: Array = camp_spec.tile as Array
+		camp.name = "TorbenCamp_" + String(camp_spec.id)
+		camp.world = self
+		camp.position = Vector2(float(ctile[0]), float(ctile[1])) * 16.0 + Vector2(8, 8)
+		add_child(camp)
+		_clear_around(clear, camp.position, int(camp_spec.get("clear_radius", 9)))
 	for mine_spec: Dictionary in DataRegistry.table("ground").get("mines", []) as Array: ## the old mine's gate (docs/mine.md)
 		var gate: MineEntrance = MineEntrance.new()
 		var mtile: Array = mine_spec.tile as Array
@@ -703,6 +719,15 @@ func take_knight() -> Vector2:
 	return at
 
 
+func take_torben() -> Vector2:
+	torben_taken = true
+	for node: Node in get_tree().get_nodes_in_group("torben_camp"):
+		var camp: TorbenCamp = node as TorbenCamp
+		if camp != null:
+			return camp.take_torben()
+	return Vector2.INF
+
+
 ## Puts the knight where the story wants him: "fire" = sitting on the log by the fire, "door" = resting in front of the hut's door (the second morning on).
 func place_knight(where: String) -> void:
 	if knight_taken:
@@ -740,16 +765,19 @@ func apply_renewed() -> void:
 
 ## A story conversation started by a quest step (event `story:<id>`): the full dialogue `id` of data/dialogue.json; when it is closed its `take` {item, count} is taken out of her bag
 ## and its `flag` is set (this is what ends the step).
-func play_story_dialogue(player: Player, id: String) -> void:
+func play_story_dialogue(player: Player, id: String, anchor: Node2D = null) -> void:
 	if not player.is_multiplayer_authority():
 		return
 	var entry: Dictionary = DataRegistry.get_entry("dialogue", id)
-	for child: Node in player.get_children():
-		var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
+	if bool(entry.get("fullscreen", false)):
+		var box: DialogueBox = DialogueBox.find(player)
 		if box != null:
 			box.start(id)
 			await box.finished
-			break
+	else:
+		var runner: BubbleRunner = BubbleRunner.find(player)
+		if runner != null:
+			await runner.play(id, anchor)
 	var take: Dictionary = entry.get("take", {}) as Dictionary
 	if not take.is_empty():
 		player.inventory.remove_item(String(take.item), int(take.count))
@@ -825,8 +853,15 @@ func debug_jump_town(all_done: bool = false) -> void:
 	for quest_id: String in ["rebuild_hut", "town_start", "gustav_rescue", "town_workshop"]:
 		var until: String = "ws_pickaxe" if quest_id == "town_workshop" and not all_done else ""
 		_quest_to_step(saved, quest_id, until)
+	if all_done:
+		for quest_id: String in ["town_board", "torben_smithy"]:
+			if not DataRegistry.get_entry("quests", quest_id).is_empty():
+				_quest_to_step(saved, quest_id, "")
 	for flag: String in ["rebuild_done", "lumberjack_reported", "rebuild_delivered", "rebuild_wood_delivered", "hut_mushrooms_removed", "hut_tree_felled", "knows_gustav", "gustav_packed", "gustav_joined", "built_workshop", "workshop_done"]:
 		flags[flag] = true
+	if all_done:
+		for flag: String in ["crafted_pickaxe", "board_intro_done", "built_quest_board", "opened_quest_board", "tb_camp_reached", "tb_ambush_done", "tb_met", "built_smithy", "crafted_iron_ingot"]:
+			flags[flag] = true
 	player.quests.import_data(saved)
 	if not player.inventory.has_item("sickle_basic"):
 		player.inventory.give("sickle_basic", 1) ## Gustav's gift; the pickaxe is made at his bench
@@ -930,7 +965,7 @@ func resume_story(player: Player) -> void:
 		if next != "":
 			player.quests.start(next)
 	if player.quests != null: ## the town quests lead into each other; a migrated old save may stand between two (start() keeps existing progress)
-		for chained: String in ["town_start", "gustav_rescue"]:
+		for chained: String in ["town_start", "gustav_rescue", "town_workshop"]:
 			if player.quests.is_finished(chained):
 				var follow: String = String(DataRegistry.get_entry("quests", chained).get("next", ""))
 				if follow != "":
@@ -1001,6 +1036,11 @@ func start_ambush(player: Player) -> void:
 ## Scene initialization uses the same starting health on host and all peers.
 func starting_health_ratio() -> float:
 	return float(DataRegistry.get_entry("ground", "story_start").get("health_ratio", 0.1))
+
+
+func loading_step() -> bool:
+	_stream(false)
+	return _stream_settled
 
 
 func _spawn_position(index: int) -> Vector2:
@@ -1128,7 +1168,7 @@ func _stream(all: bool) -> void:
 			for dx: int in range(-radius, radius + 1):
 				var c: Vector2i = center + Vector2i(dx, dy)
 				wanted[c] = true ## (loaded ones too: the prune only looks at unloaded builds)
-				if _chunks.has(c) or c.x < 0 or c.y < 0 or c.x * CHUNK >= RegionMap.WORLD_TILES or c.y * CHUNK >= RegionMap.WORLD_TILES:
+				if _chunks.has(c) or (_pending_commit != null and _pending_commit.cell == c) or c.x < 0 or c.y < 0 or c.x * CHUNK >= RegionMap.WORLD_TILES or c.y * CHUNK >= RegionMap.WORLD_TILES:
 					continue
 				missing.append(Vector3i(dx * dx + dy * dy + penalty, c.x, c.y))
 				if not all and dx * dx + dy * dy + penalty < best_d:
@@ -1166,7 +1206,7 @@ func _stream(all: bool) -> void:
 							break
 					if has_ground_near: break
 				if has_ground_near: break
-			var is_teleport_dest: bool = (best_d == 0 and not has_ground_near)
+			var is_teleport_dest: bool = (best_d == 0 and not has_ground_near and not loading_in_steps)
 			var time_now: int = Time.get_ticks_usec()
 			if not all and time_now >= frame_deadline and not is_teleport_dest:
 				pass

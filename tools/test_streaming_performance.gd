@@ -38,6 +38,10 @@ func _run() -> void:
 	var world: WorldLevel = load("res://src/world/world_level.tscn").instantiate() as WorldLevel
 	add_child(world)
 	world.process_mode = Node.PROCESS_MODE_DISABLED
+	# _ready queues authored guards/props. Let those finish before measuring
+	# whether a detached chunk build adds anything to the live world.
+	await get_tree().process_frame
+	await get_tree().process_frame
 	var c: Vector2i = world._start / WorldLevel.CHUNK + Vector2i(2, 0)
 	var before_props: int = world._things.size()
 	var before_cells: int = world._ground.get_used_cells().size()

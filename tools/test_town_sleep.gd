@@ -66,10 +66,10 @@ func _run() -> void:
 	_check(interiors._cover <= 0.001, "the dark opened again (cover %f)" % interiors._cover)
 	_check(Interiors.slot_at(player.global_position) < 0, "she is outside again")
 	_check(not interiors._busy and not player.story_lock, "the door released her")
-	var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	_check(box != null and box.is_active(), "Valdric's talk starts only after the dark has opened")
-	if box != null and box.is_active():
-		box._end()
+	var bubbles: BubbleRunner = BubbleRunner.find(player)
+	_check(bubbles != null and bubbles.is_active(), "Valdric's talk starts only after the dark has opened")
+	if bubbles != null and bubbles.is_active():
+		bubbles.skip_all()
 		await _frames(10)
 	_check(not InputManager.ui_blocking and not get_tree().paused, "everything is released after the talk")
 	for layer: Node in get_tree().root.find_children("*", "CanvasLayer", true, false):

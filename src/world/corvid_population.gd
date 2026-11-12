@@ -61,7 +61,7 @@ func _populate(cell: Vector2i) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 6299))
 	var gloom: float = BiomeBlend.amount_at(Vector2(cell) * CHUNK_PIXELS + Vector2.ONE * CHUNK_PIXELS * 0.5) ## 0 on all old land: there the draws and numbers stay exactly as they were
-	for species: String in ["crow", "raven", "owl", "hoopoe"]:
+	for species: String in ["crow", "raven"]:
 		var spec: Dictionary = local_spec(species, gloom)
 		if rng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 			continue
@@ -113,6 +113,108 @@ func _populate(cell: Vector2i) -> void:
 					continue
 				bird._finish.rpc(perch["position"], perch["height"], perch["path"])
 			flock.append(bird)
+	_populate_owl(cell, gloom, flock)
+
+
+func _populate_owl(cell: Vector2i, gloom: float, flock: Array[WildCorvid]) -> void:
+	var owl_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	owl_rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 9187))
+	var spec: Dictionary = local_spec("owl", gloom)
+	if owl_rng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count("owl") >= int(spec.get("max_species_loaded", 2)):
+		return
+	var margin: float = float(spec["spawn_margin"])
+	var center: Vector2 = Vector2.ZERO
+	var found: bool = false
+	for attempt: int in int(spec["spawn_attempts"]):
+		var candidate: Vector2 = Vector2(cell) * CHUNK_PIXELS + Vector2(owl_rng.randf_range(margin, CHUNK_PIXELS - margin), owl_rng.randf_range(margin, CHUNK_PIXELS - margin))
+		if _floor(candidate, "owl") and _clear(candidate, 6.0) and _player_clear(candidate, float(spec["alert_range"])):
+			center = candidate
+			found = true
+			break
+	if not found:
+		return
+	var owl_scene: PackedScene = load(String(spec["scene"])) as PackedScene
+	var owl: WildCorvid = owl_scene.instantiate() as WildCorvid
+	_serial += 1
+	owl.name = "Corvid%d" % _serial
+	owl.species = "owl"
+	if gloom >= 0.45:
+		owl.appearance = 2 if owl_rng.randf() < 0.72 else 1
+	else:
+		owl.appearance = 0 if owl_rng.randf() < 0.65 else 1
+	owl.flock_id = "owl_%d_%d" % [cell.x, cell.y]
+	owl.home = center
+	owl.witch = gloom >= 0.45
+	owl.position = center
+	owl.facing = owl_rng.randf() * TAU
+	_birds.add_child(owl)
+	var perch: Dictionary = choose_perch(owl, Vector2.INF)
+	if perch.is_empty():
+		owl.queue_free()
+		return
+	owl._finish.rpc(perch["position"], perch["height"], perch["path"])
+	flock.append(owl)
+	if gloom < 0.35:
+		_populate_songbirds(cell, flock)
+
+
+func _populate_songbirds(cell: Vector2i, flock: Array[WildCorvid]) -> void:
+	var seeds: Dictionary = {"woodpecker": 11423, "jay": 13691, "robin": 15803}
+	for species: String in ["woodpecker", "jay", "robin"]:
+		var srng: RandomNumberGenerator = RandomNumberGenerator.new()
+		srng.seed = hash(Vector3i(cell.x, cell.y, _seed + int(seeds[species])))
+		var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
+		if srng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", 3)):
+			continue
+		var margin: float = float(spec["spawn_margin"])
+		var center: Vector2 = Vector2.ZERO
+		var found: bool = false
+		for attempt: int in int(spec["spawn_attempts"]):
+			var candidate: Vector2 = Vector2(cell) * CHUNK_PIXELS + Vector2(srng.randf_range(margin, CHUNK_PIXELS - margin), srng.randf_range(margin, CHUNK_PIXELS - margin))
+			if not _floor(candidate, species) or not _clear(candidate, 5.0) or not _player_clear(candidate, float(spec["alert_range"])):
+				continue
+			if species in ["woodpecker", "jay"] and not _near_tree(candidate, 165.0):
+				continue
+			center = candidate
+			found = true
+			break
+		if not found:
+			continue
+		var count: int = srng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
+		var flock_key: String = "%s_%d_%d" % [species, cell.x, cell.y]
+		var scene: PackedScene = load(String(spec["scene"])) as PackedScene
+		for i: int in count:
+			if _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", 3)):
+				break
+			var point: Vector2 = center if i == 0 else (center + Vector2.from_angle(srng.randf() * TAU) * srng.randf_range(16.0, float(spec["group_radius"])))
+			if i > 0 and (not _floor(point, species) or not _clear(point, 5.0) or not _player_clear(point, float(spec["alert_range"]))):
+				continue
+			var bird: WildCorvid = scene.instantiate() as WildCorvid
+			_serial += 1
+			bird.name = "Corvid%d" % _serial
+			bird.species = species
+			bird.appearance = srng.randi_range(0, int(spec.get("builds", 3)) - 1)
+			bird.flock_id = flock_key
+			bird.home = center
+			bird.position = point
+			bird.facing = srng.randf() * TAU
+			_birds.add_child(bird)
+			if bool(spec.get("requires_perch", false)):
+				var perch: Dictionary = choose_perch(bird, Vector2.INF)
+				if perch.is_empty():
+					bird.queue_free()
+					continue
+				bird._finish.rpc(perch["position"], perch["height"], perch["path"])
+			flock.append(bird)
+
+
+func _near_tree(point: Vector2, radius: float) -> bool:
+	var r2: float = radius * radius
+	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+		var tree: FirTree = node as FirTree
+		if tree != null and not tree.is_depleted() and tree.kind != "bone_tree" and tree.global_position.distance_squared_to(point) <= r2:
+			return true
+	return false
 
 
 ## The species' numbers for a chunk with `gloom` (BiomeBlend): a `witch_forest` block in data/wildlife.json raises the chunk chance
@@ -248,7 +350,7 @@ func can_land(point: Vector2, bird: WildCorvid) -> bool:
 		return false
 	for node: Node in _birds.get_children():
 		var other: WildCorvid = node as WildCorvid
-		if other != bird and other.state != WildCorvid.State.FLY and other._height < 1.0 and other.global_position.distance_to(point) < float(bird._spec["personal_space"]):
+		if other != null and other != bird and other.state != WildCorvid.State.FLY and other._height < 1.0 and other.global_position.distance_to(point) < float(bird._spec["personal_space"]):
 			return false
 	return true
 
@@ -259,6 +361,8 @@ func can_land_companion(point: Vector2, bird: WildCorvid) -> bool:
 
 
 func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
+	if bird.species == "woodpecker":
+		return choose_trunk_perch(bird, danger)
 	var best: Dictionary = {}
 	var score: float = INF
 	if not danger.is_finite() and not bird._rest_time():
@@ -306,6 +410,43 @@ func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 			if value < score:
 				score = value
 				best = {"position": seat.position, "height": seat.height, "path": String(tree.get_path()), "claim": key}
+	if not best.is_empty():
+		_claims[String(best["claim"])] = bird
+	return best
+
+
+## Woodpeckers cling directly to visible tree trunks (below the dense fir crown) or forage along fallen trunks.
+func choose_trunk_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
+	var best: Dictionary = {}
+	var score: float = INF
+	if not danger.is_finite() and not bird._rest_time():
+		for log_node: FallenLog in get_tree().get_nodes_in_group("fallen_logs"):
+			var d_log: float = bird.global_position.distance_to(log_node.perch_point)
+			var log_key: String = "%s:log" % log_node.get_path()
+			var log_owner: Variant = _claims.get(log_key)
+			if d_log < 190.0 and d_log > 16.0 and (not is_instance_valid(log_owner) or log_owner == bird):
+				var v_log: float = d_log + 24.0
+				if v_log < score:
+					score = v_log
+					best = {"position": log_node.perch_point, "height": log_node.perch_height, "path": String(log_node.get_path()), "claim": log_key}
+	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+		var tree: FirTree = node as FirTree
+		if tree == null or tree.is_depleted() or tree._falling or tree.kind == "bone_tree":
+			continue
+		var d: float = tree.global_position.distance_to(bird.global_position)
+		if d > 310.0 or (not bird._perch_path.is_empty() and String(tree.get_path()) == bird._perch_path) or (danger.is_finite() and tree.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):
+			continue
+		var trunk_key: String = "%s:trunk" % tree.get_path()
+		var owner: Variant = _claims.get(trunk_key)
+		if is_instance_valid(owner) and owner != bird:
+			continue
+		var side: float = -3.5 if bird.global_position.x <= tree.global_position.x else 3.5
+		var base_h: float = 20.0 if bird._rest_time() else (9.0 if tree.variant == 0 else 11.0)
+		var seat_pos: Vector2 = tree.global_position + Vector2(side, 2.0)
+		var val: float = d + seat_pos.distance_to(bird.home) * 0.18
+		if val < score:
+			score = val
+			best = {"position": seat_pos, "height": base_h, "path": String(tree.get_path()), "claim": trunk_key}
 	if not best.is_empty():
 		_claims[String(best["claim"])] = bird
 	return best
@@ -437,7 +578,14 @@ func _maintain() -> void:
 		for id: String in eligible:
 			var candidates: Array = eligible[id]
 			var turn: int = int(_watch_turns.get(id, 0))
-			var watchman: WildCorvid = candidates[turn % candidates.size()] as WildCorvid
+			var watchman: WildCorvid = null
+			for candidate: Variant in candidates:
+				var perched: WildCorvid = candidate as WildCorvid
+				if perched != null and (not perched._perch_path.is_empty() or perched._height > 8.0):
+					watchman = perched
+					break
+			if watchman == null:
+				watchman = candidates[turn % candidates.size()] as WildCorvid
 			watchman._set_mood(WildCorvid.State.WATCH, watchman._range("watch_seconds"))
 			_watch_turns[id] = turn + 1
 		if flock.is_empty() and not _active.has(home_cell):

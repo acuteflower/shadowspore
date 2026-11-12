@@ -104,12 +104,9 @@ func _search(player: Player) -> void:
 	InputManager.ui_blocking = true
 	player.facing = (global_position - player.global_position).normalized()
 	await get_tree().create_timer(0.4, true, false, true).timeout
-	for child: Node in player.get_children():
-		var box: DialogueBox = child.get_node_or_null("DialogueBox") as DialogueBox
-		if box != null:
-			box.start("lumberjack_found")
-			await box.finished
-			break
+	var runner: BubbleRunner = BubbleRunner.find(player)
+	if runner != null:
+		await runner.play("lumberjack_found", player)
 	_take_axe(player)
 	player.story_lock = false
 	InputManager.ui_blocking = false

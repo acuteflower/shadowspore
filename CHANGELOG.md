@@ -4,6 +4,88 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.8.3 Beta] – 2026-11-13
+### 🏜️ Die Singenden Dünen & das Herz der Stadt: Quarzwüste, Brunnenplatz, Stadtbau 2.0 & neue Prüfungen
+
+![Neue Wüsten- und Oasenflora bei Tag und Nacht](docs/img/desert_flora.png)
+
+> *Weit hinter der nördlichen Küstenwiese trocknet das Grün zu goldener Strohsteppe, reißt in warmen Ockerlehm auf und öffnet sich in die endlosen Golddünen der Quarzwüste – durchzogen von leuchtenden Kristalladern und verborgenen türkisklaren Oasen. Zurück in der Heimat fällt der erste Grundstein auf den Dorfplatz, Wasser plätschert im neuen Brunnen, und unter alten Wurzeln wie im Spiegel der Sterne erwachen zwei neue Prüfungen der Wächterin.*
+
+---
+
+> [!IMPORTANT]
+> **Ein gewaltiges Welt- & Stadt-Update!** V0.8.3 erschließt mit der **Quarzwüste** das größte neue Biom seit dem Hexenwald (samt **4 Quarzoasen**, **13 neuen Wüstenpflanzen & Felsen** sowie **11 frischen Items**), baut den **Stadtbau** komplett zum interaktiven Bauplan-Erlebnis um, macht den **Brunnenplatz** zum neuen Herzen jeder Stadtgründung und bringt **Wurzelgeflecht** & **Sternenspiegel** in die Rätselwelt!
+
+---
+
+### 🏜️ 1. Neues Biom: Die Quarzwüste („Sonnenquarz-Öde“) (`🟣 NEU`)
+
+Im hohen Norden der Welt (`165.784` Tiles – über **4× so groß wie der Hexenwald**) erstreckt sich ein völlig neues Expeditionsgebiet mit nahtloser Landanbindung:
+
+* **Organischer `96`-Tile-Klimaübergang:** Die Wiese wandelt sich allmählich über goldene **Sonnenstroh-Steppe** und rissigen **Ockerlehm mit Sandzungen** bis hin zu windgeriffelten **Gold- und Bernsteindünen**.
+* **Sinterquarz & schnelleres Vorankommen:** Seltene, strahlend weiße **Quarz-Ausbisse** (~`3,6 %` der Fläche) schimmern Tag und Nacht mit scharfen Kristallfacetten. Wer über glatten Quarz läuft, bewegt sich spürbar schneller (`1,04×` Tempo) als im weichen Dünensand (`0,94×` Tempo), während der Passatwind feine Sandfahnen über die Dünen treibt.
+* **Quarz-Sandstein-Klippen & 4 Quarzoasen:** Geschichtete Sandstein-Tafelberge mit kristallinen Adern ragen aus den Dünen; im Herzen der Wüste warten **vier variable Quarzoasen** mit grünem Ufersaum, klarem Türkiswasser, Sonnenpalmen und abbaubaren **Sonnenquarz-Felsen**.
+
+<details>
+<summary><b>🌵 Alle 13 neuen Wüstenpflanzen, Oasen-Gewächse & 11 Items im Überblick</b></summary>
+
+* **Wüsten- & Klippenflora:** **Kronen-Säulenkaktus** (*Kronenfeige*, *Kaktusholz*, *Kaktusmark*), **Sonnenfeigen-Kaktus** (*Sonnenfeige*, *Kaktusmark*), **Sandigel** (*Kaktusmark*), **Wüstendorn**, **Steppenroller** (stäubt goldene Samen im Wind) & **Dünengras**.
+* **Quarz- & Dünen-Raritäten:** **Glasaloe** (*Quarzaloe* an Quarzrändern), **Königin der Nacht** (blüht **nur nachts** leuchtend weiß-violett → *Nachtkaktusblüte*) & **Sandknolle** (zweihändig aus dem Goldsand ziehen).
+* **Oasen-Flora & Bergbau:** **Sonnenpalme** (*Sonnendattel*, *Palmenholz*), **Quarzschilf**, **Quellblume** (*Quellblüte*) & abbaubare **Sonnenquarz-Felsen** (*Sonnenquarz* + *Stein*, wächst in 3 Tagen nach).
+
+</details>
+
+---
+
+### ⛲ 2. Der Brunnenplatz & Stadtbau 2.0: „Jeder Bau ist ein Ereignis“ (`🔵 REWORK` `🟣 NEU`)
+
+![Der neue Brunnenplatz als Herz jeder Stadt](assets/town/plaza_preview.png)
+
+* **Der Brunnenplatz gründet die Stadt (`🟣 NEU`):** Nach der Renovierung der Hütte ist das Land beansprucht – aber erst der **Brunnenplatz** gründet eure Stadt wirklich und dient als Voraussetzung für alle weiteren Bauwerke. Neue Trampelwege laufen zu seinem gepflasterten Rand, die Kartenflagge sitzt auf dem Brunnen, und bei Fertigstellung verkündet ein großes Banner die Stadtgründung!
+* **Neues Bauplan-Menü & Weltvorschau (`🔵 REWORK`):**
+  * Alle Bauwerke erscheinen als illustrierte **Bauplan-Karten** mit Live-Mini-Vorschau, Kosten-Chips, Licht- & Wert-Zugewinn. Gesperrte Gebäude sind als violette Bauplan-Silhouetten sichtbar, damit ihr immer seht, was als Nächstes wartet.
+  * In der Welt zeigt die Vorschau den **neuen goldenen Lichtkreis** sowie alle Büsche und Gräser im Räumungs-Radius mit weißen Ringen.
+* **Grundstein, Gerüst & „Anpacken“ (`🟣 NEU`):** Beim Platzieren fällt ein echter **Grundstein** mit Rune, Materialien fliegen ein, ein **Holzgerüst** wächst mit dem Fortschritt mit – und haltet ihr `E` (**„ANPACKEN“**), hilft Ellie aktiv mit **dreifachem Bautempo (`×3`)** und Funkenflug!
+* **Lichtweihe & Druckwelle (`🟣 NEU`):** Ist ein Bauwerk fertig, zerschlägt ein weiß-türkiser Lichtblitz das Gerüst, eine sichtbare **Druckwelle** fegt über die Wiese, Bäume schwanken mit Nadelregen, weiche Pflanzen im Radius werden entwurzelt und ihr Ertrag fliegt automatisch ins **Stadtlager**!
+* **Stadtbanner, Wappen & Stufen-Zeremonie (`🟣 NEU`):** Wählt im Stadt-Menü aus **8 Stadtfarben** und **12 Wappen-Glyphen**. Beim Betreten der Stadt oder bei einem Stufenaufstieg rollt ein im Wind wehendes Stoffbanner herab, während der Lichtrand pulsiert und jede neue Stadtstufe spürbar **mehr Lichtreichweite** schenkt (`+8 %` bis `+32 %`).
+
+---
+
+### 🧩 3. Zwei neue Prüfungen der Wächterin: Wurzelgeflecht & Sternenspiegel (`🟣 NEU`)
+
+Beide neuen Rätseltypen stehen ab sofort in je **drei Schwierigkeitsstufen** in der speziellen **Rätselwelt** zum Ausprobieren bereit:
+
+* **Das Wurzelgeflecht (*Keimling*, *Geflecht*, *Altes Geflecht*):** Löscht den schiefen **Herzwürfel**, um ein unterirdisches Geflecht aus leuchtenden Wurzeln und Steinwürfeln zu wecken! Jeder berührte Würfel kippt sich und seine verbundenen Nachbarn um – erschwert durch wachsende **Keimwürfel**, unantastbare **Dornwürfel** und **Einwegwurzeln**.
+* **Der Sternenspiegel (*Sichel*, *Rabe*, *Wächterin*):** Tragt leuchtende **Mondsteine** frei in alle acht Richtungen an das Ufer eines stillen Teiches und legt exakt das gespiegelte **Sternbild** aus dem Wasser nach – bei den höheren Teichen sogar gedreht über die Nacht und abhängig von **Voll- oder Neumond**!
+
+---
+
+### ✨ 4. Ladescreen-Update, Pixelgenaue Arm-Verdeckung & Feinschliff (`🔵 REWORK` `🟡 FIX`)
+
+* **Silhouetten-Ladescreen zur Wegstein-Wächterin (`🔵 REWORK`):** Statt vor der Spinne zu fliehen, schreiten Ellie und zwei zufällige Begleiter nun gemeinsam mit einem **Raben** und einem **türkisen Irrlicht** über einen schwebenden Felspfad. Am Ende des Ladens erscheint die **Wegstein-Wächterin** in heller Silhouette, ihre Lichtsäule erwacht und die Gruppe löst sich in aufsteigende Sternlichtfunken auf!
+* **Pixelgenaue 3D-Arm-Verdeckung (`🔵 REWORK`):** Ellies neuer 3D-Schwertarm verschwindet nun pixelgenau hinter ihrem silbernen Haar, Gesicht und Mantel, statt komplett vor oder hinter ihr umzuspringen.
+* **Questtafel-Story-Icons & Bugfixes (`🟣 NEU` `🟡 FIX`):** Die großen Story-Aushänge (Torben, Spiegelhexe, Mornath, Seehexe) tragen eigene **Siegel-Illustrationen**; im Quest-Fortschritt und beim Bauablauf für Torbens Schmiede wurden zudem Ablauf-Fehler behoben.
+
+---
+
+### ⚖️ Vorher → Nachher: Die wichtigsten Neuerungen im Überblick
+
+| Bereich | Vorher (V0.8.2 Beta) | Nachher (V0.8.3 Beta) |
+| :--- | :--- | :--- |
+| **Nordgrenze** | Offene Küste & Meer | **Quarzwüste** (`165.784` Tiles) mit `96`-Tile-Übergang, **4 Oasen** & **13 neuen Pflanzen/Felsen** |
+| **Stadtgründung** | Nach Hütten-Renovierung direkt gegründet | **Brunnenplatz** als Pflicht-Herzstück + eigene Wege & Gründungsbanner |
+| **Stadtbau** | Passives Warten am Seilrahmen | **Bauplan-Menü**, Grundstein, Gerüst, **`E` Anpacken (`3×`)**, **Druckwelle** mit Ernte & **8 Farben / 12 Wappen** |
+| **Welt-Rätsel** | Irrlichtspur, Hortkrähe, Rabenhandel | Zusätzlich **Wurzelgeflecht** & **Sternenspiegel** (je 3 Stufen in der Rätselwelt) |
+| **Ladescreen** | Flucht vor der Void-Spinne | Pilgerzug mit **Rabe & Irrlicht** zur erwachenden **Wegstein-Wächterin** |
+| **3D-Griff-System** | Arm wechselt als Ganzes vor/hinter Ellie | **Pixelgenaue Tiefen-Verdeckung** hinter Haar, Gesicht & Mantel |
+
+---
+
+> [!TIP]
+> **Ausblick auf die nächsten Ausbaustufen:** Die **Quarzwüste** wächst in kommenden Updates weiter! Geplant sind unter anderem **Sonnenhitze-Mechaniken**, magische **Quarzgewitter**, eigene Wüstentiere (*Fennek*, *Quarz-Eidechse*, *Gold-Skarabäus*) sowie mächtige **Quarz- und Steinkolosse** als neue Gegnerfamilie – und auch **Wurzelgeflecht** & **Sternenspiegel** ziehen bald in die reguläre Spielwelt ein.
+
+✦ ──────────────── ❖ ──────────────── ✦
+
 ## [V0.8.2 Beta] – 2026-11-12
 ### ⚔️ Klingen, Krähen & wilde Pfade: 3D-Waffenphysik, erste Welt-Rätsel, Schmied Torben & Hexenwald-Fauna
 

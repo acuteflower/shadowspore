@@ -5,11 +5,19 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.8.2 Beta – „Klingen, Krähen & wilde Pfade“
+## 🚀 Aktuelle Version: V0.8.3 Beta – „Die Singenden Dünen & das Herz der Stadt“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.8.2 Beta:
+### Highlights von V0.8.3 Beta:
+* **Neues Biom – Die Quarzwüste („Sonnenquarz-Öde“):** Über `165.000` Tiles im Norden mit `96`-Tile-Klimaübergang, flirrenden Golddünen, schnellen Sinterquarz-Adern (`1,04×` Tempo), geschichteten Sandstein-Klippen, **4 variablen Quarzoasen**, **13 neuen Pflanzen/Felsen** und **11 frischen Items**.
+* **Brunnenplatz & Stadtbau 2.0:** Erst der **Brunnenplatz** gründet die Stadt; das neue **Bauplan-Menü**, Grundsteinsetzung, mitwachsendes Gerüst, aktives **`E` Anpacken (`3×` Bautempo)**, eine erntende **Druckwelle** bei Fertigstellung sowie **8 Stadtfarben & 12 Wappen** machen jedes Bauwerk zum Ereignis.
+* **Zwei neue Prüfungen der Wächterin:** **Wurzelgeflecht** (kippende Runen-, Keim-, Dorn- & Einwegwürfel) und **Sternenspiegel** (Mondsteine frei tragen & Sternbilder am Teich spiegeln) stehen in je 3 Stufen in der Rätselwelt bereit.
+* **Ladescreen-Pilgerzug & pixelgenaue Arm-Verdeckung:** Ellie, Begleiter, Rabe und Irrlicht schreiten nun zur erwachenden **Wegstein-Wächterin**, und Ellies 3D-Schwertarm verschwindet pixelgenau hinter Haar, Gesicht und Mantel.
+
+---
+
+### Vorherige Highlights (V0.8.2 Beta – „Klingen, Krähen & wilde Pfade“):
 * **3D-Griff-System & echte Waffenphysik:** Ellies rechte Hand und alle Waffen/Werkzeuge bewegen sich jetzt im echten 3D-Raum – mit 2-Knochen-Arm im Pixel-Art-Stil, spürbarer Feder-Trägheit, eigenen Trage-/Bereit-/Sprint-Haltungen (Spitzhacke & Hacke über der Schulter) und X-förmigen Schwungbögen.
 * **Die ersten Welt-Rätsel:** Entdeckt die scheue **Irrlichtspur** nördlich der Hütte, folgt der beringten **Hortkrähe** östlich vom Fluss zu ihrem Erdversteck und tauscht mit dem alten **Raben am Westhang** Glänzendes gegen seine vergrabene Mondsiegeltruhe.
 * **Schmied Torben & Questtafel-Fortschritt:** Nach dem Bau der **Questtafel** ruft euch eine neue Story-Quest in den Norden, wo ihr **Torben** gegen die Schatten helft, die **Schmiede** errichtet und ihn samt neuer Tagesaufträge ins Dorf holt.

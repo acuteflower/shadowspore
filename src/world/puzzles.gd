@@ -1,17 +1,18 @@
 class_name Puzzles
 extends Node2D
-## The trials of the Wächterin in the world (docs/raetsel_konzept.md). Built: the wisp trail (`WispTrail`) and the crow's hoard (`CrowHoard`), both
+## The trials of the Wächterin in the world (docs/raetsel_konzept.md). Built: the wisp trail (`WispTrail`), the crow's hoard (`CrowHoard`) the root weave (`RootWeave`) and the star mirror (`StarMirror`), all
 ## `WorldTrial`s. Every trial of `data/puzzles.json` `placed` is built on every peer the same way; the host runs them and decides when one is solved
 ## (`_host_solved`): then every peer marks it (`_rpc_solved`) and the reward chest comes where the trial ended (`LootChests.appear`, id `trial_<id>`,
 ## out of the light or out of the earth, `WorldTrial.reward_rise`; saved like any chest that stands in the world). Solved trials stay solved, a trial
 ## may keep progress of its own (`export_progress`); save key `"puzzles"`, a joining peer gets the list (`_rpc_snapshot`). Dev: `debug_reset(id)`,
 ## `trial_spot(id)` for the teleport (ENTWICKLER -> IRRLICHT / HORTKRÄHE).
 
-const KINDS: Dictionary = {"wisp": "wisp", "crow_hoard": "crow", "raven_trade": "raven"} ## kind -> tuning block of data/puzzles.json
+const KINDS: Dictionary = {"wisp": "wisp", "crow_hoard": "crow", "raven_trade": "raven", "root_weave": "weave", "star_mirror": "stars"} ## kind -> tuning block of data/puzzles.json
 
 var _trials: Dictionary = {} ## id -> WorldTrial
 var _specs: Dictionary = {} ## id -> entry of data/puzzles.json
 var _solved: Dictionary = {} ## id -> true
+var source: String = "placed" ## which list of data/puzzles.json to build: "placed" (the world) or "trial_world" (the flat test world); set before it enters the tree
 
 
 static func of(tree: SceneTree) -> Puzzles:
@@ -22,7 +23,7 @@ func _ready() -> void:
 	add_to_group("puzzles")
 	y_sort_enabled = true
 	var table: Dictionary = DataRegistry.table("puzzles")
-	for entry: Dictionary in table.get("placed", []) as Array:
+	for entry: Dictionary in table.get(source, []) as Array:
 		var trial_id: String = String(entry.get("id", ""))
 		var kind: String = String(entry.get("kind", ""))
 		if trial_id == "" or _trials.has(trial_id) or not KINDS.has(kind):
@@ -33,6 +34,10 @@ func _ready() -> void:
 				node = WispTrail.new()
 			"crow_hoard", "raven_trade":
 				node = CrowHoard.new()
+			"root_weave":
+				node = RootWeave.new()
+			"star_mirror":
+				node = StarMirror.new()
 		node.name = "Trial_" + trial_id
 		node.setup(entry, table.get(String(KINDS[kind]), {}) as Dictionary)
 		node.solved.connect(_on_trial_solved)
@@ -53,10 +58,18 @@ static func clear_spots() -> Array:
 				var route: Array = entry.get("route", []) as Array
 				if not route.is_empty():
 					keep = [[route[0], 2], [route[route.size() - 1], 3]]
+					for k: int in range(1, route.size() - 1): ## where it hovers stays free of trunks and bushes
+						keep.append([route[k], 1])
 			"crow_hoard", "raven_trade":
 				keep = [[entry.get("tile", [0, 0]), 2], [entry.get("mound", [0, 0]), 2]]
 				for st: Variant in entry.get("stations", []) as Array:
 					keep.append([st, 1])
+			"root_weave":
+				keep = [[entry.get("tile", [0, 0]), 14]]
+			"star_mirror":
+				var fo: Array = entry.get("field", [0, 9]) as Array
+				var tl: Array = entry.get("tile", [0, 0]) as Array
+				keep = [[tl, 7], [[float(tl[0]) + float(fo[0]), float(tl[1]) + float(fo[1])], 8]]
 		for k: Array in keep:
 			var t: Array = k[0] as Array
 			out.append([Vector2(float(t[0]), float(t[1])) * 16.0 + Vector2(8, 8), int(k[1])])

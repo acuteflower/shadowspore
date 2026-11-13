@@ -110,5 +110,32 @@
 				0
 			]
 		}
+	},
+	"quartz_desert": {
+		"name": "Sonnenquarz-Öde",
+		"tier": 7,
+		"mood": "heiß, weit, Sand und singender Quarz",
+		"color": "#d9a45b",
+		"bare": true,
+		"arid": 1.0,
+		"fade": 96.0,
+		"ground": {
+			"kinds": [
+				"plain",
+				"tuft"
+			],
+			"chance": 0.08
+		},
+		"relief": {
+			"gain": 1.25,
+			"bias": -0.04,
+			"styles": [
+				0,
+				0,
+				0,
+				0,
+				0
+			]
+		}
 	}
 }

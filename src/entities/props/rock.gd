@@ -41,7 +41,8 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 	_sync_glow(true)
 	var lights: Array = _spec.get("light", [])
 	var energy: float = float(lights[variant]) if variant < lights.size() else 0.0
-	_set_light(energy > 0.0 and stage < 3, LIGHT_COLOR, int(_radius * 0.9), energy)
+	var light_col: Color = Color(String(_spec.get("light_color", ""))) if _spec.has("light_color") else LIGHT_COLOR
+	_set_light(energy > 0.0 and stage < 3, light_col, int(_radius * 0.9), energy)
 	_body_shape.set_deferred("disabled", stage == 3) ## rubble can be walked over
 	_hurtbox.set_deferred("monitorable", stage != 3)
 	match fx:

@@ -1,0 +1,63 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/world/trial_level.gd" id="1_script"]
+[ext_resource type="TileSet" path="res://src/world/tileset.tres" id="2_tileset"]
+[ext_resource type="Shader" path="res://assets/shaders/ground_tone.gdshader" id="4_ground"]
+[ext_resource type="Script" path="res://src/world/day_night.gd" id="5_daynight"]
+[ext_resource type="Script" path="res://src/fx/fireflies.gd" id="8_fireflies"]
+[ext_resource type="TileSet" path="res://src/world/glow_tileset.tres" id="6_glowtiles"]
+[ext_resource type="Shader" path="res://assets/shaders/glow_layer.gdshader" id="7_glow"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+shader = ExtResource("7_glow")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ground"]
+shader = ExtResource("4_ground")
+
+[node name="TrialLevel" type="Node2D"]
+y_sort_enabled = true
+script = ExtResource("1_script")
+
+[node name="DayNight" type="CanvasModulate" parent="."]
+script = ExtResource("5_daynight")
+
+[node name="Ground" type="TileMapLayer" parent="."]
+z_index = -10
+material = SubResource("ShaderMaterial_ground")
+tile_set = ExtResource("2_tileset")
+
+[node name="Glow" type="TileMapLayer" parent="."]
+z_index = -9
+material = SubResource("ShaderMaterial_glow")
+tile_set = ExtResource("6_glowtiles")
+
+[node name="Fireflies" type="Node2D" parent="."]
+script = ExtResource("8_fireflies")
+
+[node name="Enemies" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/entities/enemies/shadow_spider.tscn", "res://src/entities/enemies/void_listener.tscn", "res://src/entities/enemies/void_crusher.tscn", "res://src/entities/enemies/light_fisher.tscn")
+spawn_path = NodePath("../Enemies")
+
+[node name="EnemyProjectiles" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/entities/enemies/resonance_wave.tscn")
+spawn_path = NodePath("../EnemyProjectiles")
+
+[node name="Drops" type="Node2D" parent="." groups=["drops"]]
+y_sort_enabled = true
+
+[node name="DropSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/entities/drops/item_drop.tscn")
+spawn_path = NodePath("../Drops")
+
+[node name="Players" type="Node2D" parent="."]
+y_sort_enabled = true
+
+[node name="MultiplayerSpawner" type="MultiplayerSpawner" parent="."]
+_spawnable_scenes = PackedStringArray("res://src/entities/player/player.tscn")
+spawn_path = NodePath("../Players")

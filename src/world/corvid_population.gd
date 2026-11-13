@@ -212,7 +212,7 @@ func _near_tree(point: Vector2, radius: float) -> bool:
 	var r2: float = radius * radius
 	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
 		var tree: FirTree = node as FirTree
-		if tree != null and not tree.is_depleted() and tree.kind != "bone_tree" and tree.global_position.distance_squared_to(point) <= r2:
+		if tree != null and not tree.is_depleted() and not tree.kind in ["bone_tree", "crown_cactus", "sun_palm"] and BiomeBlend.arid_at(tree.global_position) < 0.22 and tree.global_position.distance_squared_to(point) <= r2:
 			return true
 	return false
 
@@ -395,7 +395,7 @@ func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 		return best
 	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
 		var tree: FirTree = node as FirTree
-		if tree == null or tree.is_depleted() or tree._falling:
+		if tree == null or tree.is_depleted() or tree._falling or tree.kind in ["bone_tree", "crown_cactus", "sun_palm"] or BiomeBlend.arid_at(tree.global_position) >= 0.22:
 			continue
 		var distance: float = tree.global_position.distance_to(bird.global_position)
 		if distance > 340.0 or (danger.is_finite() and tree.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):
@@ -431,7 +431,7 @@ func choose_trunk_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 					best = {"position": log_node.perch_point, "height": log_node.perch_height, "path": String(log_node.get_path()), "claim": log_key}
 	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
 		var tree: FirTree = node as FirTree
-		if tree == null or tree.is_depleted() or tree._falling or tree.kind == "bone_tree":
+		if tree == null or tree.is_depleted() or tree._falling or tree.kind == "bone_tree" or tree.kind == "crown_cactus" or tree.kind == "sun_palm":
 			continue
 		var d: float = tree.global_position.distance_to(bird.global_position)
 		if d > 310.0 or (not bird._perch_path.is_empty() and String(tree.get_path()) == bird._perch_path) or (danger.is_finite() and tree.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):
@@ -457,6 +457,8 @@ func choose_trunk_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 func _slot_count(tree: FirTree) -> int:
 	if tree.kind == "bone_tree":
 		return 2 + tree.variant
+	if tree.kind == "crown_cactus":
+		return 1 if tree.variant == 0 else 2
 	return 1 if tree.variant == 0 else 3
 
 

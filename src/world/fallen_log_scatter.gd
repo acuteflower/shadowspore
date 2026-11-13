@@ -12,7 +12,8 @@ static func candidate(world: Variant,c: Vector2i,index: int,obstacles: Array[Dic
 	var pos: Vector2 = Vector2(c*32)*16+Vector2(x*128+64,y*128+64)+Vector2(rng.randf_range(-20,20),rng.randf_range(-20,20)).round()
 	var tile: Vector2i = Vector2i(pos/16.0)
 	if not world._land_at(tile.x,tile.y): return {}
-	var bones: bool = world._generator.is_bare(tile) ## the Hexenwald: bleached Bleichbaum trunks (FallenLog frames 24-47)
+	if world._generator.is_desert_bare(tile): return {}
+	var bones: bool = world._generator.is_witch(tile) ## the Hexenwald: bleached Bleichbaum trunks (FallenLog frames 24-47)
 	var trees: int = _trees_near(pos, obstacles, grid)
 	var chance: float = float(DataRegistry.table("fallen_logs").get("chance",0.42))
 	chance *= 0.12 if trees == 0 else 1.0 + 0.15 * float(mini(trees, 4)) ## a trunk lies in or at a wood, rarely out in the open
@@ -29,7 +30,7 @@ static func candidate(world: Variant,c: Vector2i,index: int,obstacles: Array[Dic
 		var point: Vector2 = a.lerp(b,i/12.0)
 		var cell: Vector2i = Vector2i((point/16.0).floor())
 		if world._rivers != null and not world._rivers.clear_for_prop(point, 14.0): return {}
-		if not world._land_at(cell.x,cell.y) or not world._relief.flat_around(point,13.0) or world._generator.blocked_cells.has(cell) or world._stone_cells.has(cell) or world.edits.terrain.has(WorldEdits.key(cell)):
+		if not world._land_at(cell.x,cell.y) or not world._relief.flat_around(point,13.0) or world._generator.blocked_cells.has(cell) or world._stone_cells.has(cell) or world.edits.terrain.has(WorldEdits.key(cell)) or world._generator.is_desert_bare(cell):
 			return {}
 		for patch: Node in Terrain.patches:
 			if patch.call("surface_at",point) != "": return {}

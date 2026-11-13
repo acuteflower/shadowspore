@@ -32,6 +32,12 @@ func surface_at(world_pos: Vector2) -> String:
 		var stepped: String = relief.surface_at(world_pos)
 		if stepped != "":
 			surface = stepped
+	if surface == DEFAULT_SURFACE:
+		var arid: float = BiomeBlend.arid_at(world_pos)
+		if arid > 0.68:
+			surface = "quartz" if BiomeBlend.is_quartz_surface(world_pos) else "sand"
+		elif arid > 0.28:
+			surface = "steppe"
 	return surface
 
 

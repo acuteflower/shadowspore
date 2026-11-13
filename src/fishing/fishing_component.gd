@@ -731,7 +731,7 @@ func _ctx() -> Dictionary:
 ## Which fish comes next and when. `settle`: the float just splashed down, the fish first have to come back.
 func _pick_bite(fresh: bool, settle: bool = false) -> void:
 	var ctx: Dictionary = _ctx()
-	var weights: Dictionary = FishingRules.weights(ctx)
+	var weights: Dictionary = {} if BiomeBlend.arid_at(bobber) >= 0.35 else FishingRules.weights(ctx)
 	if not fresh and _bite_species != "" and weights.has(_bite_species):
 		return ## still interested
 	if _approaching: ## the shadow that was swimming in loses interest

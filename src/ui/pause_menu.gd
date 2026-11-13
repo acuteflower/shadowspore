@@ -248,6 +248,7 @@ func _build_items() -> void:
 				_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
 				_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
 				_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
+				_add(0, "button", "IN DIE QUARZWÜSTE", "", {"action": "quartz_desert"})
 				_add(0, "button", "ZUR SEEHEXE", "", {"action": "lake_witch"}) ## docs/seehexe_konzept.md: in front of her house at the Hexenwald lake
 				_add(0, "button", "SEEHEXE: QUEST STARTEN", "", {"action": "lake_witch_quest"}) ## the entry quest from the start, the ring asleep (host)
 				_add(0, "button", "SEEHEXE BEKANNT", "", {"action": "lake_witch_known"}) ## the ring awake, the quest done, the staff in the bag (host)
@@ -266,6 +267,16 @@ func _build_items() -> void:
 				_add(0, "button", "RABE: ZUM BAUM", "", {"action": "raven_go"}) ## to the raven's snag (docs/raetsel_konzept.md 4, rare)
 				_add(0, "button", "RABE ZURÜCKSETZEN", "", {"action": "raven_reset"})
 				_add(0, "button", "GLIMMER + STEIN FÜR DEN RABEN", "", {"action": "raven_kit"}) ## host: a pawn it likes and a plain stone it refuses
+				_add(0, "button", "WURZELGEFLECHT: ZUM HERZ", "", {"action": "weave_go"}) ## to the first root weave's heart (docs/raetsel_konzept.md 6a)
+				_add(0, "button", "WURZELGEFLECHT ZURÜCKSETZEN", "", {"action": "weave_reset"})
+				_add(0, "button", "STERNENSPIEGEL: ZUM TEICH", "", {"action": "stars_go"}) ## to the first star mirror's pond (docs/raetsel_konzept.md 6b)
+				_add(0, "button", "STERNENSPIEGEL ZURÜCKSETZEN", "", {"action": "stars_reset"})
+				_add(0, "button", "MOND: VOLL", "", {"action": "moon:4"}) ## host: tonight's moon (the star mirror reads it)
+				_add(0, "button", "MOND: NEU", "", {"action": "moon:0"})
+				if get_tree().get_first_node_in_group("sandbox") != null:
+					_add(0, "button", "ZURÜCK IN DIE WELT", "", {"action": "trials_leave"}) ## the save is loaded again
+				else:
+					_add(0, "button", "RÄTSELWELT BETRETEN", "", {"action": "trials_enter"}) ## the flat test world with every trial (unsaved progress here is lost)
 			if multiplayer.is_server():
 				var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
 				_add(0, "heading", "KARTE")
@@ -414,6 +425,8 @@ func _build_town_page() -> void:
 	var level: int = town.level()
 	var next_worth: float = TownRules.next_worth(level)
 	_add(0, "heading", town.town_name())
+	if not town.has_heart():
+		_add(0, "info", "NOCH NICHT GEGRÜNDET", "", {"text": "BAUE DEN BRUNNENPLATZ"})
 	_add(0, "info", "STUFE", "", {"text": town.level_label()})
 	_add(0, "info", "WERT", "", {"text": "%d / %d" % [int(town.worth()), int(next_worth)] if next_worth >= 0.0 else "%d" % int(town.worth())})
 	_add(0, "info", "EINWOHNER", "", {"text": str(town.population())})
@@ -433,6 +446,8 @@ func _build_town_page() -> void:
 	_add(0, "button", "BAUEN", "", {"action": "town_build"})
 	_add(0, "button", "ABREISSEN", "", {"action": "town_demolish"})
 	_add(0, "choice", "NAME", "town_name", {"text": town.town_name()})
+	_add(0, "choice", "FARBE", "town_color", {"text": TownEmblems.COLOR_NAMES[town.look_color]})
+	_add(0, "choice", "WAPPEN", "town_emblem", {"text": TownEmblems.NAMES[town.look_emblem]})
 	_add(1, "heading", "LAGER")
 	var shown: int = 0
 	for item: String in town.stock:
@@ -549,6 +564,10 @@ func _change(item: Dictionary, direction: int) -> void:
 			var town: TownManager = _town()
 			if key == "town_name" and town != null and direction != 0:
 				town.request_name(posmod(town.name_index + direction, TownRules.town_names().size()))
+			elif key == "town_color" and town != null and direction != 0:
+				town.request_look(town.look_color + direction, town.look_emblem)
+			elif key == "town_emblem" and town != null and direction != 0:
+				town.request_look(town.look_color, town.look_emblem + direction)
 
 
 func _toggle(item: Dictionary) -> void:
@@ -870,9 +889,19 @@ func _run_action(action: String) -> void:
 			if _player is Player:
 				(_player as Player).request_teleport(Vector2(738, 936) * 16.0 + Vector2(8, 40))
 				_set_open(false)
-		"wisp_go", "wisp_reset", "crow_go", "crow_reset", "crow_kit", "raven_go", "raven_reset", "raven_kit": ## the trials (docs/raetsel_konzept.md)
+		"trials_enter", "trials_leave": ## the trials' test world (TrialLevel) and back
+			_set_open(false)
+			GameLauncher.launch(get_tree(), {"mode": "new", "world": "trials"} if action == "trials_enter" else {"mode": "continue"})
+		"moon:4", "moon:0": ## dev, host: the day moves on to the next one with that moon (the clock keeps its time)
+			if not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			var want: int = int(action.get_slice(":", 1))
+			TimeManager.day += posmod(want - posmod(TimeManager.day, 8), 8)
+			_set_open(false)
+		"wisp_go", "wisp_reset", "crow_go", "crow_reset", "crow_kit", "raven_go", "raven_reset", "raven_kit", "weave_go", "weave_reset", "stars_go", "stars_reset": ## the trials (docs/raetsel_konzept.md)
 			var trials: Puzzles = Puzzles.of(get_tree())
-			var kinds: Dictionary = {"wisp": "wisp", "crow": "crow_hoard", "raven": "raven_trade"}
+			var kinds: Dictionary = {"wisp": "wisp", "crow": "crow_hoard", "raven": "raven_trade", "weave": "root_weave", "stars": "star_mirror"}
 			var first: String = "" if trials == null else trials.first_of(String(kinds[action.get_slice("_", 0)]))
 			if first == "" or not (_player is Player):
 				_failed_flash = 2.5
@@ -896,6 +925,10 @@ func _run_action(action: String) -> void:
 		"hexenwald": ## into the middle of the Hexenwald
 			if _player is Player:
 				(_player as Player).request_teleport(Vector2(826, 880) * 16.0)
+				_set_open(false)
+		"quartz_desert": ## into the heart of the Sonnenquarz-Öde
+			if _player is Player:
+				(_player as Player).request_teleport(Vector2(842, 185) * 16.0)
 				_set_open(false)
 		"map_reveal_all", "map_reset": ## dev, host only: the whole map seen / the fog from before it back (kept in the save)
 			var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
@@ -1426,6 +1459,15 @@ func _draw_row(item: Dictionary, p: float, void_level: float) -> void:
 			var on: String = "AN" if bool(GameSettings.get_value(String(item["key"]))) else "AUS"
 			_text(on, Vector2(control_x + 16.0, rect.position.y + 5.0), UiStyle.TEXT if bool(GameSettings.get_value(String(item["key"]))) else UiStyle.TEXT_DIM, p)
 		"choice":
+			var town_now: TownManager = _town() if String(item["key"]).begins_with("town_") else null
+			if town_now != null and String(item["key"]) == "town_color":
+				draw_rect(Rect2(control_x - 1.0, rect.position.y + 3.0, 12.0, 10.0), Color(TownEmblems.INK, p))
+				draw_rect(Rect2(control_x, rect.position.y + 4.0, 10.0, 8.0), Color(TownEmblems.color(town_now.look_color), p))
+				draw_rect(Rect2(control_x + 1.0, rect.position.y + 4.0, 1.0, 8.0), Color(TownEmblems.GOLD, p))
+				control_x += 16.0
+			elif town_now != null and String(item["key"]) == "town_emblem":
+				TownEmblems.draw(self, town_now.look_emblem, Vector2(control_x, rect.position.y + 2.0), 1.0, p)
+				control_x += 16.0
 			_text(String(item["text"]), Vector2(control_x, rect.position.y + 5.0), UiStyle.TEXT_DIM, p)
 		"field":
 			var box: Rect2 = Rect2(control_x, rect.position.y + 2.0, 112.0, 13.0)

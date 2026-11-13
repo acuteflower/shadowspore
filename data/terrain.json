@@ -114,5 +114,36 @@
 		},
 		"sound": "mud",
 		"sound_gain": -4.0
+	},
+	"steppe": {
+		"speed": 1.0,
+		"step": {
+			"kind": "puff",
+			"color": "#d8be7e",
+			"amount": 2
+		},
+		"sound": "grass"
+	},
+	"sand": {
+		"speed": 0.94,
+		"step": {
+			"kind": "puff",
+			"color": "#e2b26e",
+			"amount": 4
+		},
+		"footprint": {
+			"color": "#744943",
+			"seconds": 9
+		},
+		"sound": "slope"
+	},
+	"quartz": {
+		"speed": 1.04,
+		"step": {
+			"kind": "puff",
+			"color": "#e5e3f8",
+			"amount": 2
+		},
+		"sound": "stone"
 	}
 }

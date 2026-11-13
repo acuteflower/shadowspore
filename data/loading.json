@@ -1,50 +1,88 @@
 {
-    "walk_speed":  46.0,
-    "sprint_speed":  210.0,
-    "spider_speed":  330.0,
-    "cast":  [
-                 {
-                     "id":  "ellie",
-                     "sheet":  "res://assets/characters/player.png",
-                     "frame":  [
-                                   48,
-                                   56
-                               ],
-                     "feet":  [
-                                  24,
-                                  51
-                              ],
-                     "walk":  [
-                                  0,
-                                  6
-                              ],
-                     "run":  [
-                                 6,
-                                 6
-                             ],
-                     "walk_stride":  4.77,
-                     "run_stride":  8.27
-                 },
-                 {
-                     "id":  "adventurer",
-                     "sheet":  "res://assets/characters/adventurer.png",
-                     "rig":  "adventurer_rig",
-                     "walk_stride":  5.0,
-                     "run_stride":  8.0
-                 },
-                 {
-                     "id":  "gustav",
-                     "sheet":  "res://assets/characters/gustav.png",
-                     "rig":  "gustav_rig",
-                     "walk_stride":  5.0,
-                     "run_stride":  8.5
-                 },
-                 {
-                     "id":  "torben",
-                     "sheet":  "res://assets/characters/torben.png",
-                     "rig":  "torben_rig",
-                     "walk_stride":  6.5,
-                     "run_stride":  10.0
-                 }
-             ]
+	"walk_speed": 36.0,
+	"approach_speed": 104.0,
+	"cast_sheet": "res://assets/ui/loading_cast.png",
+	"cell": [64, 64],
+	"feet": [32, 61],
+	"cols": 12,
+	"rows": 5,
+	"cast": [
+		{
+			"id": "ellie",
+			"row": 0,
+			"count": 6,
+			"walk_stride": 4.6
+		},
+		{
+			"id": "adventurer",
+			"row": 1,
+			"count": 8,
+			"walk_stride": 4.9
+		},
+		{
+			"id": "gustav",
+			"row": 2,
+			"count": 6,
+			"walk_stride": 4.7
+		},
+		{
+			"id": "torben",
+			"row": 3,
+			"count": 8,
+			"walk_stride": 5.3
+		}
+	],
+	"bird": {
+		"row": 4,
+		"flap": [0, 8],
+		"glide": [8, 4],
+		"flap_fps": 8.2,
+		"center": [32, 32]
+	},
+	"scenery": [
+		{
+			"id": "voidbloom",
+			"sheet": "res://assets/props/voidbloom.png",
+			"glow": "res://assets/props/voidbloom_glow.png",
+			"hframes": 5,
+			"vframes": 2,
+			"feet": [20, 31],
+			"glow_tint": "#f0b8ff",
+			"glow_amount": 0.85,
+			"sway": 1.0
+		},
+		{
+			"id": "moonbell",
+			"sheet": "res://assets/props/moonbell.png",
+			"glow": "res://assets/props/moonbell_glow.png",
+			"hframes": 5,
+			"vframes": 2,
+			"feet": [20, 31],
+			"glow_tint": "#78f4e6",
+			"glow_amount": 0.9,
+			"sway": 1.0
+		},
+		{
+			"id": "glowfern",
+			"sheet": "res://assets/props/glowfern.png",
+			"glow": "res://assets/props/glowfern_glow.png",
+			"hframes": 5,
+			"vframes": 2,
+			"feet": [20, 30],
+			"glow_tint": "#9efaf0",
+			"glow_amount": 0.75,
+			"sway": 1.0
+		},
+		{
+			"id": "crystal",
+			"sheet": "res://assets/props/waystone/crystals_wild.png",
+			"glow": "res://assets/props/waystone/crystals_lit.png",
+			"hframes": 10,
+			"vframes": 1,
+			"feet": [14, 24],
+			"glow_tint": "#78f4e6",
+			"glow_amount": 0.65,
+			"sway": 0.0
+		}
+	]
 }

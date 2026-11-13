@@ -25,7 +25,7 @@ void vertex() {
 	VERTEX += round((wind+contact)*rooted);
 }
 void fragment() {
-	vec2 uv = vec2((UV.x+floor(detail.r*30.+.5))/30.,1.-UV.y); // 30 = MeadowDetails.COUNT // flip back (see vertex)
+	vec2 uv = vec2((UV.x+floor(detail.r*34.+.5))/34.,1.-UV.y); // 34 = MeadowDetails.COUNT // flip back (see vertex)
 	COLOR = tint*texture(TEXTURE,uv);
 	COLOR.rgb = day_grade(COLOR.rgb, daylight_position, 0.7);
 }

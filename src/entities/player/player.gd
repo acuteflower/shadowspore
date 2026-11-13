@@ -71,6 +71,11 @@ const FAINT_SHEET: Texture2D = preload("res://assets/characters/player_faint.png
 const SIT_SHEET: Texture2D = preload("res://assets/characters/player_sit.png") ## tools/art_hero_sit.py: she sits down by the fire
 const SIT_BLOOD: Texture2D = preload("res://assets/characters/player_sit_blood.png")
 const WARDROBE_SHEET: Texture2D = preload("res://assets/characters/player_wardrobe.png") ## tools/art_hero_wardrobe.py: she shuts her wardrobe (north view), the opening of her room
+const CARRY_STONE_SHEET: Texture2D = preload("res://assets/characters/player_carry_stone.png") ## tools/art_hero_carry_stone.py: she carries a moonstone (8 facings: lift 0-7, walk 8-15)
+const CARRY_STONE_ID: int = 41 ## `_sheet` while she carries a stone
+const CARRY_SPEED: float = 0.62 ## of her walking speed while she carries a stone
+const CARRY_LIFT_FPS: float = 12.0
+const CARRY_WALK_FPS: float = 10.0
 const CARRY_SHEET: Texture2D = preload("res://assets/characters/player_carry.png") ## tools/art_hero_carry.py: she carries a board (side view, facing east)
 const FAINT_BLOOD: Texture2D = preload("res://assets/characters/player_faint_blood.png")
 const STUMBLE_SHEET: Texture2D = preload("res://assets/characters/player_stumble.png") ## tools/art_hero_stumble.py: 8 views, she trips and gets up
@@ -235,6 +240,10 @@ var _busy: bool = false ## synced by RPC: she is picking and stands still
 var _busy_time: float = 0.0
 var _sector: int = 2
 var sprinting: bool = false ## synced
+var carry_stone: int = 0 ## > 0 while she carries a moonstone of the star mirror (set on every peer by `StarMirror`: `start_carry` / `end_carry`)
+var _carry_anim: float = -1.0 ## seconds into lifting it (or setting it down); -1 = neither
+var _carry_dir: int = 1 ## 1 lifting, -1 setting down
+var _carry_walk: float = 0.0
 var swim: int = 0 ## synced: SwimRules.NONE / TREAD / BREAST / CRAWL (docs/schwimmen_konzept.md)
 var swimmer: SwimComponent
 const SWIM_SUBMERGE: float = 17.0 ## px of water over her body while swimming (stand-in until the swim sheet exists)
@@ -479,7 +488,7 @@ func _physics_process(delta: float) -> void:
 		_update_interact()
 	else:
 		position += velocity * delta ## remote player: the synchronizer sends at 20 Hz, so carry on with the synced velocity until the next packet
-	attack.visible = not down and intro == null and not fainting and not stumbling and not climb.active()
+	attack.visible = not down and intro == null and not fainting and not stumbling and not climb.active() and carry_stone == 0
 	_wound = move_toward(_wound, _wound_target(), delta * 0.5)
 	(_sprite.material as ShaderMaterial).set_shader_parameter("wound", _wound)
 	attack.wound = _wound
@@ -905,6 +914,9 @@ func _move(delta: float) -> void:
 			return
 		_finish_step() ## ... then, with a direction held, she runs straight on at the speed she had (the landing pose is skipped)
 		velocity = held.normalized() * maxf(_step_carry, max_speed * (WOUND_SPEED if wounded else 1.0))
+	if carry_stone != 0: ## a moonstone in her arms: slow, no sprint, no swing, no dodge (she sets it down with E)
+		_move_carrying(delta)
+		return
 	## Alt breaks everything she is doing (a swing in any phase, a charge, picking, eating, a gesture): a real dodge
 	if InputManager.shadow_step_pressed() and stepper.is_ready() and swim == 0 and not (fishing != null and fishing.locks_movement()) and bool(_surface.get("allow_blink", true)):
 		if _try_shadow_step(InputManager.move_vector()):
@@ -1032,6 +1044,72 @@ func _update_alt() -> void:
 
 
 ## Something owns her: a cutscene, an action, a fall (the rod cannot be cast then).
+## Owner: walking with a moonstone in both arms. While it is lifted or set down she stands still.
+func _move_carrying(delta: float) -> void:
+	sprinting = false
+	stealth.sneaking = false
+	var dir: Vector2 = InputManager.move_vector() if _carry_anim < 0.0 and not _busy else Vector2.ZERO
+	var speed: float = max_speed * CARRY_SPEED * float(_surface.get("speed", 1.0)) * _slow_factor() * (WOUND_SPEED if wounded else 1.0)
+	velocity = velocity.move_toward(dir * speed, acceleration * delta) if dir != Vector2.ZERO else velocity.move_toward(Vector2.ZERO, friction * 2.0 * delta)
+	move_and_slide()
+	if dir != Vector2.ZERO:
+		facing = dir.normalized()
+
+
+## Every peer (the star mirror calls it for the player who took a stone): she stoops and lifts it.
+func start_carry() -> void:
+	carry_stone = 1
+	_carry_anim = 0.0
+	_carry_dir = 1
+	_carry_walk = 0.0
+	sprinting = false
+
+
+## Every peer: she sets the stone down (the lift backwards), then the normal sheet comes back.
+func end_carry() -> void:
+	if carry_stone == 0:
+		return
+	_carry_anim = 0.0
+	_carry_dir = -1
+
+
+## Seconds the lift (or the set-down) takes.
+static func carry_lift_time() -> float:
+	return 8.0 / CARRY_LIFT_FPS
+
+
+func _animate_carry(delta: float) -> void:
+	if _sheet != CARRY_STONE_ID:
+		_sheet = CARRY_STONE_ID
+		(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", null)
+		_sprite.texture = CARRY_STONE_SHEET
+		_sprite.hframes = int(CARRY_STONE_SHEET.get_width() / 72.0)
+		_sprite.vframes = 8
+		_sprite.offset = Vector2(0.0, -13.0)
+		_sprite.flip_h = false
+		_sprite.position = Vector2.ZERO
+		_sprite.skew = 0.0
+	var sector: int = posmod(roundi(facing.angle() / (PI / 4.0)), 8)
+	var col: int = 7
+	if _carry_anim >= 0.0:
+		_carry_anim += delta
+		var k: int = clampi(int(_carry_anim * CARRY_LIFT_FPS), 0, 7)
+		col = k if _carry_dir > 0 else 7 - k
+		if _carry_anim >= carry_lift_time():
+			_carry_anim = -1.0
+			if _carry_dir < 0:
+				carry_stone = 0
+				_sheet = -1 ## the next _animate puts the normal sheet back
+				_sprite.offset = Vector2(0.0, -23.0)
+				return
+	elif velocity.length() > 5.0:
+		_carry_walk = fposmod(_carry_walk + CARRY_WALK_FPS * clampf(velocity.length() / (max_speed * CARRY_SPEED), 0.4, 1.4) * delta, 8.0)
+		col = 8 + int(_carry_walk)
+	else:
+		_carry_walk = 0.0
+	_sprite.frame_coords = Vector2i(col, sector)
+
+
 func is_busy() -> bool:
 	return _busy or climb.active() or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging() or swim > 0
 
@@ -1085,7 +1163,7 @@ func _play_release_feed() -> void:
 ## Local player: eats what is in hotbar slot `slot` (a consumable), if that would do anything. The
 ## berry is used up when it reaches her mouth (EAT_USE_TIME); being hit before that stops it.
 func use_slot(slot: int) -> void:
-	if _busy or climb.active() or stumbling or swim > 0 or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
+	if carry_stone != 0 or _busy or climb.active() or stumbling or swim > 0 or attack.is_swinging() or attack.is_charging() or health.current <= 0.0 or slot < 0 or slot >= InventoryComponent.HOTBAR_SIZE:
 		return
 	var stack: Dictionary = inventory.slots[slot]
 	var def: Dictionary = Items.definition(stack)
@@ -1597,6 +1675,9 @@ func _animate(delta: float) -> void:
 	if _step_t >= 0.0:
 		_animate_step(delta)
 		return
+	if carry_stone != 0:
+		_animate_carry(delta)
+		return
 	if _sheet == STEP_SHEET_ID:
 		_sprite.position.x = 0.0
 	var angle: float = facing.angle() / (PI / 4.0)
@@ -1647,6 +1728,11 @@ func _animate(delta: float) -> void:
 	var shoulder: Vector2 = Vector2(-4.0, -31.0)
 	var hand: Vector2 = Vector2(-5.0, -21.0)
 	var free_hand: bool = false ## the main sheet plays: the held item may move the fist to its own hold (AttackComponent / GripRig)
+	var arm_tex0: String = "player.png"
+	var arm_tex1: String = "player.png"
+	var arm_f0: int = main_frame
+	var arm_f1: int = main_frame
+	var arm_blend: float = 0.0
 	if main_frame < _rig_hand.size():
 		shoulder = _rig_shoulder[main_frame]
 		hand = _rig_hand[main_frame]
@@ -1674,6 +1760,8 @@ func _animate(delta: float) -> void:
 	if swim_drawn:
 		shoulder = Vector2(0.0, -30.0) ## the sheet already shows both arms; the sword arm is hidden below
 		hand = Vector2(0.0, -22.0)
+		arm_tex0 = ""
+		arm_tex1 = ""
 	elif _busy and _busy_kind.begins_with("cast_") and _cast_sheet != null:
 		## Casting (docs/magie_konzept.md): its own sheet, legs planted; the right arm holds the staff from the rig, the staff's angle follows STAFF_KEYS.
 		var clip: int = maxi(CAST_CLIPS.find(_cast_motion()), 0)
@@ -1686,6 +1774,11 @@ func _animate(delta: float) -> void:
 		_sprite.frame = cast_base + clampi(int(cast_pos), 0, PICK_FRAMES - 1)
 		hand = _rig_cast_hand[cast_base + ci].lerp(_rig_cast_hand[cast_base + ci + 1], cf)
 		shoulder = _rig_cast_shoulder[cast_base + ci].lerp(_rig_cast_shoulder[cast_base + ci + 1], cf)
+		arm_tex0 = "player_cast.png"
+		arm_tex1 = "player_cast.png"
+		arm_f0 = cast_base + ci
+		arm_f1 = cast_base + ci + 1
+		arm_blend = cf
 	elif _busy and not _rig_pick_hand.is_empty() and not _rig_eat_hand.is_empty():
 		## Picking and eating have their own sheets too (legs planted); the right arm is drawn from the rig, weapon put away.
 		var position_in_sheet: float = _busy_time / _busy_length() * float(PICK_FRAMES)
@@ -1701,10 +1794,16 @@ func _animate(delta: float) -> void:
 		var feeding: bool = _busy_kind == "feed" and not _rig_feed_hand.is_empty()
 		var hands: PackedVector2Array = _rig_drink_hand if drinking else _rig_feed_hand if feeding else _rig_eat_hand if eating else (_rig_touch_hand if touching else (_rig_pull_hand if pulling else _rig_pick_hand))
 		var shoulders: PackedVector2Array = _rig_drink_shoulder if drinking else _rig_feed_shoulder if feeding else _rig_eat_shoulder if eating else (_rig_touch_shoulder if touching else (_rig_pull_shoulder if pulling else _rig_pick_shoulder))
+		var busy_tex: String = "player_drink.png" if drinking else ("player_feed.png" if feeding else ("player_eat.png" if eating else ("player_touch.png" if touching else ("player_pull.png" if pulling else "player_pick.png"))))
 		_use_sheet(DRINK_SHEET_ID if drinking else 14 if feeding else 3 if eating else (5 if touching else (4 if pulling else 2)))
 		_sprite.frame = base + clampi(int(position_in_sheet), 0, PICK_FRAMES - 1)
 		hand = hands[base + i].lerp(hands[base + i + 1], f)
 		shoulder = shoulders[base + i].lerp(shoulders[base + i + 1], f)
+		arm_tex0 = busy_tex
+		arm_tex1 = busy_tex
+		arm_f0 = base + i
+		arm_f1 = base + i + 1
+		arm_blend = f
 		if drinking:
 			var lips: Vector2 = _rig_drink_mouth[base + i].lerp(_rig_drink_mouth[base + i + 1], f)
 			_drink_fx.show_state(_busy_time, hand + Vector2(0.0, _sink), lips + Vector2(0.0, _sink), facing)
@@ -1724,6 +1823,11 @@ func _animate(delta: float) -> void:
 		_sprite.frame = heavy_base + (hi + 1 if hf >= 0.5 else hi)
 		hand = _rig_heavy_hand[heavy_base + hi].lerp(_rig_heavy_hand[heavy_base + hi + 1], hf)
 		shoulder = _rig_heavy_shoulder[heavy_base + hi].lerp(_rig_heavy_shoulder[heavy_base + hi + 1], hf)
+		arm_tex0 = "player_heavy.png"
+		arm_tex1 = "player_heavy.png"
+		arm_f0 = heavy_base + hi
+		arm_f1 = heavy_base + hi + 1
+		arm_blend = hf
 	elif attack.is_swinging() and not _rig_attack_hand.is_empty():
 		## The swing has its own sheet: upper body from the keyframe, legs planted while she stands and
 		## following the walk cycle while she moves.
@@ -1733,6 +1837,7 @@ func _animate(delta: float) -> void:
 		var base: int = _sector * COMBO_COLS + ((int(swing.x) - 3) * ATTACK_LEGS + legs) * ATTACK_FRAMES if learned_step else _sector * ATTACK_COLS + (mini(int(swing.x), 2) * ATTACK_LEGS + legs) * ATTACK_FRAMES
 		var swing_hands: PackedVector2Array = _rig_combo_hand if learned_step else _rig_attack_hand
 		var swing_shoulders: PackedVector2Array = _rig_combo_shoulder if learned_step else _rig_attack_shoulder
+		var swing_tex: String = "player_combo.png" if learned_step else "player_attack.png"
 		var key: float = swing.y
 		var i: int = clampi(int(maxf(key, 0.0)), 0, ATTACK_FRAMES - 2)
 		var f: float = maxf(key, 0.0) - float(i)
@@ -1743,6 +1848,17 @@ func _animate(delta: float) -> void:
 		if key < 0.0: ## winding up: from where the hand was into the first keyframe
 			to_hand = hand.lerp(swing_hands[base], key + 1.0)
 			to_shoulder = shoulder.lerp(swing_shoulders[base], key + 1.0)
+			arm_tex0 = "player.png"
+			arm_f0 = main_frame
+			arm_tex1 = swing_tex
+			arm_f1 = base
+			arm_blend = key + 1.0
+		else:
+			arm_tex0 = swing_tex
+			arm_f0 = base + i
+			arm_tex1 = swing_tex
+			arm_f1 = base + i + 1
+			arm_blend = f
 		hand = to_hand
 		shoulder = to_shoulder
 	elif fish_frame_ok:
@@ -1751,6 +1867,11 @@ func _animate(delta: float) -> void:
 		hand = fish_frame["hand"] as Vector2
 		shoulder = fish_frame["shoulder"] as Vector2
 		attack.rod_pose = fish_frame["rod"] as Vector3
+		arm_tex0 = "player_fish.png"
+		arm_tex1 = "player_fish.png"
+		arm_f0 = int(fish_frame["frame"])
+		arm_f1 = arm_f0
+		arm_blend = 0.0
 	elif _standby_clip >= 0:
 		var key: float = clampf(_standby_time * STANDBY_FPS, 0.0, float(STANDBY_FRAMES - 1))
 		var i: int = int(key)
@@ -1760,6 +1881,11 @@ func _animate(delta: float) -> void:
 		_sprite.frame = base + i
 		hand = _rig_standby_hand[base + i].lerp(_rig_standby_hand[base + next], key - float(i))
 		shoulder = _rig_standby_shoulder[base + i].lerp(_rig_standby_shoulder[base + next], key - float(i))
+		arm_tex0 = "player_standby.png"
+		arm_tex1 = "player_standby.png"
+		arm_f0 = base + i
+		arm_f1 = base + next
+		arm_blend = key - float(i)
 	else:
 		_use_sheet(0)
 		_sprite.frame = main_frame
@@ -1770,8 +1896,36 @@ func _animate(delta: float) -> void:
 		_drink_fx.clear()
 	if not (_busy and _busy_kind == "feed"):
 		_feed_fx.clear()
-	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, _sink + _limp_dip)
-	attack.rig_hand = hand + Vector2(-_sprite.skew * hand.y, _sink + _limp_dip)
+	var vert_dy: float = _sink + _limp_dip
+	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, vert_dy)
+	attack.rig_hand = hand + Vector2(-_sprite.skew * hand.y, vert_dy)
+	var a3_0: Array[Vector3] = GripRig.frame_arm3(arm_tex0, arm_f0)
+	var a3_1: Array[Vector3] = GripRig.frame_arm3(arm_tex1, arm_f1)
+	attack.rig_arm3 = GripRig.shift_arm3(GripRig.blend_arm3(a3_0, a3_1, arm_blend), _sprite.skew, vert_dy)
+	var blood_tex: Texture2D = (_sprite.material as ShaderMaterial).get_shader_parameter("blood_map") as Texture2D
+	var dsrc: Dictionary = ArmPainter.depth_source(blood_tex)
+	if bool(dsrc.get("valid", false)) and _sprite.hframes > 0 and _sprite.vframes > 0:
+		var cw: int = int(dsrc["w"]) / _sprite.hframes
+		var ch: int = int(dsrc["h"]) / _sprite.vframes
+		var col_i: int = _sprite.frame % _sprite.hframes
+		var row_i: int = _sprite.frame / _sprite.hframes
+		attack.depth_ctx = {
+			"valid": true,
+			"tex_id": blood_tex.get_instance_id() % 1000000,
+			"bytes": dsrc["bytes"],
+			"w": dsrc["w"],
+			"h": dsrc["h"],
+			"cell_x": col_i * cw,
+			"cell_y": row_i * ch,
+			"cell_w": cw,
+			"cell_h": ch,
+			"foot_x": roundi(float(cw) * 0.5 - _sprite.offset.x),
+			"foot_y": roundi(float(ch) * 0.5 - _sprite.offset.y),
+			"skew": _sprite.skew,
+			"dy": vert_dy,
+		}
+	else:
+		attack.depth_ctx = {}
 	attack.carrying = moving and _gait == 2 and not attack.is_swinging() ## the blade trails back only in the real sprint
 	attack.body_dir = Vector2.from_angle(float(_sector) * PI / 4.0) ## the item rests relative to the facing the sheet shows, not the cursor
 	attack.free_hand = free_hand

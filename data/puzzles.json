@@ -1,5 +1,5 @@
 {
-	"_doc": "Trials of the Wächterin (docs/raetsel_konzept.md). `wisp` = tuning of every wisp trail (px, px/s, seconds). `placed`: the trials in the world; a wisp trail has `tile` (the bowl), `route` (tiles: the first point is the bowl, the last is where it sinks into the ground, checked flat level-0 land away from water and the void), `stops` (route indices where it hovers and waits for her), `linger` (stops where it circles something curious first), `tier` (the chest). `crow` = tuning of the crow's hoard; a hoard has `tile` (the crow's snag), `variant` (0 lightning stump, 1 ring stump, 2 crooked stump, 3 rock; default by its id) and `mound` (where it hid its finds). `raven` = tuning of the raven trade (`likes` = what it takes as a pawn); a trade also has `stations` (tiles where it drops a feather).",
+	"_doc": "Trials of the Wächterin (docs/raetsel_konzept.md). `wisp` = tuning of every wisp trail (px, px/s, seconds). `placed`: the trials in the world; a wisp trail has `tile` (the bowl), `route` (tiles: the first point is the bowl, the last is where it sinks into the ground, checked flat level-0 land away from water and the void), `stops` (route indices where it hovers and waits for her), `linger` (stops where it circles something curious first), `tier` (the chest). `crow` = tuning of the crow's hoard; a hoard has `tile` (the crow's snag), `variant` (0 lightning stump, 1 ring stump, 2 crooked stump, 3 rock; default by its id) and `mound` (where it hid its finds). `weave` = tuning of every root weave (Wurzelgeflecht, seconds/px; a weave has `tile` = the heart, `goal` all|path, `cubes` {id: {kind cube|seed|thorn|heart|crown, at [tiles from the heart], lit, from (the seed it rises from), rune, variant}}, `roots` [[a, b, one_way]]; checked by `py -3 tools/check_root_weave.py`). `stars` = tuning of every star mirror (Sternenspiegel; an entry has `tile` = the pond's centre, `field` [tiles from the pond to the field's centre], `size` tiles, `mirror` x|y|diag, `turn` degrees the reflection turns over the night, `faint` (dim stars hide at new moon), `lines` night|full_moon, `stars` [[u, v, brightness 1-3]] in field units, `links` [[i, j]], `stones` [[tiles from the pond]], more stones than stars = decoys). `trial_world` = the trials of the flat test world (`--trials`, coordinates of that world). `raven` = tuning of the raven trade (`likes` = what it takes as a pawn); a trade also has `stations` (tiles where it drops a feather).",
 	"wisp": {
 		"wake_range": 58.0,
 		"beckon": 92.0,
@@ -56,34 +56,3199 @@
 		"junk_limit": 3,
 		"dig_reach": 48.0,
 		"digs": 3,
-		"likes": ["lake_glimmer", "lake_moonstone", "silver_chain", "iron_ingot", "mora_shard", "crystal_banish_1", "crystal_roots_1", "crystal_embers_1", "crystal_veil_1", "crystal_maw_1"]
+		"likes": [
+			"lake_glimmer",
+			"lake_moonstone",
+			"silver_chain",
+			"iron_ingot",
+			"mora_shard",
+			"crystal_banish_1",
+			"crystal_roots_1",
+			"crystal_embers_1",
+			"crystal_veil_1",
+			"crystal_maw_1"
+		]
+	},
+	"stars": {},
+	"weave": {
+		"pulse_time": 0.28,
+		"rise_time": 0.85,
+		"leave_radius": 420.0,
+		"leave_time": 60.0
 	},
 	"placed": [
 		{
 			"id": "wisp_nordweg",
 			"kind": "wisp",
 			"tier": "common",
-			"tile": [796, 647],
-			"route": [[796, 647], [797, 634], [797, 621], [796, 608], [797, 596], [802, 586], [809, 579], [818, 575], [827, 575], [834, 580], [839, 588]],
-			"stops": [2, 4, 6, 8, 10],
-			"linger": [4]
+			"tile": [
+				796,
+				647
+			],
+			"route": [
+				[
+					796,
+					647
+				],
+				[
+					797,
+					634
+				],
+				[
+					797,
+					621
+				],
+				[
+					796,
+					608
+				],
+				[
+					797,
+					596
+				],
+				[
+					802,
+					586
+				],
+				[
+					809,
+					579
+				],
+				[
+					818,
+					575
+				],
+				[
+					827,
+					575
+				],
+				[
+					834,
+					580
+				],
+				[
+					839,
+					588
+				]
+			],
+			"stops": [
+				2,
+				4,
+				6,
+				8,
+				10
+			],
+			"linger": [
+				4
+			]
 		},
 		{
 			"id": "hoard_flussufer",
 			"kind": "crow_hoard",
 			"tier": "common",
-			"tile": [826, 701],
+			"tile": [
+				826,
+				701
+			],
 			"variant": 0,
-			"mound": [857, 709]
+			"mound": [
+				857,
+				709
+			]
 		},
 		{
 			"id": "raben_westhang",
 			"kind": "raven_trade",
 			"tier": "rare",
-			"tile": [688, 641],
+			"tile": [
+				688,
+				641
+			],
 			"variant": 0,
-			"stations": [[667, 650], [676, 670], [651, 698]],
-			"mound": [641, 713]
+			"stations": [
+				[
+					667,
+					650
+				],
+				[
+					676,
+					670
+				],
+				[
+					651,
+					698
+				]
+			],
+			"mound": [
+				641,
+				713
+			]
+		},
+		{
+			"id": "weave_glasklippen",
+			"kind": "root_weave",
+			"tier": "legendary",
+			"area": "Glasklippen",
+			"auto": true,
+			"goal": "all",
+			"cubes": {
+				"A": {
+					"at": [
+						-3,
+						-3
+					],
+					"lit": false
+				},
+				"B": {
+					"at": [
+						3,
+						-3
+					],
+					"lit": false
+				},
+				"C": {
+					"at": [
+						4,
+						2
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						0,
+						4
+					],
+					"lit": false
+				},
+				"E": {
+					"kind": "seed",
+					"at": [
+						-4,
+						2
+					],
+					"lit": false
+				},
+				"F": {
+					"kind": "seed",
+					"at": [
+						6,
+						-7
+					],
+					"lit": false
+				},
+				"G": {
+					"at": [
+						10,
+						-3
+					],
+					"from": "F",
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"I": {
+					"kind": "seed",
+					"at": [
+						9,
+						3
+					],
+					"from": "F",
+					"lit": false
+				},
+				"J": {
+					"kind": "thorn",
+					"at": [
+						11,
+						-8
+					],
+					"from": "F",
+					"lit": false
+				},
+				"K": {
+					"at": [
+						5,
+						8
+					],
+					"from": "I",
+					"lit": false
+				},
+				"L": {
+					"kind": "thorn",
+					"at": [
+						0,
+						9
+					],
+					"lit": false
+				},
+				"M": {
+					"at": [
+						-8,
+						-1
+					],
+					"from": "E",
+					"lit": true
+				},
+				"N": {
+					"kind": "seed",
+					"at": [
+						-7,
+						6
+					],
+					"from": "E",
+					"lit": false
+				},
+				"O": {
+					"kind": "thorn",
+					"at": [
+						-9,
+						-6
+					],
+					"from": "E",
+					"lit": false
+				},
+				"P": {
+					"at": [
+						-4,
+						10
+					],
+					"from": "N",
+					"lit": true
+				},
+				"Q": {
+					"at": [
+						-11,
+						9
+					],
+					"from": "N",
+					"lit": false
+				},
+				"S": {
+					"at": [
+						-1,
+						-8
+					],
+					"lit": false
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"H",
+					"B"
+				],
+				[
+					"H",
+					"C"
+				],
+				[
+					"H",
+					"D"
+				],
+				[
+					"H",
+					"E"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"E"
+				],
+				[
+					"E",
+					"A"
+				],
+				[
+					"A",
+					"S"
+				],
+				[
+					"S",
+					"F"
+				],
+				[
+					"B",
+					"F"
+				],
+				[
+					"F",
+					"J"
+				],
+				[
+					"J",
+					"G"
+				],
+				[
+					"F",
+					"G"
+				],
+				[
+					"G",
+					"I"
+				],
+				[
+					"I",
+					"C",
+					1
+				],
+				[
+					"I",
+					"K"
+				],
+				[
+					"K",
+					"L"
+				],
+				[
+					"L",
+					"D"
+				],
+				[
+					"E",
+					"M"
+				],
+				[
+					"M",
+					"O"
+				],
+				[
+					"O",
+					"A",
+					1
+				],
+				[
+					"E",
+					"N"
+				],
+				[
+					"N",
+					"Q"
+				],
+				[
+					"Q",
+					"P"
+				],
+				[
+					"P",
+					"L"
+				],
+				[
+					"N",
+					"P",
+					1
+				],
+				[
+					"M",
+					"Q"
+				],
+				[
+					"K",
+					"P",
+					1
+				]
+			],
+			"tile": [
+				196,
+				248
+			]
+		},
+		{
+			"id": "weave_leerenbluehen",
+			"kind": "root_weave",
+			"tier": "legendary",
+			"area": "Das Leerenblühen",
+			"auto": true,
+			"goal": "all",
+			"cubes": {
+				"A": {
+					"at": [
+						3,
+						-3
+					],
+					"lit": true
+				},
+				"B": {
+					"at": [
+						-3,
+						-3
+					],
+					"lit": false
+				},
+				"C": {
+					"at": [
+						-4,
+						2
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						0,
+						4
+					],
+					"lit": true
+				},
+				"E": {
+					"kind": "seed",
+					"at": [
+						4,
+						2
+					],
+					"lit": false
+				},
+				"F": {
+					"kind": "seed",
+					"at": [
+						-6,
+						-7
+					],
+					"lit": false
+				},
+				"G": {
+					"at": [
+						-10,
+						-3
+					],
+					"from": "F",
+					"lit": true
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"I": {
+					"kind": "seed",
+					"at": [
+						-9,
+						3
+					],
+					"from": "F",
+					"lit": false
+				},
+				"J": {
+					"kind": "thorn",
+					"at": [
+						-11,
+						-8
+					],
+					"from": "F",
+					"lit": false
+				},
+				"K": {
+					"at": [
+						-5,
+						8
+					],
+					"from": "I",
+					"lit": false
+				},
+				"L": {
+					"kind": "thorn",
+					"at": [
+						0,
+						9
+					],
+					"lit": false
+				},
+				"M": {
+					"at": [
+						8,
+						-1
+					],
+					"from": "E",
+					"lit": false
+				},
+				"N": {
+					"kind": "seed",
+					"at": [
+						7,
+						6
+					],
+					"from": "E",
+					"lit": false
+				},
+				"O": {
+					"kind": "thorn",
+					"at": [
+						9,
+						-6
+					],
+					"from": "E",
+					"lit": true
+				},
+				"P": {
+					"at": [
+						4,
+						10
+					],
+					"from": "N",
+					"lit": true
+				},
+				"Q": {
+					"at": [
+						11,
+						9
+					],
+					"from": "N",
+					"lit": true
+				},
+				"S": {
+					"at": [
+						1,
+						-8
+					],
+					"lit": false
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"H",
+					"B"
+				],
+				[
+					"H",
+					"C"
+				],
+				[
+					"H",
+					"D"
+				],
+				[
+					"H",
+					"E"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"E"
+				],
+				[
+					"E",
+					"A"
+				],
+				[
+					"A",
+					"S"
+				],
+				[
+					"S",
+					"F"
+				],
+				[
+					"B",
+					"F"
+				],
+				[
+					"F",
+					"J"
+				],
+				[
+					"J",
+					"G"
+				],
+				[
+					"F",
+					"G"
+				],
+				[
+					"G",
+					"I"
+				],
+				[
+					"I",
+					"C",
+					1
+				],
+				[
+					"I",
+					"K"
+				],
+				[
+					"K",
+					"L"
+				],
+				[
+					"L",
+					"D"
+				],
+				[
+					"E",
+					"M"
+				],
+				[
+					"M",
+					"O"
+				],
+				[
+					"O",
+					"A",
+					1
+				],
+				[
+					"E",
+					"N"
+				],
+				[
+					"N",
+					"Q"
+				],
+				[
+					"Q",
+					"P"
+				],
+				[
+					"P",
+					"L"
+				],
+				[
+					"N",
+					"P",
+					1
+				],
+				[
+					"M",
+					"Q"
+				],
+				[
+					"K",
+					"P",
+					1
+				]
+			],
+			"tile": [
+				584,
+				260
+			]
+		},
+		{
+			"id": "weave_lichtung",
+			"kind": "root_weave",
+			"tier": "rare",
+			"area": "Die Lichtung",
+			"auto": true,
+			"goal": "all",
+			"cubes": {
+				"A": {
+					"at": [
+						-3,
+						-3
+					],
+					"lit": true
+				},
+				"B": {
+					"at": [
+						3,
+						-3
+					],
+					"lit": false
+				},
+				"C": {
+					"at": [
+						4,
+						2
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						0,
+						4
+					],
+					"lit": false
+				},
+				"E": {
+					"at": [
+						-4,
+						2
+					],
+					"lit": false
+				},
+				"F": {
+					"kind": "seed",
+					"at": [
+						7,
+						-5
+					],
+					"lit": false
+				},
+				"G": {
+					"at": [
+						10,
+						-1
+					],
+					"from": "F",
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"I": {
+					"kind": "thorn",
+					"at": [
+						8,
+						4
+					],
+					"from": "F",
+					"lit": true
+				},
+				"T": {
+					"kind": "thorn",
+					"at": [
+						-7,
+						-1
+					],
+					"lit": true
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"H",
+					"B"
+				],
+				[
+					"H",
+					"C"
+				],
+				[
+					"H",
+					"D"
+				],
+				[
+					"H",
+					"E"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"E"
+				],
+				[
+					"E",
+					"A"
+				],
+				[
+					"B",
+					"F"
+				],
+				[
+					"F",
+					"G"
+				],
+				[
+					"G",
+					"I"
+				],
+				[
+					"I",
+					"C",
+					1
+				],
+				[
+					"A",
+					"T"
+				],
+				[
+					"T",
+					"E"
+				]
+			],
+			"tile": [
+				256,
+				1012
+			]
+		},
+		{
+			"id": "weave_hexenwald",
+			"kind": "root_weave",
+			"tier": "rare",
+			"area": "Hexenwald",
+			"auto": true,
+			"goal": "all",
+			"cubes": {
+				"A": {
+					"at": [
+						3,
+						-3
+					],
+					"lit": false
+				},
+				"B": {
+					"at": [
+						-3,
+						-3
+					],
+					"lit": true
+				},
+				"C": {
+					"at": [
+						-4,
+						2
+					],
+					"lit": false
+				},
+				"D": {
+					"at": [
+						0,
+						4
+					],
+					"lit": false
+				},
+				"E": {
+					"at": [
+						4,
+						2
+					],
+					"lit": false
+				},
+				"F": {
+					"kind": "seed",
+					"at": [
+						-7,
+						-5
+					],
+					"lit": false
+				},
+				"G": {
+					"at": [
+						-10,
+						-1
+					],
+					"from": "F",
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"I": {
+					"kind": "thorn",
+					"at": [
+						-8,
+						4
+					],
+					"from": "F",
+					"lit": false
+				},
+				"T": {
+					"kind": "thorn",
+					"at": [
+						7,
+						-1
+					],
+					"lit": true
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"H",
+					"B"
+				],
+				[
+					"H",
+					"C"
+				],
+				[
+					"H",
+					"D"
+				],
+				[
+					"H",
+					"E"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"E"
+				],
+				[
+					"E",
+					"A"
+				],
+				[
+					"B",
+					"F"
+				],
+				[
+					"F",
+					"G"
+				],
+				[
+					"G",
+					"I"
+				],
+				[
+					"I",
+					"C",
+					1
+				],
+				[
+					"A",
+					"T"
+				],
+				[
+					"T",
+					"E"
+				]
+			],
+			"tile": [
+				900,
+				916
+			]
+		},
+		{
+			"id": "weave_nebelwald",
+			"kind": "root_weave",
+			"tier": "common",
+			"area": "Nebelwald",
+			"auto": true,
+			"goal": "path",
+			"cubes": {
+				"A": {
+					"at": [
+						-2,
+						-3
+					],
+					"lit": true
+				},
+				"B": {
+					"at": [
+						1,
+						-5
+					],
+					"lit": true
+				},
+				"C": {
+					"at": [
+						-1,
+						-8
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						3,
+						-10
+					],
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"X": {
+					"at": [
+						5,
+						-6
+					],
+					"lit": true
+				},
+				"Y": {
+					"at": [
+						-5,
+						-6
+					],
+					"lit": false
+				},
+				"Z": {
+					"kind": "crown",
+					"at": [
+						1,
+						-12
+					]
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"Z"
+				],
+				[
+					"B",
+					"X"
+				],
+				[
+					"A",
+					"Y"
+				],
+				[
+					"C",
+					"Y"
+				],
+				[
+					"X",
+					"D"
+				]
+			],
+			"tile": [
+				508,
+				556
+			]
+		},
+		{
+			"id": "weave_ruinen",
+			"kind": "root_weave",
+			"tier": "common",
+			"area": "Versunkene Ruinen",
+			"auto": true,
+			"goal": "path",
+			"cubes": {
+				"A": {
+					"at": [
+						2,
+						-3
+					],
+					"lit": true
+				},
+				"B": {
+					"at": [
+						-1,
+						-5
+					],
+					"lit": true
+				},
+				"C": {
+					"at": [
+						1,
+						-8
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						-3,
+						-10
+					],
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"X": {
+					"at": [
+						-5,
+						-6
+					],
+					"lit": true
+				},
+				"Y": {
+					"at": [
+						5,
+						-6
+					],
+					"lit": false
+				},
+				"Z": {
+					"kind": "crown",
+					"at": [
+						-1,
+						-12
+					]
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"Z"
+				],
+				[
+					"B",
+					"X"
+				],
+				[
+					"A",
+					"Y"
+				],
+				[
+					"C",
+					"Y"
+				],
+				[
+					"X",
+					"D"
+				]
+			],
+			"tile": [
+				972,
+				396
+			]
+		},
+		{
+			"id": "stars_ruinen",
+			"kind": "star_mirror",
+			"tier": "legendary",
+			"area": "Versunkene Ruinen",
+			"auto": true,
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "diag",
+			"turn": 90,
+			"faint": true,
+			"lines": "full_moon",
+			"stars": [
+				[
+					0.5,
+					0.12,
+					3
+				],
+				[
+					0.36,
+					0.3,
+					2
+				],
+				[
+					0.64,
+					0.3,
+					2
+				],
+				[
+					0.5,
+					0.42,
+					3
+				],
+				[
+					0.2,
+					0.46,
+					1
+				],
+				[
+					0.82,
+					0.58,
+					1
+				],
+				[
+					0.38,
+					0.7,
+					2
+				],
+				[
+					0.66,
+					0.74,
+					2
+				],
+				[
+					0.5,
+					0.9,
+					1
+				]
+			],
+			"links": [
+				[
+					0,
+					3
+				],
+				[
+					1,
+					3
+				],
+				[
+					2,
+					3
+				],
+				[
+					1,
+					4
+				],
+				[
+					2,
+					5
+				],
+				[
+					3,
+					6
+				],
+				[
+					3,
+					7
+				],
+				[
+					6,
+					8
+				],
+				[
+					7,
+					8
+				]
+			],
+			"stones": [
+				[
+					-6.4,
+					0.0
+				],
+				[
+					-7.6,
+					1.4
+				],
+				[
+					-5.8,
+					2.6
+				],
+				[
+					-8.4,
+					-1.0
+				],
+				[
+					-7.0,
+					3.2
+				],
+				[
+					6.4,
+					0.3
+				],
+				[
+					7.6,
+					1.6
+				],
+				[
+					5.8,
+					2.7
+				],
+				[
+					8.4,
+					-0.8
+				],
+				[
+					7.0,
+					3.3
+				],
+				[
+					0.0,
+					3.6
+				]
+			],
+			"tile": [
+				768,
+				356
+			]
+		},
+		{
+			"id": "stars_glasklippen",
+			"kind": "star_mirror",
+			"tier": "rare",
+			"area": "Glasklippen",
+			"auto": true,
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "x",
+			"turn": 70,
+			"faint": true,
+			"stars": [
+				[
+					0.15,
+					0.55,
+					3
+				],
+				[
+					0.32,
+					0.42,
+					2
+				],
+				[
+					0.5,
+					0.35,
+					3
+				],
+				[
+					0.68,
+					0.22,
+					2
+				],
+				[
+					0.84,
+					0.3,
+					1
+				],
+				[
+					0.6,
+					0.6,
+					2
+				],
+				[
+					0.42,
+					0.8,
+					1
+				]
+			],
+			"links": [
+				[
+					0,
+					1
+				],
+				[
+					1,
+					2
+				],
+				[
+					2,
+					3
+				],
+				[
+					3,
+					4
+				],
+				[
+					2,
+					5
+				],
+				[
+					5,
+					6
+				]
+			],
+			"stones": [
+				[
+					-6.5,
+					0.2
+				],
+				[
+					-7.4,
+					1.8
+				],
+				[
+					-5.6,
+					2.8
+				],
+				[
+					6.2,
+					0.4
+				],
+				[
+					7.4,
+					1.6
+				],
+				[
+					6.0,
+					2.8
+				],
+				[
+					-8.0,
+					-0.8
+				],
+				[
+					8.2,
+					-0.4
+				]
+			],
+			"tile": [
+				216,
+				684
+			]
+		},
+		{
+			"id": "stars_leerenbluehen",
+			"kind": "star_mirror",
+			"tier": "rare",
+			"area": "Das Leerenblühen",
+			"auto": true,
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "y",
+			"turn": 60,
+			"faint": true,
+			"stars": [
+				[
+					0.3,
+					0.2,
+					2
+				],
+				[
+					0.7,
+					0.2,
+					2
+				],
+				[
+					0.38,
+					0.4,
+					3
+				],
+				[
+					0.62,
+					0.4,
+					3
+				],
+				[
+					0.5,
+					0.58,
+					1
+				],
+				[
+					0.32,
+					0.8,
+					2
+				],
+				[
+					0.7,
+					0.82,
+					1
+				]
+			],
+			"links": [
+				[
+					0,
+					2
+				],
+				[
+					1,
+					3
+				],
+				[
+					2,
+					3
+				],
+				[
+					2,
+					4
+				],
+				[
+					3,
+					4
+				],
+				[
+					4,
+					5
+				],
+				[
+					4,
+					6
+				]
+			],
+			"stones": [
+				[
+					-6.5,
+					0.2
+				],
+				[
+					-7.4,
+					1.8
+				],
+				[
+					-5.6,
+					2.8
+				],
+				[
+					6.2,
+					0.4
+				],
+				[
+					7.4,
+					1.6
+				],
+				[
+					6.0,
+					2.8
+				],
+				[
+					-8.0,
+					-0.8
+				],
+				[
+					8.2,
+					-0.4
+				]
+			],
+			"tile": [
+				392,
+				124
+			]
+		},
+		{
+			"id": "stars_lichtung",
+			"kind": "star_mirror",
+			"tier": "common",
+			"area": "Die Lichtung",
+			"auto": true,
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "x",
+			"turn": 0,
+			"stars": [
+				[
+					0.18,
+					0.72,
+					3
+				],
+				[
+					0.3,
+					0.42,
+					2
+				],
+				[
+					0.52,
+					0.24,
+					3
+				],
+				[
+					0.78,
+					0.32,
+					2
+				],
+				[
+					0.66,
+					0.7,
+					2
+				]
+			],
+			"links": [
+				[
+					0,
+					1
+				],
+				[
+					1,
+					2
+				],
+				[
+					2,
+					3
+				],
+				[
+					3,
+					4
+				]
+			],
+			"stones": [
+				[
+					-6.5,
+					0.5
+				],
+				[
+					-7.2,
+					2.0
+				],
+				[
+					6.4,
+					1.2
+				],
+				[
+					7.4,
+					-0.6
+				],
+				[
+					5.8,
+					2.6
+				]
+			],
+			"tile": [
+				488,
+				904
+			]
+		},
+		{
+			"id": "stars_nebelwald",
+			"kind": "star_mirror",
+			"tier": "common",
+			"area": "Nebelwald",
+			"auto": true,
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "y",
+			"turn": 0,
+			"stars": [
+				[
+					0.18,
+					0.78,
+					2
+				],
+				[
+					0.36,
+					0.58,
+					3
+				],
+				[
+					0.56,
+					0.44,
+					2
+				],
+				[
+					0.78,
+					0.26,
+					3
+				],
+				[
+					0.6,
+					0.18,
+					2
+				]
+			],
+			"links": [
+				[
+					0,
+					1
+				],
+				[
+					1,
+					2
+				],
+				[
+					2,
+					3
+				],
+				[
+					2,
+					4
+				]
+			],
+			"stones": [
+				[
+					-6.5,
+					0.5
+				],
+				[
+					-7.2,
+					2.0
+				],
+				[
+					6.4,
+					1.2
+				],
+				[
+					7.4,
+					-0.6
+				],
+				[
+					5.8,
+					2.6
+				]
+			],
+			"faint": false,
+			"tile": [
+				728,
+				492
+			]
+		},
+		{
+			"id": "raben_glasklippen",
+			"kind": "raven_trade",
+			"tier": "rare",
+			"area": "Glasklippen",
+			"auto": true,
+			"tile": [
+				292,
+				464
+			],
+			"mound": [
+				282,
+				524
+			],
+			"stations": [
+				[
+					282,
+					473
+				],
+				[
+					282,
+					490
+				],
+				[
+					282,
+					507
+				]
+			],
+			"variant": 0
+		},
+		{
+			"id": "raben_ruinen",
+			"kind": "raven_trade",
+			"tier": "rare",
+			"area": "Versunkene Ruinen",
+			"auto": true,
+			"tile": [
+				1020,
+				616
+			],
+			"mound": [
+				953,
+				613
+			],
+			"stations": [
+				[
+					1001,
+					616
+				],
+				[
+					984,
+					616
+				],
+				[
+					967,
+					616
+				]
+			],
+			"variant": 1
+		},
+		{
+			"id": "raben_hexenwald",
+			"kind": "raven_trade",
+			"tier": "rare",
+			"area": "Hexenwald",
+			"auto": true,
+			"tile": [
+				724,
+				876
+			],
+			"mound": [
+				700,
+				830
+			],
+			"stations": [
+				[
+					720,
+					861
+				],
+				[
+					716,
+					848
+				],
+				[
+					702,
+					845
+				]
+			],
+			"variant": 1
+		},
+		{
+			"id": "hoard_lichtung",
+			"kind": "crow_hoard",
+			"tier": "common",
+			"area": "Die Lichtung",
+			"auto": true,
+			"tile": [
+				396,
+				740
+			],
+			"mound": [
+				396,
+				784
+			],
+			"variant": 0
+		},
+		{
+			"id": "hoard_glasklippen",
+			"kind": "crow_hoard",
+			"tier": "common",
+			"area": "Glasklippen",
+			"auto": true,
+			"tile": [
+				116,
+				412
+			],
+			"mound": [
+				159,
+				413
+			],
+			"variant": 0
+		},
+		{
+			"id": "hoard_ruinen",
+			"kind": "crow_hoard",
+			"tier": "common",
+			"area": "Versunkene Ruinen",
+			"auto": true,
+			"tile": [
+				584,
+				416
+			],
+			"mound": [
+				585,
+				373
+			],
+			"variant": 0
+		},
+		{
+			"id": "hoard_leerenbluehen",
+			"kind": "crow_hoard",
+			"tier": "common",
+			"area": "Das Leerenblühen",
+			"auto": true,
+			"tile": [
+				372,
+				308
+			],
+			"mound": [
+				328,
+				308
+			],
+			"variant": 0
+		},
+		{
+			"id": "hoard_hexenwald",
+			"kind": "crow_hoard",
+			"tier": "common",
+			"area": "Hexenwald",
+			"auto": true,
+			"tile": [
+				796,
+				972
+			],
+			"mound": [
+				764,
+				960
+			],
+			"variant": 0
+		},
+		{
+			"id": "wisp_lichtung",
+			"kind": "wisp",
+			"tier": "common",
+			"area": "Die Lichtung",
+			"auto": true,
+			"tile": [
+				404,
+				1028
+			],
+			"route": [
+				[
+					404,
+					1028
+				],
+				[
+					407,
+					1020
+				],
+				[
+					407,
+					1009
+				],
+				[
+					407,
+					998
+				],
+				[
+					407,
+					987
+				],
+				[
+					407,
+					976
+				],
+				[
+					407,
+					965
+				],
+				[
+					407,
+					954
+				],
+				[
+					407,
+					943
+				],
+				[
+					407,
+					935
+				]
+			],
+			"stops": [
+				2,
+				4,
+				6,
+				8,
+				9
+			],
+			"linger": [
+				4
+			]
+		},
+		{
+			"id": "wisp_glasklippen",
+			"kind": "wisp",
+			"tier": "common",
+			"area": "Glasklippen",
+			"auto": true,
+			"tile": [
+				384,
+				608
+			],
+			"route": [
+				[
+					384,
+					608
+				],
+				[
+					382,
+					617
+				],
+				[
+					382,
+					628
+				],
+				[
+					382,
+					639
+				],
+				[
+					385,
+					647
+				],
+				[
+					386,
+					657
+				],
+				[
+					385,
+					667
+				],
+				[
+					380,
+					673
+				],
+				[
+					373,
+					677
+				],
+				[
+					373,
+					685
+				]
+			],
+			"stops": [
+				2,
+				4,
+				6,
+				8,
+				9
+			],
+			"linger": [
+				4
+			]
+		},
+		{
+			"id": "wisp_ruinen",
+			"kind": "wisp",
+			"tier": "common",
+			"area": "Versunkene Ruinen",
+			"auto": true,
+			"tile": [
+				924,
+				500
+			],
+			"route": [
+				[
+					924,
+					500
+				],
+				[
+					924,
+					511
+				],
+				[
+					924,
+					522
+				],
+				[
+					924,
+					533
+				],
+				[
+					924,
+					544
+				],
+				[
+					924,
+					555
+				],
+				[
+					924,
+					566
+				],
+				[
+					924,
+					577
+				],
+				[
+					924,
+					588
+				],
+				[
+					924,
+					596
+				]
+			],
+			"stops": [
+				2,
+				4,
+				6,
+				8,
+				9
+			],
+			"linger": [
+				4
+			]
+		},
+		{
+			"id": "wisp_leerenbluehen",
+			"kind": "wisp",
+			"tier": "common",
+			"area": "Das Leerenblühen",
+			"auto": true,
+			"tile": [
+				440,
+				432
+			],
+			"route": [
+				[
+					440,
+					432
+				],
+				[
+					451,
+					432
+				],
+				[
+					462,
+					432
+				],
+				[
+					473,
+					432
+				],
+				[
+					484,
+					432
+				],
+				[
+					495,
+					432
+				],
+				[
+					506,
+					432
+				],
+				[
+					517,
+					432
+				],
+				[
+					528,
+					432
+				],
+				[
+					536,
+					432
+				]
+			],
+			"stops": [
+				2,
+				4,
+				6,
+				8,
+				9
+			],
+			"linger": [
+				4
+			]
+		}
+	],
+	"trial_world": [
+		{
+			"id": "stars_sichel",
+			"kind": "star_mirror",
+			"tier": "common",
+			"tile": [
+				-50,
+				2
+			],
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "x",
+			"turn": 0,
+			"stars": [
+				[
+					0.18,
+					0.72,
+					3
+				],
+				[
+					0.3,
+					0.42,
+					2
+				],
+				[
+					0.52,
+					0.24,
+					3
+				],
+				[
+					0.78,
+					0.32,
+					2
+				],
+				[
+					0.66,
+					0.7,
+					2
+				]
+			],
+			"links": [
+				[
+					0,
+					1
+				],
+				[
+					1,
+					2
+				],
+				[
+					2,
+					3
+				],
+				[
+					3,
+					4
+				]
+			],
+			"stones": [
+				[
+					-6.5,
+					0.5
+				],
+				[
+					-7.2,
+					2.0
+				],
+				[
+					6.4,
+					1.2
+				],
+				[
+					7.4,
+					-0.6
+				],
+				[
+					5.8,
+					2.6
+				]
+			]
+		},
+		{
+			"id": "stars_rabe",
+			"kind": "star_mirror",
+			"tier": "rare",
+			"tile": [
+				26,
+				-40
+			],
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "x",
+			"turn": 70,
+			"faint": true,
+			"stars": [
+				[
+					0.15,
+					0.55,
+					3
+				],
+				[
+					0.32,
+					0.42,
+					2
+				],
+				[
+					0.5,
+					0.35,
+					3
+				],
+				[
+					0.68,
+					0.22,
+					2
+				],
+				[
+					0.84,
+					0.3,
+					1
+				],
+				[
+					0.6,
+					0.6,
+					2
+				],
+				[
+					0.42,
+					0.8,
+					1
+				]
+			],
+			"links": [
+				[
+					0,
+					1
+				],
+				[
+					1,
+					2
+				],
+				[
+					2,
+					3
+				],
+				[
+					3,
+					4
+				],
+				[
+					2,
+					5
+				],
+				[
+					5,
+					6
+				]
+			],
+			"stones": [
+				[
+					-6.5,
+					0.2
+				],
+				[
+					-7.4,
+					1.8
+				],
+				[
+					-5.6,
+					2.8
+				],
+				[
+					6.2,
+					0.4
+				],
+				[
+					7.4,
+					1.6
+				],
+				[
+					6.0,
+					2.8
+				],
+				[
+					-8.0,
+					-0.8
+				],
+				[
+					8.2,
+					-0.4
+				]
+			]
+		},
+		{
+			"id": "stars_waechterin",
+			"kind": "star_mirror",
+			"tier": "legendary",
+			"tile": [
+				50,
+				22
+			],
+			"field": [
+				0,
+				10
+			],
+			"size": 10,
+			"mirror": "diag",
+			"turn": 90,
+			"faint": true,
+			"lines": "full_moon",
+			"stars": [
+				[
+					0.5,
+					0.12,
+					3
+				],
+				[
+					0.36,
+					0.3,
+					2
+				],
+				[
+					0.64,
+					0.3,
+					2
+				],
+				[
+					0.5,
+					0.42,
+					3
+				],
+				[
+					0.2,
+					0.46,
+					1
+				],
+				[
+					0.82,
+					0.58,
+					1
+				],
+				[
+					0.38,
+					0.7,
+					2
+				],
+				[
+					0.66,
+					0.74,
+					2
+				],
+				[
+					0.5,
+					0.9,
+					1
+				]
+			],
+			"links": [
+				[
+					0,
+					3
+				],
+				[
+					1,
+					3
+				],
+				[
+					2,
+					3
+				],
+				[
+					1,
+					4
+				],
+				[
+					2,
+					5
+				],
+				[
+					3,
+					6
+				],
+				[
+					3,
+					7
+				],
+				[
+					6,
+					8
+				],
+				[
+					7,
+					8
+				]
+			],
+			"stones": [
+				[
+					-6.4,
+					0.0
+				],
+				[
+					-7.6,
+					1.4
+				],
+				[
+					-5.8,
+					2.6
+				],
+				[
+					-8.4,
+					-1.0
+				],
+				[
+					-7.0,
+					3.2
+				],
+				[
+					6.4,
+					0.3
+				],
+				[
+					7.6,
+					1.6
+				],
+				[
+					5.8,
+					2.7
+				],
+				[
+					8.4,
+					-0.8
+				],
+				[
+					7.0,
+					3.3
+				],
+				[
+					0.0,
+					3.6
+				]
+			]
+		},
+		{
+			"id": "weave_keimling",
+			"kind": "root_weave",
+			"tier": "common",
+			"goal": "path",
+			"tile": [
+				-22,
+				10
+			],
+			"cubes": {
+				"A": {
+					"at": [
+						-2,
+						-3
+					],
+					"lit": true
+				},
+				"B": {
+					"at": [
+						1,
+						-5
+					],
+					"lit": true
+				},
+				"C": {
+					"at": [
+						-1,
+						-8
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						3,
+						-10
+					],
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"X": {
+					"at": [
+						5,
+						-6
+					],
+					"lit": true
+				},
+				"Y": {
+					"at": [
+						-5,
+						-6
+					],
+					"lit": false
+				},
+				"Z": {
+					"kind": "crown",
+					"at": [
+						1,
+						-12
+					]
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"Z"
+				],
+				[
+					"B",
+					"X"
+				],
+				[
+					"A",
+					"Y"
+				],
+				[
+					"C",
+					"Y"
+				],
+				[
+					"X",
+					"D"
+				]
+			]
+		},
+		{
+			"id": "weave_geflecht",
+			"kind": "root_weave",
+			"tier": "rare",
+			"goal": "all",
+			"tile": [
+				0,
+				-18
+			],
+			"cubes": {
+				"A": {
+					"at": [
+						-3,
+						-3
+					],
+					"lit": true
+				},
+				"B": {
+					"at": [
+						3,
+						-3
+					],
+					"lit": false
+				},
+				"C": {
+					"at": [
+						4,
+						2
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						0,
+						4
+					],
+					"lit": false
+				},
+				"E": {
+					"at": [
+						-4,
+						2
+					],
+					"lit": false
+				},
+				"F": {
+					"kind": "seed",
+					"at": [
+						7,
+						-5
+					],
+					"lit": false
+				},
+				"G": {
+					"at": [
+						10,
+						-1
+					],
+					"from": "F",
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"I": {
+					"kind": "thorn",
+					"at": [
+						8,
+						4
+					],
+					"from": "F",
+					"lit": true
+				},
+				"T": {
+					"kind": "thorn",
+					"at": [
+						-7,
+						-1
+					],
+					"lit": true
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"H",
+					"B"
+				],
+				[
+					"H",
+					"C"
+				],
+				[
+					"H",
+					"D"
+				],
+				[
+					"H",
+					"E"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"E"
+				],
+				[
+					"E",
+					"A"
+				],
+				[
+					"B",
+					"F"
+				],
+				[
+					"F",
+					"G"
+				],
+				[
+					"G",
+					"I"
+				],
+				[
+					"I",
+					"C",
+					1
+				],
+				[
+					"A",
+					"T"
+				],
+				[
+					"T",
+					"E"
+				]
+			]
+		},
+		{
+			"id": "weave_altes_geflecht",
+			"kind": "root_weave",
+			"tier": "legendary",
+			"goal": "all",
+			"tile": [
+				26,
+				8
+			],
+			"cubes": {
+				"A": {
+					"at": [
+						-3,
+						-3
+					],
+					"lit": false
+				},
+				"B": {
+					"at": [
+						3,
+						-3
+					],
+					"lit": false
+				},
+				"C": {
+					"at": [
+						4,
+						2
+					],
+					"lit": true
+				},
+				"D": {
+					"at": [
+						0,
+						4
+					],
+					"lit": false
+				},
+				"E": {
+					"kind": "seed",
+					"at": [
+						-4,
+						2
+					],
+					"lit": false
+				},
+				"F": {
+					"kind": "seed",
+					"at": [
+						6,
+						-7
+					],
+					"lit": false
+				},
+				"G": {
+					"at": [
+						10,
+						-3
+					],
+					"from": "F",
+					"lit": false
+				},
+				"H": {
+					"kind": "heart",
+					"at": [
+						0,
+						0
+					]
+				},
+				"I": {
+					"kind": "seed",
+					"at": [
+						9,
+						3
+					],
+					"from": "F",
+					"lit": false
+				},
+				"J": {
+					"kind": "thorn",
+					"at": [
+						11,
+						-8
+					],
+					"from": "F",
+					"lit": false
+				},
+				"K": {
+					"at": [
+						5,
+						8
+					],
+					"from": "I",
+					"lit": false
+				},
+				"L": {
+					"kind": "thorn",
+					"at": [
+						0,
+						9
+					],
+					"lit": false
+				},
+				"M": {
+					"at": [
+						-8,
+						-1
+					],
+					"from": "E",
+					"lit": true
+				},
+				"N": {
+					"kind": "seed",
+					"at": [
+						-7,
+						6
+					],
+					"from": "E",
+					"lit": false
+				},
+				"O": {
+					"kind": "thorn",
+					"at": [
+						-9,
+						-6
+					],
+					"from": "E",
+					"lit": false
+				},
+				"P": {
+					"at": [
+						-4,
+						10
+					],
+					"from": "N",
+					"lit": true
+				},
+				"Q": {
+					"at": [
+						-11,
+						9
+					],
+					"from": "N",
+					"lit": false
+				},
+				"S": {
+					"at": [
+						-1,
+						-8
+					],
+					"lit": false
+				}
+			},
+			"roots": [
+				[
+					"H",
+					"A"
+				],
+				[
+					"H",
+					"B"
+				],
+				[
+					"H",
+					"C"
+				],
+				[
+					"H",
+					"D"
+				],
+				[
+					"H",
+					"E"
+				],
+				[
+					"A",
+					"B"
+				],
+				[
+					"B",
+					"C"
+				],
+				[
+					"C",
+					"D"
+				],
+				[
+					"D",
+					"E"
+				],
+				[
+					"E",
+					"A"
+				],
+				[
+					"A",
+					"S"
+				],
+				[
+					"S",
+					"F"
+				],
+				[
+					"B",
+					"F"
+				],
+				[
+					"F",
+					"J"
+				],
+				[
+					"J",
+					"G"
+				],
+				[
+					"F",
+					"G"
+				],
+				[
+					"G",
+					"I"
+				],
+				[
+					"I",
+					"C",
+					1
+				],
+				[
+					"I",
+					"K"
+				],
+				[
+					"K",
+					"L"
+				],
+				[
+					"L",
+					"D"
+				],
+				[
+					"E",
+					"M"
+				],
+				[
+					"M",
+					"O"
+				],
+				[
+					"O",
+					"A",
+					1
+				],
+				[
+					"E",
+					"N"
+				],
+				[
+					"N",
+					"Q"
+				],
+				[
+					"Q",
+					"P"
+				],
+				[
+					"P",
+					"L"
+				],
+				[
+					"N",
+					"P",
+					1
+				],
+				[
+					"M",
+					"Q"
+				],
+				[
+					"K",
+					"P",
+					1
+				]
+			]
+		},
+		{
+			"id": "trial_wisp",
+			"kind": "wisp",
+			"tier": "common",
+			"tile": [
+				-48,
+				-10
+			],
+			"route": [
+				[
+					-48,
+					-10
+				],
+				[
+					-52,
+					-18
+				],
+				[
+					-54,
+					-27
+				],
+				[
+					-50,
+					-35
+				],
+				[
+					-42,
+					-38
+				],
+				[
+					-33,
+					-36
+				],
+				[
+					-27,
+					-30
+				],
+				[
+					-24,
+					-22
+				]
+			],
+			"stops": [
+				2,
+				4,
+				6,
+				7
+			],
+			"linger": [
+				4
+			]
+		},
+		{
+			"id": "trial_hoard",
+			"kind": "crow_hoard",
+			"tier": "common",
+			"tile": [
+				44,
+				-24
+			],
+			"variant": 0,
+			"mound": [
+				56,
+				-6
+			]
+		},
+		{
+			"id": "trial_raven",
+			"kind": "raven_trade",
+			"tier": "rare",
+			"tile": [
+				-36,
+				30
+			],
+			"variant": 0,
+			"stations": [
+				[
+					-26,
+					36
+				],
+				[
+					-14,
+					38
+				],
+				[
+					-2,
+					36
+				]
+			],
+			"mound": [
+				8,
+				38
+			]
 		}
 	]
 }

@@ -385,77 +385,426 @@ def catmull(points, step=2.0):
     return np.array(out)
 
 
+PATH_RAMP = [hexc(c) for c in ("463852", "5e4f62", "7b6b6e", "988978", "b4a58b", "cdc0a2", "e3d7ba")]
+DAMP_RAMP = [hexc(c) for c in ("2d2540", "433852", "5c4f64", "796b78", "96888c", "b4a7a0", "ccc0b6")]
+MEADOW_HI = MEADOW + [hexc("a8dc8c")]
+WILDFLOWERS = [hexc("dc9ac4"), hexc("b6ace0"), hexc("fff0e4"), hexc("ffe28a")]
+ROOT_BARK = [hexc(c) for c in ("281d34", "523e52", "826876", "b29690")]
+
+
+def _draw_path_pebble(img, mask, cx, cy, size):
+    """Shaded 3D twilight-slate pebble/cobble with top-left glint and cool-violet seat shadow."""
+    h, w = img.shape[:2]
+    ix, iy = int(round(cx)), int(round(cy))
+    if size <= 1.15:
+        if 1 <= ix < w - 1 and 1 <= iy < h - 1 and img[iy, ix, 3] > 0:
+            img[iy, ix] = STONE[4]
+            if img[iy, ix + 1, 3] > 0:
+                img[iy, ix + 1] = STONE[2]
+        return
+    rx, ry = size, max(1.2, size * 0.76)
+    for y in range(int(cy - ry - 1), int(cy + ry + 2)):
+        for x in range(int(cx - rx - 1), int(cx + rx + 2)):
+            if not (0 <= x < w and 0 <= y < h):
+                continue
+            dx, dy = (x - cx) / rx, (y - cy) / ry
+            d = dx * dx + dy * dy
+            if d <= 1.0:
+                lit = -(dx * 0.65 + dy * 0.75)
+                img[y, x] = STONE[clampi(int(round(2.8 + lit * 1.8)), 1, 5)]
+                if size >= 2.2:
+                    mask[y, x] = (STONE_CODE, 0, 0, 255)
+            elif d <= 1.38 and dy > 0.15 and dx > -0.2 and img[y, x, 3] > 0:
+                img[y, x, :3] = (
+                    int(img[y, x, 0] * 0.76),
+                    int(img[y, x, 1] * 0.74),
+                    min(255, int(img[y, x, 2] * 0.84 + 6)),
+                )
+
+
+def _draw_path_slab(img, mask, cx, cy, rx, ry, angle_deg, seed, mossy=0.28):
+    """Cluster-clean crooked sunken flagstone slab (top-left bevel, mortar seat, moss cushions)."""
+    h, w = img.shape[:2]
+    ca, sa = math.cos(math.radians(angle_deg)), math.sin(math.radians(angle_deg))
+    reach = int(max(rx, ry)) + 3
+    tone_shift = (noise(int(cx), int(cy), seed) / 255.0 - 0.5) * 0.65
+    for y in range(int(cy) - reach, int(cy) + reach + 1):
+        for x in range(int(cx) - reach, int(cx) + reach + 1):
+            if not (0 <= x < w and 0 <= y < h):
+                continue
+            ux, uy = x - cx, y - cy
+            dx = (ux * ca + uy * sa) / rx
+            dy = (-ux * sa + uy * ca) / ry
+            ang = math.atan2(dy, dx)
+            wob = 1.0 + 0.11 * math.sin(ang * 3.0 + seed) + 0.06 * math.cos(ang * 5.0 - seed * 0.7)
+            d = (abs(dx) ** 3.0 + abs(dy) ** 3.0) ** (1.0 / 3.0) / wob
+            if d > 1.10:
+                continue
+            if d > 0.96:
+                if ux * 0.6 + uy * 0.8 > 0.0 and img[y, x, 3] > 0:
+                    img[y, x] = MORTAR
+                continue
+            lit = -(ux / rx * 0.55 + uy / ry * 0.80)
+            if d > 0.78:
+                c = STONE[4] if lit > 0.22 else (STONE[1] if lit < -0.25 else STONE[2])
+            else:
+                cush = (noise(x // 3, y // 3, seed + 9) / 255.0 - 0.5) * 0.85
+                val = 2.65 + tone_shift + lit * 0.85 + cush
+                c = STONE[clampi(int(round(val)), 1, 4)]
+                if mossy > 0 and noise(x // 2, y // 2, seed + 17) > int(255 * (1.0 - mossy)):
+                    c = MOSS[clampi(int(lit + 1.6), 0, 3)]
+            img[y, x] = c
+            mask[y, x] = (STONE_CODE, 0, 0, 255)
+
+
 def bake_path(spec, seed, centre):
+    """Bakes a rich, organic Shadowspore path decal:
+    - Cluster-shaded earth cushions (orphan-cleaned, zero 4x4 Bayer static)
+    - Alternating double-rut stretches, warm single-track sections, and natural grassy spur-islands
+    - Whole-cell Voronoi twilight-slate flagstones & crooked curbstones in weathered stretches
+    - Damp violet-umber hollows with sky-reflecting puddles, shaded pebbles, bark chips & bank roots
+    - Scalloped overhanging NW turf & curved SE grass blades melting seamlessly into grass.png."""
     width = float(spec.get("width", 26))
-    curve = catmull(spec["points"])
+    is_gloom = bool(spec.get("gloom", False))
+    curve = catmull(spec["points"], step=1.6)
     seg = np.linalg.norm(np.diff(curve, axis=0), axis=1)
     arc = np.concatenate([[0.0], np.cumsum(seg)])
-    total = arc[-1]
-    margin = int(width) + 14
+    total = float(arc[-1])
+    margin = int(width) + 18
     x0, y0 = int(curve[:, 0].min()) - margin, int(curve[:, 1].min()) - margin
     x1, y1 = int(curve[:, 0].max()) + margin, int(curve[:, 1].max()) + margin
     w, h = x1 - x0, y1 - y0
+
     rng = np.random.default_rng(seed)
-    phase = rng.random(8) * math.tau
-    # width and "grassiness" along the path
-    half = np.array([width * 0.5 * (0.88 + 0.22 * math.sin(a / 47.0 + phase[0]) + 0.1 * math.sin(a / 19.0 + phase[1])) for a in arc])
+    prng = random.Random(seed)
+    phase = rng.random(12) * math.tau
+
+    # Breathing width, ruts, dampness, stone paving, and occasional spur-islands along arc `s`
+    half = width * 0.5 * (
+        0.88
+        + 0.20 * np.sin(arc / 53.0 + phase[0])
+        + 0.11 * np.sin(arc / 21.0 + phase[1])
+        + 0.08 * np.maximum(0.0, np.sin(arc / 115.0 + phase[2]) - 0.35)
+    )
     taper_in = np.clip(arc / float(spec.get("taper_in", 0.0) or 1.0), 0.0, 1.0) if spec.get("taper_in", 0) else np.ones_like(arc)
     taper_out = np.clip((total - arc) / float(spec.get("taper_out", 70.0)), 0.0, 1.0)
-    half = half * np.minimum(taper_in, 0.25 + 0.75 * taper_out)
-    grass = np.array([0.5 + 0.5 * math.sin(a / 33.0 + phase[2]) * math.sin(a / 71.0 + phase[3]) for a in arc])
+    end_env = np.minimum(taper_in, 0.25 + 0.75 * taper_out)
+    half = half * end_env
+
+    rut_amt = np.clip(0.55 + 0.55 * np.sin(arc / 85.0 + phase[3]), 0.0, 1.0)
+    damp_amt = np.clip(0.38 + 0.58 * np.sin(arc / 130.0 + phase[4]) * np.cos(arc / 67.0 + phase[5]), 0.0, 1.0)
+    if is_gloom:
+        damp_amt = np.clip(damp_amt * 0.7 + 0.35, 0.0, 1.0)
+    # Stone flagstone patches: stronger near start_ruins on footpath_start, plus organic old remnants along the way
+    ruin_boost = np.exp(-arc / 160.0) * (0.42 if spec.get("id") == "footpath_start" else 0.0)
+    pave_amt = np.clip(0.45 * np.sin(arc / 95.0 + phase[6]) * np.sin(arc / 43.0 + phase[7]) + ruin_boost, 0.0, 1.0)
+    island_amt = np.where((half >= 12.2) & (arc > 75.0) & (arc < total - 95.0), np.sin(arc / 145.0 + phase[8]), -1.0)
+
     tangents = np.gradient(curve, axis=0)
     tangents /= np.linalg.norm(tangents, axis=1)[:, None] + 1e-9
-    edge_noise = vnoise(w, h, 5, seed + 11) - 0.5
-    pebble_noise = vnoise(w, h, 2, seed + 12)
+
+    # Fast band-restricted distance & nearest-index rasterization around the curve!
+    d2_map = np.full((h, w), 1e9, dtype=np.float32)
+    idx_map = np.zeros((h, w), dtype=np.int32)
+    cx_local = curve[:, 0] - x0
+    cy_local = curve[:, 1] - y0
+    for i in range(len(curve)):
+        hw_i = float(half[i])
+        if hw_i < 0.8:
+            continue
+        reach = int(hw_i * 1.45) + 5
+        lx0, lx1 = max(0, int(cx_local[i]) - reach), min(w - 1, int(cx_local[i]) + reach)
+        ly0, ly1 = max(0, int(cy_local[i]) - reach), min(h - 1, int(cy_local[i]) + reach)
+        if lx1 < lx0 or ly1 < ly0:
+            continue
+        px = (np.arange(lx0, lx1 + 1, dtype=np.float32) + 0.5)[None, :]
+        py = (np.arange(ly0, ly1 + 1, dtype=np.float32) + 0.5)[:, None]
+        dd2 = (px - cx_local[i]) ** 2 + (py - cy_local[i]) ** 2
+        cur_sub = d2_map[ly0:ly1 + 1, lx0:lx1 + 1]
+        better = dd2 < cur_sub
+        cur_sub[better] = dd2[better]
+        idx_map[ly0:ly1 + 1, lx0:lx1 + 1][better] = i
+
+    near_band = d2_map < 1e8
+    ys_b, xs_b = np.nonzero(near_band)
     img = np.zeros((h, w, 4), dtype=np.uint8)
     mask = np.zeros((h, w, 4), dtype=np.uint8)
-    light = np.array([-0.7, -0.7])
-    prng = random.Random(seed)
-    for y in range(h):
-        py = y + y0 + 0.5
-        px = np.arange(w) + x0 + 0.5
-        dx = px[:, None] - curve[None, :, 0]
-        dy = py - curve[None, :, 1]
-        d2 = dx * dx + dy * dy
-        idx = np.argmin(d2, axis=1)
-        d = np.sqrt(d2[np.arange(w), idx])
-        hw = half[idx]
-        t = d / np.maximum(hw, 0.5) + edge_noise[y] * 0.5
-        vx = (px - curve[idx, 0]) / np.maximum(d, 1e-6)
-        vy = (py - curve[idx, 1]) / np.maximum(d, 1e-6)
-        side = vx * light[0] + vy * light[1]  # >0: on the lit side (north-west) of the line
-        lat = vx * (-tangents[idx, 1]) + vy * tangents[idx, 0]  # signed sideways offset, -1 .. 1 times t
-        for x in range(w):
-            tt = t[x]
-            if tt >= 1.0 or hw[x] < 1.0:
-                continue
-            gx, gy = x + x0, y + y0
-            b = BAYER[gy % 4][gx % 4]
-            cover = 1.0 - max(0.0, tt - 0.55) / 0.45  # the edge thins out into the meadow
-            cover *= 1.0 - 0.55 * grass[idx[x]] * min(1.0, tt * 1.4)  # grass grows through in places
-            if cover <= b * 0.95 + 0.04 * (noise(gx, gy, 3) / 255.0):
-                continue
-            n = noise(gx // 2, gy // 2, 21) / 255.0
-            base = 2.75 + (n - 0.5) * 1.6 + (b - 0.5) * 0.7 - 0.7 * tt
-            if tt > 0.72:  # the path lies a little sunk: shade on the north-west bank, a light rim on the other side
-                base += -0.9 if side[x] > 0.25 else (0.5 if side[x] < -0.25 else 0.0)
-            wear = abs(abs(lat[x]) * d[x] - 0.3 * hw[x]) < 0.8 and tt < 0.7  # two faint wear lines
-            if wear:
-                base -= 0.7
-            c = PATH[clampi(int(base), 0, 5)]
-            pn = pebble_noise[y, x]
-            if pn > 0.88 and noise(gx, gy, 5) > 140:  # a pebble
-                c = STONE[2 + (noise(gx, gy, 6) > 128)] if (gx + gy) % 2 else PATH[5]
-            img[y, x] = c
-            if tt < 0.85:
-                mask[y, x] = (PATH_CODE, 0, 0, 255)
-    for _ in range(int(total / 9)):  # tufts of grass here and there on the path itself
-        i = prng.randrange(len(curve))
-        lateral = prng.uniform(-0.8, 0.8) * half[i]
-        x = int(curve[i, 0] - tangents[i, 1] * lateral - x0)
-        y = int(curve[i, 1] + tangents[i, 0] * lateral - y0)
-        if 4 <= x < w - 4 and 6 <= y < h - 2 and img[y, x, 3] and half[i] > 4:
-            tuft(img, x, y, prng.randrange(2, 5), prng, MEADOW)
+    if len(ys_b) == 0:
+        return img, mask, (x0, y0)
+
+    edge_wob = (vnoise(w, h, 8, seed + 11) - 0.5) * 0.28 + (vnoise(w, h, 3, seed + 12) - 0.5) * 0.10
+    cush = (vnoise(w, h, 9, seed + 13) - 0.5) * 1.55 + (vnoise(w, h, 4, seed + 14) - 0.5) * 0.55
+
+    c_idx = idx_map[ys_b, xs_b]
+    d_val = np.sqrt(d2_map[ys_b, xs_b])
+    hw_val = np.maximum(half[c_idx], 0.5)
+    vx = (xs_b + 0.5 - cx_local[c_idx]) / np.maximum(d_val, 1e-6)
+    vy = (ys_b + 0.5 - cy_local[c_idx]) / np.maximum(d_val, 1e-6)
+    nw_val = vx * (-0.7071) + vy * (-0.7071)
+    lat_val = vx * (-tangents[c_idx, 1]) + vy * tangents[c_idx, 0]
+
+    # Spur-Insel: where island_amt > 0.78, push the two tracks gently apart around a tiny meadow island
+    isl = np.clip((island_amt[c_idx] - 0.76) / 0.24, 0.0, 1.0)
+    eff_t = np.where(
+        isl > 0.0,
+        np.abs(d_val - isl * hw_val * 0.48) / (hw_val * (1.0 - 0.26 * isl)),
+        d_val / hw_val,
+    )
+    te_val = eff_t + edge_wob[ys_b, xs_b]
+
+    keep_sub = (te_val < 1.0) & (hw_val >= 1.0)
+    ky, kx = ys_b[keep_sub], xs_b[keep_sub]
+    k_cidx = c_idx[keep_sub]
+    k_te = te_val[keep_sub]
+    k_t = eff_t[keep_sub]
+    k_nw = nw_val[keep_sub]
+    k_lat = lat_val[keep_sub]
+    k_isl = isl[keep_sub]
+
+    keep = np.zeros((h, w), dtype=bool)
+    keep[ky, kx] = True
+    nw_grid = np.zeros((h, w), dtype=np.float32)
+    nw_grid[ky, kx] = k_nw
+    te_grid = np.ones((h, w), dtype=np.float32) * 2.0
+    te_grid[ky, kx] = k_te
+
+    # Compute cluster-shaded soil index (0..6)
+    rut_profile = np.exp(-((np.abs(k_lat * k_t) - 0.44) / 0.18) ** 2) * rut_amt[k_cidx] * (1.0 - k_isl)
+    center_warm = (1.0 - rut_amt[k_cidx]) * 0.75 * np.maximum(0.0, 1.0 - (k_t / 0.62) ** 2)
+    bank_shade = np.where(
+        k_te > 0.74,
+        np.where(k_nw > 0.16, -0.75, np.where(k_nw < -0.16, 0.55, 0.0)),
+        0.0,
+    )
+    raw_tone = (
+        3.65
+        + cush[ky, kx]
+        + center_warm
+        - 1.30 * rut_profile
+        - 0.75 * np.maximum(0.0, k_te - 0.62) / 0.38
+        + bank_shade
+    )
+    tone_grid = np.zeros((h, w), dtype=np.int32)
+    tone_grid[ky, kx] = np.clip(np.rint(raw_tone), 0, 6).astype(np.int32)
+
+    # Vectorized 2-pass orphan cleanup so every soil patch reads as crisp cel-shaded cushions!
+    for _ in range(2):
+        up = np.pad(tone_grid[:-1, :], ((1, 0), (0, 0)), mode="edge")
+        dn = np.pad(tone_grid[1:, :], ((0, 1), (0, 0)), mode="edge")
+        lf = np.pad(tone_grid[:, :-1], ((0, 0), (1, 0)), mode="edge")
+        rt = np.pad(tone_grid[:, 1:], ((0, 0), (0, 1)), mode="edge")
+        same = (tone_grid == up).astype(int) + (tone_grid == dn).astype(int) + (tone_grid == lf).astype(int) + (tone_grid == rt).astype(int)
+        orphan = keep & (same == 0)
+        med = np.sort(np.stack([up, dn, lf, rt], axis=-1), axis=-1)[..., 1]
+        tone_grid[orphan] = med[orphan]
+
+    # Blend between warm sunlit EARTH and cool violet-umber DAMP_RAMP along damp stretches
+    earth_arr = np.array(PATH_RAMP, dtype=np.float32)
+    damp_arr = np.array(DAMP_RAMP, dtype=np.float32)
+    t_idx = tone_grid[ky, kx]
+    d_mix = damp_amt[k_cidx][:, None]
+    cols = np.clip(earth_arr[t_idx] * (1.0 - d_mix) + damp_arr[t_idx] * d_mix, 0, 255).astype(np.uint8)
+    cols[:, 3] = 255
+    img[ky, kx] = cols
+
+    solid_mask = keep & (te_grid < 0.88)
+    mask[solid_mask] = (PATH_CODE, 0, 0, 255)
+
+    # Subtle 2-3 px horizontal soil ripples inside wide beds
+    for _ in range(int(total * 0.45)):
+        ci = prng.randrange(len(curve))
+        if half[ci] < 5.0:
+            continue
+        off = prng.uniform(-0.65, 0.65) * half[ci]
+        sx_i = int(cx_local[ci] - tangents[ci, 1] * off)
+        sy_i = int(cy_local[ci] + tangents[ci, 0] * off)
+        if 2 <= sx_i < w - 4 and 2 <= sy_i < h - 2 and keep[sy_i, sx_i]:
+            nt = clampi(tone_grid[sy_i, sx_i] + prng.choice((-1, 1)), 0, 6)
+            dm = float(damp_amt[ci])
+            rc = tuple(int(earth_arr[nt, ch] * (1.0 - dm) + damp_arr[nt, ch] * dm) for ch in range(3)) + (255,)
+            for dx in range(prng.randint(2, 3)):
+                if keep[sy_i, sx_i + dx]:
+                    img[sy_i, sx_i + dx] = rc
+
+    # Whole-cell Voronoi twilight-slate flagstones in weathered paved stretches (never sliced mid-stone!)
+    stone_drawn = np.zeros((h, w), dtype=bool)
+    pave_indices = np.nonzero(pave_amt > 0.16)[0]
+    visited_boxes = set()
+    for ci in pave_indices[::6]:
+        bx_c, by_c = int(cx_local[ci]) // 16, int(cy_local[ci]) // 16
+        if (bx_c, by_c) in visited_boxes:
+            continue
+        visited_boxes.add((bx_c, by_c))
+        reach = int(half[ci]) + 4
+        ya, yb = max(0, int(cy_local[ci]) - reach), min(h - 1, int(cy_local[ci]) + reach)
+        xa, xb = max(0, int(cx_local[ci]) - reach), min(w - 1, int(cx_local[ci]) + reach)
+        loc_thresh = 1.0 - pave_amt[ci] * 1.15
+        for py_i in range(ya, yb + 1):
+            for px_i in range(xa, xb + 1):
+                if not keep[py_i, px_i] or stone_drawn[py_i, px_i]:
+                    continue
+                gx, gy = px_i + x0 + seed * 5, py_i + y0 + seed * 3
+                cid, d1, d2, (ccx, ccy) = cell_of(gx, gy)
+                icx = clampi(int(round(ccx - seed * 5 - x0)), 0, w - 1)
+                icy = clampi(int(round(ccy - seed * 3 - y0)), 0, h - 1)
+                if te_grid[icy, icx] >= 0.72:
+                    continue
+                if (noise(cid, 3, seed + 91) / 255.0) < loc_thresh:
+                    continue
+                stone_drawn[py_i, px_i] = True
+                mask[py_i, px_i] = (STONE_CODE, 0, 0, 255)
+                if d2 - d1 < 1.25:
+                    img[py_i, px_i] = MOSS[noise(gx, gy, 47) % 3] if noise(gx // 2, gy // 2, 46) > 198 else MORTAR
+                else:
+                    tone = 1 + (noise(cid, 7, 43) % 3)
+                    lit = -0.52 * ((gx + 0.5 - ccx) + (gy + 0.5 - ccy)) / (CELL * 0.6)
+                    if d2 - d1 < 2.5 and (gx + 0.5 - ccx) + (gy + 0.5 - ccy) < -0.4:
+                        img[py_i, px_i] = STONE[clampi(tone + 1, 2, 5)]
+                    else:
+                        c_cush = (noise(gx // 3, gy // 3, 48) / 255.0 - 0.5) * 0.65
+                        img[py_i, px_i] = STONE[clampi(int(round(tone + 0.6 + lit + c_cush)), 1, 4)]
+
+    # Crooked sunken stepping slabs, mossy island boulders, occasional puddles, and bank roots
+    last_feature_a = -40.0
+    for ci in range(12, len(curve) - 12, 8):
+        a_cur = float(arc[ci])
+        if a_cur - last_feature_a < 26.0 or half[ci] < 7.5:
+            continue
+        nx_v, ny_v = -tangents[ci, 1], tangents[ci, 0]
+        ang = math.degrees(math.atan2(ny_v, nx_v)) + 90.0
+        # Mossy boulder on Spur-Insel centers!
+        if island_amt[ci] > 0.88:
+            _draw_path_slab(img, mask, cx_local[ci], cy_local[ci], 5.6, 4.0, ang + prng.uniform(-15, 15), seed + ci, mossy=0.45)
+            last_feature_a = a_cur + 22.0
+            continue
+        r_roll = prng.random()
+        if damp_amt[ci] > 0.78 and half[ci] >= 11.0 and r_roll < 0.22:
+            # Small organic rainwater puddle reflecting the sky
+            pcx = cx_local[ci] + nx_v * prng.uniform(-2.5, 2.5)
+            pcy = cy_local[ci] + ny_v * prng.uniform(-2.5, 2.5)
+            prx, pry = prng.uniform(4.2, 6.4), prng.uniform(2.6, 3.8)
+            for yy in range(max(0, int(pcy - pry - 2)), min(h, int(pcy + pry + 3))):
+                for xx in range(max(0, int(pcx - prx - 2)), min(w, int(pcx + prx + 3))):
+                    if not keep[yy, xx] or stone_drawn[yy, xx]:
+                        continue
+                    pa = math.atan2(yy - pcy, xx - pcx)
+                    pw = 1.0 + 0.14 * math.sin(pa * 2.0 + ci)
+                    dd = math.hypot((xx - pcx) / prx, (yy - pcy) / pry) / pw
+                    if 1.0 < dd <= 1.26:
+                        img[yy, xx] = DAMP_RAMP[0]
+                    elif dd <= 1.0:
+                        pt = 0 if dd > 0.76 else (2 if (yy - pcy) < -0.1 * pry else 1)
+                        if -0.4 * prx < (xx - pcx) < 0.05 * prx and -0.4 * pry < (yy - pcy) < -0.05 * pry:
+                            pt = 3
+                        img[yy, xx] = PUDDLE[pt]
+            last_feature_a = a_cur + 28.0
+        elif r_roll < (0.28 if is_gloom else 0.18):
+            # Crooked sunken curbstone or stepping slab
+            side_sgn = prng.choice((-1, 1))
+            off = side_sgn * half[ci] * (prng.uniform(0.55, 0.78) if not is_gloom else prng.uniform(0.1, 0.65))
+            _draw_path_slab(
+                img, mask,
+                cx_local[ci] + nx_v * off, cy_local[ci] + ny_v * off,
+                prng.uniform(3.8, 5.2), prng.uniform(2.6, 3.6),
+                ang + prng.uniform(-14, 14), seed + ci * 3, mossy=0.32
+            )
+            last_feature_a = a_cur
+        elif r_roll < (0.52 if is_gloom else 0.25):
+            # Tapering gnarled root gripping from the shady bank into the sunken path bed
+            side_sgn = -1 if (nx_v * (-0.7) + ny_v * (-0.7)) < 0 else 1
+            r_start = (cx_local[ci] + nx_v * side_sgn * half[ci] * 0.92, cy_local[ci] + ny_v * side_sgn * half[ci] * 0.92)
+            r_mid = (
+                cx_local[ci] + nx_v * side_sgn * half[ci] * 0.42 + tangents[ci, 0] * prng.uniform(-4, 4),
+                cy_local[ci] + ny_v * side_sgn * half[ci] * 0.42 + tangents[ci, 1] * prng.uniform(-4, 4),
+            )
+            r_end = (
+                cx_local[ci] + nx_v * side_sgn * half[ci] * 0.05 + tangents[ci, 0] * prng.uniform(-7, 7),
+                cy_local[ci] + ny_v * side_sgn * half[ci] * 0.05 + tangents[ci, 1] * prng.uniform(-7, 7),
+            )
+            rc = catmull([r_start, r_mid, r_end], step=0.6)
+            for ri, (rx_f, ry_f) in enumerate(rc):
+                rad = 1.65 * (1.0 - 0.65 * ri / max(1, len(rc) - 1))
+                for yy in range(max(0, int(ry_f - 2)), min(h, int(ry_f + 3))):
+                    for xx in range(max(0, int(rx_f - 2)), min(w, int(rx_f + 3))):
+                        if not keep[yy, xx]:
+                            continue
+                        dd = math.hypot(xx - rx_f, yy - ry_f)
+                        if dd <= rad:
+                            lit = -((xx - rx_f) * 0.65 + (yy - ry_f) * 0.75) / max(rad, 0.5)
+                            img[yy, xx] = ROOT_BARK[clampi(int(round(1.7 + lit * 1.2)), 0, 3)]
+            last_feature_a = a_cur
+
+    # Shaded 3D slate pebbles & occasional bark chips
+    for _ in range(int(total / 6.5)):
+        ci = prng.randrange(len(curve))
+        if half[ci] < 4.0:
+            continue
+        off = prng.uniform(-0.82, 0.82) * half[ci]
+        px_f = cx_local[ci] - tangents[ci, 1] * off
+        py_f = cy_local[ci] + tangents[ci, 0] * off
+        ix, iy = int(px_f), int(py_f)
+        if 3 <= ix < w - 3 and 3 <= iy < h - 3 and keep[iy, ix] and not stone_drawn[iy, ix]:
+            if prng.random() < 0.22:
+                img[iy, ix] = WOOD_CHIP[prng.randrange(1, 4)]
+                if keep[iy, ix + 1]:
+                    img[iy, ix + 1] = WOOD_CHIP[prng.randrange(0, 3)]
+            else:
+                _draw_path_pebble(img, mask, px_f, py_f, prng.choice((1.0, 1.0, 1.5, 2.1)))
+
+    # Melted turf edge: scalloped overhanging NW grass cushions + curved SE grass blades & wildflowers
+    eroded = keep.copy()
+    eroded[1:, :] &= keep[:-1, :]
+    eroded[:-1, :] &= keep[1:, :]
+    eroded[:, 1:] &= keep[:, :-1]
+    eroded[:, :-1] &= keep[:, 1:]
+    rim_ys, rim_xs = np.nonzero(keep & ~eroded)
+    rim_pts = list(zip(rim_xs.tolist(), rim_ys.tolist()))
+    prng.shuffle(rim_pts)
+    for bx, by in rim_pts:
+        if prng.random() > 0.62:
+            continue
+        nw = nw_grid[by, bx]
+        if nw > 0.05:
+            w_clump = prng.randint(2, 4)
+            for dx in range(w_clump):
+                xx = bx + dx - 1
+                if not (0 <= xx < w):
+                    continue
+                drop = 1 if (dx == 0 or dx == w_clump - 1) else prng.randint(1, 2)
+                for dy in range(0, drop):
+                    yy = by + dy
+                    if 0 <= yy < h and keep[yy, xx]:
+                        img[yy, xx] = MEADOW_HI[clampi(4 - dy, 1, 5)]
+                if 0 <= by + drop < h and keep[by + drop, xx]:
+                    img[by + drop, xx, :3] = (
+                        int(img[by + drop, xx, 0] * 0.80),
+                        int(img[by + drop, xx, 1] * 0.78),
+                        min(255, int(img[by + drop, xx, 2] * 0.88 + 6)),
+                    )
+        else:
+            for k in range(prng.randint(2, 4)):
+                xx0 = bx + k - 1
+                ln = prng.randint(2, 5)
+                lean = prng.choice((-1, 0, 0, 1))
+                for j in range(ln):
+                    xx = xx0 + (lean if j >= ln - 1 else 0)
+                    yy = by + 1 - j
+                    if 0 <= xx < w and 0 <= yy < h:
+                        img[yy, xx] = MEADOW_HI[clampi(2 + (j * 4) // max(ln, 1), 1, 6)]
+            if not is_gloom and prng.random() < 0.045 and 2 <= by < h - 1 and 1 <= bx < w - 1:
+                img[by - 1, bx] = prng.choice(WILDFLOWERS)
+
+    # Occasional grass tufts on outer shoulders and grassy median strips
+    for _ in range(int(total / 8.5)):
+        ci = prng.randrange(len(curve))
+        if half[ci] <= 5.0:
+            continue
+        in_med = rut_amt[ci] > 0.68 and prng.random() < 0.42
+        lateral = (prng.uniform(-0.14, 0.14) if in_med else prng.choice((-1, 1)) * prng.uniform(0.62, 0.86)) * half[ci]
+        x = int(cx_local[ci] - tangents[ci, 1] * lateral)
+        y = int(cy_local[ci] + tangents[ci, 0] * lateral)
+        if 4 <= x < w - 4 and 6 <= y < h - 2 and keep[y, x] and not stone_drawn[y, x]:
+            tuft(img, x, y, prng.randrange(2, 5), prng, MEADOW_HI[:6])
     return img, mask, (x0, y0)
 
 
@@ -613,9 +962,9 @@ def bake_yard(spec, seed):
 
 # ------------------------------------------------------------------ output
 def save(path, arr):
-    h, w = arr.shape[:2]
+    from PIL import Image
     path.parent.mkdir(parents=True, exist_ok=True)
-    write_png(path, w, h, [[tuple(int(v) for v in arr[y, x]) for x in range(w)] for y in range(h)])
+    Image.fromarray(arr).save(path)
 
 
 def preview(items, path):
@@ -775,18 +1124,48 @@ def main():
     centre = (sx * 16 + 8, sy * 16 + 8)
     seed = int(data.get("seed", 1))
     only_path = next((a[7:] for a in sys.argv[1:] if a.startswith("--path=")), "")  # bakes just that path (e.g. hexenwald_path) and merges it into data/ground_baked.json
-    if only_path:
-        i, spec = next((i, p) for i, p in enumerate(data["paths"]) if p["id"] == only_path)
-        img, mask, (ox, oy) = bake_path(spec, int(data.get("seed", 1)) + i * 101 + 7, centre)
-        if spec.get("gloom"):
-            gloom_tone(img, (centre[0] + ox, centre[1] + oy))
-        save(ROOT / "assets" / "world" / "ground" / (spec["id"] + ".png"), img)
-        save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_mask.png"), mask)
-        entry = {"id": spec["id"], "texture": "res://assets/world/ground/%s.png" % spec["id"], "mask": "res://assets/world/ground/%s_mask.png" % spec["id"], "x": centre[0] + ox, "y": centre[1] + oy}
+    only_paths = "--paths" in sys.argv  # quick rebuild of all paths in data/ground.json (with stone_fields cut-out & gloom)
+    if only_path or only_paths:
         out = json.load(open(ROOT / "data" / "ground_baked.json"))
-        out["decals"] = [d for d in out["decals"] if d["id"] != spec["id"]] + [entry]
+        by_id = {d["id"]: d for d in out.get("decals", [])}
+        loaded_stones = []
+        for sf in data.get("stone_fields", []):
+            d_sf = by_id.get(sf["id"])
+            sf_path = ROOT / "assets" / "world" / "ground" / (sf["id"] + ".png")
+            if d_sf and sf_path.exists():
+                loaded_stones.append((load_png(str(sf_path)), None, (int(d_sf["x"]) - centre[0], int(d_sf["y"]) - centre[1])))
+        targets = [(i, p) for i, p in enumerate(data["paths"]) if (not only_path or p["id"] == only_path)]
+        rebuilt = {}
+        for i, spec in targets:
+            img, mask, (ox, oy) = bake_path(spec, seed + i * 101 + 7, centre)
+            if loaded_stones:
+                cut_under_stones(img, mask, (ox, oy), loaded_stones)
+            if spec.get("gloom"):
+                gloom_tone(img, (centre[0] + ox, centre[1] + oy))
+            save(ROOT / "assets" / "world" / "ground" / (spec["id"] + ".png"), img)
+            save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_mask.png"), mask)
+            rebuilt[spec["id"]] = {
+                "id": spec["id"],
+                "texture": "res://assets/world/ground/%s.png" % spec["id"],
+                "mask": "res://assets/world/ground/%s_mask.png" % spec["id"],
+                "x": centre[0] + ox,
+                "y": centre[1] + oy,
+            }
+            print("baked", spec["id"], img.shape[1], "x", img.shape[0])
+        kept = []
+        seen = set()
+        for d in out.get("decals", []):
+            did = d["id"]
+            if did in rebuilt:
+                kept.append(rebuilt[did])
+                seen.add(did)
+            else:
+                kept.append(d)
+        for did, entry in rebuilt.items():
+            if did not in seen:
+                kept.append(entry)
+        out["decals"] = kept
         json.dump(out, open(ROOT / "data" / "ground_baked.json", "w"), separators=(",", ":"))
-        print("baked", spec["id"], img.shape[1], "x", img.shape[0])
         return
     only_yards = "--yards" in sys.argv  # quick rebuild of the hut yards alone: the rest of data/ground_baked.json stays as it is
     args = [a for a in sys.argv[1:] if not a.startswith("--")]

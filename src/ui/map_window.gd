@@ -683,7 +683,7 @@ func _draw_town(fade: float) -> void:
 				continue
 			var tone: Color = Color(TOWN_TEAL, (0.16 if pass_index == 0 else 0.55) * fade)
 			VineStyle.ring(_overlay, around, int(radius), tone, 0.6 if pass_index == 1 else 0.3)
-	var at: Vector2 = _to_screen(town.center / 16.0)
+	var at: Vector2 = _to_screen(town.heart() / 16.0)
 	if _on_screen(at):
 		_glyph(TOWN_FLAG, at + Vector2(0, -3), TOWN_TEAL, fade)
 		_overlay.draw_rect(Rect2(at + Vector2(-2, -5), Vector2(1, 8)), Color(VineStyle.BARK_LIGHT, fade))

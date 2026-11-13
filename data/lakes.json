@@ -17,6 +17,86 @@
         24
       ],
       "seed": 7
+    },
+    {
+      "id": "oasis_west",
+      "center": [
+        508,
+        95
+      ],
+      "radius": [
+        13,
+        10
+      ],
+      "angle": -22,
+      "seed": 17
+    },
+    {
+      "id": "oasis_lagoon",
+      "center": [
+        708,
+        139
+      ],
+      "radius": [
+        19,
+        14
+      ],
+      "angle": -18,
+      "seed": 19,
+      "lobes": [
+        {
+          "offset": [
+            13,
+            6
+          ],
+          "radius": [
+            11,
+            9
+          ],
+          "angle": 14,
+          "seed": 23
+        }
+      ]
+    },
+    {
+      "id": "oasis_twins",
+      "center": [
+        798,
+        209
+      ],
+      "radius": [
+        12,
+        9
+      ],
+      "angle": 28,
+      "seed": 43,
+      "lobes": [
+        {
+          "offset": [
+            -10,
+            5
+          ],
+          "radius": [
+            9,
+            8
+          ],
+          "angle": -15,
+          "seed": 47
+        }
+      ]
+    },
+    {
+      "id": "oasis_spring",
+      "center": [
+        1002,
+        119
+      ],
+      "radius": [
+        10,
+        8
+      ],
+      "angle": 12,
+      "seed": 59
     }
   ]
 }

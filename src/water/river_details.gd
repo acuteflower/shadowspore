@@ -19,6 +19,10 @@ var _jellies: Array[Dictionary] = []
 var _water_glows: Dictionary = {} ## water-plant sprite -> its glow sprite (same frame)
 var _water_homes: Dictionary = {} ## water-plant sprite -> where it floats
 var _bank_glow_sheet: Texture2D
+var _oasis_bank_sheet: Texture2D
+var _oasis_bank_glow_sheet: Texture2D
+var _oasis_water_sheet: Texture2D
+var _oasis_water_glow_sheet: Texture2D
 var _flora_shader: Shader ## river_flora.gdshader; the materials stay per plant (bend and current are per-plant uniforms)
 
 func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> void:
@@ -38,10 +42,11 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 			if _sprites.size() >= int(_spec["max_chunk"]): break
 			var at: Vector2 = Vector2(cell) * 512.0 + Vector2(x + rng.randf_range(-8, 8), y + rng.randf_range(-8, 8)).round()
 			var field: Vector2 = rivers.field_at(at)
+			var arid_w: bool = BiomeBlend.arid_at(at) > 0.42
 			var row: int = -1
-			if field.x > 1.0 and field.x < 9.0: row = 1
-			elif field.x < -2.0 and field.y > 0.15 and field.y < 0.55: row = 0 if rng.randf() < 0.8 else 4
-			elif field.x < -10.0 and field.y > 0.78 and rng.randf() < 0.3:
+			if not arid_w and field.x > 1.0 and field.x < 9.0: row = 1
+			elif not arid_w and field.x < -2.0 and field.y > 0.15 and field.y < 0.55: row = 0 if rng.randf() < 0.8 else 4
+			elif not arid_w and field.x < -10.0 and field.y > 0.78 and rng.randf() < 0.3:
 				var ford_free: bool = true
 				for ford: Array in data["fords"]:
 					if at.distance_to(Vector2(float(ford[0]), float(ford[1]))) < float(_spec["rock_clear_ford"]): ford_free = false
@@ -61,7 +66,8 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 			sprite.offset = Vector2(-16, -34)
 			sprite.position = at
 			sprite.z_index = -6 if row in [0, 4, 5] else 0
-			if row in [0, 4]: sprite.modulate = Color(0.65, 0.85, 0.8, 0.65)
+			if row in [0, 4]:
+				sprite.modulate = Color(0.70, 0.94, 0.88, 0.68) if arid_w else Color(0.65, 0.85, 0.8, 0.65)
 			if row in [0, 1]:
 				sprite.material = _flora_material()
 			add_child(sprite)
@@ -83,6 +89,7 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 		var outlet: Array = basin["outlet"]
 		var at: Vector2 = Vector2(float(outlet[0]), float(outlet[1])) + Vector2(5, -2)
 		if Vector2i((at / 512.0).floor()) != cell or _sprites.size() >= int(_spec["max_chunk"]): continue
+		if BiomeBlend.arid_at(at) > 0.42: continue
 		var pad: Sprite2D = Sprite2D.new()
 		pad.texture = sheet
 		pad.hframes = 8
@@ -128,12 +135,18 @@ func _bank_props(rivers: WorldRivers, cell: Vector2i) -> void:
 			# Patchy: most of the shore stays bare, some stretches are crowded.
 			var density: float = clampf(0.30 + clumps.get_noise_2dv(at) * 0.9, 0.04, 0.8)
 			if rng.randf() > density: continue
-			var kind: int = _bank_kind(gap, rng.randf())
+			var arid_b: bool = BiomeBlend.arid_at(at) > 0.42
+			var kind: int = _oasis_bank_kind(gap, rng.randf()) if arid_b else _bank_kind(gap, rng.randf())
+			var active_sheet: Texture2D = sheet
+			if arid_b:
+				if _oasis_bank_sheet == null:
+					_oasis_bank_sheet = load("res://assets/water/oasis_bank_details.png") as Texture2D
+				active_sheet = _oasis_bank_sheet
 			for i: int in 1 + (rng.randi() % 3 if rng.randf() < 0.5 else 0):
 				var spot: Vector2 = (at + Vector2(rng.randf_range(-11, 11), rng.randf_range(-6, 6)) * (1.0 if i > 0 else 0.0)).round()
 				var spot_gap: float = rivers.field_at(spot).x
 				if spot_gap < 1.5 or spot_gap > 17.0: continue
-				_add_bank_sprite(sheet, spot, kind, rng.randi() % 6, rng)
+				_add_bank_sprite(active_sheet, spot, kind, rng.randi() % 6, rng)
 				placed += 1
 
 ## 0 reeds, 1 stones, 2 driftwood, 3 blooms, 4 ferns, 5 foam stones, 6 glow reeds (7 lilies, 8 kelp: see _water_glow); chosen by distance to the water.
@@ -163,8 +176,13 @@ func _add_bank_sprite(sheet: Texture2D, at: Vector2, kind: int, variant: int, rn
 	_flows.append(Vector2.ZERO)
 	if kind in [3, 6, 7, 8]:  # luminous plants: only the glowing pixels, drawn unlit and brighter at night
 		var glow: Sprite2D = Sprite2D.new()
-		if _bank_glow_sheet == null: _bank_glow_sheet = load("res://assets/water/bank_details_glow.png") as Texture2D
-		glow.texture = _bank_glow_sheet
+		if BiomeBlend.arid_at(at) > 0.42:
+			if _oasis_bank_glow_sheet == null:
+				_oasis_bank_glow_sheet = load("res://assets/water/oasis_bank_details_glow.png") as Texture2D
+			glow.texture = _oasis_bank_glow_sheet
+		else:
+			if _bank_glow_sheet == null: _bank_glow_sheet = load("res://assets/water/bank_details_glow.png") as Texture2D
+			glow.texture = _bank_glow_sheet
 		glow.hframes = 6
 		glow.vframes = 9
 		glow.frame = sprite.frame
@@ -205,7 +223,16 @@ func _water_flora(rivers: WorldRivers, cell: Vector2i) -> void:
 					var at: Vector2 = (centre + Vector2(rng.randf_range(-16, 16), rng.randf_range(-8, 8)) * (1.0 if i > 0 else 0.0)).round()
 					var spot: Vector2 = rivers.field_at(at)
 					if spot.x > -4.0 or spot.y < 0.04: continue
-					_add_water_sprite(sheet, glow_sheet, at, kind, variant if i == 0 or rng.randf() < 0.6 else rng.randi() % 6, rng)
+					var w_sheet: Texture2D = sheet
+					var w_glow: Texture2D = glow_sheet
+					if BiomeBlend.arid_at(at) > 0.42:
+						if _oasis_water_sheet == null:
+							_oasis_water_sheet = load("res://assets/water/oasis_water_flora.png") as Texture2D
+						if _oasis_water_glow_sheet == null:
+							_oasis_water_glow_sheet = load("res://assets/water/oasis_water_flora_glow.png") as Texture2D
+						w_sheet = _oasis_water_sheet
+						w_glow = _oasis_water_glow_sheet
+					_add_water_sprite(w_sheet, w_glow, at, kind, variant if i == 0 or rng.randf() < 0.6 else rng.randi() % 6, rng)
 					placed += 1
 
 func _add_water_sprite(sheet: Texture2D, glow_sheet: Texture2D, at: Vector2, kind: int, variant: int, rng: RandomNumberGenerator) -> void:
@@ -273,7 +300,12 @@ func _water_glow(rivers: WorldRivers, cell: Vector2i) -> void:
 			var field: Vector2 = rivers.field_at(at)
 			if field.x > -3.0 or field.y < 0.08 or field.y > 0.6 or rng.randf() > 0.32: continue
 			var kind: int = 7 if field.y < 0.3 and rng.randf() < 0.6 else 8
-			_add_bank_sprite(sheet, at, kind, rng.randi() % 6, rng)
+			var g_sheet: Texture2D = sheet
+			if BiomeBlend.arid_at(at) > 0.42:
+				if _oasis_bank_sheet == null:
+					_oasis_bank_sheet = load("res://assets/water/oasis_bank_details.png") as Texture2D
+				g_sheet = _oasis_bank_sheet
+			_add_bank_sprite(g_sheet, at, kind, rng.randi() % 6, rng)
 			_flows[_flows.size() - 1] = _flow_at(at)
 			placed += 1
 
@@ -295,7 +327,7 @@ func _spawn_jellies(rivers: WorldRivers, cell: Vector2i) -> void:
 		if _jellies.size() >= int(_spec["jelly_max"]): return
 		var at: Vector2 = Vector2(cell) * 512.0 + Vector2(rng.randf() * 512.0, rng.randf() * 512.0).round()
 		if not _jelly_ok(at): continue
-		var color: int = rng.randi() % 3
+		var color: int = 0 if BiomeBlend.arid_at(at) > 0.42 else rng.randi() % 3
 		var big: int = 1 if rng.randf() < 0.4 else 0
 		var sprite: Sprite2D = Sprite2D.new()
 		sprite.texture = texture
@@ -317,9 +349,27 @@ func _spawn_jellies(rivers: WorldRivers, cell: Vector2i) -> void:
 		_jellies.append({"sprite": sprite, "pos": at, "heading": rng.randf() * TAU, "phase": rng.randf(), "row": color * 2 + big, "speed": float(_spec["jelly_speed"]) * rng.randf_range(0.7, 1.3)})
 
 func _jelly_ok(at: Vector2) -> bool:
+	if BiomeBlend.arid_at(at) >= 0.22:
+		return false
 	# The bell and its trailing tentacles (about 12 px south) must stay clear of the banks.
 	var field: Vector2 = _rivers.field_at(at)
 	return field.x < -7.0 and field.y > 0.2 and _rivers.field_at(at + Vector2(0, 12)).x < -5.0 and _rivers.field_at(at + Vector2(0, -6)).x < -5.0
+
+
+static func _oasis_bank_kind(gap: float, roll: float) -> int:
+	if gap <= 6.2:
+		if roll < 0.28: return 0 # Zwerg-Papyrus
+		if roll < 0.48: return 6 # Sternen-Binsen (glow)
+		if roll < 0.64: return 5 # Quellquarz im Uferschaum
+		if roll < 0.80: return 1 # Sonnenquarz-Uferkiesel
+		if roll < 0.92: return 2 # Salzquarz-Uferkruste (no wood)
+		return 3 # Oasen-Goldtau (glow)
+	if roll < 0.22: return 3 # Oasen-Goldtau (glow)
+	if roll < 0.40: return 4 # Fächerpalmen-Schössling
+	if roll < 0.58: return 0 # Zwerg-Papyrus
+	if roll < 0.74: return 1 # Sonnenquarz-Uferkiesel
+	if roll < 0.88: return 2 # Salzquarz-Uferkruste
+	return 6 # Sternen-Binsen (glow)
 
 func _drift_jellies(delta: float) -> void:
 	for jelly: Dictionary in _jellies:

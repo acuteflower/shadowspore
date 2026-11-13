@@ -30,7 +30,8 @@ try:
     head = subprocess.run(["git", "show", "HEAD:assets/world/relief.png"], cwd=ROOT, capture_output=True, check=True).stdout
     import io
     old = np.asarray(Image.open(io.BytesIO(head)).convert("RGBA"))
-    check((old[~hexm] == relief[~hexm]).all(), "relief.png outside the Hexenwald equals HEAD")
+    keep = ~(hexm | (relief[..., 3] == 206))
+    check((old[keep] == relief[keep]).all(), "relief.png outside Hexenwald and Sonnenquarz-Öde equals HEAD")
 except (subprocess.CalledProcessError, FileNotFoundError):
     print("skip: no git HEAD to compare with")
 

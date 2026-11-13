@@ -10,14 +10,18 @@ Everything she holds lives in the same small 3D world as her body model (`tools/
 (pitch 26 deg: screen = (x, y sin - z cos)). `GripRig` (src/components/grip_rig.gd) is that geometry, pure functions only, so every peer
 derives the same pose from the synced state (`held_weapon`, swing RPCs, the body sector) without new network traffic.
 
-- **The fist** starts at the sheet's natural right hand (`rig_hand`, lifted into 3D by `GripRig.hand_3d`) and, while the main sheet plays
-  (`free_hand`, set by `Player._animate`), moves to the item's own hold. Swings, picking, eating, casting and fishing keep the sheet's hand.
-- **The arm** is a two-bone solve (`GripRig.arm`) from the rig shoulder with the renderer's arm lengths and elbow pole, painted by
-  `ArmPainter` (src/fx/arm_painter.gd) exactly like her left arm: leather shoulder cap, plum coat sleeve, black leather bracer with the
-  glowing violet band, leather glove; the same radii, the same light from the upper left in four flat bands (`shade_band` thresholds),
-  ink where a part lies in front of another and the dark outline (`ink_color`). The arm and the item wear a copy of her sprite shader
-  (`AttackComponent.mirror_material`), so pallor, wetness, the hit flash, the mist veil and the daylight grade match the sheet. The arm
-  sorts on its own node (`ArmSort`), so a near arm can hold a blade that points behind her. It is painted again only when it moved.
+- **The fist** starts at the sheet's exact 3D right-arm pose (`data/hero_arm3d.json`, exported by `tools/art_hero_arm_depth.py` via
+  `GripRig.frame_arm3`, falling back to `GripRig.hand_3d`) and, while the main sheet plays (`free_hand`, set by `Player._animate`) and an
+  item is visibly held (`_hold_k`), moves toward the item's own hold via `GripRig.arm`. Empty hands, sheathed weapons, swings, picking,
+  eating, casting, fishing and standby gestures follow the exact 3D shoulder/elbow/wrist/fist from the body model.
+- **The arm** is painted by `ArmPainter` (src/fx/arm_painter.gd) with the same 4x4 subpixel coverage threshold (`>= 6/16` samples) as
+  `tools/art_hero3d.py`, matching the thickness of her baked left arm: plum coat sleeve, black leather bracer with the glowing violet band,
+  leather glove; the same radii, the same light from the upper left in four flat bands (`shade_band` thresholds), ink where a part lies in
+  front of another and the dark outline (`ink_color`). Each gameplay `*_blood.png` stores per-pixel camera depth in `G` and material ID in
+  `B` (with `alpha = 1` on sprite outlines so `hit_flash.gdshader` ignores them while lossless import preserves RGB), allowing `ArmPainter`
+  to occlude the arm and its outline per-pixel behind her silver hair, face and coat instead of flipping the whole arm in front of or behind
+  the sprite. The arm and the item wear a copy of her sprite shader (`AttackComponent.mirror_material`), so pallor, wetness, the hit flash,
+  the mist veil and the daylight grade match the sheet. It is painted again only when the arm pose or sprite frame changed.
 - **The item** points along a 3D direction. At rest a damped spring on its compass angle and pitch pulls it toward the hold, so it has
   weight: the fist's acceleration swings the tip, turning to a new facing sweeps it round (relative to the facing the body sheet shows,
   not the cursor), and it settles with a small overshoot. Only the projected angle and foreshortening reach the pre-rotated sprite

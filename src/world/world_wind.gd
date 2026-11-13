@@ -10,7 +10,10 @@ var strength: float = 0.25 ## the weather's wind 0 (still) .. 1 (storm), see set
 var base_angle: float = 0.26
 var storm: float = 0.0
 var rain: float = 0.0
+var sand_drift: Vector2 = Vector2.ZERO
+var dune_creep: float = 0.0
 var _debris_timer: float = 0.5
+var _sand_timer: float = 0.18
 var _world: Variant ## dynamic to avoid the WorldLevel -> HUD/interior preload cycle
 var _previous: Dictionary = {}
 var _tick: float = 0.0
@@ -76,6 +79,17 @@ func _process(delta: float) -> void:
 	RenderingServer.global_shader_parameter_set("g_wind_dir",direction) ## the same wind for the shaders of the small plants (flora_wind)
 	RenderingServer.global_shader_parameter_set("g_wind_gust",gust)
 	RenderingServer.global_shader_parameter_set("g_wind_clock",clock)
+	var g_soft: float = gust if gust <= 1.1 else 1.1 + 0.7 * tanh((gust - 1.1) * 0.35)
+	var desert_push: float = clampf((0.16 + g_soft * 0.60) * 1.15, 0.0, 1.45)
+	var trade_align: float = clampf(direction.dot(Vector2(0.9653, 0.2612)), 0.38, 1.0)
+	sand_drift.x += (7.5 + g_soft * 15.0) * trade_align * delta
+	sand_drift.y = 0.0
+	dune_creep += (0.24 + g_soft * 0.68) * delta
+	if sand_drift.x > 1.0e6:
+		sand_drift.x = fmod(sand_drift.x, 91200.0)
+	if dune_creep > 65536.0:
+		dune_creep = fmod(dune_creep, 4096.0)
+	RenderingServer.global_shader_parameter_set("g_wind_sand", Vector4(sand_drift.x, sand_drift.y, dune_creep, desert_push))
 	_tick += delta
 	_rustle_wait = maxf(0.0,_rustle_wait-delta)
 	if _tick >= float(_config.get("contact_tick",0.08)):
@@ -142,7 +156,9 @@ func _air_allowed(player: Player) -> bool:
 	return player != null and not player.story_lock and not InputManager.ui_blocking and not InputManager.map_open and _world.navigation_floor(player.global_position)
 
 func _budget() -> int:
-	return int(_config.get("air_budget",8)) + int(_config.get("storm_budget",34) * clampf((strength-0.55)/0.45,0.0,1.0))
+	var viewer: Player = _viewer()
+	var arid_bonus: int = 5 if viewer != null and BiomeBlend.arid_at(viewer.global_position) > 0.45 else 0
+	return int(_config.get("air_budget",8)) + arid_bonus + int(_config.get("storm_budget",34) * clampf((strength-0.55)/0.45,0.0,1.0))
 
 func _release_seed(pos: Vector2) -> void:
 	if _air.size() >= _budget(): return
@@ -158,7 +174,11 @@ func _advance_air(delta: float) -> void:
 			continue
 		var vel: Vector2 = sample(particle.pos as Vector2)* (40.0 if int(particle.kind)==3 else 20.0)
 		vel.y += sin(clock*1.6+float(particle.phase))*3.0-1.0
-		if int(particle.kind) >= 6: ## storm debris rides the wind hard: leaves and dust fly, twigs tumble
+		if int(particle.kind) == 9: ## desert wind-sand wisps skimming low over the dunes (never rising into the sky)
+			var w_s: Vector2 = sample_soft(particle.pos as Vector2)
+			var skim_dir: Vector2 = (Vector2(0.9653, 0.2612) * 0.70 + Vector2(absf(w_s.x) + 0.15, clampf(w_s.y, -0.04, 0.36)) * 0.30).normalized()
+			vel = skim_dir * (20.0 + minf(w_s.length(), 1.35) * 18.0) + Vector2(0.0, sin(clock * 2.2 + float(particle.phase)) * 1.8)
+		elif int(particle.kind) >= 6: ## storm debris rides the wind hard: leaves and dust fly, twigs tumble
 			var speed: float = 95.0 if int(particle.kind) == 8 else 62.0
 			vel = sample(particle.pos as Vector2) * speed + Vector2(0.0, sin(clock * 5.0 + float(particle.phase)) * 14.0 + (6.0 if int(particle.kind) == 7 else -2.0))
 		elif int(particle.kind) >= 4: ## the Hexenwald: a dead leaf tumbles down from the crowns, ash sinks slowly, both rock from side to side
@@ -166,6 +186,7 @@ func _advance_air(delta: float) -> void:
 			vel = sample(particle.pos as Vector2) * (8.0 if leaf else 12.0) + Vector2(sin(clock * (2.2 if leaf else 1.1) + float(particle.phase)) * (9.0 if leaf else 4.0), 8.0 if leaf else 3.5)
 		particle.pos = (particle.pos as Vector2)+vel*delta
 	_spawn_debris(delta, viewer)
+	_spawn_desert_sand(delta, viewer)
 	_air_timer -= delta
 	if _air_timer > 0.0: return
 	var gap: Array = _config.get("air_spawn_gap",[1.8,4.6])
@@ -208,10 +229,34 @@ func _spawn_debris(delta: float, viewer: Player) -> void:
 	if _air.size() >= _budget(): return
 	var across: Vector2 = Vector2(-direction.y, direction.x)
 	var pos: Vector2 = viewer.global_position - direction * _rng.randf_range(230.0, 300.0) + across * _rng.randf_range(-190.0, 190.0) + Vector2(0.0, _rng.randf_range(-30.0, 30.0))
+	if BiomeBlend.arid_at(pos) > 0.45:
+		_air.append({"pos": pos, "origin": pos, "age": 0.0, "life": _rng.randf_range(1.6, 2.8), "kind": 9, "phase": _rng.randf() * TAU, "spark": _rng.randf() > 0.90})
+		return
 	var roll: float = _rng.randf()
 	var kind: int = 8 if roll < 0.45 else (6 if roll < 0.85 else 7)
 	var tints: Array[Color] = [Color("6a7f48"), Color("8a6a3c"), Color("a89a58"), Color("5e4a36")]
 	_air.append({"pos":pos,"origin":pos,"age":0.0,"life":_rng.randf_range(1.6,3.2) if kind == 8 else _rng.randf_range(2.4,4.2),"kind":kind,"phase":_rng.randf()*TAU,"petal_tint":tints[_rng.randi_range(0,3)]})
+
+## Calm windborne golden sand wisps & rare faint crystal grains skimming low over Sonnenquarz-Öde dunes.
+func _spawn_desert_sand(delta: float, viewer: Player) -> void:
+	if not _air_allowed(viewer) or rain > 0.35 or not _safe_for_trace(viewer):
+		return
+	var arid: float = BiomeBlend.arid_at(viewer.global_position)
+	if arid < 0.45 or gust < 0.18:
+		return
+	_sand_timer -= delta
+	if _sand_timer > 0.0:
+		return
+	var push: float = clampf(gust * arid, 0.25, 1.3)
+	_sand_timer = _rng.randf_range(0.28, 0.64) / push
+	if _air.size() >= _budget():
+		return
+	var trade: Vector2 = Vector2(0.9653, 0.2612)
+	var across_t: Vector2 = Vector2(-trade.y, trade.x)
+	var pos: Vector2 = viewer.global_position - trade * _rng.randf_range(120.0, 240.0) + across_t * _rng.randf_range(-170.0, 170.0)
+	if BiomeBlend.arid_at(pos) < 0.42:
+		return
+	_air.append({"pos": pos, "origin": pos, "age": 0.0, "life": _rng.randf_range(1.4, 2.4), "kind": 9, "phase": _rng.randf() * TAU, "spark": _rng.randf() > 0.90})
 
 func _safe_for_trace(player: Player) -> bool:
 	for node: Node in get_tree().get_nodes_in_group("predators"):
@@ -249,6 +294,15 @@ func _draw() -> void:
 			var dust: Color = Color(0.82, 0.78, 0.66, alpha * 0.36)
 			for j: int in 4:
 				draw_rect(Rect2(at - direction.round() * float(j) * 1.4, Vector2.ONE), Color(dust, dust.a * (1.0 - float(j) * 0.22)))
+		elif kind == 9: ## subtle wind-sand wisp + rare faint 1px sand-crystal grain
+			var spark: bool = bool(particle.get("spark", false))
+			if spark:
+				draw_rect(Rect2(at, Vector2.ONE), Color(0.96, 0.90, 0.76, alpha * 0.20))
+			else:
+				var sand_c: Color = Color(0.90, 0.75, 0.48, alpha * 0.26)
+				for j: int in 3:
+					var p_step: Vector2 = (at - Vector2(0.9653, 0.2612) * float(j) * 1.4).round()
+					draw_rect(Rect2(p_step, Vector2.ONE), Color(sand_c, sand_c.a * (1.0 - float(j) * 0.28)))
 		elif kind == 4: ## a tumbling leaf: flat, then on edge, then flat again
 			var leaf_color: Color = particle.get("petal_tint",Color("6a4e42")) as Color
 			leaf_color.a = alpha*0.85

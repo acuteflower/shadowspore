@@ -86,6 +86,9 @@ func _process(_delta: float) -> void:
 func _populate(cell: Vector2i) -> void:
 	if not _settled.has(cell):
 		_settled[cell] = {}
+	var origin: Vector2 = Vector2(cell) * 512.0
+	if BiomeBlend.arid_at(origin + Vector2(256.0, 256.0)) >= 0.22 and BiomeBlend.arid_at(origin) >= 0.22 and BiomeBlend.arid_at(origin + Vector2(512.0, 512.0)) >= 0.22:
+		return
 	var settled: Dictionary = _settled[cell]
 	var witch: bool = _witch(cell)
 	for species: String in ["snail", "bee", "ladybug", "moth", "toad", "bat"]:
@@ -110,7 +113,7 @@ func _populate(cell: Vector2i) -> void:
 				var lights: Array[Vector2] = []
 				var candles: Array[Vector2] = [] ## in the Hexenwald they keep to the grave candles' flames
 				for node: Node in get_tree().get_nodes_in_group("flora_glow"):
-					if node is Node2D and _cell((node as Node2D).global_position) == cell:
+					if node is Node2D and _cell((node as Node2D).global_position) == cell and BiomeBlend.arid_at((node as Node2D).global_position) < 0.22:
 						lights.append((node as Node2D).global_position)
 						if node is WorldProp and (node as WorldProp).kind == "grave_candle":
 							candles.append((node as Node2D).global_position + Vector2(0, -8))
@@ -154,7 +157,7 @@ func _populate(cell: Vector2i) -> void:
 			elif species == "snail" and rng.randf() < float(spec["tree_chance"]):
 				for node: Node in get_tree().get_nodes_in_group("bird_perches"):
 					var candidate: FirTree = node as FirTree
-					if candidate != null and _cell(candidate.global_position) == cell and int(candidate.state.get("f", 0)) == 0 and float((candidate.spec()["clear"] as Array)[candidate.variant]) >= 24.0:
+					if candidate != null and _cell(candidate.global_position) == cell and not candidate.kind in ["crown_cactus", "sun_palm"] and BiomeBlend.arid_at(candidate.global_position) < 0.22 and int(candidate.state.get("f", 0)) == 0 and float((candidate.spec()["clear"] as Array)[candidate.variant]) >= 24.0:
 						tree = candidate
 						at = tree.global_position
 						break

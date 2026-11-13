@@ -39,7 +39,7 @@ func _ready() -> void:
 
 
 func _build_props() -> void:
-	var tex: Texture2D = load("res://assets/world/iron_rock.png") as Texture2D
+	var tex: Texture2D = load("res://assets/props/iron_rock.png") as Texture2D
 	var placements: Array[Dictionary] = [
 		{"pos": Vector2(-28.0, -6.0), "frame": 0, "radius": 11.0},
 		{"pos": Vector2(36.0, -16.0), "frame": 4, "radius": 11.0}
@@ -76,7 +76,7 @@ func _build_props() -> void:
 func _draw() -> void:
 	# Subtle trampled earth and iron ember hearth between boulders
 	var pts: PackedVector2Array = PackedVector2Array()
-	for i: int in 21:
+	for i: int in 20:
 		pts.append(Vector2.from_angle(TAU * i / 20.0) * Vector2(54.0, 26.0))
 	draw_colored_polygon(pts, Color(0.18, 0.14, 0.11, 0.25))
 	draw_circle(Vector2(-2.0, 0.0), 6.0, Color(0.15, 0.11, 0.09, 0.85))

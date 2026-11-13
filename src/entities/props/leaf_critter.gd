@@ -47,6 +47,8 @@ static func _roll(cell: Vector2i, salt: int) -> float:
 
 
 static func _raw_kind(thing: WorldProp) -> String:
+	if BiomeBlend.arid_at(thing.global_position) >= 0.22:
+		return ""
 	var spec: Dictionary = thing.spec().get("critters", {})
 	if spec.is_empty(): return ""
 	var population: Dictionary = config().population

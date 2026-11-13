@@ -166,6 +166,50 @@
    {
     "item": "fish_pike",
     "price": 45
+   },
+   {
+    "item": "sun_fig",
+    "price": 5
+   },
+   {
+    "item": "crown_fig",
+    "price": 10
+   },
+   {
+    "item": "cactus_wood",
+    "price": 4
+   },
+   {
+    "item": "cactus_pulp",
+    "price": 3
+   },
+   {
+    "item": "quartz_aloe",
+    "price": 9
+   },
+   {
+    "item": "night_cactus_bloom",
+    "price": 12
+   },
+   {
+    "item": "sand_tuber",
+    "price": 8
+   },
+   {
+    "item": "palm_wood",
+    "price": 5
+   },
+   {
+    "item": "sun_date",
+    "price": 6
+   },
+   {
+    "item": "oasis_blossom",
+    "price": 10
+   },
+   {
+    "item": "sun_quartz",
+    "price": 14
    }
   ],
   "lines": {
@@ -748,6 +792,14 @@
    {
     "item": "gem_hunger_1",
     "price": 16
+   },
+   {
+    "item": "oasis_blossom",
+    "price": 11
+   },
+   {
+    "item": "sun_quartz",
+    "price": 15
    }
   ],
   "refresh": {
@@ -845,7 +897,9 @@
     "wound_leaf",
     "ember_berry",
     "mist_lily",
-    "void_bloom"
+    "void_bloom",
+    "oasis_blossom",
+    "sun_quartz"
    ]
   },
   "lines": {

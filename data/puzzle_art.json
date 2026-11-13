@@ -186,5 +186,102 @@
 			-1.0,
 			-23.5
 		]
+	},
+	"weave": {
+		"frame": [
+			40,
+			44
+		],
+		"ground": 36,
+		"rows": [
+			"cube0",
+			"cube1",
+			"cube2",
+			"seed",
+			"seed_open",
+			"thorn0",
+			"thorn1"
+		],
+		"states": [
+			"dark",
+			"lit",
+			"gold"
+		],
+		"rune": [
+			[
+				-0.8,
+				-1.6
+			],
+			[
+				-3.7,
+				-1.8
+			],
+			[
+				-2.1,
+				-2.3
+			],
+			[
+				-0.8,
+				-1.6
+			],
+			[
+				-0.8,
+				-1.6
+			],
+			[
+				-0.8,
+				-1.6
+			],
+			[
+				-3.7,
+				-1.8
+			]
+		],
+		"heart_frame": [
+			60,
+			66
+		],
+		"heart_ground": 54,
+		"heart": [
+			"heart_lit",
+			"heart_dark",
+			"heart_gold",
+			"crown",
+			"crown_open"
+		],
+		"eye": [
+			-3.1,
+			-12.9
+		],
+		"crown_top": [
+			0.5,
+			-15.9
+		]
+	},
+	"star_mirror": {
+		"pond_frame": [
+			160,
+			92
+		],
+		"pond_ground": 50,
+		"water": [
+			62,
+			30
+		],
+		"stone_frame": [
+			28,
+			24
+		],
+		"stone_ground": 19,
+		"stone_shapes": 4,
+		"corner_frame": [
+			22,
+			34
+		],
+		"corner_ground": 28,
+		"corner_rune": [
+			0.0,
+			-5.4
+		]
 	}
 }

@@ -1,24 +1,40 @@
 class_name TownPathArt
 extends RefCounted
-## The picture of a trampled way (a "Trampelweg"), in the colours of the story's footpath (tools/bake_ground.py). Worn, not drawn: the width swells and thins along the way
-## (slow noise, now and then a wide place where people stepped aside), a door gets a worn apron in front of it, the edge is not a line but ground thinning out (the
-## grass comes back pixel by pixel, in dither and in noise), tufts of grass grow through the middle, the north-west rim lies in shade and the south-east rim catches
-## light, so the way lies a little sunk. Made once per way from its polyline, on every peer the same (everything is noise and hash seeded by `seed_value`).
+## Renders a dynamic settlement footpath ("Trampelweg") matching Shadowspore's cluster-shaded world paths (tools/bake_ground.py):
+## clean cel-shaded earth cushions (orphan-cleaned, no Bayer checkerboard noise), scalloped grass-blade fringes, sunken 3/4 NW/SE
+## bank shading, worn door aprons, and small shaded twilight-slate pebbles. Deterministic across peers via `seed_value`.
 
-const SHADE: Color = Color("75666a")
-const MID: Color = Color("958776")
-const LIGHT: Color = Color("b3a58a")
-const HIGH: Color = Color("e4d8ba")
-const BANK: Color = Color("55465a")
-const BAYER: Array[float] = [0.0, 8.0, 2.0, 10.0, 12.0, 4.0, 14.0, 6.0, 3.0, 11.0, 1.0, 9.0, 15.0, 7.0, 13.0, 5.0]
+const RAMP: Array[Color] = [
+	Color("463852"),
+	Color("5e4f62"),
+	Color("7b6b6e"),
+	Color("988978"),
+	Color("b4a58b"),
+	Color("cdc0a2"),
+	Color("e3d7ba"),
+]
+const GRASS: Array[Color] = [
+	Color("22483c"),
+	Color("2f624e"),
+	Color("3e7d56"),
+	Color("55985f"),
+	Color("7cb96d"),
+	Color("a8dc8c"),
+]
+const PEBBLE: Array[Color] = [
+	Color("2e2a52"),
+	Color("47436f"),
+	Color("665f94"),
+	Color("8a83b8"),
+]
 const PAD: int = 13
-const BASE: float = 4.7 ## half width in the open
-const APRON: float = 4.6 ## how much wider the ground is worn in front of a door
+const BASE: float = 4.8 ## half width in the open
+const APRON: float = 4.6 ## extra worn width in front of a doorway
 const APRON_LENGTH: float = 20.0
-const SUNK: Vector2 = Vector2(-1.0, -1.0) ## the shaded rim lies on this side
+const SUNK: Vector2 = Vector2(-1.0, -1.0)
 
 
-## {texture: ImageTexture, origin: Vector2 (world px of the texture's top left)}; empty for a way of fewer than two points.
+## {texture: ImageTexture, origin: Vector2 (world px of the texture's top left)}; empty for fewer than two points.
 static func make(points: PackedVector2Array, seed_value: int, end_door: bool = false) -> Dictionary:
 	var made: Dictionary = image(points, seed_value, end_door)
 	if made.is_empty():
@@ -26,7 +42,7 @@ static func make(points: PackedVector2Array, seed_value: int, end_door: bool = f
 	return {"texture": ImageTexture.create_from_image(made.image as Image), "origin": made.origin}
 
 
-## The same as an Image (no renderer needed): {image: Image, origin: Vector2}.
+## Pure Image builder (safe without renderer): {image: Image, origin: Vector2}.
 static func image(points: PackedVector2Array, seed_value: int, end_door: bool = false) -> Dictionary:
 	if points.size() < 2:
 		return {}
@@ -40,82 +56,155 @@ static func image(points: PackedVector2Array, seed_value: int, end_door: bool = 
 			length += points[i - 1].distance_to(points[i])
 	var origin: Vector2 = (low - Vector2(PAD, PAD)).floor()
 	var size: Vector2i = Vector2i((high - low).ceil()) + Vector2i(PAD * 2 + 1, PAD * 2 + 1)
-	var noise: FastNoiseLite = FastNoiseLite.new()
-	noise.seed = seed_value
-	noise.frequency = 0.06
-	var wide: FastNoiseLite = FastNoiseLite.new()
-	wide.seed = seed_value + 5
-	wide.frequency = 0.02
-	var tuft: FastNoiseLite = FastNoiseLite.new()
-	tuft.seed = seed_value + 9
-	tuft.frequency = 0.3
-	var cover: PackedFloat32Array = PackedFloat32Array()
-	cover.resize(size.x * size.y)
+	var w: int = size.x
+	var h: int = size.y
+	var total_px: int = w * h
+
+	var cushion_noise: FastNoiseLite = FastNoiseLite.new()
+	cushion_noise.seed = seed_value
+	cushion_noise.frequency = 0.095
+	var edge_noise: FastNoiseLite = FastNoiseLite.new()
+	edge_noise.seed = seed_value + 3
+	edge_noise.frequency = 0.14
+	var wide_noise: FastNoiseLite = FastNoiseLite.new()
+	wide_noise.seed = seed_value + 5
+	wide_noise.frequency = 0.022
+
+	var norm_t: PackedFloat32Array = PackedFloat32Array()
+	norm_t.resize(total_px)
+	norm_t.fill(9.0)
 	var side: PackedFloat32Array = PackedFloat32Array()
-	side.resize(size.x * size.y)
+	side.resize(total_px)
+	var door_pin: PackedByteArray = PackedByteArray()
+	door_pin.resize(total_px)
+
 	var shade_dir: Vector2 = SUNK.normalized()
 	var s: float = 0.0
 	for seg: int in points.size() - 1:
 		var a: Vector2 = points[seg] - origin
 		var b: Vector2 = points[seg + 1] - origin
-		var steps: int = maxi(ceili(a.distance_to(b)), 1)
+		var seg_len: float = a.distance_to(b)
+		var steps: int = maxi(ceili(seg_len), 1)
 		for i: int in steps + 1:
-			var c: Vector2 = a.lerp(b, float(i) / float(steps))
-			var here: float = s + a.distance_to(b) * float(i) / float(steps)
-			var reach: float = BASE + 1.5 * wide.get_noise_1d(here) + 0.7 * noise.get_noise_1d(here * 0.8)
-			reach += maxf(wide.get_noise_1d(here * 0.35 + 300.0) - 0.35, 0.0) * 6.0 ## a wide place where people stepped aside
-			var door: float = clampf(1.0 - here / APRON_LENGTH, 0.0, 1.0)
-			reach += APRON * door * door
+			var u: float = float(i) / float(steps)
+			var c: Vector2 = a.lerp(b, u)
+			var here: float = s + seg_len * u
+			var reach: float = BASE + 1.4 * wide_noise.get_noise_1d(here) + 0.6 * cushion_noise.get_noise_1d(here * 0.7)
+			reach += maxf(wide_noise.get_noise_1d(here * 0.35 + 300.0) - 0.35, 0.0) * 5.2
+			var door_w: float = clampf(1.0 - here / APRON_LENGTH, 0.0, 1.0)
+			reach += APRON * door_w * door_w
+			var end_w: float = 0.0
 			if end_door:
-				var near_end: float = clampf(1.0 - (length - here) / APRON_LENGTH, 0.0, 1.0)
-				reach += APRON * near_end * near_end
-			reach = maxf(reach, 2.4)
-			var span: int = ceili(reach) + 3
+				end_w = clampf(1.0 - (length - here) / APRON_LENGTH, 0.0, 1.0)
+				reach += APRON * end_w * end_w
+			reach = maxf(reach, 2.6)
+			var span: int = ceili(reach * 1.35) + 2
 			for dy: int in range(-span, span + 1):
+				var py: int = int(c.y) + dy
+				if py < 0 or py >= h:
+					continue
 				for dx: int in range(-span, span + 1):
 					var px: int = int(c.x) + dx
-					var py: int = int(c.y) + dy
-					if px < 0 or py < 0 or px >= size.x or py >= size.y:
+					if px < 0 or px >= w:
 						continue
 					var offset: Vector2 = Vector2(float(px) + 0.5 - c.x, float(py) + 0.5 - c.y)
-					var value: float = clampf((reach + 1.5 - offset.length()) / 3.5, 0.0, 1.0) ## solid in the middle, 3.5 px of thinning ground at the edge
-					if value > cover[py * size.x + px]:
-						cover[py * size.x + px] = value
-						side[py * size.x + px] = offset.dot(shade_dir)
-		s += a.distance_to(b)
-	var img: Image = Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
-	for y: int in size.y:
-		for x: int in size.x:
-			var v: float = cover[y * size.x + x]
-			if v <= 0.0:
+					var d: float = offset.length()
+					var t_here: float = d / reach
+					var idx: int = py * w + px
+					if t_here < norm_t[idx]:
+						norm_t[idx] = t_here
+						side[idx] = (offset / maxf(d, 0.001)).dot(shade_dir)
+					if (door_w > 0.75 or end_w > 0.75) and d < 2.2:
+						door_pin[idx] = 1
+		s += seg_len
+
+	var keep: PackedByteArray = PackedByteArray()
+	keep.resize(total_px)
+	var tones: PackedByteArray = PackedByteArray()
+	tones.resize(total_px)
+
+	for y: int in h:
+		var wy: float = origin.y + float(y)
+		for x: int in w:
+			var idx: int = y * w + x
+			var t_raw: float = norm_t[idx]
+			if t_raw > 1.35:
 				continue
-			var wx: int = int(origin.x) + x
-			var wy: int = int(origin.y) + y
-			var dither: float = BAYER[(wy & 3) * 4 + (wx & 3)] / 16.0
-			var rough: float = float(hash(Vector2i(wx, wy) + Vector2i(seed_value, 3)) & 255) / 255.0
-			var patch: float = noise.get_noise_2d(float(wx) * 0.8, float(wy) * 0.8)
-			var wear: float = v * (0.92 + 0.18 * patch)
-			if wear < 0.07 + 0.62 * (0.4 * dither + 0.6 * rough):
-				continue ## the grass is back here
-			if wear > 0.5 and tuft.get_noise_2d(float(wx), float(wy)) > 0.62:
-				continue ## a tuft growing through the middle
-			var n: float = noise.get_noise_2d(float(wx) * 1.7, float(wy) * 1.7)
-			var color: Color = MID
-			if wear < 0.38: ## the rim
-				if side[y * size.x + x] > 0.0:
-					color = BANK if rough < 0.5 else SHADE
-				else:
-					color = LIGHT if rough < 0.85 else HIGH
-			elif wear < 0.7:
-				color = LIGHT if n > -0.1 else (SHADE if n < -0.42 else MID)
-			else:
-				if n > 0.0:
-					color = LIGHT
-				elif n < -0.34:
-					color = SHADE
-				elif absf(n) < 0.04:
-					color = SHADE ## the faint wear line of feet
-				if hash(Vector2i(wx, wy) + Vector2i(seed_value, 0)) % 97 == 0:
-					color = HIGH ## a pebble
-			img.set_pixel(x, y, color)
+			var wx: float = origin.x + float(x)
+			var wob: float = edge_noise.get_noise_2d(wx, wy) * 0.22 + cushion_noise.get_noise_2d(wx * 2.1, wy * 2.1) * 0.08
+			var te: float = t_raw + wob
+			if door_pin[idx] == 0 and te >= 1.0:
+				continue
+			keep[idx] = 1
+			var cush: float = cushion_noise.get_noise_2d(wx, wy) * 1.55 + edge_noise.get_noise_2d(wx * 1.8, wy * 1.8) * 0.45
+			var center_wear: float = 0.85 * maxf(0.0, 1.0 - (t_raw / 0.62) * (t_raw / 0.62))
+			var bank: float = 0.0
+			if te > 0.72:
+				if side[idx] > 0.16:
+					bank = -0.85
+				elif side[idx] < -0.16:
+					bank = 0.55
+			var raw_tone: float = 3.35 + cush + center_wear - 0.75 * maxf(0.0, te - 0.58) / 0.42 + bank
+			tones[idx] = clampi(roundi(raw_tone), 0, RAMP.size() - 1)
+
+	# Orphan-pixel cleanup pass so earth tones form crisp Shadowspore cushions
+	var cleaned: PackedByteArray = tones.duplicate()
+	for y: int in range(1, h - 1):
+		for x: int in range(1, w - 1):
+			var idx: int = y * w + x
+			if keep[idx] == 0:
+				continue
+			var v: int = tones[idx]
+			var u_idx: int = (y - 1) * w + x
+			var d_idx: int = (y + 1) * w + x
+			var l_idx: int = y * w + (x - 1)
+			var r_idx: int = y * w + (x + 1)
+			var matches: int = 0
+			var sum_nb: int = 0
+			var cnt_nb: int = 0
+			for n_idx: int in [u_idx, d_idx, l_idx, r_idx]:
+				if keep[n_idx] == 1:
+					cnt_nb += 1
+					sum_nb += tones[n_idx]
+					if tones[n_idx] == v:
+						matches += 1
+			if cnt_nb >= 3 and matches == 0:
+				cleaned[idx] = clampi(roundi(float(sum_nb) / float(cnt_nb)), 0, RAMP.size() - 1)
+
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	for y: int in h:
+		for x: int in w:
+			var idx: int = y * w + x
+			if keep[idx] == 0:
+				continue
+			img.set_pixel(x, y, RAMP[cleaned[idx]])
+
+	# Shaded 2px slate pebbles & melted grass-blade tufts along the rim
+	for y: int in range(2, h - 2):
+		var wy_i: int = int(origin.y) + y
+		for x: int in range(2, w - 2):
+			var idx: int = y * w + x
+			if keep[idx] == 0:
+				continue
+			var wx_i: int = int(origin.x) + x
+			var hval: int = abs(hash(Vector2i(wx_i, wy_i) + Vector2i(seed_value * 13, 7)))
+			var is_rim: bool = keep[(y - 1) * w + x] == 0 or keep[(y + 1) * w + x] == 0 or keep[y * w + x - 1] == 0 or keep[y * w + x + 1] == 0
+			if is_rim and door_pin[idx] == 0:
+				if (hval % 10) < 4:
+					if side[idx] > 0.08:
+						img.set_pixel(x, y, GRASS[3])
+						if keep[(y + 1) * w + x] == 1:
+							var under: Color = img.get_pixel(x, y + 1)
+							img.set_pixel(x, y + 1, Color(under.r * 0.80, under.g * 0.78, minf(1.0, under.b * 0.88 + 0.02), 1.0))
+					else:
+						var bh: int = 2 + (hval % 2)
+						for j: int in bh:
+							if y - j >= 0:
+								img.set_pixel(x, y - j, GRASS[mini(2 + j * 2, GRASS.size() - 1)])
+			elif norm_t[idx] < 0.72 and (hval % 89) == 0:
+				img.set_pixel(x, y, PEBBLE[3])
+				if keep[y * w + x + 1] == 1:
+					img.set_pixel(x + 1, y, PEBBLE[1])
+				if keep[(y + 1) * w + x + 1] == 1:
+					img.set_pixel(x + 1, y + 1, PEBBLE[0])
 	return {"image": img, "origin": origin}

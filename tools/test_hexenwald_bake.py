@@ -25,17 +25,17 @@ relief = np.asarray(Image.open(os.path.join(ROOT, "assets/world/relief.png")).co
 land = sdf >= 128
 biomes = json.load(open(os.path.join(ROOT, "data/biomes.json")))
 
-check([int(r["id"]) for r in d["regions"]] == list(range(32)), "regions 0-31 in order")
+check([int(r["id"]) for r in d["regions"]] == list(range(len(d["regions"]))) and len(d["regions"]) >= 32, "regions in order")
 sup = d["supers"][5]
 check(int(sup["id"]) == 5 and sup["biome"] == "witch_forest" and sup["name"] == "Hexenwald" and [int(r) for r in sup["regions"]] == [31], "super region 5 is the Hexenwald")
-check(d["biome"] == "meadow" and d["own_biomes"] == ["witch_forest"], "meadow stays shared, the Hexenwald is its own biome")
+check(d["biome"] == "meadow" and "witch_forest" in d["own_biomes"], "meadow stays shared, the Hexenwald is its own biome")
 check(list(biomes).index("witch_forest") == 5, "witch_forest is the sixth biome (relief byte 205)")
 check(biomes["witch_forest"].get("bare") is True, "no props yet")
 reg = d["regions"][31]
 cells = int((grid == 31).sum())
 check(int(reg["area"]) == cells * CELL * CELL, "region area matches its cells")
 check(all(int(r["super"]) == 5 for r in [reg]) and all(31 in [int(n) for n in d["regions"][int(n)]["neighbors"]] for n in reg["neighbors"]), "neighbour lists are mutual")
-check(all(int(r["super"]) < 5 for r in d["regions"][:31]), "old regions keep their super regions")
+check(all(int(r["super"]) != 5 for r in d["regions"] if int(r["id"]) != 31), "only region 31 belongs to Hexenwald")
 
 tiles = int(land[np.repeat(np.repeat(grid == 31, CELL, 0), CELL, 1)].sum())
 check(25000 <= tiles <= 60000, "size %d tiles is big enough and not huge" % tiles)

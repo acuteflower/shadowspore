@@ -95,6 +95,7 @@ func _build_world() -> void:
 	_fire_world = hut.global_position + FIRE_OFFSET
 	var view: Vector2 = Vector2(640.0, 360.0)
 	_camera = Camera2D.new()
+	_camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_camera_home = (_fire_world - FIRE_AT_SCREEN + view / 2.0).round()
 	_camera.position = _camera_home
 	_camera.zoom = Vector2.ONE

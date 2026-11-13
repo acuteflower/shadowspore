@@ -191,7 +191,8 @@ func _fill_ground() -> void:
 	for id: String in biomes:
 		var active: String = RegionMap.active_biome(id)
 		if not _layers.has(active):
-			_layers[active] = _ground if active == "meadow" or (biomes[active] as Dictionary).has("gloom") else _make_layer(active, Color((biomes[active] as Dictionary).color as String)) ## a biome with `gloom` is painted by the ground shader itself (palette mixed by BiomeBlend), on the shared layer
+			var cfg: Dictionary = biomes[active] as Dictionary
+			_layers[active] = _ground if active == "meadow" or cfg.has("gloom") or cfg.has("arid") else _make_layer(active, Color(cfg.color as String)) ## biomes with `gloom` or `arid` are painted by the ground shader itself on the shared layer
 		_layers[id] = _layers[active]
 	_start = _map.start if _map.start.x >= 0 else _map.anchor(_map.start_region)
 	var cleared: Rect2i = Rect2i() ## nothing is cleared by area any more: the generator fills the start like everywhere else (only the footpath and the cover stay free)
@@ -1849,6 +1850,14 @@ func _detail_candidate(build: ChunkBuild) -> void:
 	if build.rng.randf() > density * (0.8 + patch):
 		return
 	var pos: Vector2 = Vector2(cell) * 16.0 + Vector2(build.rng.randf_range(3,13),build.rng.randf_range(5,14)).round()
+	var arid: float = BiomeBlend.arid_at(pos)
+	var oasis: float = BiomeBlend.oasis_at(pos) if arid > 0.04 else 0.0
+	if arid > 0.04 and oasis < 0.25:
+		if BiomeBlend.is_quartz_surface(pos):
+			return
+		var cull_chance: float = lerpf(0.0, 0.86, smoothstep(0.04, 0.72, arid)) * (1.0 - 0.90 * oasis)
+		if build.rng.randf() < cull_chance:
+			return
 	if not _rivers.clear_for_prop(pos, 10.0): return
 	if not _relief.flat_around(pos, 10.0):
 		return
@@ -1907,6 +1916,21 @@ func _detail_candidate(build: ChunkBuild) -> void:
 	var tint: Color = Color.WHITE
 	match biome:
 		"witch_forest": tint = Color.WHITE.lerp(Color(0.42, 0.5, 0.68) if kind < MeadowDetails.MEADOW_COUNT else Color(0.82, 0.84, 0.94), BiomeBlend.amount_at(pos)) ## grass as dark as the ground under it, its own kinds only a little
+		"quartz_desert":
+			if oasis > 0.42:
+				kind = [30, 31, 22, 33, 30, 0][build.rng.randi_range(0, 5)]
+				tint = Color.WHITE if kind >= 30 else Color(0.92, 0.94, 0.78)
+			else:
+				var near_q: bool = arid >= 0.58 and (BiomeBlend.is_quartz_surface(pos + Vector2(18.0, 0.0)) or BiomeBlend.is_quartz_surface(pos - Vector2(18.0, 0.0)) or BiomeBlend.is_quartz_surface(pos + Vector2(0.0, 18.0)) or BiomeBlend.is_quartz_surface(pos - Vector2(0.0, 18.0)))
+				if near_q:
+					kind = [33, 33, 32, 31][build.rng.randi_range(0, 3)]
+					tint = Color.WHITE
+				elif arid < 0.36:
+					kind = [22, 23, 30, 30, 0, 31][build.rng.randi_range(0, 5)]
+					tint = Color.WHITE if kind >= 30 else Color.WHITE.lerp(Color(0.96, 0.84, 0.58), clampf(arid * 1.8, 0.0, 1.0))
+				else:
+					kind = [30, 30, 31, 31, 32, 33][build.rng.randi_range(0, 5)]
+					tint = Color.WHITE
 		"mist_forest": tint = Color(0.79,0.95,0.94)
 		"glass_cliffs": tint = Color(0.88,0.85,1.0)
 		"sunken_ruins": tint = Color(0.94,0.88,0.73)
@@ -1923,6 +1947,9 @@ func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 	if rng.randf() > 0.6 + 0.4 * open:
 		return false
 	var center: Vector2 = Vector2(tile) * 16.0 + Vector2(8, 8)
+	var square: TownManager = town()
+	if square != null and square.cleared.has(Vector2i((center / 16.0).floor())):
+		return false ## a town piece cleared this field for good (`town_clear_clover`)
 	var rx: float = float(field.rx)
 	var ry: float = float(field.ry)
 	for other: Vector3 in build.clover_discs: ## two fields never lie in each other
@@ -2369,6 +2396,8 @@ func _rpc_thing_snapshot(snapshot: Dictionary) -> void:
 
 ## Wildlife is native to green meadow floors, away from the void and steep relief edges.
 func _rabbit_habitat(at: Vector2) -> bool:
+	if BiomeBlend.arid_at(at) >= 0.22:
+		return false
 	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
 	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
 		return false
@@ -2377,6 +2406,8 @@ func _rabbit_habitat(at: Vector2) -> bool:
 
 
 func _bird_habitat(at: Vector2, species: String) -> bool:
+	if BiomeBlend.arid_at(at) >= 0.22:
+		return false
 	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
 	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
 		return false
@@ -2385,6 +2416,8 @@ func _bird_habitat(at: Vector2, species: String) -> bool:
 
 
 func _fauna_habitat(at: Vector2, species: String) -> bool:
+	if BiomeBlend.arid_at(at) >= 0.22:
+		return false
 	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
 	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
 		return false
@@ -2404,7 +2437,9 @@ func _flower_targets(chunk: Vector2i) -> Array[Vector2]:
 		for x: int in CHUNK:
 			var cell: Vector2i = chunk * CHUNK + Vector2i(x, y)
 			if atlases.has(_ground.get_cell_atlas_coords(cell)):
-				result.append(Vector2(cell) * 16.0 + Vector2(8, 8))
+				var px: Vector2 = Vector2(cell) * 16.0 + Vector2(8, 8)
+				if BiomeBlend.arid_at(px) < 0.22 and _land_biome(cell) != "quartz_desert":
+					result.append(px)
 	return result
 
 
@@ -2516,7 +2551,7 @@ func _town_soft(thing: WorldProp) -> bool:
 		return true
 	if thing.kind in PropGenerator.TREE_KINDS:
 		return thing.state.has("f") ## felled: stump and sapling have no collision (a young tree grows back by itself otherwise)
-	return (thing.kind == "rock" or thing.kind == "iron_rock" or thing.kind == "curse_rock") and thing.is_depleted()
+	return (thing.kind == "rock" or thing.kind == "iron_rock" or thing.kind == "curse_rock" or thing.kind == "sun_quartz_rock") and thing.is_depleted()
 
 
 ## The loaded props a foundation on `rect` sweeps away (cells): bushes, grass, pebbles, mushrooms, stumps and spent rocks.
@@ -2526,6 +2561,101 @@ func town_soft_cells(rect: Rect2) -> Array:
 		var thing: WorldProp = _things[cell] as WorldProp
 		if _town_soft(thing) and rect.grow(thing._radius * 0.8).has_point(thing.position):
 			out.append(cell)
+	return out
+
+
+## Host: what the pressure wave of a finished piece tears out (docs/stadtbau_konzept.md 4.2): every soft prop and every small plant (bushes, grass, flora) within
+## `radius` of `center` that also lies in the town's light (`circles`, the new piece's own circle included). Trees, rocks and ore stay.
+func town_wave_cells(center: Vector2, radius: float, circles: Array[Vector3]) -> Array:
+	var out: Array = []
+	for cell: Vector2i in _things:
+		var thing: WorldProp = _things[cell] as WorldProp
+		if thing.position.distance_to(center) > radius or not (_town_soft(thing) or (thing is Bush and not thing.kind in PropGenerator.TREE_KINDS)):
+			continue
+		if TownRules.light_depth(circles, thing.position) > 0.0:
+			out.append(cell)
+	return out
+
+
+## The loaded prop on `cell` (null when it is not loaded).
+func prop_node(cell: Vector2i) -> WorldProp:
+	return _things.get(cell) as WorldProp
+
+
+## Where the loaded prop on `cell` stands.
+func prop_position(cell: Vector2i) -> Vector2:
+	var thing: WorldProp = _things.get(cell) as WorldProp
+	return thing.position if thing != null else PropGenerator.position_of(cell)
+
+
+## Host: what an uprooted prop gives the stock (one roll of what picking or harvesting it would give; a picked or stripped one gives nothing).
+func town_wave_yield(cell: Vector2i) -> String:
+	var thing: WorldProp = _things.get(cell) as WorldProp
+	if thing == null or thing.is_depleted():
+		return ""
+	var pickup: Dictionary = thing._spec.get("pickup", {}) as Dictionary
+	if pickup.has("item") and not thing.state.has("p"):
+		return String(pickup.item)
+	for drop: Variant in ((thing._spec.get("harvest", {}) as Dictionary).get("drops", []) as Array):
+		if randf() < float((drop as Dictionary).get("chance", 0.0)) * 1.4:
+			return String((drop as Dictionary).id)
+	return ""
+
+
+## Everyone: the pressure wave tears these props out. Gone from the world's tables at once (nothing else may touch them), the pictures pop out of the ground
+## when the ring reaches them (`speed` px/s from `origin`, after `delay`), burst into their own colours and fade.
+func town_uproot(cells: Array, origin: Vector2, speed: float, delay: float) -> void:
+	var sounds: int = 0
+	for raw: Variant in cells:
+		var cell: Vector2i = raw as Vector2i
+		_thing_states.erase(cell)
+		if not _things.has(cell):
+			continue
+		var thing: WorldProp = _things[cell] as WorldProp
+		_things.erase(cell)
+		for chunk: Chunk in _chunks.values():
+			chunk.things.erase(thing)
+		thing.set_process(false)
+		for child: Node in thing.get_children():
+			if child is CollisionObject2D:
+				child.queue_free()
+		var wait: float = delay + thing.position.distance_to(origin) / speed
+		var away: Vector2 = (thing.position - origin).normalized()
+		var tween: Tween = thing.create_tween()
+		tween.tween_interval(wait)
+		var loud: bool = sounds < 6
+		sounds += 1
+		tween.tween_callback(func() -> void:
+			var colors: Array = thing.call("_leaf_colors") if thing.has_method("_leaf_colors") else [Color("8a7f9a"), Color("c8c0d8"), Color("5c5470")]
+			thing.call("_burst", 12, colors, 52.0)
+			if loud:
+				var sound: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+				sound.stream = load("res://assets/audio/town/uproot_%s.wav" % ["a", "b", "c"][randi() % 3]) as AudioStream
+				sound.volume_db = -10.0
+				sound.pitch_scale = randf_range(0.9, 1.15)
+				sound.max_distance = 360.0
+				thing.add_child(sound)
+				sound.play())
+		tween.set_parallel(true)
+		tween.tween_property(thing, "position", thing.position + away * 10.0 + Vector2(0, -6), 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(thing, "scale", Vector2(1.15, 0.7), 0.12)
+		tween.tween_property(thing, "modulate:a", 0.0, 0.45).set_delay(0.1)
+		tween.set_parallel(false)
+		tween.tween_callback(thing.queue_free)
+
+
+## Everyone: clover fields within `radius` of `at` are torn out (a town piece's foundation or pressure wave). Returns their centre cells for `cleared`,
+## so the chunk never paints them again.
+func town_clear_clover(at: Vector2, radius: float) -> Array:
+	var out: Array = []
+	for chunk: Chunk in _chunks.values():
+		for field: CloverField in chunk.clover.duplicate():
+			if field.position.distance_to(at) < radius + field.radius.x * 0.5:
+				chunk.clover.erase(field)
+				out.append(Vector2i((field.position / 16.0).floor()))
+				var tween: Tween = field.create_tween()
+				tween.tween_property(field, "modulate:a", 0.0, 0.4)
+				tween.tween_callback(field.queue_free)
 	return out
 
 

@@ -303,7 +303,22 @@ func import_data(data: Dictionary) -> void:
 	for quest_id: Variant in data.get("done", []) as Array:
 		_done.append(String(quest_id))
 	_migrate_town_start(data)
+	_migrate_plaza()
 	changed.emit()
+
+
+## Saves from before the fountain square (docs/brunnenplatz.md): a town quest already waiting at the lamp post goes back one step, to the square, which now
+## founds the town and must stand before anything else can be built.
+func _migrate_plaza() -> void:
+	if not _active.has("town_start") or bool(_flags.get("built_plaza", false)):
+		return
+	var steps: Array = (_quests["town_start"] as Dictionary).steps as Array
+	var plaza: int = -1
+	for i: int in steps.size():
+		if String((steps[i] as Dictionary).get("id", "")) == "build_plaza":
+			plaza = i
+	if plaza >= 0 and int(_active["town_start"]) > plaza:
+		_active["town_start"] = plaza
 
 
 ## Saves from before the Gustav quest line: `town_start` used to end with "build a workshop", "a stranger comes", "talk to him". The first of those hands over to the new rescue

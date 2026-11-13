@@ -288,14 +288,14 @@ func _wrap(text: String, width: int) -> Array[String]:
 
 
 ## The item cell: outline, rarity ring, dark ground, the icon (like `ItemSlot`), optionally big and with a count.
-func draw_cell(at: Vector2, item: String, count: int, big: bool = false, dim: bool = false, level: int = 0) -> void:
+func draw_cell(at: Vector2, item: String, count: int, big: bool = false, dim: bool = false, level: int = 0, custom_icon: Texture2D = null, custom_ring: Color = Color(0, 0, 0, 0)) -> void:
 	var cell: int = 36 if big else ItemSlot.SIZE
 	var stack: Dictionary = {"id": item, "count": count}
-	var ring: Color = Items.rarity_color(stack) if item != "" else UiStyle.RIM
+	var ring: Color = custom_ring if custom_ring.a > 0.0 else (Items.rarity_color(stack) if item != "" else UiStyle.RIM)
 	_canvas.draw_rect(Rect2(at, Vector2(cell, cell)), UiStyle.OUTLINE)
 	_canvas.draw_rect(Rect2(at + Vector2(1, 1), Vector2(cell - 2, cell - 2)), Color(ring, 0.55 if dim else 1.0))
 	_canvas.draw_rect(Rect2(at + Vector2(2, 2), Vector2(cell - 4, cell - 4)), UiStyle.SLOT_BG)
-	var icon: Texture2D = Items.icon(stack) if item != "" else null
+	var icon: Texture2D = custom_icon if custom_icon != null else (Items.icon(stack) if item != "" else null)
 	if icon != null:
 		var tint: Color = Color(1, 1, 1, 0.45 if dim else 1.0)
 		if big:
@@ -468,7 +468,7 @@ func _draw_list(card: Rect2) -> void:
 		if on:
 			_canvas.draw_rect(rect, Color(LIT, 0.12 + 0.05 * sin(_time * 4.0)))
 			_canvas.draw_rect(Rect2(rect.position, Vector2(2, rect.size.y)), LIT)
-		draw_cell(rect.position + Vector2(4, 0), String(row.get("item", "")), int(row.get("count", 1)), false, state != OK, int(row.get("level", 0)))
+		draw_cell(rect.position + Vector2(4, 0), String(row.get("item", "")), int(row.get("count", 1)), false, state != OK, int(row.get("level", 0)), row.get("icon") as Texture2D, row.get("ring", Color(0, 0, 0, 0)) as Color)
 		var name_color: Color = TEXT if state == OK else (DIM if on else Color(DIM, 0.75))
 		var sub: String = String(row.get("sub", ""))
 		_text(rect.position + Vector2(30, 4 if sub != "" else 7), String(row.get("name", "")), name_color)

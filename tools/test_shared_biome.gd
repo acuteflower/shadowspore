@@ -26,7 +26,7 @@ func _run() -> void:
 		for id: int in area.regions:
 			if int(area.id) < 5:
 				_check(map.biome_at(map.anchor(id)) == "meadow", "region %d uses meadow" % id)
-	_check(names.size() == 6 and names.has("Hexenwald") and names.has("Die Lichtung") and names.has("Nebelwald") and names.has("Glasklippen") and names.has("Versunkene Ruinen") and names.has("Das Leerenblühen"), "all five existing area names survive")
+	_check(names.size() == 7 and names.has("Hexenwald") and names.has("Sonnenquarz-Öde") and names.has("Die Lichtung") and names.has("Nebelwald") and names.has("Glasklippen") and names.has("Versunkene Ruinen") and names.has("Das Leerenblühen"), "all area names survive including Sonnenquarz-Öde")
 	var roundtrip: RegionMap = RegionMap.new(0, map.to_data())
 	_check(roundtrip.to_data() == map.to_data(), "serialization preserves area names, topology and biome policy")
 	_check(map.biome_at(Vector2i.ZERO).is_empty(), "outside the island stays outside the biome")
@@ -39,7 +39,7 @@ func _run() -> void:
 	for i: int in range(0, old.size(), 4):
 		geometry = geometry and old[i] == relief._bytes[i] and (old[i+1] & 15) == (relief._bytes[i+1] & 15) and old[i+2] == relief._bytes[i+2] and (old[i+3] == 0) == (relief._bytes[i+3] == 0)
 		if old[i+3] != 0:
-			materials = materials and (relief._bytes[i+3] == 200 and (relief._bytes[i+1] >> 4) < 2 or relief._bytes[i+3] == 205 and (relief._bytes[i+1] >> 4) == 5)
+			materials = materials and (relief._bytes[i+3] == 200 and (relief._bytes[i+1] >> 4) < 2 or relief._bytes[i+3] == 205 and (relief._bytes[i+1] >> 4) == 5 or relief._bytes[i+3] == 206 and (relief._bytes[i+1] >> 4) == 6)
 	_check(geometry, "every height, connector kind, geometry byte and land flag is unchanged")
 	_check(materials, "old land uses meadow with grass/rock materials, the Hexenwald its slate")
 	var block: Image = Relief.BLOCK.get_image()
@@ -81,7 +81,7 @@ func _run() -> void:
 		_check(world._land_biome(at) == "meadow", "world habitat in " + map.area_name(int(area.id)))
 		var cell: Vector2i = at / WorldLevel.CHUNK
 		world._load_chunk(cell)
-		_check(world._chunks[cell].cells.size() == 1 and world._chunks[cell].cells.has("meadow"), "full meadow ground painted in " + map.area_name(int(area.id)))
+		_check(world._chunks[cell].cells.has("meadow") and world._chunks[cell].cells.keys().all(func(k: String) -> bool: return k == "meadow" or map.own_biomes.has(k)), "full meadow ground painted in " + map.area_name(int(area.id)))
 		world._unload_chunk(cell)
 		await get_tree().process_frame
 	for id: String in DataRegistry.table("biomes"):
@@ -92,7 +92,7 @@ func _run() -> void:
 	_check(window._area_names == names, "map keeps territory names independently of its biome palette")
 	_check(window._area_colors.slice(0, 5).all(func(color: Color) -> bool: return color == Color(String(DataRegistry.get_entry("biomes", "meadow").color))), "the five old map areas share one colour")
 	var area_biomes: PackedInt32Array = window._material.get_shader_parameter("area_biomes")
-	_check(area_biomes == PackedInt32Array([0, 0, 0, 0, 0, 5]), "the five old shader territories use meadow symbols and palette, the Hexenwald its own")
+	_check(area_biomes == PackedInt32Array([0, 0, 0, 0, 0, 5, 6]), "the five old shader territories use meadow symbols and palette, the Hexenwald and Sonnenquarz-Öde their own")
 	var texture: Texture2D = window._material.get_shader_parameter("areas") as Texture2D
 	var area_image: Image = texture.get_image()
 	var borders: bool = true

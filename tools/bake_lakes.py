@@ -49,21 +49,33 @@ def enclosed_components(land):
     return lakes, sorted(entries, key=lambda entry: -entry['area_tiles'])
 
 
+def _ellipse_mask(xx, yy, cx, cy, rx, ry, angle_deg, seed):
+    rng = np.random.default_rng(seed)
+    amps = rng.uniform(0.03, 0.09, 4)
+    phases = rng.uniform(0, 6.283, 4)
+    rad = np.radians(angle_deg)
+    ca, sa = np.cos(rad), np.sin(rad)
+    ox, oy = xx + .5 - cx, yy + .5 - cy
+    dx = (ox * ca + oy * sa) / rx
+    dy = (-ox * sa + oy * ca) / ry
+    angle = np.arctan2(dy, dx)
+    edge = 1 + sum(a * np.sin(angle * (k + 2) + p) for k, (a, p) in enumerate(zip(amps, phases)))
+    return np.hypot(dx, dy) < edge
+
+
 def pond_mask(ponds, shape, land, relief):
-    """Inland lakes drawn by hand (data/lakes.json `ponds`): a wobbly ellipse in tiles, on open flat floor only."""
+    """Inland lakes drawn by hand (data/lakes.json `ponds`): wobbly rotated/multi-lobed ellipses on open flat floor only."""
     mask = np.zeros(shape, dtype=bool)
     entries = []
     yy, xx = np.mgrid[:shape[0], :shape[1]]
     for pond in ponds:
         cx, cy = pond['center']
         rx, ry = pond['radius']
-        rng = np.random.default_rng(pond.get('seed', 1))
-        amps = rng.uniform(0.03, 0.09, 4)
-        phases = rng.uniform(0, 6.283, 4)
-        dx, dy = (xx + .5 - cx) / rx, (yy + .5 - cy) / ry
-        angle = np.arctan2(dy, dx)
-        edge = 1 + sum(a * np.sin(angle * (k + 2) + p) for k, (a, p) in enumerate(zip(amps, phases)))
-        local = np.hypot(dx, dy) < edge
+        local = _ellipse_mask(xx, yy, cx, cy, rx, ry, pond.get('angle', 0.0), pond.get('seed', 1))
+        for lobe in pond.get('lobes', []):
+            lox, loy = lobe['offset']
+            lrx, lry = lobe['radius']
+            local |= _ellipse_mask(xx, yy, cx + lox, cy + loy, lrx, lry, lobe.get('angle', 0.0), lobe.get('seed', 1))
         wet = np.argwhere(local)
         ok = land[local].all() and not (relief[local][:, 1] & 15).any() and not relief[local][:, 0].any()
         assert ok, f"pond {pond['id']} lies on cliffs, other levels or the coast"

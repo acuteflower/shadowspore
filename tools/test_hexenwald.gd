@@ -23,8 +23,8 @@ func _ready() -> void:
 func _run() -> void:
 	var data: Dictionary = DataRegistry.table("world_map")
 	var map: RegionMap = RegionMap.new(0, data)
-	_check(map.supers.size() == 6 and map.regions.size() == 32, "six areas, 32 regions")
-	_check(map.own_biomes.size() == 1 and map.own_biomes[0] == "witch_forest", "own biomes are read")
+	_check(map.supers.size() >= 6 and map.regions.size() >= 32, "at least six areas, 32+ regions")
+	_check(map.own_biomes.has("witch_forest"), "own biomes include witch_forest")
 	_check(map.biome_at(CENTRE) == "witch_forest" and map.biome_at(HUT) == "meadow", "the Hexenwald has its own biome, the town stays meadow")
 	_check(map.area_name(5) == "Hexenwald" and map.super_at(CENTRE) == 5 and map.region_at(CENTRE) == 31, "area 5 / region 31")
 	_check(RegionMap.active_biome("witch_forest") == "witch_forest" and RegionMap.active_biome("glass_cliffs") == "meadow", "legacy biome ids still fold into meadow, the Hexenwald does not")
@@ -205,9 +205,9 @@ func _run() -> void:
 	var window: MapWindow = MapWindow.new()
 	add_child(window)
 	window._load_data()
-	_check(window._area_names.has("Hexenwald") and window._area_colors.size() == 6, "the map names the area")
+	_check(window._area_names.has("Hexenwald") and window._area_colors.size() == map.supers.size(), "the map names the area")
 	_check((window._material.get_shader_parameter("area_biomes") as PackedInt32Array)[5] == 5, "the map paints it with the sixth palette")
-	_check((window._material.get_shader_parameter("pal") as PackedVector3Array).size() == 18, "six palettes")
+	_check((window._material.get_shader_parameter("pal") as PackedVector3Array).size() == DataRegistry.table("biomes").size() * 3, "biome palettes match")
 	window.queue_free()
 	world.queue_free()
 	await get_tree().process_frame

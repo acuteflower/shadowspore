@@ -106,7 +106,8 @@ func _set_on_screen(on: bool) -> void:
 func apply_state(new_state: Dictionary, fx: String) -> void:
 	super(new_state, fx)
 	if fx == "pick" and _spec.has("pull"): ## the root gives: earth flies, the hole stays
-		_burst(18, SOIL_BURST, 62.0, Vector2(0, -3))
+		var soil: Array[Color] = _colors(_spec.soil_burst as Array) if _spec.has("soil_burst") else SOIL_BURST
+		_burst(18, soil, 62.0, Vector2(0, -3))
 		_burst(6, _pick_colors(), 40.0, Vector2(0, -_height * 0.4))
 	_row = -1
 	_pose()

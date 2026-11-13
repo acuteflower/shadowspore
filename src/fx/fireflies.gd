@@ -9,6 +9,7 @@ const MARGIN: float = 40.0 ## px outside the screen where a firefly may still li
 const NEAR_FLORA: float = 0.7 ## share that hovers around a glowing plant
 const COLORS: Array[Color] = [Color("a4fff0"), Color("d6ffe6"), Color("a4fff0"), Color("f6dc8c")]
 const WITCH_COLORS: Array[Color] = [Color("a8ff6a"), Color("eaffc4"), Color("a8ff6a"), Color("c690ec")] ## in the Hexenwald: witch green, now and then violet
+const DESERT_COLORS: Array[Color] = [Color("e8f2ff"), Color("fff2da"), Color("dceaff"), Color("ffe8c2")] ## in the desert: sparse, faint heat/crystal glimmers over quartz
 const WITCH_DUSK: float = 0.45 ## the Hexenwald never gets light: its flies keep this much of the night by day (BiomeBlend at the view's middle)
 const NEIGHBORS: Array[Vector2] = [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]
 const DIAGONALS: Array[Vector2] = [Vector2(1, 1), Vector2(-1, 1), Vector2(1, -1), Vector2(-1, -1)]
@@ -93,27 +94,53 @@ func _respawn(fly: Fly, rect: Rect2) -> void:
 		fly.home = _flora[randi() % _flora.size()] + Vector2(randf_range(-12.0, 12.0), randf_range(-10.0, 4.0))
 	else:
 		fly.home = rect.position + Vector2(randf() * rect.size.x, randf() * rect.size.y)
+	var arid: float = BiomeBlend.arid_at(fly.home)
+	if arid > 0.50:
+		var oasis_w: float = BiomeBlend.oasis_at(fly.home)
+		if oasis_w > 0.30:
+			fly.color = [Color(1.0, 0.85, 0.45), Color(0.45, 0.96, 0.90), Color(0.95, 0.92, 0.65)][randi() % 3]
+			return
+		for _try_q: int in 5:
+			var try_pos: Vector2 = rect.position + Vector2(randf() * rect.size.x, randf() * rect.size.y)
+			if BiomeBlend.is_quartz_surface(try_pos):
+				fly.home = try_pos
+				break
+		fly.color = DESERT_COLORS[randi() % DESERT_COLORS.size()]
+		return
 	var witch: bool = BiomeBlend.amount_at(fly.home) > 0.5
-	if witch != WITCH_COLORS.has(fly.color):
+	if witch != WITCH_COLORS.has(fly.color) or DESERT_COLORS.has(fly.color):
 		fly.color = (WITCH_COLORS if witch else COLORS)[randi() % 4]
 
 
 func _draw() -> void:
 	var night: float = _night_here()
-	for fly: Fly in _flies:
+	for i: int in _flies.size():
+		var fly: Fly = _flies[i]
 		if fly.home.x == INF:
 			continue
+		var arid: float = BiomeBlend.arid_at(fly.home)
+		var oasis_w: float = BiomeBlend.oasis_at(fly.home) if arid > 0.20 else 0.0
+		var desert_t: float = smoothstep(0.25, 0.68, arid) * (1.0 - 0.85 * oasis_w)
 		var sway: Vector2 = Vector2(
 			sin(_time * fly.speed_x + fly.phase_x) * fly.radius,
-			cos(_time * fly.speed_y + fly.phase_y) * fly.radius * 0.5 - 6.0 + sin(_time * 0.9 + fly.phase_x) * 2.0)
+			cos(_time * fly.speed_y + fly.phase_y) * fly.radius * 0.5 - 6.0 + sin(_time * 0.9 + fly.phase_x) * 2.0) * lerpf(1.0, 0.25, desert_t)
 		var point: Vector2 = (fly.home + sway).round()
-		var glow: float = pow(0.5 + 0.5 * sin(_time * fly.blink_rate + fly.blink_phase), 1.7) * night
+		var on_q: bool = desert_t > 0.30 and BiomeBlend.is_quartz_surface(point)
+		if desert_t > 0.05:
+			var keep_share: float = lerpf(1.0, 0.18 if on_q else 0.04, desert_t)
+			if float(posmod(i * 37 + 11, 100)) / 100.0 >= keep_share:
+				continue
+		var rate: float = fly.blink_rate * lerpf(1.0, 0.42, desert_t)
+		var glow: float = pow(0.5 + 0.5 * sin(_time * rate + fly.blink_phase), 1.7) * night
 		if glow < 0.06:
 			continue
-		draw_rect(Rect2(point, Vector2.ONE), Color(fly.color, minf(glow * 1.5, 1.0)))
-		if glow > 0.25: ## a bright flash gets a small cross of glow around it, the brightest a soft ring
+		var alpha: float = minf(glow * lerpf(1.5, 0.36, desert_t), lerpf(1.0, 0.30 if on_q else 0.16, desert_t))
+		if alpha < 0.04:
+			continue
+		draw_rect(Rect2(point, Vector2.ONE), Color(fly.color, alpha))
+		if glow > 0.25 and desert_t < 0.35: ## a bright flash gets a small cross of glow around it, the brightest a soft ring
 			for offset: Vector2 in NEIGHBORS:
 				draw_rect(Rect2(point + offset, Vector2.ONE), Color(fly.color, (glow - 0.25) * 0.9))
-		if glow > 0.6:
+		if glow > 0.6 and desert_t < 0.35:
 			for offset: Vector2 in DIAGONALS:
 				draw_rect(Rect2(point + offset, Vector2.ONE), Color(fly.color, (glow - 0.6) * 0.6))

@@ -3,8 +3,8 @@ extends MultiMeshInstance2D
 ## Tiny decorative ground cover. One batched draw per streamed chunk, no physics,
 ## interaction, loot, individual processing or persistent state.
 const SIZE: Vector2i = Vector2i(16, 20)
-const COUNT: int = 30 ## 0-23 grass, flowers, ferns, straw; 24-25 shade moss (forest floors, north slopes, cliff feet); 26-29 the Hexenwald's floor (witch-hair moss, dead leaves, a root arch, bone-white toadstools)
-const MEADOW_COUNT: int = 26 ## what the meadow draws from (the Hexenwald's kinds are chosen on purpose, see WorldLevel._detail_candidate)
+const COUNT: int = 34 ## 0-23 grass, flowers, ferns, straw; 24-25 shade moss (forest floors, north slopes, cliff feet); 26-29 the Hexenwald's floor; 30-33 Sonnenquarz-Öde's floor (steppe tuft, thorn twig, sand rosette, quartz crust)
+const MEADOW_COUNT: int = 26 ## what the meadow draws from (Hexenwald and desert kinds are chosen on purpose, see WorldLevel._detail_candidate)
 const WIND: Shader = preload("res://assets/shaders/meadow_details.gdshader")
 static var _atlas: ImageTexture
 var _wind: ShaderMaterial
@@ -21,6 +21,7 @@ var _contact_timer: float = 0.0
 const CONTACT_UPDATE_INTERVAL: float = 0.12 ## Throttle texture upload to ~8 updates/sec max during active contacts
 
 func setup(points: Array[Dictionary], origin: Vector2 = Vector2.ZERO) -> void:
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_origin = origin
 	position = origin
 	if _atlas == null:
@@ -251,6 +252,8 @@ static func _extra_plant(im: Image,v: int,dark: Color,stem: Color,leaf: Color,ti
 			if v==23:
 				_pixel(im,v,x-1,y-1,Color("6f6269"))
 				_pixel(im,v,x,y-2,Color("9c927a"))
+	elif v >= 30:
+		_desert_floor(im, v)
 	elif v >= 26:
 		_witch_floor(im, v)
 	else: # shade moss: 24 low cushions in dark teal-green lit from the top left, 25 a flat mat with thin spore stalks
@@ -312,3 +315,39 @@ static func _witch_floor(im: Image, v: int) -> void:
 				for dx: int in range(-cap.z/2, cap.z/2+1):
 					_pixel(im,v,cap.x+dx,cap.y,Color("dedacc") if dx <= 0 else Color("8a8698"))
 				_pixel(im,v,cap.x,cap.y-1,Color("f6f2e0"))
+
+
+## Sonnenquarz-Öde's ground cover:
+## 30 dry steppe grass tuft (ochre-gold blades), 31 brittle thorn twig on pale sand,
+## 32 low succulent sand rosette (olive-jade), 33 tiny sun-quartz crust splinter.
+static func _desert_floor(im: Image, v: int) -> void:
+	match v:
+		30:
+			var straw: Array[Color] = [Color("8c6838"), Color("b88d4c"), Color("d8b26a"), Color("e8ca82")]
+			for blade: Vector3i in [Vector3i(4, 10, 0), Vector3i(7, 8, 2), Vector3i(10, 9, 1), Vector3i(12, 12, 2)]:
+				var bx: int = 7 + (blade.x - 7) / 2
+				_line(im, v, Vector2i(bx, 18), Vector2i(blade.x, blade.y), straw[1 if blade.z == 0 else 2])
+				_pixel(im, v, blade.x, blade.y, straw[3])
+			for dx: int in range(5, 11):
+				_pixel(im, v, dx, 18, straw[0])
+		31:
+			var twig: Array[Color] = [Color("725642"), Color("9e7c60"), Color("cbb08e"), Color("ead6b4")]
+			_line(im, v, Vector2i(3, 17), Vector2i(12, 15), twig[1])
+			_line(im, v, Vector2i(4, 18), Vector2i(11, 16), twig[0])
+			_line(im, v, Vector2i(7, 16), Vector2i(9, 13), twig[2])
+			_pixel(im, v, 9, 12, twig[3])
+			_pixel(im, v, 13, 14, twig[3])
+		32:
+			var succ: Array[Color] = [Color("465838"), Color("647a4c"), Color("869e66"), Color("aeb87e")]
+			for leaf: Vector2i in [Vector2i(4, 16), Vector2i(12, 16), Vector2i(6, 15), Vector2i(10, 15), Vector2i(8, 14)]:
+				_line(im, v, Vector2i(8, 18), leaf, succ[1 if leaf.y >= 16 else 2])
+				_pixel(im, v, leaf.x, leaf.y, succ[3])
+			for dx: int in range(6, 11):
+				_pixel(im, v, dx, 18, succ[0])
+		33:
+			var qz: Array[Color] = [Color("a69b8a"), Color("d4cbbc"), Color("f0ece0"), Color("ffffff")]
+			_line(im, v, Vector2i(5, 17), Vector2i(6, 12), qz[2])
+			_line(im, v, Vector2i(6, 17), Vector2i(7, 11), qz[3])
+			_line(im, v, Vector2i(9, 18), Vector2i(10, 14), qz[1])
+			_pixel(im, v, 10, 13, qz[2])
+			_line(im, v, Vector2i(4, 18), Vector2i(11, 18), qz[0])

@@ -28,6 +28,13 @@ var _time: float = 0.0
 var _held: float = 0.0
 var _last_placed: Vector2 = Vector2(INF, INF)
 var _player: Player
+var _plan: ShaderMaterial ## the ghost is drawn as a projected plan (blueprint.gdshader)
+var _sweep: Array[Vector2] = [] ## where the props stand that the new piece's pressure wave would tear out
+var _sweep_cells: Array = []
+var _sweep_for: Vector3 = Vector3.INF ## (x, y, piece hash) the sweep was found for
+var _sweep_clock: float = 0.0
+var _rustle_clock: float = 0.0
+var _last_snap: Vector2 = Vector2.INF
 
 
 func setup(owner_town: TownManager) -> void:
@@ -38,7 +45,9 @@ func setup(owner_town: TownManager) -> void:
 	material = Unlit.material()
 	_ghost = Sprite2D.new()
 	_ghost.centered = false
-	_ghost.material = Unlit.material()
+	_plan = ShaderMaterial.new()
+	_plan.shader = preload("res://assets/shaders/blueprint.gdshader")
+	_ghost.material = _plan
 	_ghost.visible = false
 	add_child(_ghost)
 	menu = BuildMenu.new()
@@ -84,6 +93,8 @@ func set_active(on: bool) -> void:
 			var list: Array[String] = pieces_here()
 			piece = list[0] if not list.is_empty() else ""
 	active = on
+	if on:
+		menu.deal()
 	InputManager.build_open = on
 	_ghost.visible = false
 	demolish = false
@@ -120,6 +131,7 @@ func _choose_category(step: int) -> void:
 	if cats.is_empty():
 		return
 	category = posmod(category + step, cats.size())
+	menu.deal()
 	var list: Array[String] = pieces_here()
 	select(list[0] if not list.is_empty() else "")
 
@@ -182,8 +194,54 @@ func _update_ghost(cursor: Vector2) -> void:
 	_ghost.texture = tex
 	_ghost.flip_h = flip
 	_ghost.position = pos + Vector2(-float(frame[0]) / 2.0, -float(spec.get("feet", frame[1])))
-	_ghost.modulate = Color(0.55, 1.0, 0.9, 0.62) if reason == "" else Color(1.0, 0.4, 0.45, 0.55)
+	_plan.set_shader_parameter("tint", Color(0.47, 0.96, 0.9, 0.95) if reason == "" else Color(1.0, 0.35, 0.42, 0.9))
+	_plan.set_shader_parameter("shake", 0.0 if reason == "" else 0.6)
 	_ghost.visible = true
+	if pos != _last_snap:
+		if _last_snap != Vector2.INF and InputManager.using_mouse:
+			_tick()
+		_last_snap = pos
+	_update_sweep()
+
+
+func _tick() -> void:
+	var player: AudioStreamPlayer = AudioStreamPlayer.new()
+	player.stream = load("res://assets/audio/town/snap_tick.wav") as AudioStream
+	player.volume_db = -18.0
+	player.pitch_scale = randf_range(0.95, 1.08)
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
+
+
+## Which props the piece's pressure wave would tear out where it stands now (asked again when it moves, at most 8 times a second), and they shiver.
+func _update_sweep() -> void:
+	_sweep_clock -= get_process_delta_time()
+	var key: Vector3 = Vector3(pos.x, pos.y, float(piece.hash()))
+	var radius: float = TownManager.wave_radius(piece)
+	if radius <= 0.0 or town.world == null:
+		_sweep.clear()
+		_sweep_cells.clear()
+		_sweep_for = key
+		return
+	if key != _sweep_for and _sweep_clock <= 0.0:
+		_sweep_clock = 0.12
+		_sweep_for = key
+		_sweep.clear()
+		var lit: Array[Vector3] = town.circles().duplicate()
+		var spec: Dictionary = TownRules.piece(piece)
+		if float(spec.get("reach", 0.0)) > 0.0:
+			lit.append(Vector3(pos.x, pos.y - 8.0, float(spec.reach) * town.light_grow()))
+		_sweep_cells = town.world.town_wave_cells(pos, radius, lit)
+		for cell: Variant in _sweep_cells:
+			_sweep.append(town.world.prop_position(cell as Vector2i))
+	_rustle_clock -= get_process_delta_time()
+	if _rustle_clock <= 0.0 and reason == "":
+		_rustle_clock = 0.7
+		for cell: Variant in _sweep_cells:
+			var thing: WorldProp = town.world.prop_node(cell as Vector2i)
+			if thing != null:
+				thing.call("_rustle", 1.0 if (cell as Vector2i).x % 2 == 0 else -1.0, 0.07)
 
 
 func _structure_at(cursor: Vector2) -> int:
@@ -259,6 +317,22 @@ func _draw() -> void:
 	var color: Color = GOOD if reason == "" else BAD
 	draw_rect(rect, Color(color, 0.16 + 0.05 * sin(_time * 5.0)))
 	draw_rect(rect, Color(color, 0.85), false, 1.0)
+	var spec: Dictionary = TownRules.piece(piece)
+	var reach: float = float(spec.get("reach", 0.0)) * town.light_grow()
+	if reach > 0.0 and reason == "": ## the light it would bring: a dashed gold ring, the new ground faintly lit
+		var center: Vector2 = Vector2(pos.x, pos.y - 8.0)
+		var count: int = maxi(int(reach * TAU / 3.0), 24)
+		for k: int in count:
+			var angle: float = TAU * float(k) / float(count) + _time * 0.15
+			if k % 4 < 2:
+				var point: Vector2 = (center + Vector2.from_angle(angle) * reach).round()
+				draw_rect(Rect2(point, Vector2.ONE), Color(1.0, 0.82, 0.48, 0.75))
+		draw_circle(center, reach, Color(1.0, 0.82, 0.48, 0.05))
+	for spot: Vector2 in _sweep: ## what the wave will tear out
+		var r: float = 5.0 + sin(_time * 6.0 + spot.x) * 0.6
+		for k2: int in 10:
+			var a: float = TAU * float(k2) / 10.0
+			draw_rect(Rect2((spot + Vector2(0, -3) + Vector2.from_angle(a) * r).round(), Vector2.ONE), Color(1.0, 1.0, 1.0, 0.55))
 	var front: Rect2 = TownRules.front_rect(piece, pos.x, pos.y) ## the ground in front of the door, which has to stay free
 	if front.has_area():
 		draw_rect(front, Color(color, 0.07))

@@ -33,7 +33,7 @@ func _site(town: TownManager, piece: String, near: Vector2) -> Vector2:
 		for dy: int in range(-ring, ring + 1):
 			for dx: int in range(-ring, ring + 1):
 				var p: Vector2 = TownRules.snapped_position(piece, near + Vector2(float(dx) * 24.0, float(dy) * 24.0 + step * 0.1))
-				if town.can_place(piece, p) == "":
+				if town.check_site(piece, p) == "":
 					return p
 	return Vector2.INF
 
@@ -104,6 +104,7 @@ func _run() -> void:
 				_check(wc <= 5, "Torben line in %s has <= 5 words (%d): %s" % [did, wc, String(l.get("text", ""))])
 
 	## --- 3. Live World: Overworld TorbenCamp & Quest Progression ---
+	(TownRules.piece("plaza") as Dictionary)["build_seconds"] = 0.5
 	(TownRules.piece("workshop") as Dictionary)["build_seconds"] = 0.5
 	(TownRules.piece("quest_board") as Dictionary)["build_seconds"] = 0.5
 	(TownRules.piece("smithy") as Dictionary)["build_seconds"] = 0.5
@@ -129,14 +130,27 @@ func _run() -> void:
 	## Set up town cleanly at ws_pickaxe (without pre-building quest_board)
 	world.debug_jump_gustav()
 	await _frames(30)
-	player.inventory.give("wood", 60)
-	player.inventory.give("stone", 60)
+	player.inventory.give("wood", 90)
+	player.inventory.give("stone", 90)
 	player.inventory.give("plant_fiber", 20)
 	player.inventory.give("plank", 12)
 	player.inventory.give("iron_ore", 16)
 	player.inventory.give("glow_cap", 2)
+	if not town.has_built("plaza"):
+		player.request_teleport(hut.position + Vector2(-140, 40))
+		await _frames(3)
+		var plaza_at: Vector2 = _site(town, "plaza", hut.position + Vector2(0, 150))
+		_check(plaza_at != Vector2.INF, "plaza site found")
+		player.request_teleport(plaza_at + Vector2(0, 28))
+		await _frames(3)
+		town.request_place("plaza", plaza_at, false)
+		_check(await _until(func() -> bool: return town.has_built("plaza"), 180), "plaza built")
+	player.request_teleport(hut.position + Vector2(-140, 40))
+	await _frames(3)
 	var shop_at: Vector2 = _site(town, "workshop", hut.position + Vector2(40, 140))
 	_check(shop_at != Vector2.INF, "workshop site found")
+	player.request_teleport(shop_at + Vector2(0, 28))
+	await _frames(3)
 	town.request_place("workshop", shop_at, false)
 	_check(await _until(func() -> bool: return town.has_built("workshop"), 180), "workshop built")
 	var saved: Dictionary = player.quests.export_data()
@@ -154,8 +168,12 @@ func _run() -> void:
 	player.quests.set_flag("board_intro_done")
 	await _frames(4)
 	_check(player.quests.active_step_id("town_board") in ["bd_gather", "bd_build"], "board materials recognized -> bd_build")
+	player.request_teleport(hut.position + Vector2(-140, 40))
+	await _frames(3)
 	var bd_at: Vector2 = _site(town, "quest_board", shop_at + Vector2(-80, 0))
 	_check(bd_at != Vector2.INF, "quest_board site found")
+	player.request_teleport(bd_at + Vector2(0, 28))
+	await _frames(3)
 	town.request_place("quest_board", bd_at, false)
 	_check(await _until(func() -> bool: return town.has_built("quest_board"), 180), "quest_board built")
 	await _frames(6)
@@ -209,8 +227,12 @@ func _run() -> void:
 	_check(town.is_unlocked("smithy"), "smithy is unlocked after Torben joins")
 	_check(player.quests.active_step_id("torben_smithy") == "tb_build", "having materials skips tb_gather to tb_build (%s)" % player.quests.active_step_id("torben_smithy"))
 
+	player.request_teleport(hut.position + Vector2(-140, 40))
+	await _frames(3)
 	var sm_at: Vector2 = _site(town, "smithy", shop_at + Vector2(130, 0))
 	_check(sm_at != Vector2.INF, "smithy site found")
+	player.request_teleport(sm_at + Vector2(0, 28))
+	await _frames(3)
 	town.request_place("smithy", sm_at, false)
 	_check(await _until(func() -> bool: return town.has_built("smithy"), 180), "smithy built")
 	await _frames(6)

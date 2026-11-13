@@ -14,7 +14,7 @@ outer = np.asarray(Image.open(ROOT/'assets/world/outer_sdf.png').convert('L'))
 lake_sdf = np.asarray(Image.open(ROOT/'assets/world/lakes_sdf.png').convert('L'))
 mask = lake_sdf < 128
 ponds = [lake for lake in lakes['lakes'] if lake.get('inland')]
-assert len(lakes['lakes']) == 8 + len(ponds) == 9 and int(mask.sum()) == sum(lake['area_tiles'] for lake in lakes['lakes'])
+assert len(lakes['lakes']) == 8 + len(ponds) and len(ponds) == len(read('lakes')['ponds']) and int(mask.sum()) == sum(lake['area_tiles'] for lake in lakes['lakes'])
 pond_zone = np.zeros_like(mask)
 for pond in ponds:
     x, y, w, h = pond['bounds']

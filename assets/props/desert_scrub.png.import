@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cyyqxxn6igvrv"
-path="res://.godot/imported/wall_glow.png-281b4778fcd125969962ca5b989279ee.ctex"
+uid="uid://cc8ux0r041hn4"
+path="res://.godot/imported/desert_scrub.png-bde7f9d3f79e59e231b7d1b264891c66.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/interior/lake_hut/wall_glow.png"
-dest_files=["res://.godot/imported/wall_glow.png-281b4778fcd125969962ca5b989279ee.ctex"]
+source_file="res://assets/props/desert_scrub.png"
+dest_files=["res://.godot/imported/desert_scrub.png-bde7f9d3f79e59e231b7d1b264891c66.ctex"]
 
 [params]
 

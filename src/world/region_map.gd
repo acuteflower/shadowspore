@@ -190,7 +190,7 @@ func biome_at(tile: Vector2i) -> String:
 	return own if world_biome.is_empty() or own_biomes.has(own) else world_biome
 
 
-## One byte per map cell, 1 where the cell's biome has no props yet (`bare` in data/biomes.json); PropGenerator reads it.
+## One byte per map cell: 0 normal meadow, 1 Hexenwald (`witch_forest`), 2 other bare biomes (`quartz_desert`); PropGenerator reads it.
 func bare_cells() -> PackedByteArray:
 	var biomes: Dictionary = DataRegistry.table("biomes")
 	var out: PackedByteArray = PackedByteArray()
@@ -198,7 +198,9 @@ func bare_cells() -> PackedByteArray:
 	for i: int in out.size():
 		var id: int = _grid[i]
 		if id >= 0:
-			out[i] = 1 if bool((biomes.get(biome_at(Vector2i(i % grid_size, i / grid_size) * CELL), {}) as Dictionary).get("bare", false)) else 0
+			var b: String = biome_at(Vector2i(i % grid_size, i / grid_size) * CELL)
+			if bool((biomes.get(b, {}) as Dictionary).get("bare", false)):
+				out[i] = 1 if b == "witch_forest" else 2
 	return out
 
 

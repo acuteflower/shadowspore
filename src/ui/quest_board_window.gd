@@ -118,6 +118,9 @@ func _row(offer: Dictionary, running: bool) -> Dictionary:
 		"sub": "VON %s" % _giver_name(offer), "state": OK, "why": "",
 		"tag": "SIEGEL" if story else ("NOCH %d T" % left if left >= 0 else ""), "tag_color": GOLD if story else DIM,
 	}
+	if story:
+		row["icon"] = BoardRules.story_icon(offer)
+		row["ring"] = GOLD
 	if BoardRules.is_urgent(offer): ## a rush notice counts hours, not days
 		row["tag"] = "EIL %d H" % BoardRules.urgent_hours(offer, TimeManager.time_of_day)
 		row["tag_color"] = RUSH
@@ -214,7 +217,7 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 		return
 	var offer: Dictionary = row.offer as Dictionary
 	var kind: String = String(offer.k)
-	draw_cell(area.position + Vector2(0, 2), String(row.item), int(offer.n) if kind == BoardRules.FETCH else 1, true, false)
+	draw_cell(area.position + Vector2(0, 2), String(row.item), int(offer.n) if kind == BoardRules.FETCH else 1, true, false, 0, row.get("icon") as Texture2D, row.get("ring", Color(0, 0, 0, 0)) as Color)
 	var x: float = area.position.x + 46.0
 	_text(Vector2(x, area.position.y + 4.0), "%s" % _giver_name(offer), GOLD)
 	var why: String = String(offer.get("w", ""))

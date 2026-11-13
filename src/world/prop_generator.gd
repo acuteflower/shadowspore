@@ -47,15 +47,26 @@ const LAYERS: Array[Dictionary] = [
 	{"id": 31, "name": "bloom_drift", "cell": 21, "reach": 9},
 	{"id": 32, "name": "boulder_nook", "cell": 33, "reach": 7},
 	{"id": 33, "name": "lake_stones", "cell": 5, "reach": 3},
+	{"id": 34, "name": "desert_garden", "cell": 23, "reach": 10},
+	{"id": 35, "name": "desert_cactus", "cell": 13, "reach": 5},
+	{"id": 36, "name": "desert_scrub", "cell": 8, "reach": 5},
+	{"id": 37, "name": "desert_quartz", "cell": 7, "reach": 4},
+	{"id": 38, "name": "desert_tuber", "cell": 16, "reach": 4},
+	{"id": 39, "name": "oasis_palm", "cell": 5, "reach": 6},
+	{"id": 40, "name": "oasis_flora", "cell": 4, "reach": 4},
+	{"id": 41, "name": "desert_rock_cluster", "cell": 30, "reach": 8},
+	{"id": 42, "name": "desert_rock_lone", "cell": 15, "reach": 4},
 ]
 const WITCH_KINDS: Array[String] = ["hag_tree", "bone_tree", "thorn_hedge", "grave_candle", "witch_hat", "toad_cap", "ghost_fern", "mandrake", "curse_rock", "hex_shrub", "witch_broom"] ## the Hexenwald's own plant world (tools/art_hexenwald.py): grows only where the biome is `bare` of the meadow's
-const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail", "lake_glimmer", "lake_moonstone"] ## may grow at the water's edge
+const DESERT_KINDS: Array[String] = ["crown_cactus", "prickly_pear", "barrel_cactus", "desert_scrub", "tumble_scrub", "dune_grass", "glass_aloe", "night_cactus", "sand_tuber", "sun_palm", "oasis_reed", "oasis_lily", "sun_quartz_rock"] ## Sonnenquarz-Öde's own desert flora (tools/art_desert.py): grows only where `is_desert_bare` (`bare == 2`)
+const DESERT_SHARED: Array[String] = ["bush", "grass"] ## meadow plants allowed into the outer steppe fringe (arid < 0.35), where they warm and give way to desert scrub/grass
+const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail", "lake_glimmer", "lake_moonstone", "oasis_reed", "oasis_lily"] ## may grow at the water's edge
 const LAKE_KINDS: Array[String] = ["lake_glimmer", "lake_moonstone"] ## the lake witch's raw stones (docs/seehexe_konzept.md 6): only on the shores of the Hexenwald's waters
-const TREE_KINDS: Array[String] = ["tree", "willow", "blossom", "birch", "hag_tree", "bone_tree"] ## what has a trunk and a crown
+const TREE_KINDS: Array[String] = ["tree", "willow", "blossom", "birch", "hag_tree", "bone_tree", "crown_cactus", "sun_palm"] ## what has a trunk and a crown
 const WITCH_SHARED: Array[String] = ["bush"] ## meadow plants the Hexenwald shares: only along its fringe, deeper in every "bush" becomes one of its own (`_hex_bush`)
 const WITCH_CLEARING: int = 15 ## percent of the witch_wood cells that are a clearing with a witches' ring instead of a wood (`_in_clearing`)
 const WITCH_CLEARING_R: float = 7.5 ## tiles: no tree or bush grows that close to a clearing's middle
-const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "iron_rock": 3.05, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3, "hag_tree": 4.0, "bone_tree": 3.6, "curse_rock": 3.05, "thorn_hedge": 2.0, "ghost_fern": 0.3, "grave_candle": 0.25, "witch_hat": 0.25, "toad_cap": 0.1, "mandrake": 0.2, "hex_shrub": 1.9, "witch_broom": 1.8, "lake_glimmer": -1.0, "lake_moonstone": -1.0} ## mushrooms give way to everything, so they never change what else stands where
+const PRIORITY: Dictionary = {"tree": 4.0, "rock": 3.0, "iron_rock": 3.05, "berry_bush": 2.2, "bush": 2.0, "pebble": 1.0, "mushroom": 0.0, "grass": 0.6, "ember_bush": 2.1, "willow": 3.5, "blossom": 3.4, "birch": 3.3, "ember_morel": 0.1, "moon_parasol": 0.1, "moon_iris": 0.3, "brook_mint": 0.25, "marsh_gold": 0.3, "moonbell": 0.2, "wound_leaf": 0.2, "puffseed": 0.25, "glowfern": 0.3, "cattail": 0.35, "sunbloom": 0.3, "voidbloom": 0.2, "earth_tuber": 0.15, "ember_carrot": 0.25, "night_beet": 0.25, "mist_lily": 0.3, "spark_poppy": 0.25, "snapper": 0.3, "hag_tree": 4.0, "bone_tree": 3.6, "curse_rock": 3.05, "thorn_hedge": 2.0, "ghost_fern": 0.3, "grave_candle": 0.25, "witch_hat": 0.25, "toad_cap": 0.1, "mandrake": 0.2, "hex_shrub": 1.9, "witch_broom": 1.8, "lake_glimmer": -1.0, "lake_moonstone": -1.0, "crown_cactus": 3.8, "prickly_pear": 2.15, "barrel_cactus": 1.85, "desert_scrub": 1.9, "tumble_scrub": 1.6, "dune_grass": 0.65, "glass_aloe": 1.4, "night_cactus": 1.5, "sand_tuber": 0.25, "sun_palm": 3.95, "sun_quartz_rock": 3.08, "oasis_lily": 1.45, "oasis_reed": 1.35} ## mushrooms give way to everything, so they never change what else stands where
 const BED_RX: Array[float] = [40.0, 48.0, 56.0, 64.0, 72.0, 80.0] ## px, the gravel beds (assets/props/stonebed.png)
 const BED_FLATTEN: float = 0.64
 const GAP: float = 3.0 ## px kept free between footprints
@@ -63,7 +74,7 @@ const CROWN_OVERLAP: float = 0.8 ## crowns may just touch (x their half widths):
 const DENSE_CROWN_OVERLAP: float = 0.6 ## the same for two trees of a grove or a wood: their crowns reach into each other and close into one canopy (a smaller factor lets them stand closer)
 const FOREST_BED_RX: Array[float] = [28.0, 36.0, 44.0, 52.0, 60.0, 70.0] ## px, the forest floor under every tree of a wood (assets/props/forestbed.png, tools/art_forestbed.py); variants 6-11 are the same sizes in the Hexenwald's floor (row 1)
 const KRUMMHOLZ_LEVEL: float = 1.6 ## relief level (0..3, smooth) from which trees and bushes are stunted by wind and cold
-const BUSH_KINDS: Array[String] = ["bush", "berry_bush", "ember_bush"]
+const BUSH_KINDS: Array[String] = ["bush", "berry_bush", "ember_bush", "prickly_pear", "desert_scrub"]
 const YOUNG_GROW_DAYS: float = 7.0 ## days a generated sapling needs to become a fir (WorldLevel counts them from day 1)
 const BUCKET: float = 72.0 ## px, grid for the overlap search (bigger than any two footprints together)
 const SMALL_ROCKS: Array[int] = [0, 1, 4, 5, 6]
@@ -119,12 +130,28 @@ func sync_inputs(source: PropGenerator) -> void:
 	bare = source.bare
 
 
-## True where the map's biome carries no props (data/biomes.json `bare`).
+## True where the map's biome suppresses meadow props (`bare` in data/biomes.json: 1 = witch_forest, 2 = other bare biomes).
 func is_bare(cell: Vector2i) -> bool:
 	if bare.is_empty():
 		return false
 	var side: int = RegionMap.WORLD_TILES / RegionMap.CELL
+	return bare[clampi(cell.y / RegionMap.CELL, 0, side - 1) * side + clampi(cell.x / RegionMap.CELL, 0, side - 1)] != 0
+
+
+## True specifically in the Hexenwald (`bare == 1`), which grows its own plant world.
+func is_witch(cell: Vector2i) -> bool:
+	if bare.is_empty():
+		return false
+	var side: int = RegionMap.WORLD_TILES / RegionMap.CELL
 	return bare[clampi(cell.y / RegionMap.CELL, 0, side - 1) * side + clampi(cell.x / RegionMap.CELL, 0, side - 1)] == 1
+
+
+## True in bare biomes that currently carry zero props at all (`bare == 2`, e.g. stage-1 `quartz_desert`).
+func is_desert_bare(cell: Vector2i) -> bool:
+	if bare.is_empty():
+		return false
+	var side: int = RegionMap.WORLD_TILES / RegionMap.CELL
+	return bare[clampi(cell.y / RegionMap.CELL, 0, side - 1) * side + clampi(cell.x / RegionMap.CELL, 0, side - 1)] == 2
 
 
 ## Where a prop in `cell` stands (px, at its feet): a little off the middle so rows never look ruled.
@@ -389,11 +416,14 @@ func _cluster(layer: Dictionary, cc: Vector2i) -> Array[Dictionary]:
 			if rng.randf() < 0.28 + 0.22 * shade + 0.2 * shore:
 				_boulder_nook(found, rng, center, shade, shore, slope)
 		"witch_wood", "witch_tree", "witch_flora", "witch_patch", "witch_ore":
-			if is_bare(Vector2i(floori(center.x), floori(center.y))):
+			if is_witch(Vector2i(floori(center.x), floori(center.y))):
 				_witch(String(layer.name), found, rng, center, wild)
 		"lake_stones": ## Seeglimmer right at the waterline (it shows at night), Seemondstein further up the dry shore
-			if is_bare(Vector2i(floori(center.x), floori(center.y))):
+			if is_witch(Vector2i(floori(center.x), floori(center.y))):
 				_lake_stones(found, rng, center)
+		"desert_garden", "desert_cactus", "desert_scrub", "desert_quartz", "desert_tuber", "oasis_palm", "oasis_flora", "desert_rock_cluster", "desert_rock_lone":
+			if is_desert_bare(Vector2i(floori(center.x), floori(center.y))):
+				_desert(String(layer.name), found, rng, center, wild)
 	## Pure: a cluster depends only on its key, the seed and the static world inputs (set once before any chunk, and `_cache` is
 	## cleared on terrain edits), so a cleared entry is simply computed again with the same result.
 	if _cache.size() >= CACHE_LIMIT: _cache.clear()
@@ -531,9 +561,12 @@ func _birch_grove(found: Array[Dictionary], rng: RandomNumberGenerator, center: 
 
 ## Px from the water's edge to a point (tiles), INF when no water is near.
 func _water_gap(at: Vector2) -> float:
-	if not water_dist.is_valid():
-		return INF
-	return float(water_dist.call(at * 16.0))
+	var best: float = INF
+	if water_dist.is_valid():
+		best = float(water_dist.call(at * 16.0))
+	if best > 240.0 and BiomeBlend.arid_at(at * 16.0) >= 0.35:
+		best = minf(best, BiomeBlend.lake_tiles_at(at) * 16.0)
+	return best
 
 
 ## 0 far from the water .. 1 at its edge (within about 100 px).
@@ -855,6 +888,190 @@ func _witch(layer: String, found: Array[Dictionary], rng: RandomNumberGenerator,
 				_add(found, rng, "curse_rock", _weighted(rng, "curse_rock"), center)
 
 
+## Cliff/mesa shelter in Sonnenquarz-Öde: 1.0 directly at the foot of a wall face, 0.75 beside a higher plateau or cliff edge, 0.0 open dune.
+func _cliff_shelter(tile: Vector2i) -> float:
+	if _relief.wall_above(tile):
+		return 1.0
+	var base_lvl: int = _relief.level(tile.x, tile.y)
+	for off: Vector2i in [Vector2i(0, -3), Vector2i(-2, -2), Vector2i(2, -2), Vector2i(-3, 0), Vector2i(3, 0), Vector2i(0, 3)]:
+		var nx: int = tile.x + off.x
+		var ny: int = tile.y + off.y
+		if _relief.kind(nx, ny) == Relief.FACE or _relief.level(nx, ny) > base_lvl:
+			return 0.75
+	return 0.0
+
+
+## Classification of white quartz outcrops at `pos` (px):
+## 3 = deep crystal interior (keep 100% clear), 2 = outer quartz edge (`glass_aloe` only),
+## 1 = sand rim directly beside quartz (`glass_aloe` & `night_cactus`), 0 = open dune sand.
+func _quartz_rim(pos: Vector2) -> int:
+	var on_q: bool = BiomeBlend.is_quartz_surface(pos)
+	var q_neighbors: int = 0
+	for d: Vector2 in [Vector2(22.0, 0.0), Vector2(-22.0, 0.0), Vector2(0.0, 22.0), Vector2(0.0, -22.0)]:
+		if BiomeBlend.is_quartz_surface(pos + d):
+			q_neighbors += 1
+	if on_q:
+		return 3 if q_neighbors == 4 else 2
+	return 1 if q_neighbors > 0 else 0
+
+
+## Position-hashed transition for surviving meadow bushes & grass in the outer desert fringe (`arid < 0.35`, zero RNG calls).
+func _desert_shared_kind(cell: Vector2i, kind: String, arid: float) -> String:
+	var roll: int = absi(hash(Vector2i(cell.x * 13 + 5, cell.y * 19 + 11))) % 100
+	if float(roll) / 100.0 < smoothstep(0.10, 0.35, arid) * 0.55:
+		return ""
+	if kind == "bush":
+		if arid < 0.22 and float(roll % 50) / 50.0 > arid / 0.22:
+			return "bush"
+		return "desert_scrub" if roll % 5 < 3 else "tumble_scrub"
+	if arid < 0.18 and float(roll % 50) / 50.0 > arid / 0.18:
+		return "grass"
+	return "dune_grass"
+
+
+## Sonnenquarz-Öde's sparse three-zone flora ecology (`DESERT_KINDS`): leaves ~85%+ of open dune sand bare and keeps quartz centers clear.
+func _desert(layer: String, found: Array[Dictionary], rng: RandomNumberGenerator, center: Vector2, wild: float) -> void:
+	var tile: Vector2i = Vector2i(floori(center.x), floori(center.y))
+	var pos_px: Vector2 = center * 16.0 + Vector2(8.0, 8.0)
+	var arid: float = BiomeBlend.arid_at(pos_px)
+	var oasis: float = BiomeBlend.oasis_at(pos_px)
+	var lake_d: float = BiomeBlend.lake_tiles_at(pos_px)
+	var shelter: float = _cliff_shelter(tile)
+	match layer:
+		"desert_garden":
+			if arid < 0.34 or oasis > 0.45:
+				return
+			if rng.randf() >= (0.74 if shelter > 0.5 else 0.24 + 0.28 * wild):
+				return
+			var crowns: int = rng.randi_range(1, 3)
+			for i: int in crowns:
+				var t: float = sqrt(rng.randf())
+				var at: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.0, 2.8) * t
+				var v: int = 4 if t < 0.35 and rng.randf() < 0.55 else (3 if t < 0.55 else (2 if t < 0.8 else _weighted(rng, "crown_cactus")))
+				_add(found, rng, "crown_cactus", mini(v, 4), at)
+			var mates: Array[String] = ["prickly_pear", "prickly_pear", "barrel_cactus", "barrel_cactus", "desert_scrub", "tumble_scrub", "dune_grass"]
+			for _i: int in rng.randi_range(4, 7):
+				var kind: String = mates[rng.randi() % mates.size()]
+				var at: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.8, 5.2)
+				_add(found, rng, kind, _weighted(rng, kind), at)
+			if arid >= 0.55 and rng.randf() < 0.4:
+				var at: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.8, 3.6)
+				_add(found, rng, "night_cactus", _weighted(rng, "night_cactus"), at)
+		"desert_cactus":
+			if arid < 0.26 or oasis > 0.50:
+				return
+			if rng.randf() < 0.34 + 0.32 * shelter + 0.14 * wild:
+				var r: float = rng.randf()
+				if arid >= 0.44 and r < 0.28:
+					_add(found, rng, "crown_cactus", _weighted(rng, "crown_cactus"), center)
+					if rng.randf() < 0.55:
+						var sub: String = ["barrel_cactus", "prickly_pear", "desert_scrub"][rng.randi() % 3]
+						_add(found, rng, sub, _weighted(rng, sub), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.6, 2.8))
+				elif r < 0.66:
+					_add(found, rng, "prickly_pear", _weighted(rng, "prickly_pear"), center)
+					if rng.randf() < 0.50:
+						for _i: int in rng.randi_range(1, 2):
+							var sub: String = ["prickly_pear", "barrel_cactus", "desert_scrub"][rng.randi() % 3]
+							_add(found, rng, sub, _weighted(rng, sub), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.5, 2.6))
+				else:
+					_add(found, rng, "barrel_cactus", _weighted(rng, "barrel_cactus"), center)
+					if rng.randf() < 0.45:
+						for _i: int in rng.randi_range(1, 2):
+							var sub: String = ["barrel_cactus", "tumble_scrub", "desert_scrub"][rng.randi() % 3]
+							_add(found, rng, sub, _weighted(rng, sub), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.3, 2.4))
+		"desert_scrub":
+			if arid < 0.12 or oasis > 0.65:
+				return
+			var saum: float = 1.0 - smoothstep(0.20, 0.70, arid)
+			if rng.randf() < 0.52 * saum + 0.32 + 0.24 * shelter:
+				var kind: String = ["dune_grass", "dune_grass", "desert_scrub", "desert_scrub", "tumble_scrub"][rng.randi() % 5] if saum > 0.35 else ["desert_scrub", "desert_scrub", "tumble_scrub", "dune_grass"][rng.randi() % 4]
+				_add(found, rng, kind, _weighted(rng, kind), center)
+				if rng.randf() < 0.60:
+					for _i: int in rng.randi_range(1, 3):
+						_add(found, rng, kind, _weighted(rng, kind), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.2, 2.8))
+		"desert_quartz":
+			if arid < 0.58:
+				return
+			for i: int in 6:
+				var at: Vector2 = center + (Vector2.ZERO if i == 0 else Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.8, 3.2))
+				var at_cell: Vector2i = Vector2i(floori(at.x), floori(at.y))
+				var rim: int = _quartz_rim(position_of(at_cell))
+				if rim == 1 or rim == 2:
+					if rng.randf() < 0.78:
+						var q_kind: String = "glass_aloe" if (rim == 2 or rng.randf() < 0.58) else "night_cactus"
+						_add(found, rng, q_kind, _weighted(rng, q_kind), at)
+						if q_kind == "glass_aloe" and rng.randf() < 0.45:
+							_add(found, rng, "glass_aloe", _weighted(rng, "glass_aloe"), at + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.1, 2.0))
+					return
+			if shelter > 0.5 and arid >= 0.65 and rng.randf() < 0.08:
+				_add(found, rng, "night_cactus", _weighted(rng, "night_cactus"), center)
+		"desert_tuber":
+			if arid < 0.38 or oasis > 0.35:
+				return
+			if rng.randf() < 0.22 * (1.0 - 0.45 * shelter):
+				_add(found, rng, "sand_tuber", _weighted(rng, "sand_tuber"), center)
+				if rng.randf() < 0.25:
+					_add(found, rng, "sand_tuber", _weighted(rng, "sand_tuber"), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.5, 2.8))
+		"oasis_palm":
+			if arid < 0.35 or lake_d < 0.7 or lake_d > 7.8:
+				return
+			var palm_chance: float = 0.86 if lake_d < 4.2 else 0.48
+			if rng.randf() >= palm_chance:
+				return
+			var count: int = rng.randi_range(2, 3) if (lake_d < 4.0 and rng.randf() < 0.55) else 1
+			for p_idx: int in count:
+				var p_at: Vector2 = center + (Vector2.ZERO if p_idx == 0 else Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.8, 3.4))
+				var p_var: int = [1, 2, 3, 4, 5][rng.randi() % 5] if (lake_d < 3.6 and rng.randf() < 0.68) else _weighted(rng, "sun_palm")
+				_add(found, rng, "sun_palm", p_var, p_at, 0.0, true)
+			for _i: int in rng.randi_range(2, 4):
+				var sub_kind: String = ["oasis_lily", "oasis_reed", "dune_grass", "glass_aloe"][rng.randi() % 4]
+				_add(found, rng, sub_kind, _weighted(rng, sub_kind), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.1, 2.8))
+			if rng.randf() < 0.24:
+				var edge_kind: String = "prickly_pear" if (lake_d > 3.2 and rng.randf() < 0.5) else "sun_quartz_rock"
+				_add(found, rng, edge_kind, _weighted(rng, edge_kind), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.8, 3.4))
+		"oasis_flora":
+			var gap: float = _water_gap(center)
+			if arid < 0.35 or gap < 4.2 or gap > 96.0 or lake_d < 0.15 or lake_d > 6.4:
+				return
+			if gap <= 42.0:
+				if rng.randf() < 0.85:
+					for _i: int in rng.randi_range(3, 6):
+						var pos: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.0, 1.4)
+						if _water_gap(pos) >= 3.8:
+							_add(found, rng, "oasis_reed", _weighted(rng, "oasis_reed"), pos)
+					for _j: int in rng.randi_range(1, 3):
+						var lpos: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.4, 1.8)
+						if _water_gap(lpos) >= 4.0:
+							_add(found, rng, "oasis_lily", _weighted(rng, "oasis_lily"), lpos)
+			elif rng.randf() < 0.58:
+				for _i: int in rng.randi_range(2, 5):
+					var kind: String = ["oasis_lily", "oasis_lily", "oasis_reed", "dune_grass", "glass_aloe"][rng.randi() % 5]
+					var opos: Vector2 = center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(0.4, 2.0)
+					if _water_gap(opos) >= 5.5:
+						_add(found, rng, kind, _weighted(rng, kind), opos)
+		"desert_rock_cluster":
+			if arid < 0.34 or oasis >= 0.42:
+				return
+			var near_q: bool = arid >= 0.54 and _quartz_rim(pos_px) > 0
+			var rock_chance: float = 0.68 if near_q else (0.58 if shelter > 0.4 else 0.24 + 0.10 * wild)
+			if rng.randf() >= rock_chance:
+				return
+			var big_v: int = [1, 2, 3, 4, 5][rng.randi() % 5]
+			_add(found, rng, "sun_quartz_rock", big_v, center)
+			for _i: int in rng.randi_range(1, 3):
+				_add(found, rng, "sun_quartz_rock", _weighted(rng, "sun_quartz_rock"), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.6, 3.8))
+			for _i: int in rng.randi_range(1, 3):
+				var sub: String = "glass_aloe" if (near_q or rng.randf() < 0.45) else "desert_scrub"
+				_add(found, rng, sub, _weighted(rng, sub), center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(1.5, 4.2))
+		"desert_rock_lone":
+			if arid < 0.30 or oasis >= 0.58:
+				return
+			var near_q: bool = arid >= 0.54 and _quartz_rim(pos_px) > 0
+			var lone_chance: float = 0.36 if near_q else (0.16 + 0.26 * shelter)
+			if rng.randf() < lone_chance:
+				_add(found, rng, "sun_quartz_rock", _weighted(rng, "sun_quartz_rock"), center)
+
+
 func _coast(at: Vector2) -> float:
 	var cell: Vector2i = Vector2i(clampi(floori(at.x), 0, RegionMap.WORLD_TILES - 1), clampi(floori(at.y), 0, RegionMap.WORLD_TILES - 1))
 	return (float(_sdf[cell.y * RegionMap.WORLD_TILES + cell.x]) - 128.0) / 8.0
@@ -887,22 +1104,44 @@ func _bed_valid(center: Vector2, rx: float) -> bool:
 ## Adds a candidate if it is valid and clear of what this cluster already placed.
 func _add(found: Array[Dictionary], rng: RandomNumberGenerator, kind: String, variant: int, at: Vector2, bias: float = 0.0, dense: bool = false, young: int = -1) -> void:
 	var cell: Vector2i = Vector2i(floori(at.x), floori(at.y))
+	var desert_shared_tie: float = -1.0
+	if DESERT_KINDS.has(kind):
+		if not is_desert_bare(cell):
+			return
+		var pos_px_d: Vector2 = position_of(cell)
+		var rim: int = _quartz_rim(pos_px_d)
+		var in_oasis: bool = (kind == "oasis_reed" or kind == "oasis_lily" or kind == "sun_palm") and BiomeBlend.oasis_at(pos_px_d) > 0.25
+		if not in_oasis and (rim >= 3 or (rim == 2 and kind != "glass_aloe" and kind != "sun_quartz_rock")):
+			return
+	elif is_desert_bare(cell):
+		if not DESERT_SHARED.has(kind):
+			return
+		var pos_px: Vector2 = position_of(cell)
+		var arid: float = BiomeBlend.arid_at(pos_px)
+		if arid >= 0.35 or BiomeBlend.is_quartz_surface(pos_px):
+			return
+		kind = _desert_shared_kind(cell, kind, arid)
+		if kind.is_empty():
+			return
+		var cols: int = int((_plants[kind] as Dictionary).columns)
+		variant = absi(hash(Vector2i(cell.x * 7 + 1, cell.y * 23 + 3))) % cols
+		desert_shared_tie = float(absi(hash(Vector2i(cell.x * 29, cell.y * 31))) % 900) / 1000.0
 	if (kind == "berry_bush" or kind == "ember_bush") and berry_free_cells.has(cell):
 		kind = "bush"
-	if kind == "bush" and is_bare(cell):
+	if kind == "bush" and is_witch(cell):
 		kind = _hex_bush(cell)
 		if kind != "bush":
 			variant = [0, 0, 0, 1, 1, 1, 2, 2][absi(hash(Vector2i(cell.x * 3, cell.y * 17))) % 8]
-	if (TREE_KINDS.has(kind) or kind == "thorn_hedge" or kind == "hex_shrub" or kind == "witch_broom" or kind == "bush") and is_bare(cell) and _in_clearing(at):
+	if (TREE_KINDS.has(kind) or kind == "thorn_hedge" or kind == "hex_shrub" or kind == "witch_broom" or kind == "bush") and is_witch(cell) and _in_clearing(at):
 		return
 	var plant: Dictionary = _plants[kind]
 	var tile: int = RegionMap.WORLD_TILES
-	var prio: float = float(PRIORITY[kind]) + rng.randf() * 0.9 + bias ## the random part breaks ties the same way everywhere; `bias` < 0 makes the newer woods give way to what stood before
+	var prio: float = float(PRIORITY[kind]) + (desert_shared_tie if desert_shared_tie >= 0.0 else rng.randf() * 0.9) + bias ## the random part breaks ties the same way everywhere; `bias` < 0 makes the newer woods give way to what stood before
 	if cell.x < 0 or cell.y < 0 or cell.x >= tile or cell.y >= tile or _exclude.has_point(cell) or blocked_cells.has(cell):
 		return
 	if TREE_KINDS.has(kind) and tree_free_cells.has(cell):
 		return
-	if is_bare(cell) != (WITCH_KINDS.has(kind) or LAKE_KINDS.has(kind)) and not (is_bare(cell) and WITCH_SHARED.has(kind)): ## the Hexenwald carries its own plants (and the plain bushes of the meadow); its plants grow nowhere else
+	if is_witch(cell) != (WITCH_KINDS.has(kind) or LAKE_KINDS.has(kind)) and not (is_witch(cell) and WITCH_SHARED.has(kind)): ## the Hexenwald carries its own plants (and the plain bushes of the meadow); its plants grow nowhere else
 		return
 	if (float(_sdf[cell.y * tile + cell.x]) - 128.0) / 8.0 < float(plant.edge_margin):
 		return
@@ -911,7 +1150,7 @@ func _add(found: Array[Dictionary], rng: RandomNumberGenerator, kind: String, va
 		variant = mini(variant, 1) ## a sapling grows into one of the small firs
 	elif (TREE_KINDS.has(kind) or BUSH_KINDS.has(kind)) and _relief.level_at(position_of(cell)) >= KRUMMHOLZ_LEVEL:
 		## Krummholz: on the high levels the wind and cold keep trees short (smallest two sizes) and everything woody a fifth smaller
-		if TREE_KINDS.has(kind):
+		if TREE_KINDS.has(kind) and kind != "sun_palm":
 			variant = mini(variant, 1)
 		scale = lerpf(0.75, 0.85, float(absi(hash(Vector2i(cell.x * 5, cell.y * 11))) % 100) / 100.0)
 	var cand: Dictionary = {"cell": cell, "kind": kind, "variant": variant, "pos": position_of(cell), "foot": _foot(plant, kind, variant) * scale, "crown": _crown(plant, kind, variant) * scale, "prio": prio}
@@ -921,7 +1160,7 @@ func _add(found: Array[Dictionary], rng: RandomNumberGenerator, kind: String, va
 		cand["young"] = young
 	if dense:
 		cand["dense"] = true
-		if kind in TREE_KINDS and young < 0:
+		if kind in TREE_KINDS and kind != "crown_cactus" and kind != "sun_palm" and young < 0:
 			cand["bed"] = _bed_index(float(cand.crown))
 	if not _relief.flat_around(cand.pos as Vector2, float(cand.foot) + 4.0): ## no feet on a wall, a ramp or a cliff edge
 		return
@@ -944,7 +1183,11 @@ func _foot(plant: Dictionary, kind: String, variant: int) -> float:
 	match kind:
 		"tree", "willow", "blossom", "hag_tree", "bone_tree":
 			return maxf(float((plant.trunk_half_width as Array)[variant]) * 1.6 + 8.0, float((plant.crown_half_width as Array)[variant]) * 0.5)
-		"rock", "iron_rock", "curse_rock":
+		"crown_cactus":
+			return maxf(float((plant.trunk_half_width as Array)[variant]) * 1.5 + 6.0, float((plant.crown_half_width as Array)[variant]) * 0.42)
+		"sun_palm":
+			return maxf(float((plant.trunk_half_width as Array)[variant]) * 1.4 + 6.0, float((plant.crown_half_width as Array)[variant]) * 0.36)
+		"rock", "iron_rock", "curse_rock", "sun_quartz_rock":
 			return float((plant.radius as Array)[variant]) * 0.9
 		"pebble":
 			return float((plant.radius as Array)[variant]) * 0.6

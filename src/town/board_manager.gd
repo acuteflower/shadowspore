@@ -386,8 +386,8 @@ func _hook_player_story(player: Player) -> void:
 			player.quests.quest_finished.connect(_on_story_trigger_id)
 		if not player.quests.changed.is_connected(check_story_now):
 			player.quests.changed.connect(check_story_now)
-	if player.progress != null and not player.progress.level_changed.is_connected(_on_story_level_changed):
-		player.progress.level_changed.connect(_on_story_level_changed)
+	if player.progress != null and not player.progress.leveled.is_connected(_on_story_level_changed):
+		player.progress.leveled.connect(_on_story_level_changed)
 
 
 func _on_story_trigger_id(_id: String) -> void:
@@ -885,7 +885,7 @@ func _clean(raw: Dictionary) -> Dictionary:
 		offer["u"] = bool(offer.u)
 	if offer.has("ut"):
 		offer["ut"] = float(offer.ut)
-	for key: String in ["w", "oc", "win", "bn"]:
+	for key: String in ["w", "oc", "win", "bn", "ic"]:
 		if offer.has(key):
 			offer[key] = String(offer[key])
 	if offer.has("bh"):

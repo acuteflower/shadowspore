@@ -11,6 +11,8 @@ uniform sampler2D water_detail : filter_nearest, repeat_enable;
 uniform sampler2D bank_material : source_color, filter_nearest, repeat_enable;
 uniform vec2 world_origin = vec2(0.0);
 global uniform float g_water_time; // seconds of the river clock (WorldRivers / river_design_patch), shared by all water
+global uniform sampler2D g_arid : filter_linear, repeat_disable;
+global uniform vec4 g_gloom_rect;
 uniform float bank_width = 12.0;
 // World bake only: bank_map.g holds the depth under the surface (0..8 px) for shore shading.
 uniform bool bank_inner = false;
@@ -31,6 +33,7 @@ void fragment() {
 	float calm = texture(bank_map, UV).b;
     float distance_to_water = texture(bank_map, UV).r * bank_width;
     vec2 pixel = floor(UV * vec2(textureSize(TEXTURE, 0))) + floor(world_origin);
+    float oasis_m = g_gloom_rect.z > 0.0 ? smoothstep(0.42, 0.68, texture(g_arid, (pixel - g_gloom_rect.xy) / g_gloom_rect.zw).r) : 0.0;
     vec4 out_color = vec4(0.0);
     if (mask.r > 0.5) {
         vec2 flow = mask.ba * 2.0 - 1.0;
@@ -47,11 +50,18 @@ void fragment() {
         if (depth < 0.70) { color = vec3(0.18, 0.36, 0.37); }
         if (depth < 0.48) { color = vec3(0.22, 0.41, 0.40); }
         if (depth < 0.27) { color = vec3(0.29, 0.46, 0.43); }
+        if (oasis_m > 0.01) {
+            vec3 ocol = vec3(0.10, 0.38, 0.46);
+            if (depth < 0.70) { ocol = vec3(0.15, 0.49, 0.54); }
+            if (depth < 0.48) { ocol = vec3(0.24, 0.61, 0.60); }
+            if (depth < 0.27) { ocol = vec3(0.38, 0.73, 0.67); }
+            color = mix(color, ocol, oasis_m);
+        }
         // Slow one-pixel refraction shifts submerged stones together in small patches.
         float refract_shift = step(0.72, sin(floor(pixel.y / 8.0) * 0.8 + g_water_time * 0.45));
         vec4 fixed_detail = texture(water_detail, (pixel + vec2(refract_shift, 0.0) + vec2(0.5)) / 128.0);
         if (mask.g < 0.48 && fixed_detail.r > 0.3) {
-            color = mix(color, vec3(0.54, 0.54, 0.43), (1.0 - mask.g / 0.48) * 0.72);
+            color = mix(color, mix(vec3(0.54, 0.54, 0.43), vec3(0.68, 0.78, 0.72), oasis_m), (1.0 - mask.g / 0.48) * 0.72);
         }
         // Broken, multi-pixel painted reflection clusters flowing downstream.
         vec2 q = floor(vec2(dot(pixel, flow), dot(pixel, across)));
@@ -105,7 +115,7 @@ void fragment() {
             if (mask.g < 0.34) {
                 float c1 = sin(pixel.x * 0.45 + g_water_time * 0.8 + sin(pixel.y * 0.37 + g_water_time * 0.6) * 1.7);
                 float c2 = sin(pixel.y * 0.52 - g_water_time * 0.7 + sin(pixel.x * 0.33) * 1.5);
-                if (c1 + c2 > 1.4) { color = mix(color, vec3(0.70, 0.86, 0.66), 0.5 * daylight); }
+                if (c1 + c2 > 1.4) { color = mix(color, mix(vec3(0.70, 0.86, 0.66), vec3(0.76, 0.96, 0.88), oasis_m), 0.5 * daylight); }
             }
         }
         // Elliptical broken arcs and short, downstream foam trails around obstacles.
@@ -174,12 +184,12 @@ void fragment() {
             float north_land = texture(bank_map, UV + vec2(0.0, -texel.y * 3.0)).r
                              + texture(bank_map, UV + vec2(0.0, -texel.y * 5.0)).r;
             float shore = hash21(floor(pixel / vec2(6.0, 3.0)));
-            if (inside < 3.0 && mask.g < 0.30) {
-                float sandy = (1.0 - inside / 3.0) * 0.5;
-                if (bayer4(pixel) < sandy) { color = mix(color, vec3(0.50, 0.58, 0.50), 0.55); }
+            if (inside < 3.5 && mask.g < 0.34) {
+                float sandy = (1.0 - inside / 3.5) * mix(0.5, 0.72, oasis_m);
+                if (bayer4(pixel) < sandy) { color = mix(color, mix(vec3(0.50, 0.58, 0.50), vec3(0.68, 0.74, 0.60), oasis_m), 0.60); }
             }
             if (north_land > 0.0 && inside < 2.5 && bayer4(pixel + vec2(1.0, 2.0)) < 0.6 * (1.0 - inside / 2.5)) {
-                color = mix(color, vec3(0.07, 0.17, 0.22), 0.6);
+                color = mix(color, mix(vec3(0.07, 0.17, 0.22), vec3(0.09, 0.28, 0.34), oasis_m), 0.6);
             }
             float foam_line = 0.7 + 0.3 * sin(g_water_time * 1.2 + pixel.x * 0.11);
             if (inside < 1.1 && shore > 0.34 - 0.1 * foam_line) {
@@ -219,24 +229,36 @@ void fragment() {
         if (d < edge) {
             float wet = 1.0 - smoothstep(0.0, 3.5 + 2.0 * (1.0 - lit), d);
             if (kind == 0) {
-                // Damp plum-brown mud with a wet sheen towards the light and twig flecks.
+                // Damp plum-brown mud (warms to damp golden oasis sand inside arid basins).
                 col = mix(vec3(0.40, 0.33, 0.31), vec3(0.27, 0.22, 0.26), wet);
+                if (oasis_m > 0.01) {
+                    col = mix(col, mix(vec3(0.62, 0.49, 0.36), vec3(0.39, 0.31, 0.28), wet), oasis_m);
+                }
                 if (speck > 0.90) { col = mix(col, vec3(0.55, 0.46, 0.38), 0.7); }
                 if (wet > 0.35 && lit > 0.55 && speck < 0.12) { col = mix(col, vec3(0.62, 0.63, 0.70), 0.45); }
                 if (rnd > 0.86 && mod(pixel.x, 5.0) < 3.0 && mod(pixel.y, 4.0) < 1.0) { col = vec3(0.23, 0.18, 0.21); }
             } else if (kind == 1) {
-                // Overgrown moss and clover in the game's grass ramp, darker towards the water.
+                // Overgrown moss and clover in the game's grass ramp, warming to damp golden sand & olive-jade sedge in desert oases.
                 col = mix(vec3(0.24, 0.49, 0.34), vec3(0.18, 0.38, 0.30), wet);
                 if (speck > 0.84) { col = mix(col, vec3(0.49, 0.73, 0.43), 0.8); }
                 if (speck < 0.16) { col = mix(col, vec3(0.12, 0.26, 0.23), 0.85); }
-                // Now and then a tiny bloom on the mossy shore: violet, pink or pale.
-                float bloom = hash21(pixel + 91.0);
-                if (bloom > 0.985 && d > 2.0) {
-                    col = bloom > 0.995 ? vec3(0.93, 0.89, 0.76) : (bloom > 0.99 ? vec3(0.91, 0.66, 0.82) : vec3(0.66, 0.54, 0.94));
+                if (oasis_m > 0.01) {
+                    vec3 o_bank = mix(vec3(0.58, 0.48, 0.35), vec3(0.32, 0.46, 0.34), 0.55 - 0.35 * wet);
+                    if (speck > 0.82) { o_bank = mix(o_bank, vec3(0.62, 0.66, 0.42), 0.5); }
+                    col = mix(col, o_bank, oasis_m);
+                } else {
+                    // Now and then a tiny bloom on the mossy shore: violet, pink or pale.
+                    float bloom = hash21(pixel + 91.0);
+                    if (bloom > 0.985 && d > 2.0) {
+                        col = bloom > 0.995 ? vec3(0.93, 0.89, 0.76) : (bloom > 0.99 ? vec3(0.91, 0.66, 0.82) : vec3(0.66, 0.54, 0.94));
+                    }
                 }
             } else {
-                // Gravel bar: warm silt and pebbles lit from the top left like the world's rocks.
+                // Gravel bar: warm silt and pebbles lit from the top left (with gleaming quartz pebbles in desert oases).
                 col = mix(vec3(0.52, 0.49, 0.42), vec3(0.36, 0.35, 0.36), wet);
+                if (oasis_m > 0.01) {
+                    col = mix(col, mix(vec3(0.66, 0.55, 0.42), vec3(0.44, 0.38, 0.35), wet), oasis_m);
+                }
                 if (speck > 0.86) { col = mix(col, vec3(0.64, 0.60, 0.50), 0.7); }
                 if (speck < 0.08) { col = mix(col, vec3(0.30, 0.28, 0.30), 0.8); }
                 vec2 pc = floor(pixel / vec2(4.0, 3.0));
@@ -251,18 +273,22 @@ void fragment() {
                         float tone = hash21(pc + 17.0);
                         vec3 top = tone > 0.6 ? vec3(0.68, 0.66, 0.76) : (tone > 0.3 ? vec3(0.62, 0.58, 0.66) : vec3(0.70, 0.64, 0.52));
                         vec3 body = tone > 0.6 ? vec3(0.40, 0.37, 0.58) : (tone > 0.3 ? vec3(0.42, 0.40, 0.50) : vec3(0.48, 0.42, 0.36));
+                        if (oasis_m > 0.01 && tone > 0.58) {
+                            top = mix(top, vec3(0.88, 0.95, 0.98), oasis_m);
+                            body = mix(body, vec3(0.62, 0.76, 0.88), oasis_m);
+                        }
                         col = row < 1.0 ? top : (row < 2.0 ? body : body * 0.55);
                         if (local.x == px0 + pw - 1.0 && row > 0.0) { col *= 0.8; }
                     }
                 }
             }
-            // Waterline: a dark wet lip, deepest where the cut bank hangs over the water.
-            if (d < 1.2) { col = mix(col, vec3(0.11, 0.10, 0.18), 0.72); }
-            else if (d < 2.4 + far_bank * 2.0) { col *= 0.68 + 0.2 * lit; }
+            // Waterline: a dark wet lip, softened into warm damp sand inside desert oases.
+            if (d < 1.2) { col = mix(col, mix(vec3(0.11, 0.10, 0.18), vec3(0.36, 0.31, 0.27), oasis_m * 0.78), 0.72); }
+            else if (d < 2.4 + far_bank * 2.0) { col *= mix(0.68 + 0.2 * lit, 0.82 + 0.14 * lit, oasis_m); }
             // Far shore: a vertical earth face with hanging roots; the near shore gets a light rim.
             if (far_bank > 0.35 && d < 3.5) {
-                col = mix(col, vec3(0.20, 0.15, 0.22), 0.55);
-                if (hash21(vec2(floor(pixel.x / 2.0), 3.0)) > 0.62 && d > 1.0 && d < 3.0) { col = vec3(0.45, 0.33, 0.28); }
+                col = mix(col, mix(vec3(0.20, 0.15, 0.22), vec3(0.42, 0.32, 0.26), oasis_m), mix(0.55, 0.35, oasis_m));
+                if (oasis_m < 0.4 && hash21(vec2(floor(pixel.x / 2.0), 3.0)) > 0.62 && d > 1.0 && d < 3.0) { col = vec3(0.45, 0.33, 0.28); }
             } else if (lit > 0.72 && d > 1.8 && d < 3.2 && speck > 0.5) {
                 col = mix(col, vec3(0.80, 0.78, 0.66), 0.28);
             }
@@ -272,24 +298,26 @@ void fragment() {
         } else {
             paint = false;
         }
-        // Wet ground: the grass beyond the bank darkens in a dithered halo, with taller, darker blades.
+        // Wet ground: the grass beyond the bank darkens in a dithered halo, with taller, darker blades (warms to damp oasis sand & sedge in desert oases).
         if (!paint) {
             float halo_reach = edge + 3.0 + wide * 5.0;
             if (d < halo_reach) {
                 float k = 1.0 - (d - edge + 3.0) / (halo_reach - edge + 3.0);
                 if (dither < 0.55 * k) {
                     paint = true;
-                    col = vec3(0.10, 0.24, 0.24);
-                    alpha = 0.34 * k + 0.12;
+                    col = mix(vec3(0.10, 0.24, 0.24), vec3(0.48, 0.38, 0.28), oasis_m);
+                    alpha = (0.34 * k + 0.12) * mix(1.0, 0.65, oasis_m);
                 }
                 // Tufts of tall wet grass, 1 px blades in 2-4 px stacks, leaning with the wind-less shore.
                 vec2 tc = floor((pixel + vec2(floor(hash21(floor(pixel / 12.0)) * 5.0), 0.0)) / vec2(6.0, 5.0));
                 float th = hash21(tc + 31.0);
                 vec2 tl = pixel + vec2(floor(hash21(floor(pixel / 12.0)) * 5.0), 0.0) - tc * vec2(6.0, 5.0);
                 float tall = 2.0 + floor(hash21(tc + 7.0) * 3.0);
-                if (th > 0.74 && d > edge - 2.0 && d < edge + 7.0 && mod(tl.x + floor(th * 3.0), 2.0) < 1.0 && tl.y >= 4.0 - tall) {
+                if (th > mix(0.74, 0.84, oasis_m) && d > edge - 2.0 && d < edge + 7.0 && mod(tl.x + floor(th * 3.0), 2.0) < 1.0 && tl.y >= 4.0 - tall) {
                     float tip = (tl.y - (4.0 - tall)) / tall;
-                    col = tip < 0.34 ? vec3(0.49, 0.73, 0.43) : (tip < 0.7 ? vec3(0.24, 0.49, 0.34) : vec3(0.13, 0.30, 0.26));
+                    vec3 m_col = tip < 0.34 ? vec3(0.49, 0.73, 0.43) : (tip < 0.7 ? vec3(0.24, 0.49, 0.34) : vec3(0.13, 0.30, 0.26));
+                    vec3 o_col = tip < 0.34 ? vec3(0.62, 0.70, 0.42) : (tip < 0.7 ? vec3(0.36, 0.48, 0.32) : vec3(0.22, 0.32, 0.25));
+                    col = mix(m_col, o_col, oasis_m);
                     alpha = 1.0;
                     paint = true;
                 }

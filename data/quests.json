@@ -312,6 +312,13 @@
     "event": "story:town_intro"
    },
    {
+    "id": "build_plaza",
+    "text": "BAUE DEN BRUNNENPLATZ",
+    "type": "flag",
+    "flag": "built_plaza",
+    "hint": "build"
+   },
+   {
     "id": "build_lamp",
     "text": "BAUE EINEN LICHTPFOSTEN",
     "type": "flag",

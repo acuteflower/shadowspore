@@ -29,34 +29,15 @@
   "mushroom"
  ],
  "levels": [
-  {
-   "id": "camp",
-   "name": "RASTPLATZ",
-   "worth": 0
-  },
-  {
-   "id": "hamlet",
-   "name": "WEILER",
-   "worth": 25
-  },
-  {
-   "id": "village",
-   "name": "DORF",
-   "worth": 70
-  },
-  {
-   "id": "borough",
-   "name": "FLECKEN",
-   "worth": 150
-  },
-  {
-   "id": "town",
-   "name": "STADT",
-   "worth": 300
-  }
+  {"id": "camp", "name": "RASTPLATZ", "worth": 0, "light": 1.0, "gift": ""},
+  {"id": "hamlet", "name": "WEILER", "worth": 25, "light": 1.08, "gift": "ALLE LICHTER REICHEN 8 % WEITER"},
+  {"id": "village", "name": "DORF", "worth": 70, "light": 1.16, "gift": "ALLE LICHTER REICHEN 16 % WEITER"},
+  {"id": "borough", "name": "FLECKEN", "worth": 150, "light": 1.24, "gift": "ALLE LICHTER REICHEN 24 % WEITER"},
+  {"id": "town", "name": "STADT", "worth": 300, "light": 1.32, "gift": "ALLE LICHTER REICHEN 32 % WEITER"}
  ],
  "resident_worth": 8,
  "categories": [
+  {"id": "heart", "name": "PLATZ"},
   {
    "id": "light",
    "name": "LICHT"
@@ -79,6 +60,29 @@
   }
  ],
  "pieces": {
+  "plaza": {
+   "name": "BRUNNENPLATZ",
+   "category": "heart",
+   "texture": "plaza",
+   "frame": [208, 136],
+   "feet": 78,
+   "foot": [176, 104],
+   "foot_drop": 44,
+   "snap": 8,
+   "walk": true,
+   "surface": "stone",
+   "limit": 1,
+   "paths": true,
+   "preview": "plaza_preview",
+   "cost": {"stone": 12, "wood": 4},
+   "build_seconds": 14.0,
+   "wave": 24,
+   "reach": 112.0,
+   "worth": 10,
+   "aura": {"color": "9ff6ea", "radius": 84, "energy": 0.35},
+   "stand": {"texture": "plaza_fountain", "frame": [56, 48], "feet": 41, "frames": 4, "fps": 5, "glow": true, "solid": [40, 14], "window": [0.3, 1.0]},
+   "info": "DAS HERZ DER STADT. ERST MIT IHM IST SIE GEGRÜNDET, VON HIER GEHEN DIE WEGE AUS."
+  },
   "house": {
    "name": "HAUS",
    "category": "hidden",
@@ -101,6 +105,7 @@
    }
   },
   "lamp_post": {
+   "needs": "plaza",
    "name": "LICHTPFOSTEN",
    "category": "light",
    "texture": "lamp_post",
@@ -119,6 +124,7 @@
     "glow_cap": 2
    },
    "build_seconds": 4.0,
+   "wave": 40,
    "reach": 112.0,
    "worth": 2,
    "glow": true,
@@ -195,6 +201,7 @@
    }
   },
   "fence": {
+   "needs": "plaza",
    "name": "ZAUNSTÜCK",
    "category": "living",
    "texture": "fence",
@@ -212,6 +219,7 @@
     "wood": 1
    },
    "build_seconds": 1.5,
+   "wave": 0,
    "worth": 0.2,
    "info": "GRENZEN UND GEHEGE",
    "glow": true,
@@ -229,6 +237,7 @@
    }
   },
   "bench": {
+   "needs": "plaza",
    "name": "BANK",
    "category": "living",
    "texture": "bench",
@@ -246,6 +255,7 @@
     "wood": 3
    },
    "build_seconds": 3.0,
+   "wave": 24,
    "worth": 1,
    "info": "EIN PLATZ ZUM SITZEN",
    "glow": true,
@@ -275,6 +285,7 @@
    }
   },
   "banner_post": {
+   "needs": "plaza",
    "name": "STANDARTE",
    "category": "living",
    "texture": "banner_post",
@@ -293,6 +304,7 @@
     "plant_fiber": 1
    },
    "build_seconds": 2.5,
+   "wave": 24,
    "worth": 1,
    "info": "DAS BANNER DER STADT",
    "glow": false,
@@ -334,6 +346,7 @@
    }
   },
   "path_stone": {
+   "needs": "plaza",
    "name": "TRITTPLATTE",
    "category": "ground",
    "texture": "path_stone",
@@ -353,6 +366,7 @@
     "stone": 1
    },
    "build_seconds": 1.0,
+   "wave": 0,
    "worth": 0.1,
    "info": "FESTER WEG",
    "trample": {
@@ -362,6 +376,7 @@
    }
   },
   "stockpile": {
+   "needs": "plaza",
    "name": "VORRATSLAGER",
    "category": "craft",
    "texture": "stockpile",
@@ -381,7 +396,9 @@
     "stone": 4
    },
    "build_seconds": 12.0,
-   "reach": 40.0,
+   "wave": 64,
+   "aura": {"color": "ffc27a", "radius": 84, "energy": 0.42},
+   "reach": 72.0,
    "worth": 6,
    "role": "stock",
    "glow": true,
@@ -591,6 +608,7 @@
    }
   },
   "workshop": {
+   "needs": "plaza",
    "name": "WERKSTATT",
    "needs_resident": "gustav",
    "category": "craft",
@@ -612,7 +630,9 @@
     "plant_fiber": 4
    },
    "build_seconds": 24.0,
-   "reach": 56.0,
+   "wave": 72,
+   "aura": {"color": "ffb060", "radius": 104, "energy": 0.5},
+   "reach": 96.0,
    "worth": 12,
    "role": "craft",
    "glow": true,
@@ -811,7 +831,9 @@
     "plant_fiber": 2
    },
    "build_seconds": 6.0,
-   "reach": 40.0,
+   "wave": 40,
+   "aura": {"color": "9ff6ea", "radius": 64, "energy": 0.32},
+   "reach": 56.0,
    "worth": 2,
    "role": "board",
    "glow": false,
@@ -840,6 +862,7 @@
    ]
   },
   "smithy": {
+   "needs": "plaza",
    "name": "SCHMIEDE",
    "needs_resident": "torben",
    "category": "craft",
@@ -862,7 +885,9 @@
     "iron_ore": 8
    },
    "build_seconds": 40.0,
-   "reach": 64.0,
+   "wave": 80,
+   "aura": {"color": "ff9a50", "radius": 116, "energy": 0.55},
+   "reach": 104.0,
    "worth": 18,
    "role": "smith",
    "glow": true,
@@ -1042,6 +1067,7 @@
    }
   },
   "field": {
+   "needs": "plaza",
    "name": "FELD",
    "category": "farm",
    "texture": "field",
@@ -1064,6 +1090,7 @@
     "plant_fiber": 2
    },
    "build_seconds": 3.0,
+   "wave": 0,
    "worth": 0.4,
    "info": "BEETE ZUM HACKEN, SÄEN UND ERNTEN",
    "trample": {

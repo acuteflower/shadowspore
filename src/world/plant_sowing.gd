@@ -110,7 +110,7 @@ func _wither_round(day: int) -> void:
 ## Can a seed take root on this tile: a loaded chunk, free ground, nothing within a tile, no more than `MAX_PER_CHUNK` sown in the chunk.
 func cell_ok(cell: Vector2i) -> bool:
 	var chunk_cell: Vector2i = Vector2i(floori(cell.x / float(WorldLevel.CHUNK)), floori(cell.y / float(WorldLevel.CHUNK)))
-	if not level._chunks.has(chunk_cell) or sown.has(cell) or _pending.has(cell) or level._generator.blocked_cells.has(cell):
+	if not level._chunks.has(chunk_cell) or sown.has(cell) or _pending.has(cell) or level._generator.blocked_cells.has(cell) or level._generator.is_bare(cell):
 		return false
 	var pos: Vector2 = PropGenerator.position_of(cell)
 	var in_chunk: int = 0
@@ -123,7 +123,7 @@ func cell_ok(cell: Vector2i) -> bool:
 		for dx: int in range(-2, 3):
 			var near: Vector2i = cell + Vector2i(dx, dy)
 			var thing: WorldProp = level._things.get(near) as WorldProp
-			var gap: float = 26.0 if (thing != null and (thing.kind in PropGenerator.TREE_KINDS or thing.kind == "rock" or thing.kind == "iron_rock" or thing.kind == "curse_rock")) else 14.0
+			var gap: float = 26.0 if (thing != null and (thing.kind in PropGenerator.TREE_KINDS or thing.kind == "rock" or thing.kind == "iron_rock" or thing.kind == "curse_rock" or thing.kind == "sun_quartz_rock")) else 14.0
 			if (thing != null or sown.has(near)) and pos.distance_to(PropGenerator.position_of(near)) < gap:
 				return false
 	return level.town_probe(Rect2(pos - Vector2(6, 6), Vector2(12, 12))) == ""

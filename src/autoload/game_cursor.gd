@@ -255,6 +255,8 @@ func _pickable_at(at: Vector2) -> Object:
 	var at_x: float = at.x
 	var at_y: float = at.y
 	for node: Node in _get_cached_interactables():
+		if not is_instance_valid(node):
+			continue
 		var item: Node2D = node as Node2D
 		if item == null:
 			continue
@@ -284,6 +286,8 @@ func _fauna_at(at: Vector2) -> bool:
 	var at_x: float = at.x
 	var at_y: float = at.y
 	for node: Node in _get_cached_fauna():
+		if not is_instance_valid(node):
+			continue
 		var animal: Node2D = node as Node2D
 		if animal == null:
 			continue

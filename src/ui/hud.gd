@@ -177,7 +177,7 @@ func bind(player: Node) -> void:
 		quest_vine.offset_left = -(QuestVine.LENGTH + 24.0)
 		quest_vine.offset_top = 80.0
 		quest_vine.offset_right = 0.0
-		quest_vine.offset_bottom = 164.0
+		quest_vine.offset_bottom = 252.0
 		add_child(quest_vine)
 		quest_vine.bind(player, player.quests, player.tracked)
 		var dialogue: DialogueBox = DialogueBox.new() ## speech scenes (the quest steps start them)

@@ -7,6 +7,7 @@ extends Node2D
 const COUNT: int = 40 ## hard safety cap; configured visible population in daylight.json
 const MARGIN: float = 40.0
 const COLORS: Array[Color] = [Color("fff6d0"), Color("ffe9a0"), Color("ffffff"), Color("ffd98a")]
+const DESERT_COLOR: Color = Color("fff2d8")
 const GOLDEN_COLOR: Color = Color("ffb55e")
 
 
@@ -56,11 +57,22 @@ func _process(delta: float) -> void:
 	var wind: Vector2 = Vector2.ZERO
 	for mote: Mote in _motes:
 		if not rect.has_point(mote.home):
-			mote.home = rect.position + Vector2(randf(), randf()) * rect.size
+			var candidate: Vector2 = rect.position + Vector2(randf(), randf()) * rect.size
+			if BiomeBlend.arid_at(candidate) > 0.55:
+				for _try_q: int in 5:
+					var try_pos: Vector2 = rect.position + Vector2(randf(), randf()) * rect.size
+					if BiomeBlend.is_quartz_surface(try_pos):
+						candidate = try_pos
+						break
+			mote.home = candidate
 			mote.age = 0.0
 		mote.age += delta
-		wind = WorldWind.sample(mote.home)
-		mote.home += (wind * 14.0 + Vector2(0.0, -1.2)) * delta
+		var arid_m: float = BiomeBlend.arid_at(mote.home)
+		var desert_m: float = smoothstep(0.20, 0.65, arid_m)
+		wind = WorldWind.sample(mote.home) if desert_m <= 0.001 else WorldWind.sample_soft(mote.home)
+		var wind_mul: float = lerpf(14.0, 1.4, desert_m)
+		var rise_y: float = lerpf(-1.2, 0.0, desert_m)
+		mote.home += (wind * wind_mul + Vector2(0.0, rise_y)) * delta
 	queue_redraw()
 
 
@@ -75,18 +87,31 @@ func _draw() -> void:
 	for mote: Mote in _motes:
 		if mote.home.x == INF or mote.rank > density:
 			continue
-		var sway: Vector2 = Vector2(sin(_time * mote.speed + mote.phase) * mote.radius, cos(_time * mote.speed * 1.3 + mote.phase) * mote.radius * 0.5)
+		var sway_scale: float = lerpf(1.0, 0.35, smoothstep(0.20, 0.65, BiomeBlend.arid_at(mote.home)))
+		var sway: Vector2 = Vector2(sin(_time * mote.speed + mote.phase) * mote.radius, cos(_time * mote.speed * 1.3 + mote.phase) * mote.radius * 0.5) * sway_scale
 		var point: Vector2 = (mote.home + sway).round()
-		var fade: float = clampf((density - mote.rank) * 6.0, 0.0, 1.0) ## comes and goes with the light
+		var arid: float = BiomeBlend.arid_at(point)
+		var desert_t: float = smoothstep(0.20, 0.65, arid)
+		var on_q: bool = desert_t > 0.25 and BiomeBlend.is_quartz_surface(point)
+		var eff_density: float = density * lerpf(1.0, 0.28 if on_q else 0.10, desert_t)
+		if mote.rank > eff_density:
+			continue
+		var fade: float = clampf((eff_density - mote.rank) * 6.0, 0.0, 1.0) ## comes and goes with the light
 		fade *= smoothstep(0.0, 1.2, mote.age)
 		if is_instance_valid(DaylightField.current):
 			fade *= pow(DaylightField.current.light_at(point), 1.7)
-		var glint: float = pow(0.5 + 0.5 * sin(_time * mote.twinkle_rate + mote.phase * 2.0), 2.0) * fade
+		var rate: float = mote.twinkle_rate * lerpf(1.0, 0.45, desert_t)
+		var glint: float = pow(0.5 + 0.5 * sin(_time * rate + mote.phase * 2.0), 2.0) * fade
 		if glint < 0.08:
 			continue
-		var color: Color = mote.color.lerp(GOLDEN_COLOR, golden)
-		var big: bool = mote.rank < 0.10 ## the first half are 2 px motes
-		draw_rect(Rect2(point, Vector2(2, 2) if big else Vector2.ONE), Color(color, minf(glint * 1.5, 1.0)))
+		var base_col: Color = mote.color.lerp(DESERT_COLOR, desert_t)
+		var color: Color = base_col.lerp(GOLDEN_COLOR, golden * (1.0 - 0.45 * desert_t))
+		var big: bool = mote.rank < 0.10 and desert_t < 0.30 ## 2 px + cross only in vegetated/meadow air, never in the desert
+		var alpha_cap: float = lerpf(1.0, 0.28 if on_q else 0.15, desert_t)
+		var alpha: float = minf(glint * lerpf(1.5, 0.38, desert_t), alpha_cap)
+		if alpha < 0.04:
+			continue
+		draw_rect(Rect2(point, Vector2(2, 2) if big else Vector2.ONE), Color(color, alpha))
 		if glint > 0.82 and big: ## a bright mote gets a small cross
 			for offset: Vector2 in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
 				draw_rect(Rect2(point + offset, Vector2.ONE), Color(color, (glint - 0.6) * 2.0))

@@ -2,7 +2,7 @@
 
 Kleine Rätsel, über die man beim Erkunden stolpert und die mit einer Truhe aus dem Licht belohnen (wie Genshins Siegel- und Zeiträtsel). Dieses Dokument ist **Konzept, nichts davon ist gebaut**. Die Truhen selbst und ihre Ankunft aus der Lichtsäule gibt es schon (`docs/beutetruhen_konzept.md`, `LootChests`, `LootChest.arrive`).
 
-Ausgearbeitet: **Irrlichtspur**, **Runenreihe**, **Schweigender Hain**, **Krähenschatz** (gewöhnlich + selten) und zwei neue, **Rissläufer** und **Die letzte Laterne**. Am Ende stehen das gemeinsame Designkonzept, Technik und Bauplan.
+Ausgearbeitet: **Irrlichtspur**, **Runenreihe**, **Schweigender Hain**, **Krähenschatz** (gewöhnlich + selten), zwei neue, **Rissläufer** und **Die letzte Laterne**, **Das Wurzelgeflecht** (6a) und der **Sternenspiegel** (6b). Am Ende stehen das gemeinsame Designkonzept, Technik und Bauplan.
 
 ---
 
@@ -197,6 +197,128 @@ Ausgearbeitet: **Irrlichtspur**, **Runenreihe**, **Schweigender Hain**, **Krähe
 
 ---
 
+## 6a. NEU: Das Wurzelgeflecht (gewöhnlich / selten / legendär)
+
+> **Gebaut (2026-11-13):** `RootWeave` (src/entities/puzzles/root_weave.gd, ein `WorldTrial`) + `WeaveCube` (ein Würfel, Interactable) + `WeaveRules` (src/systems/weave_rules.gd, pur; Spiegel von `tools/check_root_weave.py`, das jedes Geflecht in data/puzzles.json löst und Mindestgriffe prüft: gewöhnlich 3, selten 6, legendär 12). Host-autoritativ: der Host prüft einen Griff, alle Peers spielen ihn deterministisch nach (`_rpc_do`), Späteinsteiger bekommen den Stand (`_rpc_state`). Art `py -3 tools/art_root_weave.py [preview.png]` (Würfel: 3 Formen, Keim zu/offen, 2 Dornen, je schlafend/wach/gold; Herz schief/dunkel/gold aufgerichtet; Krone zu/blühend; Runen zeichnet das Spiel aus data/puzzle_runes.json), Klänge `py -3 tools/audio_root_weave.py`. Wurzeln, Saft, Pulse und Erdbrocken sind Pixel im Code. Die drei Geflechte stehen bisher nur in der **Rätselwelt** (`--trials` bzw. ENTWICKLER -> RÄTSELWELT BETRETEN, `TrialLevel`: flach, leer, nie gespeichert, mit Irrlicht, Hortkrähe, Rabe und Startausrüstung): Keimling (Saftweg, 3 Griffe), Geflecht (7 Griffe, eine Lösung), Altes Geflecht (17 Würfel, vier Keime, Dornen, Einwegwurzeln, **12 Griffe, genau eine kürzeste Lösung**, die zweimal einen Keim kurz weckt). Entscheidungen der Nutzerin: kein Maß-Bonus, keine Hilfe, nachts friedlich. Abweichung: ZURÜCKZIEHEN ist ein Tipp auf E am Herzen (kein Halten). Test `tools/test_root_weave.tscn` (`ROOT WEAVE OK`), Look `tools/preview_root_weave.tscn -- --dir=/abs [--night]`. Noch nicht: Geflechte in der echten Welt, Karte, Netzwerktest mit zwei Prozessen.
+
+> Konzept 2026-11-13. Idee der Nutzerin: ein halb eingegrabener magischer Würfel, den Ellie an- und ausschaltet; wenn er erlischt, wachsen Wurzeln, neue Würfel steigen aus dem Boden, und welche man an- und ausschaltet, verändert das ganze Bild.
+
+**Fantasie:** Mitten auf einer Lichtung steckt ein Würfel aus dem Stein der Wächterin schief im Boden, halb von Erde und Wurzeln verschluckt. Er summt und leuchtet teal. Wer ihn löscht, weckt das, was unter ihm schläft: Wurzeln brechen aus der Erde, und rundherum steigen weitere Würfel auf, verbunden durch ein Geflecht, durch das Licht fließt. Jeder Griff an einen Würfel schickt einen Puls durch seine Wurzeln, und das ganze Bild kippt.
+
+### Die Teile
+| Teil | Aussehen | Regel |
+|---|---|---|
+| **Herzwürfel** (Prüfstein) | größer (24 px), schief, halb eingegraben, ein Auge auf der Oberseite | Start: leuchtet. E „LÖSCHEN“ = Rätsel beginnt. Danach nicht mehr drückbar; **E „ZURÜCKZIEHEN“** = alles zurück. Trägt die Fortschrittsperlen. |
+| **Wurzelwürfel** | 14 px, Rune auf der Stirnseite, wach = Teal-Rune + Lichtadern, schlafend = grau, matt | E „BERÜHREN“: schaltet **sich selbst und jeden Würfel, zu dem eine Wurzel von ihm führt** um. |
+| **Keimwürfel** | wie ein Wurzelwürfel, aber mit einem Trieb oben (geschlossene Knospe) | Wird er zum **ersten Mal** wach, wachsen aus ihm neue Wurzeln und Würfel (in ihrem festen Startzustand). **Gewachsenes bleibt**, auch wenn der Keim wieder erlischt (bis zum Zurückziehen). |
+| **Dornwürfel** | von Dornenranken umklammert, keine Rune sichtbar | Kann nicht berührt werden (E zeigt nichts, Ellie zuckt zurück). Nur Pulse der Nachbarn schalten ihn. |
+| **Einwegwurzel** | Wurzel mit Dornen, die in eine Richtung zeigen, der Saft fließt sichtbar nur in diese Richtung | Puls läuft nur in Pfeilrichtung, nicht zurück. |
+| **Kronwürfel** (Ziel, nur „Saftweg“) | größer, mit einer Krone aus geschlossenen Kristallblättern | Wird nicht gedrückt, er ist das Ziel. |
+
+### Die zwei Ziele
+- **Saftweg** (gewöhnlich): Der Kronwürfel blüht, sobald eine **ununterbrochene Kette wacher Würfel** vom Herzwürfel bis zu ihm reicht (Licht fließt sichtbar entlang der wachen Kette und staut sich am ersten schlafenden Würfel: man sieht, wo es hakt).
+- **Ganzes Geflecht** (selten / legendär): **Alle Würfel gleichzeitig wach**, auch alle gewachsenen. Wer zu früh alle wach hat, aber einen Keim noch nicht gezündet hat, ist nicht fertig: Die Knospe am Keim leuchtet als Hinweis.
+
+### Ablauf
+1. **Entdecken:** Glühwürmchen sammeln sich nachts um den Herzwürfel, am Tag summt er leise, wenn man näher als 80 px kommt. Das Auge öffnet sich (Prüfstein-Regel 7.1).
+2. **Löschen:** E am Herzwürfel. Ellie legt beide Hände auf (`Player.begin_touch`), das Teal zieht sich in den Boden zurück, ein dumpfer Herzschlag, dann reißen Wurzeln strahlenförmig aus der Erde (wachsen Pixel für Pixel, Erdbrocken fliegen), und die erste Stufe Würfel steigt auf (Schnitt-Shader wie die aus der Erde brechende Truhe, `LootChest.rise`). Manche wach, manche schlafend.
+3. **Spielen:** E an einem Wurzelwürfel. Kurzer Handgriff (schnelle Variante von `begin_touch`, 0,35 s). Der Würfel kippt sofort um, dann **läuft der Puls sichtbar die Wurzeln entlang** (0,25 s pro Wurzel, ein Lichtfunke) und schaltet am Ende den Nachbarn. Ursache und Wirkung sind immer zu sehen.
+4. **Vorschau (Fairness):** Steht Ellie an einem Würfel (Prompt sichtbar), schimmern die Wurzeln, die er treffen würde, schwach, und die betroffenen Würfel zittern einen Pixel. Man kann also planen, ohne zu probieren.
+5. **Wachsen:** Ein Keim, der zum ersten Mal wach wird, öffnet seine Knospe, neue Wurzeln schießen aus ihm, neue Würfel steigen auf, manchmal auf einem Hang oder hinter einem Busch (Laufwege gehören dazu).
+6. **Gelöst:** Ein goldener Ring läuft durch das ganze Geflecht, alle Runen werden gold, der Herzwürfel richtet sich mit einem Ruck gerade auf und stößt das Moos ab, die Wurzeln ziehen sich als goldene Adern in den Boden zurück und bleiben als Muster liegen. Die Truhe kommt **aus der Erde** am Kronwürfel bzw. am Herzwürfel (Wurzeln heben sie heraus, gleiche Technik wie der Krähenschatz).
+7. **Zurückziehen:** E am Herzwürfel. Die Würfel sinken, Wurzeln kriechen zurück, der Herzwürfel leuchtet wieder. Kein Schaden, nichts verloren. Weggehen (> 400 px für 60 s) zieht ebenfalls zurück.
+
+### Warum es schwer wird (und trotzdem fair)
+Der Kern ist ein Umschalträtsel über einem Graphen (jeder Druck schaltet sich und seine Wurzelnachbarn). Das allein ist schon knifflig, weil jeder Druck mehrere Würfel ändert. Die eigenen Zutaten machen es zu **unserem** Rätsel:
+- **Wachstum ändert das Brett.** Je nachdem, wann man einen Keim zündet, kommen neue Würfel mit festen Zuständen dazu. Die Reihenfolge zählt.
+- **Der Kniff „kurz wecken“:** Weil Gewachsenes bleibt, kann man einen Keim wecken und gleich wieder löschen. Das ist die Aha-Lösung vieler legendärer Geflechte (siehe Beispiel).
+- **Dornwürfel** zwingen zu Umwegen über Nachbarn, **Einwegwurzeln** brechen die Symmetrie (A schaltet B, aber B nicht A).
+- **Doppelt drücken ist nutzlos**, außer es lässt etwas wachsen. Das merkt man beim Spielen.
+
+**Lösbarkeit:** Jedes Geflecht wird beim Backen von einem Löser geprüft (Breitensuche über Zustand + gewachsene Keime; klein genug, 16 Würfel = 65 536 Zustände pro Wachstumsstand). Gespeichert werden die kürzeste Lösung („Maß“) und wie viele Lösungen es gibt. Ein Geflecht ohne Lösung, mit Maß < 3 oder einer Lösung, die ohne Nachdenken durch bloßes Abklappern fällt, wird verworfen.
+
+### Stufen
+| Stufe | Würfel | Ziel | Zutaten | Maß |
+|---|---|---|---|---|
+| gewöhnlich „Keimling“ | 4–6 | Saftweg | nur Wurzelwürfel | 2–4 |
+| selten „Geflecht“ | 6–9 | Ganzes Geflecht | + 1 Keim, + Dornwürfel | 4–6 |
+| legendär „Altes Geflecht“ | 14–18 | Ganzes Geflecht | + 3–4 Keime (Wachstum in mehreren Stufen, auch Keime aus Keimen), Einwegwurzeln, Dornen | mindestens 12, möglichst eine einzige kürzeste Lösung |
+
+### Kleines Beispiel zum Kniff „kurz wecken“ (vom Löser geprüft; die echten legendären Geflechte sind größer, siehe oben)
+```
+        H ── K                 Start nach dem Löschen:  A wach, B schlafend (Keim),
+        │     ╲ (K→F)                                    C schlafend, D wach
+   (D→H)│      ╲               Wächst aus B:  E schlafend, F Dorn schlafend, G Keim wach
+        │   G ──→ C (G→C)      Wächst aus G:  H schlafend, K wach
+   D ── A ── B ── E
+   │         │    │
+   └─── C ───┘    F(Dorn) ── G
+```
+Wurzeln: A–B, B–C, C–D, D–A (der Ring um das Herz), B–E, E–F, F–G, G→C, G–H, H–K, K→F, D→H.
+**Kürzeste Lösung (5):** C, C, G, K, E. Der Trick: Das erste C weckt B, B wächst, und weil G schon wach aufsteigt, wachsen H und K gleich mit. Das zweite C löscht B wieder, aber das Gewachsene bleibt. Danach schalten G, K (über die Einwegwurzel auf F) und E den Rest wach. Wer B einfach direkt drückt, verheddert sich.
+
+### Koop
+Jeder kann jeden Würfel berühren, der Host ordnet die Griffe (ein Griff sperrt das Geflecht für die Dauer seines Pulses, ~0,5 s, ein zweiter Griff wird so lange gepuffert). Koop hilft durch Laufwege und Mitdenken, nie durch Pflicht. Die Truhe gehört allen (Ziehung +1 pro Spieler in der Nähe wie bei allen Truhen).
+
+### Design
+- **Würfel:** der hellviolette Stein der Wegstatuen, leicht verwittert, abgerundete Kanten, Moos auf der Oberseite, 3/4-Ansicht wie alle Props. Die Stirnseite trägt eine der sechs **Prüfrunen** (7.3); wach = Rune und feine Adern teal (unlit), schlafend = Rune als dunkle Ritzung. Halb eingegraben: ein Erdwulst mit Wurzelansätzen um den Fuß.
+- **Wurzeln:** pflaumen-violette Holzwurzeln wie unter den Bäumen, 2–3 px dick, gekrümmt (Catmull-Rom wie die Trampelwege), mit Erdaufwurf an den Seiten. In jeder Wurzel eine 1 px Saftader, die teal fließt, wenn beide Enden wach sind, und dunkel ist sonst. Einwegwurzeln haben kleine Dornen in Flussrichtung.
+- **Dornwürfel:** schwarze, glänzende Dornranken (Leerenschwarz mit violettem Rand) umklammern ihn; erst wenn er wach wird, glimmt die Rune durch die Lücken.
+- **Keim:** eine geschlossene Knospe oben auf dem Würfel, die sich beim Wachsen zu einer Blüte aus Kristallblättern öffnet (BloomOrb-Sprache, aber als Sprite).
+- **Klang:** jeder Würfel ein Glaston (Tonhöhe nach Rune), der Puls ein leises Holzknacken, das die Wurzel entlangläuft, Wachsen ein tiefes Reißen und Grollen, Gelöst = der Akkord der Wächterin (7.4), Zurückziehen = die drei Töne absteigend.
+- **Ort:** Lichtungen und flache Hänge; die Würfel verteilen sich auf 6–14 Tiles Radius, gelegentlich auf einer Stufe oder hinter einem Felsen, damit man den Überblick suchen muss. Nie im Stadtlicht.
+
+### Technik (Vorschlag)
+- `RootWeave` (src/entities/puzzles/root_weave.gd) extends `WorldTrial`, Art `root_weave` in `Puzzles.KINDS`. Daten in `data/puzzles.json` `placed`: `{id, kind "root_weave", tile, tier, goal "path"|"all", cubes {id: {at [dx, dy] Tiles vom Herz, kind, lit, from (Keim, der ihn wachsen lässt)}}, roots [[a, b, one_way]], crown}`.
+- `WeaveRules` (pur, src/systems): `press(state, id)`, `grow(state)`, `solved(state, data)`, `solve(data)` (Breitensuche, gibt Maß + Lösung). Genutzt vom Host, vom Bake-Check und vom Test.
+- Host-autoritativ: `request_press(id)` → `_rpc_press(id, seq)` (jeder Peer spielt Puls und Wachstum selbst ab, Zustand ist deterministisch), `request_withdraw`, Snapshot (`lit`-Bits + gewachsene Keime) für Späteinsteiger. Gespeichert wird nur „gelöst“ (Versuche nicht).
+- Würfel = kleine `Interactable`s (Prompt nur, wenn drückbar), Wurzeln = ein selbst gezeichneter Knoten pro Geflecht (Pixel, nur neu gezeichnet bei Änderung), Pulse/Adern unlit.
+- Art `py -3 tools/art_root_weave.py` (Ellipsoid-/Box-Renderer wie die Truhen: Herz, Würfel ×6 Runen × wach/schlafend, Dorn, Keim mit Knospe/Blüte, Kron; Glow-Blätter), Klänge `py -3 tools/audio_root_weave.py`. Löser-Check `tools/check_weaves.py` (oder im Godot-Test). Test `tools/test_root_weave.tscn` (Löser, Drücken, Wachstum, Einweg, Dorn, Zurückziehen, Maß-Bonus, Speichern, `ROOT WEAVE OK`), Look `tools/preview_root_weave.tscn`.
+
+### Entschieden
+- Kein Maß-Bonus, keine Hilfe nach Fehlversuchen, nachts bleibt das Rätsel friedlich (2026-11-13).
+
+---
+
+## 6b. NEU: Sternenspiegel (gewöhnlich / selten / legendär)
+
+> **Gebaut (2026-11-13):** `StarMirror` (src/entities/puzzles/star_mirror.gd, ein `WorldTrial`, Art `star_mirror`) + `StarStone` (ein Mondstein, Interactable). Ellie trägt Steine frei in alle acht Richtungen: `Player.start_carry/end_carry/carry_stone` (Sheet `player_carry_stone.png` aus `py -3 tools/art_hero_carry_stone.py`: dieselben Posen wie das Brett der Holzfällerhütte, der Stein über den neuen Posen-Schlüssel `rock` von art_hero3d.py eingebacken; 62 % Tempo, kein Sprint, keine Schläge, kein Schattenschritt, kein Essen). Teichrand, Mondsteine und Feldsteine: `py -3 tools/art_star_mirror.py [preview.png]`; Wasser, Spiegelbild, Lichtlinien und Lichtsäule zeichnet das Spiel. Klänge `py -3 tools/audio_star_mirror.py`. Host-autoritativ (`_rpc_pick`, `_rpc_drop`, `_rpc_state` für Späteinsteiger); wer fällt, lässt den Stein fallen. Drei Teiche in der **Rätselwelt** (`trial_world`): Sichel (5 Sterne, links/rechts), Rabe (7 Sterne, 8 Steine, dreht sich 70° über die Nacht, schwache Sterne bei Neumond weg), Wächterin (9 Sterne, 11 Steine, diagonal gespiegelt, dreht sich 90°, Linien nur bei Vollmond). Dev: ENTWICKLER -> STERNENSPIEGEL: ZUM TEICH / ZURÜCKSETZEN, MOND: VOLL / NEU. Test `tools/test_star_mirror.tscn` (`STAR MIRROR OK`), Look `tools/preview_star_mirror.tscn -- --dir=/abs [--id=stars_rabe]`. Noch nicht: Teiche in der echten Welt, Netzwerktest mit zwei Prozessen.
+
+**Fantasie:** An einem stillen Teich liegen Mondsteine im Gras. Nachts spiegelt das Wasser ein Sternbild, das es am echten Himmel nicht gibt. Ellie muss die Steine so auf die Wiese legen, dass sie das Spiegelbild nachbilden.
+
+**Ablauf**
+1. **Lesen:** Nachts zeigt das Wasser 5–9 helle Punkte und schwache Linien, gespiegelt und langsam drehend; die vier Runen der Feldsteine (Mond, Auge, Flamme, Feder an den Ecken des quadratischen Feldes neben dem Teich) spiegeln sich mit, so findet man das Feld im Bild wieder.
+2. **Tragen:** E hebt einen Stein auf (Trage-Sheet), langsam, kein Sprint; ein Punkte-Ring zeigt, wo er landet (hell, wenn er auf einem freien Stern landen würde). E legt ihn ab.
+3. **Rückmeldung:** Ein Stein in der Nähe (13 px) eines freien Sterns rastet ein, leuchtet, Licht läuft zu jedem schon belegten Nachbarn der Figur, sein Stern im Teich glüht warm. Falsch gelegte Steine bleiben dunkel, nichts wird zurückgesetzt. Nicht ins Wasser.
+4. **Gelöst:** Alle Sterne belegt: Lichtsäule aus dem Teich, die Truhe steigt am Westufer aus der Erde.
+
+**Mond:** Bei Neumond zeigen Figuren mit `faint` nur die helleren Sterne, Figuren mit `lines: full_moon` ihre Linien nur nahe Vollmond. Am Tag ist der Teich nur Wasser: das Bild einprägen und tagsüber legen geht.
+
+| Stufe | Sterne | Steine | Spiegelung |
+|---|---|---|---|
+| gewöhnlich | 5 | 5 | links/rechts |
+| selten | 7 | 8 | links/rechts, dreht sich |
+| legendär | 9 | 11 | diagonal, dreht sich, Linien nur bei Vollmond |
+
+---
+
+## 6c. Verteilung in der Welt (2026-11-13)
+
+`python3 tools/place_trials.py [--write] --variants=<pfad>` verteilt die Prüfungen fair auf die benannten Gebiete und schreibt sie mit `"auto": true` und `"area"` in data/puzzles.json `placed` (von Hand gesetzte bleiben). Ein Ort muss trockenes Land weit innerhalb der Küste sein, auf einer Höhenebene, auf Bodenkacheln für den ganzen Fußabdruck, fern von Flüssen, Seen, Stadt (90 Kacheln um die Hütte), Start, Story-Orten und Wegstatuen, mindestens 46 Kacheln von jeder anderen Prüfung; Wege (Irrlichtroute, Krähenhügel, Rabenstationen) werden auf derselben Ebene gesucht. Unter den guten Orten gewinnt der, der am weitesten von allen schon gesetzten liegt.
+
+| Gebiet | Prüfungen |
+|---|---|
+| Nebelwald | Irrlicht, Hortkrähe, Rabe (von Hand, bei der Stadt), Geflecht gewöhnlich, Sternenspiegel gewöhnlich (Feder) |
+| Die Lichtung | Irrlicht, Hortkrähe, Geflecht selten, Sternenspiegel gewöhnlich (Sichel) |
+| Glasklippen | Irrlicht, Hortkrähe, Rabe, Geflecht legendär (12 Griffe), Sternenspiegel selten (Rabe) |
+| Versunkene Ruinen | Irrlicht, Hortkrähe, Rabe, Geflecht gewöhnlich, Sternenspiegel legendär (Wächterin) |
+| Das Leerenblühen | Irrlicht, Hortkrähe, Geflecht legendär (11 Griffe, gespiegelte Variante), Sternenspiegel selten (Eule) |
+| Hexenwald | nur Hortkrähe, Rabe und ein Geflecht selten (gespiegelte Variante) |
+
+Geflechte, die zweimal vorkommen, sind gespiegelt und haben einen neuen Startzustand (neue Lösung); die zweite legendäre Variante hat 11 Griffe (Wahl der Nutzerin), `tools/check_root_weave.py` verlangt für legendär mindestens 11. Zwei neue Sternbilder: Feder (5 Sterne, oben/unten gespiegelt) und Eule (7 Sterne, 8 Steine, oben/unten, dreht sich 60°). Jeder Haltepunkt einer Irrlichtroute bleibt frei von Pflanzen (`Puzzles.clear_spots`). Test `tools/test_trials_world.tscn` (`TRIALS WORLD OK`; mit `-- --dir=/abs` ein Bild je Prüfung).
+
+---
+
 ## 7. Designkonzept: die Sprache der Prüfungen
 
 ### 7.1 Der Prüfstein (gemeinsames Element)
@@ -240,6 +362,8 @@ Sechs eigene Glyphen, 7×7 px, aus Motiven der Welt: **Mond** (Sichel), **Wurzel
 | Schweigender Hain | Mondsiegeltruhe | steht schon da (das Ziel ist das Erreichen) |
 | Rissläufer | Mondsiegeltruhe / Glutreliquiar | fällt aus der Leere, dann Licht |
 | Die letzte Laterne | Glutreliquiar + beleuchteter Weg | große Lichtsäule am Zielschrein |
+| Wurzelgeflecht | Wurzelkiste / Mondsiegeltruhe / Glutreliquiar (nach Stufe) | Wurzeln heben sie aus der Erde |
+| Sternenspiegel | Wurzelkiste / Mondsiegeltruhe / Glutreliquiar (nach Stufe) | Lichtsäule aus dem Teich, Truhe am Ufer |
 
 Prüfungstruhen bekommen einen eigenen Pool-Zuschlag: +1 Ziehung aus dem nächsthöheren Pool, damit sich das Lösen mehr lohnt als eine zufällig gefundene Truhe.
 
@@ -266,6 +390,7 @@ Prüfungstruhen bekommen einen eigenen Pool-Zuschlag: +1 Ziehung aus dem nächst
 3. **Krähenschatz** (gewöhnlich, dann selten; nutzt Pet- und Hackensysteme).
 4. **Schweigender Hain** (Spinnen-Schlaf, Lärm).
 5. **Rissläufer** (Schritt-Signal, Riss-Shader als Dauerobjekt).
+5a. **Wurzelgeflecht** (rein lokal, pure Regeln + Löser, kein KI-Anteil; gut als nächstes).
 6. **Die letzte Laterne** (bewegliche Lichtkreise, eigene Wellen; das größte Stück).
 7. Verteilen: 8–12 Prüfungen pro benanntem Gebiet, nie im Licht der Stadt, bevorzugt an schönen Orten (Plateaus, Wasser, Waldränder, der Hexenwald für die Nebel-Varianten).
 

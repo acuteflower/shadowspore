@@ -43,15 +43,19 @@ func leader(id: String) -> RiverAnimal:
 	for animal: RiverAnimal in animals.get_children():
 		if animal.school == id and animal.member == 0 and not animal.is_queued_for_deletion(): return animal
 	return null
+static func _arid(point: Vector2) -> bool:
+	return BiomeBlend.arid_at(point) >= 0.22
+
+
 func valid_route(animal: RiverAnimal, end: Vector2, curve: Vector2) -> bool:
 	var cell: Vector2i = Vector2i((animal.home / 512.0).floor())
 	var bounds: Rect2 = Rect2(Vector2(cell) * 512.0 + Vector2.ONE * 16, Vector2.ONE * 480)
-	if not _active.has(cell) or not bounds.has_point(end) or end.distance_to(animal.home) > float(animal._spec["range"]): return false
+	if not _active.has(cell) or not bounds.has_point(end) or end.distance_to(animal.home) > float(animal._spec["range"]) or _arid(end): return false
 	for i: int in range(1, 17):
 		var t: float = float(i) / 16
 		var point: Vector2 = animal.position.lerp(end, t) + curve * sin(t * PI)
 		var field: Vector2 = rivers.field_at(point)
-		if not bounds.has_point(point): return false
+		if not bounds.has_point(point) or _arid(point): return false
 		if animal.kind in ["shoal", "brook", "strider"] and field.x > -2.0: return false
 		if animal.kind == "frog" and field.x > 10.0: return false
 		if animal.kind == "duck" and (field.x < -24.0 or field.x > 8.5 or field.y > 0.78): return false
@@ -62,10 +66,11 @@ func valid_route(animal: RiverAnimal, end: Vector2, curve: Vector2) -> bool:
 ## A flight needs only the animal's own chunk (everything below it is air).
 func valid_flight(animal: RiverAnimal, end: Vector2) -> bool:
 	var cell: Vector2i = Vector2i((animal.home / 512.0).floor())
-	return _active.has(cell) and Rect2(Vector2(cell) * 512.0 + Vector2.ONE * 16, Vector2.ONE * 480).has_point(end)
+	return _active.has(cell) and Rect2(Vector2(cell) * 512.0 + Vector2.ONE * 16, Vector2.ONE * 480).has_point(end) and not _arid(end)
 
 ## Where a flying animal may come down: the heron in shallows or on the bank, the duck on open water, the kingfisher on a perch.
 func valid_landing(animal: RiverAnimal, end: Vector2) -> bool:
+	if _arid(end): return false
 	var field: Vector2 = rivers.field_at(end)
 	match animal.kind:
 		"heron": return field.x > -8.0 and field.x < 12.0 and field.y < 0.5
@@ -126,6 +131,9 @@ func shore_target(home: Vector2, to_water: bool, rng: RandomNumberGenerator) -> 
 	return home
 func _populate(cell: Vector2i) -> void:
 	if not _active.has(cell): return
+	var chunk_origin: Vector2 = Vector2(cell) * 512.0
+	if _arid(chunk_origin + Vector2(256.0, 256.0)) and _arid(chunk_origin) and _arid(chunk_origin + Vector2(512.0, 512.0)):
+		return
 	var settings: Dictionary = DataRegistry.table("river_animals")
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(settings["seed"])))
@@ -137,6 +145,7 @@ func _populate(cell: Vector2i) -> void:
 		var at: Vector2
 		for attempt: int in 200:
 			at = Vector2(cell) * 512.0 + Vector2(rng.randf_range(28, 484), rng.randf_range(28, 484))
+			if _arid(at): continue
 			var field: Vector2 = rivers.field_at(at)
 			var valid: bool = field.x < -6.0 and field.y < 0.7
 			if kind == "brook": valid = field.x < -8.0 and field.y > 0.45

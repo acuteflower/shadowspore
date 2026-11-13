@@ -2143,5 +2143,150 @@
   "icon": "res://assets/items/lake_moonstone.png",
   "description": "Ein milchiger, runder Kiesel vom Ufer des Hexenwald-Sees. Unter der Kruste schläft ein Verstärkerstein: Ilva frischt ihn auf.",
   "hidden": {"kinds": ["gem_lens", "gem_wild", "gem_tinder", "gem_haze", "gem_hunger"], "tiers": {"1": 74, "2": 20, "3": 5, "4": 1}}
+ },
+ "sun_fig": {
+  "name": "Sonnenfeige",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/sun_fig.png",
+  "stats": {
+   "heal": 6,
+   "regen": 8,
+   "regen_seconds": 6
+  },
+  "description": "Prall und korallenrot vom Ohrenkaktus gepflückt. Kühlt die Kehle und schmeckt nach warmem Honig."
+ },
+ "crown_fig": {
+  "name": "Kronenfeige",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/crown_fig.png",
+  "stats": {
+   "heal": 12,
+   "regen": 10,
+   "regen_seconds": 8
+  },
+  "description": "Seltene Goldfrucht aus der Krone eines alten Säulenkaktus, voll gespeicherter Mittagssonne."
+ },
+ "cactus_wood": {
+  "name": "Kaktusholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/cactus_wood.png",
+  "description": "Leichtes, durchbrochenes Rippenholz eines großen Säulenkaktus, von Sonne und Passat gehärtet."
+ },
+ "cactus_pulp": {
+  "name": "Kaktusmark",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/cactus_pulp.png",
+  "stats": {
+   "heal": 4,
+   "regen": 6,
+   "regen_seconds": 6
+  },
+  "description": "Saftiges, blassgrünes Fruchtfleisch aus dem Inneren eines Wüstenkaktus. Stillt den Durst in der Öde."
+ },
+ "quartz_aloe": {
+  "name": "Quarz-Aloe",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/quartz_aloe.png",
+  "stats": {
+   "heal": 10,
+   "regen": 14,
+   "regen_seconds": 10
+  },
+  "description": "Durchscheinendes, kühles Blattgel von den weißen Quarzadern. Lindert Wunden fast augenblicklich."
+ },
+ "night_cactus_bloom": {
+  "name": "Königsblüte",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/night_cactus_bloom.png",
+  "description": "Große, mondweiße Sternblüte der Königin der Nacht. Öffnet ihren Kelch nur unter den Sternen der Öde."
+ },
+ "sand_tuber": {
+  "name": "Sandknolle",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/sand_tuber.png",
+  "stats": {
+   "heal": 8,
+   "regen": 18,
+   "regen_seconds": 12
+  },
+  "description": "Tief aus dem Dünensand gezogene Wasserknolle. Knackig, kühl und voller zäher Ausdauer."
+ },
+ "palm_wood": {
+  "name": "Palmenholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/palm_wood.png",
+  "description": "Zähes, honigwarmes Faserholz einer Sonnenpalme von den Quarzoasen."
+ },
+ "sun_date": {
+  "name": "Sonnendattel",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/sun_date.png",
+  "stats": {
+   "heal": 10,
+   "regen": 12,
+   "regen_seconds": 8
+  },
+  "description": "Goldbraune, süße Dattelfrucht aus der Krone einer Oasenpalme. Stärkt rasch nach langen Wegen durch den Sand."
+ },
+ "oasis_blossom": {
+  "name": "Quellblüte",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/oasis_blossom.png",
+  "stats": {
+   "heal": 14,
+   "regen": 14,
+   "regen_seconds": 10
+  },
+  "description": "Türkisleuchtender Blütenkelch vom Rand einer Quarzoase, kühl wie frisches Quellwasser."
+ },
+ "sun_quartz": {
+  "name": "Sonnenquarz",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/sun_quartz.png",
+  "description": "Klarer, weiß-türkiser Kristallsplitter aus den Felsen der Sonnenquarz-Öde. In seinen Kanten glimmt gespeichertes Sonnenlicht."
  }
 }

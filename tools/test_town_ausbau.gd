@@ -278,8 +278,11 @@ func _people(world: WorldLevel, town: TownManager, player: Player) -> void:
 	await _frames(30)
 	town._inside = false
 	town._entered_day = -1
+	if town._banner != null: ## earlier banners (founding, arrivals) may still wait in the queue: this check is about the name
+		town._banner._queue.clear()
+		town._banner._age = 99.0
 	town._watch_territory(0.0)
-	_check(town._banner != null and town._banner.is_showing() and town._entered_day == TimeManager.day, "the name comes when the town is entered")
+	_check(town._banner != null and town._banner.is_showing() and String(town._banner._now.get("title", "")) == town.town_name() and town._entered_day == TimeManager.day, "the name comes when the town is entered")
 	var shown_before: bool = town._banner.is_showing()
 	town._inside = false
 	town._banner._age = 99.0

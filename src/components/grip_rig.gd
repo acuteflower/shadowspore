@@ -19,6 +19,56 @@ const SCREEN_DOWN: Vector3 = Vector3(0.0, SINP, -COSP) ## the 3D direction that 
 const VIEW: Vector3 = Vector3(0.0, COSP, SINP) ## toward the camera
 
 static var _data: Dictionary = {}
+static var _arm3_sheets: Dictionary = {} ## texture file name -> PackedFloat32Array (12 floats per frame: sh, el, wr, fist)
+
+
+## Exact 3D right-arm joints [shoulder, elbow, wrist, fist] of a sheet frame (data/hero_arm3d.json), or empty when unmapped.
+static func frame_arm3(tex_file: String, frame: int) -> Array[Vector3]:
+	if tex_file.is_empty() or frame < 0:
+		return []
+	if not _arm3_sheets.has(tex_file):
+		var root: Dictionary = DataRegistry.table("hero_arm3d")
+		var inv_scale: float = 1.0 / maxf(float(root.get("scale", 20.0)), 1.0)
+		var entry: Dictionary = (root.get("sheets", {}) as Dictionary).get(tex_file, {}) as Dictionary
+		var raw: Array = entry.get("data", []) as Array
+		var packed: PackedFloat32Array = PackedFloat32Array()
+		packed.resize(raw.size())
+		for i: int in raw.size():
+			packed[i] = float(raw[i]) * inv_scale
+		_arm3_sheets[tex_file] = packed
+	var buf: PackedFloat32Array = _arm3_sheets[tex_file] as PackedFloat32Array
+	var base: int = frame * 12
+	if base + 12 > buf.size():
+		return []
+	return [
+		Vector3(buf[base], buf[base + 1], buf[base + 2]),
+		Vector3(buf[base + 3], buf[base + 4], buf[base + 5]),
+		Vector3(buf[base + 6], buf[base + 7], buf[base + 8]),
+		Vector3(buf[base + 9], buf[base + 10], buf[base + 11]),
+	]
+
+
+static func blend_arm3(a: Array[Vector3], b: Array[Vector3], t: float) -> Array[Vector3]:
+	if a.size() < 4:
+		return b
+	if b.size() < 4 or t <= 0.0001:
+		return a
+	if t >= 0.9999:
+		return b
+	return [a[0].lerp(b[0], t), a[1].lerp(b[1], t), a[2].lerp(b[2], t), a[3].lerp(b[3], t)]
+
+
+## Shifts 3D arm joints by the sprite's 2D skew and vertical offset (`_sink + _limp_dip`) without changing camera depth.
+static func shift_arm3(pts: Array[Vector3], skew: float, dy: float) -> Array[Vector3]:
+	if pts.size() < 4 or (absf(skew) < 0.0001 and absf(dy) < 0.0001):
+		return pts
+	var out: Array[Vector3] = []
+	out.resize(4)
+	for i: int in 4:
+		var p: Vector3 = pts[i]
+		var sy: float = p.y * SINP - p.z * COSP
+		out[i] = p + Vector3(-skew * sy, 0.0, 0.0) + SCREEN_DOWN * dy
+	return out
 
 
 ## Screen position (relative to the feet) of a point.
@@ -119,9 +169,9 @@ static func arm(shoulder: Vector3, fist: Vector3, pole: Vector3) -> Array[Vector
 	return [elbow, reached - down * PALM, reached]
 
 
-## Where the elbow wants to go for her right arm: down, out to her right and back, like the renderer's pole (-0.8, -0.6, -0.3).
+## Where the elbow wants to go for her right arm: down, tucked near her ribs and a little back.
 static func pole(forward: Vector2) -> Vector3:
-	return body_offset(forward, right_of(forward), Vector3(-0.3, 0.8, -0.6))
+	return body_offset(forward, right_of(forward), Vector3(-0.45, 0.45, -0.75))
 
 
 static func light() -> Vector3:

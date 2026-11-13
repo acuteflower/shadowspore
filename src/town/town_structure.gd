@@ -6,7 +6,12 @@ extends Interactable
 ## The stockpile also answers E.
 
 const DIR: String = "res://assets/town/"
-const HAMMERS: Array[String] = ["res://assets/audio/hut/hammer_a.wav", "res://assets/audio/hut/hammer_b.wav", "res://assets/audio/hut/hammer_c.wav"]
+const HAMMERS: Array[String] = ["res://assets/audio/town/hammer_build_a.wav", "res://assets/audio/town/hammer_build_b.wav", "res://assets/audio/town/hammer_build_c.wav"]
+const PLANK: Color = Color("8a6a52")
+const PLANK_LIGHT: Color = Color("b48e6a")
+const INK: Color = Color("1b1a2e")
+const STONE: Color = Color("6e6688")
+const STONE_LIGHT: Color = Color("a59cc4")
 const POST: Color = Color("6b5a74")
 const ROPE: Color = Color("a89477")
 const SITE: Color = Color("78f4e6")
@@ -28,6 +33,7 @@ var _glow: Sprite2D
 var _pad: Sprite2D
 var _light: NightLight
 var _light_base: float = 0.0
+var _aura: NightLight
 var attention: float = 0.0 ## 0..1, set by the quest board's notes: unread notices make its bud light shine further
 var _flicker: float = 0.0
 var _body: StaticBody2D
@@ -56,6 +62,15 @@ var _shutter_forced: float = 0.0 ## seconds the flap stays up although it is nig
 var _shutter_check: float = 0.0
 var _shutter_near: bool = false
 var _lamp_k: float = 1.0 ## a lamp post: 1 burning, 0.2 only embers (empty), 0 cold; every other piece 1
+var _scaffold: Node2D ## the scaffold round a site (world-lit, in front of the picture)
+var _over: Node2D ## unlit things over the piece: the foundation stone falling, the material flying in, the sparks from her hands, the progress over a site
+var _found_t: float = -1.0 ## seconds since the foundation stone was laid (-1: the site was there already)
+var _found_from: Vector2 = Vector2.INF ## where the material flies from (the nearest player when it was laid)
+var _sparks_out: Array[Dictionary] = [] ## {from, to, t}: light flying from her hands into the build
+var _milestone: int = 0 ## quarters of the build already marked
+var _parts_done: Dictionary = {} ## part index -> true once its window is complete
+var _stand: Sprite2D ## a part that stands upright on a floor piece (the fountain on its square, data `stand`): y-sorted with the people, its own collider
+var helping_here: bool = false ## the local player lends a hand at this site (the progress shows "x3")
 
 
 func setup(owner_manager: TownManager, structure_id: int) -> void:
@@ -84,13 +99,15 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	_sprite.centered = false
 	_sprite.flip_h = _flipped
 	if bool(_spec.get("walk", false)):
-		_sprite.z_index = -9
+		_sprite.z_index = -6 ## a floor (plates, the fountain square): over the meadow's blades and clover (-8), under shadows, blood and warnings
 	add_child(_sprite)
 	_sprite.position = Vector2(-_frame.x / 2.0, -_feet)
 	if bool(_spec.get("glow", false)) and ResourceLoader.exists(DIR + texture_name + "_glow.png"):
 		_glow = _make_glow(_sprite, DIR + texture_name + "_glow.png", _spec.get("anim", {}) as Dictionary)
 	for raw: Variant in _spec.get("parts", []) as Array:
 		_make_part(raw as Dictionary)
+	if _spec.has("stand"):
+		_make_stand(_spec.stand as Dictionary)
 	if not bool(_spec.get("walk", false)):
 		_body = StaticBody2D.new()
 		var shape: CollisionShape2D = CollisionShape2D.new()
@@ -113,6 +130,16 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 		_light_base = float(spec.energy)
 		_flicker = float(spec.get("flicker", 0.0))
 		add_child(_light)
+	if _spec.has("aura"):
+		var aura: Dictionary = _spec.aura as Dictionary
+		_aura = NightLight.new() ## the building itself gives light: a wide soft pool round its walls (docs/stadtbau_konzept.md)
+		_aura.position = TownRules.foot_rect(piece, 0.0, 0.0).get_center()
+		_aura.radius = int(aura.radius)
+		_aura.squash = 0.75
+		_aura.base_energy = float(aura.energy)
+		_aura.glow_color = Color(String(aura.color))
+		_aura.pulse = 0.12
+		add_child(_aura)
 	if _spec.has("smoke"):
 		_make_smoke()
 	if _spec.has("motes"):
@@ -129,8 +156,20 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	var window: Array = _spec.get("window", [0.0, 1.0]) as Array
 	_shown = float(progress) / float(TownManager.PROGRESS_FULL)
 	_add_layer(_sprite, float(window[0]), float(window[1]), false)
+	if _stand != null:
+		var stand_window: Array = (_spec.stand as Dictionary).get("window", [0.0, 1.0]) as Array
+		_add_layer(_stand, float(stand_window[0]), float(stand_window[1]), false)
 	for part: Dictionary in _parts:
 		_add_layer(part.sprite as Sprite2D, float(part.from), float(part.to), part.sway != null)
+	_scaffold = Node2D.new()
+	_scaffold.draw.connect(_draw_scaffold)
+	add_child(_scaffold)
+	_over = Node2D.new()
+	_over.z_index = 40
+	_over.material = Unlit.material()
+	_over.draw.connect(_draw_over)
+	add_child(_over)
+	_milestone = int(float(progress) / float(TownManager.PROGRESS_FULL) * 4.0)
 	if String(_spec.get("role", "")) == "board":
 		add_to_group("quest_board_piece")
 		_make_board_notes()
@@ -203,6 +242,38 @@ func _make_part(spec: Dictionary) -> void:
 			(_parts[_parts.size() - 1] as Dictionary)["glow_mat"] = mat
 	if bool(spec.get("fireflies", false)):
 		sprite.add_to_group("flora_glow")
+
+
+## The upright part of a floor piece: its own sprite at the piece's feet (sorted with the people there), an optional animated sheet and glow, a solid footprint.
+func _make_stand(spec: Dictionary) -> void:
+	var frame: Array = spec.get("frame", [16, 16]) as Array
+	_stand = Sprite2D.new()
+	_stand.texture = load(DIR + String(spec.texture) + ".png") as Texture2D
+	_stand.centered = false
+	_stand.hframes = int(spec.get("frames", 1))
+	_stand.flip_h = _flipped
+	_stand.position = Vector2(-float(frame[0]) / 2.0, -float(spec.get("feet", frame[1])))
+	add_child(_stand)
+	var anim: Dictionary = {"frames": int(spec.get("frames", 1)), "fps": float(spec.get("fps", 5.0))}
+	if _stand.hframes > 1:
+		_anims.append({"sprite": _stand, "frames": _stand.hframes, "fps": anim.fps})
+	if bool(spec.get("glow", false)) and ResourceLoader.exists(DIR + String(spec.texture) + "_glow.png"):
+		_make_glow(_stand, DIR + String(spec.texture) + "_glow.png", anim)
+	if spec.has("solid"):
+		var solid: Array = spec.solid as Array
+		var body: StaticBody2D = StaticBody2D.new()
+		var shape: CollisionShape2D = CollisionShape2D.new()
+		var box: RectangleShape2D = RectangleShape2D.new()
+		box.size = Vector2(float(solid[0]), float(solid[1]))
+		shape.shape = box
+		shape.position = Vector2(0.0, -float(solid[1]) / 2.0)
+		body.add_child(shape)
+		add_child(body)
+
+
+## The footprint round the feet (`TownRules.foot_rect` at the origin).
+func _foot_local() -> Rect2:
+	return TownRules.foot_rect(piece, 0.0, 0.0)
 
 
 ## The build look of one picture: its pixels fall into place (`build_pixels.gdshader`), the rest shows as a dotted blueprint.
@@ -472,6 +543,8 @@ func _apply_progress() -> void:
 		(part.sprite as Sprite2D).visible = fraction > float(part.from)
 	if _light != null:
 		_light.visible = done and _lamp_k > 0.0
+	if _aura != null:
+		_aura.visible = done
 	if _spill != null:
 		_spill.visible = done
 	set_night(TimeManager.night_amount())
@@ -482,6 +555,10 @@ func set_progress(value: int, done: bool = false) -> void:
 	if value > progress:
 		_last_gain_msec = Time.get_ticks_msec()
 	progress = value
+	var quarter: int = int(float(value) / float(TownManager.PROGRESS_FULL) * 4.0)
+	if quarter > _milestone and quarter < 4 and value < TownManager.PROGRESS_FULL:
+		_milestone = quarter
+		_mark_milestone()
 	_apply_progress()
 	if done:
 		_finish_fx()
@@ -534,6 +611,15 @@ func dismantle() -> void:
 
 func _finish_fx() -> void:
 	_burst(22, Color(0.9, 0.82, 0.7, 0.85), 46.0)
+	_scatter_frame()
+	for light: NightLight in [_light, _aura]:
+		if light != null:
+			var full: float = light.base_energy
+			light.base_energy = full * 4.0
+			create_tween().tween_property(light, "base_energy", full, 1.6).set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+	for glow: Sprite2D in _glows:
+		glow.modulate.a = 1.0
+		create_tween().tween_property(glow, "modulate:a", lerpf(GLOW_BY_DAY, 1.0, TimeManager.night_amount()) * _lamp_k, 1.4)
 	_flash = 1.0
 	_sprite.scale = Vector2(1.0, 1.0)
 	var tween: Tween = create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
@@ -546,6 +632,126 @@ func _finish_fx() -> void:
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
+
+
+## The foundation stone (a fresh site, on every peer): it drops onto the feet with dust and a knock, the whole shape lights up once as a wire frame and sinks
+## into the dotted plan, the pegs of the rope frame shoot up and the material flies in from the nearest player.
+func lay_foundation() -> void:
+	_found_t = 0.0
+	var nearest: float = 300.0
+	for player: Player in Player.all:
+		var d: float = player.global_position.distance_to(global_position)
+		if d < nearest:
+			nearest = d
+			_found_from = player.global_position - global_position + Vector2(0, -20)
+	_sound("res://assets/audio/town/stone_set.wav", -3.0)
+	get_tree().create_timer(0.55, false).timeout.connect(func() -> void:
+		if is_instance_valid(self):
+			_sound("res://assets/audio/town/material_land.wav", -6.0))
+	for layer: Dictionary in _layers:
+		var glow: ShaderMaterial = layer.glow as ShaderMaterial
+		glow.set_shader_parameter("flash", 1.0)
+		var tween: Tween = create_tween()
+		tween.tween_interval(0.22)
+		tween.tween_method(func(v: float) -> void: glow.set_shader_parameter("flash", v), 1.0, 0.0, 0.7)
+
+
+## Light from her hands flies into the build (she lends a hand, `Player` calls it on every grab).
+func hand_burst(from: Vector2) -> void:
+	var top: float = -_feet * clampf(_shown, 0.08, 1.0)
+	var w: float = _frame.x * 0.7
+	for i: int in 10:
+		_sparks_out.append({"from": from - global_position, "to": Vector2(randf_range(-w / 2.0, w / 2.0), top + randf_range(-4.0, 8.0)), "t": -float(i) * 0.03})
+	_last_gain_msec = Time.get_ticks_msec()
+	_hammer()
+
+
+func _mark_milestone() -> void:
+	_sound("res://assets/audio/town/milestone.wav", -6.0)
+	_burst(16, Color(0.85, 0.78, 0.66, 0.85), 40.0)
+	for layer: Dictionary in _layers:
+		var glow: ShaderMaterial = layer.glow as ShaderMaterial
+		var tween: Tween = create_tween()
+		tween.tween_method(func(v: float) -> void: glow.set_shader_parameter("flash", v), 0.5, 0.0, 0.5)
+	for player: Player in Player.all:
+		if player.is_multiplayer_authority() and player.global_position.distance_to(global_position) < 200.0:
+			player.add_shake(0.25)
+
+
+func _sound(path: String, db: float) -> void:
+	if not ResourceLoader.exists(path):
+		return
+	var player: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+	player.stream = load(path) as AudioStream
+	player.volume_db = db
+	player.max_distance = 420.0
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
+
+
+## A part of the piece is complete (the lantern, the sign, a pennant): a little puff where it hangs and a chime.
+func _part_done(part: Dictionary) -> void:
+	var sprite: Sprite2D = part.sprite as Sprite2D
+	var size: Vector2 = sprite.texture.get_size() if sprite.texture != null else Vector2(8, 8)
+	var puff: CPUParticles2D = CPUParticles2D.new()
+	puff.one_shot = true
+	puff.explosiveness = 1.0
+	puff.amount = 8
+	puff.lifetime = 0.6
+	puff.spread = 180.0
+	puff.initial_velocity_min = 14.0
+	puff.initial_velocity_max = 30.0
+	puff.gravity = Vector2(0, 30)
+	puff.color = Color(0.9, 1.0, 0.95, 0.9)
+	puff.position = sprite.position + _sprite.position + size / 2.0
+	puff.z_index = 3
+	puff.material = Unlit.material()
+	puff.emitting = true
+	add_child(puff)
+	puff.finished.connect(puff.queue_free)
+	_sound("res://assets/audio/town/card_flip.wav" if part.sway != null else "res://assets/audio/town/snap_tick.wav", -8.0)
+
+
+## A flash of light through the finished piece after `delay` s (the town's level ceremony, walking into the town): glows flare, gold sparks rise.
+func flare(delay: float) -> void:
+	get_tree().create_timer(delay, false).timeout.connect(func() -> void:
+		if not is_instance_valid(self):
+			return
+		_flash = 0.8
+		for glow: Sprite2D in _glows:
+			glow.modulate.a = 1.0
+			create_tween().tween_property(glow, "modulate:a", lerpf(GLOW_BY_DAY, 1.0, TimeManager.night_amount()) * _lamp_k, 1.0)
+		_burst(10, Color(1.0, 0.86, 0.5, 0.9), 40.0))
+
+
+## The rope frame of the site breaks apart: its posts and rope fly off as splinters.
+func _scatter_frame() -> void:
+	var r: Rect2 = _foot_local()
+	for corner: Vector2 in [r.position, Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), r.end]:
+		var bits: CPUParticles2D = CPUParticles2D.new()
+		bits.one_shot = true
+		bits.explosiveness = 1.0
+		bits.amount = 7
+		bits.lifetime = 0.8
+		bits.direction = (corner - r.get_center()).normalized() if corner != r.get_center() else Vector2.UP
+		bits.spread = 50.0
+		bits.initial_velocity_min = 40.0
+		bits.initial_velocity_max = 90.0
+		bits.gravity = Vector2(0, 260)
+		bits.angular_velocity_min = -400.0
+		bits.angular_velocity_max = 400.0
+		bits.scale_amount_min = 1.0
+		bits.scale_amount_max = 2.5
+		var ramp: Gradient = Gradient.new()
+		ramp.colors = PackedColorArray([POST, ROPE, Color(POST, 0.0)])
+		ramp.offsets = PackedFloat32Array([0.0, 0.6, 1.0])
+		bits.color_ramp = ramp
+		bits.position = corner + Vector2(0, -8)
+		bits.z_index = 3
+		bits.emitting = true
+		add_child(bits)
+		bits.finished.connect(bits.queue_free)
 
 
 func _burst(amount: int, color: Color, speed: float) -> void:
@@ -563,8 +769,7 @@ func _burst(amount: int, color: Color, speed: float) -> void:
 	puff.scale_amount_min = 1.0
 	puff.scale_amount_max = 2.0
 	puff.color = color
-	var foot: Array = _spec.get("foot", [16, 16]) as Array
-	puff.position = Vector2(0.0, -float(foot[1]) * 0.5)
+	puff.position = _foot_local().get_center()
 	puff.z_index = 3
 	add_child(puff)
 	get_tree().create_timer(1.4).timeout.connect(puff.queue_free)
@@ -573,6 +778,28 @@ func _burst(amount: int, color: Color, speed: float) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_update_build(delta)
+	if _found_t >= 0.0:
+		_found_t += delta
+		if _found_t > 0.22 and _found_t - delta <= 0.22:
+			_burst(14, Color(0.78, 0.7, 0.6, 0.85), 36.0)
+			for player: Player in Player.all:
+				if player.is_multiplayer_authority() and player.global_position.distance_to(global_position) < 160.0:
+					player.add_shake(0.3)
+		if _found_t > 1.4:
+			_found_t = -1.0
+	for i: int in range(_sparks_out.size() - 1, -1, -1):
+		_sparks_out[i].t = float(_sparks_out[i].t) + delta * 2.6
+		if float(_sparks_out[i].t) >= 1.0:
+			_sparks_out.remove_at(i)
+	if progress < TownManager.PROGRESS_FULL or _found_t >= 0.0 or not _sparks_out.is_empty():
+		_over.queue_redraw()
+		_scaffold.queue_redraw()
+	if progress < TownManager.PROGRESS_FULL:
+		for i: int in _parts.size():
+			var part: Dictionary = _parts[i]
+			if not _parts_done.has(i) and _shown >= float(part.to) and float(part.to) < 0.999:
+				_parts_done[i] = true
+				_part_done(part)
 	for anim: Dictionary in _anims:
 		(anim.sprite as Sprite2D).frame = (int(_time * float(anim.fps)) + id) % int(anim.frames)
 	if _smoke != null or _spec.has("light"):
@@ -669,12 +896,13 @@ func _hammer() -> void:
 func _draw() -> void:
 	if progress >= TownManager.PROGRESS_FULL or _spec.is_empty():
 		return
+	draw_set_transform(Vector2(0.0, _foot_local().end.y)) ## the frame stands on the footprint's lower edge (below the feet for the fountain square)
 	var foot: Array = _spec.get("foot", [16, 16]) as Array
 	var w: float = float(foot[0])
 	var h: float = float(foot[1])
 	var left: float = -w / 2.0
 	var top: float = -h
-	var post: float = 9.0 + minf(w, 40.0) * 0.1
+	var post: float = (9.0 + minf(w, 40.0) * 0.1) * (clampf((_found_t - 0.25) / 0.3, 0.0, 1.0) if _found_t >= 0.0 else 1.0)
 	for corner: Vector2 in [Vector2(left, top), Vector2(-left, top), Vector2(left, 0.0), Vector2(-left, 0.0)]:
 		draw_line(corner, corner + Vector2(0.0, -post), POST, 1.0)
 		draw_rect(Rect2(corner + Vector2(-1.0, -post - 1.0), Vector2(3.0, 2.0)), POST)
@@ -692,11 +920,93 @@ func _draw() -> void:
 		x += dash * 2.0
 
 
+## The scaffold round a site: two poles at the sides of the picture, short ledgers sticking out every 14 px up to just above the build front, a full plank
+## right at the front (where the work is), diagonal braces. Gone when the piece is finished (its planks fly off, `_scatter_frame`).
+func _draw_scaffold() -> void:
+	if progress >= TownManager.PROGRESS_FULL or _spec.is_empty() or bool(_spec.get("walk", false)) or _feet < 30.0:
+		return
+	var grow: float = clampf((_found_t - 0.45) / 0.5, 0.0, 1.0) if _found_t >= 0.0 else 1.0
+	var reach: float = minf(_feet * clampf(_shown + 0.18, 0.2, 1.0), _feet + 4.0) * grow
+	var half: float = roundf(_frame.x * 0.5) - 3.0
+	for x: float in [-half, half]:
+		_scaffold.draw_rect(Rect2(x - 1.0, -reach, 3.0, reach), INK)
+		_scaffold.draw_rect(Rect2(x, -reach + 1.0, 1.0, reach - 1.0), PLANK_LIGHT)
+	var y: float = -12.0
+	while y > -reach + 2.0:
+		for side: float in [-1.0, 1.0]:
+			var ledger: Rect2 = Rect2(side * half - 7.0, y, 8.0, 1.0) if side < 0.0 else Rect2(side * half, y, 8.0, 1.0)
+			_scaffold.draw_rect(ledger.grow(1.0), INK)
+			_scaffold.draw_rect(ledger, PLANK)
+		y -= 14.0
+	var front: float = -roundf(_feet * clampf(_shown, 0.0, 1.0)) + 2.0
+	if _shown > 0.05 and _shown < 0.98:
+		_scaffold.draw_rect(Rect2(-half - 1.0, front - 1.0, half * 2.0 + 3.0, 3.0), Color(INK, 0.85))
+		_scaffold.draw_rect(Rect2(-half, front, half * 2.0 + 1.0, 1.0), PLANK_LIGHT)
+		for k: int in int(half * 2.0 / 9.0):
+			_scaffold.draw_rect(Rect2(-half + 4.0 + float(k) * 9.0, front, 1.0, 1.0), PLANK)
+	for side: float in [-1.0, 1.0]:
+		var x1: float = side * half
+		var steps: int = int(reach / 3.0)
+		for i: int in mini(steps, 9):
+			_scaffold.draw_rect(Rect2(x1 - side * float(i), -float(i) * 3.0 - 4.0, 1.0, 1.0), Color(PLANK, 0.7))
+
+
+## Unlit, over everything: the stone falling, the material arcing in, light from her hands and (when she is near) the progress over the site.
+func _draw_over() -> void:
+	if _found_t >= 0.0:
+		var k: float = clampf(_found_t / 0.22, 0.0, 1.0)
+		var y: float = -40.0 * (1.0 - k * k) - 2.0
+		var fade: float = clampf((1.2 - _found_t) / 0.4, 0.0, 1.0)
+		_over.draw_rect(Rect2(-5.0, y - 6.0, 11.0, 8.0), Color(INK, fade))
+		_over.draw_rect(Rect2(-4.0, y - 5.0, 9.0, 6.0), Color(STONE, fade))
+		_over.draw_rect(Rect2(-4.0, y - 5.0, 9.0, 1.0), Color(STONE_LIGHT, fade))
+		_over.draw_rect(Rect2(-1.0, y - 3.0, 3.0, 1.0), Color(SITE, fade * (0.5 + 0.5 * sin(_found_t * 20.0))))
+		_over.draw_rect(Rect2(0.0, y - 4.0, 1.0, 3.0), Color(SITE, fade * (0.5 + 0.5 * sin(_found_t * 20.0))))
+		if _found_from != Vector2.INF:
+			var cost: Array = (_spec.get("cost", {}) as Dictionary).keys()
+			for i: int in cost.size():
+				var t: float = (_found_t - 0.15 - float(i) * 0.09) / 0.55
+				if t <= 0.0 or t >= 1.0:
+					continue
+				var landing: Vector2 = Vector2(-10.0 + float(i) * 8.0, -4.0)
+				var p: Vector2 = _found_from.lerp(landing, t) + Vector2(0, -34.0 * sin(PI * t))
+				var icon: Texture2D = Items.icon({"id": String(cost[i]), "count": 1})
+				if icon != null:
+					_over.draw_texture(icon, (p - Vector2(8, 8)).round(), Color(1, 1, 1, clampf((1.0 - t) * 5.0, 0.0, 1.0)))
+	for spark: Dictionary in _sparks_out:
+		var t2: float = float(spark.t)
+		if t2 < 0.0:
+			continue
+		var a: Vector2 = spark.from as Vector2
+		var b: Vector2 = spark.to as Vector2
+		var q: Vector2 = a.lerp(b, t2) + Vector2(0, -18.0 * sin(PI * t2))
+		var tail: Vector2 = a.lerp(b, maxf(t2 - 0.12, 0.0)) + Vector2(0, -18.0 * sin(PI * maxf(t2 - 0.12, 0.0)))
+		_over.draw_line(tail.round(), q.round(), Color(SITE, 0.5), 1.0)
+		_over.draw_rect(Rect2(q.round(), Vector2.ONE), Color(0.92, 1.0, 0.98))
+	if progress >= TownManager.PROGRESS_FULL:
+		return
+	var me: Player = manager.local_player() if manager != null else null
+	if me == null or me.global_position.distance_to(global_position) > 130.0:
+		return
+	var fraction: float = clampf(_shown, 0.0, 1.0)
+	var top: float = roundf(-_feet - 12.0)
+	var w: float = 44.0
+	var x0: float = -w / 2.0
+	_over.draw_rect(Rect2(x0 - 1.0, top - 1.0, w + 2.0, 4.0), INK)
+	_over.draw_rect(Rect2(x0, top, w, 2.0), Color(0.12, 0.08, 0.2))
+	_over.draw_rect(Rect2(x0, top, roundf(w * fraction), 2.0), SITE)
+	_over.draw_rect(Rect2(x0 + roundf(w * fraction) - 1.0, top - 1.0, 2.0, 4.0), Color(0.92, 1.0, 0.98, 0.6 + 0.4 * sin(_time * 8.0)))
+	var label: String = "%d %%" % int(fraction * 100.0) + ("  X3" if helping_here else "")
+	PixelText.draw(_over, label, Vector2i(int(-float(PixelText.width(label)) / 2.0), int(top) - 8), Color(0.92, 1.0, 0.98) if helping_here else SITE, INK)
+
+
 # ---------- use ----------
 
 func prompt() -> String:
-	if progress < TownManager.PROGRESS_FULL or InputManager.ui_blocking:
+	if InputManager.ui_blocking:
 		return ""
+	if progress < TownManager.PROGRESS_FULL:
+		return "" if helping_here or bool(_spec.get("walk", false)) else "ANPACKEN"
 	if _spec.has("fuel"):
 		return manager.lamp_prompt(id)
 	match String(_spec.get("role", "")):
@@ -710,7 +1020,7 @@ func prompt() -> String:
 func reach_distance(from: Vector2) -> float:
 	var rect: Rect2 = TownRules.foot_rect(piece, position.x, position.y)
 	var nearest: Vector2 = Vector2(clampf(from.x, rect.position.x, rect.end.x), clampf(from.y, rect.position.y, rect.end.y))
-	return from.distance_to(nearest)
+	return maxf(from.distance_to(nearest) - (16.0 if progress < TownManager.PROGRESS_FULL else 0.0), 0.0) ## a site can be taken in hand from a little further off
 
 
 func prompt_position() -> Vector2:
@@ -718,6 +1028,10 @@ func prompt_position() -> Vector2:
 
 
 func interact(player: Player) -> void:
+	if progress < TownManager.PROGRESS_FULL:
+		if player.is_multiplayer_authority():
+			manager.lend_hand(player, id)
+		return
 	if _spec.has("fuel"):
 		if prompt() != "" and player.is_multiplayer_authority():
 			manager.request_lamp(id)

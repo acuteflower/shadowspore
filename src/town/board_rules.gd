@@ -11,6 +11,9 @@ extends RefCounted
 const FETCH: String = "fetch"
 const KILL: String = "kill"
 const STORY: String = "story"
+const DEFAULT_STORY_ICON: String = "res://assets/ui/board/story_seal.png"
+
+static var _story_icons: Dictionary = {}
 
 
 static func config() -> Dictionary:
@@ -107,8 +110,50 @@ static func make(rng: RandomNumberGenerator, template: Dictionary, giver: String
 static func make_story(entry: Dictionary, day: int, id: int) -> Dictionary:
 	return {
 		"id": id, "k": STORY, "g": String(entry.get("giver", "")), "tx": String(entry.id), "q": String(entry.quest), "ti": String(entry.get("title", "")),
+		"ic": String(entry.get("icon", "")),
 		"txt": String(entry.get("text", "")), "n": 0, "c": 0, "x": 0, "tr": 0, "b": {}, "t": "", "d": day, "e": -1,
 	}
+
+
+static func story_entry_of(key: String) -> Dictionary:
+	if key == "":
+		return {}
+	for raw: Variant in story_entries():
+		var entry: Dictionary = raw as Dictionary
+		if String(entry.get("id", "")) == key or String(entry.get("quest", "")) == key:
+			return entry
+	return {}
+
+
+static func story_icon_path(offer: Dictionary) -> String:
+	if String(offer.get("k", "")) != STORY:
+		return ""
+	var own: String = String(offer.get("ic", ""))
+	if own != "":
+		return own
+	var entry: Dictionary = story_entry_of(String(offer.get("tx", "")))
+	if entry.is_empty():
+		entry = story_entry_of(String(offer.get("q", "")))
+	var path: String = String(entry.get("icon", ""))
+	return path if path != "" else DEFAULT_STORY_ICON
+
+
+static func story_icon_by_path(path: String) -> Texture2D:
+	var target: String = path if path != "" else DEFAULT_STORY_ICON
+	if _story_icons.has(target):
+		return _story_icons[target] as Texture2D
+	if not ResourceLoader.exists(target):
+		if target != DEFAULT_STORY_ICON:
+			return story_icon_by_path(DEFAULT_STORY_ICON)
+		return null
+	var tex: Texture2D = load(target) as Texture2D
+	_story_icons[target] = tex
+	return tex
+
+
+static func story_icon(offer: Dictionary) -> Texture2D:
+	var path: String = story_icon_path(offer)
+	return story_icon_by_path(path) if path != "" else null
 
 
 static func template_of(id: String) -> Dictionary:

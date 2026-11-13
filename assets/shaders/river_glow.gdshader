@@ -8,12 +8,15 @@ render_mode unshaded, blend_add;
 uniform sampler2D bank_map : filter_nearest, repeat_disable;
 uniform vec2 world_origin = vec2(0.0);
 global uniform float g_water_time; // same global river clock as river_water.gdshader
+global uniform sampler2D g_arid : filter_linear, repeat_disable;
+global uniform vec4 g_gloom_rect;
 uniform float bank_width = 20.0;
 uniform float night = 0.0;
 
 void fragment() {
     vec4 mask = texture(TEXTURE, UV);
     vec2 pixel = floor(UV * vec2(textureSize(TEXTURE, 0))) + floor(world_origin);
+    float oasis_m = g_gloom_rect.z > 0.0 ? smoothstep(0.42, 0.68, texture(g_arid, (pixel - g_gloom_rect.xy) / g_gloom_rect.zw).r) : 0.0;
     vec3 glow = vec3(0.0);
     if (mask.r > 0.5) {
         vec2 flow = mask.ba * 2.0 - 1.0;
@@ -37,14 +40,14 @@ void fragment() {
         float twinkle = 0.5 + 0.5 * sin(g_water_time * (1.0 + h * 2.0) + h * 40.0);
         bool streak = h > 0.95 && local.y == at.y && local.x >= at.x - 2.0 && local.x <= at.x;
         if (h > 0.78 && ((local.x == at.x && local.y == at.y) || streak)) {
-            vec3 c = h > 0.8 ? vec3(0.55, 0.45, 0.95) : vec3(0.30, 0.95, 0.85);
+            vec3 c = h > 0.8 ? mix(vec3(0.55, 0.45, 0.95), vec3(0.98, 0.78, 0.38), oasis_m) : mix(vec3(0.30, 0.95, 0.85), vec3(0.32, 0.96, 0.90), oasis_m);
             glow += c * (0.35 + 0.65 * twinkle) * (0.5 + depth);
         }
         // The shoreline: teal light under the surface along the bank, broken into stretches.
         float inside = texture(bank_map, UV).g * 8.0;
         float stretch = vnoise(pixel / 13.0 + 5.0);
         if (inside < 2.0 && stretch > 0.42) {
-            glow += vec3(0.10, 0.50, 0.46) * (1.0 - inside / 2.0) * (0.55 + 0.45 * sin(g_water_time * 0.9 + pixel.x * 0.07 + pixel.y * 0.05));
+            glow += mix(vec3(0.10, 0.50, 0.46), vec3(0.14, 0.58, 0.56), oasis_m) * (1.0 - inside / 2.0) * (0.55 + 0.45 * sin(g_water_time * 0.9 + pixel.x * 0.07 + pixel.y * 0.05));
         }
     } else {
         // Luminous specks on the bank: fungi and glowing moss close to the water.
@@ -52,7 +55,8 @@ void fragment() {
         float h = hash21(pixel + 13.0);
         if (d < 12.0 && h > 0.994) {
             float tw = 0.5 + 0.5 * sin(g_water_time * 1.3 + h * 300.0);
-            glow += (h > 0.998 ? vec3(0.55, 0.40, 0.95) : vec3(0.25, 0.85, 0.75)) * (0.4 + 0.6 * tw);
+            vec3 speck_c = h > 0.998 ? mix(vec3(0.55, 0.40, 0.95), vec3(0.98, 0.78, 0.38), oasis_m) : mix(vec3(0.25, 0.85, 0.75), vec3(0.32, 0.96, 0.90), oasis_m);
+            glow += speck_c * (0.4 + 0.6 * tw);
         }
     }
     COLOR = vec4(glow * night, 1.0);

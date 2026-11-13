@@ -4,6 +4,7 @@ extends Node
 ##   --host            host for up to 4 players
 ##   --join[=address]  join a host (default 127.0.0.1)
 ##   --arena           the small movement test arena instead of the world (any mode)
+##   --trials          the flat test world with every trial of the Wächterin (never saved)
 ##   --new             singleplayer without loading the save file (a new game, so the intro plays)
 ##   --skip-intro      a new game without the intro
 ##   --skip-menu       singleplayer straight into the game (loads the save)

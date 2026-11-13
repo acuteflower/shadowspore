@@ -45,6 +45,8 @@ const HEAVY_SOUNDS: String = "res://assets/audio/heavy/"
 var facing: Vector2 = Vector2.DOWN ## set by the player every frame
 var rig_shoulder: Vector2 = Vector2(-4.0, -31.0) ## right shoulder and natural hand, relative to the feet,
 var rig_hand: Vector2 = Vector2(-5.0, -21.0) ## from the current sheet frame (set by the player every frame)
+var rig_arm3: Array[Vector3] = [] ## exact [shoulder, elbow, wrist, fist] in GripRig space (data/hero_arm3d.json), empty when unmapped
+var depth_ctx: Dictionary = {} ## per-frame blood/depth lookup context for ArmPainter
 var carrying: bool = false ## sprinting: the blade trails behind the runner
 var body_dir: Vector2 = Vector2.DOWN ## the facing the body sheet shows (its sector), set by the player every frame: the item rests relative to it
 var free_hand: bool = true ## the main sheet plays (no clip owns the hand): the fist may leave the natural hand for the item's own hold (set by the player)
@@ -1094,13 +1096,30 @@ func _update_pose(delta: float) -> void:
 	_hold_k = move_toward(_hold_k, 1.0 if _has_weapon and _weapon_alpha > 0.05 else 0.0, 5.0 * delta)
 	var hold: Array = _rest_hold()
 	var rest_dir: Vector3 = _rod_dir(forward, right) if rod_pose.is_finite() else GripRig.body_dir(forward, float(hold[1]), float(hold[2]))
-	_shoulder3 = GripRig.shoulder_3d(rig_shoulder, forward)
-	var natural: Vector3 = GripRig.hand_3d(rig_hand, _shoulder3, forward)
-	var fist_goal: Vector3 = natural + GripRig.body_offset(forward, right, hold[0] as Vector3) * (_free_k * _hold_k)
-	var solved: Array[Vector3] = GripRig.arm(_shoulder3, fist_goal, GripRig.pole(forward))
-	_elbow3 = solved[0]
-	_wrist3 = solved[1]
-	_fist3 = solved[2]
+	var hold_w: float = _free_k * _hold_k
+	if rig_arm3.size() == 4:
+		_shoulder3 = rig_arm3[0]
+		var base_el: Vector3 = rig_arm3[1]
+		var base_wr: Vector3 = rig_arm3[2]
+		var natural_3d: Vector3 = rig_arm3[3]
+		if hold_w > 0.001:
+			var fist_goal_3d: Vector3 = natural_3d + GripRig.body_offset(forward, right, hold[0] as Vector3) * hold_w
+			var solved_3d: Array[Vector3] = GripRig.arm(_shoulder3, fist_goal_3d, GripRig.pole(forward))
+			_elbow3 = base_el.lerp(solved_3d[0], hold_w)
+			_wrist3 = base_wr.lerp(solved_3d[1], hold_w)
+			_fist3 = natural_3d.lerp(solved_3d[2], hold_w)
+		else:
+			_elbow3 = base_el
+			_wrist3 = base_wr
+			_fist3 = natural_3d
+	else:
+		_shoulder3 = GripRig.shoulder_3d(rig_shoulder, forward)
+		var natural: Vector3 = GripRig.hand_3d(rig_hand, _shoulder3, forward)
+		var fist_goal: Vector3 = natural + GripRig.body_offset(forward, right, hold[0] as Vector3) * hold_w
+		var solved: Array[Vector3] = GripRig.arm(_shoulder3, fist_goal, GripRig.pole(forward))
+		_elbow3 = solved[0]
+		_wrist3 = solved[1]
+		_fist3 = solved[2]
 	var grip: Vector2 = GripRig.screen(_fist3)
 	var hand_acc: Vector2 = Vector2.ZERO ## the fist's acceleration, smoothed (the sheets move it in whole pixels)
 	if delta > 0.0:
@@ -1127,8 +1146,11 @@ func _update_pose(delta: float) -> void:
 		_weapon_behind = true
 	elif mid.y > 0.4:
 		_weapon_behind = false
+	var has_depth: bool = bool(depth_ctx.get("valid", false))
 	var arm_mid: float = (_elbow3.y + _fist3.y) * 0.5
-	if arm_mid < -0.6:
+	if has_depth:
+		_arm_behind = false
+	elif arm_mid < -0.6:
 		_arm_behind = true
 	elif arm_mid > 0.0:
 		_arm_behind = false
@@ -1381,6 +1403,12 @@ func _arm_pose_key() -> PackedFloat32Array:
 		key.append(roundf(p.y * 4.0))
 		key.append(roundf(p.z * 4.0))
 	key.append(_arm_sort.position.y)
+	if bool(depth_ctx.get("valid", false)):
+		key.append(float(int(depth_ctx.get("tex_id", 0))))
+		key.append(float(int(depth_ctx.get("cell_x", -1))))
+		key.append(float(int(depth_ctx.get("cell_y", -1))))
+		key.append(roundf(float(depth_ctx.get("dy", 0.0)) * 2.0))
+		key.append(roundf(float(depth_ctx.get("skew", 0.0)) * 40.0))
 	return key
 
 
@@ -1414,7 +1442,7 @@ func mirror_material(source: Material) -> void:
 
 ## Her sword arm, painted like her left one (ArmPainter); a worn bracelet sits on the violet band.
 func _draw_arm() -> void:
-	var drawn: Array[Vector2] = ArmPainter.paint(_arm, _arm_sort.position, _shoulder3, _elbow3, _wrist3, _fist3, 1.0)
+	var drawn: Array[Vector2] = ArmPainter.paint(_arm, _arm_sort.position, _shoulder3, _elbow3, _wrist3, _fist3, 1.0, depth_ctx)
 	var bracelet: String = _talismans.worn_id("bracelet") if _talismans != null else ""
 	if bracelet != "": ## the worn bracelet (Wuchtreif ...) takes the place of the band
 		TalismanArt.draw_bracelet(_arm, bracelet, drawn[0], drawn[1], float(Time.get_ticks_msec()) / 1000.0)

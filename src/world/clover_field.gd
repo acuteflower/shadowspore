@@ -144,6 +144,7 @@ func _add_band(key: int, clumps: Array, textures: Array[ImageTexture]) -> void:
 	add_child(band)
 	for layer: int in 2:
 		var instance: MultiMeshInstance2D = MultiMeshInstance2D.new()
+		instance.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 		instance.texture = textures[layer]
 		instance.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		instance.material = _materials[layer]

@@ -41,7 +41,8 @@ static func foot_rect(id: String, x: float, y: float) -> Rect2:
 	var foot: Array = piece(id).get("foot", [16, 16]) as Array
 	var w: float = float(foot[0])
 	var h: float = float(foot[1])
-	return Rect2(x - w / 2.0, y - h, w, h)
+	var drop: float = float(piece(id).get("foot_drop", 0.0)) ## how far the footprint reaches below the feet line (the fountain square: its feet are the fountain's)
+	return Rect2(x - w / 2.0, y - h + drop, w, h)
 
 
 ## The ground in front of a door that has to stay free: where people stand, work and walk in (`front` [w, d] in the data: as wide as the door side, d deep from the
@@ -62,7 +63,7 @@ static func snapped_position(id: String, pos: Vector2) -> Vector2:
 	var grid: float = snap_of(id)
 	var rect: Rect2 = foot_rect(id, pos.x, pos.y)
 	var corner: Vector2 = Vector2(roundf(rect.position.x / grid) * grid, roundf(rect.position.y / grid) * grid)
-	return corner + Vector2(rect.size.x / 2.0, rect.size.y)
+	return corner + Vector2(rect.size.x / 2.0, rect.size.y - float(piece(id).get("foot_drop", 0.0)))
 
 
 ## Do two footprints overlap? (Touching edges do not.)

@@ -197,23 +197,64 @@ def bandage_mask(m, kind, mat):
     return ((y > lo) & (y < hi)).astype(float)
 
 
-def to_blood(bl, code, band=None):
-    """The threshold sheet frame from the supersampled buffer (same solidity rule as to_pixels): rows of (t, t, t, 255), or transparent."""
+def to_blood(bl, code, band=None, depth=None):
+    """The threshold sheet frame from the supersampled buffer (same solidity rule as to_pixels): rows of (t, g, b, 255), or transparent.
+    When `depth` is passed, G encodes camera depth `round((dmean + 20) * 4)` (1..255) and B encodes `1 + mat` on solid pixels (`64 + mat`
+    with alpha 1 on sprite outline pixels; `(255, 137, 42, 1)` marker at empty (0, 0)) for per-pixel arm occlusion in `ArmPainter`."""
     sub = bl.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
     csub = code.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
     opaque = (csub >= 0).sum(-1)
+    solid = opaque >= 6
     mean = np.where(csub >= 0, sub, 0.0).sum(-1) / np.maximum(opaque, 1)
     band_mean = None
     if band is not None:
         bsub = band.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
         band_mean = np.where(csub >= 0, bsub, 0.0).sum(-1) / np.maximum(opaque, 1)
+    dmean = np.zeros((FH, FW))
+    if depth is not None:
+        dsub = depth.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
+        dmean = np.where(csub >= 0, dsub, 0.0).sum(-1) / np.maximum(opaque, 1)
+    best_code = np.full((FH, FW), -1, dtype=np.int16)
+    best_w = np.zeros((FH, FW))
+    for v in range(len(RAMPS) * 4):
+        w = (csub == v).sum(-1) * DECAL_WEIGHT.get(v // 4, 1.0)
+        better = solid & (w > best_w)
+        best_code = np.where(better, v, best_code)
+        best_w = np.where(better, w, best_w)
+    if depth is None:
+        rows = []
+        for y in range(FH):
+            row = []
+            for x in range(FW):
+                if solid[y, x]:
+                    v = int(round(float(np.clip(mean[y, x], 0.0, 1.0)) * 255))
+                    row.append((v, v, v, 254 if band_mean is not None and band_mean[y, x] >= 0.5 else 255))
+                else:
+                    row.append((255, 255, 255, 0))
+            rows.append(row)
+        return rows
+    z_byte = np.clip(np.rint((dmean + 20.0) * 4.0), 1, 255).astype(np.int32)
+    best_mat = np.maximum(best_code // 4, 0).astype(np.int32)
     rows = []
     for y in range(FH):
         row = []
         for x in range(FW):
-            if opaque[y, x] >= 6:
+            if solid[y, x]:
                 v = int(round(float(np.clip(mean[y, x], 0.0, 1.0)) * 255))
-                row.append((v, v, v, 254 if band_mean is not None and band_mean[y, x] >= 0.5 else 255))
+                a = 254 if band_mean is not None and band_mean[y, x] >= 0.5 else 255
+                row.append((v, int(z_byte[y, x]), 1 + int(best_mat[y, x]), a))
+                continue
+            nb_z = -1
+            nb_m = 0
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < FW and 0 <= ny < FH and solid[ny, nx] and int(z_byte[ny, nx]) > nb_z:
+                    nb_z = int(z_byte[ny, nx])
+                    nb_m = int(best_mat[ny, nx])
+            if nb_z > 0:
+                row.append((255, nb_z, 64 + nb_m, 1))
+            elif x == 0 and y == 0:
+                row.append((255, 137, 42, 1))
             else:
                 row.append((255, 255, 255, 0))
         rows.append(row)
@@ -1070,15 +1111,15 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         if pose:  # attack: hands go where the keyframe puts them (the right one is drawn by the game)
             m.ell(sh, (1.75, 1.75, 1.75), LEATHER)
             sh_abs = sh + m.off
-            if side == -1 and not pose.get("both_arms"):
-                m.rig = {"shoulder": sh_abs, "hand": np.array(pose["hand_r"], float)}
-                continue
-            if side == -1:
-                m.rig = {"shoulder": sh_abs, "hand": np.array(pose["hand_r"], float)}
             target = pose["hand_r"] if side == -1 else pose["hand_l"]
             pole = pose.get("pole_r", (-0.8, -0.6, -0.3)) if side == -1 else pose.get("pole_l", (0.8, -0.6, -0.3))
             elbow_abs, wrist_abs = ik2(sh_abs, target, 6.6, 6.0, pole)
             d2 = (wrist_abs - elbow_abs) / np.linalg.norm(wrist_abs - elbow_abs)
+            if side == -1:
+                m.rig = {"shoulder": sh_abs, "hand": np.array(pose["hand_r"], float)}
+                m.arm3 = (sh_abs, elbow_abs, wrist_abs, wrist_abs + 0.9 * d2)
+                if not pose.get("both_arms"):
+                    continue
             elbow, wrist = elbow_abs - m.off, wrist_abs - m.off
             arm_pts["hand_l" if side == 1 else "hand_r"] = wrist_abs  # swimming: where the hands enter the water
             m.limb(sh, elbow, 1.35, 1.1, COAT)
@@ -1124,7 +1165,8 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         wrist = elbow + 6.0 * d2
         m.ell(sh, (1.75, 1.75, 1.75), LEATHER)
         if side == -1:
-            m.rig = {"shoulder": sh, "hand": wrist + 0.9 * d2}
+            m.rig = {"shoulder": sh + m.off, "hand": wrist + 0.9 * d2 + m.off}
+            m.arm3 = (sh + m.off, elbow + m.off, wrist + m.off, wrist + 0.9 * d2 + m.off)
             continue
         m.limb(sh, elbow, 1.35, 1.1, COAT)
         m.limb(elbow + 0.4 * d2, wrist, 1.2, 0.95, LEATHER)  # bracer
@@ -1293,6 +1335,11 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         for k in range(-int(pose.get("plank_len", 28)) // 2, int(pose.get("plank_len", 28)) // 2 + 1):
             m.ell(pc + Rp @ np.array([0.0, 0.0, k * 1.0]), (3.8, 0.9, 1.5), pm, R=Rp)
         m.ell(pc + Rp @ np.array([0.0, 0.5, 2.0]), (3.9, 0.4, 0.5), IRON_P if False else pm, R=Rp)
+    if pose and pose.get("rock"):  # optional: a round stone carried in both hands (the star mirror's moonstones): centre (absolute), `rock_r`, `rock_mat`, a teal fleck
+        rc = np.array(pose["rock"], float) - m.off
+        rr = float(pose.get("rock_r", 2.6))
+        m.ell(rc, (rr, rr * 0.8, rr * 0.9), int(pose.get("rock_mat", LEATHER)))
+        m.ell(rc + np.array([0.7, rr * 0.55, rr * 0.55]), (rr * 0.32, rr * 0.2, rr * 0.3), TEAL, kind="emit")
     if pose and pose.get("pitch"):  # the whole body turned about the pelvis (prone, crawling), then set down on the ground
         pivot = np.array([0.0, 24.0, 0.0])
         Rg = rot_x(float(pose["pitch"]))
@@ -1308,6 +1355,8 @@ def build(t: float, mode: str, crouch: bool, pose=None) -> Model:
         if pose.get("level"):  # the rig points (mouth, ears, hands) turn and move with the body
             for key, v in list(m.rig.items()):
                 m.rig[key] = pivot + Rg @ (np.asarray(v, float) - pivot) + np.array(pose.get("shift", (0.0, 0.0, 0.0)), float)
+            if hasattr(m, "arm3"):
+                m.arm3 = tuple(pivot + Rg @ (np.asarray(pt, float) - pivot) + np.array(pose.get("shift", (0.0, 0.0, 0.0)), float) for pt in m.arm3)
     m.bob = bob
     return m
 
@@ -1316,6 +1365,12 @@ def project(model: Model, yaw: float, point) -> list[float]:
     """Feet-relative screen position (px, y down) of a model point, as the game places sprites."""
     p = rot_y(yaw) @ (np.asarray(point, float) + np.array([0.0, model.bob, 0.0])) * SCALE
     return [round(float(p[0]), 1), round(float(-(p[1] * COSP - p[2] * SINP)), 1)]
+
+
+def project_3d(model: Model, yaw: float, point) -> list[float]:
+    """Point in GripRig 3D space (x = east, y = south/toward camera, z = up; one unit = one art pixel, origin at feet)."""
+    p = rot_y(yaw) @ (np.asarray(point, float) + np.array([0.0, model.bob, 0.0])) * SCALE
+    return [round(float(p[0]), 2), round(float(p[2]), 2), round(float(p[1]), 2)]
 
 
 def face_eyes(model: Model, yaw: float) -> list:
@@ -1337,17 +1392,21 @@ def frame(sector: int, t: float, mode: str, crouch: bool, pose=None):
     yaw = math.pi / 2 - sector * math.pi / 4
     model = build(t, mode, crouch, pose)
     global LAST_BLOOD
-    if POINTS_ONLY:  # jewellery export: only the rig points are wanted, no pixels
+    if POINTS_ONLY:  # jewellery / arm3d export: only the rig points are wanted, no pixels
         rig = {k: project(model, yaw, v) for k, v in model.rig.items()}
         rig["jf"] = [round(float((rot_y(yaw) @ v) @ WHAT), 3) for v in getattr(model, "facing", [])]
+        if hasattr(model, "arm3"):
+            rig["arm3"] = [c for pt in model.arm3 for c in project_3d(model, yaw, pt)]
         return None, rig
     if WANT_BLOOD:
         depth, code, bl = render(model.transform(yaw, model.bob), yaw, model.bob)
-        LAST_BLOOD = to_blood(bl, code, LAST_BAND)
+        LAST_BLOOD = to_blood(bl, code, LAST_BAND, depth)
     else:
         depth, code = render(model.transform(yaw, model.bob))
     rig = {k: project(model, yaw, v) for k, v in model.rig.items()}
     rig["jf"] = [round(float((rot_y(yaw) @ v) @ WHAT), 3) for v in getattr(model, "facing", [])]  # how much each part faces the camera (1 = straight at it)
+    if hasattr(model, "arm3"):
+        rig["arm3"] = [c for pt in model.arm3 for c in project_3d(model, yaw, pt)]
     global FACE_EYES
     FACE_EYES = LAST_EYES if LAST_EYES is not None else face_eyes(model, yaw)
     try:

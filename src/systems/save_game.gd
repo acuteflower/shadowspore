@@ -31,6 +31,8 @@ static func info(path: String = PATH) -> Dictionary:
 
 
 static func save(tree: SceneTree, path: String = "") -> bool:
+	if tree.get_first_node_in_group("sandbox") != null: ## the trials' test world is never saved
+		return false
 	var player: Player = _local_player(tree)
 	if player == null or not tree.root.multiplayer.is_server():
 		return false
@@ -113,6 +115,8 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 
 
 static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -> bool:
+	if tree.get_first_node_in_group("sandbox") != null:
+		return false
 	var data: Dictionary = _read(path if path != "" else path_for(tree))
 	var player: Player = _local_player(tree)
 	if data.is_empty() or player == null:

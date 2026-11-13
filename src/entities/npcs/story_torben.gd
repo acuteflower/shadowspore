@@ -114,7 +114,7 @@ func _show() -> void:
 
 func _draw() -> void:
 	var pts: PackedVector2Array = PackedVector2Array()
-	for i: int in 25:
+	for i: int in 24:
 		pts.append(Vector2.from_angle(TAU * i / 24.0) * Vector2(12.0, 3.5))
 	draw_colored_polygon(pts, Color(0, 0, 0, 0.28))
 	if _sprite == null:

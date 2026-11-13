@@ -90,19 +90,25 @@ func _setup_glow() -> void:
 ## Near the world's edge the Void eats the plants (docs/plant_life.md): small plants fade toward grey-violet and sag the closer they
 ## stand to the coast, and in moonlit nights they glimmer violet. Only a look (trees and rocks are left alone).
 const GLOOM_TINT: Color = Color(0.5, 0.64, 0.7) ## meadow bushes in the Hexenwald: darker and colder with the biome's gloom (BiomeBlend)
+const ARID_TINT: Color = Color(1.06, 0.88, 0.64) ## surviving meadow bushes and steppe grasses in the desert border warm and dry with BiomeBlend
 
 
 ## The plain bushes the Hexenwald shares with the meadow take on its dark, cool light instead of glowing lime against it.
 func _setup_gloom() -> void:
-	if _sprite == null or kind != "bush":
+	if _sprite == null:
 		return
-	var gloom: float = BiomeBlend.amount_at(global_position)
-	if gloom > 0.02:
-		_sprite.self_modulate *= Color.WHITE.lerp(GLOOM_TINT, gloom)
+	if kind == "bush":
+		var gloom: float = BiomeBlend.amount_at(global_position)
+		if gloom > 0.02:
+			_sprite.self_modulate *= Color.WHITE.lerp(GLOOM_TINT, gloom)
+	if kind == "bush" or kind == "grass":
+		var arid: float = BiomeBlend.arid_at(global_position) * (1.0 - 0.92 * BiomeBlend.oasis_at(global_position))
+		if arid > 0.03:
+			_sprite.self_modulate *= Color.WHITE.lerp(ARID_TINT, minf(arid * 1.4, 1.0))
 
 
 func _setup_blight() -> void:
-	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "iron_rock", "curse_rock", "mine_rock", "mine_collapse"]:
+	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "iron_rock", "curse_rock", "sun_quartz_rock", "mine_rock", "mine_collapse"]:
 		return
 	blight = 1.0 - smoothstep(2.0, BLIGHT_REACH, level.coast_tiles(global_position))
 	if blight <= 0.02:

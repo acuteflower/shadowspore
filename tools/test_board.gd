@@ -188,10 +188,21 @@ func _rules() -> void:
 	BoardRules.urgentize(plain, BoardRules.template_of("any_trout"))
 	_check(int(plain.c) == plain_c * 2 and BoardRules.is_urgent(plain) and int(plain.e) == 6 and not (plain.b as Dictionary).is_empty(), "rush: double pay and the extra item for sure")
 	_check(BoardRules.story_due({"quest": "q", "flag": "flag_one"}, quests, finished, flagged) and not BoardRules.story_due({"quest": "q", "flag": "no"}, quests, finished, flagged), "flag: a set flag")
+	var story_cfg: Array = BoardRules.story_entries()
+	_check(story_cfg.size() >= 4, "board.json defines all 4 main story notices")
+	for raw_story: Variant in story_cfg:
+		var se: Dictionary = raw_story as Dictionary
+		var ipath: String = String(se.get("icon", ""))
+		_check(ipath != "" and ResourceLoader.exists(ipath), "story entry %s has an existing icon (%s)" % [String(se.get("id", "")), ipath])
+		var itex: Texture2D = BoardRules.story_icon_by_path(ipath)
+		_check(itex != null and itex.get_size() == Vector2(16, 16), "story entry %s icon is 16x16" % String(se.get("id", "")))
+	_check(BoardRules.story_icon({"k": "story", "tx": "torben_notice", "q": "torben_smithy"}) != null, "legacy saved story offer without ic resolves icon from board.json")
+	_check(BoardRules.story_icon({"k": "story", "tx": "unknown_story", "q": "unknown_q"}) != null, "unknown story offer falls back to story_seal icon")
 
 
 func _run() -> void:
 	_rules()
+	(TownRules.piece("plaza") as Dictionary)["build_seconds"] = 0.5
 	(TownRules.piece("lamp_post") as Dictionary)["build_seconds"] = 0.5
 	(TownRules.piece("quest_board") as Dictionary)["build_seconds"] = 0.5
 	(TownRules.piece("workshop") as Dictionary)["build_seconds"] = 0.5
@@ -206,12 +217,29 @@ func _run() -> void:
 	player.quests.set_flag("rebuild_done")
 	await _frames(100)
 	_check(town.founded and town.board != null, "the town is founded and has a board manager")
-	player.inventory.give("wood", 80)
-	player.inventory.give("stone", 20)
+	player.inventory.give("wood", 100)
+	player.inventory.give("stone", 40)
 	player.inventory.give("plant_fiber", 30)
 	player.inventory.give("glow_cap", 4)
 	_check(not town.is_unlocked("quest_board"), "the board waits for the workshop")
+	player.request_teleport(hut.position + Vector2(-140, 40))
+	await _frames(3)
+	var plaza_at: Vector2 = _find_site(town, "plaza", hut.position + Vector2(0, 150))
+	_check(plaza_at != Vector2.INF, "there is a free site for the plaza")
+	player.request_teleport(plaza_at + Vector2(0, 28))
+	await _frames(3)
+	town.request_place("plaza", plaza_at, false)
+	await _frames(3)
+	for i: int in 300:
+		await get_tree().process_frame
+		if town.has_built("plaza"):
+			break
+	_check(town.has_built("plaza") and not town.is_unlocked("quest_board"), "the plaza is built and the board still waits for the workshop")
+	player.request_teleport(hut.position + Vector2(-140, 40))
+	await _frames(3)
 	var lamp_at: Vector2 = _find_site(town, "lamp_post", hut.position + Vector2(60, 100))
+	player.request_teleport(lamp_at + Vector2(0, 28))
+	await _frames(3)
 	town.request_place("lamp_post", lamp_at, false)
 	await _frames(3)
 	for i: int in 300:
@@ -222,7 +250,11 @@ func _run() -> void:
 	town.add_story_resident("gustav")
 	await _frames(3)
 	_check(town.residents.has("gustav"), "Gustav lives in the town")
+	player.request_teleport(hut.position + Vector2(-140, 40))
+	await _frames(3)
 	var shop_at: Vector2 = _find_site(town, "workshop", hut.position + Vector2(0, 130))
+	player.request_teleport(shop_at + Vector2(0, 28))
+	await _frames(3)
 	town.request_place("workshop", shop_at, false)
 	await _frames(3)
 	for i: int in 300:
@@ -233,8 +265,12 @@ func _run() -> void:
 	_check(not town.board.is_ready(), "no board built yet: nothing may be posted")
 	town.board._on_day_started(TimeManager.day + 1)
 	_check(town.board.offers.is_empty(), "no notices without a built board")
+	player.request_teleport(hut.position + Vector2(-140, 40))
+	await _frames(3)
 	var at: Vector2 = _find_site(town, "quest_board", lamp_at + Vector2(0, 40))
 	_check(at != Vector2.INF, "there is a free site for the board")
+	player.request_teleport(at + Vector2(0, 28))
+	await _frames(3)
 	town.request_place("quest_board", at, false)
 	await _frames(3)
 	var board_id: int = town.next_id - 1
@@ -374,9 +410,40 @@ func _run() -> void:
 	for offer: Dictionary in board.offers:
 		stories += 1 if String(offer.k) == BoardRules.STORY else 0
 	_check(stories == 1, "and only once")
+	var vine: QuestVine = player._hud.get_node("QuestVine") as QuestVine
+	_check(player.tracked.open_story_notices().size() == 1 and vine._has_notice and vine._notice_flare > 0.0, "unaccepted main story notice activates QuestVine notice and flares")
+	player.tracked.mark_seen([story_id])
+	_check(vine._has_notice, "marking the board story notice seen keeps the QuestVine notice until accepted")
+	var story_win: QuestBoardWindow = QuestBoardWindow.open(get_tree(), player, town)
+	await _frames(4)
+	var story_row: Dictionary = {}
+	for row: Dictionary in story_win.rows:
+		if int(row.id) == story_id:
+			story_row = row
+	_check(not story_row.is_empty() and story_row.get("icon") != null and String(story_row.get("item", "")) == "" and not story_win._tip.visible, "story row shows bespoke icon without triggering item tooltip")
+	story_win._close()
+	await _frames(60)
 	board.request_accept(story_id)
 	await _frames(3)
 	_check(player.quests.is_active("board_test"), "taking a story notice starts the quest")
+	_check(player.tracked.open_story_notices().is_empty() and not vine._has_notice, "accepting the story notice clears the QuestVine board notice")
+	# standalone QuestVine notice when no quest is active/focused
+	var solo_story_id: int = -1
+	quests["board_test_solo"] = {"title": "SOLO TEST", "steps": [{"id": "a", "text": "WARTE", "type": "flag", "flag": "board_test_never"}]}
+	(BoardRules.config().story as Array).append({"id": "story_test_solo", "quest": "board_test_solo", "giver": "valdric", "title": "DRITTER RUF", "text": "x", "after": "", "flag": ""})
+	var saved_quests_data: Dictionary = player.quests.export_data()
+	player.quests.import_data({"flags": {"hud_unlocked": true}})
+	board._check_story()
+	await _frames(6)
+	for offer: Dictionary in board.offers:
+		if String(offer.get("tx", "")) == "story_test_solo":
+			solo_story_id = int(offer.id)
+	_check(solo_story_id >= 0 and vine._has_notice and not vine._has_quest and vine._grow > 0.0 and vine.visible, "QuestVine grows standalone when an open main quest hangs and no quest is focused")
+	board._remove(solo_story_id)
+	(BoardRules.config().story as Array).pop_back()
+	player.quests.import_data(saved_quests_data)
+	player.tracked._on_board()
+	await _frames(2)
 	player.global_position = spot
 	_check(board.offer_of(story_id).get("id", -1) == story_id, "the story notice stays for the others")
 	board.request_finish(story_id)
@@ -449,6 +516,7 @@ func _run() -> void:
 		panel = piece.get_node_or_null("Notes") as BoardNotes
 	_check(panel != null, "the built board has its lit notes node")
 	if panel != null:
+		panel._ghosts.clear()
 		var ghost_id: int = board.debug_post("any_berry", "gustav")
 		await _frames(8)
 		var slot_before: int = -1
@@ -837,6 +905,8 @@ func _journal_rules(player: Player, board: BoardManager, spot: Vector2, story_id
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--journal-capture="):
 			await _capture_journal(arg.trim_prefix("--journal-capture="), player, board, spot, journal)
+		elif arg.begins_with("--story-ui-capture="):
+			await _capture_story_ui(arg.trim_prefix("--story-ui-capture="), player, board, spot)
 
 
 ## Optional renderer QA after the rules test, with a normal story and two board entries.
@@ -872,6 +942,87 @@ func _capture_journal(folder: String, player: Player, board: BoardManager, spot:
 	await _frames(5)
 	await _capture(folder.path_join("tagebuch-umblattern.png"))
 	journal.close()
+
+
+## Optional renderer QA for the 4 main-story board icons and Ellie's QuestVine notice.
+func _capture_story_ui(folder: String, player: Player, board: BoardManager, spot: Vector2) -> void:
+	if board.town.world != null:
+		board.town.world.finish_opening()
+	player.health.heal_full()
+	player.set_bandaged(false)
+	player.sync_wound_visuals()
+	if board.town._banner != null:
+		board.town._banner._age = 99.0
+		board.town._banner._queue.clear()
+		board.town._banner.hide()
+	TimeManager.locked = true
+	TimeManager.time_of_day = 0.42
+	player._hud.call("_finish_reveal")
+	player._hud.set("_idle_time", 0.0)
+	player._hud.set("_idle_alpha", 1.0)
+	board.offers.clear()
+	board.taken.clear()
+	for raw: Variant in BoardRules.story_entries():
+		var se: Dictionary = raw as Dictionary
+		if String(se.get("id", "")) in ["torben_notice", "spiegelhexe_notice", "mornath_notice", "lake_witch_notice"]:
+			board.offers.append(BoardRules.make_story(se, board.next_id, TimeManager.day))
+			board.next_id += 1
+	board.debug_post("gustav_wood", "gustav")
+	board.changed.emit()
+	player.global_position = spot
+	await _frames(3)
+	var win: QuestBoardWindow = QuestBoardWindow.open(get_tree(), player, board.town)
+	await _frames(55)
+	var shots: Dictionary = {
+		"torben_notice": "quest_board_torben.png",
+		"spiegelhexe_notice": "quest_board_esma.png",
+		"mornath_notice": "quest_board_mornath.png",
+		"lake_witch_notice": "quest_board_ilva.png",
+	}
+	for tx_id: String in shots:
+		for i: int in win.rows.size():
+			var offer: Dictionary = board.offer_of(int(win.rows[i].id))
+			if String(offer.get("tx", "")) == tx_id:
+				win.focus = i
+				win._canvas.queue_redraw()
+				break
+		await _frames(2)
+		await _capture(folder.path_join(String(shots[tx_id])))
+	win._close()
+	await _frames(60)
+	board.offers.clear()
+	for raw: Variant in BoardRules.story_entries():
+		var se: Dictionary = raw as Dictionary
+		if String(se.get("id", "")) == "torben_notice":
+			board.offers.append(BoardRules.make_story(se, board.next_id, TimeManager.day))
+			board.next_id += 1
+	board.changed.emit()
+	player.global_position = spot + Vector2(-96, 24)
+	var vine: QuestVine = player._hud.get_node("QuestVine") as QuestVine
+	player.quests.import_data({"active": {"rebuild_hut": 0}, "flags": {"hud_unlocked": true}})
+	player.tracked.import_data({})
+	player.tracked._on_board()
+	player._hud.set("_idle_time", 0.0)
+	player._hud.set("_idle_alpha", 1.0)
+	vine._grow = 1.0
+	vine._notice_grow = 1.0
+	vine._typed = 999.0
+	await _frames(6)
+	await _capture(folder.path_join("quest_vine_companion.png"))
+	player.quests.import_data({"flags": {"hud_unlocked": true}})
+	player.tracked.import_data({})
+	player.tracked._on_board()
+	player._hud.set("_idle_time", 0.0)
+	player._hud.set("_idle_alpha", 1.0)
+	vine._grow = 1.0
+	vine._notice_grow = 1.0
+	await _frames(6)
+	await _capture(folder.path_join("quest_vine_standalone.png"))
+	TimeManager.time_of_day = 0.0
+	player._hud.set("_idle_time", 0.0)
+	player._hud.set("_idle_alpha", 1.0)
+	await _frames(6)
+	await _capture(folder.path_join("quest_vine_night.png"))
 
 
 func _capture(path: String) -> void:

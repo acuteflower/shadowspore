@@ -90,7 +90,7 @@ func style(x: int, y: int) -> int:
 	return _at(x, y, 1) >> 4
 
 
-## True if any land tile in `rect` (tile coordinates) has crystal (3) or void (4) style.
+## True if any land tile in `rect` (tile coordinates) has crystal (3), void (4) or quartz-sandstone (6) style.
 func has_glow_style(rect: Rect2i) -> bool:
 	var x0: int = maxi(0, rect.position.x)
 	var y0: int = maxi(0, rect.position.y)
@@ -102,7 +102,7 @@ func has_glow_style(rect: Rect2i) -> bool:
 			var idx: int = row + x * 4
 			if _bytes[idx + 3] != 0: ## land
 				var st: int = _bytes[idx + 1] >> 4
-				if st == 3 or st == 4:
+				if st == 3 or st == 4 or st == 6:
 					return true
 	return false
 

@@ -66,6 +66,7 @@ var _lit_dirty: bool = true
 var _seat_root: Node2D
 var _seats: Dictionary = {} ## "id_index" -> BenchSeat (always there, whether or not the bench's picture is loaded)
 var _last_level: int = -1
+var _wave_gains: Dictionary = {} ## id -> [[Vector2, item]]: what the pressure wave of a piece just finished brought in (`_rpc_wave`, shown by `_consecrate`)
 var chatter: SettlerChatter
 var alert_on: bool = false ## the dark gathers at the edge of the light (a raid is warned): Valdric keeps the watch, the edge of the light glows brighter
 var alert_angle: float = 0.0 ## from the middle of the town towards where it gathers
@@ -73,6 +74,14 @@ var fear_on: bool = false ## the dark is near: the people run indoors and hide u
 var _touch_msec: int = 0
 var _inside: bool = false ## the local player stands in the town
 var _entered_day: int = -1
+var _left_msec: int = -1 ## when the local player last left the town's light
+var _hands: Dictionary = {} ## host: peer -> [site id, msec of the last grab]: who lends a hand where (counts x3 at that site)
+var _help_site: int = -1 ## the site the local player lends a hand at (-1: none)
+var _quiet: bool = false ## the developer checkpoint builds a whole town at once: no foundation stones, no consecrations
+const HAND_WEIGHT: float = 3.0
+const HAND_MSEC: int = 1600
+var look_color: int = 0 ## the town's banner colour (`TownEmblems.COLORS`), chosen in the STADT tab
+var look_emblem: int = 0 ## the town's emblem (`TownEmblems.GLYPHS`)
 var wear: Dictionary = {} ## Vector2i cell (8 px) -> 0..1 how trodden the ground is (`TownWear`, computed on every peer from the state)
 var _wear_dirty: bool = true
 var _wear_clock: float = 0.0
@@ -148,9 +157,14 @@ func _ready() -> void:
 	built.connect(_on_built)
 	changed.connect(func() -> void: _wear_dirty = true)
 	town_founded.connect(func() -> void:
-		_entered_day = TimeManager.day ## the founding says the name already
-		_announce("STADT GEGRÜNDET", town_name()))
-	resident_joined.connect(func(sid: String) -> void: _announce("%s ZIEHT EIN" % String(settler_spec(sid).get("name", sid)), String(settler_spec(sid).get("title", ""))))
+		_entered_day = TimeManager.day) ## the ground is claimed; the town itself is founded by its fountain square (`_found_heart`)
+	built.connect(func(piece: String, _id: int) -> void:
+		if piece == "plaza" and not _quiet:
+			get_tree().create_timer(2.6, false).timeout.connect(_found_heart))
+	resident_joined.connect(func(sid: String) -> void:
+		_circles_dirty = true ## residents add worth: the level (and with it the light) may grow
+		town_banner({"header": "NEU IN %s" % town_name(), "title": "%s ZIEHT EIN" % String(settler_spec(sid).get("name", sid)), "sub": String(settler_spec(sid).get("title", ""))}))
+	event.connect(_on_town_event)
 	TimeManager.day_started.connect(_on_day_started)
 
 
@@ -174,10 +188,70 @@ func _on_built(piece: String, _id: int) -> void:
 func _announce(title: String, sub: String) -> void:
 	if local_player() == null:
 		return
+	_banner_node().show_text(title, sub)
+
+
+func _banner_node() -> TownBanner:
 	if _banner == null:
 		_banner = TownBanner.new()
 		add_child(_banner)
-	_banner.show_text(title, sub)
+	return _banner
+
+
+## The fountain square is finished: now the town is founded for real (docs/brunnenplatz.md).
+func _found_heart() -> void:
+	_entered_day = TimeManager.day
+	town_banner({"header": "STADT GEGRÜNDET", "title": town_name(), "sub": "DER BRUNNEN IST IHR HERZ", "big": true, "sound": "level_bells"})
+
+
+## The heart of the town: the fountain square once it is built (where the ways lead), else the house.
+func heart() -> Vector2:
+	var ids: Array[int] = built_ids("plaza")
+	return position_of(ids[0]) + Vector2(0.0, -8.0) if not ids.is_empty() else center
+
+
+## Has the town its heart yet? Until then it is only claimed ground round the hut.
+func has_heart() -> bool:
+	return has_built("plaza")
+
+
+## The town's own banner (its colour and emblem): `info` as `TownBanner.show_banner`.
+func town_banner(info: Dictionary) -> void:
+	if local_player() == null:
+		return
+	var full: Dictionary = info.duplicate()
+	full["color"] = TownEmblems.color(look_color)
+	full["emblem"] = look_emblem
+	_banner_node().show_banner(full)
+
+
+## What happens to the town, on every peer: a new level is a ceremony (docs/stadtbau_konzept.md 5.2).
+func _on_town_event(kind: String, data: Dictionary) -> void:
+	if kind == "level_up":
+		_circles_dirty = true
+		get_tree().create_timer(2.4, false).timeout.connect(func() -> void: _level_ceremony(int(data.get("level", level()))))
+
+
+## A new level: every finished building lights up one after the other from the house outwards, a ring of light runs from the house to the edge of the
+## town's light, the bells ring and the banner names the level and what it brings.
+func _level_ceremony(index: int) -> void:
+	var player: Player = local_player()
+	if player == null or not founded:
+		return
+	var far: float = 0.0
+	var middle: Vector2 = heart()
+	for c: Vector3 in circles():
+		far = maxf(far, Vector2(c.x, c.y).distance_to(middle) + c.z)
+	if player.global_position.distance_to(middle) < far + 200.0:
+		for id: int in _views:
+			var view: TownStructure = _views[id] as TownStructure
+			if is_instance_valid(view) and view.is_done():
+				view.flare(view.position.distance_to(middle) / 260.0)
+		TownConsecration.play(_root, middle, {"radius": 0.0, "reach": far, "light_color": Color("ffd27a")})
+	var levels: Array = TownRules.config().get("levels", []) as Array
+	var spec: Dictionary = levels[clampi(index, 0, levels.size() - 1)] as Dictionary if not levels.is_empty() else {}
+	var gift: String = String(spec.get("gift", ""))
+	town_banner({"header": "%s WÄCHST" % town_name(), "title": TownRules.level_name(index), "sub": gift, "big": true, "sound": "level_bells"})
 
 
 func _on_day_started(_day: int) -> void:
@@ -286,13 +360,20 @@ func level_label() -> String:
 	return TownRules.level_name(level())
 
 
+## How much further every light of the town reaches at its level (`levels[].light` in town.json): a bigger town holds the dark further off.
+func light_grow() -> float:
+	var levels: Array = TownRules.config().get("levels", []) as Array
+	return float((levels[clampi(level(), 0, levels.size() - 1)] as Dictionary).get("light", 1.0)) if not levels.is_empty() else 1.0
+
+
 ## Circles of light {x, y, reach} of the finished pieces: the ground the group may build on.
 func circles() -> Array[Vector3]:
 	if _circles_dirty:
 		_circles.clear()
+		var grow: float = light_grow()
 		for id: int in structures:
 			var data: Dictionary = structures[id] as Dictionary
-			var reach: float = float(TownRules.piece(String(data.p)).get("reach", 0.0))
+			var reach: float = float(TownRules.piece(String(data.p)).get("reach", 0.0)) * grow
 			if reach > 0.0 and int(data.g) >= PROGRESS_FULL:
 				_circles.append(Vector3(float(data.x), float(data.y) - 8.0, reach))
 		_circles_dirty = false
@@ -515,7 +596,7 @@ func lit_circles() -> Array[Vector3]:
 		_lit.clear()
 		for id: int in structures:
 			var data: Dictionary = structures[id] as Dictionary
-			var reach: float = float(TownRules.piece(String(data.p)).get("reach", 0.0))
+			var reach: float = float(TownRules.piece(String(data.p)).get("reach", 0.0)) * light_grow()
 			if reach > 0.0 and int(data.g) >= PROGRESS_FULL and (lamp_spec(id).is_empty() or is_lamp_burning(id)):
 				_lit.append(Vector3(float(data.x), float(data.y) - 8.0, reach))
 		_lit_dirty = false
@@ -581,6 +662,13 @@ func dark_edge(from: Vector2, to: Vector2, margin: float) -> Vector2:
 	for i: int in steps + 1:
 		var point: Vector2 = to.lerp(from, float(i) / float(steps))
 		if light_depth(point) < -margin:
+			var lit: Vector2 = to.lerp(from, float(maxi(i - 1, 0)) / float(steps))
+			for k: int in 6: ## narrow the step down to about a pixel: the edge, not somewhere up to a step past it
+				var middle: Vector2 = lit.lerp(point, 0.5)
+				if light_depth(middle) < -margin:
+					point = middle
+				else:
+					lit = middle
 			return point
 	return from
 
@@ -691,12 +779,17 @@ func check_site(piece: String, pos: Vector2, check_world: bool = true) -> String
 			reason = world.town_probe(front) ## a fallen log, a trunk or a rock in front of the door: nobody could get in
 			if reason != "":
 				return "TÜR ZUGESTELLT" if reason == "IM WEG" else reason
-		for node: Node in get_tree().get_nodes_in_group("players"):
-			if rect.grow(5.0).has_point((node as Node2D).global_position):
-				return "JEMAND STEHT DARIN"
-		for node: Node in get_tree().get_nodes_in_group("settlers"):
-			if rect.grow(5.0).has_point((node as Node2D).global_position):
-				return "JEMAND STEHT DARIN"
+		var body: Rect2 = rect ## where nobody may stand: the footprint, or on a walkable floor only what stands on it (the fountain)
+		if bool(spec.get("walk", false)):
+			var solid: Array = (spec.get("stand", {}) as Dictionary).get("solid", []) as Array
+			body = Rect2(pos.x - float(solid[0]) / 2.0, pos.y - float(solid[1]), float(solid[0]), float(solid[1])) if solid.size() == 2 else Rect2()
+		if body.has_area():
+			for node: Node in get_tree().get_nodes_in_group("players"):
+				if body.grow(5.0).has_point((node as Node2D).global_position):
+					return "JEMAND STEHT DARIN"
+			for node: Node in get_tree().get_nodes_in_group("settlers"):
+				if body.grow(5.0).has_point((node as Node2D).global_position):
+					return "JEMAND STEHT DARIN"
 	return ""
 
 
@@ -709,6 +802,8 @@ func check_place(piece: String, pos: Vector2, builder: Player, check_world: bool
 		return "UNBEKANNT"
 	if not is_unlocked(piece):
 		return lock_reason(piece)
+	if spec.has("limit") and count_of(piece) >= int(spec.limit):
+		return "STEHT SCHON" if int(spec.limit) == 1 else "NUR %d MAL" % int(spec.limit)
 	if structures.size() >= int((TownRules.config().get("limits", {}) as Dictionary).get("max_pieces", 400)):
 		return "ZU VIELE TEILE"
 	if builder != null and builder.global_position.distance_to(pos) > float((TownRules.config().get("limits", {}) as Dictionary).get("build_reach", 240.0)):
@@ -800,9 +895,14 @@ func _rpc_added(id: int, data: Dictionary, cells: Array) -> void:
 		cleared[cell as Vector2i] = true
 	if world != null:
 		world.town_clear_cells(cells)
+		var rect: Rect2 = TownRules.foot_rect(String(data.p), float(data.x), float(data.y))
+		for cell: Variant in world.town_clear_clover(rect.get_center(), maxf(rect.size.x, rect.size.y) * 0.5):
+			cleared[cell as Vector2i] = true
 	next_id = maxi(next_id, id + 1)
 	_circles_dirty = true
 	_register(id)
+	if not _quiet and _views.has(id) and int(data.get("g", 0)) == 0:
+		(_views[id] as TownStructure).lay_foundation()
 	changed.emit()
 
 
@@ -814,9 +914,10 @@ func debug_build_all(with_torben: bool = false) -> void:
 	request_found()
 	if not founded:
 		return
+	_quiet = true ## the whole town at once: no stones, no consecrations
 	if not unlocks.has("farming"):
 		_rpc_unlock.rpc("farming", false) ## the checkpoint town has its hoe and can: fields are open
-	var plan: Array = [["lamp_post", Vector2(-80, 120)], ["lamp_post", Vector2(150, 140)], ["workshop", Vector2(40, 175)], ["stockpile", Vector2(-110, 190)], ["bench", Vector2(80, 100)]]
+	var plan: Array = [["plaza", Vector2(0, 150)], ["lamp_post", Vector2(-80, 120)], ["lamp_post", Vector2(150, 140)], ["workshop", Vector2(40, 175)], ["stockpile", Vector2(-110, 190)], ["bench", Vector2(80, 100)]]
 	for k: int in 4:
 		plan.append(["fence", Vector2(-170 + k * 24, 215)])
 	for k: int in 6:
@@ -861,6 +962,7 @@ func debug_build_all(with_torben: bool = false) -> void:
 		if not residents.has(sid) and has_built(String(arrive.get("needs", ""))):
 			_rpc_resident.rpc(sid, {"trust": 30 if with_torben else 0, "talked": -1}, false) ## not freshly arrived: they are simply at home (the full checkpoint also knows their trust)
 	_sync_stock()
+	_quiet = false
 
 
 ## The nearest free spot for `piece` round `around` (rings of 8 px, 24 directions).
@@ -919,11 +1021,23 @@ func _host_make_way(id: int) -> void:
 	var rect: Rect2 = rect_of(id)
 	var doors: Array[Vector2] = [position_of(id) + Vector2(0.0, 9.0), rect.get_center() + Vector2(rect.size.x / 2.0 + 8.0, 0.0), rect.get_center() - Vector2(rect.size.x / 2.0 + 8.0, 0.0), rect.get_center() - Vector2(0.0, rect.size.y / 2.0 + 8.0)]
 	var targets: Array[Vector2] = []
-	if hut != null:
-		targets.append(hut.exit_position)
+	var square: int = -1
 	for other: int in structures:
-		if other != id and bool(TownRules.piece(String((structures[other] as Dictionary).p)).get("paths", false)):
-			targets.append(position_of(other) + Vector2(0.0, 9.0))
+		if String((structures[other] as Dictionary).p) == "plaza":
+			square = other
+	if String((structures[id] as Dictionary).p) == "plaza":
+		var ring: Array[Vector2] = _square_rim(id) ## the square's own way leaves from its rim towards the house
+		if hut != null:
+			ring.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_to(hut.exit_position) < b.distance_to(hut.exit_position))
+		doors = ring
+	if square >= 0 and square != id:
+		targets = _square_rim(square) ## every way leads to the fountain square: the heart of the town
+	else:
+		if hut != null:
+			targets.append(hut.exit_position)
+		for other: int in structures:
+			if other != id and bool(TownRules.piece(String((structures[other] as Dictionary).p)).get("paths", false)):
+				targets.append(position_of(other) + Vector2(0.0, 9.0))
 	if targets.is_empty():
 		return
 	var ctx: Dictionary = _walk_context(position_of(id))
@@ -949,6 +1063,16 @@ func _host_make_way(id: int) -> void:
 			pts_out.append([snappedf(p.x, 0.1), snappedf(p.y, 0.1)])
 		_rpc_way_added.rpc({"s": id, "p": pts_out, "d": 0, "e": 0 if bool(made.joined) else 1})
 		return
+
+
+## Points just outside the fountain square's cobbles where ways begin and end (12 round its ellipse).
+func _square_rim(id: int) -> Array[Vector2]:
+	var rect: Rect2 = rect_of(id)
+	var out: Array[Vector2] = []
+	for k: int in 12:
+		var a: float = TAU * float(k) / 12.0
+		out.append(rect.get_center() + Vector2(cos(a) * (rect.size.x * 0.5 + 6.0), sin(a) * (rect.size.y * 0.5 + 5.0)))
+	return out
 
 
 static func way_points(way: Dictionary) -> PackedVector2Array:
@@ -1154,16 +1278,16 @@ func _physics_process(delta: float) -> void:
 			continue
 		var spec: Dictionary = TownRules.piece(String(data.p))
 		var middle: Vector2 = rect_of(id).get_center()
-		var helpers: int = 0
+		var helpers: float = 0.0
 		for p: Player in players:
 			if p.global_position.distance_to(middle) <= radius:
-				helpers += 1
+				helpers += _hand_weight(p.get_multiplayer_authority(), id)
 		for sid: String in _settlers:
 			if (_settlers[sid] as Settler).is_helping() and (_settlers[sid] as Settler).global_position.distance_to(middle) <= radius * 1.4:
-				helpers += 1
-		if helpers == 0:
+				helpers += 1.0
+		if helpers <= 0.0:
 			continue
-		var rate: float = float(PROGRESS_FULL) / maxf(float(spec.get("build_seconds", 5.0)), 0.5) * (1.0 + 0.5 * float(helpers - 1))
+		var rate: float = float(PROGRESS_FULL) / maxf(float(spec.get("build_seconds", 5.0)), 0.5) * (1.0 + 0.5 * (helpers - 1.0))
 		var now: float = float(_progress.get(id, float(data.g))) + rate * delta
 		_progress[id] = now
 		var value: int = mini(int(now), PROGRESS_FULL)
@@ -1175,6 +1299,7 @@ func _physics_process(delta: float) -> void:
 		if value >= PROGRESS_FULL:
 			_progress.erase(id)
 			_progress_dirty.erase(id)
+			_host_wave(id)
 			_rpc_done.rpc(id)
 	_progress_clock += delta
 	if _progress_clock >= 0.25 and not _progress_dirty.is_empty():
@@ -1194,6 +1319,145 @@ func _rpc_progress(ids: PackedInt32Array, values: PackedInt32Array) -> void:
 					(_views[ids[i]] as TownStructure).set_progress(values[i])
 
 
+## How far the pressure wave of a finished `piece` reaches from its feet: its data `wave` (px beyond the walls) plus half its footprint's width; 0 = none.
+static func wave_radius(piece: String) -> float:
+	var spec: Dictionary = TownRules.piece(piece)
+	var wave: float = float(spec.get("wave", 0.0))
+	return wave + float((spec.get("foot", [0, 0]) as Array)[0]) * 0.5 if wave > 0.0 else 0.0
+
+
+## Local player, E at a site: she lends a hand there. Each round of her working clip (the picking motion: she stoops, takes, sets) is a grab; the host
+## counts her as three helpers while the grabs keep coming. Any movement or a finished site ends it (`_update_help`).
+func lend_hand(player: Player, id: int) -> void:
+	if not structures.has(id) or is_built(id) or player.is_busy():
+		return
+	_help_site = id
+	_grab(player)
+
+
+func _grab(player: Player) -> void:
+	var rect: Rect2 = rect_of(_help_site)
+	var aim: Vector2 = Vector2(clampf(player.global_position.x, rect.position.x, rect.end.x), clampf(player.global_position.y, rect.position.y, rect.end.y)) - player.global_position
+	var site: int = _help_site
+	player.begin_pick(aim if aim.length() > 1.0 else player.facing, func() -> void:
+		if multiplayer.is_server():
+			_rpc_hand(site)
+		else:
+			_rpc_hand.rpc_id(1, site))
+	if _views.has(site):
+		(_views[site] as TownStructure).helping_here = true
+
+
+func _update_help() -> void:
+	if _help_site < 0:
+		return
+	var player: Player = local_player()
+	var stop: bool = player == null or not structures.has(_help_site) or is_built(_help_site) or player.health.current <= 0.0 or player.story_lock
+	if not stop and InputManager.move_vector().length() > 0.2:
+		stop = true
+	if not stop and player.global_position.distance_to(rect_of(_help_site).get_center()) > float((TownRules.config().get("limits", {}) as Dictionary).get("helper_radius", 100.0)):
+		stop = true
+	if stop:
+		if _views.has(_help_site):
+			(_views[_help_site] as TownStructure).helping_here = false
+		_help_site = -1
+		return
+	if not player.is_busy():
+		_grab(player)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_hand(id: int) -> void:
+	if not multiplayer.is_server() or not structures.has(id) or is_built(id):
+		return
+	var peer: int = multiplayer.get_remote_sender_id()
+	if peer == 0:
+		peer = multiplayer.get_unique_id()
+	_hands[peer] = [id, Time.get_ticks_msec()]
+	var who: Player = player_by_peer(peer)
+	_rpc_hand_fx.rpc(id, who.global_position + Vector2(0, -22) if who != null else rect_of(id).get_center())
+
+
+@rpc("authority", "call_local", "unreliable")
+func _rpc_hand_fx(id: int, from: Vector2) -> void:
+	if _views.has(id):
+		(_views[id] as TownStructure).hand_burst(from)
+
+
+func player_by_peer(peer: int) -> Player:
+	for node: Node in get_tree().get_nodes_in_group("players"):
+		if node is Player and node.get_multiplayer_authority() == peer:
+			return node as Player
+	return null
+
+
+## Host: how much a player counts at site `id` (3 while lending a hand there, else 1).
+func _hand_weight(peer: int, id: int) -> float:
+	var hand: Array = _hands.get(peer, []) as Array
+	return HAND_WEIGHT if hand.size() == 2 and int(hand[0]) == id and Time.get_ticks_msec() - int(hand[1]) < HAND_MSEC else 1.0
+
+
+## Host, the moment a piece is finished: its pressure wave (data `wave` px, docs/stadtbau_konzept.md 4) tears the soft props and small plants round it out
+## (only inside the light, the new piece's own circle included) and what they would give goes into the stock. Sent before `_rpc_done` on the same channel.
+func _host_wave(id: int) -> void:
+	var data: Dictionary = structures[id] as Dictionary
+	var spec: Dictionary = TownRules.piece(String(data.p))
+	var radius: float = wave_radius(String(data.p))
+	if radius <= 0.0 or world == null:
+		return
+	var at: Vector2 = position_of(id)
+	var lit: Array[Vector3] = circles().duplicate()
+	if float(spec.get("reach", 0.0)) > 0.0:
+		lit.append(Vector3(at.x, at.y - 8.0, float(spec.reach)))
+	var cells: Array = world.town_wave_cells(at, radius, lit)
+	var gains: Array = []
+	for cell: Variant in cells:
+		var item: String = world.town_wave_yield(cell as Vector2i)
+		if item != "":
+			_add_stock(item, 1)
+			gains.append([world.prop_position(cell as Vector2i), item])
+	if not gains.is_empty():
+		_sync_stock()
+	_rpc_wave.rpc(id, cells, gains)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_wave(id: int, cells: Array, gains: Array) -> void:
+	for cell: Variant in cells:
+		cleared[cell as Vector2i] = true
+	if world != null and structures.has(id):
+		world.town_uproot(cells, position_of(id), TownConsecration.WAVE_SPEED, TownConsecration.WAVE_START)
+		for cell: Variant in world.town_clear_clover(position_of(id), wave_radius(String((structures[id] as Dictionary).p))):
+			cleared[cell as Vector2i] = true
+	_wave_gains[id] = gains
+
+
+## Everyone near: the consecration of a finished piece (`TownConsecration`): impact, bell, wave, light flooding out, the gains flying to the stockpile.
+func _consecrate(id: int) -> void:
+	var view: TownStructure = _views.get(id) as TownStructure
+	if view == null or not is_instance_valid(view):
+		_wave_gains.erase(id)
+		return
+	var data: Dictionary = structures[id] as Dictionary
+	var spec: Dictionary = TownRules.piece(String(data.p))
+	var target: Vector2 = Vector2.INF
+	var stocks: Array[int] = built_ids("stockpile")
+	if not stocks.is_empty() and stocks[0] != id:
+		target = door_of(stocks[0])
+	var light: Dictionary = (spec.get("aura", spec.get("light", {})) as Dictionary)
+	TownConsecration.play(view.get_parent(), view.position, {
+		"radius": wave_radius(String(data.p)),
+		"reach": float(spec.get("reach", 0.0)),
+		"title": String(spec.get("name", "")).to_upper(),
+		"worth": float(spec.get("worth", 0.0)),
+		"light_color": Color(String(light.get("color", "ffd27a"))),
+		"gains": _wave_gains.get(id, []),
+		"gain_target": target,
+		"height": float(spec.get("feet", 40.0)),
+	})
+	_wave_gains.erase(id)
+
+
 @rpc("authority", "call_local", "reliable")
 func _rpc_done(id: int) -> void:
 	if not structures.has(id):
@@ -1211,6 +1475,8 @@ func _rpc_done(id: int) -> void:
 	_register(id)
 	if _views.has(id):
 		(_views[id] as TownStructure).set_progress(PROGRESS_FULL, true)
+		if not _quiet:
+			_consecrate(id)
 	_sync_seats()
 	built.emit(String(data.p), id)
 	if multiplayer.is_server():
@@ -2142,6 +2408,36 @@ func _rpc_name_state(index: int) -> void:
 	changed.emit()
 
 
+## The town's colour and emblem (anyone may change them, the host tells everyone).
+func request_look(color_index: int, emblem_index: int) -> void:
+	if multiplayer.is_server():
+		_rpc_look_state.rpc(color_index, emblem_index)
+	else:
+		_rpc_look.rpc_id(1, color_index, emblem_index)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_look(color_index: int, emblem_index: int) -> void:
+	if multiplayer.is_server():
+		_rpc_look_state.rpc(color_index, emblem_index)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_look_state(color_index: int, emblem_index: int) -> void:
+	look_color = posmod(color_index, TownEmblems.COLORS.size())
+	look_emblem = posmod(emblem_index, TownEmblems.GLYPHS.size())
+	changed.emit()
+
+
+## Walking in: the edge of the light ripples round her feet and every lamp in sight flares a moment.
+func _greet_light(player: Player) -> void:
+	TownConsecration.play(player.get_parent(), player.global_position, {"radius": 0.0, "reach": 46.0, "light_color": Color("78f4e6")})
+	for id: int in _views:
+		var view: TownStructure = _views[id] as TownStructure
+		if is_instance_valid(view) and view.is_done() and view.position.distance_to(player.global_position) < 360.0:
+			view.flare(0.3 + view.position.distance_to(player.global_position) / 400.0)
+
+
 # ---------- messages ----------
 
 func _tell(peer: int, text: String, good: bool) -> void:
@@ -2308,6 +2604,7 @@ func build_mode() -> BuildMode:
 
 
 func _process(delta: float) -> void:
+	_update_help()
 	if _build == null and local_player() != null:
 		_build = BuildMode.new()
 		add_child(_build)
@@ -2375,11 +2672,16 @@ func _watch_territory(_delta: float) -> void:
 	var depth: float = TownRules.light_depth(circles(), player.global_position)
 	if not _inside and depth > 10.0:
 		_inside = true
-		if _entered_day != TimeManager.day and not player.story_lock and player.intro == null:
+		var away: bool = _left_msec >= 0 and Time.get_ticks_msec() - _left_msec > 180000 ## three minutes out in the wild: the town greets her again
+		if (_entered_day != TimeManager.day or away) and has_heart() and not player.story_lock and player.intro == null:
 			_entered_day = TimeManager.day
-			_announce(town_name(), "%s · TAG %d" % [level_label(), TimeManager.day + 1])
+			_left_msec = -1
+			var people: int = population()
+			town_banner({"title": town_name(), "sub": "%s · %d %s · TAG %d" % [level_label(), people, "EINWOHNER" if people != 1 else "EINWOHNERIN", TimeManager.day + 1], "sound": "town_motif"})
+			_greet_light(player)
 	elif _inside and depth < -20.0:
 		_inside = false
+		_left_msec = Time.get_ticks_msec()
 
 
 # ---------- saving and joining ----------
@@ -2392,7 +2694,7 @@ func export_state(snapshot: bool = false) -> Dictionary:
 	for cell: Vector2i in cleared:
 		out_cleared.append([cell.x, cell.y])
 	return {
-		"version": STATE_VERSION, "founded": founded, "name": name_index, "center": [center.x, center.y], "day": founded_day,
+		"version": STATE_VERSION, "founded": founded, "name": name_index, "look": [look_color, look_emblem], "center": [center.x, center.y], "day": founded_day,
 		"next_id": next_id, "structures": out_structures, "stock_slots": box.slots.duplicate(true), "cleared": out_cleared, "residents": residents.duplicate(true), "paths": paths.duplicate(true), "orders": orders.duplicate(true),
 		"fear": fear_on, "brewed": brewed.duplicate(), "alchemy_gift": alchemy_gift,
 		"unlocks": unlocks.keys(), "farm": farm.export_state() if farm != null else {},
@@ -2426,6 +2728,9 @@ func import_state(data: Dictionary) -> void:
 		brewed[brew_key] = int(counts[brew_key])
 	alchemy_gift = bool(data.get("alchemy_gift", false))
 	name_index = int(data.get("name", 0))
+	var look: Array = data.get("look", [0, 0]) as Array
+	look_color = int(look[0]) if look.size() > 1 else 0
+	look_emblem = int(look[1]) if look.size() > 1 else 0
 	var middle: Array = data.get("center", [0, 0]) as Array
 	center = Vector2(float(middle[0]), float(middle[1]))
 	founded_day = int(data.get("day", 0))

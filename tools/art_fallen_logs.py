@@ -137,7 +137,7 @@ def build(variant):
         m.ell(b,(.85,.7,.85),WOOD)
         m.limb(a+V(-.3,.6,0),b+V(-.3,.5,0),.27,.16,RIDGE)
 
-    # Moss grows as ragged overlapping cushions with little lips and hanging ends.
+    # Moss grows as overlapping cushions.
     for patch in range([6,4,8][variant]):
         x=rng.uniform(-half*.83,half*.80)
         phi=rng.uniform(-32,38)
@@ -151,7 +151,7 @@ def build(variant):
             a=surf(x+2,phi+34,.5)
             m.limb(a,a+V(.4,-1.5,1.5),.45,.2,MOSS)
 
-    # Connected crooked violet cracks with sparse forks (same scale as the knight).
+    # Connected crooked violet cracks with sparse forks.
     for trail in range(1 if variant==1 else 2):
         x=-half*rng.uniform(.25,.8)
         phi=16 if trail==0 else 72
@@ -165,7 +165,7 @@ def build(variant):
             if k==3:
                 m.limb(a,a+V(2,-1.1,1.2),.30,.17,h.VIOLET,kind='emit')
 
-    # Layered bracket fungi: dark attachment, broad cool cap, pale rim, smaller shelf.
+    # Layered bracket fungi.
     for i in range(1 if variant==1 else 2):
         x=-half*.4+i*half*.72
         a=surf(x,70,.7)

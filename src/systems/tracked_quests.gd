@@ -336,6 +336,72 @@ func toggle_track(oid: int) -> void:
 	focus("" if is_tracked(oid) else "board:%d" % oid)
 
 
+func _live_board() -> BoardManager:
+	if _board != null and is_instance_valid(_board):
+		return _board
+	if not is_inside_tree():
+		return null
+	var found: BoardManager = _find_board()
+	if found != null and found != _board:
+		_board = found
+		if not _board.changed.is_connected(_on_board):
+			_board.changed.connect(_on_board)
+	return _board
+
+
+func open_story_notices() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var b: BoardManager = _live_board()
+	if b == null or not b.is_ready() or _player == null:
+		return out
+	for offer: Dictionary in b.open_for(_peer()):
+		if String(offer.get("k", "")) != BoardRules.STORY:
+			continue
+		var qid: String = String(offer.get("q", ""))
+		if quests != null and (quests.is_active(qid) or quests.is_finished(qid)):
+			continue
+		out.append(offer)
+	return out
+
+
+func _nearest_board_pos(b: BoardManager) -> Vector2:
+	if b == null or b.town == null or _player == null:
+		return Vector2.INF
+	var best: float = INF
+	var at: Vector2 = Vector2.INF
+	for id: int in b.town.built_ids_of_role("board"):
+		var center: Vector2 = b.town.rect_of(id).get_center()
+		var dist: float = _player.global_position.distance_squared_to(center)
+		if dist < best:
+			best = dist
+			at = center
+	return at
+
+
+func story_board_notice() -> Dictionary:
+	var open: Array[Dictionary] = open_story_notices()
+	if open.is_empty():
+		return {}
+	var ids: Array[int] = []
+	var unread_any: bool = false
+	for offer: Dictionary in open:
+		var oid: int = int(offer.id)
+		ids.append(oid)
+		if not seen.has(oid):
+			unread_any = true
+	var first: Dictionary = open[0]
+	return {
+		"count": open.size(),
+		"oid": int(first.id),
+		"ids": ids,
+		"title": String(first.get("ti", "HAUPTAUFTRAG")),
+		"quest": String(first.get("q", "")),
+		"icon": BoardRules.story_icon_path(first),
+		"unread": unread_any,
+		"target": _nearest_board_pos(_live_board()),
+	}
+
+
 # ---------- reading ----------
 
 func is_seen(oid: int) -> bool:

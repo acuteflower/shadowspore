@@ -17,7 +17,7 @@ uniform sampler2D paths : filter_linear, repeat_disable;
 uniform sampler2D water : filter_linear_mipmap, repeat_disable;
 uniform sampler2D lake_shore : filter_linear, repeat_disable;
 uniform sampler2D areas : filter_nearest, repeat_disable; // named territories, independent of biome
-uniform int area_biomes[6];
+uniform int area_biomes[7];
 uniform vec2 view_size = vec2(640.0, 360.0);
 uniform vec2 center = vec2(550.0); // tile in the middle of the view
 uniform float map_scale = 1.0; // screen pixels per tile
@@ -26,7 +26,7 @@ uniform float night = 0.0;
 uniform float open = 1.0; // 0 shut .. 1 open
 uniform vec2 focus = vec2(320.0, 180.0); // screen pixel the opening spreads from
 uniform float world_tiles = 1100.0;
-uniform vec3 pal[18]; // per biome: dark, mid, light
+uniform vec3 pal[21]; // per biome: dark, mid, light
 
 #include "res://assets/shaders/map_veil.gdshaderinc"
 
@@ -39,8 +39,8 @@ const vec3 LAKE_MID = vec3(0.13, 0.29, 0.36);
 const vec3 LAKE_SHELF = vec3(0.24, 0.43, 0.45);
 const vec3 LAKE_LIGHT = vec3(0.52, 0.71, 0.67);
 // 5x5 map symbols per biome (two each): bit = row * 5 + column
-const uint GLYPHS[12] = uint[12](146080u, 135620u, 32969156u, 163268u, 33073280u, 145860u, 14815374u, 18400814u, 4543812u, 18157905u, 17978692u, 476608u);
-const float DENSITY[6] = float[6](0.42, 0.85, 0.5, 0.5, 0.6, 0.5);
+const uint GLYPHS[14] = uint[14](146080u, 135620u, 32969156u, 163268u, 33073280u, 145860u, 14815374u, 18400814u, 4543812u, 18157905u, 17978692u, 476608u, 19285440u, 32986244u);
+const float DENSITY[7] = float[7](0.42, 0.85, 0.5, 0.5, 0.6, 0.5, 0.48);
 
 int area_raw(vec2 w) {
 	return int(texture(areas, w / world_tiles).r * 255.0 + 0.5) - 1;

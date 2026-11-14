@@ -5,11 +5,19 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.8.4 Beta – „Horizonte im Aufbruch (V0.9-Vorbote)“
+## 🚀 Aktuelle Version: V0.8.5 Beta – „Steine von Hallgrat & Wunder der Wiese“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.8.4 Beta *(Mid-Work auf dem Weg zu V0.9)*:
+### Highlights von V0.8.5 Beta:
+* **Hallgrat im neuen Steinmetz-Look:** Alle Häuser, Hallen, Torhäuser, Stallungen und Marktstände stehen nun im passenden Maßstab – inklusive **diagonaler `48°`-Gebäude** an schrägen Gassen, Vordächern, Honiglicht-Fenstern und gepflasterten Plätzen.
+* **Die drei Weltwunder & Nacht-Wunder:** Entdeckt den **Glockenteich**, den **Kreis der Schlafenden Wächter** und das **Blumen-Amphitheater**, schleicht euch nachts an den **Weißen Kronenhirsch** heran, bergt **Sternerz** aus **Sternschnuppen-Kratern** und erkundet **Alte Wassermühlen**, **gebrochene Steinbrücken** sowie **Fischerstege**.
+* **Vier neue Schätze & Relikte:** *Sternerz*, *Kronenhirsch-Reif*, *Glockenteich-Gehänge* und das *Ordenssiegel der Wacht*.
+* **Freiluftsalon „Spiegelplatz“ & Mod-Menü:** Ein neuer, luftiger Dorfplatz mit flackerndem Abendhimmel-Spiegel und gemütlicher Sitz-Kamerafahrt sowie ein übersichtliches Mod-/Test-Menü im Pausenbildschirm.
+
+---
+
+### Vorherige Highlights (V0.8.4 Beta – „Horizonte im Aufbruch (V0.9-Vorbote)“):
 * **Quarzwüste Stufen 3–7a:** **Sonnenhitze** (`ERHITZT`/`ERFRISCHT`), **Singender Resonanzwind & Arkane Quarzgewitter** ohne Regen, **6 neue Wüstentiere** (*Kronen-Oryx*, *Dünen-Fennek*, *Springmaus*, *Agame*, *Sonnenfalke*, *Gold-Skarabäus*), aktive Quarzruinen & Prisma-Adern, der erste **Quarzwächter** sowie die monumentale **Zenitwarte** im Norden.
 * **Die Karawane (Jorun):** Nach dem Bau des Brunnenplatzes besucht Händler **Jorun** mit Planwagen und Moosbüffel alle `2–5 Tage` euer Dorf, klappt seine Theke auf und handelt mit Raritäten & „Gesuchtem“.
 * **Hallgrat & der Westweg:** Der **790 Tiles lange Westweg** mit **15 Meilensteinen** führt zum steinernen Grundriss von **Hallgrat** auf dem Glaskamm (inkl. 6 Bezirken & Mauerwerk im Relief).

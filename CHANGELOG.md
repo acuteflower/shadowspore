@@ -4,6 +4,70 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.8.5 Beta] – 2026-11-14
+### ✨ Steine von Hallgrat & Wunder der Wiese: Weltwunder, Nacht-Geheimnisse, fertiges Hallgrat & Freiluftsalon
+
+![Nacht-Wunder: Weißer Kronenhirsch, Sternschnuppen-Krater und vier neue Talismane & Relikte](docs/img/night_wonders_sheet.png)
+
+> *Hinter den Schiefer-Vordächern von Hallgrat schimmert warmes Honiglicht auf frisch verlegten Steingassen, während weit draußen auf den Wiesen drei uralte Weltwunder erwachen: Über dem Glockenteich schwingt ein alter Turm, zwischen schlafenden Wächtern flackern Feuerschalen, und in klaren Nächten scharrt der Weiße Kronenhirsch unter fallenden Sternensplittern verborgene Schätze frei.*
+
+---
+
+> [!IMPORTANT]
+> **Der nächste große Baustein Richtung V0.9!** V0.8.5 vollendet die gesamte Architektur von **Hallgrat** im Westen (inklusive diagonaler Steinhäuser und überarbeiteter Gassen), erweckt die **drei einmaligen Weltwunder**, **Nacht-Wunder** und **Wasser- & Kultur-POIs** im Wiesenbiom, und bringt den stimmungsvollen **Freiluftsalon („Spiegelplatz“)** sowie ein praktisches **Mod-/Entwickler-Menü** ins Spiel!
+
+---
+
+### 🏰 1. Hallgrat im Westen: Steinmetz-Häuser, Diagonale Gassen & Honiglicht (`🔵 REWORK` `🟣 NEU`)
+
+![Diagonale Steinhäuser und Westweg-Meilenstein in Hallgrat](docs/img/hallgrat_diagonal.png)
+
+* **Überarbeitete Steinmetz-Architektur (`🔵 REWORK`):** Alle Gebäude in Hallgrat (Wohnhäuser, Hallen, Torhaus, Laden, Stallungen, verlassene Häuser & Marktstände) wurden komplett auf den Maßstab von Ellie angepasst, bestehen aus denselben behauenen Quadern wie die Stadtmauern, tragen violette Schieferdächer samt kleinem **Eingangs-Vordach** und leuchten nachts mit ruhigem **Honiglicht** hinter den Fenstern.
+* **Diagonale Häuser an schrägen Wegen (`🟣 NEU`):** Entlang schräger Straßen – etwa direkt am Ende des Westwegs vor dem Osttor – stehen Häuser jetzt authentisch **diagonal gedreht (`48°`)**, sodass Vorder- und Seitenfassade gleichzeitig sichtbar sind und nahtlos am Wegrand sitzen.
+* **Gassenpflaster auf den Plätzen (`🔵 REWORK`):** Steinmarkt, Karrenhof und Nordgasse wurden auf sauberes Gassenpflaster mit langen Randsteinen umgestellt.
+
+---
+
+### 🌟 2. Die drei Weltwunder & Nacht-Wunder des Wiesenbioms (`🟣 NEU`)
+
+![Die drei Weltwunder des Wiesenbioms: Glockenteich, Schlafende Wächter & Blumen-Amphitheater](docs/img/meadow_wonders_sheet.png)
+
+#### 🏛️ Drei einmalige Weltwunder
+* **Der Glockenteich:** Ein halb versunkener Glockenturm im See samt Trittsteinen auf dem Wasser – wer das Rätsel am Ufer löst, birgt unter anderem das neue **Glockenteich-Gehänge**.
+* **Der Kreis der Schlafenden Wächter:** Mächtige steinerne Wächterstatuen und alte Feuerschalen im Kreis – entfacht die Schalen im richtigen Zusammenspiel!
+* **Das Blumen-Amphitheater:** Ein überwuchertes, kunstvoll verziertes Blüten-Podium mitten in der offenen Landschaft.
+
+#### 🌙 Nacht-Wunder & neue Kultur-Orte am Wasser
+* **Weißer Kronenhirsch & Sternschnuppen-Krater (`🟣 NEU`):** In der Nacht tauchen glühende **Sternschnuppen-Krater** mit **Sternerz** auf – und wer sich leise an den seltenen **Weißen Kronenhirsch** heranschleicht, wird mit dem **Kronenhirsch-Reif** belohnt!
+* **Spuren der Vergangenheit (`🟣 NEU`):** Entdeckt verfallene **Alte Wassermühlen**, **gebrochene Steinbrücken** (perfekt für einen gezielten Schattenschritt!), einsame **Fischerstege** sowie Gedenksteine des **Roten Ordens** (inkl. **Ordenssiegel der Wacht**).
+
+---
+
+### 🪞 3. Freiluftsalon „Spiegelplatz“ & Mod-Menü (`🟣 NEU`)
+
+* **Der Freiluftsalon (`🟣 NEU`, Stufe 1):** Ein offener Holzpodest-Platz unter einer leichten Stoff-Pergola mit Laterne, Regal voller Tücher & Fläschchen und einem großen, im Abendhimmel-Türkis und Violett schimmernden **Standspiegel**. Ellie kann sich via `E` („PLATZ NEHMEN“) auf den Samtstuhl setzen, woraufhin die Kamera sanft heranzoomt. *(Die komplette Frisuren- & Outfit-Auswahl folgt im nächsten Schritt!)*
+* **Neues Mod-Menü (`🟣 NEU`):** Im Pausenmenü zieht ein übersichtliches **Mod- / Werkzeug-Menü** mit Kategorien und Suchfilter ein, um Items, Wetter, Cheats und Weltzustände blitzschnell zu testen.
+
+---
+
+### ⚖️ Vorher → Nachher: Die wichtigsten Neuerungen im Überblick
+
+| Bereich | Vorher (V0.8.4 Beta) | Nachher (V0.8.5 Beta) |
+| :--- | :--- | :--- |
+| **Hallgrat-Gebäude** | Fehlendes Hochhaus-Asset, gerade Platzierung | Komplett gerenderte Häuser im Ellie-Maßstab, **diagonale `48°`-Ansichten** & Honiglicht-Fenster |
+| **Wiesenbiom-Welt** | Makro-Habitate, Aussichtspunkte & Ordensspuren | Zusätzlich **3 Weltwunder** (*Glockenteich*, *Schlafende Wächter*, *Amphitheater*), **Kronenhirsch**, **Sternschnuppen-Krater**, **Wassermühlen** & **gebrochene Brücken** |
+| **Neue Schätze** | Wüsten- & Ordensfunde | **4 neue Talismane & Erze** (*Sternerz*, *Kronenhirsch-Reif*, *Glockenteich-Gehänge*, *Ordenssiegel*) |
+| **Dorfleben** | Karawane & Standardgebäude | Neuer **Freiluftsalon („Spiegelplatz“)** mit animiertem Stoffsegel, Spiegelglanz & Sitz-Kamerafahrt |
+
+---
+
+> [!WARNING]
+> **Bekannte Ecken & Kanten dieser Beta:**
+> * Im automatisierten Weltwunder-Testskript tritt aktuell noch ein Skript-Fehler beim erzwungenen Wetterwechsel auf; im normalen Spielverlauf sind die Weltwunder unabhängig davon in der Welt platziert.
+> * Beim **Freiluftsalon** ist aktuell Stufe 1 (Sitz-Animation & Kamerafahrt) live – das eigentliche Umzieh-Fenster für Ellies Frisuren und Outfits folgt gemeinsam mit den letzten Bausteinen zu **V0.9**.
+
+✦ ──────────────── ❖ ──────────────── ✦
+
 ## [V0.8.4 Beta] – 2026-11-14
 ### 🌅 Horizonte im Aufbruch (V0.9-Vorbote): Zenitwarte, Wüsten-Ökosystem, Karawane, Hallgrat & Lebendige Wiese
 

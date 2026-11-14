@@ -123,6 +123,9 @@ func start(id: String) -> void:
 	var journal: QuestJournal = get_parent().get_node_or_null("QuestJournal") as QuestJournal
 	if journal != null:
 		journal.interrupt()
+	var mod_menu: Node = get_parent().get_node_or_null("ModMenu")
+	if mod_menu != null:
+		mod_menu.call("close")
 	_time = 0.0
 	_menu_before = InputManager.menu_open
 	InputManager.menu_open = true

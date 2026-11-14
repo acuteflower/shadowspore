@@ -34,16 +34,25 @@ from gen_art import hexc  # noqa: E402
 OUT = ROOT / "town" / "hallgrat"
 DATA = Path(__file__).resolve().parent.parent / "data" / "hallgrat_art.json"
 S = h.SCALE
-SLATE = (
-    [hexc(c) for c in ("1a1d30", "343c5a", "56628a", "8a98c0")],   # cold blue slate
-    [hexc(c) for c in ("1d1e2a", "3a3e52", "5e6480", "9097b2")],   # grey slate
-    [hexc(c) for c in ("1f1a30", "3e3658", "625888", "958ab8")],   # violet slate, like the walls
+SLATE = (  # slate of the Glaskamm: the walls' violet stone, split thin and a shade darker
+    [hexc(c) for c in ("18162a", "2c2848", "463f6c", "6e6696")],
+    [hexc(c) for c in ("1b1a28", "312e46", "4e4a68", "77728f")],
+    [hexc(c) for c in ("1f1a30", "3a3254", "5a5080", "877cae")],
 )
 MASON = [hexc(c) for c in ("19172d", "292645", "3e3a5e", "58537b", "78729b", "a29cc1")]  # relief.gdshader MASON: streets, stairs, terrace walls
 h.RAMPS[STONE] = MASON[1:5]          # the walls: the very stone of the streets
 h.RAMPS[STONE_L] = MASON[2:6]        # lintels, sills, quoins, arches: the same stone, a lighter cut
 STONES = (STONE, STONE, STONE)
-CANVAS = (300, 220, 180)   # w, h, ground row of the render canvas (cropped afterwards)
+CANVAS = (620, 440, 360)   # w, h, ground row of the render canvas (cropped afterwards)
+# Ellie is 52 px tall and a door has to take her (about 40 px): the models are built small and grown to her size here, per kind
+GROW = {"halle": 1.6, "torhaus": 1.7, "stall": 1.3, "mauer_ns": 1.6, "leitstein": 1.5, "stand": 1.6}
+
+
+def grow_of(name):
+    for k, v in GROW.items():
+        if name.startswith(k):
+            return v
+    return 1.9
 
 
 def rot_z(a):
@@ -566,9 +575,15 @@ DOORS = {"haus_a": 6.0, "haus_b": -10.0, "verlassen_a": 6.0, "verlassen_b": -10.
 
 
 # ------------------------------------------------------------------ finishing
+# lamplight behind glass: a calm honey tone, never the flickering fire ramp (that read as flames in the windows)
+GLASS = [tuple(int(c[i:i + 2], 16) for i in (0, 2, 4)) for c in ("4a3044", "8a5a3e", "c08a52", "e2b872")]
+GLASS_SET = set(GLASS)
+
+
 def windows_glow(arr, seed):
-    """Every pane of lit glass: bright and warm at its foot, darker towards the top, dithered; separately for each window."""
-    fire = {tuple(c[:3]): b for b, c in enumerate(h.RAMPS[FIRE])}
+    """Every pane of lit glass, separately per window: one even warm tone, a little brighter in its middle, the top row in the lintel's
+    shadow and the side columns a step darker (the reveal of the thick wall); a few panes dimmer than others (not every lamp burns as bright)."""
+    fire = {tuple(c[:3]) for c in h.RAMPS[FIRE]}
     H, W = arr.shape[:2]
     mask = np.zeros((H, W), bool)
     for y in range(H):
@@ -593,13 +608,20 @@ def windows_glow(arr, seed):
             xs = [p[0] for p in comp]
             ys = [p[1] for p in comp]
             gx0, gx1, gy0, gy1 = min(xs), max(xs), min(ys), max(ys)
-            cx, hw, hh = (gx0 + gx1) / 2.0, max(1.0, (gx1 - gx0) / 2.0), max(1.0, gy1 - gy0)
+            cx, cy = (gx0 + gx1) / 2.0, (gy0 + gy1) / 2.0
+            hw, hh = max(1.0, (gx1 - gx0) / 2.0), max(1.0, (gy1 - gy0) / 2.0)
+            dim = hsh(gx0, gy0, seed + 77) < 0.3
+            big = len(comp) > 30
             for x, y in comp:
-                v = (y - gy0) / hh
-                u = (x - cx) / hw
-                i = 0.45 + 0.45 * v + 0.2 * (1 - u * u) + (bayer(x, y) - 0.5) * 0.18
-                b = 3 if i > 0.98 else 2 if i > 0.74 else 1 if i > 0.5 else 0
-                out[y, x, :3] = h.RAMPS[FIRE][b][:3]
+                u, v = (x - cx) / hw, (y - cy) / hh
+                b = 2
+                if y == gy0 or abs(u) > 0.8:
+                    b = 1
+                elif big and u * u + v * v < 0.18 and bayer(x, y) < 0.6:
+                    b = 3
+                if dim:
+                    b = max(0, b - 1)
+                out[y, x, :3] = GLASS[b]
     return out
 
 
@@ -634,6 +656,12 @@ def other_sides(m, rng, W, D, eave, info):
 
 
 VIEWS = {"s": 0.0, "n": math.pi, "e": math.pi / 2}  # front, back, the east gable end (west = the east one mirrored in the game)
+# turned halfway, for diagonal ways (48 degrees in the model: front and side both show, the door stays in sight; the true yaw for a
+# 45-degree street on the squashed ground, atan(1 / SINP), hid the front almost entirely); se = the front looks south-east (house north-west of its way), ne = north-east (the back shows); the game
+# mirrors them for sw / nw
+DIAG_YAW = math.radians(48.0)
+DIAG = {"se": DIAG_YAW, "ne": math.pi - DIAG_YAW}
+DIAG_TYPES = ("haus_a", "haus_b", "haus_hoch", "giebel", "laden", "verlassen_a", "verlassen_b")
 
 
 def eave_shadow(arr, mask, reach=7, strength=0.62):
@@ -700,14 +728,33 @@ def build(name, seed, view="s"):
     rng = rng_for(seed)
     m, info = TYPES[name](rng)
     W, D = info["W"], info["D"]
+    extra = {}
     if not info.get("stall"):
         other_sides(m, rng_for(seed + 1), W, D, 0, info)
-        if view != "s":  # turned about the house's middle, then moved so the new front edge is at z = 0 again
+        if view in DIAG:  # turned about the middle; the front corner of its box is moved to z = 0, the box gives the footprint
+            Ry = h.rot_y(DIAG[view])
+            rel = [Ry @ V(x, 0.0, z) for x, z in ((-W, D / 2.0), (W, D / 2.0), (W, -D / 2.0), (-W, -D / 2.0))]
+            zmax = max(r_[2] for r_ in rel)
+            zmin = min(r_[2] for r_ in rel)
+            xmax = max(abs(r_[0]) for r_ in rel)
+            dm = Ry @ V(DOORS.get(name, 0.0), 0.0, D / 2.0)
+            turn(m, DIAG[view], about=(0.0, -D / 2.0), shift=(0.0, -zmax))
+            g_ = grow_of(name)
+            k_ = S * g_
+            extra = {"diag": True, "door": [round(float(dm[0]) * k_, 1), round(float(dm[2] - zmax) * h.SINP * k_, 1)],
+                     "poly": [[round(float(r_[0]) * k_, 1), round(float(r_[2] - zmax) * h.SINP * k_, 1)] for r_ in rel]}
+            W, D = xmax, zmax - zmin
+        elif view != "s":  # turned about the house's middle, then moved so the new front edge is at z = 0 again
             yaw = VIEWS[view]
             half = D / 2.0 if view == "n" else W
             turn(m, yaw, about=(0.0, -D / 2.0), shift=(0.0, -half))
             if view == "e":
                 W, D = D / 2.0, 2.0 * W
+    g = grow_of(name)
+    for p_ in m.prims:
+        p_.c = p_.c * g
+        p_.r = p_.r * g
+    W, D = W * g, D * g
     raw = to_array(hut_lib.render(m, CANVAS[0], CANVAS[1], CANVAS[2]))
     cover = mask_of(raw, (ROOF, BARK_D) if not info.get("stall") else (BANNER, LINEN, WINE, OCHRE, PLUM))
     arr = hut_lib.roof_pass(raw, seed, moss=info["moss"], shadow=6)
@@ -724,9 +771,12 @@ def build(name, seed, view="s"):
     feet = (CANVAS[0] // 2 - max(0, x0 - pad), CANVAS[2] - max(0, y0 - pad))
     hut_lib.soft_shadow(arr, feet[0], feet[1] - foot_d / 2.0, foot_w / 2.0 + 4, foot_d / 2.0 + 3)
     glow = glow_of(arr, (FIRE, h.TEAL, h.CRYSTAL))
+    for yy, xx in zip(*np.nonzero(arr[..., 3] > 0)):
+        if tuple(int(c) for c in arr[yy, xx, :3]) in GLASS_SET:
+            glow[yy, xx] = arr[yy, xx]
     gy, gx = np.nonzero(glow[..., 3] > 0)
     lights = [[int(gx.mean()), int(gy.mean())]] if len(gx) else []  # one warm light where the lit glass is
-    return arr, glow, {"size": [arr.shape[1], arr.shape[0]], "feet": list(feet), "foot": [foot_w, foot_d], "lights": lights}
+    return arr, glow, dict({"size": [arr.shape[1], arr.shape[0]], "feet": list(feet), "foot": [foot_w, foot_d], "lights": lights}, **extra)
 
 
 def main():
@@ -735,7 +785,7 @@ def main():
     data = {"about": "Written by tools/art_hallgrat_houses.py: per picture its size, feet (middle of the front edge on the ground, px in the picture), foot (footprint w x d in px) and the window lights (px in the picture).", "types": {}}
     shown = []
     for i, name in enumerate(TYPES):
-        views = ("s",) if name.startswith(("stand_", "mauer", "leitstein")) else ("s", "n", "e")
+        views = ("s",) if name.startswith(("stand_", "mauer", "leitstein")) else ("s", "n", "e") + (("se", "ne") if name in DIAG_TYPES else ())
         for view in views:
             key = name if view == "s" else "%s_%s" % (name, view)
             arr, glow, info = build(name, 3100 + i * 17, view)
@@ -744,7 +794,7 @@ def main():
             data["types"][key] = info
             shown.append(arr)
             print(key, info["size"], "foot", info["foot"])
-    data["doors"] = {k: round(v * S, 1) for k, v in DOORS.items()}  # the front door's x (px from the feet) of every front view, for the door paths
+    data["doors"] = {k: round(v * S * grow_of(k), 1) for k, v in DOORS.items()}  # the front door's x (px from the feet) of every front view, for the door paths
     DATA.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
     png = [a for a in sys.argv[1:] if a.endswith(".png")]
     if png:

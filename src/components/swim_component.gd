@@ -49,7 +49,8 @@ func step(delta: float, amount: float, water: bool, allowed: bool, moving: bool,
 	var seconds: Dictionary = SwimRules.cfg()["blend_seconds"]
 	var span: float = maxf(float(seconds["enter"] if active else seconds["exit"]), 0.01)
 	blend = move_toward(blend, wanted_blend, delta / span)
-	if water and (allowed or active):
+	var pass_depth: bool = (water and (allowed or active)) or (_body != null and _body.has_meta("water_deck"))
+	if pass_depth:
 		_scan -= delta
 		if _scan <= 0.0:
 			_scan = float(SwimRules.cfg()["exception_scan"])

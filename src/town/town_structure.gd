@@ -71,6 +71,7 @@ var _milestone: int = 0 ## quarters of the build already marked
 var _parts_done: Dictionary = {} ## part index -> true once its window is complete
 var _stand: Sprite2D ## a part that stands upright on a floor piece (the fountain on its square, data `stand`): y-sorted with the people, its own collider
 var helping_here: bool = false ## the local player lends a hand at this site (the progress shows "x3")
+var _glow_boost: float = 0.0 ## `set_glow_boost`: somebody uses the piece, its glow is brighter
 
 
 func setup(owner_manager: TownManager, structure_id: int) -> void:
@@ -567,9 +568,19 @@ func set_progress(value: int, done: bool = false) -> void:
 func set_night(amount: float) -> void:
 	amount = MineManager.night_at(self, amount)
 	for glow: Sprite2D in _glows:
-		glow.modulate.a = lerpf(GLOW_BY_DAY, 1.0, amount) * _lamp_k
+		glow.modulate.a = lerpf(GLOW_BY_DAY, 1.0, minf(amount + _glow_boost, 1.0)) * _lamp_k
+		var bright: float = 1.0 + _glow_boost * 0.6
+		glow.modulate.r = bright
+		glow.modulate.g = bright
+		glow.modulate.b = bright
 	if _motes != null:
 		_motes.emitting = amount > 0.4 and progress >= TownManager.PROGRESS_FULL and _lamp_k > 0.5
+
+
+## Somebody uses the piece (the salon's chair, `SalonSeat`): its glow shines brighter, by day too (0 = as usual).
+func set_glow_boost(amount: float) -> void:
+	_glow_boost = amount
+	set_night(TimeManager.night_amount())
 
 
 ## A lamp post shows its flame by its state (cold / lit / empty, `TownManager.lamp_state`): the lantern's glow, the vein of light and the pool of light follow `_lamp_k`.
@@ -607,6 +618,23 @@ func dismantle() -> void:
 	var tween: Tween = create_tween()
 	tween.tween_property(self, "modulate:a", 0.0, 0.35)
 	tween.tween_callback(queue_free)
+
+
+## The bodies of this piece (its walls, a part standing on it): a piece that is being moved does not stand in its own way (`TownManager.check_move`).
+func solid_rids() -> Array[RID]:
+	var out: Array[RID] = []
+	for node: Node in find_children("*", "CollisionObject2D", true, false):
+		out.append((node as CollisionObject2D).get_rid())
+	return out
+
+
+## Set down at a new place (moved in the build mode, on every peer): a little dust, a knock, the picture drops the last few pixels.
+func arrive() -> void:
+	_burst(12, Color(0.72, 0.64, 0.58, 0.8), 30.0)
+	_sound("res://assets/audio/town/stone_set.wav", -9.0)
+	var rest: float = _sprite.position.y
+	_sprite.position.y = rest - 4.0
+	create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(_sprite, "position:y", rest, 0.28)
 
 
 func _finish_fx() -> void:

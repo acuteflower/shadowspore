@@ -482,13 +482,26 @@ func _update_desert_heat(delta: float) -> void:
 	heat_amount = clampf(heat_amount + drive * delta, 0.0, 1.0)
 
 func _physics_process(delta: float) -> void:
-	var tile_pos: Vector2i = Vector2i((global_position / 16.0).floor())
-	if tile_pos != _last_surface_tile:
-		_last_surface_tile = tile_pos
-		_surface = Terrain.surface_data(Terrain.surface_at(global_position))
+	var sub_pos: Vector2i = Vector2i((global_position / 4.0).floor())
+	if sub_pos != _last_surface_tile:
+		_last_surface_tile = sub_pos
+		var surf_id: String = Terrain.surface_at(global_position)
+		_surface = Terrain.surface_data(surf_id)
+		var on_water_deck: bool = false
 		for patch: Node in Terrain.patches:
-			if patch is WorldRivers:
-				_surface = (patch as WorldRivers).wade_data(global_position, _surface)
+			if patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", global_position)):
+				on_water_deck = true
+				break
+		if on_water_deck:
+			set_meta("water_deck", true)
+			if swimmer != null:
+				swimmer.sync_exceptions()
+		else:
+			if has_meta("water_deck"):
+				remove_meta("water_deck")
+			for patch: Node in Terrain.patches:
+				if patch is WorldRivers:
+					_surface = (patch as WorldRivers).wade_data(global_position, _surface)
 		_last_surface_result = _surface
 	else:
 		_surface = _last_surface_result
@@ -1022,7 +1035,7 @@ func _move(delta: float) -> void:
 		facing = attack.aim_dir ## follows the cursor while the blow is charged
 		return
 	var in_combat: bool = attack.is_in_combat(1.5)
-	if in_combat and InputManager.using_mouse:
+	if in_combat and InputManager.using_mouse and not InputManager.mod_menu_open:
 		var look_mouse: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER)
 		if look_mouse != Vector2.ZERO:
 			facing = look_mouse
@@ -1391,7 +1404,7 @@ func _scan_interact() -> Interactable:
 		var item: Interactable = node as Interactable
 		if item == null:
 			continue
-		if absf(item.global_position.x - global_position.x) > 48.0 or absf(item.global_position.y - global_position.y) > 48.0:
+		if absf(item.global_position.x - global_position.x) > 96.0 or absf(item.global_position.y - global_position.y) > 96.0:
 			continue
 		if item.prompt() == "":
 			continue
@@ -1406,7 +1419,7 @@ func _scan_interact() -> Interactable:
 func _candidate_usable(item: Interactable) -> bool:
 	if InputManager.ui_blocking or not item.is_in_group("interactables"):
 		return false
-	if absf(item.global_position.x - global_position.x) > 48.0 or absf(item.global_position.y - global_position.y) > 48.0:
+	if absf(item.global_position.x - global_position.x) > 96.0 or absf(item.global_position.y - global_position.y) > 96.0:
 		return false
 	if item.prompt() == "":
 		return false

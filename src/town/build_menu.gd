@@ -1,7 +1,7 @@
 class_name BuildMenu
 extends CanvasLayer
 ## The build mode's menu ("Der Bauplan", docs/stadtbau_konzept.md 1; first version docs/town.md), grown like the hotbar: a branch above the hotbar with the categories hanging from it as name tags (the same tags as the Escape
-## menu's, the last one is the demolish tool), under them a thinner vine out of the branch with the pieces of the open category hanging from it as pendants (number keys
+## menu's, the last two are the move and the demolish tool), under them a thinner vine out of the branch with the pieces of the open category hanging from it as pendants (number keys
 ## on them, the chosen one lifts and glows, a bloom opens on the vine above it) and beside the pendants a small leaf of bark paper: name, build time, what it is for (or
 ## what stops it right now, in red) and the cost as chips (red where the stock and the bag fall short). In the demolish tool the leaf says what the piece under the
 ## cursor gives back. Everything is see-through except the tags, the pendants and the leaf, and the whole thing dims while the piece to be set lies behind it, so the
@@ -20,6 +20,7 @@ const PLAN: Shader = preload("res://assets/shaders/blueprint.gdshader")
 const TAG_GAP: float = 5.0
 const OPEN_SECONDS: float = 0.9
 const DEMOLISH_LABEL: String = "X ABRISS"
+const MOVE_LABEL: String = "T VERSETZEN"
 const TEXT: Color = Color("e9dcff")
 const DIM: Color = Color("8f7fb0")
 const LIT: Color = Color("78f4e6")
@@ -36,7 +37,7 @@ var _fade: float = 1.0
 var _toast_text: String = ""
 var _toast_good: bool = false
 var _toast_left: float = 0.0
-var _tags: Array[Rect2] = [] ## the categories, then the demolish tool
+var _tags: Array[Rect2] = [] ## the categories, then the move tool, then the demolish tool
 var _slots: Array[Rect2] = [] ## the pendants of the open category
 var _hit: Array[Rect2] = [] ## everything that catches the mouse
 var _bounds: Rect2 = Rect2()
@@ -102,14 +103,15 @@ func _process(delta: float) -> void:
 		_open = minf(_open + delta / OPEN_SECONDS, 1.0)
 		_fade = lerpf(_fade, 0.3 if _ghost_behind() else 1.0, 1.0 - exp(-8.0 * delta))
 		var at: Vector2 = _canvas.get_local_mouse_position()
+		var cat_count: int = mode.categories().size()
 		for i: int in _tags.size():
-			var open: bool = (i == mode.category and not mode.demolish) if i < mode.categories().size() else mode.demolish
+			var open: bool = (i == mode.category and mode.building()) if i < cat_count else (mode.moving if i == cat_count else mode.demolish)
 			var over: bool = InputManager.using_mouse and _tags[i].has_point(at)
 			_tab_lift[i] = lerpf(float(_tab_lift.get(i, 0.0)), 3.0 if open else (2.0 if over else 0.0), 1.0 - exp(-14.0 * delta))
 		var list: Array[String] = mode.pieces_here()
 		for i: int in list.size():
 			var id: String = list[i]
-			_lift[id] = lerpf(float(_lift.get(id, 0.0)), 5.0 if id == mode.piece and not mode.demolish else 0.0, 1.0 - exp(-14.0 * delta))
+			_lift[id] = lerpf(float(_lift.get(id, 0.0)), 5.0 if id == mode.piece and mode.building() else 0.0, 1.0 - exp(-14.0 * delta))
 			var was: float = float(_flip.get(id, 0.0))
 			_flip[id] = minf(was + delta * 5.0, 1.0) if _open > 0.4 + 0.07 * float(i) else was
 			if was < 0.5 and float(_flip[id]) >= 0.5:
@@ -132,12 +134,13 @@ func _ghost_behind() -> bool:
 	if over_card():
 		return false
 	var world: Rect2 = Rect2()
-	if mode.demolish:
+	var shown: String = mode.ghost_piece()
+	if shown != "":
+		world = TownRules.foot_rect(shown, mode.pos.x, mode.pos.y)
+	elif mode.demolish or mode.moving:
 		if mode.target_id < 0 or not mode.town.structures.has(mode.target_id):
 			return false
 		world = mode.town.rect_of(mode.target_id)
-	elif mode.piece != "":
-		world = TownRules.foot_rect(mode.piece, mode.pos.x, mode.pos.y)
 	else:
 		return false
 	var view: Transform2D = get_viewport().get_canvas_transform()
@@ -173,7 +176,7 @@ func _frame() -> Rect2:
 	var tags: float = 0.0
 	for cat: Dictionary in mode.categories():
 		tags += float(PixelText.width(String(cat.name)) + 10) + TAG_GAP
-	tags += float(PixelText.width(DEMOLISH_LABEL) + 10) + 26.0
+	tags += float(PixelText.width(DEMOLISH_LABEL) + 10) + float(PixelText.width(MOVE_LABEL) + 10) + TAG_GAP + 26.0
 	var width: float = roundf(maxf(MIN_W, maxf(26.0 + tags + 8.0, FIRST + float(_widest()) * STRIDE + INFO_MIN + 14.0)))
 	return Rect2(roundf((_canvas.size.x - width) / 2.0), _canvas.size.y - BOTTOM - HEIGHT, width, HEIGHT)
 
@@ -199,7 +202,10 @@ func click() -> void:
 	for i: int in _tags.size():
 		if not _tags[i].has_point(at):
 			continue
-		if i >= cats:
+		if i == cats:
+			mode.set_moving(not mode.moving)
+			return
+		if i > cats:
 			mode.set_demolish(not mode.demolish)
 			return
 		mode.category = i
@@ -234,10 +240,13 @@ func _draw() -> void:
 	var x: float = x0 + 26.0
 	for i: int in cats.size():
 		var label: String = String(cats[i].name)
-		var on: bool = i == mode.category and not mode.demolish
+		var on: bool = i == mode.category and mode.building()
 		x = _hang_tag(label, x, course, i, on, GOLD if on else TEXT, GOLD, void_level)
 	var demolish_width: float = float(PixelText.width(DEMOLISH_LABEL) + 10)
-	_hang_tag(DEMOLISH_LABEL, x1 - 14.0 - demolish_width, course, cats.size(), mode.demolish, BAD if mode.demolish else DIM, BAD, void_level)
+	var move_width: float = float(PixelText.width(MOVE_LABEL) + 10)
+	var demolish_x: float = x1 - 14.0 - demolish_width
+	_hang_tag(MOVE_LABEL, demolish_x - TAG_GAP - move_width, course, cats.size(), mode.moving, GOLD if mode.moving else DIM, LIT, void_level)
+	_hang_tag(DEMOLISH_LABEL, demolish_x, course, cats.size() + 1, mode.demolish, BAD if mode.demolish else DIM, BAD, void_level)
 
 	var y1: float = y0 + 31.0
 	var pend_right: float = x0 + FIRST + float(_widest() - 1) * STRIDE + PEND / 2.0 + 10.0
@@ -256,12 +265,20 @@ func _draw() -> void:
 	if reveal > 0.5:
 		if mode.demolish:
 			_draw_demolish(leaf, reveal)
+		elif mode.moving:
+			_draw_move(leaf, reveal)
 		else:
 			_draw_info(leaf, reveal)
 	_draw_town_strip(Rect2(x1 - 160.0, frame.position.y - 12.0, 156.0, 14.0), reveal)
 	_plans.queue_redraw()
 	_mini.queue_redraw()
-	var controls: String = "LMT SETZEN  R SPIEGELN  V KATEGORIE  X ABRISS  B ENDE" if not mode.demolish else "LMT ABREISSEN  X ZURÜCK ZUM BAUEN  B ENDE"
+	var controls: String = "LMT SETZEN  R SPIEGELN  V KATEGORIE  T VERSETZEN  X ABRISS  B ENDE"
+	if mode.demolish:
+		controls = "LMT ABREISSEN  X ZURÜCK ZUM BAUEN  B ENDE"
+	elif mode.carrying():
+		controls = "LMT ABSETZEN  R SPIEGELN  RMT ZURÜCKSTELLEN  B ENDE"
+	elif mode.moving:
+		controls = "LMT ANHEBEN  T ZURÜCK ZUM BAUEN  X ABRISS  B ENDE"
 	PixelText.draw(_canvas, controls, Vector2i(int(frame.get_center().x) - PixelText.width(controls) / 2, int(leaf.end.y) + 4), Color(DIM, reveal), SHADOW)
 	if _toast_left > 0.0:
 		_draw_toast(Vector2(frame.get_center().x, frame.position.y - 24.0))
@@ -285,7 +302,7 @@ func _draw_town_strip(rect: Rect2, fade: float) -> void:
 		return
 	var k: float = clampf((worth - base) / maxf(next - base, 1.0), 0.0, 1.0)
 	var gain: float = 0.0
-	if not mode.demolish and mode.piece != "":
+	if mode.building() and mode.piece != "":
 		gain = float(TownRules.piece(mode.piece).get("worth", 0.0))
 	var k2: float = clampf((worth + gain - base) / maxf(next - base, 1.0), 0.0, 1.0)
 	_canvas.draw_rect(bar.grow(1.0), Color(SHADOW, 0.9 * fade))
@@ -360,12 +377,12 @@ func _draw_pendants(left: float, course: Callable, void_level: float) -> void:
 		var drop: float = clampf(float(_flip.get(id, 0.0)), 0.0, 1.0)
 		if drop <= 0.0:
 			continue
-		var on: bool = id == mode.piece and not mode.demolish
+		var on: bool = id == mode.piece and mode.building()
 		var thread: float = (3.0 + VineStyle.rand(i * 7 + 1) * 3.0) * VineStyle.back_out(drop)
 		var sway: float = roundf(sin(_time * 1.1 + float(i) * 1.7))
 		var width: float = roundf(PEND * drop)
 		var plate: Rect2 = Rect2(roundf(cx + sway - width / 2.0), roundf(anchor_y + thread - float(_lift.get(id, 0.0))), width, CARD_H)
-		var alpha: float = minf(drop * 2.0, 1.0) * (0.4 if mode.demolish else 1.0)
+		var alpha: float = minf(drop * 2.0, 1.0) * (1.0 if mode.building() else 0.4)
 		var open: bool = mode.town.is_unlocked(id)
 		var short: bool = false
 		var cost: Dictionary = TownRules.piece(id).get("cost", {}) as Dictionary
@@ -512,6 +529,37 @@ func _draw_demolish(leaf: Rect2, fade: float) -> void:
 	var cx: float = float(x)
 	for item: String in back:
 		cx += _chip(Vector2(cx, float(y) + 18.0), item, "+%d" % int(back[item]), LIT, 1.0, fade)
+
+
+## The move tool's leaf: what the hand would lift (or carries), whether it may stand where it is held (or why not), that it is free.
+func _draw_move(leaf: Rect2, fade: float) -> void:
+	var x: int = int(leaf.position.x) + 9
+	var y: int = int(leaf.position.y) + 7
+	var right: int = int(leaf.end.x) - 9
+	var id: int = mode.carry_id if mode.carrying() else mode.target_id
+	if id < 0 or not mode.town.structures.has(id):
+		PixelText.draw(_canvas, "ZIEL AUF EIN TEIL", Vector2i(x, y), Color(TEXT, fade), SHADOW)
+		PixelText.draw(_canvas, "LMT HEBT ES AN, LMT SETZT ES WIEDER AB", Vector2i(x, y + 9), Color(DIM, fade), SHADOW)
+		PixelText.draw(_canvas, "VERSETZEN KOSTET NICHTS", Vector2i(x, y + 18), Color(LIT, fade), SHADOW)
+		return
+	var data: Dictionary = mode.town.structures[id] as Dictionary
+	var spec: Dictionary = TownRules.piece(String(data.p))
+	PixelText.draw(_canvas, String(spec.name).to_upper(), Vector2i(x, y), Color(GOLD, fade), SHADOW)
+	var state: String = "FERTIG" if int(data.g) >= TownManager.PROGRESS_FULL else "BAUSTELLE"
+	PixelText.draw(_canvas, state, Vector2i(right - PixelText.width(state), y), Color(DIM, fade), SHADOW)
+	if not mode.carrying():
+		PixelText.draw(_canvas, "LMT HEBT ES AN", Vector2i(x, y + 9), Color(TEXT, fade), SHADOW)
+		var keeps: String = "DIE BAUSTELLE BEHÄLT IHREN FORTSCHRITT" if state == "BAUSTELLE" else "ES BLEIBT, WIE ES IST, NUR WOANDERS"
+		PixelText.draw(_canvas, keeps, Vector2i(x, y + 18), Color(DIM, fade), SHADOW)
+		PixelText.draw(_canvas, "VERSETZEN KOSTET NICHTS", Vector2i(x, y + 27), Color(LIT, fade), SHADOW)
+		return
+	var text: String = mode.reason if mode.reason != "" else "HIER KANN ES STEHEN"
+	var row: int = 0
+	for line: String in _wrap(text, right - x):
+		if row < 2:
+			PixelText.draw(_canvas, line, Vector2i(x, y + 9 + row * 7), Color(BAD if mode.reason != "" else LIT, fade), SHADOW)
+		row += 1
+	PixelText.draw(_canvas, "RMT STELLT ES ZURÜCK", Vector2i(x, y + 27), Color(DIM, fade), SHADOW)
 
 
 ## An item's icon with a label beside it, like the workbench's cost chips; returns its width including the gap.

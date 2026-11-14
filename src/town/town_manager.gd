@@ -753,8 +753,8 @@ func missing_text(cost: Dictionary, player: Player) -> String:
 
 
 ## Everything that can be said against a piece standing with its feet at `pos` (a snapped position), independent of who builds and what they carry:
-## "" when the site is fine, otherwise a short reason.
-func check_site(piece: String, pos: Vector2, check_world: bool = true) -> String:
+## "" when the site is fine, otherwise a short reason. `ignore`: a piece that is being moved (it does not stand in its own way).
+func check_site(piece: String, pos: Vector2, check_world: bool = true, ignore: int = -1) -> String:
 	var spec: Dictionary = TownRules.piece(piece)
 	if spec.is_empty():
 		return "UNBEKANNT"
@@ -768,6 +768,8 @@ func check_site(piece: String, pos: Vector2, check_world: bool = true) -> String
 		if parked != "":
 			return parked
 	for id: int in structures:
+		if id == ignore:
+			continue
 		var data: Dictionary = structures[id] as Dictionary
 		var other: Dictionary = TownRules.piece(String(data.p))
 		if not bool(other.get("builtin", false)) and TownRules.overlaps(rect, rect_of(id)):
@@ -780,11 +782,12 @@ func check_site(piece: String, pos: Vector2, check_world: bool = true) -> String
 		if their_front.has_area() and TownRules.overlaps(rect, their_front):
 			return "VERSPERRT EINE TÜR"
 	if check_world and world != null:
-		var reason: String = world.town_probe(rect)
+		var own: Array[RID] = (_views[ignore] as TownStructure).solid_rids() if _views.has(ignore) and is_instance_valid(_views[ignore]) else ([] as Array[RID])
+		var reason: String = world.town_probe(rect, own)
 		if reason != "":
 			return reason
 		if front.has_area():
-			reason = world.town_probe(front) ## a fallen log, a trunk or a rock in front of the door: nobody could get in
+			reason = world.town_probe(front, own) ## a fallen log, a trunk or a rock in front of the door: nobody could get in
 			if reason != "":
 				return "TÜR ZUGESTELLT" if reason == "IM WEG" else reason
 		var body: Rect2 = rect ## where nobody may stand: the footprint, or on a walkable floor only what stands on it (the fountain)
@@ -820,6 +823,25 @@ func check_place(piece: String, pos: Vector2, builder: Player, check_world: bool
 	if reason != "":
 		return reason
 	return missing_text(spec.get("cost", {}) as Dictionary, builder)
+
+
+## Can the piece `id` be carried to `pos` (snapped)? The same site rules as a new piece (it does not stand in its own way), the builder must reach both the old
+## and the new place; it costs nothing. The house stays, and the fountain square stays while the caravan stands on it.
+func check_move(id: int, pos: Vector2, builder: Player, check_world: bool = true) -> String:
+	if not founded:
+		return "KEINE STADT"
+	if not structures.has(id):
+		return "UNBEKANNT"
+	var data: Dictionary = structures[id] as Dictionary
+	var piece: String = String(data.p)
+	if bool(TownRules.piece(piece).get("builtin", false)):
+		return "DAS HAUS BLEIBT"
+	if piece == "plaza" and caravan != null and CaravanRules.parked(caravan.state()):
+		return "DIE KARAWANE STEHT DARAUF"
+	var reach: float = float((TownRules.config().get("limits", {}) as Dictionary).get("build_reach", 240.0))
+	if builder != null and (builder.global_position.distance_to(pos) > reach or builder.global_position.distance_to(position_of(id)) > reach):
+		return "ZU WEIT WEG"
+	return check_site(piece, pos, check_world, id)
 
 
 # ---------- founding ----------
@@ -1021,8 +1043,9 @@ func _rpc_stock_state(new_slots: Array) -> void:
 # ---------- trampled ways ----------
 
 ## Host: a building gets a way from its door towards the town (the hut's door, another building's door); on the way it joins an older way when it meets one
-## (`TownWays`). The front is tried first; when something stands in front of it (a fallen log) the sides and the back are.
-func _host_make_way(id: int) -> void:
+## (`TownWays`). The front is tried first; when something stands in front of it (a fallen log) the sides and the back are. `done`: the piece stands already (it was
+## moved), the way shows at once.
+func _host_make_way(id: int, done: bool = false) -> void:
 	if world == null:
 		return
 	var hut: Hut = world.hut_node()
@@ -1069,7 +1092,7 @@ func _host_make_way(id: int) -> void:
 		var pts_out: Array = []
 		for p: Vector2 in route:
 			pts_out.append([snappedf(p.x, 0.1), snappedf(p.y, 0.1)])
-		_rpc_way_added.rpc({"s": id, "p": pts_out, "d": 0, "e": 0 if bool(made.joined) else 1})
+		_rpc_way_added.rpc({"s": id, "p": pts_out, "d": 1 if done else 0, "e": 0 if bool(made.joined) else 1})
 		return
 
 
@@ -1267,6 +1290,78 @@ func _rpc_removed(id: int) -> void:
 	_rebuild_surfaces()
 	_sync_seats()
 	changed.emit()
+
+
+# ---------- moving ----------
+
+## Local builder asks to carry the piece `id` to `pos` (already snapped), mirrored or not. Free; a site keeps its progress, a field its beds.
+func request_move(id: int, pos: Vector2, flip: bool) -> void:
+	if multiplayer.is_server():
+		_host_move(id, pos, 1 if flip else 0, multiplayer.get_unique_id())
+	else:
+		_rpc_move.rpc_id(1, id, pos.x, pos.y, 1 if flip else 0)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_move(id: int, x: float, y: float, flip: int) -> void:
+	if multiplayer.is_server():
+		_host_move(id, Vector2(x, y), flip, multiplayer.get_remote_sender_id())
+
+
+func _host_move(id: int, pos: Vector2, flip: int, peer: int) -> void:
+	if not structures.has(id):
+		return
+	var piece: String = String((structures[id] as Dictionary).p)
+	pos = TownRules.snapped_position(piece, pos)
+	var reason: String = check_move(id, pos, player_of(peer))
+	if reason != "":
+		_tell(peer, reason, false)
+		return
+	var spec: Dictionary = TownRules.piece(piece)
+	var rect: Rect2 = TownRules.foot_rect(piece, pos.x, pos.y)
+	var front: Rect2 = TownRules.front_rect(piece, pos.x, pos.y)
+	var cells: Array = world.town_soft_cells(rect.merge(front) if front.has_area() else rect) if world != null else []
+	_rpc_moved.rpc(id, pos.x, pos.y, flip, cells)
+	if bool(spec.get("paths", false)):
+		_host_make_way(id, is_built(id)) ## a way from the new door (the old one stays trodden, like the way of a piece that was taken down)
+	_tell(peer, "%s VERSETZT" % String(spec.name), true)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_moved(id: int, x: float, y: float, flip: int, cells: Array) -> void:
+	if not structures.has(id):
+		return
+	var data: Dictionary = structures[id] as Dictionary
+	data.x = x
+	data.y = y
+	data.f = flip
+	for cell: Variant in cells:
+		cleared[cell as Vector2i] = true
+	if world != null:
+		world.town_clear_cells(cells)
+		var rect: Rect2 = rect_of(id)
+		for cell: Variant in world.town_clear_clover(rect.get_center(), maxf(rect.size.x, rect.size.y) * 0.5):
+			cleared[cell as Vector2i] = true
+	var dropped: bool = false
+	for i: int in range(paths.size() - 1, -1, -1):
+		if int((paths[i] as Dictionary).s) == id and int((paths[i] as Dictionary).d) == 0:
+			paths.remove_at(i) ## the planned way of a site led to the old door
+			dropped = true
+	if dropped: ## the pictures are kept by index: lay them out again
+		for sprite: Variant in _path_views.values():
+			(sprite as Sprite2D).queue_free()
+		_path_views.clear()
+		_refresh_ways()
+	if _views.has(id):
+		(_views[id] as TownStructure).dismantle()
+		_views.erase(id)
+	_walk_key = -1 ## the settlers find their ways anew
+	_circles_dirty = true
+	_register(id)
+	if _views.has(id):
+		(_views[id] as TownStructure).arrive()
+	_sync_seats()
+	changed.emit() ## a field's beds go along by themselves (they are kept by index in the field)
 
 
 # ---------- building ----------
@@ -2520,9 +2615,10 @@ func _sync_seats() -> void:
 		if _seats.has(key):
 			(_seats[key] as BenchSeat).refresh()
 			continue
-		var seat: BenchSeat = BenchSeat.new()
+		var seat_id: int = int((wanted[key] as Array)[0])
+		var seat: BenchSeat = SalonSeat.new() if bool(TownRules.piece(String((structures[seat_id] as Dictionary).p)).get("salon", false)) else BenchSeat.new() ## the salon's chair frames her up close
 		_seat_root.add_child(seat)
-		seat.setup(self, int((wanted[key] as Array)[0]), int((wanted[key] as Array)[1]))
+		seat.setup(self, seat_id, int((wanted[key] as Array)[1]))
 		_seats[key] = seat
 
 

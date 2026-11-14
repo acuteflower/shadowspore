@@ -9,6 +9,7 @@ var item_keys_claimed: bool = false ## the inventory uses the number keys this f
 
 ## True while the Escape menu is open (the inventory stays shut then).
 var menu_open: bool = false
+var mod_menu_open: bool = false ## the item drop menu holds the hero's movement and aim
 
 ## True while the free camera (L) flies: she stands still and nothing in the world reacts to the keys.
 var freecam_open: bool = false
@@ -40,7 +41,7 @@ func _input(event: InputEvent) -> void:
 
 
 func move_vector() -> Vector2:
-	return Vector2.ZERO if map_open or journal_open or skills_open or progress_open or freecam_open else map_pan_vector()
+	return Vector2.ZERO if map_open or journal_open or skills_open or progress_open or freecam_open or mod_menu_open else map_pan_vector()
 
 
 func skills_pressed() -> bool:
@@ -154,7 +155,7 @@ const HOTBAR_ACTIONS: Array[StringName] = [
 
 ## Number key 1-8 pressed this frame -> 0-7, else -1.
 func hotbar_pick() -> int:
-	if (skills_open or progress_open) or build_open or freecam_open or item_keys_claimed:
+	if (skills_open or progress_open) or build_open or freecam_open or item_keys_claimed or mod_menu_open:
 		return -1
 	for i: int in 8:
 		if Input.is_action_just_pressed(HOTBAR_ACTIONS[i]):
@@ -178,7 +179,7 @@ func sneak_held() -> bool:
 
 
 func blink_pressed() -> bool:
-	return not (skills_open or progress_open) and not freecam_open and Input.is_action_just_pressed("blink")
+	return not (skills_open or progress_open) and not freecam_open and not mod_menu_open and Input.is_action_just_pressed("blink")
 
 
 ## Alt (gamepad B): the shadow step, a short evasive step through the void.

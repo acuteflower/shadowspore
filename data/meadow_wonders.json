@@ -1,0 +1,34 @@
+{
+  "_doc": "Die drei einmaligen Weltwunder des Standard-Wiesenbioms (docs/wiesenbiom_ausbau_konzept.md, Stufe 5): Der Glockenteich, Der Kreis der Schlafenden Wächter und Das Blumen-Amphitheater.",
+  "bell_pond": {
+    "id": "wonder_bell_pond",
+    "name": "DER GLOCKENTEICH",
+    "sub": "DIE VERSUNKENEN TRITTSTEINE SIND ERWACHT",
+    "shore_tile": [795, 525],
+    "spire_tile": [801, 525],
+    "chest_tier": "legendary",
+    "xp": 28,
+    "reveal_cells": 16.0
+  },
+  "sleeping_guardians": {
+    "id": "wonder_sleeping_guardians",
+    "name": "KREIS DER SCHLAFENDEN WÄCHTER",
+    "sub": "EIN URALTES SEGENS-ECHO DURCHSTRÖMT DAS PLATEAU",
+    "tile": [256, 205],
+    "ring_rx": 76.0,
+    "ring_ry": 52.0,
+    "headstone_offset": [88.0, 56.0],
+    "chest_tier": "legendary",
+    "xp": 32,
+    "reveal_cells": 18.0
+  },
+  "flower_amphitheater": {
+    "id": "wonder_flower_amphitheater",
+    "name": "DAS BLUMEN-AMPHITHEATER",
+    "sub": "DIE IRRLICHTER TANZEN AUF DER STILLEN BÜHNE",
+    "tile": [421, 667],
+    "chest_tier": "rare",
+    "xp": 24,
+    "reveal_cells": 15.0
+  }
+}

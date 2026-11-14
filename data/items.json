@@ -2345,5 +2345,94 @@
    "regen_seconds": 10
   },
   "description": "Schimmernde, blassgrüne Birne von uralten Weidebäumen. Im kühlen Fruchtfleisch glimmt sanftes Nachtlicht – stellt 6 Leben sofort und 16 über 10 Sekunden wieder her."
+ },
+ "star_shard": {
+  "name": "Sternerz",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/star_shard.png",
+  "description": "Noch immer handwarmes, violett-goldenes Himmelsgestein aus einem nächtlichen Sternschnuppenkrater der Wiese. In seinem Kern singt reines Sternenlicht."
+ },
+ "antler_talisman": {
+  "name": "Kronenhirsch-Reif",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "bracelet",
+  "rarity": "epic",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/antler_talisman.png",
+  "bonus": {
+   "alarm": -0.35,
+   "charge_speed": 0.18,
+   "corvid_calm": 0.25
+  },
+  "look": {
+   "metal": "silver",
+   "stone": "9ef8f0",
+   "stones": 1,
+   "glow": true,
+   "glint": true
+  },
+  "description": "Aus perlweißem Geweih geschwungener Armreif, den der Weiße Kronenhirsch für geduldig Schleichende aus dem Moos scharrte. Deine Schritte klingen für Waldtiere und Schatten wie leiser Tau."
+ },
+ "bell_chime_talisman": {
+  "name": "Glockenteich-Gehänge",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "earrings",
+  "rarity": "epic",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/bell_chime_talisman.png",
+  "bonus": {
+   "blink_cooldown": -0.22,
+   "absorb": 0.1
+  },
+  "look": {
+   "metal": "gold",
+   "stone": "5ee9dc",
+   "stones": 2,
+   "glow": true,
+   "drop": [
+    "m",
+    "S",
+    "T",
+    "s"
+   ]
+  },
+  "description": "Zwei winzige Glöckchen aus patinierter Bronze aus der versunkenen Turmspitze des Glockenteichs. Sie läuten lautlos unter Wasser, wann immer du durch den Schatten trittst."
+ },
+ "order_signet": {
+  "name": "Ordenssiegel der Wacht",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "necklace",
+  "rarity": "rare",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/order_signet.png",
+  "bonus": {
+   "health": 18,
+   "armor": 3,
+   "heavy_damage": 0.1
+  },
+  "look": {
+   "metal": "gold",
+   "stone": "d13b4f",
+   "stones": 1,
+   "pendant": [
+    "lm",
+    "mS",
+    ".d"
+   ]
+  },
+  "description": "Schweres weinrot-goldenes Wappenmedaillon eines Kommandanten des Roten Ordens. Selbst nach Jahren im Wiesenwind liegt es warm und unerschütterlich auf der Brust."
  }
 }

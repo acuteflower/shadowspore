@@ -18,12 +18,11 @@ func _run() -> void:
 	player.inventory.give("wood", 3)
 	var inventory_before: Array = player.inventory.slots.duplicate(true)
 	player.quests.set_flag("developer_test_keep")
-	menu._set_open(true)
-	menu._select_tab(3)
+	menu.open_test_tools()
 	var found: bool = false
 	for item: Dictionary in menu._items:
 		if String(item.get("action", "")) == "return_home": found = true
-	check(found, "developer tab has return-home button")
+	check(found, "test tools have return-home button")
 	menu._run_action("return_home")
 	await get_tree().process_frame
 	check(not get_tree().paused and not menu.visible, "developer menu closes and unpauses")

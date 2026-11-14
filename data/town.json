@@ -345,6 +345,146 @@
     "front": false
    }
   },
+  "salon": {
+   "name": "FREILUFTSALON",
+   "needs": "plaza",
+   "category": "living",
+   "texture": "salon",
+   "frame": [
+    112,
+    96
+   ],
+   "feet": 84,
+   "foot": [
+    72,
+    18
+   ],
+   "snap": 8,
+   "limit": 1,
+   "salon": true,
+   "cost": {
+    "wood": 10,
+    "stone": 3,
+    "plant_fiber": 4,
+    "glow_cap": 1
+   },
+   "build_seconds": 8.0,
+   "wave": 32,
+   "worth": 3,
+   "info": "EIN FRISIERPLATZ UNTER FREIEM HIMMEL. HIER WIRD ELLIE BALD IHR AUSSEHEN ÄNDERN.",
+   "glow": true,
+   "anim": {
+    "frames": 8,
+    "fps": 6
+   },
+   "light": {
+    "color": "ffc890",
+    "radius": 48,
+    "energy": 0.6,
+    "at": [
+     33,
+     -60
+    ],
+    "flicker": 0.15
+   },
+   "preview": "salon_preview",
+   "seats": [
+    [
+     -14,
+     4,
+     2
+    ]
+   ],
+   "mirror": [
+    18,
+    -42
+   ],
+   "fireflies": true,
+   "trample": {
+    "strength": 0.6,
+    "margin": 10,
+    "front": false
+   },
+   "perches": [
+    [
+     -24,
+     -16,
+     58
+    ],
+    [
+     12,
+     -16,
+     58
+    ]
+   ],
+   "parts": [
+    {
+     "texture": "salon_ribbons",
+     "frame": [
+      36,
+      15
+     ],
+     "at": [
+      26,
+      45
+     ],
+     "window": [
+      0.7,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.6,
+      "flutter": 0.9
+     }
+    },
+    {
+     "texture": "salon_canopy",
+     "frame": [
+      80,
+      14
+     ],
+     "at": [
+      16,
+      12
+     ],
+     "window": [
+      0.8,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.2,
+      "flutter": 0.6
+     }
+    },
+    {
+     "texture": "salon_lantern",
+     "frame": [
+      6,
+      12
+     ],
+     "at": [
+      86,
+      18
+     ],
+     "window": [
+      0.85,
+      1.0
+     ],
+     "sway": {
+      "pivot": 0,
+      "amount": 1.4,
+      "flutter": 0.3
+     },
+     "glow": {
+      "frames": 8,
+      "fps": 6
+     },
+     "fireflies": true
+    }
+   ]
+  },
   "path_stone": {
    "needs": "plaza",
    "name": "TRITTPLATTE",

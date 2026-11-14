@@ -29,7 +29,6 @@ const TABS: Array[Dictionary] = [
 	{"id": "map", "name": "KARTE", "x": -34.0, "sealed": true},
 	{"id": "town", "name": "STADT", "x": 52.0, "sealed": false}, ## the skill graph stays on F / Start (and the settings page lists its key)
 	{"id": "pets", "name": "VÖGEL", "x": 98.0, "sealed": false}, ## the book of the named crows and ravens (docs/pet_konzept.md)
-	{"id": "dev", "name": "ENTWICKLER", "x": 150.0, "sealed": false},
 ]
 const CONTROLS: Array[Array] = [
 	["BEWEGEN", "", "WASD"], ["SPRINTEN", "sprint", ""], ["SCHATTENSCHRITT", "shadow_step", ""],
@@ -41,10 +40,11 @@ var _open_t: float = 0.0
 var _opening: bool = false
 var _time: float = 0.0
 var _tab: int = 0
+var _test_tools: bool = false
 var _tab_t: float = 1.0 ## 0 -> 1 after switching: the page grows again
 var _bloom_x: float = 0.0
-var _tab_lift: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
-var _tab_deny: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0] ## a sealed tag shivers when clicked
+var _tab_lift: Array[float] = [0.0, 0.0, 0.0, 0.0]
+var _tab_deny: Array[float] = [0.0, 0.0, 0.0, 0.0] ## a sealed tag shivers when clicked
 var _hover_tab: int = -1
 var _items: Array[Dictionary] = []
 var _cursor: Array[float] = [0.0, 0.0]
@@ -62,10 +62,10 @@ var _quit_t: float = -1.0
 var _dirty: bool = false
 var _paused_here: bool = false
 var _vignette: GradientTexture2D
-var _tp_text: String = "" ## the teleport field of the developer tab: "x, y" in tiles
+var _tp_text: String = "" ## the test tools' teleport field: "x, y" in tiles
 var _scrolls: Array[float] = [0.0, 0.0] ## per column: how far it is scrolled up (px); a column taller than the screen scrolls on its own
 var _editing: bool = false ## a text field takes the keys
-var _field: String = "tp" ## which one: "tp" (teleport, developer tab) or "pet" (the name of a bird)
+var _field: String = "tp" ## which one: "tp" (test tools' teleport) or "pet" (the name of a bird)
 var _pet_sel: String = "" ## the bird whose page is open in the VÖGEL tab
 var _pet_text: String = "" ## the new name being typed
 
@@ -110,13 +110,19 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-func _set_open(open: bool) -> void:
+func open_test_tools() -> void:
+	if not _opening:
+		_set_open(true, true)
+
+
+func _set_open(open: bool, test_tools: bool = false) -> void:
 	if open == _opening:
 		return
 	_opening = open
 	InputManager.ui_blocking = open
 	InputManager.menu_open = open
 	if open:
+		_test_tools = test_tools
 		_tab = 0
 		_tab_t = 0.0
 		_editing = false
@@ -125,7 +131,10 @@ func _set_open(open: bool) -> void:
 		_bloom_x = float(TABS[0]["x"])
 		_armed = ""
 		_save_info = SaveGame.info(SaveGame.path_for(get_tree())) if _can_save() else {}
-		_refresh_footer()
+		if _test_tools:
+			_footer.clear()
+		else:
+			_refresh_footer()
 		_build_items()
 		_paused_here = multiplayer.get_peers().is_empty() ## alone: time stands still
 		get_tree().paused = _paused_here
@@ -185,10 +194,137 @@ func _add(col: int, kind: String, label: String, key: String = "", extra: Dictio
 	_cursor[col] += height
 
 
+func _build_test_tools() -> void:
+	_add(0, "heading", "SPIELER")
+	_add(0, "button", "TITELKARTE ZEIGEN", "", {"action": "title_card"})
+	_add(0, "button", "AUF 5 HP SETZEN", "", {"action": "hurt5"})
+	if multiplayer.is_server():
+		if get_tree().get_first_node_in_group("world") is WorldLevel:
+			_add(0, "button", "VORSTOSS AUSLÖSEN", "", {"action": "raid"})
+		_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
+		_add(0, "button", "HIMMELSRISS BEKOMMEN", "", {"action": "rift_sword"})
+		for lvl: int in [0, 5, 10, 15]:
+			_add(0, "button", "WAFFE +%d" % lvl, "", {"action": "refine_%d" % lvl}) ## sets the refinement of the weapon in her hand
+		_add(0, "button", "TALISMANE ANLEGEN", "", {"action": "talismans_on"})
+		_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
+		_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
+		_add(0, "button", "ALLE TRÄNKE (ALLE STUFEN)", "", {"action": "potions_all"})
+		_add(0, "button", "ZAUBERSTÄBE + ALLE KRISTALLE", "", {"action": "magic_all"}) ## docs/magie_konzept.md: the Hexenulmenstab and every crystal of every tier
+		_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
+		_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
+		_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
+		_add(0, "button", "IN DIE QUARZWÜSTE", "", {"action": "quartz_desert"})
+		_add(0, "button", "ZUR ZENITWARTE", "", {"action": "desert_observatory"})
+		_add(0, "button", "ZUM AUSSICHTSPUNKT", "", {"action": "vista_next"}) ## cycles through the 14 meadow cliff vistas (docs/wiesenbiom_ausbau_konzept.md)
+		_add(0, "button", "IN DEN TIEFEN URFORST", "", {"action": "habitat_urforst"})
+		_add(0, "button", "ZUR WINDWIESE (WINDEICHE)", "", {"action": "habitat_wind"})
+		_add(0, "button", "ZUM ALTEN WEIDELAND", "", {"action": "habitat_pasture"})
+		_add(0, "button", "ZU DEN ORDENS-RUINEN", "", {"action": "poi_order"})
+		_add(0, "button", "ZUR ALTEN WASSERMÜHLE", "", {"action": "poi_mill"})
+		_add(0, "button", "ZUR GEBROCHENEN BRÜCKE", "", {"action": "poi_bridge"})
+		_add(0, "button", "ZUM FISCHERSTEG", "", {"action": "poi_pier"})
+		_add(0, "button", "WUNDER: GLOCKENTEICH", "", {"action": "wonder_bell"})
+		_add(0, "button", "WUNDER: SCHLAFENDE WÄCHTER", "", {"action": "wonder_guardians"})
+		_add(0, "button", "WUNDER: BLUMEN-AMPHITHEATER", "", {"action": "wonder_amphitheater"})
+		_add(0, "button", "QUARZWÄCHTER SPAWNEN", "", {"action": "quartz_golem_spawn"})
+		_add(0, "button", "ZUR SEEHEXE", "", {"action": "lake_witch"}) ## docs/seehexe_konzept.md: in front of her house at the Hexenwald lake
+		_add(0, "button", "SEEHEXE: QUEST STARTEN", "", {"action": "lake_witch_quest"}) ## the entry quest from the start, the ring asleep (host)
+		_add(0, "button", "SEEHEXE BEKANNT", "", {"action": "lake_witch_known"}) ## the ring awake, the quest done, the staff in the bag (host)
+		_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
+		_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
+		_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
+		_add(0, "button", "TRUHE: GEWÖHNLICH", "", {"action": "chest:common"}) ## a test chest in front of her (docs/beutetruhen_konzept.md, not saved)
+		_add(0, "button", "TRUHE: SELTEN", "", {"action": "chest:rare"})
+		_add(0, "button", "TRUHE: LEGENDÄR", "", {"action": "chest:legendary"})
+		_add(0, "button", "TRUHE: BOSS-ANKUNFT", "", {"action": "chest:legendary:arrive"}) ## falls out of a pillar of light like a boss's chest
+		_add(0, "button", "IRRLICHT: ZUR SCHALE", "", {"action": "wisp_go"}) ## to the wisp trail's bowl (docs/raetsel_konzept.md 1)
+		_add(0, "button", "IRRLICHT ZURÜCKSETZEN", "", {"action": "wisp_reset"}) ## host: the trail open again, its chest gone
+		_add(0, "button", "HORTKRÄHE: ZUM BAUM", "", {"action": "crow_go"}) ## to the crow's hoard snag (docs/raetsel_konzept.md 4)
+		_add(0, "button", "HORTKRÄHE ZURÜCKSETZEN", "", {"action": "crow_reset"}) ## host: the hoard hidden again, its chest gone
+		_add(0, "button", "SONNENKERNE + HACKE", "", {"action": "crow_kit"}) ## host: crow food and a hoe for the hoard
+		_add(0, "button", "RABE: ZUM BAUM", "", {"action": "raven_go"}) ## to the raven's snag (docs/raetsel_konzept.md 4, rare)
+		_add(0, "button", "RABE ZURÜCKSETZEN", "", {"action": "raven_reset"})
+		_add(0, "button", "GLIMMER + STEIN FÜR DEN RABEN", "", {"action": "raven_kit"}) ## host: a pawn it likes and a plain stone it refuses
+		_add(0, "button", "WURZELGEFLECHT: ZUM HERZ", "", {"action": "weave_go"}) ## to the first root weave's heart (docs/raetsel_konzept.md 6a)
+		_add(0, "button", "WURZELGEFLECHT ZURÜCKSETZEN", "", {"action": "weave_reset"})
+		_add(0, "button", "STERNENSPIEGEL: ZUM TEICH", "", {"action": "stars_go"}) ## to the first star mirror's pond (docs/raetsel_konzept.md 6b)
+		_add(0, "button", "STERNENSPIEGEL ZURÜCKSETZEN", "", {"action": "stars_reset"})
+		_add(0, "button", "MOND: VOLL", "", {"action": "moon:4"}) ## host: tonight's moon (the star mirror reads it)
+		_add(0, "button", "MOND: NEU", "", {"action": "moon:0"})
+		if get_tree().get_first_node_in_group("sandbox") != null:
+			_add(0, "button", "ZURÜCK IN DIE WELT", "", {"action": "trials_leave"}) ## the save is loaded again
+		else:
+			_add(0, "button", "RÄTSELWELT BETRETEN", "", {"action": "trials_enter"}) ## the flat test world with every trial (unsaved progress here is lost)
+	if multiplayer.is_server():
+		_add(0, "heading", "ANGELN")
+		_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
+		if _town() != null and _town().caravan != null: ## the travelling merchant (docs/haendler_konzept.md)
+			_add(0, "heading", "KARAWANE")
+			_add(0, "button", "KARAWANE: JETZT HOLEN", "", {"action": "caravan_come"})
+			_add(0, "button", "KARAWANE: 2 TAGE", "", {"action": "caravan_come2"})
+			_add(0, "button", "KARAWANE: ABREISEN", "", {"action": "caravan_leave"})
+		if get_tree().get_first_node_in_group("world") is WorldLevel:
+			_add(0, "button", "ZUM NÄCHSTEN UFER", "", {"action": "fish_bank"})
+	var west: Hallgrat = get_tree().get_first_node_in_group("hallgrat") as Hallgrat
+	if west != null: ## the stone town in the west, stage 1: its ground plan and the Westweg (docs/stadt_westen_konzept.md)
+		_add(0, "heading", "HALLGRAT")
+		_add(0, "button", "HALLGRAT: PLAN VERBERGEN" if west.plan_shown() else "HALLGRAT: PLAN ZEIGEN", "", {"action": "hallgrat_plan"})
+		_add(0, "button", "HALLGRAT: ZUM OSTTOR", "", {"action": "hallgrat_gate"})
+		_add(0, "button", "WESTWEG: ZUR GABELUNG", "", {"action": "hallgrat_fork"})
+	var story_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+	if story_world != null and story_world.debug_can_return_home():
+		_add(0, "heading", "STORY-SPRUNG")
+		_add(0, "button", "ZURÜCK MIT DER AXT", "", {"action": "return_home"})
+		_add(0, "button", "FERTIGE STADT", "", {"action": "town_jump"})
+		_add(0, "button", "GUSTAV GERETTET", "", {"action": "gustav_jump"})
+		_add(0, "button", "ALLES FERTIG + TORBEN", "", {"action": "all_jump"})
+	if story_world != null and _player != null and story_world.has_arena_story():
+		_add(0, "heading", "BOSS-QUEST")
+		_add(0, "button", "MORNATH-QUEST STARTEN", "", {"action": "mornath_quest"})
+		_add(0, "button", "ZUR SÄULENEBENE", "", {"action": "mornath_arena"})
+	if story_world != null and _player != null and story_world.witch_arena != null:
+		_add(0, "heading", "MORWENNA")
+		_add(0, "button", "ZUM RABENBAUM", "", {"action": "morwenna_tree"})
+		_add(0, "button", "MORWENNA SOFORT", "", {"action": "morwenna_fight"})
+		_add(0, "button", "SPIEGELHEXE-QUEST", "", {"action": "morwenna_quest"})
+	if story_world != null and multiplayer.is_server() and multiplayer.get_peers().is_empty():
+		_add(0, "heading", "MINE")
+		for lvl: int in [1, 5, 10, 20]:
+			_add(0, "button", "EBENE %d" % lvl, "", {"action": "mine_%d" % lvl})
+		_add(0, "button", "ZURÜCK NACH OBEN", "", {"action": "mine_out"})
+	if _player != null:
+		_add(1, "heading", "TELEPORT")
+		if _tp_text == "":
+			var feet: Vector2 = (_player as Node2D).global_position
+			_tp_text = "%d, %d" % [int(floorf(feet.x / 16.0)), int(floorf(feet.y / 16.0))]
+		_add(1, "field", "KOORDINATEN", "tp")
+		_add(1, "button", "ZUM ZIEL", "", {"action": "teleport"})
+	_add(1, "heading", "WELTWERKSTATT")
+	if multiplayer.is_server() and multiplayer.get_peers().is_empty() and get_tree().get_first_node_in_group("world") is WorldLevel:
+		_add(1, "button", "MAP-EDITOR ÖFFNEN", "", {"action": "editor"})
+	else:
+		_add(1, "info", "NUR IN DER SOLO-WELT", "", {"text": ""})
+	_add(1, "info", "", "", {"text": "SOLO · OBJEKTE & TERRAIN"})
+	_add(1, "heading", "SPIELSTAND")
+	_add(1, "button", "SPEICHERSTAND LÖSCHEN & START", "", {"action": "reset", "risky": true})
+
+
 func _build_items() -> void:
 	_items.clear()
 	_cursor = [TOP_Y, TOP_Y]
 	_focus = -1
+	if _test_tools:
+		_build_test_tools()
+	else:
+		_build_tab()
+	for col: int in 2:
+		_scrolls[col] = clampf(_scrolls[col], 0.0, _max_scroll(col))
+	for item: Dictionary in _items:
+		if _focus < 0 and _interactive(item):
+			_focus = int(item["idx"])
+
+
+func _build_tab() -> void:
 	match String(TABS[_tab]["id"]):
 		"settings":
 			_add(0, "heading", "TON")
@@ -217,136 +353,6 @@ func _build_items() -> void:
 			_build_town_page()
 		"pets":
 			_build_pets_page()
-		"dev":
-			_add(0, "heading", "ZEIT")
-			_add(0, "button", "TAG", "", {"action": "day"})
-			_add(0, "button", "NACHT", "", {"action": "night"})
-			_add(0, "heading", "WETTER: %s" % (WeatherManager.current.display_name() if WeatherManager.current != null else "-"))
-			for pair: Array in [["KLAR", "clear"], ["WOLKIG", "broken"], ["BEDECKT", "overcast"], ["NIESELN", "drizzle"], ["REGEN", "rain"], ["STARKREGEN", "downpour"], ["GEWITTER", "storm"], ["STURMWIND", "gale"], ["NEBEL", "fog"], ["AUTOMATISCH", ""]]:
-				_add(0, "button", String(pair[0]), "", {"action": "weather:" + String(pair[1])})
-			if multiplayer.is_server() and get_tree().get_first_node_in_group("world") is WorldLevel:
-				_add(0, "button", "VORSTOSS AUSLÖSEN", "", {"action": "raid"})
-			_add(0, "heading", "SPIELER")
-			_add(0, "button", "TITELKARTE ZEIGEN", "", {"action": "title_card"})
-			_add(0, "button", "HEILEN", "", {"action": "heal"})
-			if multiplayer.is_server() and _player is Player:
-				_add(0, "button", "GODMODE: %s" % ("AN" if (_player as Player).health.god_mode else "AUS"), "", {"action": "godmode"})
-			_add(0, "button", "AUF 5 HP SETZEN", "", {"action": "hurt5"})
-			if multiplayer.is_server() and _player is Player:
-				_add(0, "button", "+100 XP", "", {"action": "xp_100"})
-				_add(0, "button", "+1 STUFE", "", {"action": "level_up"})
-			if multiplayer.is_server():
-				_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
-				_add(0, "button", "HIMMELSRISS BEKOMMEN", "", {"action": "rift_sword"})
-				for lvl: int in [0, 5, 10, 15]:
-					_add(0, "button", "WAFFE +%d" % lvl, "", {"action": "refine_%d" % lvl}) ## sets the refinement of the weapon in her hand
-				_add(0, "button", "TALISMANE ANLEGEN", "", {"action": "talismans_on"})
-				_add(0, "button", "TALISMANE ABLEGEN", "", {"action": "talismans_off"})
-				_add(0, "button", "ALLE TALISMANE", "", {"action": "talismans_all"})
-				_add(0, "button", "ALLE TRÄNKE (ALLE STUFEN)", "", {"action": "potions_all"})
-				_add(0, "button", "ZAUBERSTÄBE + ALLE KRISTALLE", "", {"action": "magic_all"}) ## docs/magie_konzept.md: the Hexenulmenstab and every crystal of every tier
-				_add(0, "button", "RISSFEDER BEKOMMEN", "", {"action": "rissfeder"})
-				_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
-				_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
-				_add(0, "button", "IN DIE QUARZWÜSTE", "", {"action": "quartz_desert"})
-				_add(0, "button", "ZUR ZENITWARTE", "", {"action": "desert_observatory"})
-				_add(0, "button", "ZUM AUSSICHTSPUNKT", "", {"action": "vista_next"}) ## cycles through the 14 meadow cliff vistas (docs/wiesenbiom_ausbau_konzept.md)
-				_add(0, "button", "IN DEN TIEFEN URFORST", "", {"action": "habitat_urforst"})
-				_add(0, "button", "ZUR WINDWIESE (WINDEICHE)", "", {"action": "habitat_wind"})
-				_add(0, "button", "ZUM ALTEN WEIDELAND", "", {"action": "habitat_pasture"})
-				_add(0, "button", "QUARZWÄCHTER SPAWNEN", "", {"action": "quartz_golem_spawn"})
-				_add(0, "button", "ZUR SEEHEXE", "", {"action": "lake_witch"}) ## docs/seehexe_konzept.md: in front of her house at the Hexenwald lake
-				_add(0, "button", "SEEHEXE: QUEST STARTEN", "", {"action": "lake_witch_quest"}) ## the entry quest from the start, the ring asleep (host)
-				_add(0, "button", "SEEHEXE BEKANNT", "", {"action": "lake_witch_known"}) ## the ring awake, the quest done, the staff in the bag (host)
-				_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
-				_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
-				_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
-				_add(0, "button", "TRUHE: GEWÖHNLICH", "", {"action": "chest:common"}) ## a test chest in front of her (docs/beutetruhen_konzept.md, not saved)
-				_add(0, "button", "TRUHE: SELTEN", "", {"action": "chest:rare"})
-				_add(0, "button", "TRUHE: LEGENDÄR", "", {"action": "chest:legendary"})
-				_add(0, "button", "TRUHE: BOSS-ANKUNFT", "", {"action": "chest:legendary:arrive"}) ## falls out of a pillar of light like a boss's chest
-				_add(0, "button", "IRRLICHT: ZUR SCHALE", "", {"action": "wisp_go"}) ## to the wisp trail's bowl (docs/raetsel_konzept.md 1)
-				_add(0, "button", "IRRLICHT ZURÜCKSETZEN", "", {"action": "wisp_reset"}) ## host: the trail open again, its chest gone
-				_add(0, "button", "HORTKRÄHE: ZUM BAUM", "", {"action": "crow_go"}) ## to the crow's hoard snag (docs/raetsel_konzept.md 4)
-				_add(0, "button", "HORTKRÄHE ZURÜCKSETZEN", "", {"action": "crow_reset"}) ## host: the hoard hidden again, its chest gone
-				_add(0, "button", "SONNENKERNE + HACKE", "", {"action": "crow_kit"}) ## host: crow food and a hoe for the hoard
-				_add(0, "button", "RABE: ZUM BAUM", "", {"action": "raven_go"}) ## to the raven's snag (docs/raetsel_konzept.md 4, rare)
-				_add(0, "button", "RABE ZURÜCKSETZEN", "", {"action": "raven_reset"})
-				_add(0, "button", "GLIMMER + STEIN FÜR DEN RABEN", "", {"action": "raven_kit"}) ## host: a pawn it likes and a plain stone it refuses
-				_add(0, "button", "WURZELGEFLECHT: ZUM HERZ", "", {"action": "weave_go"}) ## to the first root weave's heart (docs/raetsel_konzept.md 6a)
-				_add(0, "button", "WURZELGEFLECHT ZURÜCKSETZEN", "", {"action": "weave_reset"})
-				_add(0, "button", "STERNENSPIEGEL: ZUM TEICH", "", {"action": "stars_go"}) ## to the first star mirror's pond (docs/raetsel_konzept.md 6b)
-				_add(0, "button", "STERNENSPIEGEL ZURÜCKSETZEN", "", {"action": "stars_reset"})
-				_add(0, "button", "MOND: VOLL", "", {"action": "moon:4"}) ## host: tonight's moon (the star mirror reads it)
-				_add(0, "button", "MOND: NEU", "", {"action": "moon:0"})
-				if get_tree().get_first_node_in_group("sandbox") != null:
-					_add(0, "button", "ZURÜCK IN DIE WELT", "", {"action": "trials_leave"}) ## the save is loaded again
-				else:
-					_add(0, "button", "RÄTSELWELT BETRETEN", "", {"action": "trials_enter"}) ## the flat test world with every trial (unsaved progress here is lost)
-			if multiplayer.is_server():
-				var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
-				_add(0, "heading", "KARTE")
-				if fog != null and fog.is_reveal_all():
-					_add(0, "button", "NEBEL ZURÜCKSETZEN", "", {"action": "map_reset"}) ## the fog from before the whole-map reveal comes back
-				else:
-					_add(0, "button", "GANZE KARTE AUFDECKEN", "", {"action": "map_reveal_all"}) ## every part of the world counts as seen (M shows all of it)
-			if multiplayer.is_server():
-				_add(0, "heading", "ANGELN")
-				_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
-				if _town() != null and _town().caravan != null: ## the travelling merchant (docs/haendler_konzept.md)
-					_add(0, "heading", "KARAWANE")
-					_add(0, "button", "KARAWANE: JETZT HOLEN", "", {"action": "caravan_come"})
-					_add(0, "button", "KARAWANE: 2 TAGE", "", {"action": "caravan_come2"})
-					_add(0, "button", "KARAWANE: ABREISEN", "", {"action": "caravan_leave"})
-				if get_tree().get_first_node_in_group("world") is WorldLevel:
-					_add(0, "button", "ZUM NÄCHSTEN UFER", "", {"action": "fish_bank"})
-			var west: Hallgrat = get_tree().get_first_node_in_group("hallgrat") as Hallgrat
-			if west != null: ## the stone town in the west, stage 1: its ground plan and the Westweg (docs/stadt_westen_konzept.md)
-				_add(0, "heading", "HALLGRAT")
-				_add(0, "button", "HALLGRAT: PLAN VERBERGEN" if west.plan_shown() else "HALLGRAT: PLAN ZEIGEN", "", {"action": "hallgrat_plan"})
-				_add(0, "button", "HALLGRAT: ZUM OSTTOR", "", {"action": "hallgrat_gate"})
-				_add(0, "button", "WESTWEG: ZUR GABELUNG", "", {"action": "hallgrat_fork"})
-			var story_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
-			if story_world != null and story_world.debug_can_return_home():
-				_add(0, "heading", "STORY-SPRUNG")
-				_add(0, "button", "ZURÜCK MIT DER AXT", "", {"action": "return_home"})
-				_add(0, "button", "FERTIGE STADT", "", {"action": "town_jump"})
-				_add(0, "button", "GUSTAV GERETTET", "", {"action": "gustav_jump"})
-				_add(0, "button", "ALLES FERTIG + TORBEN", "", {"action": "all_jump"})
-			if story_world != null and _player != null and story_world.has_arena_story():
-				_add(0, "heading", "BOSS-QUEST")
-				_add(0, "button", "MORNATH-QUEST STARTEN", "", {"action": "mornath_quest"})
-				_add(0, "button", "ZUR SÄULENEBENE", "", {"action": "mornath_arena"})
-			if story_world != null and _player != null and story_world.witch_arena != null:
-				_add(0, "heading", "MORWENNA")
-				_add(0, "button", "ZUM RABENBAUM", "", {"action": "morwenna_tree"})
-				_add(0, "button", "MORWENNA SOFORT", "", {"action": "morwenna_fight"})
-				_add(0, "button", "SPIEGELHEXE-QUEST", "", {"action": "morwenna_quest"})
-			if story_world != null and multiplayer.is_server() and multiplayer.get_peers().is_empty():
-				_add(0, "heading", "MINE")
-				for lvl: int in [1, 5, 10, 20]:
-					_add(0, "button", "EBENE %d" % lvl, "", {"action": "mine_%d" % lvl})
-				_add(0, "button", "ZURÜCK NACH OBEN", "", {"action": "mine_out"})
-			if _player != null:
-				_add(1, "heading", "TELEPORT")
-				if _tp_text == "":
-					var feet: Vector2 = (_player as Node2D).global_position
-					_tp_text = "%d, %d" % [int(floorf(feet.x / 16.0)), int(floorf(feet.y / 16.0))]
-				_add(1, "field", "KOORDINATEN", "tp")
-				_add(1, "button", "ZUM ZIEL", "", {"action": "teleport"})
-			_add(1, "heading", "WELTWERKSTATT")
-			if multiplayer.is_server() and multiplayer.get_peers().is_empty() and get_tree().get_first_node_in_group("world") is WorldLevel:
-				_add(1, "button", "MAP-EDITOR ÖFFNEN", "", {"action": "editor"})
-			else:
-				_add(1, "info", "NUR IN DER SOLO-WELT", "", {"text": ""})
-			_add(1, "info", "", "", {"text": "SOLO · OBJEKTE & TERRAIN"})
-			_add(1, "heading", "SPIELSTAND")
-			_add(1, "button", "SPEICHERSTAND LÖSCHEN & START", "", {"action": "reset", "risky": true})
-	for col: int in 2:
-		_scrolls[col] = clampf(_scrolls[col], 0.0, _max_scroll(col))
-	for item: Dictionary in _items:
-		if _focus < 0 and _interactive(item):
-			_focus = int(item["idx"])
 
 
 func _on_pets_changed(_key: String = "") -> void:
@@ -479,6 +485,7 @@ func _build_town_page() -> void:
 	_add(0, "heading", "VERWALTUNG")
 	_add(0, "button", "BAUEN", "", {"action": "town_build"})
 	_add(0, "button", "ABREISSEN", "", {"action": "town_demolish"})
+	_add(0, "button", "VERSETZEN", "", {"action": "town_move"})
 	_add(0, "choice", "NAME", "town_name", {"text": town.town_name()})
 	_add(0, "choice", "FARBE", "town_color", {"text": TownEmblems.COLOR_NAMES[town.look_color]})
 	_add(0, "choice", "WAPPEN", "town_emblem", {"text": TownEmblems.NAMES[town.look_emblem]})
@@ -647,17 +654,6 @@ func _run_action(action: String) -> void:
 		chests.request_dev(parts[1], hero.global_position + ahead * 40.0, parts.size() > 2)
 		_set_open(false)
 		return
-	if action.begins_with("weather:"):
-		if WeatherManager.current == null or not multiplayer.is_server():
-			_failed_flash = 2.5
-			return
-		var forced: String = action.trim_prefix("weather:")
-		if forced == "":
-			WeatherManager.current.release()
-		else:
-			WeatherManager.current.force(forced, 0.0)
-		_build_items()
-		return
 	if action == "weather_fx":
 		GameSettings.set_value("weather_fx", (int(GameSettings.get_value("weather_fx")) + 2) % 3) ## 2 full -> 1 reduced -> 0 off -> 2
 		_dirty = true
@@ -704,16 +700,7 @@ func _run_action(action: String) -> void:
 			if not InputManager.journal_open:
 				_set_open(true)
 				_failed_flash = 2.5
-		"xp_100", "level_up": ## dev: XP through the normal path (host); the reward still has to be collected in the Fortschritt window
-			var earner: Player = _player as Player
-			if earner == null or not multiplayer.is_server():
-				_failed_flash = 2.5
-				return
-			var amount: int = 100
-			if action == "level_up":
-				amount = maxi(Levels.xp_at(earner.progress.level + 1) - earner.progress.xp, 1)
-			earner.progress.award(0, amount)
-		"town_build", "town_demolish":
+		"town_build", "town_demolish", "town_move":
 			var town: TownManager = _town()
 			var builder: BuildMode = town.build_mode() if town != null else null
 			if builder == null or _player == null or not town.founded:
@@ -724,7 +711,9 @@ func _run_action(action: String) -> void:
 			visible = false
 			builder.set_active(true)
 			if builder.active and action == "town_demolish":
-				builder.demolish = true
+				builder.set_demolish(true)
+			elif builder.active and action == "town_move":
+				builder.set_moving(true)
 		"title_card":
 			_set_open(false)
 			_open_t = 0.0
@@ -828,29 +817,12 @@ func _run_action(action: String) -> void:
 				mines.enter(_player as Player, action.trim_prefix("mine_").to_int())
 		"teleport":
 			_teleport_to_field()
-		"day":
-			TimeManager.set_time(0.4)
-		"night":
-			TimeManager.set_time(0.0)
 		"raid": ## the lure is full: the next tick of the night director gathers a raid (needs night creatures nearby and a founded town)
 			var level: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if level == null or level.night == null or not level.night.active():
 				_failed_flash = 2.5
 				return
 			level.night.debug_force_raid()
-		"heal":
-			if _player != null:
-				_player.call("request_heal")
-		"godmode": ## host only: damage, burn and kills do nothing to the local player
-			var god: Player = _player as Player
-			if god == null or not multiplayer.is_server():
-				_failed_flash = 2.5
-				return
-			god.health.god_mode = not god.health.god_mode
-			var keep_focus: int = _focus
-			_build_items()
-			if keep_focus >= 0 and keep_focus < _items.size() and _interactive(_items[keep_focus]):
-				_focus = keep_focus
 		"hurt5":
 			if _player != null:
 				_player.call("request_set_health", 5.0)
@@ -1025,6 +997,40 @@ func _run_action(action: String) -> void:
 			var offset_px: Vector2 = Vector2(8.0, 28.0) if action == "habitat_wind" else Vector2(8.0, 24.0)
 			(_player as Player).request_teleport(Vector2(target_tile) * 16.0 + offset_px)
 			_set_open(false)
+		"poi_order", "poi_mill", "poi_bridge", "poi_pier": ## cycle through Red Order ruins, watermills, broken stone bridges & fisher piers
+			var mp: MeadowPois = MeadowPois.of(get_tree())
+			if mp == null or not (_player is Player):
+				_failed_flash = 2.5
+				return
+			var p_spots: Array[Vector2i] = []
+			match action:
+				"poi_order": p_spots = mp.order_tiles()
+				"poi_mill": p_spots = mp.mill_tiles()
+				"poi_bridge": p_spots = mp.bridge_tiles()
+				"poi_pier": p_spots = mp.pier_tiles()
+			if p_spots.is_empty():
+				_failed_flash = 2.5
+				return
+			var p_key: String = "idx_" + action
+			var p_idx: int = int(get_meta(p_key, 0)) % p_spots.size()
+			set_meta(p_key, (p_idx + 1) % p_spots.size())
+			var p_tile: Vector2i = p_spots[p_idx]
+			var p_off: Vector2 = Vector2(8.0, 26.0)
+			if action == "poi_bridge":
+				p_off = Vector2(-56.0, 8.0)
+			elif action == "poi_pier":
+				p_off = Vector2(8.0, -8.0)
+			(_player as Player).request_teleport(Vector2(p_tile) * 16.0 + p_off)
+			_set_open(false)
+		"wonder_bell", "wonder_guardians", "wonder_amphitheater": ## jump directly to any of the 3 unique Meadow World Wonders
+			var mw: MeadowWonders = MeadowWonders.of(get_tree())
+			if mw == null or not (_player is Player):
+				_failed_flash = 2.5
+				return
+			var w_tile: Vector2i = mw.bell_shore_tile() if action == "wonder_bell" else (mw.guardians_tile() if action == "wonder_guardians" else mw.amphitheater_tile())
+			var w_off: Vector2 = Vector2(-8.0, 8.0) if action == "wonder_bell" else (Vector2(8.0, 42.0) if action == "wonder_guardians" else Vector2(8.0, 62.0))
+			(_player as Player).request_teleport(Vector2(w_tile) * 16.0 + w_off)
+			_set_open(false)
 		"quartz_golem_spawn": ## dev, host: spawn a peaceful Quarzwächter near Ellie
 			var world_node: Node = get_tree().get_first_node_in_group("world")
 			if world_node == null or not world_node.has_method("spawn_quartz_golem") or not (_player is Player) or not multiplayer.is_server():
@@ -1033,16 +1039,6 @@ func _run_action(action: String) -> void:
 			var p_pos: Vector2 = (_player as Player).global_position + Vector2(44.0, 0.0)
 			world_node.call("spawn_quartz_golem", p_pos, PI, randi() % 3, false)
 			_set_open(false)
-		"map_reveal_all", "map_reset": ## dev, host only: the whole map seen / the fog from before it back (kept in the save)
-			var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
-			if fog == null or not multiplayer.is_server():
-				_failed_flash = 2.5
-				return
-			if action == "map_reveal_all":
-				fog.reveal_all()
-			else:
-				fog.reset_reveal()
-			_build_items()
 		"relics_reset": ## forget the boss kills of every player: the next kill of Mornath drops the Rissfeder for certain again (host)
 			var ledger: BossRelics = BossRelics.of(get_tree())
 			if ledger == null or not multiplayer.is_server():
@@ -1158,10 +1154,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				_type_into_field(typed)
 			get_viewport().set_input_as_handled()
 			return
-	if event.is_action_pressed("ui_cancel"):
+	if event.is_action_pressed("ui_cancel") or (_opening and _test_tools and event.is_action_pressed("mod_menu")):
 		if _opening:
 			if _quit_t < 0.0:
 				_set_open(false)
+				if _test_tools:
+					_open_t = 0.0
+					hide()
+					get_parent().get_node("ModMenu").call("reopen")
 				Sfx.ui(self, "ui_back", -3.0)
 			get_viewport().set_input_as_handled()
 		elif not InputManager.ui_blocking: ## the inventory takes its own Escape first
@@ -1172,9 +1172,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var key: InputEventKey = event as InputEventKey
 	var pad: InputEventJoypadButton = event as InputEventJoypadButton
-	if key != null and key.pressed and not key.echo and key.physical_keycode in [KEY_Q, KEY_E]:
+	if not _test_tools and key != null and key.pressed and not key.echo and key.physical_keycode in [KEY_Q, KEY_E]:
 		_step_tab(-1 if key.physical_keycode == KEY_Q else 1)
-	elif pad != null and pad.pressed and pad.button_index in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
+	elif not _test_tools and pad != null and pad.pressed and pad.button_index in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
 		_step_tab(-1 if pad.button_index == JOY_BUTTON_LEFT_SHOULDER else 1)
 	elif event.is_action_pressed("ui_down"):
 		_move_focus(1)
@@ -1352,6 +1352,8 @@ func _tab_rect(i: int) -> Rect2:
 
 
 func _tab_at(point: Vector2) -> int:
+	if _test_tools:
+		return -1
 	for i: int in TABS.size():
 		if _tab_rect(i).grow(2.0).has_point(point):
 			return i
@@ -1390,7 +1392,7 @@ func _taken(x: float) -> float:
 
 
 func _row_p(item: Dictionary) -> float:
-	## The stagger is capped: long pages (the developer tab has 40+ rows) must still be fully shown once
+	## The stagger is capped: long pages must still be fully shown once
 	## _open_t and _tab_t reach 1, or the rows with a high index would never appear.
 	var idx: int = int(item["idx"])
 	var open: float = _p(0.45 + int(item["col"]) * 0.06 + minf(idx * 0.025, 0.18), 0.3)
@@ -1406,14 +1408,20 @@ func _draw() -> void:
 	if void_level > 0.01:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.18, 0.05, 0.4, 0.14 * void_level * fade))
 	VineStyle.motes(self, size, _time, fade, void_level)
-	_draw_tab_branch(void_level)
 	_draw_page(void_level)
-	_draw_footer(void_level)
-	for i: int in TABS.size():
-		_draw_tab(i)
-	var hint_p: float = _p(0.6, 0.3) * 0.6 ## Q and E flip through the tabs
-	_text("Q", Vector2(_tab_rect(0).position.x - 10.0, _tab_rect(0).position.y + 3.0), UiStyle.TEXT_DIM, hint_p)
-	_text("E", Vector2(_tab_rect(TABS.size() - 1).end.x + 6.0, _tab_rect(TABS.size() - 1).position.y + 3.0), UiStyle.TEXT_DIM, hint_p)
+	if _test_tools:
+		var heading: String = "TESTWERKZEUGE"
+		var back: String = "ESC / O ZURÜCK"
+		_text(heading, Vector2((size.x - PixelText.width(heading)) * 0.5, 32.0), UiStyle.TEXT, fade)
+		_text(back, Vector2((size.x - PixelText.width(back)) * 0.5, 48.0), UiStyle.TEXT_DIM, fade)
+	else:
+		_draw_tab_branch(void_level)
+		_draw_footer(void_level)
+		for i: int in TABS.size():
+			_draw_tab(i)
+		var hint_p: float = _p(0.6, 0.3) * 0.6 ## Q and E flip through the tabs
+		_text("Q", Vector2(_tab_rect(0).position.x - 10.0, _tab_rect(0).position.y + 3.0), UiStyle.TEXT_DIM, hint_p)
+		_text("E", Vector2(_tab_rect(TABS.size() - 1).end.x + 6.0, _tab_rect(TABS.size() - 1).position.y + 3.0), UiStyle.TEXT_DIM, hint_p)
 	if _paused_here:
 		var word: String = "ZEIT STEHT STILL"
 		PixelText.draw(self, word, Vector2i(roundi(size.x / 2.0) - PixelText.width(word) / 2, 66), Color(UiStyle.TEXT_DIM, 0.55 * fade), Color(VineStyle.OUTLINE, 0.55 * fade))

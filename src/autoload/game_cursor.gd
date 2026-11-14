@@ -354,6 +354,8 @@ func _resolve() -> Look:
 		if bool(build.demolish):
 			_locked = int(build.target_id) >= 0
 			return Look.DEMOLISH
+		if bool(build.moving) and int(build.carry_id) < 0: ## the move tool, nothing lifted yet: an open hand
+			return Look.GRAB
 		return Look.BUILD if String(build.reason) == "" else Look.BUILD_BAD
 	var fishing: Node = player.fishing
 	if fishing != null and bool(fishing.rod_active()):

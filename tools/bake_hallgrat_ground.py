@@ -6,6 +6,7 @@ Styles:
   ring   the forum: elliptic courses of cut setts round the Wächterin, her own flagstone bed stays free (`hole`), a darker band of kerb
          stones at the rim; the 3/4 view squashes the circles like the statue's bed
   setts  streets and lanes: rows of small cut stones in running bond, lit from the upper left, a kerb of larger stones along the edges
+  setts on a `poly`: a square in the streets' setts with a kerb round it (paint_square)
   flags  the old squares of the Fuß: irregular flagstones (the world's stone fields), more grass and moss with `wear`
 `wear` 0..1 takes stones away, lets grass and moss in and frays the edge (the Stille is kept up, the Fuß is half abandoned).
 
@@ -179,6 +180,23 @@ def paint_ring(X, Y, cx, cy, sq, seed, dais):
     return col, sid
 
 
+def paint_square(X, Y, edge, seed):
+    """A square: the streets' own setts in running bond (rows east-west, so they meet the streets that run into it), worn towards its
+    middle, framed by a kerb of long stones laid along the rim (along x on the north and south rims, along y on the east and west ones)."""
+    sid, joint, crack = setts_field(Y, X, seed)
+    worn = np.clip(edge / 40.0, 0.0, 1.0) * 0.45
+    gy, gx = np.gradient(edge)
+    along = np.where(np.abs(gy) >= np.abs(gx), X, Y)
+    kerb = edge < 4.5
+    ku = np.floor(along / 15.0)
+    ksid = hash2(ku, np.floor((X + Y) / 400.0), seed + 21)
+    kj = np.mod(along, 15.0) < 1.0
+    sid = np.where(kerb, ksid * 0.6, sid)
+    joint = np.where(kerb, kj | ((edge > 3.8) & (edge < 4.5)), joint)
+    col = finish(sid, joint, X, Y, seed, worn=np.where(kerb, 0.0, worn), crack=crack & ~kerb)
+    return col, np.where(kerb, ksid, sid)
+
+
 def paint_flags(X, Y, seed):
     col = np.zeros(X.shape + (3,), dtype=np.float32)
     ids = np.zeros(X.shape, dtype=np.float32)
@@ -273,7 +291,8 @@ def bake(spec, town, relief, seed):
         if style == "flags":
             col, ids = paint_flags(X, Y, seed)
         else:
-            col, ids = paint_setts(X, Y, edge, seed, w, h)
+            col, ids = paint_square(X, Y, edge, seed)
+        U, V = Y, X  # the landings at a square's stairs follow its rows
     floor_ok, near = floor_mask(X, Y, relief)
     ok = shape & floor_ok
     if style == "setts":  # landings: a row of broad slabs where the street meets a stair, laid parallel to its steps
@@ -306,6 +325,18 @@ def bake(spec, town, relief, seed):
         return None
     ya, yb, xa, xb = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
     return img[ya:yb, xa:xb], mask[ya:yb, xa:xb], (int(x0 + xa), int(y0 + ya)), ok
+
+
+def save_retry(path, arr):
+    """OneDrive (or a running import) may hold a picture for a moment: try again a few times before giving up."""
+    import time
+    for k in range(8):
+        try:
+            bg.save(path, arr)
+            return
+        except OSError:
+            time.sleep(0.4 + k * 0.3)
+    bg.save(path, arr)
 
 
 def runs_of(paved):
@@ -344,8 +375,8 @@ def main():
             continue
         img, mask, (ox, oy), ok = out
         name = "hallgrat_" + spec["id"]
-        bg.save(bg.ROOT / "assets" / "world" / "ground" / (name + ".png"), img)
-        bg.save(bg.ROOT / "assets" / "world" / "ground" / (name + "_mask.png"), mask)
+        save_retry(bg.ROOT / "assets" / "world" / "ground" / (name + ".png"), img)
+        save_retry(bg.ROOT / "assets" / "world" / "ground" / (name + "_mask.png"), mask)
         decals.append({"id": name, "texture": "res://assets/world/ground/%s.png" % name, "mask": "res://assets/world/ground/%s_mask.png" % name, "x": ox, "y": oy})
         shown.append((img, ox, oy))
         stone = mask[..., 0] == bg.STONE_CODE

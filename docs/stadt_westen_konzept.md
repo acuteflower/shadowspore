@@ -558,6 +558,25 @@ Die Flächen kommen als Decals `hallgrat_<id>` (Oberfläche `stone`) in ground_b
 - **Rothalle:** Sie hat ihren Platz nördlich der Hüterhalle, die benannten Gebäude suchen weiter (`reach`) und halten auch ihre Tür frei.
 - **Noch nicht gebaut:** Wachposten auf der Mauer, die Schwarze Mauer als Objekt, Gassenklang je Bezirk, Lichtrunde.
 
+### 14.6 Überarbeitung der Häuser (2026-11-14)
+- **Stein wie der Boden:**
+  - Die Mauern sind in denselben Steinen geschnitten wie Gassen, Treppen und Terrassenmauern (MASON-Palette).
+  - `wall_pass` legt sie als Lagen von Quadern: 5 px hoch, 7 bis 12 px lang, versetzt, mit dunklen Fugen, heller Ober- und Linkskante und eigenem Ton je Stein. Das Licht der Form bleibt.
+  - Das Schiefer ist ins Violett der Wände gezogen.
+- **Vordach:** Über jeder Haustür hängt ein kleines Schieferdach auf Eisenkonsolen, mit Stufe davor.
+- **Seitlich gedreht an Nord-Süd-Wegen** (Ansicht `e`/`w`): Die Tür zeigt zum Weg, ihr Türweg beginnt an dieser Seite. Zwischen solchen Häusern bleibt so viel Abstand, wie ihr Bild höher als ihr Fuß ist, damit kein Dach das nächste verdeckt.
+- **Maßstab nach Ellie** (52 px, Tür ≈ 40 px):
+  - Die Modelle werden je Art vergrößert: Häuser ×1,9, Hallen ×1,6, Torhaus ×1,7, Stallungen ×1,3, Mauer ×1,6, Leitsteine ×1,5, Stände ×1,6 (`GROW`).
+  - Die Steinlagen bleiben gleich groß. Damit stehen jetzt rund 40 Häuser und Hallen und 8 Stände.
+- **Diagonal an schrägen Wegen** (Ansichten `se`/`ne`, im Spiel gespiegelt `sw`/`nw`):
+  - Wohnhäuser (`DIAG_TYPES`) werden zusätzlich um 48° gedreht gerendert, so dass Front und Seite beide zu sehen sind. Die rechnerisch exakte Drehung für einen 45°-Weg (`atan(1 / SINP)`) versteckte die Tür fast ganz.
+  - `hallgrat_art.json` speichert dazu `door` (Tür relativ zu den Füßen) und `poly` (die gedrehte Grundfläche).
+  - Der Platzierer wählt diagonal, wenn die Wegnormale schräg liegt (beide Anteile > 0,42). Er setzt die Tür auf den Wegrand, prüft und belegt die Kacheln unter dem Polygon und hält eine Türschwelle auf dem Weg frei. Rückansichten (`ne`/`nw`) sind wie `n` nicht in den Standard-`views` einer Reihe.
+  - `HallgratBuilding` bekommt dann ein Kollisionspolygon statt eines Rechtecks. Erste Anwendung: das Westweg-Ende vor dem Osttor (5 Häuser).
+- **Fensterlicht:** Lampenlicht hinter Glas in einem ruhigen Honigton (`GLASS`, 4 Stufen), statt der flackernden Feuer-Rampe, die wie Flammen in den Fenstern aussah. Oberste Reihe und Seiten liegen eine Stufe dunkler, manche Fenster brennen schwächer.
+- **Plätze im Gassenpflaster:** Steinmarkt, Karrenhof und Nordgasse sind jetzt `setts` statt `flags`. Ein Platz (`poly`) bekommt `paint_square`: dieselben Steinreihen wie die Gassen (Ost-West), einen Rand aus langen Steinen und weniger Abnutzung (`wear` 0,22 / 0,3).
+- **Offen:** Die Rothalle findet in der neuen Größe keinen Platz. Sie braucht einen eigenen Ort (zum Beispiel die Brunnenmulde) oder eine schmalere Form.
+
 ## 15. Ideenspeicher (alles, was noch nirgends hineinpasste)
 
 - Eine **Sonnenuhr** am Forum, deren Schatten die Mondphase *und* die Stadtstufe anzeigt.

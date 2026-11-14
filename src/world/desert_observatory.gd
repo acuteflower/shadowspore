@@ -26,13 +26,15 @@ const GLOBE_TILE: Vector2i = Vector2i(926, 193)
 
 ## Verified flat L1/L2 saddle tiles along the causeway ascent ([962,176] -> [936,163] -> [920,159] -> L3)
 const CAUSEWAY_PILLAR_SPECS: Array[Array] = [
-	[Vector2i(951, 163), 0],
-	[Vector2i(950, 168), 1],
+	[Vector2i(951, 162), 0],
+	[Vector2i(950, 170), 1],
 	[Vector2i(943, 161), 0],
-	[Vector2i(943, 168), 1],
-	[Vector2i(932, 161), 0],
-	[Vector2i(932, 167), 1],
+	[Vector2i(943, 170), 1],
+	[Vector2i(931, 160), 0],
+	[Vector2i(932, 170), 1],
 ]
+
+const PORTAL_YSORT_SHIFT: Vector2 = Vector2(0.0, -16.0)
 
 ## Decorative levitating shards orbiting cliff rims (offset in tiles from world anchors, non-blocking)
 const DEBRIS_SPOTS: Array[Array] = [
@@ -72,7 +74,7 @@ var _last_tick_step: int = -1
 var _surface_patch: ObservatorySurfacePatch
 var _ysort_owned: Array[Node] = []
 var _night_sprites: Array[Dictionary] = [] ## [{sprite: Sprite2D, base: float, night: float}]
-var _conduits: Array[DesertRuins.LightConduit] = []
+var _conduits: Array[ObservatoryConduit] = []
 
 var _armillary_sprite: Sprite2D
 var _armillary_glow: Sprite2D
@@ -288,6 +290,10 @@ func _refresh_night_glow(night: float, storm: float) -> void:
 		if is_instance_valid(spr):
 			var a: float = lerpf(float(entry["base"]), float(entry["night"]), night) + boost * 0.45
 			spr.modulate.a = clampf(a, 0.0, 1.35)
+	var surging: bool = _surge_timer > 0.0
+	for c: ObservatoryConduit in _conduits:
+		if is_instance_valid(c):
+			c.update_glow_state(night, storm, surging)
 
 
 ## Group contract `"quest_actors"` -> world map icon in Region 34
@@ -348,7 +354,7 @@ func on_arcane_lightning(strike_pos: Vector2, _info: Dictionary = {}) -> void:
 
 
 func _trigger_all_conduits() -> void:
-	for c: DesertRuins.LightConduit in _conduits:
+	for c: ObservatoryConduit in _conduits:
 		if is_instance_valid(c):
 			c.trigger_pulse()
 
@@ -357,7 +363,7 @@ func _trigger_all_conduits() -> void:
 func _build_zone_gate(ysort_parent: Node2D) -> void:
 	var floor_fx: Node2D = MeridianForecourtFloor.new()
 	floor_fx.position = _gate_pos
-	floor_fx.z_index = -1
+	floor_fx.z_index = -8
 	add_child(floor_fx)
 
 	var gate_meta: Dictionary = _meta_block("ecliptic_gate")
@@ -369,8 +375,8 @@ func _build_zone_gate(ysort_parent: Node2D) -> void:
 	_add_ysorted(ysort_parent, gate_node)
 
 	_make_static_pair(gate_node, "ecliptic_gate", -feet, 0.22, 0.95)
-	_add_box_collider(gate_node, Vector2(-50.0, -5.0), Vector2(32.0, 16.0))
-	_add_box_collider(gate_node, Vector2(50.0, -5.0), Vector2(32.0, 16.0))
+	_add_box_collider(gate_node, Vector2(-50.0, -1.0), Vector2(31.0, 14.0))
+	_add_box_collider(gate_node, Vector2(50.0, -1.0), Vector2(31.0, 14.0))
 	_add_canopy_at(_gate_pos + Vector2(-46.0, 8.0), 34.0, 22.0)
 	_add_canopy_at(_gate_pos + Vector2(54.0, 8.0), 34.0, 22.0)
 
@@ -407,7 +413,7 @@ func _build_zone_sundial(ysort_parent: Node2D) -> void:
 	var court_node: Node2D = Node2D.new()
 	court_node.name = "ObsSundialCourt"
 	court_node.position = _sundial_pos
-	court_node.z_index = -1
+	court_node.z_index = -8
 	add_child(court_node)
 	_make_static_pair(court_node, "sundial_court", -c_center, 0.20, 0.90)
 
@@ -417,8 +423,10 @@ func _build_zone_sundial(ysort_parent: Node2D) -> void:
 	_sundial_overlay.setup(c_center, socket_off, fan_radii, markers)
 	court_node.add_child(_sundial_overlay)
 
-	# Collider along curved north exedra parapet wall of Sundial Court so dial floor & front steps stay walkable
-	_add_box_collider(court_node, Vector2(0.0, -60.0), Vector2(154.0, 14.0))
+	# Colliders along curved north exedra parapet wall of Sundial Court so dial floor & front steps stay walkable
+	for seg_i: int in 7:
+		var p_ang: float = lerpf(PI * 0.10, PI * 0.90, float(seg_i) / 6.0)
+		_add_box_collider(court_node, Vector2(cos(p_ang) * 95.0, -sin(p_ang) * 61.0), Vector2(28.0, 12.0))
 
 	# Towering Y-sorted Sundial Gnomon + Falcon Perch aligned at court socket
 	var gn_meta: Dictionary = _meta_block("sundial_gnomon")
@@ -431,7 +439,7 @@ func _build_zone_sundial(ysort_parent: Node2D) -> void:
 	_add_ysorted(ysort_parent, gn_node)
 
 	_make_static_pair(gn_node, "sundial_gnomon", -gn_feet, 0.25, 1.0)
-	_add_box_collider(gn_node, Vector2(0.0, -4.0), Vector2(42.0, 14.0))
+	_add_ellipse_collider(gn_node, Vector2.ZERO, Vector2(21.0, 11.5))
 	_add_canopy_at(gn_pos + Vector2(24.0, 12.0), 52.0, 32.0)
 
 	var gn_light: NightLight = NightLight.new()
@@ -466,7 +474,7 @@ func _build_zone_causeway(ysort_parent: Node2D) -> void:
 		p_node.position = pos
 		_add_ysorted(ysort_parent, p_node)
 		_make_grid_pair(p_node, "causeway_pillar", grid, frame_idx, -feet, 0.25, 0.95)
-		_add_box_collider(p_node, Vector2(0.0, -3.0), Vector2(24.0, 12.0))
+		_add_ellipse_collider(p_node, Vector2(0.0, -1.0), Vector2(13.0, 7.5))
 
 		var focal: Vector2 = Vector2(39.0, 44.0) if frame_idx == 0 else Vector2(17.0, 44.0)
 		if frame_idx < focals.size():
@@ -513,13 +521,13 @@ func _build_zone_causeway(ysort_parent: Node2D) -> void:
 
 ## Zone IV — Summit Heart Rotunda, Astral Plaza, Sealed Portal, Armillary, Lenses & Starlight Beam (L3, 908,175)
 func _build_zone_rotunda(ysort_parent: Node2D) -> void:
-	# 1. Astral Plaza Mosaic floor (z_index = -1)
+	# 1. Astral Plaza Mosaic floor (z_index = -8 below DaylightField shadows)
 	var plaza_meta: Dictionary = _meta_block("plaza_mosaic")
 	var p_center: Vector2 = _vec2(plaza_meta.get("center", [176, 120]), Vector2(176.0, 120.0))
 	var plaza_node: Node2D = Node2D.new()
 	plaza_node.name = "ObsPlazaMosaic"
 	plaza_node.position = _rotunda_pos
-	plaza_node.z_index = -1
+	plaza_node.z_index = -8
 	add_child(plaza_node)
 	_make_static_pair(plaza_node, "plaza_mosaic", -p_center, 0.22, 0.95)
 
@@ -546,7 +554,13 @@ func _build_zone_rotunda(ysort_parent: Node2D) -> void:
 	vault_node.position = _rotunda_pos
 	_add_ysorted(ysort_parent, vault_node)
 	_make_static_pair(vault_node, "rotunda_vault", -v_feet, 0.22, 1.0)
-	_add_box_collider(vault_node, Vector2(0.0, -34.0), Vector2(138.0, 32.0))
+	var vault_poly: PackedVector2Array = PackedVector2Array()
+	vault_poly.append(Vector2(85.0, 10.0))
+	for vi: int in 13:
+		var vang: float = PI * (float(vi) / 12.0)
+		vault_poly.append(Vector2(cos(vang) * 85.0, -sin(vang) * 48.0))
+	vault_poly.append(Vector2(-85.0, 10.0))
+	_add_polygon_collider(vault_node, vault_poly)
 	_add_canopy_at(_rotunda_pos + Vector2(22.0, 14.0), 98.0, 66.0)
 
 	var r_light: NightLight = NightLight.new()
@@ -572,7 +586,8 @@ func _build_zone_rotunda(ysort_parent: Node2D) -> void:
 	fw_node.position = _rotunda_pos + flank_w_off
 	_add_ysorted(ysort_parent, fw_node)
 	_make_grid_pair(fw_node, "rotunda_flanks", fl_grid, 0, -fl_feet, 0.22, 0.95)
-	_add_box_collider(fw_node, Vector2(0.0, -10.0), Vector2(46.0, 22.0))
+	_add_ellipse_collider(fw_node, Vector2(0.0, -1.0), Vector2(26.5, 15.5))
+	_add_ellipse_collider(fw_node, Vector2(-19.0, -1.0), Vector2(16.0, 11.0))
 	_add_canopy_at(fw_node.position + Vector2(16.0, 6.0), 48.0, 32.0)
 
 	var fe_node: Node2D = Node2D.new()
@@ -580,28 +595,30 @@ func _build_zone_rotunda(ysort_parent: Node2D) -> void:
 	fe_node.position = _rotunda_pos + flank_e_off
 	_add_ysorted(ysort_parent, fe_node)
 	_make_grid_pair(fe_node, "rotunda_flanks", fl_grid, 1, -fl_feet, 0.22, 0.95)
-	_add_box_collider(fe_node, Vector2(2.0, -10.0), Vector2(48.0, 22.0))
+	_add_ellipse_collider(fe_node, Vector2(0.0, -1.0), Vector2(26.5, 15.5))
+	_add_ellipse_collider(fe_node, Vector2(17.0, 1.0), Vector2(18.5, 13.5))
 	_add_canopy_at(fe_node.position + Vector2(16.0, 6.0), 48.0, 32.0)
 
-	# 4. Sealed Star-Portal (Das Versiegelte Sternentor) with Interactable Inspection
+	# 4. Sealed Star-Portal (Das Versiegelte Sternentor) with shifted Y-sort pivot & solid colliders
 	var po_meta: Dictionary = _meta_block("rotunda_portal")
 	var po_feet: Vector2 = _vec2(po_meta.get("feet", [64, 108]), Vector2(64.0, 108.0))
 	var po_locks: Array = po_meta.get("locks", [[64, 48], [51, 70], [77, 70]]) as Array
 	var portal_node: RotundaPortalInteractable = RotundaPortalInteractable.new()
 	portal_node.name = "ObsRotundaPortal"
-	portal_node.position = _rotunda_pos + portal_off
+	portal_node.position = _rotunda_pos + portal_off + PORTAL_YSORT_SHIFT
 	portal_node.observatory = self
 	_add_ysorted(ysort_parent, portal_node)
-	_make_static_pair(portal_node, "rotunda_portal", -po_feet, 0.28, 1.0)
-	_add_box_collider(portal_node, Vector2(0.0, -24.0), Vector2(72.0, 22.0))
-	_add_box_collider(portal_node, Vector2(-46.0, -14.0), Vector2(20.0, 22.0))
-	_add_box_collider(portal_node, Vector2(46.0, -14.0), Vector2(20.0, 22.0))
-	_add_canopy_at(portal_node.position + Vector2(12.0, 10.0), 54.0, 28.0)
+	_make_static_pair(portal_node, "rotunda_portal", -po_feet - PORTAL_YSORT_SHIFT, 0.28, 1.0)
+	_add_box_collider(portal_node, Vector2(0.0, -3.0), Vector2(118.0, 26.0))
+	_add_box_collider(portal_node, Vector2(-35.0, 21.0), Vector2(18.0, 22.0))
+	_add_box_collider(portal_node, Vector2(35.0, 21.0), Vector2(18.0, 22.0))
+	_add_canopy_at(_rotunda_pos + portal_off + Vector2(12.0, 10.0), 54.0, 28.0)
 
 	var lock_locals: Array[Vector2] = []
 	for lp: Variant in po_locks:
 		lock_locals.append(_vec2(lp, Vector2(64.0, 64.0)) - po_feet)
 	_portal_locks_fx = PortalLocksFx.new()
+	_portal_locks_fx.position = -PORTAL_YSORT_SHIFT
 	_portal_locks_fx.locks = lock_locals
 	portal_node.add_child(_portal_locks_fx)
 
@@ -695,14 +712,14 @@ func _build_zone_terraces(ysort_parent: Node2D) -> void:
 	var mir_node: Node2D = Node2D.new()
 	mir_node.name = "ObsStarMirror"
 	mir_node.position = _mirror_pos
-	mir_node.z_index = -1
+	mir_node.z_index = -8
 	add_child(mir_node)
 
 	var film_size: Vector2 = pool_radii * 2.0 + Vector2(18.0, 18.0)
 	var film: ColorRect = ColorRect.new()
 	film.size = film_size
 	film.position = pool_off - film_size * 0.5
-	film.z_index = -1
+	film.z_index = 0
 	film.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var mir_shader: Shader = load(STAR_MIRROR_SHADER_PATH) as Shader
 	if mir_shader != null:
@@ -735,6 +752,8 @@ func _build_zone_terraces(ysort_parent: Node2D) -> void:
 	cool_mist.gravity = Vector2.ZERO
 	cool_mist.color = Color(0.55, 0.94, 0.96, 0.52)
 	cool_mist.material = Unlit.material()
+	cool_mist.z_as_relative = false
+	cool_mist.z_index = 1
 	mir_node.add_child(cool_mist)
 
 	# 2. Polar Ocular Vista Telescope (880, 159)
@@ -748,7 +767,7 @@ func _build_zone_terraces(ysort_parent: Node2D) -> void:
 	oc_node.observatory = self
 	_add_ysorted(ysort_parent, oc_node)
 	_make_grid_pair(oc_node, "causeway_pillar", p_grid, 2, -p_feet, 0.28, 1.0)
-	_add_box_collider(oc_node, Vector2(0.0, -4.0), Vector2(24.0, 12.0))
+	_add_ellipse_collider(oc_node, Vector2(0.0, -1.0), Vector2(13.0, 7.5))
 
 	var oc_light: NightLight = NightLight.new()
 	oc_light.position = Vector2(0.0, -42.0)
@@ -763,7 +782,7 @@ func _build_zone_terraces(ysort_parent: Node2D) -> void:
 	altar_node.position = _altar_pos
 	_add_ysorted(ysort_parent, altar_node)
 	_make_grid_pair(altar_node, "causeway_pillar", p_grid, 3, -p_feet, 0.30, 1.0)
-	_add_box_collider(altar_node, Vector2(0.0, -4.0), Vector2(28.0, 14.0))
+	_add_ellipse_collider(altar_node, Vector2(0.0, -1.0), Vector2(14.5, 8.0))
 
 	var focals: Array = pil_meta.get("focal_points", []) as Array
 	var altar_focal: Vector2 = Vector2(28.0, 53.0)
@@ -787,7 +806,7 @@ func _build_zone_terraces(ysort_parent: Node2D) -> void:
 
 	var globe_cradle: StarGlobeCradle = StarGlobeCradle.new()
 	globe_cradle.position = _globe_pos
-	globe_cradle.z_index = -1
+	globe_cradle.z_index = -8
 	add_child(globe_cradle)
 
 	var globe_node: Node2D = Node2D.new()
@@ -805,34 +824,52 @@ func _build_zone_terraces(ysort_parent: Node2D) -> void:
 	globe_node.add_child(g_light)
 
 
-## Chained DesertRuins.LightConduit inlays guiding the player from Gate -> Causeway -> Summit
+## Chained flush ObservatoryConduit inlays guiding the player from Gate -> Causeway -> Summit
 func _build_conduits() -> void:
-	var c_gate_w: DesertRuins.LightConduit = DesertRuins.LightConduit.new()
-	c_gate_w.setup(_gate_pos + Vector2(-18.0, 56.0), _gate_pos + Vector2(-18.0, -40.0), true)
-	var c_gate_e: DesertRuins.LightConduit = DesertRuins.LightConduit.new()
-	c_gate_e.setup(_gate_pos + Vector2(18.0, 56.0), _gate_pos + Vector2(18.0, -40.0), true)
+	var c_gate_w: ObservatoryConduit = ObservatoryConduit.new()
+	c_gate_w.name = "ObsConduit_GateW"
+	c_gate_w.setup(PackedVector2Array([_gate_pos + Vector2(-18.0, 44.0), _gate_pos + Vector2(-18.0, -34.0)]))
 
-	var cw_east: Vector2 = _tile_center(Vector2i(951, 165))
-	var cw_west: Vector2 = _tile_center(Vector2i(939, 165))
-	var ramp_l2: Vector2 = _tile_center(Vector2i(933, 164))
-	var summit_entry: Vector2 = _tile_center(Vector2i(917, 163))
-	var rotunda_n: Vector2 = _rotunda_pos + Vector2(36.0, -34.0)
+	var c_gate_e: ObservatoryConduit = ObservatoryConduit.new()
+	c_gate_e.name = "ObsConduit_GateE"
+	c_gate_e.setup(PackedVector2Array([_gate_pos + Vector2(18.0, 44.0), _gate_pos + Vector2(18.0, -34.0)]))
 
-	var c_cw_1: DesertRuins.LightConduit = DesertRuins.LightConduit.new()
-	c_cw_1.setup(cw_east, cw_west, true)
-	var c_cw_2: DesertRuins.LightConduit = DesertRuins.LightConduit.new()
-	c_cw_2.setup(cw_west, ramp_l2, false)
-	var c_cw_3: DesertRuins.LightConduit = DesertRuins.LightConduit.new()
-	c_cw_3.setup(ramp_l2, summit_entry, false)
-	var c_cw_4: DesertRuins.LightConduit = DesertRuins.LightConduit.new()
-	c_cw_4.setup(summit_entry, rotunda_n, false)
+	var c_cw_l1: ObservatoryConduit = ObservatoryConduit.new()
+	c_cw_l1.name = "ObsConduit_CausewayL1"
+	c_cw_l1.setup(PackedVector2Array([
+		_tile_center(Vector2i(951, 164)),
+		_tile_center(Vector2i(940, 164)),
+	]))
 
-	c_cw_1.chained_conduits = [c_cw_2]
-	c_cw_2.chained_conduits = [c_cw_3]
-	c_cw_3.chained_conduits = [c_cw_4]
+	var c_cw_l2: ObservatoryConduit = ObservatoryConduit.new()
+	c_cw_l2.name = "ObsConduit_CausewayL2"
+	c_cw_l2.setup(PackedVector2Array([
+		_tile_center(Vector2i(934, 164)),
+		_tile_center(Vector2i(931, 162)),
+		_tile_center(Vector2i(926, 157)),
+		_tile_center(Vector2i(921, 156)),
+	]))
 
-	for c: DesertRuins.LightConduit in [c_gate_w, c_gate_e, c_cw_1, c_cw_2, c_cw_3, c_cw_4]:
-		c.z_index = -1
+	var c_summit_e: ObservatoryConduit = ObservatoryConduit.new()
+	c_summit_e.name = "ObsConduit_SummitE"
+	c_summit_e.setup(PackedVector2Array([
+		_tile_center(Vector2i(921, 161)),
+		_tile_center(Vector2i(921, 175)),
+		_rotunda_pos + Vector2(154.0, 0.0),
+	]))
+
+	var c_plaza_s: ObservatoryConduit = ObservatoryConduit.new()
+	c_plaza_s.name = "ObsConduit_PlazaS"
+	c_plaza_s.setup(PackedVector2Array([
+		_rotunda_pos + Vector2(0.0, 128.0),
+		_rotunda_pos + Vector2(0.0, 95.0),
+	]))
+
+	c_cw_l1.chained_conduits = [c_cw_l2]
+	c_cw_l2.chained_conduits = [c_summit_e]
+
+	for c: ObservatoryConduit in [c_gate_w, c_gate_e, c_cw_l1, c_cw_l2, c_summit_e, c_plaza_s]:
+		c.z_index = -8
 		add_child(c)
 		_conduits.append(c)
 
@@ -899,8 +936,8 @@ func _compute_reserved_cells() -> Dictionary:
 	mark_disc.call(OCULAR_TILE, 4, 4)
 	mark_disc.call(PRISM_ALTAR_TILE, 4, 4)
 	mark_disc.call(GLOBE_TILE, 4, 4)
-	mark_rect.call(Vector2i(929, 159), Vector2i(954, 170), true, true)
-	mark_rect.call(Vector2i(917, 156), Vector2i(925, 163), true, true)
+	mark_rect.call(Vector2i(920, 155), Vector2i(954, 172), true, true)
+	mark_rect.call(Vector2i(917, 160), Vector2i(924, 177), true, true)
 	mark_rect.call(Vector2i(965, 148), Vector2i(972, 154), true, true)
 	mark_rect.call(Vector2i(960, 173), Vector2i(966, 179), true, true)
 
@@ -1019,18 +1056,22 @@ func _add_box_collider(host: Node2D, center: Vector2, sz: Vector2) -> void:
 	host.add_child(body)
 
 
-func _add_ellipse_collider(host: Node2D, center: Vector2, radii: Vector2) -> void:
+func _add_polygon_collider(host: Node2D, pts: PackedVector2Array) -> void:
 	var body: StaticBody2D = StaticBody2D.new()
 	body.collision_layer = 1
 	body.collision_mask = 0
 	var poly: CollisionPolygon2D = CollisionPolygon2D.new()
+	poly.polygon = pts
+	body.add_child(poly)
+	host.add_child(body)
+
+
+func _add_ellipse_collider(host: Node2D, center: Vector2, radii: Vector2) -> void:
 	var pts: PackedVector2Array = PackedVector2Array()
 	for i: int in 12:
 		var ang: float = TAU * (float(i) / 12.0)
 		pts.append(center + Vector2(cos(ang) * radii.x, sin(ang) * radii.y))
-	poly.polygon = pts
-	body.add_child(poly)
-	host.add_child(body)
+	_add_polygon_collider(host, pts)
 
 
 static func _tile_center(t: Vector2i) -> Vector2:
@@ -1078,7 +1119,7 @@ class ObservatorySurfacePatch:
 			return "quartz"
 		if world_pos.distance_squared_to(ocular_pos) <= 44.0 * 44.0 or world_pos.distance_squared_to(altar_pos) <= 44.0 * 44.0:
 			return "quartz"
-		if world_pos.x >= 930.0 * 16.0 and world_pos.x <= 954.0 * 16.0 and world_pos.y >= 161.0 * 16.0 and world_pos.y <= 169.0 * 16.0:
+		if world_pos.x >= 920.0 * 16.0 and world_pos.x <= 954.0 * 16.0 and world_pos.y >= 155.0 * 16.0 and world_pos.y <= 176.0 * 16.0:
 			return "quartz"
 		return ""
 
@@ -1113,9 +1154,6 @@ class MeridianForecourtFloor:
 	extends Node2D
 
 	func _draw() -> void:
-		for dx: int in [-20, 20]:
-			draw_line(Vector2(float(dx), -54.0), Vector2(float(dx), 64.0), Color("3c2c38"), 2.0)
-			draw_line(Vector2(float(dx), -52.0), Vector2(float(dx), 62.0), Color("c89d42"), 1.0)
 		draw_arc(Vector2.ZERO, 34.0, 0.0, TAU, 24, Color("9a7230"), 1.0)
 		draw_line(Vector2(-38.0, 0.0), Vector2(-24.0, 0.0), Color("78f4e6"), 1.0)
 		draw_line(Vector2(24.0, 0.0), Vector2(38.0, 0.0), Color("78f4e6"), 1.0)
@@ -1359,18 +1397,18 @@ class RotundaPortalInteractable:
 		return "STERNENTOR UNTERSUCHEN"
 
 	func prompt_position() -> Vector2:
-		return Vector2(0.0, -86.0)
+		return Vector2(0.0, -70.0)
 
 	func reach_distance(from: Vector2) -> float:
-		return from.distance_to(global_position + Vector2(0.0, -4.0)) - 20.0
+		return from.distance_to(global_position - PORTAL_YSORT_SHIFT) - 24.0
 
 	func interact(player: Player) -> void:
 		if observatory != null:
 			if is_instance_valid(observatory._portal_locks_fx):
 				observatory._portal_locks_fx.flare(2.6)
-			observatory._play_sfx("ocular_chime", global_position, -4.0, 0.03, 520.0)
+			observatory._play_sfx("ocular_chime", global_position - PORTAL_YSORT_SHIFT, -4.0, 0.03, 520.0)
 		var bubble: SettlerBubble = SettlerBubble.new()
-		bubble.position = Vector2(0.0, -68.0)
+		bubble.position = Vector2(0.0, -52.0)
 		add_child(bubble)
 		bubble.show_text("Drei erloschene Sternenschlösser versiegeln das Innere der Zenitwarte. Die uralten Bahnen darüber warten noch auf ihr Erwachen.", 5.0)
 		get_tree().create_timer(5.2, false).timeout.connect(func() -> void:
@@ -1456,3 +1494,184 @@ class PolarOcularInteractable:
 				_cam_tween.tween_property(cam, "zoom", Vector2.ONE, 0.85)
 				_cam_tween.tween_property(_active_player, "view_shift", Vector2.ZERO, 0.85)
 		_active_player = null
+
+
+## Flush inlaid sandstone, brass & crystal meridian conduit with octagonal relay medallions
+class ObservatoryConduit:
+	extends Node2D
+	var world_points: PackedVector2Array = PackedVector2Array()
+	var points_local: PackedVector2Array = PackedVector2Array()
+	var seg_lengths: PackedFloat32Array = PackedFloat32Array()
+	var total_length: float = 0.0
+	var chained_conduits: Array[ObservatoryConduit] = []
+	var _pulse_t: float = -1.0
+	var _cooldown: float = 0.0
+	var _night: float = 0.0
+	var _storm: float = 0.0
+	var _surging: bool = false
+	var _glow: ObservatoryConduitGlow
+
+	func setup(pts: PackedVector2Array) -> void:
+		if pts.is_empty():
+			return
+		position = pts[0]
+		world_points = pts
+		points_local.clear()
+		seg_lengths.clear()
+		total_length = 0.0
+		for p: Vector2 in pts:
+			points_local.append(p - pts[0])
+		for i: int in points_local.size() - 1:
+			var seg_len: float = points_local[i].distance_to(points_local[i + 1])
+			seg_lengths.append(seg_len)
+			total_length += seg_len
+		_glow = ObservatoryConduitGlow.new()
+		_glow.owner_conduit = self
+		_glow.material = Unlit.material()
+		_glow.z_index = 1
+		add_child(_glow)
+
+	func _ready() -> void:
+		add_to_group("desert_spell_listeners")
+		add_to_group("desert_arcane_listeners")
+		_night = TimeManager.night_amount() if TimeManager != null else 0.0
+		queue_redraw()
+		if is_instance_valid(_glow):
+			_glow.queue_redraw()
+
+	func is_pulsing() -> bool:
+		return _pulse_t >= 0.0
+
+	func trigger_pulse() -> void:
+		if _cooldown > 0.0 or _pulse_t >= 0.0:
+			return
+		_pulse_t = 0.0
+		_cooldown = 0.9
+		if is_instance_valid(_glow):
+			_glow.queue_redraw()
+
+	func update_glow_state(night: float, storm: float, surging: bool) -> void:
+		if absf(_night - night) > 0.01 or absf(_storm - storm) > 0.02 or _surging != surging:
+			_night = night
+			_storm = storm
+			_surging = surging
+			if is_instance_valid(_glow):
+				_glow.queue_redraw()
+
+	func on_spell_cast(caster_pos: Vector2, target_pos: Vector2, _spell_id: String) -> void:
+		for i: int in world_points.size():
+			var wp: Vector2 = world_points[i]
+			if wp.distance_to(caster_pos) <= 96.0 or wp.distance_to(target_pos) <= 96.0:
+				trigger_pulse()
+				return
+			if i + 1 < world_points.size():
+				var mid: Vector2 = wp.lerp(world_points[i + 1], 0.5)
+				if mid.distance_to(caster_pos) <= 96.0 or mid.distance_to(target_pos) <= 96.0:
+					trigger_pulse()
+					return
+
+	func on_arcane_lightning(strike_pos: Vector2, _info: Dictionary = {}) -> void:
+		for wp: Vector2 in world_points:
+			if wp.distance_to(strike_pos) <= 140.0:
+				trigger_pulse()
+				return
+
+	func sample_at(frac: float) -> Vector2:
+		if points_local.is_empty():
+			return Vector2.ZERO
+		if points_local.size() == 1 or total_length <= 0.01:
+			return points_local[0]
+		var target_d: float = clampf(frac, 0.0, 1.0) * total_length
+		var accum: float = 0.0
+		for i: int in seg_lengths.size():
+			var sl: float = seg_lengths[i]
+			if accum + sl >= target_d and sl > 0.001:
+				var t: float = (target_d - accum) / sl
+				return points_local[i].lerp(points_local[i + 1], t)
+			accum += sl
+		return points_local[points_local.size() - 1]
+
+	func _process(delta: float) -> void:
+		if _cooldown > 0.0:
+			_cooldown = maxf(0.0, _cooldown - delta)
+		if _pulse_t >= 0.0:
+			var travel_time: float = maxf(0.45, total_length / 190.0)
+			_pulse_t += delta / travel_time
+			if _pulse_t >= 1.0:
+				_pulse_t = -1.0
+				for next_c: ObservatoryConduit in chained_conduits:
+					if is_instance_valid(next_c):
+						next_c.trigger_pulse()
+			if is_instance_valid(_glow):
+				_glow.queue_redraw()
+
+	func _draw_strip(width: float, col: Color) -> void:
+		for i: int in points_local.size() - 1:
+			draw_line(points_local[i], points_local[i + 1], col, width)
+		for j: int in range(1, points_local.size() - 1):
+			draw_circle(points_local[j], width * 0.5, col)
+
+	func _octagon_points(c: Vector2, r: float) -> PackedVector2Array:
+		var pts: PackedVector2Array = PackedVector2Array()
+		for k: int in 8:
+			var ang: float = PI * 0.125 + TAU * (float(k) / 8.0)
+			pts.append(c + Vector2(cos(ang) * r, sin(ang) * r))
+		return pts
+
+	func _draw() -> void:
+		if points_local.size() < 2:
+			return
+		_draw_strip(8.0, Color("5a3b2c"))
+		_draw_strip(6.0, Color("cfa060"))
+		for i: int in seg_lengths.size():
+			var a: Vector2 = points_local[i]
+			var b: Vector2 = points_local[i + 1]
+			var sl: float = seg_lengths[i]
+			if sl < 18.0:
+				continue
+			var dir: Vector2 = (b - a) / sl
+			var perp: Vector2 = Vector2(-dir.y, dir.x)
+			var dist: float = 12.0
+			while dist <= sl - 9.0:
+				var tick_c: Vector2 = a + dir * dist
+				draw_line(tick_c - perp * 3.0, tick_c + perp * 3.0, Color("8a5f3c"), 1.0)
+				dist += 12.0
+		_draw_strip(4.0, Color("dfbe6a"))
+		_draw_strip(2.0, Color("241e38"))
+		_draw_strip(1.0, Color("52c4bc"))
+		for wp: Vector2 in points_local:
+			draw_colored_polygon(_octagon_points(wp, 6.5), Color("5a3b2c"))
+			draw_colored_polygon(_octagon_points(wp, 5.2), Color("cfa060"))
+			draw_colored_polygon(_octagon_points(wp, 3.8), Color("dfbe6a"))
+			draw_colored_polygon(_octagon_points(wp, 2.4), Color("241e38"))
+			draw_circle(wp, 1.4, Color("78f4e6"))
+
+
+## Unlit crystal filament & travelling pulse comet over an ObservatoryConduit
+class ObservatoryConduitGlow:
+	extends Node2D
+	var owner_conduit: ObservatoryConduit
+
+	func _draw() -> void:
+		if owner_conduit == null or owner_conduit.points_local.size() < 2:
+			return
+		var alpha: float = clampf(0.14 + owner_conduit._night * 0.65 + owner_conduit._storm * 0.35 + (0.35 if owner_conduit._surging else 0.0), 0.0, 0.95)
+		var line_col: Color = Color(0.47, 0.96, 0.90, alpha)
+		for i: int in owner_conduit.points_local.size() - 1:
+			draw_line(owner_conduit.points_local[i], owner_conduit.points_local[i + 1], line_col, 1.0)
+		for wp: Vector2 in owner_conduit.points_local:
+			draw_circle(wp, 1.8, line_col)
+		if owner_conduit.is_pulsing() and owner_conduit.total_length > 1.0:
+			var tail_frac: float = clampf(owner_conduit._pulse_t - (26.0 / owner_conduit.total_length), 0.0, 1.0)
+			var head_frac: float = clampf(owner_conduit._pulse_t, 0.0, 1.0)
+			var prev_p: Vector2 = owner_conduit.sample_at(tail_frac)
+			for step_i: int in range(1, 6):
+				var f: float = lerpf(tail_frac, head_frac, float(step_i) / 5.0)
+				var cur_p: Vector2 = owner_conduit.sample_at(f)
+				draw_line(prev_p, cur_p, Color(0.47, 0.96, 0.90, 0.85), 2.5)
+				if step_i >= 3:
+					draw_line(prev_p, cur_p, Color(1.0, 0.92, 0.62, 0.95), 1.4)
+				prev_p = cur_p
+			var head_p: Vector2 = owner_conduit.sample_at(head_frac)
+			draw_circle(head_p, 4.5, Color(0.47, 0.96, 0.90, 0.45))
+			draw_circle(head_p, 2.2, Color(1.0, 0.97, 0.86, 0.98))

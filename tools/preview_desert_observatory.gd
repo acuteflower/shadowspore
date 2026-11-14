@@ -73,8 +73,8 @@ func _run() -> void:
 		if cl != null and cl.name != "MoodGrade":
 			cl.visible = false
 
-	# 1. Summit Rotunda + Armillary + Telescope Lenses + Ellie at Zenith Noon
-	await _focus_and_settle(_obs._rotunda_pos + Vector2(36.0, 56.0), 0.96, 0.50, 100)
+	# 1. Summit Rotunda + Armillary + Telescope Lenses + Ellie standing on upper Star-Portal stairs at Zenith Noon
+	await _focus_and_settle(_obs._rotunda_pos + Vector2(0.0, 18.0), 1.05, 0.50, 100)
 	_obs._surge_timer = 3.0
 	for _i: int in 8:
 		await get_tree().process_frame
@@ -110,6 +110,13 @@ func _run() -> void:
 	for _i: int in 12:
 		await get_tree().process_frame
 	await _shot(out_dir, "obs_5_ecliptic_gate_arrival")
+
+	# 6. Causeway L1 -> L2 -> L3 flush meridian conduits & relocated Wind-Harp pillars
+	await _focus_and_settle(Vector2(936.0 * 16.0, 164.0 * 16.0), 0.92, 0.42, 85)
+	_obs._trigger_all_conduits()
+	for _i: int in 14:
+		await get_tree().process_frame
+	await _shot(out_dir, "obs_6_causeway_meridian_rails")
 
 	TimeManager.unlock()
 	get_tree().quit(0)

@@ -202,6 +202,9 @@ func bind(player: Node) -> void:
 		hint.name = "HintCard"
 		add_child(hint)
 		hint.bind(player.quests, dialogue, player.tracked)
+	var mod_menu: Control = preload("res://src/ui/mod_menu.tscn").instantiate() as Control
+	add_child(mod_menu)
+	mod_menu.call("bind", player)
 	_story_world = get_tree().get_first_node_in_group("world") is WorldLevel
 	_story_quests = player.quests
 	if _story_quests != null:

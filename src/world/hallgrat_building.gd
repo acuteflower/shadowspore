@@ -61,6 +61,21 @@ func _ready() -> void:
 		light.glow_color = Color("ffb35a")
 		add_child(light)
 	var body: StaticBody2D = StaticBody2D.new()
+	if info.has("poly"):  # a house turned halfway to a diagonal way: its footprint is a turned rectangle, shrunk a little towards its middle
+		var pts: PackedVector2Array = PackedVector2Array()
+		var mid: Vector2 = Vector2.ZERO
+		for q: Variant in info.poly as Array:
+			var corner: Vector2 = Vector2(float((q as Array)[0]) * (-1.0 if flip else 1.0), float((q as Array)[1]))
+			pts.append(corner)
+			mid += corner / 4.0
+		for k: int in pts.size():
+			pts[k] = pts[k] + (mid - pts[k]).normalized() * 4.0
+		var polygon: CollisionPolygon2D = CollisionPolygon2D.new()
+		polygon.polygon = pts
+		body.add_child(polygon)
+		add_child(body)
+		_time = fposmod(position.x * 0.01, 7.0)
+		return
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var box: RectangleShape2D = RectangleShape2D.new()
 	box.size = Vector2(maxf(8.0, _foot.x - 6.0), maxf(6.0, _foot.y - 4.0))

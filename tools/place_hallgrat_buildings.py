@@ -38,8 +38,54 @@ def main():
     taken = np.zeros((N, N), bool)
     solid = np.zeros((N, N), bool)  # only the footprints (doorways are walkable, they are where the paths start)
 
+    DIAG = ("se", "sw", "ne", "nw")
+
     def key(btype, view):
+        if view in ("se", "sw"):
+            return btype + "_se"
+        if view in ("ne", "nw"):
+            return btype + "_ne"
         return btype if view == "s" else "%s_%s" % (btype, "e" if view in ("e", "w") else view)
+
+    def diag_shape(btype, view, ex, ey):
+        """A house turned halfway to a diagonal way: its door on the way's edge point; returns (box, footprint polygon, door), all px.
+        sw / nw are the se / ne pictures mirrored."""
+        info = art.get(key(btype, view))
+        if not info or "poly" not in info:
+            return None
+        sx = -1.0 if view in ("sw", "nw") else 1.0
+        dx, dy = info["door"][0] * sx, info["door"][1]
+        fx, fy = ex - dx, ey - dy
+        fw, fd = info["foot"]
+        poly = [(fx + px * sx, fy + py) for px, py in info["poly"]]
+        return (fx - fw / 2.0, fy - fd, fw, fd), poly, (ex, ey)
+
+    def poly_cells(poly, grid):
+        """The cells (of `grid` px) whose middle lies inside the polygon."""
+        xs = [q[0] for q in poly]
+        ys = [q[1] for q in poly]
+        out = []
+        for cy in range(int(min(ys) // grid), int(max(ys) // grid) + 1):
+            for cx in range(int(min(xs) // grid), int(max(xs) // grid) + 1):
+                px, py = cx * grid + grid / 2.0, cy * grid + grid / 2.0
+                c = False
+                for (ax, ay), (bx, by) in zip(poly, poly[1:] + poly[:1]):
+                    if (ay > py) != (by > py) and px < ax + (py - ay) * (bx - ax) / (by - ay):
+                        c = not c
+                if c:
+                    out.append((cx, cy))
+        return out
+
+    def fits_poly(poly, lv):
+        for tx, ty in poly_cells(poly, 16):
+            if not (land[ty, tx] and kind[ty, tx] == 0 and level[ty, tx] == lv) or paved[ty, tx]:
+                return False
+        return not any(taken[cy, cx] for cx, cy in poly_cells(poly, CELL))
+
+    def take_poly(poly):
+        for cx, cy in poly_cells(poly, CELL):
+            taken[cy, cx] = True
+            solid[cy, cx] = True
 
     def foot(btype, view):
         info = art.get(key(btype, view))
@@ -73,6 +119,7 @@ def main():
         taken[int(y // CELL) - pad:int((y + d) // CELL) + 1 + pad, int(x // CELL) - pad:int((x + w) // CELL) + 1 + pad] = True
 
     placed = []
+    doors = json.load(open(os.path.join(ROOT, "data/hallgrat_art.json"), encoding="utf-8")).get("doors", {})
     polys = [[(x * 16.0, y * 16.0) for x, y in dd["poly"]] for dd in town["districts"] if dd["id"] not in ("verloren", "glasbruch")]
 
     def inside_town(r):
@@ -87,20 +134,38 @@ def main():
                 return True
         return False
 
-    def doorway(r):
-        """The strip in front of a house's door (its front edge, 22 px deep): nothing may be built there, so every door opens onto its way."""
+    def doorway(r, view="s"):
+        """The strip in front of a house's door: nothing may be built there, so every door opens onto its way. In front of a front view it is
+        60 px deep (a roof rises that far above its footprint); a house turned to a north-south way has its door on that side."""
         x, y, w, d = r
-        return (x - 4, y + d, w + 8, 60)  # a roof rises about 60 px above its footprint: the next house in front keeps that far off
+        if view == "e":
+            return (x + w, y - 4, 26, d + 8)
+        if view == "w":
+            return (x - 26, y - 4, 26, d + 8)
+        if view == "x":  # an exact rectangle (the doorstep of a diagonal house)
+            return r
+        return (x - 4, y + d, w + 8, 60)
 
-    def doorway_free(r):
-        x, y, w, d = doorway(r)
+    def doorway_free(r, view="s"):
+        x, y, w, d = doorway(r, view)
         return not taken[int(y // CELL):int((y + d) // CELL) + 1, int(x // CELL):int((x + w) // CELL) + 1].any()
 
-    def put(bid, btype, view, r):
+    def put(bid, btype, view, r, poly=None, door_at=None):
         x, y, w, d = r
+        if poly is not None:  # a diagonal house: the footprint is its polygon, the door lies where the placing put it
+            take_poly(poly)
+            info = art[key(btype, view)]
+            sx = -1.0 if view in ("sw", "nw") else 1.0
+            feet = (door_at[0] - info["door"][0] * sx, door_at[1] - info["door"][1])
+            placed.append({"id": bid, "type": key(btype, view), "view": view, "px": [round(feet[0], 1), round(feet[1], 1)],
+                           "door": [round(door_at[0], 1), round(door_at[1], 1)],
+                           "tile": [int(feet[0] // 16), int((feet[1] - 1) // 16)], "flip": sx < 0})
+            return
+        door = {"s": (x + w / 2.0 + float(doors.get(btype, 0.0)), y + d + 3), "e": (x + w + 3, y + d / 2.0), "w": (x - 3, y + d / 2.0)}.get(view)
         solid[int(y // CELL):int((y + d) // CELL) + 1, int(x // CELL):int((x + w) // CELL) + 1] = True
         feet = (x + w / 2.0, y + d)
         placed.append({"id": bid, "type": key(btype, view), "view": view, "px": [round(feet[0], 1), round(feet[1], 1)],
+                       "door": [round(door[0], 1), round(door[1], 1)] if door else None,
                        "tile": [int(feet[0] // 16), int((feet[1] - 1) // 16)], "flip": view == "w"})
 
     # the named buildings first
@@ -155,24 +220,51 @@ def main():
                 px, py = ax + (bx - ax) * t, ay + (by - ay) * t
                 tx, ty = (bx - ax) / max(lens[j], 1e-6), (by - ay) / max(lens[j], 1e-6)
                 nx, ny = -ty * side, tx * side  # from the street towards this side
-                if abs(ny) >= abs(nx):
+                if min(abs(nx), abs(ny)) > 0.42:  # a diagonal way: the house turned halfway, its front (or back) along it
+                    view = ("se" if nx < 0 else "sw") if ny < 0 else ("ne" if nx < 0 else "nw")
+                elif abs(ny) >= abs(nx):
                     view = "s" if ny < 0 else "n"
                 else:
                     view = "e" if nx < 0 else "w"
                 btype = pal[i % len(pal)]
                 ex, ey = px + nx * (half + 3), py + ny * (half + 3)
+                if view in DIAG:
+                    shape = diag_shape(btype, view, ex, ey)
+                    why = "view" if shape is None or view not in row.get("views", ["s", "e", "w", "se", "sw"]) else ""
+                    if why == "":
+                        r, poly, door_at = shape
+                        why = "fit" if not fits_poly(poly, row["level"]) else ("town" if not inside_town(r) else "")
+                        gate = (door_at[0] - nx * 14 - 12, door_at[1] - ny * 14 - 12, 24, 24)  # the doorstep, out on the way
+                        if why == "" and not doorway_free(gate, "x"):
+                            why = "door"
+                    REASONS[name] = REASONS.get(name, {})
+                    REASONS[name][why] = REASONS[name].get(why, 0) + 1
+                    if why == "":
+                        take(gate)
+                        put("%s_%d_%d_%d" % (name, row["level"], side, k), btype, view, r, poly, (door_at[0] - nx * 3, door_at[1] - ny * 3))
+                        k += 1
+                        i += 1
+                        span = [q[0] * tx + q[1] * ty for q in poly]
+                        s_pos += (max(span) - min(span)) * 1.05 + 10 + row.get("gap", 2)  # roofs must not lie on the next house
+                        if rng.random() < row.get("lane", 0.12):
+                            s_pos += 18
+                    else:
+                        s_pos += 6
+                    continue
                 r = rect_for(btype, view, ex, ey)
                 along = r[2] if view in ("s", "n") else r[3]
-                why = "view" if view not in row.get("views", ["s"]) else ("fit" if not fits(r, row["level"]) else ("town" if not inside_town(r) else ("door" if not doorway_free(r) else "")))
+                why = "view" if view not in row.get("views", ["s", "e", "w"]) else ("fit" if not fits(r, row["level"]) else ("town" if not inside_town(r) else ("door" if not doorway_free(r, view) else "")))
                 REASONS[name] = REASONS.get(name, {})
                 REASONS[name][why] = REASONS[name].get(why, 0) + 1
                 if why == "":
                     take(r)
-                    take(doorway(r))
+                    take(doorway(r, view))
                     put("%s_%d_%d_%d" % (name, row["level"], side, k), btype, view, r)
                     k += 1
                     i += 1
                     s_pos += along + row.get("gap", 2)
+                    if view in ("e", "w"):  # turned houses stand one behind the other along the way: room enough that no roof hides the next one
+                        s_pos += 1.0 * max(0.0, art[key(btype, view)]["size"][1] - art[key(btype, view)]["foot"][1])
                     if rng.random() < row.get("lane", 0.12):  # now and then a narrow lane between two houses
                         s_pos += 18
                 else:
@@ -209,16 +301,15 @@ def main():
             sub = mk[::CELL, ::CELL]
             y0, x0 = dd["y"] // CELL, dd["x"] // CELL
             street_px[y0:y0 + sub.shape[0], x0:x0 + sub.shape[1]] |= sub
-    doors = json.load(open(os.path.join(ROOT, "data/hallgrat_art.json"), encoding="utf-8")).get("doors", {})
     paths = []
     lost = set()
     import heapq
     for b in placed:
-        if b["view"] != "s" or b["type"].startswith("stand_"):
+        if b["type"].startswith("stand_"):
             continue
-        base = b["type"]
-        dx = float(doors.get(base, 0.0))
-        sx, sy = int((b["px"][0] + dx) // CELL), int((b["px"][1] + 3) // CELL)
+        if not b.get("door"):
+            continue
+        sx, sy = int(b["door"][0] // CELL), int(b["door"][1] // CELL)
         lv = int(level[int(b["px"][1] // 16), int(b["px"][0] // 16)])
         if street_px[sy:sy + 3, sx - 1:sx + 2].any():
             continue  # the door opens right onto a street

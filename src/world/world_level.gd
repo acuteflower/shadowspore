@@ -79,6 +79,8 @@ var desert_observatory: DesertObservatory ## Die Zenitwarte: grand 5-zone observ
 var desert_ruins: DesertRuins ## active quartz arches, conduits, obelisks & seals across Sonnenquarz-Öde
 var desert_guardians: DesertGuardians ## host: spawns 24/7 QuartzGolem guardians exclusively on ground-quartz outcrops
 var meadow_landmarks: MeadowLandmarks ## SolitaryTree hilltop oaks, ForestShrines & SunbeamShafts across the 3 meadow macro-landscapes
+var meadow_pois: MeadowPois ## Red Order monuments, OldWatermills, BrokenStoneBridges & FisherPiers across the meadow biome
+var meadow_wonders: MeadowWonders ## Die 3 einmaligen Weltwunder: BellPond, SleepingGuardians & FlowerAmphitheater
 var _moss_carpet_tex: Texture2D
 var _pasture_paving_tex: Texture2D
 var knight_taken: bool = false ## Valdric is a settler (`take_knight`): the story actor stays hidden
@@ -259,6 +261,16 @@ func _fill_ground() -> void:
 	var ml_blocked: Dictionary = meadow_landmarks.setup(self, _generator.blocked_cells)
 	_generator.blocked_cells.merge(ml_blocked)
 	add_child(meadow_landmarks)
+	meadow_pois = MeadowPois.new()
+	meadow_pois.name = "MeadowPois"
+	var mp_blocked: Dictionary = meadow_pois.setup(self)
+	_generator.blocked_cells.merge(mp_blocked)
+	add_child(meadow_pois)
+	meadow_wonders = MeadowWonders.new()
+	meadow_wonders.name = "MeadowWonders"
+	var mw_blocked: Dictionary = meadow_wonders.setup(self)
+	_generator.blocked_cells.merge(mw_blocked)
+	add_child(meadow_wonders)
 	_generator.tree_free_cells = _stone_cells
 	_generator.berry_free_cells = _berry_free
 	var scenes: Array[String] = []
@@ -1721,6 +1733,10 @@ func _finish_commit(deadline: int = 0) -> void:
 			desert_ruins.populate_chunk(build.cell)
 		if meadow_landmarks != null:
 			meadow_landmarks.populate_chunk(build.cell)
+		if meadow_pois != null:
+			meadow_pois.populate_chunk(build.cell)
+		if meadow_wonders != null:
+			meadow_wonders.populate_chunk(build.cell)
 		_rivers.attach_chunk(chunk.node, build.cell)
 		_chunks[build.cell] = chunk
 		LeafCritter.settle_chunk(chunk.things)
@@ -1917,6 +1933,10 @@ func _unload_chunk(c: Vector2i) -> void:
 		desert_ruins.free_chunk(c)
 	if meadow_landmarks != null:
 		meadow_landmarks.free_chunk(c)
+	if meadow_pois != null:
+		meadow_pois.free_chunk(c)
+	if meadow_wonders != null:
+		meadow_wonders.free_chunk(c)
 	remove_child(chunk.node)
 	chunk.node.queue_free()
 	_chunks.erase(c)
@@ -2699,7 +2719,7 @@ func town() -> TownManager:
 
 
 ## What the ground says against a piece standing on `rect` (px, its footprint): "" = nothing. Land, one flat level, no water, nothing solid in the way.
-func town_probe(rect: Rect2) -> String:
+func town_probe(rect: Rect2, exclude: Array[RID] = []) -> String: ## `exclude`: bodies that do not count (a piece that is being moved does not stand in its own way)
 	var wide: Rect2 = rect.grow(8.0)
 	var middle: Vector2i = Vector2i(floori(rect.get_center().x / 16.0), floori(rect.get_center().y / 16.0))
 	var home: int = _relief.level(middle.x, middle.y)
@@ -2717,6 +2737,7 @@ func town_probe(rect: Rect2) -> String:
 	query.shape = box
 	query.transform = Transform2D(0.0, rect.get_center())
 	query.collision_mask = 1
+	query.exclude = exclude
 	if not get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty():
 		return "IM WEG"
 	return ""

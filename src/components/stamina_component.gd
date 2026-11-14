@@ -11,6 +11,12 @@ signal changed(current: float, maximum: float)
 @export var regen_delay: float = 1.25 ## seconds
 
 var current: float = 0.0
+var infinite: bool = false:
+	set(enabled):
+		infinite = enabled
+		if enabled:
+			_delay_left = 0.0
+			refill()
 
 var _delay_left: float = 0.0
 var _pulse_left: float = 1.0
@@ -71,6 +77,8 @@ func is_waiting() -> bool:
 
 ## Pays `amount` at once. Returns false (and pays nothing) if there is not enough.
 func spend(amount: float) -> bool:
+	if infinite:
+		return true
 	if current < amount:
 		return false
 	_use(amount)
@@ -79,6 +87,8 @@ func spend(amount: float) -> bool:
 
 ## Pays `rate * delta` for continuous use. Returns false once the pool is empty.
 func drain(rate: float, delta: float) -> bool:
+	if infinite:
+		return true
 	if current <= 0.0:
 		return false
 	_use(rate * delta)
@@ -97,6 +107,9 @@ func sprint_scale() -> float:
 func set_max(value: float, grow: bool = false) -> void:
 	var added: float = value - max_stamina
 	max_stamina = value
+	if infinite:
+		refill()
+		return
 	_set_current(current + added if grow and added > 0.0 else current)
 
 

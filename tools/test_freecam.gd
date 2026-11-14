@@ -1,5 +1,5 @@
 extends Node
-## Free camera (L) and the developer tab's teleport field.
+## Free camera (L) and the mod menu test tools' teleport field.
 var failures: int = 0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -42,14 +42,13 @@ func _run() -> void:
 	check(fc.active(), "no landing in the void")
 	fc._cancel()
 	check(not fc.active(), "cancel leaves the camera mode")
-	# Teleport field of the developer tab.
+	# Teleport field of the test tools.
 	var menu: PauseMenu = player._hud.get_node("PauseMenu") as PauseMenu
-	menu._set_open(true)
-	menu._select_tab(4)
+	menu.open_test_tools()
 	var field: Dictionary = {}
 	for item: Dictionary in menu._items:
 		if String(item.get("kind", "")) == "field": field = item
-	check(not field.is_empty() and menu._tp_text != "", "developer tab has a prefilled coordinate field")
+	check(not field.is_empty() and menu._tp_text != "", "test tools have a prefilled coordinate field")
 	menu._activate(field)
 	check(menu._editing, "activating the field takes the keys")
 	menu._tp_text = ""
@@ -64,21 +63,18 @@ func _run() -> void:
 	check(not menu.visible and not get_tree().paused, "teleport closes the menu")
 	var tile: Vector2 = player.global_position / 16.0
 	check(absf(tile.x - 420.0) <= 17.0 and absf(tile.y - 610.0) <= 17.0, "she stands near tile 420, 610 (%s)" % tile)
-	menu._set_open(true)
-	menu._select_tab(4)
+	menu.open_test_tools()
 	menu._tp_text = "abc"
 	menu._run_action("teleport")
 	check(menu._failed_flash > 0.0, "garbage input fails")
-	# The developer page is taller than the screen: it scrolls.
-	menu._set_open(true)
-	menu._select_tab(4)
+	# The test tools are taller than the screen: they scroll.
 	menu.size = Vector2(640, 360)
 	menu._build_items()
 	var last: Dictionary = menu._items[0]
 	for item: Dictionary in menu._items: ## the lowest row of the page
 		if float(item["y"]) > float(last["y"]): last = item
 	var col: int = int(last["col"])
-	check(menu._max_scroll(col) > 0.0, "developer page is taller than the screen (%s)" % menu._max_scroll(col))
+	check(menu._max_scroll(col) > 0.0, "test tools are taller than the screen (%s)" % menu._max_scroll(col))
 	check(not menu._row_visible(last), "the last row starts off screen")
 	var wheel: InputEventMouseButton = InputEventMouseButton.new()
 	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
@@ -92,7 +88,8 @@ func _run() -> void:
 	for i: int in 60:
 		menu._gui_input(wheel)
 	check(menu._scrolls[col] == 0.0, "wheel scrolls back to the top")
-	menu._select_tab(0)
-	check(menu._scrolls[col] == 0.0, "changing tab resets the scroll")
+	menu._set_open(false)
+	menu._set_open(true)
+	check(not menu._test_tools and menu._scrolls[col] == 0.0, "normal pause menu opens on settings")
 	print("FREECAM: %d failures" % failures)
 	get_tree().quit(1 if failures > 0 else 0)

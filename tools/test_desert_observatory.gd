@@ -75,7 +75,7 @@ func _run() -> void:
 	obs._process(0.05)
 	var pulsed_noon: bool = obs._noon_pulsed_day and obs._surge_timer > 0.0
 	var any_conduit_pulsing: bool = false
-	for c: DesertRuins.LightConduit in obs._conduits:
+	for c: DesertObservatory.ObservatoryConduit in obs._conduits:
 		if is_instance_valid(c) and c.is_pulsing():
 			any_conduit_pulsing = true
 			break
@@ -84,6 +84,28 @@ func _run() -> void:
 	var tod_pm: float = obs._sundial_overlay._tod
 	_check(tod_am < 0.35 and tod_pm > 0.65, "Sundial tracks dawn-to-dusk solar time shifts (am=%.2f -> pm=%.2f)" % [tod_am, tod_pm])
 	_check(pulsed_noon and any_conduit_pulsing, "Zenith Noon Pulse energizes conduits and flares Observatory at 0.50")
+
+	# Physics collision & Y-sort regression guards for Rotunda interior, West buttress, East stairs, and Portal landing
+	var space: PhysicsDirectSpaceState2D = world.get_world_2d().direct_space_state
+	var point_query: Callable = func(wpos: Vector2) -> bool:
+		var q: PhysicsPointQueryParameters2D = PhysicsPointQueryParameters2D.new()
+		q.position = wpos
+		q.collision_mask = 1
+		q.collide_with_bodies = true
+		return not space.intersect_point(q, 1).is_empty()
+	_check(bool(point_query.call(rotunda_pos + Vector2(0.0, -12.0))), "Rotunda interior behind doors is solidly collided")
+	_check(bool(point_query.call(rotunda_pos + Vector2(-97.0, 9.0))), "West Astrolabe outward buttress cylinder is collided")
+	_check(bool(point_query.call(rotunda_pos + Vector2(95.0, 11.0))), "East Flank curved staircase is collided")
+	_check(not bool(point_query.call(rotunda_pos + Vector2(0.0, 18.0))), "Star-Portal upper stair landing remains walkable")
+
+	# Conduits keep clear of Relief cliff blockers along all sampled waypoints
+	var conduit_cliff_hits: int = 0
+	for c: DesertObservatory.ObservatoryConduit in obs._conduits:
+		for si: int in 25:
+			var sample_local: Vector2 = c.sample_at(float(si) / 24.0)
+			if world._relief.blocked_at(c.global_position + sample_local):
+				conduit_cliff_hits += 1
+	_check(obs._conduits.size() == 6 and conduit_cliff_hits == 0, "All 6 ObservatoryConduit channels stay clear of Relief cliff walls (hits=%d)" % conduit_cliff_hits)
 
 	# Sealed Star-Portal Interactable shows SettlerBubble without switching scenes
 	var player: Player = world._players.get_child(0) as Player
@@ -96,6 +118,7 @@ func _run() -> void:
 		portal = obs.get_node_or_null("ObsRotundaPortal")
 	_check(portal != null and portal.has_method("interact"), "Sealed Star-Portal Interactable exists")
 	if portal != null and player != null:
+		_check((portal as Node2D).global_position.y < rotunda_pos.y + 13.0, "Star-Portal Y-sort pivot sits behind the top stair landing")
 		portal.call("interact", player)
 		await get_tree().process_frame
 		var has_bubble: bool = false

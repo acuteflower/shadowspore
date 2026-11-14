@@ -157,6 +157,33 @@ func _run() -> void:
 	for kind: String in spent:
 		var cell: Vector2i = spent[kind]
 		_check(world._things.has(cell) and not town.cleared.has(cell) and world._thing_states.has(cell), "a used-up %s in the light stays and grows back" % kind)
+	# --- move: a finished piece is carried a cell over (across its own footprint), mirrored, for free; it takes its light along
+	var lamp_spec: Dictionary = TownRules.piece("lamp_post")
+	var lamp_wide: float = float((lamp_spec.get("foot", [16, 16]) as Array)[0])
+	var move_to: Vector2 = TownRules.snapped_position("lamp_post", lamp_at + Vector2(maxf(TownRules.snap_of("lamp_post"), lamp_wide * 0.5), 0.0))
+	for tries: int in 8:
+		if town.check_move(lamp_id, move_to, player) == "":
+			break
+		move_to = TownRules.snapped_position("lamp_post", move_to + Vector2(0.0, TownRules.snap_of("lamp_post")))
+	_check(TownRules.overlaps(TownRules.foot_rect("lamp_post", move_to.x, move_to.y), town.rect_of(lamp_id)) == false or town.check_site("lamp_post", move_to) != "", "without its own id the piece would stand in its own way")
+	_check(town.check_move(lamp_id, move_to, player) == "", "a piece may be moved next to where it stands (%s)" % town.check_move(lamp_id, move_to, player))
+	_check(town.check_move(0, move_to, player) != "", "the house is not moved")
+	var stock_before_move: Dictionary = town.stock.duplicate()
+	var bag_before_move: int = player.inventory.count_item("wood")
+	town.request_move(lamp_id, move_to, true)
+	await _frames(3)
+	var moved: Dictionary = town.structures[lamp_id] as Dictionary
+	_check(town.position_of(lamp_id) == move_to and int(moved.f) == 1, "the piece stands at the new place, mirrored (%s)" % str(town.position_of(lamp_id)))
+	_check(town.is_built(lamp_id), "a finished piece stays finished")
+	_check(town.view_of(lamp_id) != null and town.view_of(lamp_id).position == move_to, "its picture stands at the new place")
+	_check(town.circles().any(func(c: Vector3) -> bool: return is_equal_approx(c.x, move_to.x) and is_equal_approx(c.y, move_to.y - 8.0)), "its light went along")
+	_check(town.stock == stock_before_move and player.inventory.count_item("wood") == bag_before_move, "moving costs nothing")
+	town.request_move(lamp_id, lamp_at + Vector2(0, 400), false)
+	await _frames(2)
+	_check(town.position_of(lamp_id) == move_to, "a place in the dark is refused")
+	town.request_move(lamp_id, lamp_at, false)
+	await _frames(3)
+	_check(town.position_of(lamp_id) == lamp_at and int((town.structures[lamp_id] as Dictionary).f) == 0, "it can be carried back (%s)" % str(town.position_of(lamp_id)))
 	# --- demolish: a finished piece gives back 60 %, rounded up, into the stock
 	var stock_wood: int = int(town.stock.get("wood", 0))
 	town.request_demolish(lamp_id)

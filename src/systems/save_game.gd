@@ -105,6 +105,12 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	var m_landmarks: MeadowLandmarks = MeadowLandmarks.of(tree)
 	if m_landmarks != null and m_landmarks.blessed_count() > 0:
 		data["meadow_landmarks"] = m_landmarks.export_state() ## blessed Urforst shrines (docs/wiesenbiom_ausbau_konzept.md)
+	var m_pois: MeadowPois = MeadowPois.of(tree)
+	if m_pois != null and m_pois.has_progress():
+		data["meadow_pois"] = m_pois.export_state() ## Red Order inscriptions, unjammed watermills & rowboats (docs/wiesenbiom_ausbau_konzept.md)
+	var m_wonders: MeadowWonders = MeadowWonders.of(tree)
+	if m_wonders != null and m_wonders.has_progress():
+		data["meadow_wonders"] = m_wonders.export_state() ## awakened BellPond, SleepingGuardians & FlowerAmphitheater (docs/wiesenbiom_ausbau_konzept.md)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
@@ -205,6 +211,12 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	var m_landmarks: MeadowLandmarks = MeadowLandmarks.of(tree)
 	if m_landmarks != null and data.has("meadow_landmarks"):
 		m_landmarks.import_state(data.meadow_landmarks)
+	var m_pois: MeadowPois = MeadowPois.of(tree)
+	if m_pois != null and data.has("meadow_pois"):
+		m_pois.import_state(data.meadow_pois)
+	var m_wonders: MeadowWonders = MeadowWonders.of(tree)
+	if m_wonders != null and data.has("meadow_wonders"):
+		m_wonders.import_state(data.meadow_wonders)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null and data.has("map"):
 		discovery.import_saved(Marshalls.base64_to_raw(String(data["map"])))

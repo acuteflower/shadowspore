@@ -105,7 +105,7 @@ func gate_point() -> Vector2:
 	for gate: Dictionary in DataRegistry.table("hallgrat").get("gates", []) as Array:
 		if String(gate.id) == "osttor":
 			var tile: Array = gate.tile as Array
-			return Vector2(float(tile[0]) + 4.0, float(tile[1]) + 1.0) * 16.0 + Vector2(8, 8)
+			return Vector2(float(tile[0]) + 7.0, float(tile[1]) + 2.0) * 16.0 + Vector2(8, 8)
 	return forum
 
 

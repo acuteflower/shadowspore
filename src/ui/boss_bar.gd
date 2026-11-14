@@ -112,6 +112,11 @@ func set_covered(covered: bool) -> void:
 	_covered = covered
 
 
+## True while a boss fight is actively open (turns false on death or release).
+func is_fighting() -> bool:
+	return _state == State.OPEN
+
+
 func _untrack() -> void:
 	if _health != null and is_instance_valid(_health):
 		if _health.damaged.is_connected(_on_damaged):

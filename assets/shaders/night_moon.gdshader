@@ -46,8 +46,10 @@ void fragment() {
 	// the light has colour: every pool leans its own way between ice blue and a mint teal (a slow field, so neighbours differ), and the glow that
 	// bleeds out of it is violet: cool light with a warm-violet fringe is what makes the night read as coloured instead of grey
 	float hue = n_fbm(w / 240.0 + vec2(TIME * 0.002, -TIME * 0.0016) + 71.0);
-	vec3 pool_color = mix(moon_color, moon_teal, smoothstep(0.38, 0.62, hue));
-	vec3 lit = scene * (1.0 + 2.4 * light) + pool_color * (0.05 + 0.45 * lum) * light + mix(pool_color, moon_fringe, 0.7) * halo * 0.085 * strength;
+	vec3 pool_color = mix(moon_color, moon_teal, smoothstep(0.34, 0.66, hue));
+	// preserve saturated highlights inside moon pools instead of blowing them flat white
+	float hi_keep = 1.0 - 0.52 * smoothstep(0.32, 0.85, lum);
+	vec3 lit = scene * (1.0 + 2.35 * light * hi_keep) + pool_color * (0.06 + 0.42 * lum * hi_keep) * light + mix(pool_color, moon_fringe, 0.72) * halo * 0.095 * strength;
 	// glints: single pixels that flare up and die away inside the pools
 	if (level > 0.4 && mod(art.x, 4.0) < 1.0 && mod(art.y, 4.0) < 1.0) {
 		float h = n_hash(floor(art / 4.0) + 17.0);

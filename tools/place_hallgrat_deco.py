@@ -288,7 +288,7 @@ def main():
             if land[Y, X] and level[Y, X] >= 1 and not any(point_in(q, X * 16 + 8, Y * 16 + 8) for q in inner):
                 plateau[ty, tx] = True
     core = np.repeat(np.repeat(plateau, 16 // C, 0), 16 // C, 1)[:H, :W]
-    for _ in range(3):  # the wall stands 12 px in from the brink
+    for _ in range(4):  # the wall stands 16 px in from the brink
         core = core & np.roll(core, 1, 0) & np.roll(core, -1, 0) & np.roll(core, 1, 1) & np.roll(core, -1, 1)
     ramp_cells = np.zeros((H, W), bool)
     n_towers = 0
@@ -338,7 +338,7 @@ def main():
             if abut[1]:
                 seg = seg + info_pts[j:j + 2]
             k = j
-            if len(seg) < 12:
+            if len(seg) < 20:
                 continue
             arc = [0.0]
             for (ax, ay, *_), (bx_, by_, *_) in zip(seg, seg[1:]):
@@ -352,18 +352,18 @@ def main():
                 a1 = math.atan2(seg[q][1] - seg[q - 4][1], seg[q][0] - seg[q - 4][0])
                 a2 = math.atan2(seg[q + 4][1] - seg[q][1], seg[q + 4][0] - seg[q][0])
                 turn = abs((a2 - a1 + math.pi) % (2 * math.pi) - math.pi)
-                if turn > 0.75 and all(abs(arc[q] - t) > 70 for t in towers):
+                if turn > 0.75 and all(abs(arc[q] - t) > 100 for t in towers):
                     towers.append(arc[q])
             towers.sort()
             fill_t = []
             for t0, t1 in zip(towers, towers[1:]):  # no stretch longer than ~170 px without a tower
-                n_more = int((t1 - t0) // 170)
+                n_more = int((t1 - t0) // 210)
                 fill_t += [t0 + (t1 - t0) * (m_ + 1) / (n_more + 1) for m_ in range(n_more)]
             towers = sorted(towers + fill_t)
             kept = []
             for t in towers:
                 q = min(range(len(arc)), key=lambda i_: abs(arc[i_] - t))
-                if all(math.hypot(seg[q][0] - tx_, seg[q][1] - ty_) > 44 for tx_, ty_ in tower_xy):
+                if all(math.hypot(seg[q][0] - tx_, seg[q][1] - ty_) > 70 for tx_, ty_ in tower_xy):
                     kept.append(t)
                     tower_xy.append((seg[q][0], seg[q][1]))
             towers = kept
@@ -374,14 +374,14 @@ def main():
             wall_runs.append(run)
             n_towers += len(towers)
             for p in seg:
-                mark(taken, p[0] - 8, p[1] - 8, p[0] + 8, p[1] + 8)
-                mark(hidden, p[0] - 6, p[1] - 48, p[0] + 6, p[1] - 6)
+                mark(taken, p[0] - 12, p[1] - 12, p[0] + 12, p[1] + 12)
+                mark(hidden, p[0] - 6, p[1] - 92, p[0] + 6, p[1] - 8)
                 mark(ramp_cells, p[0] - 4, p[1] - 4, p[0] + 4, p[1] + 4)
             for t in towers:
                 q = min(range(len(arc)), key=lambda i_: abs(arc[i_] - t))
                 x, y = seg[q][0], seg[q][1]
-                mark(taken, x - 16, y - 14, x + 16, y + 14)
-                mark(hidden, x - 14, y - 72, x + 14, y - 8)
+                mark(taken, x - 30, y - 26, x + 30, y + 26)
+                mark(hidden, x - 26, y - 170, x + 26, y - 12)
     n_ramp = len(wall_runs)
     print("town wall: %d stretches, %d towers, %d px" % (n_ramp, n_towers, sum(3 * (len(r["pts"]) - 1) for r in wall_runs)))
     # 0. the walls: continuous runs a hand's breadth off the paving's edge, each its own stones (tools/art_hallgrat_walls.py renders them);

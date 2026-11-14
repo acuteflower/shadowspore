@@ -284,6 +284,23 @@
      "Schon wieder weg. Gute Reise, Alter."
     ]
    ]
+  },
+  {
+   "event": "market_day",
+   "lines": [
+    [
+     "gustav",
+     "Heute ist Markttag auf dem Platz! Alle Kisten quellen über."
+    ],
+    [
+     "torben",
+     "Mehr Kundschaft, mehr Stahl. Guter Tag."
+    ],
+    [
+     "valdric",
+     "Festlicher Platz, wachsame Augen. Guter Handel."
+    ]
+   ]
   }
  ]
 }

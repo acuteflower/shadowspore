@@ -167,26 +167,17 @@ func _run() -> void:
 	if WeatherManager.current != null:
 		WeatherManager.current.release()
 
-	# --- Shot 4: Nighttime PrismSeal Sanctuary (`prism_ruinenfeld`) with Arch, Conduits, Obelisks, Corner Piers & Risen Chest ---
-	var seal_spot: Vector2 = Vector2(993.0, 180.0) * 16.0 + Vector2(8.0, 8.0)
-	var puzzles_node: Puzzles = world.get_node_or_null("Puzzles") as Puzzles
-	if puzzles_node != null and puzzles_node.trial("prism_ruinenfeld") != null:
-		seal_spot = puzzles_node.trial("prism_ruinenfeld").global_position
+	# --- Shot 4: Nighttime Die Zenitwarte (`DesertObservatory`) ---
+	var obs_spot: Vector2 = Vector2(968.0, 148.0) * 16.0 + Vector2(8.0, 8.0)
+	if world.desert_observatory != null:
+		obs_spot = world.desert_observatory.plaza_world_pos()
 	TimeManager.time_of_day = 0.0
-	hero.request_teleport(seal_spot + Vector2(0.0, 18.0))
+	hero.request_teleport(obs_spot)
 	if cam != null:
 		cam.zoom = Vector2(1.22, 1.22)
 	for _i: int in 90:
 		await get_tree().process_frame
-	if puzzles_node != null:
-		var pt: PrismSeal = puzzles_node.trial("prism_ruinenfeld") as PrismSeal
-		if pt != null:
-			pt.activate_pillar(0)
-			pt.activate_pillar(1)
-			pt.activate_pillar(2)
-	for _i: int in 25:
-		await get_tree().process_frame
-	await _shot(dir, "4_prism_seal_night")
+	await _shot(dir, "4_observatory_night")
 
 	print("DESERT FEATURES PREVIEW OK")
 	get_tree().quit()

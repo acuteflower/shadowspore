@@ -68,18 +68,23 @@ func _run() -> void:
 	await _frames(120)
 	player.quests.set_flag("rebuild_done")
 	await _frames(70)
-	for item: String in ["wood", "stone", "glow_cap", "plant_fiber"]:
+	for item: String in ["wood", "stone", "glow_cap", "plant_fiber", "earth_tuber"]:
 		player.inventory.give(item, 90)
 	town.unlock("farming")
 	await _frames(2)
-	var lamp: Vector2 = _site(town, "lamp_post", hut.position + Vector2(-60, 130))
+	var plaza_at: Vector2 = _site(town, "plaza", hut.position + Vector2(0, 140))
+	_put(town, "plaza", plaza_at)
+	var lamp: Vector2 = _site(town, "lamp_post", hut.position + Vector2(-95, 135))
 	_put(town, "lamp_post", lamp)
-	var base: Vector2 = _site(town, "field", hut.position + Vector2(60, 150))
+	var base: Vector2 = _site(town, "field", hut.position + Vector2(125, 145))
 	var first: int = _put(town, "field", base)
 	var second_at: Vector2 = TownRules.snapped_position("field", base + Vector2(48, 0)) ## right next to it: one big bed
 	var second: int = _put(town, "field", second_at) if town.check_site("field", second_at) == "" else -1
-	var third_at: Vector2 = _site(town, "field", base + Vector2(-90, 10))
+	var third_at: Vector2 = _site(town, "field", base + Vector2(0, 60))
 	var third: int = _put(town, "field", third_at) if third_at != Vector2.INF else -1
+	var scare_at: Vector2 = _site(town, "scarecrow", base + Vector2(-28, -4))
+	if scare_at != Vector2.INF:
+		_put(town, "scarecrow", scare_at)
 	await _frames(4)
 	var farm: FarmManager = town.farm
 	# the first field: every stage, wet and dry
@@ -88,7 +93,8 @@ func _run() -> void:
 		_cell(farm, first, k, String((plan[k] as Array)[0]), int((plan[k] as Array)[1]), bool((plan[k] as Array)[2]))
 	if second >= 0:
 		for k: int in [0, 1, 3, 4, 6, 7]:
-			_cell(farm, second, k, "tuber" if k % 2 == 0 else "wound_leaf", 2, k < 4)
+			var crop_id: String = ["moon_leek", "oasis_melon", "amber_grain", "moon_leek", "oasis_melon", "wound_leaf"][k % 6]
+			_cell(farm, second, k, crop_id, 3 if k in [0, 3, 4, 6] else 2, k < 6)
 	if third >= 0:
 		_cell(farm, third, 4, "", 0, true)
 		_cell(farm, third, 1, "", 0, false)

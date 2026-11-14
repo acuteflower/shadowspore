@@ -118,7 +118,7 @@ func _persona() -> PackedStringArray:
 
 
 func _header_right(right: float, y: float) -> void:
-	if _kind() in ["buy", "sell", "grind"]:
+	if _kind() in ["buy", "sell", "grind", "preorder"]:
 		draw_purse(right, y, player.progress.copper)
 	else:
 		draw_trust(right, y, npc)
@@ -205,7 +205,7 @@ func _rebuild() -> void:
 			_rebuild_refine()
 		"brew":
 			_rebuild_brew()
-		"buy", "sell" when _caravan != null:
+		"buy", "sell", "preorder" when _caravan != null:
 			for row: Dictionary in _caravan.rows(_kind(), player):
 				row["name"] = _item_name(String(row.item))
 				if bool(row.get("curio", false)):
@@ -391,6 +391,18 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 				var all_head: String = "SHIFT: ALLES  "
 				_text(Vector2(area.position.x, area.position.y + 58.0), all_head, DIM)
 				draw_purse_left(area.position.x + float(PixelText.width(all_head)), area.position.y + 58.0, int(row.price) * int(row.count))
+		"preorder":
+			var pre_head: String = "ANZAHLUNG "
+			_text(Vector2(area.position.x, area.position.y + 46.0), pre_head, GOLD)
+			var px: float = area.position.x + float(PixelText.width(pre_head))
+			draw_purse_left(px, area.position.y + 46.0, int(row.price))
+			_text(Vector2(px + purse_width(int(row.price)) + 2.0, area.position.y + 46.0), "DAS STÜCK", GOLD)
+			var pre_note: String = "LIEFERUNG BEIM NÄCHSTEN BESUCH" if String(row.why) == "" else String(row.why)
+			_text(Vector2(area.position.x, area.position.y + 58.0), pre_note, DIM if String(row.why) == "" else BAD)
+		"collect_preorder":
+			var ready: bool = bool(row.get("ready", false))
+			_text(Vector2(area.position.x, area.position.y + 46.0), "%d X VORBESTELLT" % int(row.count), GOLD)
+			_text(Vector2(area.position.x, area.position.y + 58.0), "BEREIT ZUR ABHOLUNG!" if ready else String(row.why), LIT if ready else DIM)
 
 
 ## The weapon big on the left with its fifteen pearls, what the next level gives, what it costs (material chips and copper), how long Torben needs and the chance as a bar
@@ -524,6 +536,10 @@ func _buttons() -> Array[Dictionary]:
 			return [{"id": "buy", "label": "KAUFEN", "ready": ready}, {"id": "buy10", "label": "10 X", "ready": ready and player.progress.copper >= int(row.price) * 2}]
 		"sell":
 			return [{"id": "sell", "label": "VERKAUFEN", "ready": ready}, {"id": "sell_all", "label": "ALLES", "ready": ready}]
+		"preorder":
+			return [{"id": "preorder", "label": "BESTELLEN", "ready": ready}]
+		"collect_preorder":
+			return [{"id": "collect_preorder", "label": "ABHOLEN", "ready": ready}]
 		"grind":
 			return [{"id": "grind", "label": "SCHLEIFEN", "ready": ready}]
 		"refresh":
@@ -574,6 +590,17 @@ func _press(id: String, bulk: bool) -> void:
 			town.request_trade(shop_id, "sell", String(row.item), int(row.count) if (id == "sell_all" or bulk) else 1)
 			_sound("coin")
 			_say_line("sell")
+		"preorder":
+			if _caravan != null:
+				var pre_amt: int = mini(5, int(row.get("max_amount", 1))) if bulk else 1
+				_caravan.request_preorder(String(row.item), pre_amt)
+				_sound("coin")
+				_say_line("preorder")
+		"collect_preorder":
+			if _caravan != null:
+				_caravan.request_collect_preorder(int(row.preorder_id))
+				_sound("tick")
+				_say_line("preorder_collect")
 		"grind":
 			town.request_grind(shop_id, String(row.from))
 			_sound("coin")

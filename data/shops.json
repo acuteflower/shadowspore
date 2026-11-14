@@ -945,6 +945,11 @@
     "id": "sell",
     "name": "ANKAUF",
     "kind": "sell"
+   },
+   {
+    "id": "preorder",
+    "name": "BESTELLEN",
+    "kind": "preorder"
    }
   ],
   "lines": {
@@ -960,6 +965,15 @@
    "sell": [
     "DAFÜR FINDE ICH EINEN KÄUFER.",
     "ABGEMACHT."
+   ],
+   "preorder": [
+    "ICH PACK ES BEIM NÄCHSTEN RITT EIN.",
+    "ZAHL JETZT, BEIM NÄCHSTEN HALT LIEGT ES VORN.",
+    "SAGS MIR JETZT, SONST VERGISST DER OCHSE DIE HÄLFTE."
+   ],
+   "preorder_collect": [
+    "HIER, FRISCH AUS DER KISTE.",
+    "WIE VERSPROCHEN MITGEBRACHT."
    ]
   }
  }

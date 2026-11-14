@@ -9,10 +9,10 @@ void fragment() {
 	vec2 uv = UV - 0.5;
 	uv.x *= 1.78;
 	float d = length(uv) * (1.0 + 0.03 * sin(TIME * 2.4) * amount);
-	float edge = smoothstep(0.95 - amount * 0.75, 1.15 - amount * 0.35, d);
-	// dithered like the rest of the game
-	vec2 cell = floor(FRAGCOORD.xy / 2.0);
-	float bayer = hash(cell) * 0.12;
-	float a = clamp(edge * (0.55 + amount * 0.5) + bayer * edge, 0.0, 0.96);
-	COLOR = vec4(0.03, 0.0, 0.07, a);
+	float edge = smoothstep(0.92 - amount * 0.72, 1.18 - amount * 0.34, d);
+	float inner_rim = smoothstep(0.0, 0.55, edge) * (1.0 - edge);
+	float noise = (hash(FRAGCOORD.xy) - 0.5) / 255.0;
+	vec3 col = mix(vec3(0.025, 0.0, 0.06), vec3(0.14, 0.02, 0.16), inner_rim * 0.85);
+	float a = clamp(edge * (0.58 + amount * 0.44) + noise, 0.0, 0.96);
+	COLOR = vec4(col, a);
 }

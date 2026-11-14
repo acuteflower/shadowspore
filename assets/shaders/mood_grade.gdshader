@@ -22,34 +22,47 @@ uniform float px_scale = 2.0;
 
 vec3 blurred(vec2 uv, float lod, vec2 texel) {
 	vec2 o = texel * exp2(lod) * 0.5;
-	return (textureLod(screen_texture, uv + vec2(o.x, o.y), lod).rgb + textureLod(screen_texture, uv + vec2(-o.x, o.y), lod).rgb
-		+ textureLod(screen_texture, uv + vec2(o.x, -o.y), lod).rgb + textureLod(screen_texture, uv + vec2(-o.x, -o.y), lod).rgb) * 0.25;
+	vec2 d = o * 0.7071;
+	// 9-tap octagonal filter keeps halos soft and round without boxy corner artefacts
+	vec3 acc = textureLod(screen_texture, uv, lod).rgb * 0.20;
+	acc += (textureLod(screen_texture, uv + vec2(o.x, 0.0), lod).rgb + textureLod(screen_texture, uv - vec2(o.x, 0.0), lod).rgb
+		+ textureLod(screen_texture, uv + vec2(0.0, o.y), lod).rgb + textureLod(screen_texture, uv - vec2(0.0, o.y), lod).rgb) * 0.12;
+	acc += (textureLod(screen_texture, uv + vec2(d.x, d.y), lod).rgb + textureLod(screen_texture, uv + vec2(-d.x, d.y), lod).rgb
+		+ textureLod(screen_texture, uv + vec2(d.x, -d.y), lod).rgb + textureLod(screen_texture, uv + vec2(-d.x, -d.y), lod).rgb) * 0.08;
+	return acc;
 }
 
 vec3 glow_of(vec3 b) {
 	float peak = max(b.r, max(b.g, b.b));
 	float sat = peak - min(b.r, min(b.g, b.b));
-	return b * smoothstep(threshold, threshold + 0.38, peak + 0.35 * sat); // coloured light glows sooner than grey brightness
+	float w = smoothstep(threshold, threshold + 0.36, peak + 0.38 * sat);
+	// enrich colour in the halo so teal/violet/gold blooms stay vibrant instead of washing pale
+	float lum = dot(b, vec3(0.30, 0.59, 0.11));
+	vec3 rich = mix(vec3(lum), b, 1.18);
+	return max(rich, vec3(0.0)) * w;
 }
 
 void fragment() {
 	vec3 c = textureLod(screen_texture, SCREEN_UV, 0.0).rgb;
 	float base_lod = log2(max(px_scale, 1.0));
-	vec3 near = glow_of(blurred(SCREEN_UV, base_lod + 1.6, SCREEN_PIXEL_SIZE));
-	vec3 far = glow_of(blurred(SCREEN_UV, base_lod + 3.4, SCREEN_PIXEL_SIZE));
-	vec3 glow = (near * 0.55 + far * 0.75) * bloom;
-	// bloom first (it is light), as a screen blend so bright places saturate softly instead of clipping
-	c = 1.0 - (1.0 - c) * (1.0 - clamp(glow * 0.55, 0.0, 1.0));
+	vec3 near = glow_of(blurred(SCREEN_UV, base_lod + 0.85, SCREEN_PIXEL_SIZE));
+	vec3 mid = glow_of(blurred(SCREEN_UV, base_lod + 2.25, SCREEN_PIXEL_SIZE));
+	vec3 far = glow_of(blurred(SCREEN_UV, base_lod + 3.85, SCREEN_PIXEL_SIZE));
+	vec3 glow = (near * 0.38 + mid * 0.44 + far * 0.52) * bloom;
+	// bloom first (it is light), as a soft screen blend so bright emissives glow cleanly without clipping
+	c = 1.0 - (1.0 - c) * (1.0 - clamp(glow * 0.56, 0.0, 0.92));
 	float lum = dot(c, vec3(0.30, 0.59, 0.11));
-	// vibrance
+	// vibrance: extra punch for muted tones without oversaturating already vivid highlights
 	float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));
-	c = mix(vec3(lum), c, 1.0 + vibrance * (1.0 - sat));
+	c = mix(vec3(lum), c, 1.0 + vibrance * (1.0 - sat * 0.9));
 	// split toning
-	vec3 tone = mix(shadow_tint, light_tint, smoothstep(0.10, 0.62, lum));
-	c = mix(c, c * tone + (shadow_tint - 1.0) * 0.035 * (1.0 - smoothstep(0.0, 0.30, lum)), split);
-	// S curve around the mid tones
-	vec3 s = c * c * (3.0 - 2.0 * c);
-	c = mix(c, s, contrast * 2.0);
+	vec3 tone = mix(shadow_tint, light_tint, smoothstep(0.10, 0.64, lum));
+	c = mix(c, c * tone + (shadow_tint - 1.0) * 0.04 * (1.0 - smoothstep(0.0, 0.32, lum)), split);
+	// S curve around the mid tones, eased slightly on very bright emissives so colour detail survives
+	vec3 cl = clamp(c, 0.0, 1.0);
+	vec3 s = cl * cl * (3.0 - 2.0 * cl);
+	float hi_guard = 1.0 - 0.35 * smoothstep(0.75, 1.0, lum);
+	c = mix(c, s, contrast * 2.0 * hi_guard);
 	// vignette: an oval, so the sides close in more than top and bottom; the dark leans towards the shadow tint, not grey
 	vec2 q = (SCREEN_UV - 0.5) * vec2(1.0, 1.25);
 	float rim = smoothstep(0.30, 0.78, length(q));

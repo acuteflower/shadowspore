@@ -176,14 +176,63 @@ static func present(state: String) -> bool:
 
 # ---------- the offer ----------
 
-## What visit `i` brings, for a town of level `level`: {"buy": [{item, price (base, before trust), stock, group, trust}], "sell": [{item, price, base, limit
-## (0 = no limit), wanted}]}. Pure: every peer draws the same rows.
-static func offer(world_seed: int, i: int, level: int) -> Dictionary:
+static func market_tier(plaza_lv: int) -> int:
+	return clampi(plaza_lv, 1, 3)
+
+
+static func market_spec(market_lv: int) -> Dictionary:
+	return (cfg().get("market", {}) as Dictionary).get(str(market_lv), {}) as Dictionary
+
+
+static func preorder_max() -> int:
+	return int(cfg().get("preorder_max", 3))
+
+
+static func preorders() -> Array:
+	return cfg().get("preorders", []) as Array
+
+
+static func preorder_spec(item: String) -> Dictionary:
+	for raw: Variant in preorders():
+		var entry: Dictionary = raw as Dictionary
+		if String(entry.get("item", "")) == item:
+			return entry
+	return {}
+
+
+static func preorder_price(spec: Dictionary, trust: int) -> int:
+	return buy_price(int(spec.get("price", 10)), trust)
+
+
+static func _weighted_item_pick(rng: RandomNumberGenerator, pool: Array) -> Dictionary:
+	var total: float = 0.0
+	for entry: Variant in pool:
+		total += float((entry as Dictionary).get("weight", 1.0))
+	var roll: float = rng.randf() * total
+	var pick: int = pool.size() - 1
+	for k: int in pool.size():
+		roll -= float((pool[k] as Dictionary).get("weight", 1.0))
+		if roll < 0.0:
+			pick = k
+			break
+	var chosen: Dictionary = pool[pick] as Dictionary
+	pool.remove_at(pick)
+	return chosen
+
+
+## What visit `i` brings, for a town of level `level` and fountain level `market_lv` (1 base, 2/3 Markttag):
+## {"buy": [{item, price (base, before trust), stock, group, trust}], "sell": [{item, price, base, limit (0 = no limit), wanted}]}.
+## Pure: every peer draws the same rows.
+static func offer(world_seed: int, i: int, level: int, market_lv: int = 1) -> Dictionary:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(world_seed, i, 9157))
 	var jitter: Array = cfg().get("jitter", [1.0, 1.0]) as Array
 	var goods: Dictionary = cfg().get("goods", {}) as Dictionary
+	var mkt: Dictionary = market_spec(market_lv) if market_lv >= 2 else {}
+	var extra_counts: Dictionary = mkt.get("buy_extra", {}) as Dictionary
+	var stock_mul: float = float(mkt.get("stock_mul", 1.0))
 	var buy: Array[Dictionary] = []
+	var group_pools: Dictionary = {}
 	for group: String in GROUPS:
 		var spec: Dictionary = goods.get(group, {}) as Dictionary
 		if spec.is_empty():
@@ -196,29 +245,35 @@ static func offer(world_seed: int, i: int, level: int) -> Dictionary:
 		var count_range: Array = spec.get("count", [1, 1]) as Array
 		var want: int = rng.randi_range(int(count_range[0]), int(count_range[1]))
 		for n: int in mini(want, pool.size()):
-			var total: float = 0.0
-			for entry: Variant in pool:
-				total += float((entry as Dictionary).get("weight", 1.0))
-			var roll: float = rng.randf() * total
-			var pick: int = pool.size() - 1
-			for k: int in pool.size():
-				roll -= float((pool[k] as Dictionary).get("weight", 1.0))
-				if roll < 0.0:
-					pick = k
-					break
-			var chosen: Dictionary = pool[pick] as Dictionary
-			pool.remove_at(pick)
+			var chosen: Dictionary = _weighted_item_pick(rng, pool)
 			var stock_range: Array = chosen.get("stock", [1, 1]) as Array
 			var factor: float = rng.randf_range(float(jitter[0]), float(jitter[1]))
 			buy.append({"item": String(chosen.item), "price": maxi(roundi(float(chosen.price) * factor), 1), "stock": rng.randi_range(int(stock_range[0]), int(stock_range[1])),
 				"group": group, "trust": int(chosen.get("trust", 0))})
+		group_pools[group] = pool
+	if not mkt.is_empty():
+		var m_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+		m_rng.seed = hash(Vector3i(world_seed, i, 9157 + market_lv))
+		for group: String in GROUPS:
+			var extra_n: int = int(extra_counts.get(group, 0))
+			var pool: Array = group_pools.get(group, []) as Array
+			for n: int in mini(extra_n, pool.size()):
+				var chosen: Dictionary = _weighted_item_pick(m_rng, pool)
+				var stock_range: Array = chosen.get("stock", [1, 1]) as Array
+				var factor: float = m_rng.randf_range(float(jitter[0]), float(jitter[1]))
+				buy.append({"item": String(chosen.item), "price": maxi(roundi(float(chosen.price) * factor), 1), "stock": m_rng.randi_range(int(stock_range[0]), int(stock_range[1])),
+					"group": group, "trust": int(chosen.get("trust", 0))})
+		if stock_mul > 1.01:
+			for row: Dictionary in buy:
+				row["stock"] = maxi(roundi(float(row.stock) * stock_mul), 1)
 	var sell: Array[Dictionary] = []
 	for raw: Variant in cfg().get("buys", []) as Array:
 		var entry: Dictionary = raw as Dictionary
 		if not DataRegistry.get_entry("items", String(entry.item)).is_empty():
 			sell.append({"item": String(entry.item), "price": int(entry.price), "base": int(entry.price), "limit": 0, "wanted": false})
 	var wanted: Dictionary = cfg().get("wanted", {}) as Dictionary
-	var wanted_range: Array = wanted.get("count", [0, 0]) as Array
+	var wanted_range: Array = mkt.get("wanted_count", wanted.get("count", [0, 0])) as Array
+	var limit_mul: float = float(mkt.get("wanted_limit_mul", 1.0))
 	var free: Array[int] = []
 	for k: int in sell.size():
 		free.append(k)
@@ -230,7 +285,7 @@ static func offer(world_seed: int, i: int, level: int) -> Dictionary:
 		var factor_range: Array = wanted.get("factor", [1.5, 1.5]) as Array
 		var limit_range: Array = wanted.get("limit", [5, 5]) as Array
 		row.price = maxi(roundi(float(row.base) * rng.randf_range(float(factor_range[0]), float(factor_range[1]))), int(row.base) + 1)
-		row.limit = rng.randi_range(int(limit_range[0]), int(limit_range[1]))
+		row.limit = maxi(roundi(float(rng.randi_range(int(limit_range[0]), int(limit_range[1]))) * limit_mul), 1)
 		row.wanted = true
 		wanted_rows.append(row)
 	var ordered: Array[Dictionary] = wanted_rows.duplicate()

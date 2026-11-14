@@ -592,7 +592,7 @@ Wunsch: überall passende Dekoration, Mauern am Wegrand, Pflanzen und Bäume, un
   - `ruine` (kniehoch und tiefer, Lücken, herabgefallene Steine) im Fuß und im verlorenen Viertel
 - `py -3 tools/art_hallgrat_walls.py` legt jeden Lauf Stein für Stein entlang seiner eigenen Kurve, keine zwei Stücke sind gleich.
 - Gerendert wird in Stücken von etwa 40 px (`assets/town/hallgrat/walls/wand_<lauf>_<k>.png`). Jedes Stück sortiert sich an seiner Vorderkante. Die Steine werden für den ganzen Lauf gelegt, damit die Stücke nahtlos anschließen.
-- Kollision: ein exaktes Polygon entlang der Mauer.
+- Kollision: eine Kette gedrehter Kästen entlang der Mauerlinie (`chain` je Stück, 7 px dick; das frühere Bandpolygon zerfiel bei Kurven und ließ Ellie hindurch, siehe 14.8).
 - Liste: `wall_pieces` in hallgrat_art.json.
 
 **Die Dinge** (`py -3 tools/art_hallgrat_deco.py`, gleicher Renderer wie die Häuser; `deko_*`):
@@ -627,6 +627,64 @@ Wunsch: überall passende Dekoration, Mauern am Wegrand, Pflanzen und Bäume, un
 - 260 Bäume, 85 angeschmiegte Pflanzen, 300 Büsche und Gräser, 290 Blumen
 
 Aufnahmen: `docs/img/hallgrat_deko.png`, `hallgrat_deko_staffeln.png`.
+
+### 14.8 Stadtmauer, Gassen vor den Häuserreihen, mehr Leben (2026-11-14)
+
+Rückmeldung nach dem Rundgang: Die Mauern hatten keine Hitbox. Die Füllhäuser standen kreuz und quer, jedes mit eigenem Zickzack-Streifen zur Straße. Die einzige Stadtmauer war ein gerades Stück im Westen. Und es fehlte Kleinzeug, das die Stadt bewohnt wirken lässt.
+
+**Hitboxen:** Jedes Mauerstück trägt `chain` (die Punkte der Mauerlinie relativ zu den Füßen, plus der erste Punkt des nächsten Stücks). `HallgratBuilding` baut daraus gedrehte `RectangleShape2D` je Abschnitt (Dicke `thick`, Standard 7 px, Stadtmauer 16 px) und für jeden Turm einen Kreis (`towers` [x, y, r]). `tools/test_hallgrat.tscn` prüft, dass jedes Stück einen Collider hat und dass Punkte auf der Mauerlinie in der Physikwelt blockieren.
+
+**Häuserreihen statt Streuung** (`place_hallgrat_buildings.py`, `fill`):
+- Die Füllhäuser stehen jetzt in Reihen mit gemeinsamer Frontlinie. Die Lücken zwischen den Häusern sind unterschiedlich breit (14-64 px).
+- Die nächste Reihe beginnt erst dort, wo ihre Dächer die Gasse vor der vorigen Reihe frei lassen.
+- Die Türwege laufen 8-nachbarschaftlich, halten einen Schritt Abstand zu Hauswänden und werden zweimal gerundet.
+- Die nächstgelegene Tür wird zuerst verbunden. Spätere Wege dürfen in schon gelegte münden, so wächst vor jeder Reihe eine gemeinsame Gasse. Breite 19 px.
+- Zeilen an Straßen probieren, wenn ein Haus nicht passt, einen anderen Typ der Palette oder einen Platz 5/10 px weiter hinten.
+- Ein Versuch mit eigens geplanten Gassen quer durch die Viertel ließ zu wenig Platz für Häuser (7 statt 26) und wurde verworfen.
+
+**Die Stadtmauer** (Stil `stadt` der Mauerläufe):
+- `place_hallgrat_deco.py` umfährt das Hochplateau der Stadt (Ebene >= 1, ohne Verlorenes Viertel und Glasbruch), 12 px innerhalb der Kante: im Westen über der Leere, im Süden und Osten auf der Felslippe.
+- Wo eine Straße oder ein Türweg die Stadt verlässt, öffnet sie sich zu einem Tor. An Häusern wird sie bis an die Hauswand geführt. Wo die Ebene wechselt, endet sie.
+- Rundtürme stehen an beiden Enden jeder Strecke, an Knicken und spätestens alle ~170 px. Zwei Türme stehen nie dichter als 44 px. Kleine Inseln (unter 220 px) bekommen keine Mauer.
+- `art_hallgrat_walls.py` rendert sie:
+  - Größe (nach der Rückmeldung „viel zu klein, unpassend, undetailliert"): Wehrgang auf 52 Modelleinheiten (~76 px, deutlich über den Traufen der Häuser), Türme mit Radius 15 (~44 px breit) und 22 Einheiten höher als die Mauer, Kegeldach 30 Einheiten
+  - Die Mauerflächen sind glatte Körper (Materialien `ASHLAR` und `PLINTH`), die `ashlar_pass` mit dem Quadermuster der Häuser belegt: 5-px-Lagen, 8-14 px lange Blöcke, Fugen, helle Ober- und linke Kante. Der Sockel hat 8-px-Lagen mit größeren Blöcken. Die Lagen sind an Weltpixeln verankert und laufen über die Stückgrenzen weiter.
+  - Geböschter Sockel in zwei Stufen mit Deckplatte, Gurtgesims unter dem Wehrgang, Kragsteine (Maschikulis) unter der vorkragenden Brustwehr, Zinnen 9 px breit mit 5 px Scharten, Deckplatte und Schießloch
+  - Kreuzscharten mit Werksteinrahmen, gestufte Strebepfeiler mit Wasserschlägen, Fackeln zur Stadtseite, Feuchtestreifen, Moos und Efeu
+  - Türme: geböschter Fuß, glatte gemauerte Trommel, zwei Gesimse, Scharten mit Rahmen, ein beleuchtetes Wächterfenster mit Gitterstab, doppelter Kragsteinkranz unter dem vorkragenden Kranz; dann Zinnen mit Bannermast oder ein Kegel aus einzelnen Schieferreihen mit Gaube, Knauf und weinrotem Wimpel, ein paar abgestürzte Steine am Fuß
+  - Jedes Stück wird mit 16 px seiner Nachbarn gerendert und auf seine eigene Silhouette zugeschnitten, so entsteht an den Stückgrenzen keine Naht. Dünne senkrechte Tintenlinien, wo sich überlappende Körper treffen, schließt `ashlar_pass`.
+- Bild: `docs/img/hallgrat_stadtmauer.png`.
+- Das alte gerade `westmauer`-Stück (`walls`) ist entfernt. Die Karte zeichnet jetzt die Stadtmauer (`MapHallgrat`, aus `wall_runs` Stil `stadt`).
+
+**Neue Dinge** (`art_hallgrat_deco.py`):
+- Wäscheleine, Ladenschild am Eisenarm, Körbe mit Ernte
+- Hackklotz mit Axt, Steinmetzquader
+- Bannermast (weinrot mit Goldsaum)
+- Wegschrein mit Kerzen (leuchtet nachts)
+- Holzzaun (`zaun_ew`/`zaun_ns`)
+- Gemüsebeet (`acker`, begehbar)
+
+**Neue Szenen:**
+- Läden bekommen ihr Schild neben der Tür und Körbe.
+- Wohnhäuser bekommen auch einen Hackklotz mit Holzstoß oder eine Wäscheleine im Seitenhof.
+- Die benannten Orte des Plans werden gefüllt (`PLACE_THINGS`):
+  - Brunnen auf Brunnenhof und Steinmarkt
+  - Fahnen, Bänke und Marktware auf den Plätzen
+  - Karren, Heu und Trog im Karrenhof
+  - Quader im Steinmetzhof
+  - Beete, Bank und Schrein in den Gärten
+  - Ackerreihen hinter einem Zaun auf den Terrassenfeldern
+- An den niedrigen Mauern stehen ab und zu Kübel, Prellsteine oder ein Schrein.
+
+**Stand:**
+- 44 Gebäude, 32 Türwege
+- Stadtmauer: 14 Strecken mit Türmen
+- 83 Mauerläufe in 353 Stücken
+- 61 Dinge an den benannten Orten
+
+Die Rothalle findet weiterhin keinen Platz (das war schon vorher so).
+
+Reihenfolge der Werkzeuge: `place_hallgrat_buildings.py` -> `bake_hallgrat_ground.py` -> `place_hallgrat_deco.py` -> `art_hallgrat_walls.py` (bei neuen Typen vorher `art_hallgrat_deco.py`) -> `--import`.
 
 ## 15. Ideenspeicher (alles, was noch nirgends hineinpasste)
 

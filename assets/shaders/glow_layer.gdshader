@@ -20,7 +20,7 @@ void vertex() {
 void fragment() {
 	vec4 c = texture(TEXTURE, UV);
 	float pulse = 0.5 + 0.5 * sin(TIME * 1.4 + hash(floor(world_px / 16.0)) * 6.2831);
-	c.rgb *= 1.0 + night * (0.08 + 0.2 * pulse);
+	c.rgb *= 1.0 + night * (0.14 + 0.30 * pulse);
 	if (c.a > 0.0 && g_sun > 0.0) { // by day the sleeping buds wink with a pale glint
 		vec2 px = floor(world_px);
 		float tw = step(0.8, hash(px + 5.0)) * step(0.6, fract(TIME * 0.3 + hash(px)));

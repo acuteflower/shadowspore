@@ -213,6 +213,8 @@ func prompt() -> String:
 		return ""
 	match caravan.state():
 		"open":
+			if caravan.town.board != null and not caravan.town.board.finishable(sid, caravan.town.local_player()).is_empty():
+				return "AUFTRAG ABGEBEN"
 			var talked: bool = int((caravan.town.residents.get(sid, {}) as Dictionary).get("talked", -1)) == TimeManager.day
 			return "HANDELN" if talked else "ANSPRECHEN"
 		"night", "storm":
@@ -246,6 +248,13 @@ func interact(player: Player) -> void:
 	_talking = true
 	_turned = 4.0
 	_sector = Adventurer.sector_of(player.global_position - global_position)
+	if caravan.town.board != null and not caravan.town.board.finishable(sid, player).is_empty():
+		var thanks: String = caravan.town.board.report(sid, player)
+		var box: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
+		if box != null and thanks != "":
+			await box.speak(display_name(), thanks)
+		_talking = false
+		return
 	var fresh_day: bool = int((caravan.town.residents.get(sid, {}) as Dictionary).get("talked", -1)) != TimeManager.day
 	if fresh_day:
 		var first: bool = not caravan.town.has_met(sid)
@@ -264,6 +273,8 @@ func interact(player: Player) -> void:
 func _chat_line() -> String:
 	var chat: Dictionary = spec.get("chat", {}) as Dictionary
 	var pool: Array = []
+	if caravan.is_market_day() and chat.has("market"):
+		pool.append_array(chat.get("market", []) as Array)
 	if TimeManager.night_amount() > 0.3:
 		pool.append_array(chat.get("evening", []) as Array)
 	if caravan.offer().get("sell", []).size() > 0:

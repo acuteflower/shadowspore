@@ -7,17 +7,28 @@ extends PointLight2D
 @export var radius: int = 26 ## px, horizontal radius
 @export var squash: float = 0.6 ## flat in the 3/4 view
 @export var base_energy: float = 0.9
-@export var glow_color: Color = Color("b99bff")
+@export var glow_color: Color = Color("b99bff"):
+	set(value):
+		glow_color = value
+		color = value
 @export var pulse: float = 0.14 ## how much the light breathes (0 = steady)
 
+const OVERFLOW_ALPHA_SCALE: float = 0.26 ## additive soft-pool intensity matching PointLight2D brightness on night ground
+const OVERFLOW_MAX_ALPHA: float = 0.48
+const OVERFLOW_Z: int = -2 ## above ground/water/bridges, beneath standing entities (y-sorted at 0)
+
+static var _overflow_material: CanvasItemMaterial
+
 var _night: float = 0.0
-var budgeted: bool = true: ## false: one of the many small lights that are not among the nearest ones (see `budget`)
+var budgeted: bool = true: ## false: outside the 16 nearest PointLight2Ds; falls back to an unlit additive glow pool
 	set(value):
 		budgeted = value
 		_update_active()
 var _phase: float = 0.0
 var _notifier: VisibleOnScreenNotifier2D
 var _on_screen: bool = true
+var _overflow: Sprite2D
+var _overflow_alpha: float = -1.0
 
 
 func _ready() -> void:
@@ -50,15 +61,51 @@ func _on_screen_exited() -> void:
 	_update_active()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and is_node_ready():
+		_update_active()
+
+
+func _breath_energy() -> float:
+	var breath: float = 1.0 - pulse * 0.5 + pulse * 0.5 * sin(Time.get_ticks_msec() * 0.0013 + _phase)
+	return base_energy * _night * breath
+
+
 func _update_active() -> void:
-	var active: bool = _night > 0.01 and _on_screen and budgeted
-	enabled = active
-	set_process(active)
-	if not active:
+	var lit: bool = _night > 0.01 and _on_screen and is_visible_in_tree()
+	var hw: bool = lit and budgeted
+	var overflow: bool = lit and not budgeted and texture != null
+	enabled = hw
+	set_process(hw or overflow)
+	if not hw:
 		energy = 0.0
 	elif energy == 0.0:
-		var breath: float = 1.0 - pulse * 0.5 + pulse * 0.5 * sin(Time.get_ticks_msec() * 0.0013 + _phase)
-		energy = base_energy * _night * breath
+		energy = _breath_energy()
+	if overflow:
+		_sync_overflow(_breath_energy(), true)
+	elif _overflow != null and _overflow.visible:
+		_overflow.visible = false
+		_overflow_alpha = -1.0
+
+
+func _sync_overflow(target_energy: float, force: bool = false) -> void:
+	if _overflow == null:
+		if _overflow_material == null:
+			_overflow_material = CanvasItemMaterial.new()
+			_overflow_material.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+			_overflow_material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+		_overflow = Sprite2D.new()
+		_overflow.texture = texture
+		_overflow.scale = Vector2.ONE * texture_scale
+		_overflow.material = _overflow_material
+		_overflow.z_as_relative = false
+		_overflow.z_index = OVERFLOW_Z
+		add_child(_overflow)
+	var a: float = clampf(target_energy * OVERFLOW_ALPHA_SCALE, 0.0, OVERFLOW_MAX_ALPHA)
+	_overflow.visible = a > 0.004
+	if _overflow.visible and (force or absf(a - _overflow_alpha) > 0.008 or _overflow.modulate.r != glow_color.r or _overflow.modulate.g != glow_color.g or _overflow.modulate.b != glow_color.b):
+		_overflow_alpha = a
+		_overflow.modulate = Color(glow_color.r, glow_color.g, glow_color.b, a)
 
 
 func set_night(amount: float) -> void:
@@ -68,10 +115,12 @@ func set_night(amount: float) -> void:
 
 
 func _process(_delta: float) -> void:
-	var breath: float = 1.0 - pulse * 0.5 + pulse * 0.5 * sin(Time.get_ticks_msec() * 0.0013 + _phase)
-	var new_energy: float = base_energy * _night * breath
-	if absf(energy - new_energy) > 0.02:
-		energy = new_energy
+	var new_energy: float = _breath_energy()
+	if budgeted:
+		if absf(energy - new_energy) > 0.02:
+			energy = new_energy
+	else:
+		_sync_overflow(new_energy)
 
 
 const SMALL_RADIUS: int = 48 ## lights up to this radius (glowing plants, moonbells, shrooms, pillars, boss) share a budget
@@ -79,15 +128,15 @@ const LIGHT_LIMIT: int = 16 ## the renderer's limit per picture
 const SMALL_MIN: int = 4 ## small lights that always shine, even in a crowd of big ones
 
 
-## The renderer lights one picture with at most 16 lights, and a ground tile layer is one picture.
-## Big landmark lights have priority, while nearby lights (including pillars and boss) are budgeted by distance to center.
-## Offscreen lights are culled by distance to center and notifier.
+## The renderer lights one picture with at most 16 PointLight2Ds, and a ground tile layer is one picture.
+## Big landmark lights have priority, while nearby lights share the 16 hardware slots by distance to center.
+## Any visible on-screen lights beyond those 16 fall back to an unlit additive glow pool so lights never blink off when walking away.
 static func budget(tree: SceneTree, center: Vector2) -> void:
 	var small: Array[NightLight] = []
 	var big: Array[NightLight] = []
 	for node: Node in tree.get_nodes_in_group("night_lights"):
 		var light: NightLight = node as NightLight
-		if light == null or light._night <= 0.01:
+		if light == null or light._night <= 0.01 or not light.is_visible_in_tree():
 			continue
 		var max_reach: float = float(light.radius) + 400.0
 		var d2: float = light.global_position.distance_squared_to(center)

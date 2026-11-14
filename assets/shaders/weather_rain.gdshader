@@ -6,8 +6,8 @@ render_mode unshaded;
 // sheet, each scrolling a little differently with the camera), laid out per pixel column. The streaks are SHEARED by the wind (`slant`, from WorldWind
 // and its gusts), so rain, grass and crowns lean the same way; in a storm they fly almost flat. How much falls at a pixel comes from the weather's own cloud
 // field (rain_local): a rain cell with a ragged edge passes over, under the dense crowns (g_day_cover) only a few drops get through, and the drops that
-// do come down from the crown rims are fatter. On top, diagonal veils of rain sweep along the wind in gusts, and mist banks (fog) drift in dithered pixels.
-// Whole art pixels everywhere; the ground splashes live in ground_tone / river_water (they must lie UNDER trees and people).
+// do come down from the crown rims are fatter. On top, smooth diagonal veils of rain sweep along the wind in gusts, and smooth mist banks (fog) drift across the screen.
+// Raindrops stay whole art pixels; veils and mist are smooth at screen resolution (like night_fog.gdshader) so they never show Bayer dots at 2x+; ground splashes live in ground_tone / river_water.
 
 uniform vec2 world_origin = vec2(0.0);
 uniform vec2 view_px = vec2(640.0, 360.0);
@@ -40,19 +40,29 @@ int streak(vec2 s, float parallax, float period, float len, float speed, float d
 	return k > 0.78 ? 3 : (k > 0.34 ? 2 : 1);
 }
 
-void fragment() {
-	vec2 s = floor(UV * view_px + 0.001);
-	vec2 w = world_origin + s;
+float desert_dry_at(vec2 pos) {
 	float arid = 0.0;
 	if (g_gloom_rect.z > 0.0) {
-		vec2 auv = (w - g_gloom_rect.xy) / g_gloom_rect.zw;
+		vec2 auv = (pos - g_gloom_rect.xy) / g_gloom_rect.zw;
 		if (all(greaterThanEqual(auv, vec2(0.0))) && all(lessThanEqual(auv, vec2(1.0)))) {
 			arid = texture(g_arid, auv).r;
 		}
 	}
-	float desert_dry = 1.0 - smoothstep(0.18, 0.45, arid);
+	return 1.0 - smoothstep(0.18, 0.45, arid);
+}
+
+vec4 over_blend(vec4 fg, vec4 bg) {
+	float a = fg.a + bg.a * (1.0 - fg.a);
+	if (a <= 0.0001) { return vec4(0.0); }
+	return vec4((fg.rgb * fg.a + bg.rgb * bg.a * (1.0 - fg.a)) / a, a);
+}
+
+void fragment() {
+	vec2 s = floor(UV * view_px + 0.001);
+	vec2 w = world_origin + s;
+	vec2 w_smooth = world_origin + UV * view_px;
+	float desert_dry = desert_dry_at(w);
 	float rate = rain_local(w) * desert_dry;
-	float fog_here = fog * desert_dry;
 	float canopy = day_cover(w);
 	float dry = 1.0 - 0.82 * canopy;
 	float r = rate * dry;
@@ -84,24 +94,35 @@ void fragment() {
 			}
 		}
 	}
-	// veils of rain sweeping along the wind
-	if (rate > 0.12) {
-		vec2 wd = normalize(wind_dir);
-		float along = dot(w, wd);
-		float perp = dot(w, vec2(-wd.y, wd.x));
-		float band = n_vnoise(vec2(perp / 64.0, (along - clock * (46.0 + 90.0 * storm)) / 250.0));
-		float veil = smoothstep(0.62, 0.86, band) * rate * (0.2 + 0.5 * max(gust, storm)) * dry;
-		if (veil > n_bayer(s) * 0.92 + 0.04 && out_color.a < 0.3) {
-			out_color = vec4(vec3(0.66, 0.73, 0.84) * tint * ambient, (0.07 + 0.05 * storm) * visibility);
+	// smooth rain veils and mist banks (continuous at screen resolution, with a hair of noise against 8-bit banding)
+	float desert_dry_s = desert_dry_at(w_smooth);
+	float fog_here = fog * desert_dry_s;
+	float rate_s = rain_local(w_smooth) * desert_dry_s;
+	vec4 atm = vec4(0.0);
+	if (fog_here > 0.02) {
+		float m = n_fbm(w_smooth / 120.0 + vec2(clock * 0.012, clock * 0.005) + 21.0);
+		float bank = smoothstep(0.36, 0.76, m) * fog_here;
+		float mist_a = bank * (0.09 + 0.08 * fog_here) * visibility;
+		if (mist_a > 0.001) {
+			atm = vec4(vec3(0.82, 0.86, 0.90) * ambient, mist_a);
 		}
 	}
-	// mist banks (the weather's fog, dawn mist after rain)
-	if (fog_here > 0.02) {
-		float m = n_fbm(w / 120.0 + vec2(clock * 0.012, clock * 0.005) + 21.0);
-		float bank = smoothstep(0.36, 0.76, m) * fog_here;
-		if (bank > n_bayer(s) * 0.95 + 0.03 && out_color.a < 0.25) {
-			out_color = vec4(vec3(0.82, 0.86, 0.90) * ambient, (0.08 + 0.07 * fog_here) * visibility);
+	if (rate_s > 0.12) {
+		vec2 wd = normalize(wind_dir);
+		float along = dot(w_smooth, wd);
+		float perp = dot(w_smooth, vec2(-wd.y, wd.x));
+		float band = n_vnoise(vec2(perp / 64.0, (along - clock * (46.0 + 90.0 * storm)) / 250.0));
+		float dry_s = 1.0 - 0.82 * day_cover(w_smooth);
+		float veil = smoothstep(0.62, 0.86, band) * rate_s * (0.2 + 0.5 * max(gust, storm)) * dry_s;
+		float veil_a = veil * (0.08 + 0.06 * storm) * visibility;
+		if (veil_a > 0.001) {
+			atm = over_blend(vec4(vec3(0.66, 0.73, 0.84) * tint * ambient, veil_a), atm);
 		}
+	}
+	if (atm.a > 0.001) {
+		float noise = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+		atm.a = clamp(atm.a + noise / 255.0, 0.0, 1.0);
+		out_color = over_blend(out_color, atm);
 	}
 	COLOR = out_color;
 }

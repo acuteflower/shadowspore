@@ -39,6 +39,7 @@ var _ox_clock: float = 6.0
 var _last_fold: float = 0.0
 var _last_state: String = "away"
 var _perches: Array[RoofPerch] = []
+var _rain_drips: CPUParticles2D
 
 
 func setup(owner_caravan: CaravanManager) -> void:
@@ -274,7 +275,30 @@ func _show(s: String) -> void:
 	_wagon_glow.modulate.a = clampf(0.35 + TimeManager.night_amount(), 0.0, 1.0)
 	var lantern: Array = wagon.get("lantern", [0, 0]) as Array
 	_lantern.position = Vector2(float(lantern[0]) * (1.0 if _stand_row() == 0 or _moving() else -1.0), float(lantern[1]))
+	_update_rain_drips(s)
 	_place_ox(s)
+
+
+func _update_rain_drips(s: String) -> void:
+	var wet_awning: bool = CaravanRules.parked(s) and s != "night" and WeatherManager.rain_now() > 0.2 and fold() > 0.5
+	if _rain_drips == null and wet_awning:
+		_rain_drips = CPUParticles2D.new()
+		_rain_drips.z_index = 2
+		_rain_drips.amount = 6
+		_rain_drips.lifetime = 0.55
+		_rain_drips.preprocess = 0.3
+		_rain_drips.direction = Vector2(0.0, 1.0)
+		_rain_drips.spread = 8.0
+		_rain_drips.gravity = Vector2(0.0, 110.0)
+		_rain_drips.initial_velocity_min = 12.0
+		_rain_drips.initial_velocity_max = 26.0
+		_rain_drips.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+		_rain_drips.emission_rect_extents = Vector2(28.0, 1.0)
+		_rain_drips.color = Color("7ea8cc", 0.72)
+		_rain_drips.position = Vector2(0.0, -24.0)
+		add_child(_rain_drips)
+	if _rain_drips != null:
+		_rain_drips.emitting = wet_awning
 
 
 func _place_ox(s: String) -> void:

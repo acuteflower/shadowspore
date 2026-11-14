@@ -723,40 +723,18 @@ func _verify_heat_weather_and_ruins(world: WorldLevel, plants: Dictionary) -> vo
 		_check(storm_ok, "global storm becomes dry Arkanes Quarzgewitter with violet-amber arcane lightning & +35%% spell recharge (storm=%.2f, strikes=%d, rate=%.2f)" % [wm2.desert_arcane_storm, struck_positions.size(), storm_rate])
 		wm2.release()
 
-	# 5. Active Ruin Magic (`DesertRuins`: Bundled Architectural Ensembles ONLY, ZERO lone scattered rune pieces)
-	_check(world.desert_ruins != null and world.desert_ruins.site_count() >= 10, "DesertRuins plans active bundled ruin ensembles across Sonnenquarz-Öde (sites=%d)" % (world.desert_ruins.site_count() if world.desert_ruins != null else 0))
-	if world.desert_ruins != null:
-		var all_ensembles_valid: bool = true
-		var allowed_kinds: Array[String] = ["gate_courtyard", "shrine_ensemble", "sanctum_seal"]
-		var masonry_cells: Dictionary = {}
-		for m_entry: Dictionary in world.desert_ruins.extra_masonry():
-			masonry_cells[m_entry.cell as Vector2i] = true
-		for c_key: Variant in world.desert_ruins.sites():
-			var s_spec: Dictionary = world.desert_ruins.sites()[c_key] as Dictionary
-			if not (String(s_spec.get("kind", "")) in allowed_kinds):
-				all_ensembles_valid = false
-		_check(all_ensembles_valid and not masonry_cells.is_empty(), "every DesertRuins site uses a multi-piece architectural blueprint with bundled corner masonry (masonry=%d)" % masonry_cells.size())
+	# 5. Non-Observatory Ruin Structures Removed from World (Observatory intact; ruin classes dormant for redesign)
+	_check(world.desert_observatory != null, "Die Zenitwarte (DesertObservatory) remains active in Sonnenquarz-Öde")
+	_check(world.desert_ruins == null, "Non-observatory DesertRuins ensembles are disabled in Sonnenquarz-Öde")
 
-		# Verify 100% of generated `ruin_sandstone` props across desert chunks come exclusively from bundled ruin ensembles (0 lone scattered blocks)
-		var total_ruin_blocks: int = 0
-		var stray_ruin_blocks: int = 0
-		for cy_r: int in range(3, 9):
-			for cx_r: int in range(22, 33):
-				var rect_r: Rect2i = Rect2i(Vector2i(cx_r, cy_r) * WorldLevel.CHUNK, Vector2i(WorldLevel.CHUNK, WorldLevel.CHUNK))
-				for prop_r: Dictionary in world._generator.props_for_chunk(rect_r):
-					if String(prop_r.kind) == "ruin_sandstone":
-						total_ruin_blocks += 1
-						var cell_r: Vector2i = Vector2i((prop_r.pos as Vector2) / 16.0)
-						if not masonry_cells.has(cell_r):
-							stray_ruin_blocks += 1
-		_check(total_ruin_blocks >= 12 and stray_ruin_blocks == 0, "ruin_sandstone spawns exclusively inside bundled ruin ensembles (%d bundled, %d stray)" % [total_ruin_blocks, stray_ruin_blocks])
-
-		# Populate one real DesertRuins chunk and verify >= 3 coordinated ruin nodes spawn together
-		var first_ruin_chunk: Vector2i = world.desert_ruins.sites().keys()[0] as Vector2i
-		world.desert_ruins.populate_chunk(first_ruin_chunk)
-		var spawned_nodes: Array = world.desert_ruins._live_chunks.get(first_ruin_chunk, []) as Array
-		_check(spawned_nodes.size() >= 3, "populating a DesertRuins chunk spawns a cohesive multi-node ensemble (nodes=%d)" % spawned_nodes.size())
-		world.desert_ruins.free_chunk(first_ruin_chunk)
+	var total_ruin_blocks: int = 0
+	for cy_r: int in range(3, 9):
+		for cx_r: int in range(22, 33):
+			var rect_r: Rect2i = Rect2i(Vector2i(cx_r, cy_r) * WorldLevel.CHUNK, Vector2i(WorldLevel.CHUNK, WorldLevel.CHUNK))
+			for prop_r: Dictionary in world._generator.props_for_chunk(rect_r):
+				if String(prop_r.kind) == "ruin_sandstone":
+					total_ruin_blocks += 1
+	_check(total_ruin_blocks == 0, "zero ruin_sandstone blocks generate in Sonnenquarz-Öde (%d)" % total_ruin_blocks)
 
 	var ob_harm: DesertRuins.ResonanceObelisk = DesertRuins.ResonanceObelisk.new()
 	ob_harm.setup(open_sand_px + Vector2(0.0, 90.0), 0)
@@ -776,31 +754,18 @@ func _verify_heat_weather_and_ruins(world: WorldLevel, plants: Dictionary) -> vo
 		cond_test._process(0.08)
 	var energized_ob_rate: float = DesertHeat.spell_recharge_rate(get_tree(), ob_harm.global_position + Vector2(12.0, 0.0))
 	ob_over.energize(8.0)
-	_check(pulsed_ok and ob_harm.is_energized() and passive_ob_rate >= 1.30 and energized_ob_rate > passive_ob_rate and ob_over.is_emitting_ring(), "LightConduit carries spell pulse into ResonanceObelisk (+35%% -> +60%% recharge & Overcharged Prism Ring)")
+	_check(pulsed_ok and ob_harm.is_energized() and passive_ob_rate >= 1.30 and energized_ob_rate > passive_ob_rate and ob_over.is_emitting_ring(), "LightConduit & ResonanceObelisk classes remain intact for future redesign")
 
 	arch_test.queue_free()
 	ob_harm.queue_free()
 	ob_over.queue_free()
 	cond_test.queue_free()
 
-	# Verify placed PrismSeal WorldTrials (`prism_sonnenquarz` & `prism_ruinenfeld`)
+	# Verify placed PrismSeal ruin sanctuaries are removed from Sonnenquarz-Öde
 	var puzzles_node: Puzzles = world.get_node_or_null("Puzzles") as Puzzles
 	_check(puzzles_node != null, "WorldLevel attaches Puzzles node")
 	if puzzles_node != null:
-		for pid: String in ["prism_sonnenquarz", "prism_ruinenfeld"]:
-			var ptrial: PrismSeal = puzzles_node.trial(pid) as PrismSeal
-			_check(ptrial != null and ptrial.reward_rise() and ptrial._arch != null and ptrial._conduits.size() == 3 and ptrial._corner_glows.size() == 4, "Puzzles builds %s as full PrismSeal sanctuary ensemble (arch + 3 orthogonal conduits + 4 corner piers)" % pid)
-			if ptrial != null:
-				var p_home: Vector2 = ptrial.global_position
-				_check(world.water_depth(p_home) < 0.0 and world._relief.flat_around(p_home, 108.0), "%s sits on wide dry flat desert ground (%s)" % [pid, str(p_home / 16.0)])
-		var solve_trial: PrismSeal = puzzles_node.trial("prism_sonnenquarz") as PrismSeal
-		if solve_trial != null:
-			solve_trial.activate_pillar(0)
-			solve_trial.activate_pillar(1)
-			solve_trial.activate_pillar(2)
-			await get_tree().process_frame
-			var chests_node: LootChests = LootChests.of(get_tree())
-			_check(puzzles_node.is_solved("prism_sonnenquarz") and chests_node != null and chests_node.chest("trial_prism_sonnenquarz") != null, "lighting all 3 PrismSeal obelisks solves the trial and raises reward LootChest from the sand")
+		_check(puzzles_node.trial("prism_sonnenquarz") == null and puzzles_node.trial("prism_ruinenfeld") == null, "placed PrismSeal ruin sanctuaries are removed from Sonnenquarz-Öde")
 
 	print("DESERT: %d checks, %d failures" % [_checks, _failures])
 	get_tree().quit(1 if _failures > 0 else 0)

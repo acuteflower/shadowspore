@@ -59,6 +59,9 @@ var _wear_check: float = 0.0
 var _wear_loaded: bool = false
 var _built_look: bool = false ## the build shaders are gone, the piece is whole
 var _shutters: Array[Dictionary] = [] ## {sprite, frames, t 0 shut .. 1 propped open}: the market-stall flaps (data `shutters`)
+var _shutter_drips: Array[CPUParticles2D] = [] ## subtle rain drops off propped shutters while raining
+var _market: Sprite2D ## Markttag bunting overlay on upgraded plaza (`plaza_market.png`)
+var _market_glow: Sprite2D
 var _shutter_forced: float = 0.0 ## seconds the flap stays up although it is night (somebody asked for the stock)
 var _shutter_check: float = 0.0
 var _shutter_near: bool = false
@@ -107,6 +110,20 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	_sprite.position = Vector2(-_frame.x / 2.0, -_feet)
 	if bool(_spec.get("glow", false)) and ResourceLoader.exists(DIR + texture_name + "_glow.png"):
 		_glow = _make_glow(_sprite, DIR + texture_name + "_glow.png", _spec.get("anim", {}) as Dictionary)
+	if piece == "plaza" and ResourceLoader.exists(DIR + "plaza_market.png"):
+		_market = Sprite2D.new()
+		_market.texture = load(DIR + "plaza_market.png") as Texture2D
+		_market.centered = false
+		_market.z_index = 1
+		_market.visible = false
+		_sprite.add_child(_market)
+		if ResourceLoader.exists(DIR + "plaza_market_glow.png"):
+			_market_glow = Sprite2D.new()
+			_market_glow.texture = load(DIR + "plaza_market_glow.png") as Texture2D
+			_market_glow.centered = false
+			_market_glow.material = Unlit.material()
+			_market.add_child(_market_glow)
+			_glows.append(_market_glow)
 	for raw: Variant in _spec.get("parts", []) as Array:
 		_make_part(raw as Dictionary)
 	if _spec.has("stand"):
@@ -459,7 +476,9 @@ func _update_shutters(delta: float) -> void:
 			if settler != null and settler.visible and zone.has_point(settler.global_position):
 				_shutter_near = true
 	var open: bool = TimeManager.night_amount() <= 0.5 or _shutter_forced > 0.0 or _shutter_near
-	for entry: Dictionary in _shutters:
+	var wet_open: bool = done and open and WeatherManager.rain_now() > 0.2
+	for i: int in _shutters.size():
+		var entry: Dictionary = _shutters[i]
 		var sprite: Sprite2D = entry.sprite as Sprite2D
 		sprite.visible = done
 		var before: float = float(entry.t)
@@ -468,6 +487,24 @@ func _update_shutters(delta: float) -> void:
 		sprite.frame = clampi(roundi(now * float(int(entry.frames) - 1)), 0, int(entry.frames) - 1)
 		if done and _time > 1.0 and ((before <= 0.0 and now > 0.0) or (before >= 1.0 and now < 1.0)):
 			_shutter_sound(now > before)
+		if i >= _shutter_drips.size() and wet_open:
+			var drips: CPUParticles2D = CPUParticles2D.new()
+			drips.z_index = 2
+			drips.amount = 3
+			drips.lifetime = 0.45
+			drips.direction = Vector2(0.0, 1.0)
+			drips.spread = 6.0
+			drips.gravity = Vector2(0.0, 95.0)
+			drips.initial_velocity_min = 10.0
+			drips.initial_velocity_max = 20.0
+			drips.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+			drips.emission_rect_extents = Vector2(6.0, 1.0)
+			drips.color = Color("7ea8cc", 0.68)
+			drips.position = sprite.position + Vector2(8.0, 10.0)
+			_sprite.add_child(drips)
+			_shutter_drips.append(drips)
+		if i < _shutter_drips.size():
+			_shutter_drips[i].emitting = wet_open and now > 0.5
 
 
 func _shutter_sound(opening: bool) -> void:
@@ -537,6 +574,13 @@ func _resident_about() -> bool:
 	return false
 
 
+func _update_market() -> void:
+	if _market == null:
+		return
+	var market_open: bool = progress >= TownManager.PROGRESS_FULL and manager.structure_level(id) >= 2 and manager.caravan != null and CaravanRules.parked(manager.caravan.state())
+	_market.visible = market_open
+
+
 func _apply_progress() -> void:
 	var fraction: float = clampf(float(progress) / float(TownManager.PROGRESS_FULL), 0.0, 1.0)
 	var done: bool = progress >= TownManager.PROGRESS_FULL
@@ -550,6 +594,7 @@ func _apply_progress() -> void:
 		_aura.visible = done
 	if _spill != null:
 		_spill.visible = done
+	_update_market()
 	set_night(TimeManager.night_amount())
 	queue_redraw()
 	if _over != null:
@@ -864,6 +909,7 @@ func _process(delta: float) -> void:
 		_smoke.emitting = puffing
 		_smoke.gravity = Vector2(WorldWind.sample(global_position).x * 6.0 + 2.0, -1.5)
 	_update_shutters(delta)
+	_update_market()
 	_wear_check -= delta
 	if _wear_check <= 0.0:
 		_wear_check = 1.0

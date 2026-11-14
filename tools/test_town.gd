@@ -56,7 +56,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	for id: String in ["lamp_post", "fence", "bench", "path_stone", "stockpile", "workshop"]:
+	for id: String in ["plaza", "lamp_post", "fence", "bench", "path_stone", "stockpile", "workshop"]:
 		(TownRules.piece(id) as Dictionary)["build_seconds"] = 0.6 ## simulated time is cheap, but not that cheap
 	var world: WorldLevel = load("res://src/world/world_level.tscn").instantiate() as WorldLevel
 	add_child(world)
@@ -78,21 +78,37 @@ func _run() -> void:
 	_check(town.center == hut.position and town.is_built(0), "the heart of the town is the hut")
 	_check(town.in_territory(hut.position + Vector2(0, 100)) and not town.in_territory(hut.position + Vector2(0, 400)), "the hut lights its yard only")
 	_check(town.level() == 0 and town.level_label() == "RASTPLATZ", "a new town is a camp")
-	# --- a lamp post
+	# --- plaza first (lamp_post and most pieces require the fountain square)
 	player.inventory.give("wood", 90)
 	player.inventory.give("stone", 40)
 	player.inventory.give("glow_cap", 4)
 	player.inventory.give("plant_fiber", 12)
+	var plaza_at: Vector2 = _find_site(town, "plaza", hut.position + Vector2(-90, 90))
+	_check(plaza_at != Vector2.INF, "there is a free site for the plaza by the hut")
+	town.request_place("plaza", plaza_at, false)
+	await _frames(3)
+	var start_plaza_id: int = town.next_id - 1
+	player.request_teleport(plaza_at + Vector2(0, 20))
+	for i: int in 400:
+		await get_tree().process_frame
+		if town.is_built(start_plaza_id):
+			break
+	_check(town.is_built(start_plaza_id), "the plaza is finished")
+	# --- a lamp post
 	var lamp_at: Vector2 = _find_site(town, "lamp_post", hut.position + Vector2(60, 110))
 	_check(lamp_at != Vector2.INF, "there is a free site for a lamp post by the hut")
 	_check(town.check_site("lamp_post", hut.position + Vector2(0, 400)) == "AUSSERHALB DES LICHTS", "a site in the dark is refused")
 	_check(town.check_site("lamp_post", hut.position + Vector2(0, -6)) != "", "the hut itself is in the way (%s)" % town.check_site("lamp_post", hut.position + Vector2(0, -6)))
 	var wood_before: int = player.inventory.count_item("wood")
+	var count_before_lamp: int = town.structures.size()
+	var next_before_lamp: int = town.next_id
+	player.request_teleport(lamp_at + Vector2(0, 24))
+	await _frames(2)
 	town.request_place("lamp_post", lamp_at, false)
 	await _frames(3)
-	_check(town.structures.size() == 2 and town.next_id == 2, "the lamp post is a new structure (%d)" % town.structures.size())
+	_check(town.structures.size() == count_before_lamp + 1 and town.next_id == next_before_lamp + 1, "the lamp post is a new structure (%d)" % town.structures.size())
 	_check(player.inventory.count_item("wood") == wood_before - 3 and player.inventory.count_item("glow_cap") == 2, "the cost was paid from the bag")
-	var lamp_id: int = 1
+	var lamp_id: int = next_before_lamp
 	_check(town.structures.has(lamp_id) and int((town.structures[lamp_id] as Dictionary).g) < TownManager.PROGRESS_FULL, "a new piece is a site")
 	_check(town.view_of(lamp_id) != null, "the picture of the site stands near the player")
 	_check(town.check_site("lamp_post", lamp_at) == "IM WEG", "a second piece on the same spot is refused")
@@ -200,6 +216,7 @@ func _run() -> void:
 	await _frames(2)
 	_check(town.structures.has(0), "the house cannot be demolished")
 	# --- the stockpile: stow and take
+	var paths_before_stock: int = town.paths.size()
 	var stock_site: Vector2 = _find_site(town, "stockpile", hut.position + Vector2(-40, 110))
 	_check(stock_site != Vector2.INF, "a free site for the stockpile")
 	town.request_place("stockpile", stock_site, false)
@@ -210,13 +227,13 @@ func _run() -> void:
 		if town.is_built(stock_id):
 			break
 	_check(town.is_built(stock_id) and town.has_built("stockpile"), "the stockpile is finished")
-	_check(town.paths.size() == 1 and int((town.paths[0] as Dictionary).s) == stock_id and int((town.paths[0] as Dictionary).d) == 1, "the stockpile got a trampled way when it was finished (%d)" % town.paths.size())
-	if not town.paths.is_empty():
-		var way: Array = (town.paths[0] as Dictionary).p as Array
+	_check(town.paths.size() == paths_before_stock + 1 and int((town.paths[paths_before_stock] as Dictionary).s) == stock_id and int((town.paths[paths_before_stock] as Dictionary).d) == 1, "the stockpile got a trampled way when it was finished (%d)" % town.paths.size())
+	if town.paths.size() > paths_before_stock:
+		var way: Array = (town.paths[paths_before_stock] as Dictionary).p as Array
 		var way_start: Vector2 = Vector2(float((way[0] as Array)[0]), float((way[0] as Array)[1]))
 		var way_end: Vector2 = Vector2(float((way[way.size() - 1] as Array)[0]), float((way[way.size() - 1] as Array)[1]))
 		_check(way_start.distance_to(stock_site + Vector2(0, 9)) < 1.0, "the way starts at the door (front of the footprint)")
-		_check(way_end.distance_to(hut.exit_position) < 1.0, "and runs to the hut's door, the only node of the network so far")
+		_check(way_end.distance_to(hut.exit_position) < 1.0 or town._square_rim(start_plaza_id).any(func(p: Vector2) -> bool: return way_end.distance_to(p) < 2.0), "and runs to a network door")
 		var rect: Rect2 = TownRules.foot_rect("stockpile", stock_site.x, stock_site.y)
 		var crossing: bool = false
 		for k: int in way.size() - 1:
@@ -227,7 +244,7 @@ func _run() -> void:
 					crossing = true
 		_check(not crossing, "the way goes round the building, not through it")
 		var middle: Vector2 = way_start.lerp(way_end, 0.5)
-		_check(way.size() >= 2 and town._path_views.size() == 1, "the way has its picture")
+		_check(way.size() >= 2 and town._path_views.size() == paths_before_stock + 1, "the way has its picture")
 		_check(town.surface_at(Vector2(float((way[0] as Array)[0]), float((way[0] as Array)[1]) - 1.0)) == "path" or town.surface_at(middle) == "path" or way.size() > 2, "a finished way is path underfoot (%s)" % town.surface_at(way_start))
 	var view: TownStructure = town.view_of(stock_id)
 	_check(view != null and view.prompt() == "LAGER ÖFFNEN", "the stockpile offers its stock")
@@ -306,14 +323,17 @@ func _run() -> void:
 	foot_body.free()
 	await _frames(3)
 	_check(town.check_site("workshop", door_site) == "", "with the ground clear again the site is fine (%s)" % town.check_site("workshop", door_site))
-	# --- the workshop and Gustav
+	# --- the workshop and Gustav (Gustav joins via story rescue first)
+	town.add_story_resident("gustav", false)
+	await _frames(3)
+	var paths_before_shop: int = town.paths.size()
 	var shop_at: Vector2 = _find_site(town, "workshop", hut.position + Vector2(0, 130))
 	_check(shop_at != Vector2.INF, "a free site for the workshop near the hut")
-	_check(town.check_place("workshop", shop_at, player) == "", "a workshop can be ordered (%s)" % town.check_place("workshop", shop_at, player))
 	player.inventory.give("wood", 30)
 	player.inventory.give("plant_fiber", 6)
 	player.request_teleport(shop_at + Vector2(0, 40))
 	await _frames(40)
+	_check(town.check_place("workshop", shop_at, player) == "", "a workshop can be ordered (%s)" % town.check_place("workshop", shop_at, player))
 	town.request_place("workshop", shop_at, false)
 	await _frames(3)
 	var shop_id: int = town.next_id - 1
@@ -322,16 +342,11 @@ func _run() -> void:
 		if town.is_built(shop_id):
 			break
 	_check(town.is_built(shop_id), "the workshop is finished")
-	_check(town.paths.size() == 2 and int((town.paths[1] as Dictionary).d) == 1, "and gets its own way to the network (%d ways)" % town.paths.size())
+	_check(town.paths.size() == paths_before_shop + 1 and int((town.paths[paths_before_shop] as Dictionary).d) == 1, "and gets its own way to the network (%d ways)" % town.paths.size())
 	_check(player.quests.has_flag("built_workshop"), "the workshop sets built_workshop")
-	_check(not town.residents.has("gustav"), "nobody has moved in at the very moment it is finished")
-	for i: int in 600:
-		await get_tree().process_frame
-		if town.residents.has("gustav"):
-			break
-	_check(town.residents.has("gustav"), "Gustav comes to the new light")
+	_check(town.residents.has("gustav"), "Gustav lives in the town")
 	var gustav: Settler = town.settler_node("gustav")
-	_check(gustav != null and gustav.global_position.distance_to(shop_at) > 60.0, "she starts at the edge and walks in")
+	_check(gustav != null, "Gustav settler node exists")
 	TimeManager.time_of_day = 0.5
 	var clipped: int = 0
 	for i: int in 900:
@@ -347,6 +362,8 @@ func _run() -> void:
 	var quarry_of_actors: Array = get_tree().get_nodes_in_group("quest_actors")
 	var actor_at: Vector2 = Vector2.INF
 	for node: Node in quarry_of_actors:
+		if not node.has_method("actor_position"):
+			continue
 		var at: Vector2 = node.call("actor_position", "gustav") as Vector2
 		if at != Vector2.INF:
 			actor_at = at

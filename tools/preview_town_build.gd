@@ -57,9 +57,16 @@ func _run() -> void:
 	await _frames(120)
 	player.quests.set_flag("rebuild_done")
 	await _frames(70)
-	for item: String in ["wood", "stone", "glow_cap", "plant_fiber", "plank", "iron_ore"]:
+	for item: String in ["wood", "stone", "glow_cap", "plant_fiber", "plank", "iron_ore", "earth_tuber"]:
 		player.inventory.give(item, 90)
 	town.residents["gustav"] = {"trust": 0, "talked": -1}
+	if piece != "plaza" and not town.founded:
+		var p_at: Vector2 = _site(town, "plaza", hut.position + Vector2(0, 140))
+		if p_at != Vector2.INF:
+			town._host_place("plaza", p_at, 0, 1)
+			var pid: int = town.next_id - 1
+			(town.structures[pid] as Dictionary).g = TownManager.PROGRESS_FULL
+			town._rpc_done(pid)
 	TimeManager.time_of_day = 0.96 if night else 0.5
 	var at: Vector2 = _site(town, piece, hut.position + Vector2(-60, 190))
 	player.request_teleport(at + Vector2(-70, 46))

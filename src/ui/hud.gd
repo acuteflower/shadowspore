@@ -25,7 +25,11 @@ var _prepared: Array[Dictionary] = [] ## {node, material, children: [[child, mat
 const IDLE_HIDE_SECONDS: float = 10.0 ## no input, no cursor movement and no movement of her for this long: the HUD fades away
 const IDLE_FADE_OUT: float = 1.4 ## seconds to fade away
 const IDLE_FADE_IN: float = 0.25 ## seconds to come back on activity
+const BOSS_FADE_OUT: float = 0.35 ## peripheral HUD fade-out when a boss fight starts
+const BOSS_FADE_IN: float = 0.55 ## peripheral HUD fade-in once the boss fight ends
 const IDLE_PARTS: Array[String] = ["ClockVine", "PurseVine", "Hotbar", "HealthBar", "StaminaBar", "BlinkIcon", "StatusTags", "QuestVine", "HintCard", "FishingHud", "MultiplayerHud"]
+## In boss fights, hide all peripheral info HUDs while keeping BossBar and the Hotbar combat strip.
+const BOSS_HIDE_PARTS: Array[String] = ["ClockVine", "PurseVine", "QuestVine", "HintCard", "FishingHud", "MultiplayerHud"]
 
 var _player: Node2D
 var _heat_haze: HeatHaze
@@ -33,6 +37,7 @@ var _idle_time: float = 0.0
 var _idle_alpha: float = 1.0 ## 1 = HUD shown, 0 = hidden by idling
 var vista_hide: bool = false ## panoramic VistaPoint seating gently hides the HUD right away
 var _vista_alpha: float = 1.0
+var _boss_alpha: float = 1.0 ## 0 while a boss fight is active, hiding non-combat HUDs
 var _cover_alpha: Dictionary = {} ## part name -> fade of the full-screen menus (QuestVine, HintCard)
 var _last_pos: Vector2 = Vector2.INF
 var _fold_base: Dictionary = {} ## part -> its offsets from hud.tscn, before the hotbar fold moved it
@@ -49,9 +54,9 @@ func _input(event: InputEvent) -> void:
 		_idle_time = 0.0
 
 
-## True while something keeps the HUD up even without input (menus, cutscenes, fishing, taking damage).
+## True while something keeps the HUD up even without input (menus, cutscenes, fishing, boss fights, taking damage).
 func _holds_hud(covered: bool) -> bool:
-	if covered or _intro_active or InputManager.ui_blocking or InputManager.menu_open:
+	if covered or _intro_active or InputManager.ui_blocking or InputManager.menu_open or _is_boss_fight_active():
 		return true
 	if _player != null and is_instance_valid(_player):
 		if _last_pos != Vector2.INF and _player.global_position.distance_squared_to(_last_pos) > 0.0001:
@@ -61,6 +66,13 @@ func _holds_hud(covered: bool) -> bool:
 		if fishing != null and fishing.state != FishingComponent.S.IDLE:
 			return true
 	return false
+
+
+func _is_boss_fight_active() -> bool:
+	var boss: BossBar = get_node_or_null("BossBar") as BossBar
+	if boss != null and boss.is_fighting():
+		return true
+	return get_tree() != null and get_tree().root.get_node_or_null("BossIntroLayer") != null
 
 
 func _on_player_damaged(_amount: float, _from: Vector2, _knockback: float) -> void:
@@ -77,10 +89,13 @@ func _apply_idle_fade(delta: float, covered: bool) -> void:
 	_idle_alpha = move_toward(_idle_alpha, 0.0 if fade_out else 1.0, delta * speed)
 	var vista_active: bool = vista_hide and not covered and not InputManager.menu_open
 	_vista_alpha = move_toward(_vista_alpha, 0.0 if vista_active else 1.0, delta / (0.85 if vista_active else 0.35))
+	var boss_active: bool = _is_boss_fight_active()
+	_boss_alpha = move_toward(_boss_alpha, 0.0 if boss_active else 1.0, delta / (BOSS_FADE_OUT if boss_active else BOSS_FADE_IN))
 	for part: String in IDLE_PARTS:
 		var node: CanvasItem = get_node_or_null(part) as CanvasItem
 		if node != null:
-			node.modulate.a = _idle_alpha * _vista_alpha * float(_cover_alpha.get(part, 1.0))
+			var boss_mult: float = _boss_alpha if BOSS_HIDE_PARTS.has(part) else 1.0
+			node.modulate.a = _idle_alpha * _vista_alpha * float(_cover_alpha.get(part, 1.0)) * boss_mult
 
 
 ## Full-screen menus cover the quest branch and tutorial card.

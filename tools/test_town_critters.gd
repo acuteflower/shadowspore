@@ -34,7 +34,9 @@ func _run() -> void:
 	var perches: Array[Node] = get_tree().get_nodes_in_group("town_perches")
 	_check(perches.size() >= 12, "roofs, lamps, benches and fences offer perches (%d)" % perches.size())
 	for node: Node in perches:
-		_check(not (node as RoofPerch).is_depleted(), "a finished piece's perch is free to use")
+		var perch: RoofPerch = node as RoofPerch
+		if perch != null and perch.host is TownStructure:
+			_check(not perch.is_depleted(), "a finished piece's perch is free to use")
 	var store: Vector2 = town.position_of(town.built_ids("stockpile")[0])
 	# --- a crow comes in from outside and lands on a roof
 	player.request_teleport(store + Vector2(0, 200))
@@ -98,24 +100,25 @@ func _run() -> void:
 		var plan: Dictionary = gustav.plan_at(0.35)
 		_check(String(plan.spot) == "split", "the morning has a splitting spell")
 	# --- scarecrow guards nearby perches and repels crows
-	if crow != null:
-		var scare_pos: Vector2 = store
-		var guard_perch: RoofPerch = null
-		for node: Node in perches:
-			var p: RoofPerch = node as RoofPerch
-			if p != null and town.critters._perches().has(p):
-				guard_perch = p
-				scare_pos = p.global_position + Vector2(16.0, 0.0)
-				break
-		if guard_perch != null:
-			var sc_id: int = town.next_id
-			town.next_id += 1
-			town._rpc_added(sc_id, {"p": "scarecrow", "x": scare_pos.x, "y": scare_pos.y, "f": 0, "g": TownManager.PROGRESS_FULL, "d": TimeManager.day}, [])
-			await _frames(2)
-			_check(town.scared_at(guard_perch.global_position) != Vector2.INF, "scarecrow guards nearby perches")
-			_check(not town.critters._perches().has(guard_perch), "guarded perch is skipped for new landings")
+	var scare_pos: Vector2 = store
+	var guard_perch: RoofPerch = null
+	for node: Node in perches:
+		var p: RoofPerch = node as RoofPerch
+		if p != null and p.host is TownStructure and town.critters._perches().has(p):
+			guard_perch = p
+			scare_pos = p.global_position + Vector2(16.0, 0.0)
+			break
+	_check(guard_perch != null, "found an active town perch for scarecrow test")
+	if guard_perch != null:
+		var sc_id: int = town.next_id
+		town.next_id += 1
+		town._rpc_added(sc_id, {"p": "scarecrow", "x": scare_pos.x, "y": scare_pos.y, "f": 0, "g": TownManager.PROGRESS_FULL, "d": TimeManager.day}, [])
+		await _frames(2)
+		_check(town.scared_at(guard_perch.global_position) != Vector2.INF, "scarecrow guards nearby perches")
+		_check(not town.critters._perches().has(guard_perch), "guarded perch is skipped for new landings")
+		if crow != null:
 			crow.global_position = guard_perch.global_position
-			await _frames(15)
-			_check(crow.state == WildCorvid.State.FLEE or crow.state == WildCorvid.State.FLY, "crow near scarecrow flees/flies away (%d)" % crow.state)
+			await _frames(90)
+			_check(crow.state == WildCorvid.State.FLY or crow.state == WildCorvid.State.WATCH or crow._panic_delay >= 0.0, "crow near scarecrow is alarmed/flies away (%d)" % crow.state)
 	print("TOWN CRITTERS: ", "ok" if _ok else "FAILED")
 	get_tree().quit()

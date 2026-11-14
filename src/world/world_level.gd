@@ -279,12 +279,7 @@ func _fill_ground() -> void:
 	_generator.blocked_cells.merge(obs_spec.get("blocked", {}) as Dictionary)
 	_stone_cells.merge(obs_spec.get("stones", {}) as Dictionary)
 	add_child(desert_observatory)
-	desert_ruins = DesertRuins.new()
-	desert_ruins.name = "DesertRuins"
-	var ruin_blocked: Dictionary = desert_ruins.setup(self, _generator.blocked_cells)
-	_generator.blocked_cells.merge(ruin_blocked)
-	_generator.extra_props.append_array(desert_ruins.extra_masonry())
-	add_child(desert_ruins)
+	desert_ruins = null ## non-observatory desert ruins disabled pending redesign
 	desert_guardians = DesertGuardians.new()
 	desert_guardians.name = "DesertGuardians"
 	desert_guardians.setup(self, _generator.blocked_cells)
@@ -984,12 +979,7 @@ func _init_step_stage4(deadline: int) -> void:
 		if Time.get_ticks_usec() >= deadline:
 			return
 	if _init_stage4_sub == 2:
-		desert_ruins = DesertRuins.new()
-		desert_ruins.name = "DesertRuins"
-		var ruin_blocked: Dictionary = desert_ruins.setup(self, _generator.blocked_cells)
-		_generator.blocked_cells.merge(ruin_blocked)
-		_generator.extra_props.append_array(desert_ruins.extra_masonry())
-		add_child(desert_ruins)
+		desert_ruins = null ## non-observatory desert ruins disabled pending redesign
 		_init_stage4_sub = 3
 		if Time.get_ticks_usec() >= deadline:
 			return

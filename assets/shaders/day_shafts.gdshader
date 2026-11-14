@@ -9,7 +9,7 @@ uniform float gold_alpha = 0.095;
 varying vec2 world_position;
 void vertex() { world_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy; }
 void fragment() {
-	vec2 p = floor(world_position);
+	vec2 p = world_position;
 	float glow = 0.0;
 	for (int i = 0; i < 4; i++) {
 		if (i >= shaft_count) { break; }
@@ -23,5 +23,6 @@ void fragment() {
 		glow = max(glow, edge * ends * broken);
 	}
 	float light = day_cloud(p) * (1.0 - day_cover(p) * 0.55);
-	COLOR = vec4(mix(vec3(1.0, 0.96, 0.72), vec3(1.0, 0.73, 0.36), g_day_gold), glow * light * g_day_strength * (noon_alpha + gold_alpha * g_day_gold) * air);
+	vec3 ray_color = mix(vec3(1.0, 0.96, 0.74), vec3(1.0, 0.70, 0.32), g_day_gold);
+	COLOR = vec4(ray_color, glow * light * g_day_strength * (noon_alpha * 1.15 + gold_alpha * 1.25 * g_day_gold) * air);
 }

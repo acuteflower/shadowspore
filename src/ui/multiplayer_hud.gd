@@ -81,7 +81,7 @@ func _process(delta: float) -> void:
 
 
 func _has_point(point: Vector2) -> bool:
-	return visible and _panel_rect.has_point(point)
+	return visible and modulate.a > 0.05 and _panel_rect.has_point(point)
 
 
 func _current_ip() -> String:
@@ -109,7 +109,7 @@ func _copy_invite() -> void:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if not visible:
+	if not visible or modulate.a <= 0.05:
 		return
 	if event is InputEventMouseMotion:
 		var pos: Vector2 = (event as InputEventMouseMotion).position

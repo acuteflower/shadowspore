@@ -2,18 +2,18 @@
 	"_doc": "The colour mood of the picture by time of day (MoodGrade, assets/shaders/mood_grade.gdshader). Keys are blended along the clock (t: 0 = midnight, 0.5 = noon); night holds from the last key to the first. shadow / light: tints multiplied into the dark and the bright parts (1 1 1 = untouched), split: how much of that toning applies, vibrance: extra saturation (dull colours gain most), contrast: gentle S curve, bloom: how much bright things glow, threshold: brightness from which they do, vignette: how far the picture's rim sinks into the shadow tint (0 = none; days keep it faint so the screen stays open, nights let the dark close in). indoors / hex are whole-picture presets for rooms + the mine and the Hexenwald. strength scales everything (0 = off).",
 	"strength": 1.0,
 	"keys": [
-		{"t": 0.1667, "name": "night", "shadow": [0.74, 0.82, 1.34], "light": [0.88, 1.10, 1.16], "split": 0.80, "vibrance": 0.40, "contrast": 0.13, "bloom": 1.00, "threshold": 0.28, "vignette": 0.62},
-		{"t": 0.2, "name": "violet dawn", "shadow": [0.98, 0.78, 1.26], "light": [1.22, 0.96, 1.00], "split": 0.85, "vibrance": 0.38, "contrast": 0.09, "bloom": 0.62, "threshold": 0.46, "vignette": 0.40},
-		{"t": 0.25, "name": "sunrise", "shadow": [0.96, 0.80, 1.24], "light": [1.28, 1.04, 0.78], "split": 0.90, "vibrance": 0.44, "contrast": 0.10, "bloom": 0.52, "threshold": 0.64, "vignette": 0.24},
-		{"t": 0.32, "name": "morning", "shadow": [0.88, 0.98, 1.14], "light": [1.10, 1.05, 0.92], "split": 0.58, "vibrance": 0.40, "contrast": 0.09, "bloom": 0.30, "threshold": 0.76, "vignette": 0.14},
-		{"t": 0.5, "name": "noon", "shadow": [0.86, 0.98, 1.16], "light": [1.09, 1.06, 0.92], "split": 0.54, "vibrance": 0.44, "contrast": 0.10, "bloom": 0.28, "threshold": 0.78, "vignette": 0.10},
-		{"t": 0.68, "name": "afternoon", "shadow": [0.90, 0.94, 1.16], "light": [1.12, 1.04, 0.89], "split": 0.58, "vibrance": 0.42, "contrast": 0.10, "bloom": 0.30, "threshold": 0.76, "vignette": 0.16},
-		{"t": 0.757, "name": "golden hour", "shadow": [1.02, 0.76, 1.22], "light": [1.32, 1.02, 0.70], "split": 0.95, "vibrance": 0.50, "contrast": 0.11, "bloom": 0.58, "threshold": 0.62, "vignette": 0.26},
-		{"t": 0.795, "name": "dusk", "shadow": [0.94, 0.74, 1.34], "light": [1.24, 0.88, 1.06], "split": 0.90, "vibrance": 0.42, "contrast": 0.10, "bloom": 0.72, "threshold": 0.44, "vignette": 0.42},
-		{"t": 0.8333, "name": "night", "shadow": [0.74, 0.82, 1.34], "light": [0.88, 1.10, 1.16], "split": 0.80, "vibrance": 0.40, "contrast": 0.13, "bloom": 1.00, "threshold": 0.28, "vignette": 0.62}
+		{"t": 0.1667, "name": "night", "shadow": [0.72, 0.80, 1.38], "light": [0.90, 1.12, 1.20], "split": 0.84, "vibrance": 0.46, "contrast": 0.13, "bloom": 1.08, "threshold": 0.25, "vignette": 0.62},
+		{"t": 0.2, "name": "violet dawn", "shadow": [0.98, 0.76, 1.30], "light": [1.26, 0.96, 1.02], "split": 0.88, "vibrance": 0.44, "contrast": 0.10, "bloom": 0.68, "threshold": 0.42, "vignette": 0.40},
+		{"t": 0.25, "name": "sunrise", "shadow": [0.96, 0.79, 1.26], "light": [1.32, 1.04, 0.76], "split": 0.92, "vibrance": 0.48, "contrast": 0.10, "bloom": 0.58, "threshold": 0.60, "vignette": 0.24},
+		{"t": 0.32, "name": "morning", "shadow": [0.87, 0.98, 1.15], "light": [1.11, 1.06, 0.92], "split": 0.60, "vibrance": 0.44, "contrast": 0.09, "bloom": 0.34, "threshold": 0.74, "vignette": 0.14},
+		{"t": 0.5, "name": "noon", "shadow": [0.85, 0.98, 1.17], "light": [1.10, 1.06, 0.91], "split": 0.56, "vibrance": 0.48, "contrast": 0.10, "bloom": 0.32, "threshold": 0.75, "vignette": 0.10},
+		{"t": 0.68, "name": "afternoon", "shadow": [0.89, 0.93, 1.18], "light": [1.14, 1.04, 0.88], "split": 0.62, "vibrance": 0.46, "contrast": 0.10, "bloom": 0.36, "threshold": 0.73, "vignette": 0.16},
+		{"t": 0.757, "name": "golden hour", "shadow": [1.03, 0.74, 1.25], "light": [1.36, 1.02, 0.68], "split": 0.96, "vibrance": 0.54, "contrast": 0.12, "bloom": 0.66, "threshold": 0.58, "vignette": 0.26},
+		{"t": 0.795, "name": "dusk", "shadow": [0.94, 0.72, 1.38], "light": [1.28, 0.88, 1.08], "split": 0.92, "vibrance": 0.48, "contrast": 0.11, "bloom": 0.80, "threshold": 0.40, "vignette": 0.42},
+		{"t": 0.8333, "name": "night", "shadow": [0.72, 0.80, 1.38], "light": [0.90, 1.12, 1.20], "split": 0.84, "vibrance": 0.46, "contrast": 0.13, "bloom": 1.08, "threshold": 0.25, "vignette": 0.62}
 	],
-	"indoors": {"shadow": [0.94, 0.84, 1.18], "light": [1.14, 1.03, 0.88], "split": 0.55, "vibrance": 0.24, "contrast": 0.06, "bloom": 0.70, "threshold": 0.50, "vignette": 0.30},
-	"hex": {"shadow": [0.82, 0.76, 1.30], "light": [0.90, 1.18, 0.88], "split": 0.88, "vibrance": 0.34, "contrast": 0.12, "bloom": 0.98, "threshold": 0.28, "vignette": 0.55},
+	"indoors": {"shadow": [0.94, 0.84, 1.18], "light": [1.16, 1.04, 0.88], "split": 0.56, "vibrance": 0.28, "contrast": 0.06, "bloom": 0.76, "threshold": 0.48, "vignette": 0.30},
+	"hex": {"shadow": [0.80, 0.74, 1.34], "light": [0.90, 1.22, 0.92], "split": 0.92, "vibrance": 0.42, "contrast": 0.12, "bloom": 1.08, "threshold": 0.24, "vignette": 0.54},
 	"desert": {"shadow": [0.90, 0.84, 1.20], "light": [1.14, 1.06, 0.88], "split": 0.62, "vibrance": 0.46, "contrast": 0.11, "bloom": 0.42, "threshold": 0.72, "vignette": 0.14},
 	"desert_storm": {"shadow": [0.92, 0.72, 1.34], "light": [1.22, 0.98, 1.12], "split": 0.86, "vibrance": 0.50, "contrast": 0.13, "bloom": 0.88, "threshold": 0.42, "vignette": 0.36}
 }

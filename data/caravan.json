@@ -95,5 +95,25 @@
 		{"item": "oasis_melon", "price": 14},
 		{"item": "amber_grain", "price": 9}
 	],
-	"wanted": {"count": [2, 3], "factor": [1.5, 2.2], "limit": [6, 14]}
+	"wanted": {"count": [2, 3], "factor": [1.5, 2.2], "limit": [6, 14]},
+	"market": {
+		"2": {"name": "MARKTTAG", "buy_extra": {"far": 1, "seed": 1, "basic": 1, "curio": 0}, "stock_mul": 1.35, "wanted_count": [3, 4], "wanted_limit_mul": 1.5},
+		"3": {"name": "GROSSER MARKTTAG", "buy_extra": {"far": 2, "seed": 1, "basic": 2, "curio": 1}, "stock_mul": 1.65, "wanted_count": [4, 5], "wanted_limit_mul": 2.0}
+	},
+	"preorder_max": 3,
+	"preorders": [
+		{"item": "sun_date", "price": 16, "max_amount": 6},
+		{"item": "sun_fig", "price": 14, "max_amount": 6},
+		{"item": "quartz_aloe", "price": 22, "max_amount": 5},
+		{"item": "oasis_blossom", "price": 30, "max_amount": 4},
+		{"item": "palm_wood", "price": 10, "max_amount": 10},
+		{"item": "moon_leek_seed", "price": 26, "max_amount": 5},
+		{"item": "oasis_melon_seed", "price": 30, "max_amount": 4},
+		{"item": "amber_grain_seed", "price": 22, "max_amount": 6},
+		{"item": "sun_quartz", "price": 46, "max_amount": 3, "level": 1},
+		{"item": "lake_moonstone", "price": 40, "max_amount": 3, "level": 2},
+		{"item": "potion_heal_2", "price": 125, "max_amount": 2, "level": 2},
+		{"item": "gem_lens_1", "price": 290, "max_amount": 1, "trust": 10},
+		{"item": "gem_wild_1", "price": 290, "max_amount": 1, "trust": 10}
+	]
 }

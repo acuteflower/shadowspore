@@ -169,6 +169,15 @@ func running_for(peer: int) -> Array[Dictionary]:
 
 # ---------- host: the days ----------
 
+func _board_givers() -> Dictionary:
+	var out: Dictionary = town.met_residents()
+	if town.caravan != null:
+		var mid: String = town.caravan.merchant_id()
+		if town.has_met(mid):
+			out[mid] = (town.residents.get(mid, {"trust": 0}) as Dictionary).duplicate()
+	return out
+
+
 func _on_day_started(day: int) -> void:
 	var lapsed: bool = _lapse_entries(day)
 	if not is_ready():
@@ -190,7 +199,7 @@ func _on_day_started(day: int) -> void:
 	while fresh < BoardRules.limit("new_per_day") and _simple_count() < _simple_cap():
 		if _rng.randf() > float(post.get("chance", 1.0)):
 			break
-		var offer: Dictionary = BoardRules.roll(_rng, town.met_residents(), _plain_hanging(), day, next_id)
+		var offer: Dictionary = BoardRules.roll(_rng, _board_givers(), _plain_hanging(), day, next_id)
 		if offer.is_empty():
 			break
 		_maybe_rush(offer)

@@ -47,10 +47,14 @@ void fragment() {
 	dens *= mix(0.12, 1.0, smoothstep(clear_px * 0.55, clear_px + 1.0, dc + (b - 0.5) * 40.0));
 	float fog_a = dens * mix(max_alpha, 0.46, share) * min(amount * 1.8, 1.0);
 	fog_a = max(fog_a, gloom * 0.14 * smoothstep(clear_px * 0.5, clear_px + 60.0, dc)); // a thin veil everywhere in the wood: its lasting dusk
+	// two-tone Hexenwald mist: mystic violet outer gloom bleeding into eerie witch-teal dense banks
+	vec3 hex_violet = mix(fog_color, hex_color * vec3(0.95, 0.78, 1.35), 0.55);
+	vec3 hex_dense = hex_color * vec3(0.84, 1.18, 1.06);
+	vec3 hex_tint = mix(hex_violet, hex_dense, smoothstep(0.16, 0.72, dens)) * (1.0 - 0.42 * night);
 	// the night closes in: a dark, nearly black vignette at the screen's edges (a dim middle, a gloomy rim)
 	vec2 c = (UV - 0.5) * vec2(1.0, 0.85);
 	float dark_a = night * smoothstep(0.22, 0.70, length(c)) * 0.42;
-	vec4 acc = vec4(mix(fog_color, hex_color * (1.0 - 0.45 * night), share) * fog_a * (1.0 - dark_a) + vec3(0.01, 0.0, 0.03) * dark_a, 0.0);
+	vec4 acc = vec4(mix(fog_color, hex_tint, share) * fog_a * (1.0 - dark_a) + vec3(0.01, 0.0, 0.03) * dark_a, 0.0);
 	acc.a = 1.0 - (1.0 - fog_a) * (1.0 - dark_a);
 	// (the town's light edge is no longer drawn here: it only shows in build mode, BuildMode._draw_territory)
 	COLOR = vec4(acc.a > 0.0 ? acc.rgb / acc.a : vec3(0.0), acc.a > 0.001 ? clamp(acc.a + noise / 255.0, 0.0, 1.0) * fog_on : 0.0); // a hair of noise against 8 bit banding

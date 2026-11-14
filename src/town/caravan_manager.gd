@@ -14,6 +14,8 @@ const FORCE_BASE: int = 100000 ## developer visits count from here (their offer 
 var town: TownManager
 var first_day: int = -1
 var visit: Dictionary = {} ## the running visit (see the header); {} while the caravan is away
+var preorders: Array[Dictionary] = [] ## pre-orders placed for the next caravan visit: [{id, item, amount, price, visit_i, ready}]
+var _next_preorder_id: int = 1
 var force: Dictionary = {} ## a developer visit {i, a, l} that replaces the calendar until it is over
 var phase: Dictionary = {"state": "away", "k": 0.0, "t": 0.0}
 var view: CaravanView
@@ -111,8 +113,27 @@ func _host_step(e: float) -> void:
 	if visit.is_empty() or int(visit.i) != int(v.i):
 		var line: PackedVector2Array = road()
 		var slot: int = CaravanRules.pick_slot(plaza(), _solids(), line[0] if not line.is_empty() else Vector2.INF)
-		visit = {"i": int(v.i), "a": float(v.a), "l": float(v.l), "slot": slot, "lv": town.level(), "sold": {}, "took": {}}
+		visit = {"i": int(v.i), "a": float(v.a), "l": float(v.l), "slot": slot, "lv": town.level(), "mlv": CaravanRules.market_tier(town.plaza_level()), "sold": {}, "took": {}}
+		for order: Dictionary in preorders:
+			if int(order.get("visit_i", -1)) != int(v.i):
+				order["ready"] = true
 		_send_state()
+
+
+func market_level() -> int:
+	return int(visit.get("mlv", CaravanRules.market_tier(town.plaza_level() if town != null else 1)))
+
+
+func is_market_day() -> bool:
+	return not visit.is_empty() and CaravanRules.present(state()) and market_level() >= 2
+
+
+func ready_preorder_count() -> int:
+	var n: int = 0
+	for order: Dictionary in preorders:
+		if bool(order.get("ready", false)) and int(order.get("amount", 0)) > 0:
+			n += 1
+	return n
 
 
 ## The visit of the calendar (or the developer's) whose window holds `e`.
@@ -137,9 +158,20 @@ func _on_state(was: String, to: String) -> void:
 		town.clear_outpost("caravan")
 	if to == "open" and was in ["setup", "coming", "away"]:
 		town.event.emit("caravan_arrived", {}) ## every peer sees the change itself
+		var mlv: int = market_level()
+		if mlv >= 2:
+			town.event.emit("market_day", {"tier": mlv, "name": String(CaravanRules.market_spec(mlv).get("name", "MARKTTAG"))})
 		if town.local_player() != null and town.local_player().global_position.distance_to(stall()) < 600.0:
-			town.town_banner({"header": "AUF DEM %s" % String(TownRules.piece("plaza").get("name", "PLATZ")), "title": "DIE KARAWANE IST DA",
-				"sub": String(town.settler_spec(merchant_id()).get("name", "")) if town.has_met(merchant_id()) else "EIN FREMDER HÄNDLER", "sound": "level_bells"})
+			var header: String = "AUF DEM %s" % String(TownRules.piece("plaza").get("name", "PLATZ"))
+			var title_text: String = "DIE KARAWANE IST DA"
+			if mlv >= 2:
+				header = String(CaravanRules.market_spec(mlv).get("name", "MARKTTAG"))
+				title_text = "%s AUF DEM %s" % [header, String(TownRules.piece("plaza").get("name", "PLATZ"))]
+			var sub_text: String = String(town.settler_spec(merchant_id()).get("name", "")) if town.has_met(merchant_id()) else "EIN FREMDER HÄNDLER"
+			var ready_n: int = ready_preorder_count()
+			if ready_n > 0:
+				sub_text = "%s · %d BESTELLUNG%s BEREIT" % [sub_text, ready_n, "" if ready_n == 1 else "EN"]
+			town.town_banner({"header": header, "title": title_text, "sub": sub_text, "sound": "level_bells"})
 	if to == "teardown":
 		town.event.emit("caravan_leaving", {})
 	stock_changed.emit()
@@ -290,10 +322,11 @@ func offer() -> Dictionary:
 		var none_buy: Array[Dictionary] = []
 		var none_sell: Array[Dictionary] = []
 		return {"buy": none_buy, "sell": none_sell}
-	var key: String = "%d:%d" % [int(visit.i), int(visit.get("lv", 0))]
+	var mlv: int = market_level()
+	var key: String = "%d:%d:%d" % [int(visit.i), int(visit.get("lv", 0)), mlv]
 	if key != _offer_key:
 		_offer_key = key
-		_offer = CaravanRules.offer(world_seed(), int(visit.i), int(visit.get("lv", 0)))
+		_offer = CaravanRules.offer(world_seed(), int(visit.i), int(visit.get("lv", 0)), mlv)
 	return _offer
 
 
@@ -356,6 +389,36 @@ func rows(mode: String, player: Player) -> Array[Dictionary]:
 			var sub: String = ("GESUCHT · NIMMT NOCH %d" % wanted_left) if bool(row.wanted) and wanted_left > 0 else ("IM RUCKSACK" if have > 0 else "DU HAST KEINS")
 			out.append({"kind": "sell", "item": item, "count": have, "sub": sub, "coins": price, "price": price, "wanted": bool(row.wanted) and wanted_left > 0,
 				"state": BoardWindow.OK if have > 0 else BoardWindow.MISSING, "why": "DU HAST KEIN %s" % _item_name(item)})
+	if mode == "preorder":
+		for order: Dictionary in preorders:
+			var item: String = String(order.get("item", ""))
+			var amt: int = int(order.get("amount", 1))
+			var ready: bool = bool(order.get("ready", false))
+			if amt <= 0:
+				continue
+			out.append({"kind": "collect_preorder", "preorder_id": int(order.get("id", 0)), "item": item, "count": amt,
+				"sub": "ABHOLBEREIT!" if ready else "KOMMT NÄCHSTEN BESUCH",
+				"tag": "ABHOLEN" if ready else "UNTERWEGS", "tag_color": Color("9ff6ea") if ready else Color("a8a2bc"),
+				"ready": ready, "state": BoardWindow.OK if ready else BoardWindow.MISSING,
+				"why": "" if ready else "BRINGT JORUN BEIM NÄCHSTEN HALT MIT"})
+		var at_cap: bool = preorders.size() >= CaravanRules.preorder_max()
+		var t_lv: int = town.level() if town != null else 0
+		for raw: Variant in CaravanRules.preorders():
+			var spec: Dictionary = raw as Dictionary
+			var item: String = String(spec.get("item", ""))
+			if DataRegistry.get_entry("items", item).is_empty():
+				continue
+			var price: int = CaravanRules.preorder_price(spec, trust)
+			var need_trust: int = int(spec.get("trust", 0))
+			var need_lv: int = int(spec.get("level", 0))
+			var max_amt: int = int(spec.get("max_amount", 1))
+			var locked: bool = trust < need_trust or t_lv < need_lv
+			var poor: bool = player.progress.copper < price
+			var why: String = ("VERTRAUEN %d NÖTIG" % need_trust) if trust < need_trust else (("STADTSTUFE %d NÖTIG" % (need_lv + 1)) if t_lv < need_lv else ("MAX. %d BESTELLUNGEN OFFEN" % CaravanRules.preorder_max() if at_cap else ("ZU WENIG GELD" if poor else "")))
+			var sub: String = "VERTRAUEN %d" % need_trust if trust < need_trust else ("AB STUFE %d" % (need_lv + 1) if t_lv < need_lv else ("BIS %d X BESTELLBAR" % max_amt))
+			out.append({"kind": "preorder", "item": item, "count": 1, "max_amount": max_amt, "sub": sub, "coins": price, "price": price, "poor": poor,
+				"state": BoardWindow.LOCKED if locked else (BoardWindow.OK if why == "" else BoardWindow.MISSING), "why": why})
+		return out
 	if mode == "sell": ## what she carries first, the wanted ones on top
 		var with_bag: Array[Dictionary] = []
 		for row: Dictionary in out:
@@ -453,6 +516,101 @@ func _host_trade(mode: String, item: String, amount: int, peer: int) -> void:
 	_rpc_counts.rpc(int(visit.i), (visit.sold as Dictionary).duplicate(), (visit.took as Dictionary).duplicate())
 
 
+func request_preorder(item: String, amount: int) -> void:
+	if multiplayer.is_server():
+		_host_preorder(item, amount, multiplayer.get_unique_id())
+	else:
+		_rpc_preorder.rpc_id(1, item, amount)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_preorder(item: String, amount: int) -> void:
+	if multiplayer.is_server():
+		_host_preorder(item, amount, multiplayer.get_remote_sender_id())
+
+
+func request_collect_preorder(preorder_id: int) -> void:
+	if multiplayer.is_server():
+		_host_collect_preorder(preorder_id, multiplayer.get_unique_id())
+	else:
+		_rpc_collect_preorder.rpc_id(1, preorder_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_collect_preorder(preorder_id: int) -> void:
+	if multiplayer.is_server():
+		_host_collect_preorder(preorder_id, multiplayer.get_remote_sender_id())
+
+
+func _host_preorder(item: String, amount: int, peer: int) -> void:
+	var player: Player = town.player_of(peer)
+	if player == null or amount < 1 or amount > 99:
+		return
+	var why: String = trade_block(player)
+	if why != "":
+		town._tell(peer, why, false)
+		return
+	if preorders.size() >= CaravanRules.preorder_max():
+		town._tell(peer, "MAX. %d BESTELLUNGEN OFFEN" % CaravanRules.preorder_max(), false)
+		return
+	var spec: Dictionary = CaravanRules.preorder_spec(item)
+	if spec.is_empty():
+		return
+	var trust: int = town.trust_of(merchant_id())
+	if trust < int(spec.get("trust", 0)):
+		town._tell(peer, "%s TRAUT DIR NOCH NICHT" % String(town.settler_spec(merchant_id()).get("name", "ER")), false)
+		return
+	if town.level() < int(spec.get("level", 0)):
+		town._tell(peer, "STADTSTUFE %d NÖTIG" % (int(spec.get("level", 0)) + 1), false)
+		return
+	var count: int = mini(amount, int(spec.get("max_amount", 1)))
+	var price: int = CaravanRules.preorder_price(spec, trust)
+	var total: int = price * count
+	if player.progress.copper < total:
+		town._tell(peer, "ZU WENIG GELD", false)
+		return
+	player.progress.award(-total, 0)
+	preorders.append({"id": _next_preorder_id, "item": item, "amount": count, "price": price, "visit_i": int(visit.i), "ready": false})
+	_next_preorder_id += 1
+	town._tell(peer, "%d X %s VORBESTELLT" % [count, _item_name(item)], true)
+	_send_state()
+
+
+func _host_collect_preorder(preorder_id: int, peer: int) -> void:
+	var player: Player = town.player_of(peer)
+	if player == null:
+		return
+	var why: String = trade_block(player)
+	if why != "":
+		town._tell(peer, why, false)
+		return
+	for idx: int in preorders.size():
+		var order: Dictionary = preorders[idx]
+		if int(order.get("id", 0)) != preorder_id:
+			continue
+		if not bool(order.get("ready", false)):
+			town._tell(peer, "KOMMT ERST BEIM NÄCHSTEN BESUCH", false)
+			return
+		var item: String = String(order.get("item", ""))
+		var want: int = int(order.get("amount", 0))
+		if want <= 0:
+			preorders.remove_at(idx)
+			_send_state()
+			return
+		var rest: int = player.inventory.give(item, want)
+		var got: int = want - rest
+		if got <= 0:
+			town._tell(peer, "KEIN PLATZ IM RUCKSACK", false)
+			return
+		town._tell(peer, "%d X %s ABGEHOLT" % [got, _item_name(item)], true)
+		if rest <= 0:
+			preorders.remove_at(idx)
+		else:
+			order["amount"] = rest
+		_send_state()
+		return
+
+
 @rpc("authority", "call_local", "reliable")
 func _rpc_counts(i: int, sold: Dictionary, took: Dictionary) -> void:
 	if visit.is_empty() or int(visit.i) != i:
@@ -477,7 +635,15 @@ func _rpc_state(data: Dictionary) -> void:
 
 
 func export_state() -> Dictionary:
-	return {"first": first_day, "visit": visit.duplicate(true), "force": force.duplicate(), "forced": _forced_count, "skip": skip_until}
+	return {
+		"first": first_day,
+		"visit": visit.duplicate(true),
+		"force": force.duplicate(),
+		"forced": _forced_count,
+		"skip": skip_until,
+		"pre": preorders.duplicate(true),
+		"next_pre": _next_preorder_id,
+	}
 
 
 func import_state(data: Dictionary) -> void:
@@ -491,7 +657,30 @@ func import_state(data: Dictionary) -> void:
 		var took: Dictionary = {}
 		for item: String in v.get("took", {}) as Dictionary:
 			took[item] = int((v.took as Dictionary)[item])
-		visit = {"i": int(v.get("i", 0)), "a": float(v.get("a", 0.0)), "l": float(v.get("l", 0.0)), "slot": int(v.get("slot", -1)), "lv": int(v.get("lv", 0)), "sold": sold, "took": took}
+		visit = {
+			"i": int(v.get("i", 0)),
+			"a": float(v.get("a", 0.0)),
+			"l": float(v.get("l", 0.0)),
+			"slot": int(v.get("slot", -1)),
+			"lv": int(v.get("lv", 0)),
+			"mlv": int(v.get("mlv", 1)),
+			"sold": sold,
+			"took": took,
+		}
+	preorders.clear()
+	for raw: Variant in data.get("pre", []) as Array:
+		if not (raw is Dictionary):
+			continue
+		var p: Dictionary = raw as Dictionary
+		preorders.append({
+			"id": int(p.get("id", 0)),
+			"item": String(p.get("item", "")),
+			"amount": maxi(1, int(p.get("amount", 1))),
+			"price": maxi(0, int(p.get("price", 0))),
+			"visit_i": int(p.get("visit_i", -1)),
+			"ready": bool(p.get("ready", false)),
+		})
+	_next_preorder_id = maxi(1, int(data.get("next_pre", preorders.size() + 1)))
 	var f: Dictionary = data.get("force", {}) as Dictionary
 	force = {"i": int(f.i), "a": float(f.a), "l": float(f.l)} if f.has("i") else {}
 	_forced_count = int(data.get("forced", 0))

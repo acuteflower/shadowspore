@@ -60,7 +60,7 @@ const LAYERS: Array[Dictionary] = [
 	{"id": 44, "name": "pasture_trace", "cell": 22, "reach": 15},
 ]
 const WITCH_KINDS: Array[String] = ["hag_tree", "bone_tree", "thorn_hedge", "grave_candle", "witch_hat", "toad_cap", "ghost_fern", "mandrake", "curse_rock", "hex_shrub", "witch_broom"] ## the Hexenwald's own plant world (tools/art_hexenwald.py): grows only where the biome is `bare` of the meadow's
-const DESERT_KINDS: Array[String] = ["crown_cactus", "prickly_pear", "barrel_cactus", "desert_scrub", "tumble_scrub", "dune_grass", "glass_aloe", "night_cactus", "sand_tuber", "sun_palm", "oasis_reed", "oasis_lily", "sun_quartz_rock", "prism_vein", "ruin_sandstone"] ## Sonnenquarz-Öde's own desert flora & ores (tools/art_desert.py, tools/art_desert_ruins.py): grows only where `is_desert_bare` (`bare == 2`)
+const DESERT_KINDS: Array[String] = ["crown_cactus", "prickly_pear", "barrel_cactus", "desert_scrub", "tumble_scrub", "dune_grass", "glass_aloe", "night_cactus", "sand_tuber", "sun_palm", "oasis_reed", "oasis_lily", "sun_quartz_rock", "prism_vein"] ## Sonnenquarz-Öde's own desert flora & ores (tools/art_desert.py): grows only where `is_desert_bare` (`bare == 2`)
 const DESERT_SHARED: Array[String] = ["bush", "grass"] ## meadow plants allowed into the outer steppe fringe (arid < 0.35), where they warm and give way to desert scrub/grass
 const SHORE_KINDS: Array[String] = ["marsh_gold", "moon_iris", "brook_mint", "cattail", "lake_glimmer", "lake_moonstone", "oasis_reed", "oasis_lily"] ## may grow at the water's edge
 const LAKE_KINDS: Array[String] = ["lake_glimmer", "lake_moonstone"] ## the lake witch's raw stones (docs/seehexe_konzept.md 6): only on the shores of the Hexenwald's waters

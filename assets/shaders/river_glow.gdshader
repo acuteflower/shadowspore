@@ -59,5 +59,5 @@ void fragment() {
             glow += speck_c * (0.4 + 0.6 * tw);
         }
     }
-    COLOR = vec4(glow * night, 1.0);
+    COLOR = vec4(glow * night * 1.18, 1.0);
 }

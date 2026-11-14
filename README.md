@@ -5,7 +5,23 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.8.5 Beta – „Steine von Hallgrat & Wunder der Wiese“
+## 🚀 Aktuelle Version: V0.8.6 Beta – „Zinnen von Hallgrat, Sternenfall & Ruf der Tiefe“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Hallgrat im Nachtlicht mit Stadtmauer und Laternen](docs/img/hallgrat_deko_night.png)
+
+### Highlights von V0.8.6 Beta:
+- 🏰 **Hallgrat vollendet (Stufen 3d & 3e):** Ringförmige Stadtmauer mit Rundtürmen & Zinnen (auch auf der Karte), durchgehende Garten-/Feld-/Ruinenmauern mit Kollision, geordnete Häuserreihen sowie über 60 neue Straßenszenen samt leuchtenden Nachtlaternen.
+- 🌠 **Wiesenbiom-Ausbau (Stufe 6):** Nächtliche **Sternschnuppen-Krater**, der friedliche **Weiße Kronenhirsch** (durch Anschleichen erlebbar) & **36 platzierte Entdecker-Truhen** mit neuen Talismanen.
+- 🌙 **Tag-Nacht- & Schlafrhythmus:** 40-Minuten-Zyklus (`21:00–04:12` Nacht), dynamische Schlafschwelle (`10 %–70 %`), `AUSGERUHT` (`+12 %` Ausdauer-Regeneration) & `ÜBERMÜDET`-Effekte sowie Koop-Bettwarte-Banner.
+- 🎪 **Glimmrast-Erweiterung:** **Markttage** & **Vorbestellungen** bei Jorun, **Brunnenplatz Stufe 2 & 3**, 3 neue Feldfrüchte (**Mondlauch**, **Quellmelone**, **Bernsteinkorn**), Gießkannen-Limit (`12` Güsse), **Vogelscheuche** & voller **Freiluftsalon** mit Live-Vorschau und `8` Outfit-Farben.
+- 🤝 **Koop-Welten & Boss-Fokus-HUD:** Persistente Koop-Welten mit 6-stelligem Beitrittscode, Live-Spielerliste im HUD & automatisches Ausblenden von Neben-HUDs während Bosskämpfen.
+- 🏜️ **Ausblick – Aurelith (Paket 1):** Boss-Dossier & 3-stufiges Titan-Modell von *Aurelith, Herz des Sonnenquarzes* fertiggestellt (der Kampf folgt in den nächsten Paketen).
+
+---
+
+## 🚀 Vorherige Version: V0.8.5 Beta – „Steine von Hallgrat & Wunder der Wiese“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

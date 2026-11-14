@@ -249,6 +249,12 @@ func _build_items() -> void:
 				_add(0, "button", "OHRRINGE DER KLARHEIT", "", {"action": "clarity"}) ## the witch's earrings against the Hexenwald's mist
 				_add(0, "button", "IN DEN HEXENWALD", "", {"action": "hexenwald"})
 				_add(0, "button", "IN DIE QUARZWÜSTE", "", {"action": "quartz_desert"})
+				_add(0, "button", "ZUR ZENITWARTE", "", {"action": "desert_observatory"})
+				_add(0, "button", "ZUM AUSSICHTSPUNKT", "", {"action": "vista_next"}) ## cycles through the 14 meadow cliff vistas (docs/wiesenbiom_ausbau_konzept.md)
+				_add(0, "button", "IN DEN TIEFEN URFORST", "", {"action": "habitat_urforst"})
+				_add(0, "button", "ZUR WINDWIESE (WINDEICHE)", "", {"action": "habitat_wind"})
+				_add(0, "button", "ZUM ALTEN WEIDELAND", "", {"action": "habitat_pasture"})
+				_add(0, "button", "QUARZWÄCHTER SPAWNEN", "", {"action": "quartz_golem_spawn"})
 				_add(0, "button", "ZUR SEEHEXE", "", {"action": "lake_witch"}) ## docs/seehexe_konzept.md: in front of her house at the Hexenwald lake
 				_add(0, "button", "SEEHEXE: QUEST STARTEN", "", {"action": "lake_witch_quest"}) ## the entry quest from the start, the ring asleep (host)
 				_add(0, "button", "SEEHEXE BEKANNT", "", {"action": "lake_witch_known"}) ## the ring awake, the quest done, the staff in the bag (host)
@@ -287,8 +293,19 @@ func _build_items() -> void:
 			if multiplayer.is_server():
 				_add(0, "heading", "ANGELN")
 				_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
+				if _town() != null and _town().caravan != null: ## the travelling merchant (docs/haendler_konzept.md)
+					_add(0, "heading", "KARAWANE")
+					_add(0, "button", "KARAWANE: JETZT HOLEN", "", {"action": "caravan_come"})
+					_add(0, "button", "KARAWANE: 2 TAGE", "", {"action": "caravan_come2"})
+					_add(0, "button", "KARAWANE: ABREISEN", "", {"action": "caravan_leave"})
 				if get_tree().get_first_node_in_group("world") is WorldLevel:
 					_add(0, "button", "ZUM NÄCHSTEN UFER", "", {"action": "fish_bank"})
+			var west: Hallgrat = get_tree().get_first_node_in_group("hallgrat") as Hallgrat
+			if west != null: ## the stone town in the west, stage 1: its ground plan and the Westweg (docs/stadt_westen_konzept.md)
+				_add(0, "heading", "HALLGRAT")
+				_add(0, "button", "HALLGRAT: PLAN VERBERGEN" if west.plan_shown() else "HALLGRAT: PLAN ZEIGEN", "", {"action": "hallgrat_plan"})
+				_add(0, "button", "HALLGRAT: ZUM OSTTOR", "", {"action": "hallgrat_gate"})
+				_add(0, "button", "WESTWEG: ZUR GABELUNG", "", {"action": "hallgrat_fork"})
 			var story_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if story_world != null and story_world.debug_can_return_home():
 				_add(0, "heading", "STORY-SPRUNG")
@@ -399,6 +416,21 @@ func _town() -> TownManager:
 	return get_tree().get_first_node_in_group("town") as TownManager
 
 
+## The STADT tab's line about the travelling merchant: here and for how long, or roughly when (never the exact day: docs/haendler_konzept.md 3.5).
+func _caravan_text(caravan: CaravanManager) -> String:
+	if CaravanRules.present(caravan.state()) and not caravan.visit.is_empty():
+		var days_left: int = int(floorf(float(caravan.visit.l))) - TimeManager.day
+		return "IN DER STADT · " + ("REIST HEUTE AB" if days_left <= 0 else "NOCH %d TAG%s" % [days_left, "" if days_left == 1 else "E"])
+	if caravan.first_day < 0:
+		return "NOCH NIE GESEHEN"
+	var next: Vector2i = caravan.next_arrival_days()
+	if next.x < 0:
+		return "UNTERWEGS"
+	var low: int = maxi(next.x - 1, 0)
+	var high: int = next.x + 2
+	return "MORGEN ODER BALD" if high <= 1 else "ERWARTET IN %d BIS %d TAGEN" % [maxi(low, 1), high]
+
+
 ## The STADT tab: what the town is (name, level, people, buildings, light, stock, residents, pieces) and what the group can do (build, demolish, name).
 func _build_town_page() -> void:
 	var town: TownManager = _town()
@@ -436,6 +468,8 @@ func _build_town_page() -> void:
 		reach = maxf(reach, Vector2(c.x, c.y).distance_to(town.center) + c.z)
 	_add(0, "info", "LICHT REICHT", "", {"text": "%d KACHELN" % int(reach / 16.0)})
 	_add(0, "info", "GEGRÜNDET", "", {"text": "TAG %d" % (town.founded_day + 1)})
+	if town.caravan != null and town.has_heart():
+		_add(0, "info", "KARAWANE", "", {"text": _caravan_text(town.caravan)})
 	if town.board != null: ## what the quest board remembers (docs/questtafel_ausbau_konzept.md 2.8)
 		var me: int = multiplayer.get_unique_id()
 		_add(0, "info", "ERLEDIGTE ZETTEL", "", {"text": str(town.board.honor_done())})
@@ -696,6 +730,16 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			TitleCard.show_card(self)
+		"caravan_come", "caravan_come2", "caravan_leave": ## dev, host: the caravan drives in now / packs up now
+			var caravan: CaravanManager = _town().caravan if _town() != null else null
+			if caravan == null or not multiplayer.is_server() or not _town().has_heart():
+				_failed_flash = 2.5
+				return
+			if action == "caravan_leave":
+				caravan.debug_leave()
+			else:
+				caravan.debug_come(2 if action == "caravan_come2" else 1)
+			_set_open(false)
 		"town_jump":
 			var town_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if town_world == null or not town_world.debug_can_return_home():
@@ -922,6 +966,21 @@ func _run_action(action: String) -> void:
 			else:
 				(_player as Player).request_teleport(trials.trial_spot(first))
 			_set_open(false)
+		"hallgrat_plan", "hallgrat_gate", "hallgrat_fork": ## dev: Hallgrat's ground plan on the ground / to the east gate / to the Westweg's fork
+			var west: Hallgrat = get_tree().get_first_node_in_group("hallgrat") as Hallgrat
+			if west == null or not (_player is Player):
+				_failed_flash = 2.5
+				return
+			if action == "hallgrat_plan":
+				west.show_plan(not west.plan_shown())
+				_build_items()
+				return
+			var to: Vector2 = west.gate_point() if action == "hallgrat_gate" else west.fork_point()
+			if not to.is_finite():
+				_failed_flash = 2.5
+				return
+			(_player as Player).request_teleport(to)
+			_set_open(false)
 		"hexenwald": ## into the middle of the Hexenwald
 			if _player is Player:
 				(_player as Player).request_teleport(Vector2(826, 880) * 16.0)
@@ -930,6 +989,50 @@ func _run_action(action: String) -> void:
 			if _player is Player:
 				(_player as Player).request_teleport(Vector2(842, 185) * 16.0)
 				_set_open(false)
+		"desert_observatory": ## summit plaza directly before Die Zenitwarte in Region 34
+			if _player is Player:
+				(_player as Player).request_teleport(Vector2(908, 183) * 16.0 + Vector2(8.0, 8.0))
+				_set_open(false)
+		"vista_next": ## jump to the next meadow cliff vista's approach spot (cycles through all 14)
+			var vistas: Vistas = Vistas.of(get_tree())
+			if vistas == null or not (_player is Player):
+				_failed_flash = 2.5
+				return
+			var list: Array[Dictionary] = vistas.entries()
+			if list.is_empty():
+				_failed_flash = 2.5
+				return
+			var pick_idx: int = int(get_meta("vista_idx", 0)) % list.size()
+			set_meta("vista_idx", (pick_idx + 1) % list.size())
+			var spec: Dictionary = list[pick_idx]
+			var pt: VistaPoint = vistas.point_node(String(spec.id))
+			var dest: Vector2 = pt.approach_position() if pt != null else Vector2(float((spec.tile as Array)[0]), float((spec.tile as Array)[1])) * 16.0 + Vector2(8.0, 8.0)
+			(_player as Player).request_teleport(dest)
+			_set_open(false)
+		"habitat_urforst", "habitat_wind", "habitat_pasture": ## cycle through the 3 meadow macro-landscape landmarks
+			var ml: MeadowLandmarks = MeadowLandmarks.of(get_tree())
+			if ml == null or not (_player is Player):
+				_failed_flash = 2.5
+				return
+			var spots: Array[Vector2i] = ml.shrine_tiles() if action == "habitat_urforst" else (ml.oak_tiles() if action == "habitat_wind" else ml.pasture_tiles())
+			if spots.is_empty():
+				_failed_flash = 2.5
+				return
+			var meta_key: String = "idx_" + action
+			var h_idx: int = int(get_meta(meta_key, 0)) % spots.size()
+			set_meta(meta_key, (h_idx + 1) % spots.size())
+			var target_tile: Vector2i = spots[h_idx]
+			var offset_px: Vector2 = Vector2(8.0, 28.0) if action == "habitat_wind" else Vector2(8.0, 24.0)
+			(_player as Player).request_teleport(Vector2(target_tile) * 16.0 + offset_px)
+			_set_open(false)
+		"quartz_golem_spawn": ## dev, host: spawn a peaceful Quarzwächter near Ellie
+			var world_node: Node = get_tree().get_first_node_in_group("world")
+			if world_node == null or not world_node.has_method("spawn_quartz_golem") or not (_player is Player) or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			var p_pos: Vector2 = (_player as Player).global_position + Vector2(44.0, 0.0)
+			world_node.call("spawn_quartz_golem", p_pos, PI, randi() % 3, false)
+			_set_open(false)
 		"map_reveal_all", "map_reset": ## dev, host only: the whole map seen / the fog from before it back (kept in the save)
 			var fog: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
 			if fog == null or not multiplayer.is_server():

@@ -966,22 +966,38 @@ func _draw_cage(c: Dictionary, glow: bool) -> void:
 	var gap_a: float = float(c["ga"])
 	var gap_w: float = float(c["gw"])
 	if _clock < t0 - 0.3:
-		# the warning: a dotted circle where the wall will fall, the gap lit by two bright edges and arrows pointing out of it
-		if not glow:
-			return
+		# Void-feather snare warning: abyssal shadow crust + writhing crimson-magenta ring with inward feather-thorn barbs,
+		# while keeping the safe escape gap and outward chevrons crystal-clear!
 		var urgency: float = smoothstep(float(c["show"]), t0, _clock)
 		var r0: float = float(c["r0"])
-		for k: int in 120:
-			var a: float = TAU * float(k) / 120.0
+		if not glow:
+			for k_bg: int in 140:
+				var a_bg: float = TAU * float(k_bg) / 140.0
+				if _in_cage_gap(c, a_bg):
+					continue
+				var wrig_bg: float = sin(a_bg * 10.0 + _clock * 9.0) * 0.9
+				var p_bg: Vector2 = centre + Vector2.from_angle(a_bg) * (r0 + wrig_bg)
+				canvas.draw_rect(Rect2(p_bg.round() + Vector2(-1, 0), Vector2(3, 2)), Color("120522", 0.58 + 0.25 * urgency))
+			return
+		for k: int in 140:
+			var a: float = TAU * float(k) / 140.0
 			if _in_cage_gap(c, a):
 				continue
-			var p: Vector2 = centre + Vector2.from_angle(a) * r0
-			canvas.draw_rect(Rect2(p.round(), Vector2.ONE * (2 if k % 3 == 0 else 1)), Color(1.0, 0.45 + 0.4 * urgency, 0.6 + 0.2 * urgency, 0.45 + 0.4 * urgency))
+			var wrig: float = sin(a * 10.0 + _clock * 9.0) * 0.9
+			var dir_a: Vector2 = Vector2.from_angle(a)
+			var p: Vector2 = centre + dir_a * (r0 + wrig)
+			var is_void: bool = (k % 5 == 0)
+			var ring_c: Color = Color("ff4fd8", 0.58 + 0.35 * urgency) if is_void else Color(1.0, 0.28 + 0.48 * urgency, 0.48 + 0.34 * urgency, 0.55 + 0.40 * urgency)
+			canvas.draw_rect(Rect2(p.round(), Vector2.ONE * (2 if k % 4 == 0 else 1)), ring_c)
+			if k % 10 == 0: ## inward Void-feather barbs pointing into the closing cage
+				for b_step: int in range(1, 5):
+					var bp: Vector2 = centre + dir_a * (r0 + wrig - float(b_step) * 1.4)
+					canvas.draw_rect(Rect2(bp.round(), Vector2.ONE), Color("ff4fd8" if b_step >= 3 else "ff3868", (0.65 - float(b_step) * 0.12) * (0.6 + 0.4 * urgency)))
 		for side: float in [-1.0, 1.0]:
 			var edge: float = gap_a + side * gap_w * 0.5
 			for step: int in 8:
 				var q: Vector2 = centre + Vector2.from_angle(edge) * (r0 - 6.0 + float(step) * 3.0)
-				canvas.draw_rect(Rect2(q.round(), Vector2(1, 2)), Color(HOT, 0.8))
+				canvas.draw_rect(Rect2(q.round(), Vector2(1, 2)), Color(HOT, 0.85))
 		var out: Vector2 = Vector2.from_angle(gap_a)
 		var side_v: Vector2 = out.orthogonal()
 		for ring: int in 3:

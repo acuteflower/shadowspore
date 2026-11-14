@@ -3,7 +3,7 @@ extends Node2D
 ## Sparse ground residents with stable homes. Tree-sort chain remains continuous through Residents.
 
 const CHUNK_PIXELS: float = 512.0
-var enabled_species: Array[String] = ["deer", "fox", "boar", "lynx", "squirrel", "badger", "hex_goat", "hex_toad"]
+var enabled_species: Array[String] = ["deer", "fox", "boar", "lynx", "squirrel", "badger", "hex_goat", "hex_toad", "oryx", "fennec", "jerboa", "agama"]
 var _seed: int = 0
 var _habitat: Callable
 var _active: Dictionary = {}
@@ -156,6 +156,45 @@ func _habitat_score(point: Vector2, species: String, rng: RandomNumberGenerator)
 		for log_node: FallenLog in get_tree().get_nodes_in_group("fallen_logs"):
 			best = minf(best, log_node.global_position.distance_to(point))
 		return -best + rng.randf() * 8.0
+	if species in ["oryx", "fennec", "jerboa", "agama"]:
+		var arid: float = BiomeBlend.arid_at(point)
+		if arid < 0.35:
+			return -INF
+		var oasis: float = BiomeBlend.oasis_at(point)
+		var on_quartz: bool = BiomeBlend.is_quartz_surface(point)
+		if species == "oryx":
+			var shade_bonus: float = 0.0
+			for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+				var tr: FirTree = node as FirTree
+				if tr != null and tr.kind in ["sun_palm", "crown_cactus"] and tr.global_position.distance_to(point) < 110.0:
+					shade_bonus = maxf(shade_bonus, 24.0)
+			return oasis * 48.0 + shade_bonus + rng.randf() * 14.0
+		if species == "fennec":
+			var rock_near: float = 120.0
+			for world: Node in get_tree().get_nodes_in_group("world"):
+				var props: Node = world.get_node_or_null("Props")
+				if props != null:
+					for node: Node in props.get_children():
+						var prop: WorldProp = node as WorldProp
+						if prop != null and prop.kind in ["sun_quartz_rock", "desert_scrub", "crown_cactus", "prickly_pear"]:
+							rock_near = minf(rock_near, prop.global_position.distance_to(point))
+			return -rock_near * 0.65 - oasis * 18.0 + rng.randf() * 12.0
+		if species == "jerboa":
+			if oasis > 0.45:
+				return -INF
+			var sand_bonus: float = 28.0 if not on_quartz else -12.0
+			return sand_bonus + arid * 20.0 + rng.randf() * 14.0
+		if species == "agama":
+			if oasis > 0.30:
+				return -INF
+			var q_score: float = 85.0 if on_quartz else 0.0
+			if not on_quartz:
+				for off: Vector2 in [Vector2(20, 0), Vector2(-20, 0), Vector2(0, 20), Vector2(0, -20)]:
+					if BiomeBlend.is_quartz_surface(point + off):
+						q_score = maxf(q_score, 42.0)
+			if q_score <= 0.0 and arid < 0.62:
+				return -INF
+			return q_score + rng.randf() * 10.0
 	return _cover_score(point)
 
 
@@ -194,6 +233,30 @@ func _choose_appearance(species: String, index: int, group_count: int, center: V
 			return rng.rand_weighted(PackedFloat32Array([0.46, 0.26, 0.28, 0.0]))
 		"hex_toad":
 			return rng.rand_weighted(PackedFloat32Array([0.46, 0.32, 0.22]))
+		"oryx":
+			if index == 0:
+				return 2 if rng.randf() < 0.22 else 0
+			if index == 1 and group_count >= 2 and rng.randf() < 0.72:
+				return 3
+			return 1 if rng.randf() < 0.74 else 2
+		"fennec":
+			if index > 0:
+				return 3 if rng.randf() < 0.72 else 1
+			if BiomeBlend.is_quartz_surface(center) and rng.randf() < 0.55:
+				return 2
+			return rng.rand_weighted(PackedFloat32Array([0.50, 0.32, 0.18, 0.0]))
+		"jerboa":
+			if index >= 2 and rng.randf() < 0.75:
+				return 3
+			if BiomeBlend.is_quartz_surface(center) and rng.randf() < 0.45:
+				return 2
+			return rng.rand_weighted(PackedFloat32Array([0.52, 0.28, 0.20, 0.0]))
+		"agama":
+			if BiomeBlend.is_quartz_surface(center) and rng.randf() < 0.46:
+				return 2
+			if index == 0:
+				return 0 if rng.randf() < 0.64 else 1
+			return 3 if rng.randf() < 0.36 else 1
 	return rng.randi_range(0, int(spec.get("builds", 3)) - 1)
 
 
@@ -225,7 +288,7 @@ func _populate(cell: Vector2i) -> void:
 		for i: int in count:
 			if _residents.get_child_count() >= int(spec["max_loaded"]) or _count(species) >= int(spec["max_species_loaded"]):
 				break
-			var spacing: Vector2 = Vector2(19.0 * i, 12.0 * i) if species in ["boar", "squirrel", "hex_toad"] else Vector2(25.0 * i, 15.0 * i)
+			var spacing: Vector2 = Vector2(16.0 * i, 10.0 * i) if species in ["jerboa", "agama", "fennec"] else (Vector2(19.0 * i, 12.0 * i) if species in ["boar", "squirrel", "hex_toad"] else Vector2(25.0 * i, 15.0 * i))
 			var point: Vector2 = center + spacing
 			if not _spawn_safe(point, species):
 				continue
@@ -243,11 +306,15 @@ func _populate(cell: Vector2i) -> void:
 			residents.append(animal)
 			spawned += 1
 			if bool(spec["nocturnal"]) and TimeManager.night_amount() < float(spec.get("awake_threshold", 0.4)):
-				animal._command.rpc(WoodlandMammal.Mood.HIDDEN if species == "badger" else WoodlandMammal.Mood.SLEEP, animal._range("sleep_seconds"), animal.facing, center if species == "badger" else point, center if species == "badger" else point, 0.0)
-		if species == "badger" and spawned > 0:
+				var hide_in_den: bool = species in ["badger", "jerboa"] or (species == "fennec" and rng.randf() < 0.55)
+				animal._command.rpc(WoodlandMammal.Mood.HIDDEN if hide_in_den else WoodlandMammal.Mood.SLEEP, animal._range("sleep_seconds"), animal.facing, center if hide_in_den else point, center if hide_in_den else point, 0.0)
+			elif species == "agama" and TimeManager.night_amount() > 0.38:
+				animal._command.rpc(WoodlandMammal.Mood.HIDDEN, animal._range("sleep_seconds"), animal.facing, center, center, 0.0)
+		if (species in ["badger", "fennec"] or (species == "jerboa" and rng.randf() < 0.55)) and spawned > 0:
 			# A normal spawned scene, so joining peers see the same fixed den entrance.
 			var shelter: WildlifeShelter = load("res://src/entities/wildlife/wildlife_shelter.tscn").instantiate() as WildlifeShelter
 			shelter.name = "Den%d" % _serial
+			shelter.shelter_kind = "desert_burrow" if species in ["fennec", "jerboa"] else "badger_den"
 			shelter.position = center
 			$Shelters.add_child(shelter)
 			var cell_shelters: Array = _shelters.get_or_add(cell, []) as Array

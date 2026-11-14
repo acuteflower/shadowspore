@@ -43,7 +43,8 @@
   "light": {"cloud_dim": 0.14, "rain_dim": 0.08, "shadow": 0.74, "storm_dim": 0.12},
   "gameplay": {"alarm_rain": 0.25, "alarm_storm": 0.10, "alarm_min": 0.6, "fish_light_rain": 0.30, "fish_storm": 0.85},
   "regions": {
-    "hexenwald": {"cloud_min": 0.58, "fog_min": 0.22, "flash": [0.62, 1.0, 0.36]}
+    "hexenwald": {"cloud_min": 0.58, "fog_min": 0.22, "flash": [0.62, 1.0, 0.36]},
+    "quartz_desert": {"cloud_max": 0.28, "rain_max": 0.0, "storm_max": 0.0, "fog_max": 0.0}
   },
   "audio": {"rain_db": -14.0, "wind_db": -16.0, "thunder_db": -6.0, "roof_db": -12.0}
 }

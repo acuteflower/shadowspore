@@ -114,13 +114,18 @@ func _populate(cell: Vector2i) -> void:
 				bird._finish.rpc(perch["position"], perch["height"], perch["path"])
 			flock.append(bird)
 	_populate_owl(cell, gloom, flock)
+	_populate_desert_falcon(cell, flock)
 
 
 func _populate_owl(cell: Vector2i, gloom: float, flock: Array[WildCorvid]) -> void:
 	var owl_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	owl_rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 9187))
 	var spec: Dictionary = local_spec("owl", gloom)
-	if owl_rng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count("owl") >= int(spec.get("max_species_loaded", 2)):
+	var mid_px: Vector2 = Vector2(cell) * CHUNK_PIXELS + Vector2.ONE * CHUNK_PIXELS * 0.5
+	var w_deep_owl: float = MeadowHabitats.deep_forest_at(mid_px)
+	var owl_chance: float = float(spec["chunk_chance"]) * (1.0 + 1.85 * w_deep_owl)
+	var owl_cap: int = int(spec.get("max_species_loaded", 2)) + (2 if w_deep_owl >= 0.40 else 0)
+	if owl_rng.randf() > owl_chance or _wild_count() >= int(spec["max_loaded"]) or _species_count("owl") >= owl_cap:
 		return
 	var margin: float = float(spec["spawn_margin"])
 	var center: Vector2 = Vector2.ZERO
@@ -156,6 +161,51 @@ func _populate_owl(cell: Vector2i, gloom: float, flock: Array[WildCorvid]) -> vo
 	flock.append(owl)
 	if gloom < 0.35:
 		_populate_songbirds(cell, flock)
+
+
+func _populate_desert_falcon(cell: Vector2i, flock: Array[WildCorvid]) -> void:
+	var mid: Vector2 = Vector2(cell) * CHUNK_PIXELS + Vector2.ONE * CHUNK_PIXELS * 0.5
+	if BiomeBlend.arid_at(mid) < 0.35:
+		return
+	var frng: RandomNumberGenerator = RandomNumberGenerator.new()
+	frng.seed = hash(Vector3i(cell.x, cell.y, _seed + 19427))
+	var spec: Dictionary = DataRegistry.get_entry("wildlife", "desert_falcon")
+	if frng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count("desert_falcon") >= int(spec.get("max_species_loaded", 3)):
+		return
+	var margin: float = float(spec["spawn_margin"])
+	var center: Vector2 = Vector2.ZERO
+	var found: bool = false
+	for attempt: int in int(spec["spawn_attempts"]):
+		var candidate: Vector2 = Vector2(cell) * CHUNK_PIXELS + Vector2(frng.randf_range(margin, CHUNK_PIXELS - margin), frng.randf_range(margin, CHUNK_PIXELS - margin))
+		if _floor(candidate, "desert_falcon") and _clear(candidate, 5.0) and _player_clear(candidate, float(spec["alert_range"])):
+			center = candidate
+			found = true
+			break
+	if not found:
+		return
+	var falcon_scene: PackedScene = load(String(spec["scene"])) as PackedScene
+	var falcon: WildCorvid = falcon_scene.instantiate() as WildCorvid
+	_serial += 1
+	falcon.name = "Corvid%d" % _serial
+	falcon.species = "desert_falcon"
+	if BiomeBlend.is_quartz_surface(center) and frng.randf() < 0.52:
+		falcon.appearance = 2
+	else:
+		falcon.appearance = frng.rand_weighted(PackedFloat32Array([0.48, 0.34, 0.18]))
+	falcon.flock_id = "desert_falcon_%d_%d" % [cell.x, cell.y]
+	falcon.home = center
+	falcon.position = center
+	falcon.facing = frng.randf() * TAU
+	_birds.add_child(falcon)
+	var perch: Dictionary = choose_desert_perch(falcon, Vector2.INF)
+	if not perch.is_empty():
+		falcon._finish.rpc(perch["position"], perch["height"], perch["path"])
+	elif not TimeManager.is_night():
+		var soar_h: float = frng.randf_range(78.0, 96.0)
+		var dir: Vector2 = Vector2.from_angle(falcon.facing)
+		var goal: Vector2 = center + dir * 72.0
+		falcon._act.rpc(WildCorvid.State.FLY, 2.6, dir.angle(), center, goal, dir.orthogonal() * 44.0, soar_h, soar_h, soar_h + 4.0, "", 0.0)
+	flock.append(falcon)
 
 
 func _populate_songbirds(cell: Vector2i, flock: Array[WildCorvid]) -> void:
@@ -363,6 +413,8 @@ func can_land_companion(point: Vector2, bird: WildCorvid) -> bool:
 func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 	if bird.species == "woodpecker":
 		return choose_trunk_perch(bird, danger)
+	if bird.species == "desert_falcon":
+		return choose_desert_perch(bird, danger)
 	var best: Dictionary = {}
 	var score: float = INF
 	if not danger.is_finite() and not bird._rest_time():
@@ -447,6 +499,69 @@ func choose_trunk_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 		if val < score:
 			score = val
 			best = {"position": seat_pos, "height": base_h, "path": String(tree.get_path()), "claim": trunk_key}
+	if not best.is_empty():
+		_claims[String(best["claim"])] = bird
+	return best
+
+
+## Desert falcons perch on tall crown cacti, oasis date-palm crowns, and sun-quartz monoliths.
+func choose_desert_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
+	var best: Dictionary = {}
+	var score: float = INF
+	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+		var tree: FirTree = node as FirTree
+		if tree == null or tree.is_depleted() or tree._falling or not (tree.kind in ["crown_cactus", "sun_palm"]):
+			continue
+		var d: float = tree.global_position.distance_to(bird.global_position)
+		if d > 360.0 or (danger.is_finite() and tree.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):
+			continue
+		for slot: int in _slot_count(tree):
+			var key: String = "%s:%d" % [tree.get_path(), slot]
+			var owner: Variant = _claims.get(key)
+			if is_instance_valid(owner) and owner != bird:
+				continue
+			var seat: Dictionary = _slot(tree, slot)
+			if tree.kind == "crown_cactus":
+				seat = {"position": tree.global_position + Vector2((slot * 2 - 1) * (7.0 if tree.variant >= 2 else 0.0), 1.0), "height": float(tree.spec()["height"][tree.variant]) * 0.88}
+			elif tree.kind == "sun_palm":
+				seat = {"position": tree.global_position + Vector2(0.0, 1.0), "height": float(tree.spec()["height"][tree.variant]) * 0.78}
+			var val: float = d + (seat.position as Vector2).distance_to(bird.home) * 0.15
+			if val < score:
+				score = val
+				best = {"position": seat.position, "height": seat.height, "path": String(tree.get_path()), "claim": key}
+	for world: Node in get_tree().get_nodes_in_group("world"):
+		var props: Node = world.get_node_or_null("Props")
+		if props != null:
+			for node: Node in props.get_children():
+				var prop: WorldProp = node as WorldProp
+				if prop == null or prop.kind != "sun_quartz_rock" or prop.is_depleted() or prop.variant < 1:
+					continue
+				var dr: float = prop.global_position.distance_to(bird.global_position)
+				if dr > 300.0 or (danger.is_finite() and prop.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):
+					continue
+				var rkey: String = "%s:monolith" % prop.get_path()
+				var rowner: Variant = _claims.get(rkey)
+				if is_instance_valid(rowner) and rowner != bird:
+					continue
+				var rval: float = dr + 18.0 + prop.global_position.distance_to(bird.home) * 0.15
+				if rval < score:
+					score = rval
+					best = {"position": prop.global_position + Vector2(0.0, 1.0), "height": 18.0 if prop.variant >= 2 else 14.0, "path": String(prop.get_path()), "claim": rkey}
+	for node: Node in get_tree().get_nodes_in_group("town_perches"):
+		var perch: RoofPerch = node as RoofPerch
+		if perch == null or perch.is_depleted() or BiomeBlend.arid_at(perch.global_position) < 0.4:
+			continue
+		var reach: float = perch.global_position.distance_to(bird.global_position)
+		if reach > 360.0 or (danger.is_finite() and perch.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):
+			continue
+		var roof_key: String = "%s:roof" % perch.get_path()
+		var roof_owner: Variant = _claims.get(roof_key)
+		if is_instance_valid(roof_owner) and roof_owner != bird:
+			continue
+		var roof_val: float = reach + 10.0 + perch.global_position.distance_to(bird.home) * 0.15
+		if roof_val < score:
+			score = roof_val
+			best = {"position": perch.global_position, "height": perch.perch_height, "path": String(perch.get_path()), "claim": roof_key}
 	if not best.is_empty():
 		_claims[String(best["claim"])] = bird
 	return best

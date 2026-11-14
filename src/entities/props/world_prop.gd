@@ -7,12 +7,20 @@ extends Interactable
 ## which also placed this prop. Subclasses show it (`apply_state`) and add what is special.
 
 static var _day_shared: ShaderMaterial
+static var _day_quartz_shared: ShaderMaterial
 
 static func _day_material() -> ShaderMaterial:
 	if _day_shared == null:
 		_day_shared = ShaderMaterial.new()
 		_day_shared.shader = preload("res://assets/shaders/day_sprite.gdshader")
 	return _day_shared
+
+static func _day_quartz_material() -> ShaderMaterial:
+	if _day_quartz_shared == null:
+		_day_quartz_shared = ShaderMaterial.new()
+		_day_quartz_shared.shader = preload("res://assets/shaders/day_sprite.gdshader")
+		_day_quartz_shared.set_shader_parameter("highlight", 0.02)
+	return _day_quartz_shared
 
 const SPARKS: Texture2D = preload("res://assets/fx/dust.png")
 const GLOW_BY_DAY: float = 0.22 ## how visible the glowing parts are in daylight
@@ -64,7 +72,8 @@ func _ready() -> void:
 	if _spec.has("group"):
 		add_to_group(StringName(_spec.group)) ## plants.json `group`: e.g. the toadstools the Hexenwald's toads live by (TinyPopulation)
 	_setup_prop()
-	if _sprite.material == null: _sprite.material = _day_material()
+	if _sprite.material == null:
+		_sprite.material = _day_quartz_material() if (kind == "sun_quartz_rock" or kind == "prism_vein") else _day_material()
 	_setup_blight()
 	_setup_gloom()
 	var saved: Dictionary = level.thing_state(cell) if level != null else {}
@@ -108,7 +117,7 @@ func _setup_gloom() -> void:
 
 
 func _setup_blight() -> void:
-	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "iron_rock", "curse_rock", "sun_quartz_rock", "mine_rock", "mine_collapse"]:
+	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "iron_rock", "curse_rock", "sun_quartz_rock", "prism_vein", "ruin_sandstone", "mine_rock", "mine_collapse"]:
 		return
 	blight = 1.0 - smoothstep(2.0, BLIGHT_REACH, level.coast_tiles(global_position))
 	if blight <= 0.02:

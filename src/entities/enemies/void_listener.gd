@@ -408,33 +408,56 @@ func _draw_zone() -> void:
 		return
 	var scream: bool = state != State.WAVE_WINDUP
 	var spec: Dictionary = _def["scream"] if scream else _def["wave"]
-	var locked: bool = _state_time >= float(spec["windup"]) - float(spec["aim_lock"])
-	var strength: float = 0.75 + (0.2 * sin(_state_time * 38) if locked else 0.0)
+	var locked: bool = state == State.SCREAM or _state_time >= float(spec["windup"]) - float(spec["aim_lock"])
+	var hot: bool = state == State.SCREAM
+	var strength: float = 0.80 + (0.18 * sin(_state_time * 38.0) if locked else 0.0)
 	if state == State.SCREAM:
 		strength = 1.0 - clampf(_state_time / float(spec["strike"]), 0.0, 1.0)
+	if strength <= 0.02:
+		return
 	var origin: Vector2 = attack_origin - global_position
 	var length: float = float(spec["reach"]) + ZONE_PAD if scream else warning_length + float(spec["radius"]) + ZONE_PAD
 	var across: Vector2 = attack_dir.orthogonal()
-	# Stable sparse pixels flow outward. The band matches the moving hurtbox
-	# footprint; the defensive field is a forward fan with an open rear flank.
-	for i: int in (550 if scream else 650):
-		var u: float = fposmod(sin(float(i) * 12.9898) * 43758.5453, 1.0)
-		var v: float = fposmod(sin(float(i) * 78.233 + 3.1) * 19642.349, 1.0)
-		var point: Vector2
-		var distance: float
-		if scream:
-			distance = sqrt(u) * length
-			point = attack_dir.rotated((v - 0.5) * deg_to_rad(float(spec["arc"]))) * distance
-		else:
-			distance = u * length
-			point = attack_dir * distance + across * (v - 0.5) * (float(spec["radius"]) + ZONE_PAD) * 2.0
-		if distance < 5.0:
-			continue
-		var wave: float = 0.5 + 0.5 * sin(distance * 0.26 - _state_time * (18 if locked else 9) + v * TAU)
-		if wave < 0.48:
-			continue
-		var color: Color = Color("c21f3b").lerp(Color("ffd0d6") if state == State.SCREAM else Color("ff4a63"), wave)
-		_zone.draw_rect(Rect2((origin + point).round(), Vector2.ONE), Color(color, strength * (0.35 + wave * 0.45)))
+	var abyss_a: float = 0.60 * strength
+	var main_col: Color = Color(VoidZoneStyle.SURGE_PALE if hot else VoidZoneStyle.HOT_CRIMSON, 0.94 * strength)
+	var void_col: Color = Color(VoidZoneStyle.VOID_MAGENTA, 0.86 * strength)
+
+	if scream:
+		# Psychic Void-Scream Cone: seething abyssal field + concentric jagged echolocation wavefronts + forked nerve-cracks!
+		var arc_rad: float = deg_to_rad(float(spec["arc"]))
+		VoidZoneStyle.fill_void_fan(_zone, origin, attack_dir, length, arc_rad, 1.0, _state_time, strength, locked, hot, 500)
+		var edge_l: Vector2 = attack_dir.rotated(-arc_rad * 0.5)
+		var edge_r: Vector2 = attack_dir.rotated(arc_rad * 0.5)
+		VoidZoneStyle.jagged_vein(_zone, origin + edge_l * 6.0, origin + edge_l * (length - 0.8), _state_time, 1.6, main_col, void_col, abyss_a, 1.1, true)
+		VoidZoneStyle.jagged_vein(_zone, origin + edge_r * 6.0, origin + edge_r * (length - 0.8), _state_time, 1.6, main_col, void_col, abyss_a, 3.7, true)
+		# 3 pulsing concentric echolocation scream-arcs rippling outward
+		var scroll_s: float = fposmod(_state_time * (36.0 if locked else 18.0), 14.0)
+		var r_wave: float = 10.0 + scroll_s
+		while r_wave < length - 4.0:
+			VoidZoneStyle.sinuous_rim_arc(_zone, origin, attack_dir, r_wave, arc_rad * 0.92, 1.0, _state_time * 1.6, strength * 0.78, hot, 0.0, 0)
+			r_wave += 14.0
+		# Writhing outer scream membrane with psychic shadow-cilia
+		VoidZoneStyle.sinuous_rim_arc(_zone, origin, attack_dir, length - 0.8, arc_rad, 1.0, _state_time, strength, hot, -0.8, 9)
+		return
+
+	# Resonance Rift-Wave Lane: sinuous abyssal borders + central Void-rift spine + curved acoustic shock-ribs (`) ) )`)!
+	var half_band: float = float(spec["radius"]) + ZONE_PAD
+	VoidZoneStyle.fill_void_lane(_zone, origin, attack_dir, length, half_band, _state_time, strength, locked, hot, 520)
+	VoidZoneStyle.jagged_vein(_zone, origin + attack_dir * 6.0 + across * half_band, origin + attack_dir * length + across * half_band, _state_time, 1.4, main_col, void_col, abyss_a, 0.8, false)
+	VoidZoneStyle.jagged_vein(_zone, origin + attack_dir * 6.0 - across * half_band, origin + attack_dir * length - across * half_band, _state_time, 1.4, main_col, void_col, abyss_a, 2.9, false)
+	VoidZoneStyle.jagged_vein(_zone, origin + attack_dir * 6.0, origin + attack_dir * length, _state_time * 1.4, 2.0, Color(VoidZoneStyle.VOID_VIOLET, 0.84 * strength), void_col, abyss_a * 0.7, 5.4, true)
+	# Curved blind-echolocation acoustic ribs pulsing down the resonance corridor
+	var rib_scroll: float = fposmod(_state_time * (54.0 if locked else 26.0), 18.0)
+	var d_rib: float = 12.0 + rib_scroll
+	while d_rib < length - 5.0:
+		for ri: int in range(-4, 5):
+			var u_r: float = float(ri) / 4.0
+			var bow: float = (1.0 - u_r * u_r) * 3.8
+			var rp: Vector2 = origin + attack_dir * (d_rib + bow) + across * (u_r * (half_band - 1.2))
+			VoidZoneStyle.rift_px(_zone, rp, void_col if absi(ri) >= 3 else main_col, abyss_a * 0.75)
+		d_rib += 18.0
+	# Capped Void-rift mouth at the end of the lane
+	VoidZoneStyle.sinuous_rim_arc(_zone, origin + attack_dir * (length - half_band), attack_dir, half_band, PI, 1.0, _state_time, strength, locked, -0.7, 5)
 
 
 func _scream_age() -> float:

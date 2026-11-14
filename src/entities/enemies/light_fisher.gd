@@ -867,39 +867,72 @@ func _zone_fan() -> void:
 	var spec: Dictionary = _def["snap"] as Dictionary
 	var total: float = _windup_time()
 	var locked: bool = state == State.SNAP or _state_time >= total - float(spec["aim_lock"]) * (total / float(spec["windup"]))
-	var strength: float = 0.7 + (0.22 * sin(_state_time * 38.0) if locked else 0.0)
+	var hot: bool = state == State.SNAP
+	var strength: float = 0.76 + (0.20 * sin(_state_time * 38.0) if locked else 0.0)
 	if state == State.SNAP:
 		strength = 1.0 - clampf(_state_time / float(spec["strike"]), 0.0, 1.0)
+	if strength <= 0.02:
+		return
 	var origin: Vector2 = attack_origin - global_position
 	var length: float = float(spec["reach"]) + 4.0
-	for i: int in 520:
-		var rnd: Vector2 = _flow(i, 0.0)
-		var distance: float = sqrt(rnd.x) * length
-		var point: Vector2 = attack_dir.rotated((rnd.y - 0.5) * deg_to_rad(float(spec["arc"]))) * distance
-		if distance < 5.0:
-			continue
-		var wave: float = 0.5 + 0.5 * sin(distance * 0.26 - _state_time * (18.0 if locked else 9.0) + rnd.y * TAU)
-		if wave < 0.48:
-			continue
-		_zone.draw_rect(Rect2((origin + Vector2(point.x, point.y * SQUASH)).round(), Vector2.ONE), Color(_warn_color(wave, state == State.SNAP), strength * (0.35 + wave * 0.45)))
+	var arc_rad: float = deg_to_rad(float(spec["arc"]))
+	var abyss_a: float = 0.60 * strength
+	var jaw_col: Color = Color(VoidZoneStyle.SURGE_PALE if hot else VoidZoneStyle.HOT_CRIMSON, 0.94 * strength)
+	var void_col: Color = Color(VoidZoneStyle.VOID_MAGENTA, 0.86 * strength)
+
+	# 1) Abyssal Void-water danger wash
+	VoidZoneStyle.fill_void_fan(_zone, origin, attack_dir, length, arc_rad, SQUASH, _state_time, strength, locked, hot, 480)
+
+	# 2) Upper & lower angler jaw-bone rifts closing the bite cone
+	for side_sgn: float in [-1.0, 1.0]:
+		var jaw_dir_raw: Vector2 = attack_dir.rotated(side_sgn * arc_rad * 0.5)
+		var p_start: Vector2 = origin + Vector2(jaw_dir_raw.x, jaw_dir_raw.y * SQUASH) * 5.0
+		var p_end: Vector2 = origin + Vector2(jaw_dir_raw.x, jaw_dir_raw.y * SQUASH) * (length - 0.8)
+		VoidZoneStyle.jagged_vein(_zone, p_start, p_end, _state_time, 1.3, jaw_col, void_col, abyss_a, side_sgn * 2.4, false)
+
+	# 3) Abyssal Maw Silhouette: writhing Void-rim lined with inward-biting jagged angler-fangs!
+	var bite_fang: float = -1.25 if (locked or hot) else -0.95
+	VoidZoneStyle.sinuous_rim_arc(_zone, origin, attack_dir, length - 0.8, arc_rad, SQUASH, _state_time, strength, hot, bite_fang, 9)
 
 
-## A disc of flowing red pixels on the water or the ground; `progress` 0..1 how close the moment is.
+## Abyssal Void whirlpool disc on dark water (`FLASH_WINDUP` & `ORB_CAST`), spiralling inward to a slitted Void-lure pupil.
 func _zone_disc(center: Vector2, radius: float, progress: float) -> void:
-	var strength: float = 0.35 + 0.6 * clampf(progress, 0.0, 1.0)
-	var count: int = int(clampf(radius * radius * 0.2, 60.0, 520.0))
+	var p_clamped: float = clampf(progress, 0.0, 1.0)
+	var hot: bool = p_clamped > 0.85
+	var strength: float = 0.42 + 0.56 * p_clamped
+	var abyss_a: float = 0.58 * strength
+	var count: int = int(clampf(radius * radius * 0.18, 60.0, 440.0))
 	for i: int in count:
 		var rnd: Vector2 = _flow(i, radius)
-		var distance: float = sqrt(rnd.x) * radius
+		var distance: float = sqrt(rnd.x) * maxf(3.0, radius - 1.2)
 		var angle: float = rnd.y * TAU
-		var wave: float = 0.5 + 0.5 * sin(distance * 0.3 - _state_time * (10.0 + progress * 16.0) + rnd.y * TAU)
+		var wave: float = 0.5 + 0.5 * sin(distance * 0.3 - _state_time * (10.0 + p_clamped * 16.0) + rnd.y * TAU)
 		if wave < 0.46:
 			continue
 		var point: Vector2 = Vector2(cos(angle), sin(angle) * SQUASH) * distance
-		_zone.draw_rect(Rect2((center + point).round(), Vector2.ONE), Color(_warn_color(wave, progress > 0.85), strength * (0.3 + wave * 0.5)))
-	for k: int in 36: ## the rim stays clear, so the edge of the danger is readable
-		var edge: float = TAU * float(k) / 36.0
-		_zone.draw_rect(Rect2((center + Vector2(cos(edge), sin(edge) * SQUASH) * radius).round(), Vector2.ONE), Color("ff4a63", strength * 0.8))
+		var pt: Vector2 = (center + point).round()
+		if i % 7 == 0:
+			_zone.draw_rect(Rect2(pt + Vector2(0.0, 1.0), Vector2.ONE), Color(VoidZoneStyle.ABYSS, strength * 0.42))
+		var col: Color = VoidZoneStyle.warn_color(wave, hot, 0.36 if i % 5 == 0 else 0.0)
+		_zone.draw_rect(Rect2(pt, Vector2.ONE), Color(col, strength * (0.34 + wave * 0.48)))
+
+	# Inward-tightening Void whirlpool ring + 3 abyssal spiral tendrils
+	var shrink_r: float = lerpf(radius - 1.0, 3.0, p_clamped)
+	if shrink_r > 3.5:
+		VoidZoneStyle.sinuous_rim_arc(_zone, center, Vector2.RIGHT, shrink_r, TAU, SQUASH, -_state_time * 1.8, strength * 0.82, hot, 0.0, 0)
+	for arm_i: int in 3:
+		var a0: float = float(arm_i) / 3.0 * TAU + _state_time * 2.2
+		for sk: int in 10:
+			var fk: float = float(sk) / 9.0
+			var rk: float = lerpf(3.0, radius - 2.0, fk)
+			var ak: float = a0 + fk * 1.35
+			var sp: Vector2 = center + Vector2(cos(ak) * rk, sin(ak) * rk * SQUASH)
+			VoidZoneStyle.rift_px(_zone, sp, Color(VoidZoneStyle.VOID_MAGENTA if sk % 2 == 0 else VoidZoneStyle.HOT_CRIMSON, 0.72 * strength), abyss_a * 0.5)
+
+	# Slitted abyssal Void-lure pupil in the center + writhing outer angler-tendril rim
+	_zone.draw_rect(Rect2((center + Vector2(-1.0, -3.0)).round(), Vector2(2.0, 6.0)), Color(VoidZoneStyle.ABYSS, 0.75 * strength))
+	_zone.draw_rect(Rect2((center + Vector2(0.0, -2.0)).round(), Vector2(1.0, 4.0)), Color(VoidZoneStyle.SURGE_PALE if hot else VoidZoneStyle.VOID_MAGENTA, 0.92 * strength))
+	VoidZoneStyle.sinuous_rim_arc(_zone, center, Vector2.RIGHT, radius - 0.6, TAU, SQUASH, _state_time, strength, hot, -0.8, 8)
 
 
 func _draw_fx() -> void:

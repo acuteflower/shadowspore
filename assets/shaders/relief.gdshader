@@ -740,7 +740,52 @@ vec4 forest_steps(vec2 p, vec2 l, Tile c, vec3 tint) {
 	return vec4(col, 1.0);
 }
 
+// Hallgrat's cut stairs (style 2 STAIRS): treads of fitted slabs of uneven length with a lit nosing and a dark riser, worn pale in the middle
+// where people climb, a chipped edge here and there, cheek walls with cap stones at both sides, moss and grass in the corners and joints.
+vec4 mason_stairs(vec2 wp, vec2 p, vec2 l, Tile c, vec3 tint) {
+	int cpos = (c.geom >> 4) & 3;
+	float cx = float(cpos) * 16.0 + l.x;
+	float ly = l.y + 16.0 * float(c.geom & 3);
+	float sy = floor(ly / 4.0);
+	float yy = ly - sy * 4.0;
+	float cheek = min(cx, 47.0 - cx);
+	vec3 col;
+	if (cheek < 4.0) {
+		float course = floor((ly + (cx < 24.0 ? 0.0 : 3.0)) / 6.0);
+		float cy = mod(ly + (cx < 24.0 ? 0.0 : 3.0), 6.0);
+		float h = hash21(vec2(course, cx < 24.0 ? 1.0 : 2.0));
+		int ti = cheek < 1.0 ? 1 : (cheek < 2.0 ? 4 : 3);
+		if (cy < 1.0) ti = 1;
+		col = MASON[clamp(ti + (h > 0.7 ? -1 : 0), 0, 5)];
+		if (cheek >= 1.0 && cheek < 2.0 && cy >= 1.0) col = MASON[4];
+		if (vnoise(wp * 0.3 + 7.0) > 0.66 && cheek > 1.0) col = grass(cy < 2.0 ? 3 : 2, tint);
+		return vec4(col, 1.0);
+	}
+	float jw = 8.0 + floor(hash21(vec2(sy, 41.0)) * 6.0);
+	float jx = cx + hash21(vec2(sy, 17.0)) * jw;
+	float slab = floor(jx / jw);
+	float in_slab = jx - slab * jw;
+	float sh = hash21(vec2(slab, sy));
+	float worn = 1.0 - smoothstep(4.0, 15.0, abs(cx - 24.0 + (vnoise(vec2(sy, 3.0)) - 0.5) * 6.0));
+	int ti;
+	if (yy < 1.0) ti = 5;
+	else if (yy < 2.0) ti = 4;
+	else if (yy < 3.0) ti = 2;
+	else ti = 1;
+	float tone = float(ti) + (sh - 0.5) * 0.8 + worn * (yy < 2.0 ? 0.6 : 0.2) + (bayer(wp) - 0.5) * 0.4;
+	if (yy < 2.0 && hash21(vec2(slab, sy + 50.0)) > 0.86 && in_slab < 3.0) tone -= 2.0; // a chipped nosing
+	col = MASON[clamp(int(floor(tone)), 0, 5)];
+	if (in_slab < 1.0 && yy >= 1.0) col = MASON[0];
+	if (yy >= 3.0 && in_slab < 1.0 && vnoise(wp * 0.4) > 0.5) col = grass(1, tint);
+	float side = min(cheek - 4.0, 99.0);
+	if (side < 3.0 && vnoise(wp * 0.35 + sy) > 0.55 - side * 0.08) col = grass(yy < 2.0 ? 3 : 1, tint); // moss creeping out of the corners
+	if (sh > 0.94 && abs(in_slab - jw * 0.5 - (yy - 2.0)) < 0.5) col = MASON[0]; // a crack through one slab
+	if (l.y >= 15.0 && c.geom % 4 == ((c.geom >> 2) & 3) && bayer(wp) < 0.88) col = LINE;
+	return vec4(col, 1.0);
+}
+
 vec4 steps(vec2 wp, vec2 p, vec2 l, Tile c, vec3 tint, bool rough) {
+	if (c.style == 2 && c.kind == STAIRS) return mason_stairs(wp, p, l, c, tint); // Hallgrat's cut stairs
 	if (c.style < 3 || c.style == 5) return forest_steps(p, l, c, tint);
 	int cpos = (c.geom >> 4) & 3;
 	float jitter = rough ? floor((hash21(vec2(floor(p.x / 4.0), floor(l.y / 4.0))) - 0.5) * 3.0) : 0.0;

@@ -67,11 +67,10 @@ LILY_LEAF = ramp("14322e", "225848", "368060", "56ac76", "84d48e")
 LILY_PETAL = ramp("2c8084", "4eb8b8", "84e6e2", "c8fcf8", "ffffff")
 LILY_GOLD = ramp("d8902c", "ffd86b", "fff6ba")
 
-SANDSTONE = ramp("261824", "462b30", "6e4438", "9a6644", "c69258", "ebd6a0")
-DESERT_ROCK = ramp("2c1d28", "4c3134", "754b3c", "a46f4a", "cea06a", "f0d49c")
-DESERT_RIM = ramp("7e5a4c", "d8ae78")
 QUARTZ_CRYSTAL = ramp("344868", "527494", "7eb4cc", "b8ecf4", "e8ffff", "ffffff")
-QUARTZ_GOLD = hexc("ffe69c")
+# Exact 6-step cool silver-ice -> milky pearl -> blazing snow-white ground quartz ramp (synced with ground_tone.gdshader QUARTZ_W)
+QUARTZ_W = ramp("5b698e", "8191b6", "a2b3d4", "bfcde7", "d6e2f5", "ffffff")
+QUARTZ_DEEP = hexc("465375")
 
 SCRUB_SAGE = ramp("2c3228", "4a5236", "747848", "a29c5e", "cbc07e")
 SCRUB_TEAL = ramp("263434", "3e584e", "5e7e68", "88a888", "b4ceb0")
@@ -308,90 +307,391 @@ SUN_PALMS = [
 ]
 
 
+def _pput(g, x, y, c, over=True):
+    """Safe palm pixel write leaving >= 3px margin for art_tree.finish 1px outline."""
+    if 3 <= x <= CW - 4 and 3 <= y <= CH - 3 and (over or g[y][x] is None):
+        g[y][x] = c
+
+
+def _palm_bark_shade(dx: float, r: float, arc_s: float) -> tuple:
+    """Imbricated Phoenix dactylifera diamond leaf-scar bark (Rautenschuppen) lit from top-left."""
+    u = dx / max(r, 0.85)
+    cyl_z = math.sqrt(max(0.0, 1.0 - min(1.0, u * u)))
+    # Criss-cross spiral parastichy lattice forming diamond leaf-base scales
+    d1 = arc_s * 0.27 + dx * 0.36
+    d2 = arc_s * 0.27 - dx * 0.36
+    f1 = d1 - math.floor(d1)
+    f2 = d2 - math.floor(d2)
+    lit = 0.46 - 0.44 * u + 0.12 * cyl_z
+    if f1 < 0.21 or f2 < 0.21:
+        # Recessed criss-cross V-groove between overlapping leaf-base scales
+        lit -= 0.20
+    elif f1 < 0.64 and f2 < 0.64:
+        # Sunlit upper-left facet of raised diamond scale
+        lit += 0.15
+    else:
+        # Lower-right bevel of diamond scale
+        lit -= 0.04
+    return PALM_BARK[int(clamp(lit * 5.6, 0, 5))]
+
+
 def _draw_palm_stem(grid_t, grid_c, clear_y, bx, height, curve_end, s_mid, base_r, seed, top_frac=1.0):
-    """Curved ringed desert palm trunk with criss-cross diamond leaf-scar bark."""
+    """Curved desert date-palm trunk with imbricated diamond scales & flared root buttress."""
     top_y = FEET_Y - height * top_frac
     p0 = (FEET_X + bx, FEET_Y + 0.5)
-    p1 = (FEET_X + bx + curve_end * 0.25 + s_mid, FEET_Y - height * 0.42 * top_frac)
+    p1 = (FEET_X + bx + curve_end * 0.28 + s_mid, FEET_Y - height * 0.44 * top_frac)
     p2 = (FEET_X + bx + curve_end * top_frac, top_y)
-    pts = bezier(p0, p1, p2, n=max(24, int(height * 1.8)))
+    pts = bezier(p0, p1, p2, n=max(36, int(height * 2.3)))
+    arc_s = 0.0
+    prev_x, prev_y = pts[0]
     for i, (px, py) in enumerate(pts):
+        arc_s += math.hypot(px - prev_x, py - prev_y)
+        prev_x, prev_y = px, py
         t = i / max(len(pts) - 1, 1)
-        flare = max(0.0, (0.14 - t) / 0.14) * 1.3
-        r = base_r * (1.0 - 0.44 * t) + flare
-        ring_band = abs(math.sin((FEET_Y - py) * 0.95)) < 0.34
-        target = grid_t if py >= clear_y else grid_c
+        flare = max(0.0, (0.14 - t) / 0.14) ** 1.3 * 1.45
+        # Slight swell right below the fibrous crownshaft
+        neck_swell = max(0.0, (t - 0.88) / 0.12) * 0.55
+        r = base_r * (1.0 - 0.38 * t) + flare + neck_swell
         for dy in range(-int(r) - 1, int(r) + 2):
+            iy = int(round(py + dy))
+            if iy > FEET_Y + 1:
+                continue
+            target = grid_t if iy >= clear_y else grid_c
             for dx in range(-int(r) - 1, int(r) + 2):
-                if dx * dx + dy * dy <= r * r:
-                    u = dx / max(r, 0.8)
-                    lit = 0.52 - 0.46 * u + (0.12 if ring_band else -0.05) + (noise(int(px + dx), int(py + dy), seed) / 255.0 - 0.5) * 0.14
-                    if y_ring := (abs(dx) < r * 0.72 and int(FEET_Y - py) % 4 == 0):
-                        lit -= 0.08
-                    c = PALM_BARK[int(clamp(lit * 5.2, 0, 5))]
-                    gput(target, int(round(px + dx)), int(round(py + dy)), c)
+                if dx * dx + dy * dy <= (r + 0.2) * (r + 0.2):
+                    ix = int(round(px + dx))
+                    c = _palm_bark_shade(dx, r, arc_s - dy * 0.85)
+                    # Grounded root toes at foot
+                    if iy >= FEET_Y - 1 and abs(dx) > r * 0.45:
+                        c = PALM_BARK[1 if dx > 0 else 2]
+                    _pput(target, ix, iy, c)
     return pts[-1]
 
 
-def _draw_feather_frond(grid_c, glow_c, ox, oy, angle, length, droop, seed, dry=False):
-    """Graceful arching pinnate frond with individual leaflets."""
-    steps = max(18, int(length * 1.25))
-    ca, sa = math.cos(angle), math.sin(angle)
+def _draw_feather_frond(grid_c, glow_c, ox, oy, dir_x, lift_y, length, droop, tier, seed):
+    """Graceful arched pinnate palm frond: separated starburst plume with feathered pinna teeth & zero pinholes."""
+    if dir_x < -0.12:
+        length = min(length, max(10.0, (ox - 5.0) / abs(dir_x)))
+    elif dir_x > 0.12:
+        length = min(length, max(10.0, (CW - 6.0 - ox) / abs(dir_x)))
+
+    steps = max(34, int(length * 2.5))
     p0 = (ox, oy)
-    p1 = (ox + ca * length * 0.55, oy + sa * length * 0.44 - (2.0 if dry else 6.5))
-    p2 = (ox + ca * length, oy + sa * length * 0.80 + droop)
+    p1 = (ox + dir_x * length * 0.52, oy - lift_y * length * 0.56)
+    p2 = (ox + dir_x * length, oy - lift_y * length * 0.16 + droop)
     spine = bezier(p0, p1, p2, n=steps)
-    ramp_c = DATE_RAMP if dry else PALM_LEAF
+
+    # Top-left sun (-0.55, -0.80): fronds on upper/left catch brighter lime-jade sunlight
+    sun_bias = 1 if (dir_x <= 0.18 and lift_y >= 0.05) else 0
+    n_pinnae = max(6, int(round(length * 0.28)))
+    # Keep plume slender enough that adjacent fronds preserve crisp V-sky gaps instead of merging into a dome!
+    up_max = 1.2 + min(1.3, length * 0.036)
+    dn_max = 2.6 + min(2.8, length * 0.078)
+
+    # Pass 1: Contiguous feathered pinna blade along curved tangent/normal
     for i, (sx, sy) in enumerate(spine):
         t = i / max(steps - 1, 1)
-        rib_col = ramp_c[1 if dry else (2 if t < 0.5 else 3)]
-        gput(grid_c, int(round(sx)), int(round(sy)), rib_col)
-        if i % 2 == 0 and t > 0.10 and t < 0.96:
-            llen = math.sin(t * math.pi) * (3.6 if dry else 7.6) + 1.4
-            nx, ny = -sa * 0.55, abs(ca) * 0.65 + 0.55
-            for side in (-1, 1):
-                for d in range(1, int(round(llen)) + 1):
-                    lt = d / max(llen, 1.0)
-                    lx = int(round(sx + ca * (d * 0.25) + side * nx * d * 0.72))
-                    ly = int(round(sy + lt * llen * 0.76 + d * 0.28 * side * (0.3 if ny > 0.5 else 0.15)))
-                    if dry:
-                        shade = 2 if (side < 0 or t < 0.5) else 1
-                    else:
-                        shade = 3 if (side < 0 or t < 0.6) else 2
-                        if lt > 0.65 and t > 0.3:
-                            shade = 4
-                        if noise(lx, ly, seed + i) > 192 and shade < 5:
-                            shade += 1
-                    gput(grid_c, lx, ly, ramp_c[shade])
-            if not dry and i == steps - 4 and noise(int(sx), int(sy), seed + 9) > 130:
-                gput(glow_c, int(round(sx)), int(round(sy + 1)), (*PALM_DEW[:3], 170))
+        if t < 0.06:
+            continue
+        # Tangent along rachis
+        i_prev = max(0, i - 1)
+        i_next = min(steps - 1, i + 1)
+        tx_v = spine[i_next][0] - spine[i_prev][0]
+        ty_v = spine[i_next][1] - spine[i_prev][1]
+        t_len = max(0.001, math.hypot(tx_v, ty_v))
+        tx_u, ty_u = tx_v / t_len, ty_v / t_len
+        # Ensure "up" normal points toward -y (skyward) and "down" normal droops with gravity (+y)
+        nx_up, ny_up = (ty_u, -tx_u) if -tx_u < 0 else (-ty_u, tx_u)
+        if ny_up > 0:
+            nx_up, ny_up = -nx_up, -ny_up
+        # Gravity-draped lower pinna direction: blends outward normal with downward hang
+        gx_dn = -nx_up * 0.45 + tx_u * 0.22
+        gy_dn = max(0.65, -ny_up * 0.55 + 0.58)
+        g_len = math.hypot(gx_dn, gy_dn)
+        gx_dn, gy_dn = gx_dn / g_len, gy_dn / g_len
+
+        env = (math.sin(min(1.0, t * 1.02) * math.pi) ** 0.65) * (1.0 - 0.18 * t)
+        p_pos = t * n_pinnae
+        p_frac = p_pos - math.floor(p_pos)
+        # Crisp individual leaflet serration on outer 36% of blade; inner 64% stays 100% solid (no pinholes!)
+        tooth = clamp(1.0 - abs(p_frac - 0.44) * 1.45, 0.0, 1.0)
+
+        up_h = up_max * env * (0.64 + 0.36 * tooth)
+        n_up = max(1, int(round(up_h * 1.5)))
+        for u_step in range(1, n_up + 1):
+            ud = (u_step / n_up) * up_h
+            ux = int(round(sx + nx_up * ud + tx_u * ud * 0.18))
+            uy = int(round(sy + ny_up * ud))
+            if tier == 0:
+                u_sh = 2 if p_frac > 0.26 else 1
+            elif tier == 1:
+                u_sh = (4 if sun_bias else 3) if p_frac > 0.25 else 2
+            else:
+                u_sh = (5 if (sun_bias and t < 0.74) else 4) if p_frac > 0.25 else 3
+            _pput(grid_c, ux, uy, PALM_LEAF[u_sh])
+
+        dn_h = dn_max * env * (0.64 + 0.36 * tooth)
+        n_dn = max(1, int(round(dn_h * 1.6)))
+        for d_step in range(0, n_dn + 1):
+            dt = d_step / max(n_dn, 1)
+            dd = dt * dn_h
+            slant_frac = (p_pos + dt * 0.48) - math.floor(p_pos + dt * 0.48)
+            lx = int(round(sx + gx_dn * dd))
+            ly = int(round(sy + gy_dn * dd))
+            groove = slant_frac < 0.24 and dt > 0.18
+            if tier == 0:
+                sh = 0 if (groove or dt > 0.68) else (2 if dt < 0.28 else 1)
+            elif tier == 1:
+                base_s = 3 if (dt < 0.38 and sun_bias) else (2 if dt < 0.76 else 1)
+                sh = max(0, base_s - 1) if groove else base_s
+            else:
+                base_s = (4 + sun_bias) if dt < 0.32 else (3 if dt < 0.72 else 2)
+                sh = max(1, base_s - 1) if groove else min(5, base_s)
+            _pput(grid_c, lx, ly, PALM_LEAF[sh])
+
+    # Pass 2: Continuous sunlit curved rachis spine
+    for i, (sx, sy) in enumerate(spine):
+        t = i / max(steps - 1, 1)
+        ix, iy = int(round(sx)), int(round(sy))
+        if tier == 0:
+            rib_c = PALM_LEAF[2 if t < 0.60 else 1]
+        elif tier == 1:
+            rib_c = PALM_LEAF[4 if t < 0.55 else 3]
+        else:
+            rib_c = PALM_LEAF[5 if (t < 0.62 and sun_bias) else 4]
+        _pput(grid_c, ix, iy, rib_c)
+        if t < 0.30 and tier >= 1:
+            _pput(grid_c, ix, iy + 1, PALM_LEAF[max(1, tier + 1)])
+
+    if tier == 2 and length >= 20 and (seed % 3 == 0):
+        tx_i, ty_i = int(round(spine[-2][0])), int(round(spine[-2][1])) + 1
+        _pput(glow_c, tx_i, ty_i, (*PALM_DEW[:3], 145))
 
 
-def _draw_date_bunch(grid_c, glow_c, cx, cy):
-    """Hanging golden cluster of sun-dates beneath crown heart."""
-    for dx, dy, sh in ((0, 0, 2), (-1, 2, 3), (1, 2, 2), (-2, 4, 3), (0, 4, 4), (2, 4, 1), (-1, 6, 3), (1, 6, 2), (0, 7, 4), (0, 8, 3)):
-        gput(grid_c, int(round(cx + dx)), int(round(cy + dy)), DATE_RAMP[sh])
-        if sh >= 3:
-            gput(glow_c, int(round(cx + dx)), int(round(cy + dy)), DATE_HOT if sh == 4 else DATE_GLOW)
+def _seal_crown_pinholes(grid_c):
+    """Eliminate any 1px interior transparent pinholes before art_tree.finish so #122228 speckles never form."""
+    fills = []
+    for y in range(4, CH - 4):
+        for x in range(4, CW - 4):
+            if grid_c[y][x] is not None:
+                continue
+            n_up = grid_c[y - 1][x]
+            n_dn = grid_c[y + 1][x]
+            n_lt = grid_c[y][x - 1]
+            n_rt = grid_c[y][x + 1]
+            cnt = (n_up is not None) + (n_dn is not None) + (n_lt is not None) + (n_rt is not None)
+            if cnt >= 3 or (n_up is not None and n_dn is not None and (n_lt is not None or n_rt is not None)):
+                fills.append((x, y))
+    for x, y in fills:
+        grid_c[y][x] = PALM_LEAF[1]
 
 
-def _draw_palm_canopy(grid_c, glow_c, cx, cy, fronds, flen, dates, picked, seed):
-    # Crownshaft / petiole sheath + lower sun-bleached dry frond skirt
+def _draw_crownshaft(grid_c, cx: float, cy: float):
+    """Woven fibrous petiole basket (Faserschopf) joining diamond trunk to arching frond crown."""
+    icx, icy = int(round(cx)), int(round(cy))
     for dy in range(-3, 5):
-        for dx in range(-4, 5):
-            if dx * dx * 0.55 + (dy - 0.5) * (dy - 0.5) <= 9.5:
-                gput(grid_c, int(round(cx + dx)), int(round(cy + dy)), PALM_BARK[2 if dy > 1 else 3] if dy > 0 else PALM_LEAF[3])
-    for d_ang in (0.45, 1.15, 2.0, 2.75):
-        _draw_feather_frond(grid_c, glow_c, cx, cy + 2, d_ang, flen * 0.42, 6.0, seed + 701, dry=True)
-    if dates > 0 and not picked:
-        offsets = [(-4.0, 4.5), (4.0, 5.0), (-0.5, 6.0), (5.5, 3.0)]
-        for ox, oy in offsets[:dates]:
-            _draw_date_bunch(grid_c, glow_c, cx + ox, cy + oy)
-    for f in range(fronds):
-        base_ang = (f / fronds) * math.pi * 2.0 + ((seed % 7) - 3) * 0.08
-        f_len = flen * (0.86 + 0.22 * (((f * 3 + seed) % 5) / 4.0))
-        droop = 5.0 + 4.5 * abs(math.sin(base_ang))
-        _draw_feather_frond(grid_c, glow_c, cx, cy - 1, base_ang, f_len, droop, seed + f * 31)
+        hw = 4.6 - abs(dy - 0.6) * 0.55
+        for dx in range(-int(hw) - 1, int(hw) + 2):
+            if abs(dx) > hw:
+                continue
+            u = dx / max(hw, 1.0)
+            weave = ((dx + dy) % 2 == 0)
+            if dy <= -2:
+                c = PALM_LEAF[3 if u < 0 else 2]
+            else:
+                lit = 0.52 - 0.38 * u + (0.12 if weave else -0.10) - dy * 0.04
+                c = PALM_BARK[int(clamp(lit * 5.4, 0, 5))]
+            _pput(grid_c, icx + dx, icy + dy, c)
+
+
+def _draw_date_clusters(grid_c, glow_c, cx: float, cy: float, dates: int, picked: bool, scale: float = 1.0):
+    """Foreground harvest stage: separated pendant golden Sonnendatteln bunches (Row 1/2) vs clipped stubs (Row 4/5)."""
+    if dates <= 0:
+        return
+    if dates == 1:
+        specs = [(0.0, 3.0, 0)]
+    elif dates == 2:
+        specs = [(-5.5 * scale, 2.5, -1), (5.5 * scale, 2.8, 1)]
+    elif dates == 3:
+        specs = [(-7.8 * scale, 1.8, -1), (0.0, 3.8, 0), (7.8 * scale, 2.2, 1)]
+    else:
+        specs = [
+            (-10.2 * scale, 1.2, -1),
+            (-3.6 * scale, 3.8, -1),
+            (3.6 * scale, 4.0, 1),
+            (10.2 * scale, 1.6, 1),
+        ][:dates]
+
+    for ox, oy, lean in specs:
+        sx0 = cx + lean * 2.0 * scale
+        sy0 = cy + 0.8
+        bx = cx + ox
+        by = cy + oy + 2.4 * scale
+
+        if picked:
+            # Harvested state (Row 4): ONLY short clipped woody stalk stubs under crownshaft, zero golden fruit!
+            stub_pts = bezier((sx0, sy0), (sx0 + ox * 0.20, sy0 + 0.7), (sx0 + ox * 0.34, sy0 + 2.2), n=5)
+            for j, (px, py) in enumerate(stub_pts):
+                ix, iy = int(round(px)), int(round(py))
+                c = PALM_BARK[4 if j == len(stub_pts) - 1 else (3 if lean <= 0 else 2)]
+                _pput(grid_c, ix, iy, c)
+            continue
+
+        # Unpicked state (Row 1 & Row 2): arching golden fruiting stalk + distinct pendant grape-teardrop bunch
+        stalk_pts = bezier((sx0, sy0), ((sx0 + bx) * 0.5 + lean * 1.0, sy0 - 1.0), (bx, by), n=9)
+
+        # Slender 5..6px wide pendant teardrop of plump 2x3 oval dates so adjacent bunches never merge into a block
+        if scale >= 0.9:
+            drupes = (
+                (-1, 0, 1), (1, 0, 0),
+                (-2, 2, 1), (0, 2, 1), (2, 2, -1),
+                (-2, 5, 1), (0, 5, 0), (2, 5, -1),
+                (-1, 8, 1), (1, 8, -1),
+                (0, 10, 0),
+            )
+            core_h = 10
+        else:
+            drupes = (
+                (-1, 0, 1), (1, 0, 0),
+                (-2, 2, 1), (0, 2, 0), (1, 2, -1),
+                (-1, 5, 1), (1, 5, -1),
+                (0, 7, 0),
+            )
+            core_h = 7
+
+        bunch_pixels = {}
+        glow_pixels = {}
+
+        for j, (px, py) in enumerate(stalk_pts):
+            ix, iy = int(round(px)), int(round(py))
+            bunch_pixels[(ix, iy)] = DATE_RAMP[3 if j < 5 else 2]
+            if j < 6:
+                bunch_pixels[(ix, iy + 1)] = DATE_RAMP[1]
+
+        ibx, iby = int(round(bx)), int(round(by))
+        for dy_c in range(1, core_h):
+            hw_c = 1 if dy_c < core_h - 2 else 0
+            for dx_c in range(-hw_c, hw_c + 1):
+                bunch_pixels[(ibx + dx_c, iby + dy_c)] = DATE_RAMP[0]
+
+        for dx_d, dy_d, lit_bias in sorted(drupes, key=lambda d: (-d[1], -d[0])):
+            ux, uy = ibx + dx_d, iby + dy_d
+            if lit_bias > 0:
+                c_tl, c_tr = DATE_RAMP[4], DATE_RAMP[3]
+                c_ml, c_mr = DATE_RAMP[3], DATE_RAMP[2]
+                c_bl, c_br = DATE_RAMP[2], DATE_RAMP[0]
+                glow_pixels[(ux, uy)] = DATE_HOT
+                glow_pixels[(ux, uy + 1)] = DATE_GLOW
+            elif lit_bias == 0:
+                c_tl, c_tr = DATE_RAMP[4 if dy_d <= 2 else 3], DATE_RAMP[2]
+                c_ml, c_mr = DATE_RAMP[3], DATE_RAMP[1]
+                c_bl, c_br = DATE_RAMP[1], DATE_RAMP[0]
+                glow_pixels[(ux, uy)] = DATE_GLOW
+                if dy_d >= 7:
+                    glow_pixels[(ux, uy + 1)] = DATE_HOT
+            else:
+                c_tl, c_tr = DATE_RAMP[2], DATE_RAMP[1]
+                c_ml, c_mr = DATE_RAMP[2], DATE_RAMP[0]
+                c_bl, c_br = DATE_RAMP[0], DATE_RAMP[0]
+                glow_pixels[(ux, uy + 1)] = (*DATE_GLOW[:3], 195)
+
+            bunch_pixels[(ux, uy)] = c_tl
+            bunch_pixels[(ux + 1, uy)] = c_tr
+            bunch_pixels[(ux, uy + 1)] = c_ml
+            bunch_pixels[(ux + 1, uy + 1)] = c_mr
+            bunch_pixels[(ux, uy + 2)] = c_bl
+            bunch_pixels[(ux + 1, uy + 2)] = c_br
+
+        leaf_set = set(PALM_LEAF)
+        for (px_i, py_i) in bunch_pixels:
+            for ndx, ndy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nx, ny = px_i + ndx, py_i + ndy
+                if (nx, ny) not in bunch_pixels and 3 <= nx <= CW - 4 and 3 <= ny <= CH - 3:
+                    cur = grid_c[ny][nx]
+                    if cur in leaf_set:
+                        grid_c[ny][nx] = PALM_BARK[0]
+
+        for (px_i, py_i), col in bunch_pixels.items():
+            _pput(grid_c, px_i, py_i, col)
+        for (px_i, py_i), gcol in glow_pixels.items():
+            _pput(glow_c, px_i, py_i, gcol)
+
+
+def _draw_palm_canopy(grid_c, glow_c, cx, cy, fronds, flen, dates, picked, seed, scale=1.0):
+    """3-tier starburst fountain of separated arching pinnate fronds + crownshaft + foreground Sonnendatteln."""
+    j_lean = ((seed % 5) - 2) * 0.035
+
+    # 1. Tier 0: Deep cool-emerald back fronds + compact under-crown shadow cushion behind fruit window
+    back_specs = [
+        (-0.42, -0.15, 0.46, 8.5),
+        (0.42, -0.15, 0.46, 8.5),
+        (-0.88, 0.22, 0.84, 7.5),
+        (0.88, 0.22, 0.84, 7.5),
+        (-0.48, 0.82, 0.82, -1.5),
+        (0.48, 0.82, 0.82, -1.5),
+    ]
+    if fronds < 7:
+        back_specs = back_specs[:4]
+    for bi, (dx, lift, l_mul, drp) in enumerate(back_specs):
+        _draw_feather_frond(
+            grid_c, glow_c, cx, cy,
+            dx + j_lean * 0.5, lift, flen * l_mul, drp * scale,
+            tier=0, seed=seed + 101 + bi * 17,
+        )
+
+    # 2. Woven fibrous petiole crownshaft (Faserschopf) capping the trunk apex
+    _draw_crownshaft(grid_c, cx, cy)
+
+    # 3. Tier 1: Sweeping horizontal arms + drooping lower-flank fronds (breaks mushroom dome into true palm star!)
+    mid_specs = [
+        (-0.76, -0.06, 0.82, 13.5),
+        (0.76, -0.06, 0.82, 13.5),
+        (-1.00, 0.36, 0.98, 4.5),
+        (1.00, 0.36, 0.98, 4.5),
+    ]
+    if fronds >= 10:
+        mid_specs.extend([(-0.92, 0.68, 0.92, -0.5), (0.92, 0.68, 0.92, -0.5)])
+    elif fronds < 6:
+        mid_specs = mid_specs[:2]
+    for mi, (dx, lift, l_mul, drp) in enumerate(mid_specs):
+        j_len = 0.95 + 0.08 * (((seed + mi * 3) % 5) / 4.0)
+        _draw_feather_frond(
+            grid_c, glow_c, cx, cy - 1.0,
+            dx + j_lean * 0.6, lift, flen * l_mul * j_len, drp * scale,
+            tier=1, seed=seed + 211 + mi * 23,
+        )
+
+    # 4. Tier 2: High arching sunlit fountain plumes with crisp sky V-notches between fronds
+    top_specs = [
+        (-0.74 + j_lean, 0.92, 0.92, -2.5),
+        (0.74 + j_lean, 0.90, 0.92, -2.2),
+        (-0.26 + j_lean, 1.18, 0.80, -6.5),
+        (0.28 + j_lean, 1.15, 0.80, -6.0),
+    ]
+    if fronds < 6:
+        top_specs = [(-0.68, 0.86, 0.90, -1.5), (0.68, 0.84, 0.90, -1.5), (0.02, 1.12, 0.78, -5.0)]
+    for ti, (dx, lift, l_mul, drp) in enumerate(top_specs):
+        _draw_feather_frond(
+            grid_c, glow_c, cx, cy - 2.2,
+            dx, lift, flen * l_mul, drp * scale,
+            tier=2, seed=seed + 307 + ti * 29,
+        )
+
+    # 5. Seal any 1px transparent pinholes inside foliage before outlining
+    _seal_crown_pinholes(grid_c)
+
+    # 6. Foreground Sonnendatteln (Row 1/2 = heavy golden clusters + glow; Row 4/5 = clipped bare stubs)
+    _draw_date_clusters(grid_c, glow_c, cx, cy, dates, picked, scale=scale)
+
+
+def _check_palm_bounds(tag: str, layer):
+    pts = [(x, y) for y, row in enumerate(layer) for x, c in enumerate(row) if c is not None and c[3] > 0]
+    if not pts:
+        return
+    xs = [x for x, _ in pts]
+    ys = [y for _, y in pts]
+    if min(xs) < 1 or max(xs) > CW - 2 or min(ys) < 1 or max(ys) > CH - 1:
+        F.CUT.append(f"{tag}: x {min(xs)}..{max(xs)} y {min(ys)}..{max(ys)}")
 
 
 def build_sun_palm(idx, spec, picked=False):
@@ -403,55 +703,71 @@ def build_sun_palm(idx, spec, picked=False):
     for si, (bx, h, curve, smid, br) in enumerate(spec["stems"]):
         tx, ty = _draw_palm_stem(trunk, crown, clear_y, bx, h, curve, smid, br, seed + si * 23)
         tips.append((si, tx, ty))
-    for si, tx, ty in tips:
-        scale = 1.0 if si == 0 else 0.78
+    # Draw shorter secondary stems first so primary tall crown & dates layer cleanly in front where overlapping
+    for si, tx, ty in sorted(tips, key=lambda item: -item[0]):
+        scale = 1.0 if si == 0 else (0.76 if si == 1 else 0.62)
+        sec_dates = spec["dates"] if si == 0 else (max(1, spec["dates"] - 2) if si == 1 else 0)
         _draw_palm_canopy(
             crown, glow_c, tx, ty,
-            max(5, int(round(spec["fronds"] * scale))),
+            max(6, int(round(spec["fronds"] * scale))),
             spec["flen"] * scale,
-            spec["dates"] if si == 0 else max(0, spec["dates"] - 2),
+            sec_dates,
             picked,
             seed + si * 53,
+            scale=scale,
         )
     glow_src = [[glow_c[y][x] for x in range(CW)] for y in range(CH)]
-    for y in range(2, CH - 2):
-        for x in range(2, CW - 2):
-            if glow_src[y][x] is not None and glow_src[y][x][3] > 200:
+    for y in range(3, CH - 3):
+        for x in range(3, CW - 3):
+            if glow_src[y][x] is not None and glow_src[y][x][3] > 185:
                 for dy in (-1, 0, 1):
                     for dx in (-1, 0, 1):
                         if (dx or dy) and glow_c[y + dy][x + dx] is None:
-                            glow_c[y + dy][x + dx] = (*DATE_GLOW[:3], 88)
+                            glow_c[y + dy][x + dx] = (*DATE_GLOW[:3], 84)
     t_out, c_out = art_tree.finish(trunk, crown, spec["fronds"] + spec["flen"] * 0.65)
-    return t_out, c_out, art_tree.to_pixels(glow_c), art_tree.to_pixels(glow_t)
+    gc_out, gt_out = art_tree.to_pixels(glow_c), art_tree.to_pixels(glow_t)
+    _check_palm_bounds(f"sun_palm[{idx}]_trunk", t_out)
+    _check_palm_bounds(f"sun_palm[{idx}]_crown_{'picked' if picked else 'full'}", c_out)
+    _check_palm_bounds(f"sun_palm[{idx}]_glow_{'picked' if picked else 'full'}", gc_out)
+    return t_out, c_out, gc_out, gt_out
 
 
 def build_palm_growth():
     frames = []
-    # 0..1: cut palm stumps with exposed warm golden pith ring
-    for r in (3.0, 4.4):
+    # 0..1: cut palm stumps with imbricated diamond scales & warm golden pith ring
+    for si, r in enumerate((3.2, 4.6)):
         t = grid()
-        top_y = FEET_Y - int(r * 2.1)
+        top_y = FEET_Y - int(r * 2.2)
         for y in range(top_y, FEET_Y + 2):
-            flare = max(0.0, (y - (FEET_Y - 3)) * 0.35)
+            flare = max(0.0, (y - (FEET_Y - 3)) * 0.38)
             hw = r + flare
             for dx in range(-int(hw) - 1, int(hw) + 2):
                 if abs(dx) <= hw:
-                    if y < top_y + 2 and ((dx / (r + 0.1)) ** 2 + ((y - top_y) / (r * 0.45)) ** 2) <= 1.0:
-                        d = math.sqrt((dx / (r + 0.1)) ** 2 + ((y - top_y) / (r * 0.45)) ** 2)
-                        c = PALM_BARK[5 if d < 0.45 else 4]
+                    u_top = ((dx / (r + 0.15)) ** 2 + ((y - (top_y + 1.0)) / max(1.1, r * 0.42)) ** 2)
+                    if y <= top_y + 2 and u_top <= 1.0:
+                        d = math.sqrt(u_top)
+                        c = PALM_BARK[5 if d < 0.45 else (4 if d < 0.82 else 3)]
                     else:
-                        c = PALM_BARK[2 if dx > 0 else (3 if y % 3 else 1)]
-                    gput(t, FEET_X + dx, y, c)
+                        c = _palm_bark_shade(dx, hw, FEET_Y - y + si * 3.0)
+                    _pput(t, FEET_X + dx, y, c)
         t_out, _ = art_tree.finish(t, grid(), r + 5.0)
+        _check_palm_bounds(f"sun_palm_growth[{si}]", t_out)
         frames.append(t_out)
     # 2: baby sprout rosette, 3: young palm sapling
-    for h, nfr, fl in ((6, 4, 9), (22, 6, 15)):
+    for gi, (h, nfr, fl, sc) in enumerate(((7, 5, 11, 0.55), (24, 7, 17, 0.72)), start=2):
         t = grid()
         c = grid()
-        tx, ty = _draw_palm_stem(t, c, FEET_Y - 4, 0, h, 2.0, -1.0, 1.6, 5400 + h)
-        _draw_palm_canopy(c, grid(), tx, ty, nfr, fl, 0, True, 5500 + h)
-        t_out, _ = art_tree.finish(t, c, fl * 0.7)
-        frames.append(t_out)
+        tx, ty = _draw_palm_stem(t, c, FEET_Y - 4, 0, h, 2.0, -1.0, 1.8, 5400 + h)
+        _draw_palm_canopy(c, grid(), tx, ty, nfr, fl, 0, True, 5500 + h, scale=sc)
+        t_out, c_out = art_tree.finish(t, c, fl * 0.75)
+        # Composite trunk + sapling crown into single growth frame!
+        merged = [row[:] for row in t_out]
+        for y in range(CH):
+            for x in range(CW):
+                if c_out[y][x][3] > 0:
+                    merged[y][x] = c_out[y][x]
+        _check_palm_bounds(f"sun_palm_growth[{gi}]", merged)
+        frames.append(merged)
     while len(frames) < 6:
         frames.append(frames[-1])
     out = [[CLEAR] * (CW * 6) for _ in range(CH)]
@@ -1064,175 +1380,668 @@ def make_oasis_lily(spec, seed, picked=False):
 
 
 # ================================================================== 11. Sonnenquarz-Fels (6 cols x 4 rows, 64x56, feet (32, 52))
+# 100% pure crystalline quartz formations erupting seamlessly from ground quartz veins (QUARTZ_W in ground_tone.gdshader).
+# Spire tuple: (bx, by, length, hw, angle_deg, z_layer, cleave_s1, cleave_s2, max_stage)
 QUARTZ_ROCKS = [
-    # 0: Pure Starburst Crystal Druse (cluster of 7 radiating faceted prisms on crystalline quartz matrix)
+    # Col 0 (r=14, h~28): Sternendruse — Classic radiating crown rosette of 8 hexagonal quartz points
     {
-        "prims": [("block", 32, 26, 18, 9, 0, 0), ("block", 24, 14, 9, 7, -1, -1), ("block", 40, 14, 9, 7, 1, -1)],
-        "crystal_base": True,
+        "foot_rx": 14.0,
+        "plinth": [(32.0, 49.4, 13.5, 3.3, 0.0), (24.0, 49.8, 7.2, 2.7, 0.15), (40.0, 49.8, 7.2, 2.7, -0.15)],
         "spires": [
-            (32, 46, 26, 4.6, -4), (27, 47, 22, 4.0, -22), (37, 47, 21, 4.0, 18),
-            (22, 49, 16, 3.3, -38), (42, 49, 16, 3.3, 36), (30, 50, 15, 3.1, 8), (35, 50, 13, 2.9, -14),
+            (22.5, 49.0, 15.5, 2.5, -42, 0.8, 0.72, None, 1),
+            (41.5, 49.0, 15.0, 2.5, 40, 0.8, None, 0.56, 2),
+            (26.5, 48.5, 22.0, 3.2, -21, 1.6, 0.74, 0.50, 2),
+            (37.5, 48.5, 21.0, 3.1, 19, 1.6, None, 0.48, 2),
+            (32.0, 48.5, 27.0, 3.9, -2, 2.6, 0.76, 0.50, 2),
+            (29.0, 50.0, 14.5, 2.5, -9, 3.4, None, 0.62, 2),
+            (35.5, 50.0, 13.5, 2.4, 11, 3.4, 0.76, None, 1),
+            (20.5, 50.2, 8.5, 1.8, -54, 3.6, None, None, 1),
+            (43.0, 50.2, 8.0, 1.8, 52, 3.6, None, None, 2),
         ],
+        "splinters": [(19, 51), (45, 51)],
     },
-    # 1: Asymmetric Desert Sandstone Crag + Shoulder Quartz Burst
+    # Col 1 (r=16, h~27): Schräger Zwillingskamm — Dynamic wind-swept asymmetric twin-crest quartz cluster
     {
-        "prims": [("block", 27, 30, 21, 22, -2, 0), ("block", 44, 18, 12, 13, 2, -1)],
-        "strata": 5, "veins": 1, "crack": 2,
+        "foot_rx": 16.0,
+        "plinth": [(31.5, 49.3, 15.5, 3.4, 0.0), (22.0, 48.6, 8.5, 3.4, 0.2), (41.0, 49.8, 9.0, 2.8, -0.2)],
         "spires": [
-            (36, 38, 23, 4.2, 22), (42, 42, 18, 3.5, 35), (30, 32, 19, 3.8, -12), (46, 46, 13, 2.9, 44),
+            (21.5, 48.5, 15.5, 2.8, -26, 1.0, None, 0.55, 2),
+            (18.5, 49.6, 10.5, 2.1, -41, 1.2, 0.72, None, 1),
+            (35.5, 48.5, 23.5, 3.8, 28, 1.8, 0.74, 0.50, 2),
+            (29.5, 48.5, 27.5, 4.4, 19, 2.8, 0.77, 0.50, 2),
+            (25.0, 49.6, 14.0, 2.6, -7, 3.4, None, 0.62, 2),
+            (41.5, 49.5, 15.0, 2.8, 39, 3.3, None, 0.54, 2),
+            (33.5, 50.2, 11.5, 2.3, 14, 3.8, None, None, 1),
+            (45.5, 50.4, 7.5, 1.7, 50, 3.7, None, None, 2),
         ],
+        "splinters": [(16, 51), (47, 51)],
     },
-    # 2: Grand Cathedral Quartz Monolith (towering snow-white central obelisk + flanking spires)
+    # Col 2 (r=19, h~42): Kathedralen-Monolith — Grand central cathedral obelisk + parallel sub-points & tiered flanks
     {
-        "prims": [("block", 32, 38, 28, 12, 0, 0), ("block", 18, 15, 10, 10, -1, -1), ("block", 46, 15, 10, 10, 1, -1)],
-        "strata": 6, "crack": 2,
+        "foot_rx": 19.0,
+        "plinth": [(32.0, 49.0, 18.2, 3.7, 0.0), (19.5, 49.6, 8.5, 3.0, 0.2), (44.5, 49.6, 8.5, 3.0, -0.2)],
         "spires": [
-            (32, 44, 36, 5.4, -3), (24, 46, 26, 4.3, -18), (40, 46, 25, 4.2, 16),
-            (18, 49, 17, 3.4, -32), (46, 49, 16, 3.3, 30), (35, 49, 18, 3.2, 6),
+            (18.5, 49.2, 17.5, 2.9, -32, 0.9, 0.74, None, 1),
+            (45.5, 49.2, 16.5, 2.8, 30, 0.9, None, 0.55, 2),
+            (24.0, 48.5, 27.5, 3.8, -16, 1.7, None, 0.48, 2),
+            (40.0, 48.5, 26.0, 3.7, 15, 1.7, 0.75, 0.46, 2),
+            (32.0, 48.5, 40.5, 5.2, -1, 2.6, 0.77, 0.48, 2),
+            # Fused parallel cathedral sub-terminations stepping up the central shaft
+            (28.3, 47.5, 25.5, 2.6, -2, 3.1, 0.78, 0.50, 2),
+            (35.8, 47.5, 23.0, 2.5, 0, 3.1, None, 0.48, 2),
+            (31.5, 50.2, 14.5, 2.7, 5, 3.8, None, 0.62, 2),
+            (21.5, 50.2, 9.5, 2.0, -22, 3.7, None, None, 2),
+            (43.0, 50.2, 9.0, 1.9, 24, 3.7, None, None, 1),
         ],
+        "splinters": [(14, 51), (49, 51), (27, 52)],
     },
-    # 3: Tall Leaning Desert Quartz Stele (wind-carved sandstone tower with quartz vein & jutting points)
+    # Col 3 (r=13, h~45): Schlanke Zepter-Säule — Tall dramatic slender pillar + fused twin spire on narrow foot
     {
-        "prims": [("block", 30, 22, 14, 42, 3, 0), ("block", 43, 12, 7, 17, -2, -1)],
-        "strata": 6, "veins": 2, "crack": 2,
+        "foot_rx": 12.5,
+        "plinth": [(32.0, 49.2, 11.6, 3.4, 0.0), (26.5, 49.8, 6.2, 2.7, 0.18), (37.8, 49.8, 6.2, 2.7, -0.18)],
         "spires": [
-            (32, 15, 14, 3.4, 8), (22, 29, 15, 3.2, -36), (40, 36, 16, 3.3, 32), (44, 44, 13, 2.8, 24),
+            (24.5, 49.0, 14.5, 2.3, -25, 1.0, None, 0.56, 2),
+            (38.0, 48.8, 17.5, 2.6, 23, 1.4, 0.73, None, 1),
+            (32.2, 48.8, 43.0, 4.1, 4, 2.5, 0.77, 0.49, 2),
+            # Fused parallel twin scepter spire along left-front flank
+            (28.2, 49.0, 30.5, 2.9, 3, 3.2, None, 0.50, 2),
+            (35.8, 49.8, 13.5, 2.3, 13, 3.6, None, 0.58, 2),
+            (23.0, 50.4, 8.0, 1.8, -38, 3.7, None, None, 1),
+            (40.0, 50.4, 8.5, 1.8, 34, 3.7, None, None, 2),
         ],
+        "splinters": [(21, 51), (42, 51)],
     },
-    # 4: Wide Wind-Eroded Mesa Slab with Twin Crystal Clusters
+    # Col 4 (r=21, h~25): Breite Stufendruse — Wide low multi-tiered quartz reef with twin offset clusters & Voronoi terrace saddle
     {
-        "prims": [("block", 32, 48, 42, 14, 1, 0), ("block", 24, 28, 22, 19, -1, 1)],
-        "strata": 4, "veins": 1, "crack": 2,
-        "spires": [
-            (18, 37, 21, 3.8, -18), (24, 35, 17, 3.3, 6),
-            (41, 41, 22, 4.0, 22), (46, 44, 16, 3.2, 38), (36, 42, 14, 3.0, -8),
+        "foot_rx": 21.0,
+        "plinth": [
+            (20.5, 47.4, 10.8, 4.0, 0.25),
+            (32.0, 48.6, 8.8, 3.0, 0.08),
+            (43.0, 48.2, 11.2, 3.6, -0.15),
         ],
+        "spires": [
+            (14.8, 48.5, 14.5, 2.6, -36, 1.0, 0.74, None, 1),
+            (25.0, 47.6, 17.5, 3.0, 8, 1.6, None, 0.52, 2),
+            (19.8, 47.8, 24.0, 4.0, -14, 2.5, 0.76, 0.48, 2),
+            # Low angled bridge tooth across the central Voronoi terrace saddle
+            (32.2, 49.4, 8.5, 2.2, -16, 2.2, None, 0.65, 2),
+            (38.2, 48.6, 15.5, 2.8, 4, 1.8, None, 0.50, 2),
+            (43.0, 48.5, 21.5, 3.9, 20, 2.7, 0.75, 0.48, 2),
+            (47.8, 49.4, 14.5, 2.7, 38, 3.2, None, 0.54, 2),
+            (21.8, 50.0, 9.5, 2.1, -4, 3.6, None, None, 1),
+            (41.0, 50.2, 9.0, 2.0, 12, 3.6, None, None, 2),
+        ],
+        "splinters": [(11, 51), (31, 51), (52, 51)],
     },
-    # 5: Cracked Geode Boulder (twin sandstone jaws cradling a radiant crystal hollow)
+    # Col 5 (r=17, h~29): Aufgebrochene Kristall-Geodenkrone — Split flared quartz matrix jaws cradling brilliant snow-white inner prisms
     {
-        "prims": [("block", 21, 20, 13, 24, -3, 0), ("block", 43, 20, 13, 22, 3, 0)],
-        "strata": 5, "veins": 1, "crack": 2,
-        "spires": [
-            (32, 45, 27, 4.5, 2), (28, 46, 22, 3.9, -18), (36, 46, 21, 3.8, 20),
-            (25, 48, 16, 3.2, -30), (39, 48, 15, 3.1, 30),
+        "foot_rx": 17.0,
+        "plinth": [(22.5, 48.8, 8.8, 3.5, 0.12), (32.0, 49.6, 9.5, 2.8, 0.0), (41.5, 48.8, 8.8, 3.5, -0.15)],
+        "vug_wings": [
+            # (cx, by, height, wb, wt, lean, side) — flared cupped cool slate-pearl quartz geode walls
+            (22.0, 49.5, 19.5, 9.6, 5.6, -6.8, -1),
+            (42.0, 49.5, 18.5, 9.6, 5.4, 6.8, 1),
         ],
+        "spires": [
+            (28.5, 48.2, 21.5, 3.1, -12, 2.2, 0.76, 0.50, 2),
+            (35.5, 48.2, 20.5, 3.0, 13, 2.2, None, 0.48, 2),
+            (32.0, 48.0, 28.5, 4.1, 0, 2.9, 0.78, 0.50, 2),
+            (26.5, 49.0, 14.0, 2.3, -21, 2.5, None, 0.55, 2),
+            (37.5, 49.0, 13.5, 2.3, 22, 2.5, 0.74, None, 1),
+            (31.2, 50.0, 12.5, 2.4, -3, 3.7, None, 0.60, 2),
+        ],
+        "splinters": [(15, 51), (48, 51)],
     },
 ]
 
 
-def _draw_faceted_prism(px, glow, bx, by, length, width, angle_deg, stage, seed):
-    scale = (1.0, 0.78, 0.52, 0.25)[stage]
-    ph = max(6.0, length * scale)
-    pw = max(1.8, width * (1.0 if stage == 0 else (0.86 if stage == 1 else 0.72)))
+def _qhash(ix, iy, seed):
+    h = ((ix + 4096) * 1597334677 ^ (iy + 4096) * 3812015801 ^ (seed * 2654435761)) & 0xFFFFFFFF
+    h = ((h ^ (h >> 16)) * 2246822519) & 0xFFFFFFFF
+    h = ((h ^ (h >> 13)) * 3266489917) & 0xFFFFFFFF
+    h ^= h >> 16
+    return (h >> 8) / 16777216.0
+
+
+def _voronoi_grain(x, y, seed, sc=5.8):
+    """Domain-warped 2D Voronoi crystal grain query matching ground_tone.gdshader's polygonal quartz plates."""
+    wx = x + (noise(int(x) // 3, int(y) // 3, seed + 11) / 255.0 - 0.5) * 2.0
+    wy = y + (noise(int(x) // 3, int(y) // 3, seed + 29) / 255.0 - 0.5) * 2.0
+    gx, gy = math.floor(wx / sc), math.floor(wy / sc)
+    fx, fy = wx / sc - gx, wy / sc - gy
+    d1, d2 = 99.0, 99.0
+    c1, c2 = (gx, gy), (gx, gy)
+    v1, v2 = (0.0, 0.0), (0.0, 0.0)
+    for oy in (-1, 0, 1):
+        for ox in (-1, 0, 1):
+            cx, cy = gx + ox, gy + oy
+            jx = 0.14 + 0.72 * _qhash(cx + 13, cy + 7, seed)
+            jy = 0.14 + 0.72 * _qhash(cx + 59, cy + 31, seed)
+            dx, dy = ox + jx - fx, oy + jy - fy
+            dist = math.hypot(dx, dy) * 0.82 + max(abs(dx), abs(dy)) * 0.18
+            if dist < d1:
+                d2, c2, v2 = d1, c1, v1
+                d1, c1, v1 = dist, (cx, cy), (dx, dy)
+            elif dist < d2:
+                d2, c2, v2 = dist, (cx, cy), (dx, dy)
+    edge_px = (d2 - d1) * sc
+    h1 = _qhash(c1[0] + 101, c1[1] + 37, seed)
+    h2 = _qhash(c2[0] + 101, c2[1] + 37, seed)
+    ang = _qhash(c1[0] + 211, c1[1] + 89, seed) * math.tau
+    ton_tl = (v2[0] - v1[0]) * -0.7071 + (v2[1] - v1[1]) * -0.7071
+    return edge_px, h1, h2, ang, ton_tl
+
+
+def _draw_voronoi_plinth(px, z_buf, cid_buf, is_base, spec, w_scale, h_scale, seed):
+    """Stepped Voronoi-faceted crystalline quartz shelf base & optional crystalline geode vug wings."""
+    for y in range(36, S.GR + 1):
+        for x in range(4, S.RW - 4):
+            edge_px, h1, h2, ang, ton_tl = _voronoi_grain(x, y, seed, sc=5.2)
+            # Strong per-grain polygonal step breaks up any flat horizontal bottom line into natural crystal toes!
+            grain_step = (h1 - 0.5) * 0.44
+            best_d = 99.0
+            best_bias = 0.0
+            for cx0, cy0, rx0, ry0, l_bias in spec["plinth"]:
+                cx = 32.0 + (cx0 - 32.0) * w_scale
+                cy = (S.GR - 0.8) - (S.GR - cy0) * h_scale
+                rx = rx0 * w_scale
+                ry = max(2.1, ry0 * (0.85 + 0.15 * h_scale))
+                # Polygonal Chebyshev-blended metric + per-grain step gives crisp cleaved crystal shelves
+                dx = (x + 0.5 - cx) / max(rx, 1.0)
+                dy = (y + 0.5 - cy) / max(ry, 1.0)
+                # Slightly undulating polygonal root toe along the south skirt so y_bot steps between 49..52
+                toe_mod = 0.14 * math.cos((x - 32.0) * 0.42 + (seed % 11)) if dy > 0.15 else 0.0
+                d = math.hypot(dx, dy) * 0.80 + max(abs(dx), abs(dy)) * 0.20 + grain_step + toe_mod
+                if d < best_d:
+                    best_d = d
+                    best_bias = l_bias
+            if best_d > 1.0:
+                continue
+            facet_lit = -(math.cos(ang) * 0.72 + math.sin(ang) * 0.69)
+            slope_tl = -((x - 32.0) / max(spec["foot_rx"] * w_scale, 8.0)) * 0.62 - ((y - 48.5) / 4.5) * 0.45
+            q_idx = int(clamp(math.floor(2.45 + facet_lit * 0.95 + slope_tl + best_bias), 1, 4))
+            # Crisp 1-px internal Voronoi cleavage seams & sunlit ridges
+            if abs(h1 - h2) > 0.17:
+                if edge_px < 0.95 and h1 > h2 and ton_tl > 0.05:
+                    q_idx = 5
+                elif edge_px < 0.88 and h2 > h1:
+                    q_idx = max(0, q_idx - 2)
+            z_val = 1.15 + (y - 46.0) * 0.08
+            if z_val >= z_buf[y][x]:
+                z_buf[y][x] = z_val
+                cid_buf[y][x] = 1
+                is_base[y][x] = True
+                px[y][x] = QUARTZ_W[q_idx]
+
+    # Optional Col 5 outer curved crystalline quartz vug wings (100% pure cool slate-pearl quartz matrix)
+    for wi, (cx0, by0, h0, wb0, wt0, lean0, side) in enumerate(spec.get("vug_wings", ())):
+        cx = 32.0 + (cx0 - 32.0) * w_scale
+        by = S.GR - (S.GR - by0) * h_scale
+        wh = h0 * h_scale
+        wb, wt = wb0 * w_scale, wt0 * w_scale
+        lean = lean0 * h_scale
+        y_top = max(4, int(round(by - wh)))
+        for y in range(y_top, int(round(by)) + 1):
+            t = clamp((by - y) / max(wh, 1.0), 0.0, 1.0)
+            # Cupped outward-flaring geode jaw centerline + tapered faceted crystal rim
+            xc = cx + lean * (t ** 1.25)
+            half = (wb * (1.0 - t) + wt * t) * 0.5
+            if t > 0.78:
+                half *= max(0.22, 1.0 - ((t - 0.78) / 0.22) * 0.72)
+            for x in range(max(4, int(xc - half) - 1), min(S.RW - 4, int(xc + half) + 2)):
+                edge_px, h1, h2, ang, ton_tl = _voronoi_grain(x, y, seed + 307 + wi * 41, sc=4.8)
+                rel = (x + 0.5 - xc) / max(half, 0.8)
+                if abs(rel) + (h1 - 0.5) * 0.16 > 1.0:
+                    continue
+                # Concave dark slate-periwinkle inner vug wall frames the bright snow-white inner prisms!
+                inner_cavity = (side < 0 and rel > 0.12) or (side > 0 and rel < -0.12)
+                if inner_cavity:
+                    q_idx = 0 if abs(rel) > 0.45 else 1
+                elif side < 0:
+                    q_idx = 4 if (rel < -0.52 and t > 0.35) else (3 if rel < -0.08 else 2)
+                else:
+                    q_idx = 2 if (t > 0.68 and rel < 0.0) else (1 if rel < 0.35 else 0)
+                if not inner_cavity and abs(h1 - h2) > 0.20 and edge_px < 0.85:
+                    q_idx = min(3, q_idx + 1) if (h1 > h2 and ton_tl > 0.05) else max(0, q_idx - 1)
+                z_val = 3.25 if not inner_cavity else 1.45
+                if z_val >= z_buf[y][x]:
+                    z_buf[y][x] = z_val
+                    cid_buf[y][x] = 2 + wi
+                    is_base[y][x] = y >= 48
+                    px[y][x] = QUARTZ_W[q_idx]
+
+
+def _draw_hex_prism(px, z_buf, cid_buf, is_base, tips, bx, by, length, hw, angle_deg, z_depth, cid, seed, cleave_frac=None):
+    """Renders a 3D hexagonal quartz prism (3 longitudinal faces + #ffffff facet seam + phantom chevrons)
+    crowned by either a sharp 3-plane rhombohedral pyramidal point or an angled 2-step cleavage fracture."""
     rad = math.radians(angle_deg)
     ax, ay = math.sin(rad), -math.cos(rad)
     nx, ny = math.cos(rad), math.sin(rad)
-    min_x = max(2, int(math.floor(min(bx, bx + ax * ph) - pw - 2)))
-    max_x = min(S.RW - 3, int(math.ceil(max(bx, bx + ax * ph) + pw + 2)))
-    min_y = max(2, int(math.floor(min(by, by + ay * ph) - pw - 2)))
-    max_y = min(S.GR, int(math.ceil(max(by, by + ay * ph) + 2)))
+
+    eff_len = length if cleave_frac is None else length * cleave_frac
+    if eff_len < 3.5:
+        return
+
+    asym = (_qhash(cid * 17, seed, seed) - 0.5) * 0.22
+    apex_v = asym * hw * 0.65
+    h_tip = max(3.2, min(length * 0.35, hw * 2.05))
+    l_shaft = max(1.5, length - h_tip)
+    cleave_slope = -0.22 if (cid + seed) % 2 == 0 else 0.19
+
+    # Record termination apex or bright cleavage rim center for subtle night halo
+    tip_u = eff_len - (0.8 if cleave_frac is None else 1.2)
+    tx = bx + ax * tip_u + nx * (apex_v if cleave_frac is None else -hw * 0.25)
+    ty = by + ay * tip_u + ny * (apex_v if cleave_frac is None else -hw * 0.25)
+    if ty < 47.0 and hw >= 2.1:
+        tips.append((tx, ty, 1.8 if cleave_frac is None else 1.2))
+
+    # Bounding box clamped strictly inside safe margin (x in 3..60, y in 3..52) so 1px contour stays in 2..61, 2..54
+    end_x, end_y = bx + ax * (eff_len + 2.0), by + ay * (eff_len + 2.0)
+    pad = hw + 2.5
+    min_x = max(3, int(math.floor(min(bx, end_x) - pad)))
+    max_x = min(S.RW - 4, int(math.ceil(max(bx, end_x) + pad)))
+    min_y = max(3, int(math.floor(min(by, end_y) - pad)))
+    max_y = min(S.GR, int(math.ceil(max(by, end_y) + 2.0)))
+
+    chev_u1 = l_shaft * (0.46 + 0.10 * _qhash(cid, 9, seed))
+    chev_u2 = l_shaft * (0.70 + 0.08 * _qhash(cid, 21, seed))
+
     for y in range(min_y, max_y + 1):
         for x in range(min_x, max_x + 1):
             dx = x + 0.5 - bx
             dy = y + 0.5 - by
             u = dx * ax + dy * ay
             v = dx * nx + dy * ny
-            if u < -0.6 or u > ph:
+            if u < -1.2:
                 continue
-            t = clamp(u / ph, 0.0, 1.0)
-            half = pw * ((1.0 - t) / 0.28 if t > 0.72 else 0.88 + 0.12 * (t / 0.72))
-            if abs(v) > half:
+
+            hw_u = hw * (1.0 - 0.05 * clamp(u / max(length, 1.0), 0.0, 1.0))
+            if u < 0.0:
+                # Tapered root wedge sinks cleanly into the Voronoi collar
+                hw_u *= max(0.0, 1.0 + u / 1.3)
+            s1 = (-0.30 + asym * 0.35) * hw_u
+            s2 = (0.34 + asym * 0.35) * hw_u
+
+            # Small daughter needles (width <= 4px)
+            if hw < 2.15:
+                if u > eff_len:
+                    continue
+                if cleave_frac is None and u > eff_len * 0.64:
+                    v_lim = hw_u * max(0.0, (eff_len - u) / max(eff_len * 0.36, 0.8))
+                else:
+                    v_lim = hw_u
+                if abs(v) > v_lim + 0.15:
+                    continue
+                if u > eff_len - 1.4:
+                    q_idx = 5
+                elif v < -0.12 * hw_u:
+                    q_idx = 5 if u > eff_len * 0.45 else 4
+                elif v <= 0.38 * hw_u:
+                    q_idx = 3 if u > eff_len * 0.35 else 2
+                else:
+                    q_idx = 1 if u > 1.5 else 0
+                z_px = z_depth + (0.08 if abs(v) < 0.4 * hw_u else 0.0)
+                if z_px >= z_buf[y][x]:
+                    z_buf[y][x] = z_px
+                    cid_buf[y][x] = cid
+                    is_base[y][x] = False
+                    px[y][x] = QUARTZ_W[q_idx]
                 continue
-            rel = v / max(half, 0.5)
-            if t > 0.72:
-                sh = 5 if rel <= 0.1 else (4 if rel <= 0.6 else 3)
-            elif rel < -0.58:
-                sh = 5 if t > 0.2 else 4
-            elif rel < -0.14:
-                sh = 4 if t > 0.25 else 3
-            elif rel < 0.30:
-                sh = 3 if t > 0.18 else 2
+
+            # Full 3-plane hexagonal prism + either rhombohedral termination or stepped cleavage table
+            if cleave_frac is not None:
+                if abs(v) > hw_u:
+                    continue
+                step_jog = 1.05 if v > s1 else 0.0
+                u_top = eff_len + cleave_slope * v - step_jog
+                if u > u_top:
+                    continue
+                cap_h = max(2.1, hw_u * 0.62)
+                u_front = u_top - cap_h + (0.65 if s1 <= v <= s2 else 0.0)
+                if u >= u_front:
+                    # Bright sky-facing freshly cleaved rhombohedral fracture plane
+                    if u < u_front + 0.95 or (v <= s1 and u > u_top - 0.85):
+                        q_idx = 5
+                    elif abs(v - s1) < 0.55:
+                        q_idx = 2 if u > (u_front + u_top) * 0.5 else 5
+                    elif v < s1:
+                        q_idx = 4
+                    elif v <= s2 + 0.25 * hw_u:
+                        q_idx = 3
+                    else:
+                        q_idx = 2
+                    z_px = z_depth + 0.22
+                    if z_px >= z_buf[y][x]:
+                        z_buf[y][x] = z_px
+                        cid_buf[y][x] = cid
+                        is_base[y][x] = False
+                        px[y][x] = QUARTZ_W[q_idx]
+                    continue
+                u_sh = u_front
             else:
-                sh = 2 if rel < 0.72 else 1
-            if u < 1.8 and sh > 1:
-                sh -= 1
-            if t > 0.45 and t < 0.74 and abs(rel + 0.14) < 0.18 and seed % 3 == 0:
-                px[y][x] = QUARTZ_GOLD if stage == 0 else QUARTZ_CRYSTAL[5]
+                if u > length:
+                    continue
+                # 3D hexagonal shoulder girdle (front face dips slightly lower in 3/4 perspective)
+                u_s1 = l_shaft - 0.24 * h_tip
+                u_s2 = l_shaft - 0.15 * h_tip
+                u_r = l_shaft + 0.04 * h_tip
+                if v <= s1:
+                    ft = (v - (-hw_u)) / max(s1 - (-hw_u), 0.4)
+                    u_sh = l_shaft + (u_s1 - l_shaft) * clamp(ft, 0.0, 1.0)
+                elif v <= s2:
+                    ft = (v - s1) / max(s2 - s1, 0.4)
+                    u_sh = u_s1 + (u_s2 - u_s1) * clamp(ft, 0.0, 1.0)
+                else:
+                    ft = (v - s2) / max(hw_u - s2, 0.4)
+                    u_sh = u_s2 + (u_r - u_s2) * clamp(ft, 0.0, 1.0)
+
+                # Outer silhouette: straight parallel shaft sides below l_shaft, crisp straight pyramid slopes above
+                v_min = -hw_u if u <= l_shaft else -hw_u + (apex_v - (-hw_u)) * ((u - l_shaft) / max(length - l_shaft, 0.6))
+                v_max = hw_u if u <= u_r else hw_u + (apex_v - hw_u) * ((u - u_r) / max(length - u_r, 0.6))
+                if v < v_min or v > v_max:
+                    continue
+
+                if u >= u_sh:
+                    # 3-facet rhombohedral pyramidal termination
+                    r1 = s1 + (apex_v - s1) * clamp((u - u_s1) / max(length - u_s1, 0.6), 0.0, 1.0)
+                    r2 = s2 + (apex_v - s2) * clamp((u - u_s2) / max(length - u_s2, 0.6), 0.0, 1.0)
+                    if u > length - 1.55 or v < v_min + 0.92:
+                        q_idx = 5
+                    elif v < r1:
+                        q_idx = 5 if u > u_s1 + 0.52 * (length - u_s1) else 4
+                    elif v <= r2:
+                        if abs(v - r1) < 0.56 or u < u_sh + 0.92:
+                            q_idx = 5
+                        else:
+                            q_idx = 4 if (v < (r1 + r2) * 0.52 or u > l_shaft + 0.45 * h_tip) else 3
+                    else:
+                        if u < u_sh + 0.85:
+                            q_idx = 3
+                        else:
+                            q_idx = 2 if v < r2 + (v_max - r2) * 0.58 else 1
+                    z_px = z_depth + 0.20 - abs(v - apex_v) * 0.02
+                    if z_px >= z_buf[y][x]:
+                        z_buf[y][x] = z_px
+                        cid_buf[y][x] = cid
+                        is_base[y][x] = False
+                        px[y][x] = QUARTZ_W[q_idx]
+                    continue
+
+            # 3 longitudinal hexagonal prism shaft planes (below u_sh)
+            t_sh = clamp(u / max(l_shaft, 1.0), 0.0, 1.0)
+            if abs(v - s1) <= 0.56 and u > 1.6:
+                # Signature crisp 1-px pure-white longitudinal facet ridge
+                q_idx = 5 if t_sh > 0.16 else 4
+            elif v < s1:
+                # Plane 1: Sunlit NW prism face
+                if v < -hw_u + 0.92 and t_sh > 0.26:
+                    q_idx = 5
+                elif u < 2.0:
+                    q_idx = 3
+                else:
+                    q_idx = 4
+            elif v <= s2:
+                # Plane 2: Front-center prism face + subtle angled phantom quartz growth chevrons
+                q_idx = 3 if (t_sh > 0.40 - (v / max(hw_u, 1.0)) * 0.18) else 2
+                if hw >= 3.1 and u > 3.5:
+                    c_wave1 = abs((u - chev_u1) + abs(v - asym * hw_u) * 0.58)
+                    c_wave2 = abs((u - chev_u2) + abs(v - asym * hw_u) * 0.58)
+                    if c_wave1 < 0.54 or c_wave2 < 0.52:
+                        q_idx = min(4, q_idx + 1)
+                if u < 1.6:
+                    q_idx = max(1, q_idx - 1)
             else:
-                px[y][x] = QUARTZ_CRYSTAL[sh]
-            if stage < 3 and sh >= 4 and (t > 0.76 or (rel < -0.55 and (x + y) % 3 == 0)):
-                c_g = QUARTZ_GOLD if (t > 0.86 and seed % 2 == 0) else QUARTZ_CRYSTAL[4]
-                glow.emit(px, x, y, c_g, QUARTZ_CRYSTAL[3], 1 if t > 0.84 else 0)
+                # Plane 3: Shaded SE prism face
+                if v > hw_u - 0.92 or u < 1.8:
+                    q_idx = 0
+                else:
+                    q_idx = 1
+
+            z_px = z_depth + (0.16 if s1 <= v <= s2 else 0.06)
+            if z_px >= z_buf[y][x]:
+                z_buf[y][x] = z_px
+                cid_buf[y][x] = cid
+                is_base[y][x] = False
+                px[y][x] = QUARTZ_W[q_idx]
+
+
+def _apply_crystal_creases(px, z_buf, cid_buf, is_base):
+    """Carves crisp QUARTZ_W[0] / QUARTZ_DEEP overlap seams on recessed back crystals so multi-spire clusters stay razor-sharp."""
+    snap_z = [row[:] for row in z_buf]
+    snap_id = [row[:] for row in cid_buf]
+    for y in range(3, S.GR):
+        for x in range(3, S.RW - 3):
+            cid = snap_id[y][x]
+            if cid <= 0:
+                continue
+            my_z = snap_z[y][x]
+            # Check if a distinctly closer crystal overlaps immediately adjacent to this recessed pixel
+            front_hits = 0
+            from_nw = False
+            for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                nc = snap_id[y + dy][x + dx]
+                if nc > 0 and nc != cid and snap_z[y + dy][x + dx] - my_z >= 0.45:
+                    front_hits += 1
+                    if dx <= 0 and dy <= 0:
+                        from_nw = True
+            if front_hits:
+                if y < 46 and (front_hits >= 2 or from_nw) and not is_base[y][x]:
+                    px[y][x] = QUARTZ_DEEP if front_hits >= 2 else QUARTZ_W[0]
+                else:
+                    px[y][x] = QUARTZ_W[0] if px[y][x] in (QUARTZ_W[1], QUARTZ_W[2]) else QUARTZ_W[1]
+
+
+def finish_quartz_rock(px, is_base, stage, splinters=()):
+    """Seamless ground-matched foot (y >= 48, zero dark bottom outline!) + crisp cool slate-indigo upper spire contour (y < 48)."""
+    out = blank(S.RW, S.RH)
+    shape = [[px[y][x][3] == 255 for x in range(S.RW)] for y in range(S.RH)]
+    body = [row[:] for row in px]
+
+    # 1. Seamless Foot Beveling (y >= 48, or full rubble scatter in stage 3): matches ground_tone.gdshader edge_tl / edge_br / 2px south wall!
+    foot_y_start = 42 if stage == 3 else 48
+    for y in range(foot_y_start, S.RH - 2):
+        for x in range(2, S.RW - 2):
+            if not shape[y][x]:
+                continue
+            if stage < 3 and not is_base[y][x] and y < 49:
+                continue
+            e_l = not shape[y][x - 1]
+            e_u = not shape[y - 1][x]
+            e_r = not shape[y][x + 1]
+            e_d = not shape[y + 1][x]
+            edge_tl = e_l or e_u
+            edge_br = e_r or e_d
+            if edge_br and not edge_tl:
+                # Stepped SE bevel: crisp QUARTZ_W[0] on SE-facing / right-leaning steps, softer QUARTZ_W[1] on NW-side root toes
+                is_se_bevel = e_r or x >= 31 or ((x // 3 + y) % 2 == 0)
+                body[y][x] = QUARTZ_W[0] if is_se_bevel else QUARTZ_W[1]
+                # 2-px south crystal thickness wall right above the bottom bevel
+                if e_d and shape[y - 1][x] and (stage == 3 or is_base[y - 1][x] or y - 1 >= 49):
+                    if body[y - 1][x] not in (QUARTZ_W[5],):
+                        body[y - 1][x] = QUARTZ_W[1] if is_se_bevel else QUARTZ_W[2]
+            elif edge_tl and (stage == 3 or is_base[y][x] or e_l):
+                body[y][x] = QUARTZ_W[5] if (x + y) % 3 != 0 else QUARTZ_W[4]
+
+    # Add 1-2 tiny 2x1 snow-white crystal splinters at the root (exact match to ground_tone.gdshader splinters!)
+    for sx, sy in splinters:
+        if 3 <= sx <= S.RW - 5 and 48 <= sy <= S.RH - 3:
+            body[sy][sx] = QUARTZ_W[5]
+            body[sy][sx + 1] = QUARTZ_W[1]
+            shape[sy][sx] = True
+            shape[sy][sx + 1] = True
+
+    # 2. Subtle cool slate-blue translucent SE contact shadow tucked 1-2 px on the SE/right side (never muddy black!)
+    for y in range(48 if stage < 3 else 46, S.RH - 2):
+        for x in range(2, S.RW - 3):
+            if not shape[y][x]:
+                continue
+            if not shape[y + 1][x] or not shape[y][x + 1]:
+                if x >= 27:
+                    for dx, dy, alpha in ((1, 1, 72), (0, 1, 56), (2, 1, 34)):
+                        sx, sy = x + dx, y + dy
+                        if 2 <= sx <= S.RW - 3 and 49 <= sy <= S.RH - 2 and not shape[sy][sx]:
+                            if out[sy][sx][3] < alpha:
+                                out[sy][sx] = (68, 82, 118, alpha)
+
+    # Copy opaque quartz pixels onto output
+    for y in range(S.RH):
+        for x in range(S.RW):
+            if shape[y][x]:
+                out[y][x] = body[y][x]
+
+    # 3. Upper Silhouette Contour (y < 48, stages 0..2): QUARTZ_W[0] on sunlit NW outer edges, QUARTZ_DEEP on SE edges & V-clefts
+    if stage < 3:
+        for y in range(2, 48):
+            for x in range(2, S.RW - 2):
+                if shape[y][x]:
+                    continue
+                has_r = x + 1 < S.RW and shape[y][x + 1]
+                has_l = x - 1 >= 0 and shape[y][x - 1]
+                has_d = y + 1 < S.RH and shape[y + 1][x]
+                has_u = y - 1 >= 0 and shape[y - 1][x]
+                if not (has_r or has_l or has_d or has_u):
+                    continue
+                # Skip contouring flat basal skirt tops right at y == 47 so the collar merges seamlessly with ground quartz
+                if y == 47 and has_d and not (has_l or has_r or has_u) and is_base[48][x]:
+                    continue
+                shaded = has_l or has_u
+                out[y][x] = QUARTZ_DEEP if shaded else QUARTZ_W[0]
+
+    return out
+
+
+def build_quartz_glow(px, tips, stage):
+    """Faceted crystal luminescence map calibrated to floor_quartz_glow in relief.gdshader & WorldProp unshaded glow."""
+    glow = blank(S.RW, S.RH)
+    if stage == 3:
+        lut = {
+            QUARTZ_W[5]: (255, 255, 255, 92),
+            QUARTZ_W[4]: (238, 245, 255, 68),
+            QUARTZ_W[3]: (216, 230, 255, 48),
+            QUARTZ_W[2]: (198, 220, 255, 34),
+        }
+    else:
+        lut = {
+            QUARTZ_W[5]: (255, 255, 255, 155),
+            QUARTZ_W[4]: (238, 245, 255, 118),
+            QUARTZ_W[3]: (216, 230, 255, 86),
+            QUARTZ_W[2]: (198, 220, 255, 56),
+            QUARTZ_W[1]: (184, 210, 250, 30),
+        }
+    for y in range(2, S.RH - 1):
+        for x in range(2, S.RW - 2):
+            c = px[y][x]
+            if c in lut:
+                glow[y][x] = lut[c]
+
+    # Soft 1-px outer halo (210, 228, 255, 42) around upper spire tips & bright cleavage rims (never filling dark internal seams)
+    if stage < 3:
+        for tx, ty, rad in tips:
+            ir = int(math.ceil(rad + 2.2))
+            cx, cy = int(round(tx)), int(round(ty))
+            for y in range(max(2, cy - ir), min(47, cy + ir + 1)):
+                for x in range(max(2, cx - ir), min(S.RW - 2, cx + ir + 1)):
+                    if glow[y][x][3] > 0 or px[y][x][3] > 0:
+                        continue
+                    if math.hypot(x - tx, y - ty) <= rad + 1.8:
+                        # Place 1-px outer halo right outside the spire tip silhouette
+                        near_tip = any(
+                            0 <= x + dx < S.RW and 0 <= y + dy < S.RH and px[y + dy][x + dx][3] == 255
+                            for dy in (-1, 0, 1)
+                            for dx in (-1, 0, 1)
+                            if dx or dy
+                        )
+                        if near_tip:
+                            glow[y][x] = (210, 228, 255, 42)
+    return glow
+
+
+def _render_quartz_rubble(idx, spec, seed):
+    """Row 3 walkable rubble: pure broken Voronoi quartz plates, sideways snapped hexagonal crystal tips & splinters."""
+    px = blank(S.RW, S.RH)
+    z_buf = [[-1e9] * S.RW for _ in range(S.RH)]
+    cid_buf = [[0] * S.RW for _ in range(S.RH)]
+    is_base = [[True] * S.RW for _ in range(S.RH)]
+    tips = []
+    rng = random.Random(seed)
+    rx = spec["foot_rx"]
+
+    # 3-4 low polygonal cleaved quartz plates scattered across the vein footprint
+    plate_specs = [
+        (32.0 - rx * 0.42, 49.8, 4.4, 1.9, 0.2),
+        (32.0 + rx * 0.08, 50.4, 5.0, 2.0, 0.0),
+        (32.0 + rx * 0.46, 49.6, 4.2, 1.8, -0.2),
+    ]
+    if rx >= 17.0:
+        plate_specs.append((32.0 - rx * 0.70, 50.5, 3.5, 1.6, 0.15))
+        plate_specs.append((32.0 + rx * 0.72, 50.5, 3.4, 1.6, -0.15))
+    rubble_spec = {"foot_rx": rx, "plinth": plate_specs}
+    _draw_voronoi_plinth(px, z_buf, cid_buf, is_base, rubble_spec, 1.0, 1.0, seed + 51)
+
+    # 2-3 recognizable snapped hexagonal crystal tips lying sideways on the quartz floor
+    shard_defs = [
+        (32.0 - rx * 0.22, 49.5, 8.5, 2.2, -68, 2.4, 11),
+        (32.0 + rx * 0.18, 49.8, 9.2, 2.4, 72, 2.8, 12),
+        (32.0 - rx * 0.02, 48.8, 6.5, 1.8, 54, 3.2, 13),
+    ]
+    for bx, by, ln, hw, ang, zv, cid in shard_defs:
+        _draw_hex_prism(px, z_buf, cid_buf, is_base, tips, bx, by, ln, hw, ang, zv, cid, seed + cid * 19)
+
+    splinters = [
+        (int(round(32 - rx * 0.62)), 51),
+        (int(round(32 + rx * 0.58)), 51),
+        (int(round(32 + rng.uniform(-3.0, 3.0))), 52),
+    ]
+    lit = finish_quartz_rock(px, is_base, 3, splinters=splinters)
+    return lit, build_quartz_glow(lit, [], 3)
 
 
 def render_sun_quartz_rock(idx, spec, stage):
-    px = blank(S.RW, S.RH)
-    glow = Glow(S.RW, S.RH)
-    rng = random.Random(6100 + idx * 131 + stage * 17)
     seed = 6100 + idx * 131 + stage * 17
     if stage == 3:
-        # Shattered sandstone & crystalline quartz rubble pile
-        width = max(abs(p[1] - 32) + p[2] / 2 for p in spec["prims"])
-        ramp_r = QUARTZ_CRYSTAL[1:5] if spec.get("crystal_base") else DESERT_ROCK[1:5]
-        for _ in range(7 + int(width / 4)):
-            cx = 32 + rng.uniform(-width * 0.72, width * 0.72)
-            cy = S.GR - 1 - rng.uniform(0.0, 2.6)
-            r = rng.uniform(1.5, 2.8)
-            stroke(px, [(cx, cy)], r, r, ramp_r)
-        for sx, sy, sh in ((27, S.GR - 5, 4), (33, S.GR - 6, 5), (37, S.GR - 4, 3)):
-            if 4 <= sx < S.RW - 4:
-                px[sy][sx] = QUARTZ_CRYSTAL[sh]
-                px[sy + 1][sx] = QUARTZ_CRYSTAL[2]
-                glow.emit(px, sx, sy, QUARTZ_CRYSTAL[4], QUARTZ_CRYSTAL[3], 1)
-        return S.finish_rock(px), glow.done()
+        return _render_quartz_rubble(idx, spec, seed)
 
-    f = (1.0, 0.80, 0.58)[stage]
-    normal = S.rock_scene(spec, f)
-    ramp_b = QUARTZ_CRYSTAL if spec.get("crystal_base") else DESERT_ROCK
-    for y in range(S.RH):
-        for x in range(S.RW):
-            n = normal[y][x]
-            if n is None:
-                continue
-            ln = math.sqrt(n[0] ** 2 + n[1] ** 2 + n[2] ** 2)
-            lit = (n[0] * S.LIGHT[0] + n[1] * S.LIGHT[1] + n[2] * S.LIGHT[2]) / ln
-            lit += (noise(x // 2, y // 2, seed) / 255.0 - 0.5) * 0.20 + (noise(x, y, seed + 1) / 255.0 - 0.5) * 0.10
-            lit -= 0.20 * max(0.0, (y - (S.GR - 9)) / 9.0)
-            if "strata" in spec:
-                band = int((y + 3 * math.sin(x * 0.22 + seed)) // spec["strata"])
-                lit += 0.14 if band % 2 else -0.10
-            v = (lit + 0.5) / 1.5 * 5.99
-            px[y][x] = ramp_b[int(max(0, min(5, v + (BAYER[y % 4][x % 4] / 16.0 - 0.5) * 0.5)))]
-    body = [row[:] for row in px]
-    for y in range(S.RH):
-        for x in range(S.RW):
-            if not body[y][x][3]:
-                continue
-            if (y == 0 or not body[y - 1][x][3]) or (x == 0 or not body[y][x - 1][3]):
-                px[y][x] = ramp_b[5] if (x + y) % 3 else ramp_b[4]
-            elif x + 1 < S.RW and not body[y][x + 1][3] and noise(x, y, seed + 12) > 95:
-                px[y][x] = QUARTZ_CRYSTAL[3] if spec.get("crystal_base") else DESERT_RIM[int(noise(x, y, seed + 13) > 150)]
-    # Rock cracks & glowing quartz veins
-    for i in range(spec.get("crack", 0) + spec.get("veins", 0)):
-        cx = rng.randrange(22, 42)
-        cy = rng.randrange(max(12, S.GR - 34), S.GR - 8)
-        glowing = i >= spec.get("crack", 0) and stage < 2
-        for k in range(rng.randrange(5, 10)):
-            xx = cx + int(math.sin(k * 0.9 + seed + i) * 1.4)
-            yy = cy + k
-            if 0 <= xx < S.RW and 0 <= yy < S.RH and px[yy][xx][3]:
-                if glowing:
-                    glow.emit(px, xx, yy, QUARTZ_CRYSTAL[3], QUARTZ_CRYSTAL[4], 1)
-                else:
-                    px[yy][xx] = ramp_b[0]
+    px = blank(S.RW, S.RH)
+    z_buf = [[-1e9] * S.RW for _ in range(S.RH)]
+    cid_buf = [[0] * S.RW for _ in range(S.RH)]
+    is_base = [[False] * S.RW for _ in range(S.RH)]
+    tips = []
 
-    spires = spec["spires"] if stage == 0 else (spec["spires"][:max(2, len(spec["spires"]) - 1)] if stage == 1 else spec["spires"][:2])
-    # Draw back-most spires first, center last
-    for si, (ox, by, length, width, ang) in sorted(enumerate(spires), key=lambda it: abs(it[1][4]), reverse=True):
-        bx = 32.0 + (ox - 32.0) * f
-        base_y = S.GR - (S.GR - by) * f
-        _draw_faceted_prism(px, glow, bx, base_y, length, width, ang, stage, seed + si * 29)
-    return S.finish_rock(px), glow.done()
+    w_scale = (1.0, 0.95, 0.84)[stage]
+    h_scale = (1.0, 0.88, 0.64)[stage]
+    _draw_voronoi_plinth(px, z_buf, cid_buf, is_base, spec, w_scale, h_scale, seed)
+
+    # Render 3D hexagonal crystal spires with realistic pickaxe-cleaved fracture planes in stages 1 & 2
+    for si, (bx0, by0, length, hw, ang, z_layer, cl1, cl2, max_st) in enumerate(spec["spires"]):
+        if stage > max_st:
+            continue
+        bx = 32.0 + (bx0 - 32.0) * w_scale
+        by = S.GR - (S.GR - by0) * (0.92 if stage == 1 else (0.76 if stage == 2 else 1.0))
+        if stage == 0:
+            ln, pw, cleave = length, hw, None
+        elif stage == 1:
+            if cl1 is not None:
+                ln, pw, cleave = length, hw * 0.97, cl1
+            else:
+                ln, pw, cleave = length * 0.84, hw * 0.94, None
+        else:
+            if cl2 is not None:
+                ln, pw, cleave = length, hw * 0.92, cl2
+            else:
+                ln, pw, cleave = length * 0.54, hw * 0.84, None
+        _draw_hex_prism(px, z_buf, cid_buf, is_base, tips, bx, by, ln, pw, ang, z_layer, 10 + si, seed + si * 29, cleave_frac=cleave)
+
+    # In stages 1 & 2, scatter 2 freshly chipped angular quartz shards around the basal collar
+    if stage in (1, 2):
+        rx = spec["foot_rx"] * w_scale
+        for ci, (ox, ang) in enumerate(((-rx * 0.52, -64), (rx * 0.48, 66))):
+            _draw_hex_prism(px, z_buf, cid_buf, is_base, tips, 32.0 + ox, 50.2, 5.5, 1.7, ang, 4.1 + ci * 0.1, 40 + ci, seed + 99 + ci)
+
+    _apply_crystal_creases(px, z_buf, cid_buf, is_base)
+    splinters = [(int(round(32.0 + (sx - 32.0) * w_scale)), sy) for sx, sy in spec.get("splinters", ())]
+    lit = finish_quartz_rock(px, is_base, stage, splinters=splinters)
+    glow = build_quartz_glow(lit, tips, stage)
+    return lit, glow
 
 
 def i_palm_wood(px, g):
@@ -1270,16 +2079,29 @@ def i_oasis_blossom(px, g):
 
 
 def i_sun_quartz(px, g):
-    # Twin faceted crystal quartz shard cluster
-    for dx, h, x0, sh_l, sh_r in ((-2, 8, 6, 4, 2), (1, 11, 9, 5, 3)):
-        for y in range(13 - h, 13):
-            t = (y - (13 - h)) / max(h, 1.0)
-            w = 1 if t < 0.28 else 2
-            for ox in range(-w + 1, w + 1):
-                px[y][x0 + ox] = QUARTZ_CRYSTAL[sh_l if ox <= 0 else sh_r]
-        px[13 - h][x0] = QUARTZ_GOLD
-    for x in range(4, 12):
-        px[13][x] = SANDSTONE[3 if x < 8 else 2]
+    # Crisp 3-point hexagonal quartz crystal cluster + Voronoi basal quartz facets (100% QUARTZ_W, zero sandstone)
+    rows = (
+        "................",
+        "................",
+        "........5.......",
+        ".......542......",
+        "......54531.....",
+        "...5..45321.....",
+        "..542.45331.5...",
+        "..452045221541..",
+        "..452045320431..",
+        "...45205220421..",
+        "...43245321321..",
+        "...54054321021..",
+        "...4321432110...",
+        "....1001100.....",
+        "................",
+        "................",
+    )
+    for y, row in enumerate(rows):
+        for x, ch in enumerate(row):
+            if ch != ".":
+                px[y][x] = QUARTZ_W[int(ch)]
 
 
 # ================================================================== build & preview
@@ -1413,6 +2235,12 @@ def main():
     rock_lit = [[CLEAR] * (S.RW * 6) for _ in range(S.RH * 4)]
     rock_glow = [[CLEAR] * (S.RW * 6) for _ in range(S.RH * 4)]
     for fi, (rl, rg) in enumerate(rock_frames):
+        for tag, layer in (("sun_quartz_rock", rl), ("sun_quartz_rock_glow", rg)):
+            pts = [(x, y) for y, row in enumerate(layer) for x, c in enumerate(row) if c[3] > 0]
+            if pts:
+                xs, ys = [x for x, _ in pts], [y for _, y in pts]
+                if not (2 <= min(xs) and max(xs) <= S.RW - 3 and 2 <= min(ys) and max(ys) <= S.RH - 2):
+                    F.CUT.append(f"{tag} frame {fi}: x {min(xs)}..{max(xs)} y {min(ys)}..{max(ys)}")
         ox, oy = (fi % 6) * S.RW, (fi // 6) * S.RH
         for y in range(S.RH):
             rock_lit[oy + y][ox : ox + S.RW] = rl[y]
@@ -1558,7 +2386,7 @@ def write_oasis_preview(palm_parts, all_sheets, rock_frames, icons):
     new_icons = ("palm_wood", "sun_date", "oasis_blossom", "sun_quartz")
     for i, kname in enumerate(new_icons):
         paste(icons[kname], w - 36 * (len(new_icons) - i) - 12, h1 - 36, 1.0, k=z * 2)
-    out = type(ROOT)("/Users/nxye/.gemini/antigravity/brain/a4c535af-cedd-4de8-aa92-4c9315390c23/previews_oasis/oasis_sprites.png")
+    out = ROOT.parent / ".godot" / "previews_oasis" / "oasis_sprites.png"
     out.parent.mkdir(parents=True, exist_ok=True)
     write_png(out, w * z, len(img), img)
     print(f"oasis preview written: {out}")

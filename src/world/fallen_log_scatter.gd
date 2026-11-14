@@ -21,6 +21,10 @@ static func candidate(world: Variant,c: Vector2i,index: int,obstacles: Array[Dic
 	if biome == "glass_cliffs": chance *= 0.2
 	elif biome == "mist_forest": chance *= 1.35
 	elif bones: chance *= 1.25
+	if not bones:
+		var w_deep_log: float = MeadowHabitats.deep_forest_at(pos)
+		var w_wind_log: float = MeadowHabitats.wind_meadow_at(pos)
+		chance *= (1.0 + 1.15 * w_deep_log) * (1.0 - 0.92 * w_wind_log)
 	if rng.randf() > chance: return {}
 	var frame: int = rng.randi_range(0,23)
 	var spec: Dictionary = (DataRegistry.table("fallen_logs").frames as Array)[frame]
@@ -42,9 +46,10 @@ static func candidate(world: Variant,c: Vector2i,index: int,obstacles: Array[Dic
 		if not bool(obstacle.get("custom",false)) and obstacle.has("cell") and world.edits.props.has(WorldEdits.key(obstacle.cell as Vector2i)): continue
 		var point: Vector2 = obstacle.pos as Vector2
 		var radius: float = 52.0
-		if String(obstacle.kind) == "forestbed": continue ## logs lie on the forest floor
-		if String(obstacle.kind) != "stonebed":
-			var plant: Dictionary = DataRegistry.get_entry("plants",String(obstacle.kind))
+		var o_kind: String = String(obstacle.kind)
+		if o_kind == "forestbed" or o_kind == "moss_carpet" or o_kind == "pasture_paving": continue ## logs lie on the forest floor
+		if o_kind != "stonebed":
+			var plant: Dictionary = DataRegistry.get_entry("plants", o_kind)
 			radius = float((plant.radius as Array)[int(obstacle.variant)])*float(obstacle.get("scale",1.0))
 		if point.distance_to(Geometry2D.get_closest_point_to_segment(point,a,b)) < radius+14.0: return {}
 	return {"pos":pos,"frame":frame + (FallenLog.FRAMES if bones else 0)}
@@ -63,7 +68,7 @@ static func _trees_near(pos: Vector2, obstacles: Array[Dictionary], grid: Dictio
 ## forest beds (they never block a log). Every obstacle is indexed here, edited ones too: the tree count has always included them.
 static func index_obstacle(grid: Dictionary, obstacle: Dictionary) -> float:
 	var kind: String = String(obstacle.kind)
-	if kind == "forestbed": return 0.0
+	if kind == "forestbed" or kind == "moss_carpet" or kind == "pasture_paving": return 0.0
 	var radius: float = 52.0
 	if kind != "stonebed":
 		var plant: Dictionary = DataRegistry.get_entry("plants", kind)

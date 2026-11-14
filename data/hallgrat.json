@@ -1,0 +1,4627 @@
+{
+	"name": "HALLGRAT",
+	"title": "DIE STILLE STADT",
+	"about": "Grundriss der Steinstadt auf dem Glaskamm (docs/stadt_westen_konzept.md, Stufe 1). Alles in Kacheln. Bezirke sind Polygone, Orte Rechtecke [x, y, w, h] auf ihrer Ebene, Wege Linien über die vorhandenen Verbinder des Reliefs. tools/preview_hallgrat_plan.py prüft und zeichnet den Plan, tools/bake_westweg.py schreibt `westweg` und `milestones`.",
+	"forum": [
+		142,
+		355
+	],
+	"bounds": [
+		94,
+		290,
+		246,
+		412
+	],
+	"style_rect": [
+		104,
+		292,
+		192,
+		410
+	],
+	"districts": [
+		{
+			"id": "fuss",
+			"name": "DER FUSS",
+			"level": 0,
+			"color": "c9a26b",
+			"about": "Unterstadt vor dem Osttor: Steinmarkt, Gasthaus, Karrenhof und die Stallungen, Felder am Nordostrand, die Geisterzeile.",
+			"poly": [
+				[
+					188,
+					326
+				],
+				[
+					214,
+					300
+				],
+				[
+					232,
+					304
+				],
+				[
+					242,
+					330
+				],
+				[
+					244,
+					356
+				],
+				[
+					240,
+					384
+				],
+				[
+					226,
+					400
+				],
+				[
+					204,
+					404
+				],
+				[
+					190,
+					400
+				],
+				[
+					188,
+					360
+				]
+			]
+		},
+		{
+			"id": "staffeln",
+			"name": "DIE STAFFELN",
+			"level": 2,
+			"color": "d98f6a",
+			"about": "Die Terrassen der Arbeit (Ebene 1 und 2): Torgasse, Werkgasse, Steinmetzhof, Glasschleiferei, Lampenmacherei, darunter die Brunnenmulde mit Gärten und dem Zisterneneingang.",
+			"poly": [
+				[
+					146,
+					331
+				],
+				[
+					166,
+					328
+				],
+				[
+					176,
+					330
+				],
+				[
+					187,
+					338
+				],
+				[
+					187,
+					392
+				],
+				[
+					176,
+					397
+				],
+				[
+					166,
+					402
+				],
+				[
+					146,
+					400
+				],
+				[
+					143,
+					372
+				],
+				[
+					150,
+					367
+				],
+				[
+					164,
+					364
+				],
+				[
+					164,
+					347
+				],
+				[
+					150,
+					343
+				]
+			]
+		},
+		{
+			"id": "stille",
+			"name": "DIE STILLE",
+			"level": 3,
+			"color": "8fd9d0",
+			"about": "Die Oberstadt auf dem Gipfel: das Forum um die Wächterin, Hüterhalle, Rothalle, Steinarchiv, Vogtshaus, Mondturm.",
+			"poly": [
+				[
+					124,
+					326
+				],
+				[
+					141,
+					330
+				],
+				[
+					148,
+					340
+				],
+				[
+					158,
+					343
+				],
+				[
+					164,
+					347
+				],
+				[
+					164,
+					363
+				],
+				[
+					150,
+					366
+				],
+				[
+					142,
+					371
+				],
+				[
+					133,
+					371
+				],
+				[
+					126,
+					366
+				],
+				[
+					121,
+					363
+				],
+				[
+					121,
+					336
+				]
+			]
+		},
+		{
+			"id": "rand",
+			"name": "DIE RANDPROMENADE",
+			"level": 1,
+			"color": "a99be0",
+			"about": "Die Westmauer auf dem äußeren Ring (Ebene 1), der Wehrgang, die Leerenfenster und darunter der Küstenstreifen bis zur Leere; im Süden der Gedenkgarten.",
+			"poly": [
+				[
+					99,
+					326
+				],
+				[
+					111,
+					326
+				],
+				[
+					118,
+					328
+				],
+				[
+					122,
+					328
+				],
+				[
+					122,
+					334
+				],
+				[
+					121,
+					363
+				],
+				[
+					118,
+					372
+				],
+				[
+					124,
+					378
+				],
+				[
+					133,
+					392
+				],
+				[
+					124,
+					404
+				],
+				[
+					100,
+					404
+				],
+				[
+					96,
+					380
+				]
+			]
+		},
+		{
+			"id": "verloren",
+			"name": "DAS VERLORENE VIERTEL",
+			"level": 1,
+			"color": "e05c9a",
+			"about": "Die Nordwestflanke hinter der Schwarzen Mauer (versiegelt; Stufe 8 des Konzepts).",
+			"poly": [
+				[
+					118,
+					315
+				],
+				[
+					136,
+					314
+				],
+				[
+					145,
+					322
+				],
+				[
+					142,
+					330
+				],
+				[
+					130,
+					331
+				],
+				[
+					121,
+					327
+				],
+				[
+					118,
+					328
+				]
+			]
+		},
+		{
+			"id": "glasbruch",
+			"name": "DER GLASBRUCH",
+			"level": 1,
+			"color": "7fb2ff",
+			"about": "Der Nordhang mit der Mulde, in der der alte Kristallbruch in den Berg führt (Mine, Stufe 7).",
+			"poly": [
+				[
+					146,
+					312
+				],
+				[
+					163,
+					312
+				],
+				[
+					166,
+					296
+				],
+				[
+					191,
+					296
+				],
+				[
+					192,
+					318
+				],
+				[
+					178,
+					327
+				],
+				[
+					160,
+					330
+				],
+				[
+					146,
+					330
+				]
+			]
+		}
+	],
+	"ways": [
+		{
+			"id": "steige",
+			"name": "DIE STEIGE",
+			"about": "Die Hauptachse von Osten nach Westen hinauf: die Torstraße (wo der Westweg ankommt), der Markt, das Osttor (Felsstufen 0 -> 1), die Torgasse, die Torstufen (1 -> 2), die Werkgasse, die Forumstufen (2 -> 3), das Forum.",
+			"via": [
+				[
+					196,
+					350
+				],
+				[
+					194,
+					352
+				],
+				[
+					189,
+					344
+				],
+				[
+					183,
+					344
+				],
+				[
+					181,
+					352
+				],
+				[
+					176,
+					356
+				],
+				[
+					166,
+					355
+				],
+				[
+					150,
+					355
+				]
+			],
+			"line": [
+				[
+					196,
+					350
+				],
+				[
+					194,
+					350
+				],
+				[
+					194,
+					352
+				],
+				[
+					189,
+					352
+				],
+				[
+					189,
+					344
+				],
+				[
+					181,
+					344
+				],
+				[
+					181,
+					352
+				],
+				[
+					179,
+					352
+				],
+				[
+					179,
+					355
+				],
+				[
+					176,
+					355
+				],
+				[
+					176,
+					356
+				],
+				[
+					166,
+					356
+				],
+				[
+					166,
+					355
+				],
+				[
+					150,
+					355
+				]
+			]
+		},
+		{
+			"id": "karrenrampe",
+			"name": "DIE KARRENRAMPE",
+			"about": "Von der Torgasse über die Rampe (1 -> 2) in die südlichen Staffeln.",
+			"via": [
+				[
+					183,
+					362
+				],
+				[
+					178,
+					372
+				],
+				[
+					168,
+					376
+				],
+				[
+					160,
+					372
+				]
+			],
+			"line": [
+				[
+					183,
+					362
+				],
+				[
+					180,
+					362
+				],
+				[
+					180,
+					371
+				],
+				[
+					178,
+					371
+				],
+				[
+					178,
+					372
+				],
+				[
+					168,
+					372
+				],
+				[
+					168,
+					376
+				],
+				[
+					163,
+					376
+				],
+				[
+					163,
+					375
+				],
+				[
+					161,
+					375
+				],
+				[
+					161,
+					374
+				],
+				[
+					160,
+					374
+				],
+				[
+					160,
+					372
+				]
+			]
+		},
+		{
+			"id": "muldenstiege",
+			"name": "DIE MULDENSTIEGE",
+			"about": "Von den Staffeln hinab in die Brunnenmulde (2 -> 1) und weiter nach Süden ins Freie (1 -> 0).",
+			"via": [
+				[
+					162,
+					368
+				],
+				[
+					152,
+					380
+				],
+				[
+					170,
+					404
+				]
+			],
+			"line": [
+				[
+					162,
+					368
+				],
+				[
+					152,
+					368
+				],
+				[
+					152,
+					380
+				],
+				[
+					153,
+					380
+				],
+				[
+					153,
+					369
+				],
+				[
+					170,
+					369
+				],
+				[
+					170,
+					355
+				],
+				[
+					179,
+					355
+				],
+				[
+					179,
+					344
+				],
+				[
+					187,
+					344
+				],
+				[
+					187,
+					375
+				],
+				[
+					188,
+					375
+				],
+				[
+					188,
+					376
+				],
+				[
+					189,
+					376
+				],
+				[
+					189,
+					377
+				],
+				[
+					190,
+					377
+				],
+				[
+					190,
+					378
+				],
+				[
+					191,
+					378
+				],
+				[
+					191,
+					385
+				],
+				[
+					190,
+					385
+				],
+				[
+					190,
+					388
+				],
+				[
+					189,
+					388
+				],
+				[
+					189,
+					389
+				],
+				[
+					188,
+					389
+				],
+				[
+					188,
+					390
+				],
+				[
+					187,
+					390
+				],
+				[
+					187,
+					391
+				],
+				[
+					184,
+					391
+				],
+				[
+					184,
+					392
+				],
+				[
+					182,
+					392
+				],
+				[
+					182,
+					393
+				],
+				[
+					179,
+					393
+				],
+				[
+					179,
+					394
+				],
+				[
+					178,
+					394
+				],
+				[
+					178,
+					395
+				],
+				[
+					177,
+					395
+				],
+				[
+					177,
+					396
+				],
+				[
+					176,
+					396
+				],
+				[
+					176,
+					397
+				],
+				[
+					175,
+					397
+				],
+				[
+					175,
+					398
+				],
+				[
+					174,
+					398
+				],
+				[
+					174,
+					399
+				],
+				[
+					170,
+					399
+				],
+				[
+					170,
+					404
+				]
+			]
+		},
+		{
+			"id": "mauerweg",
+			"name": "DER MAUERWEG",
+			"about": "Vom Forum hinab auf den Westring (3 -> 2 -> 1): der Wehrgang über der Leere.",
+			"via": [
+				[
+					134,
+					355
+				],
+				[
+					118,
+					348
+				],
+				[
+					117,
+					333
+				],
+				[
+					113,
+					338
+				],
+				[
+					113,
+					358
+				]
+			],
+			"line": [
+				[
+					134,
+					355
+				],
+				[
+					118,
+					355
+				],
+				[
+					118,
+					335
+				],
+				[
+					119,
+					335
+				],
+				[
+					119,
+					333
+				],
+				[
+					120,
+					333
+				],
+				[
+					120,
+					331
+				],
+				[
+					117,
+					331
+				],
+				[
+					117,
+					333
+				],
+				[
+					114,
+					333
+				],
+				[
+					114,
+					335
+				],
+				[
+					113,
+					335
+				],
+				[
+					113,
+					358
+				]
+			]
+		},
+		{
+			"id": "nordgasse",
+			"name": "DIE NORDGASSE",
+			"about": "Von der Torgasse nach Norden auf den Nordhang und hinab in die Mulde des Glasbruchs.",
+			"via": [
+				[
+					183,
+					340
+				],
+				[
+					172,
+					330
+				],
+				[
+					168,
+					318
+				],
+				[
+					152,
+					325
+				]
+			],
+			"line": [
+				[
+					183,
+					340
+				],
+				[
+					174,
+					340
+				],
+				[
+					174,
+					333
+				],
+				[
+					173,
+					333
+				],
+				[
+					173,
+					332
+				],
+				[
+					172,
+					332
+				],
+				[
+					172,
+					330
+				],
+				[
+					170,
+					330
+				],
+				[
+					170,
+					329
+				],
+				[
+					168,
+					329
+				],
+				[
+					168,
+					318
+				],
+				[
+					165,
+					318
+				],
+				[
+					165,
+					317
+				],
+				[
+					152,
+					317
+				],
+				[
+					152,
+					325
+				]
+			]
+		}
+	],
+	"gates": [
+		{
+			"id": "osttor",
+			"name": "DAS OSTTOR",
+			"tile": [
+				186,
+				342
+			],
+			"about": "Die Felsstufen vom Vorland auf die Torgasse; zwei Torhäuser davor auf dem Pflaster.",
+			"houses": [
+				[
+					187,
+					337,
+					3,
+					4
+				],
+				[
+					187,
+					346,
+					3,
+					4
+				]
+			]
+		},
+		{
+			"id": "forumtor",
+			"name": "DIE FORUMSTUFEN",
+			"tile": [
+				164,
+				354
+			],
+			"about": "Die Stufen von den Staffeln auf den Gipfel."
+		},
+		{
+			"id": "schwarze_mauer",
+			"name": "DIE SCHWARZE MAUER",
+			"tile": [
+				135,
+				330
+			],
+			"sealed": true,
+			"about": "Versiegelt den Abstieg ins Verlorene Viertel."
+		}
+	],
+	"places": [
+		{
+			"id": "forum",
+			"name": "DAS FORUM DER WÄCHTERIN",
+			"district": "stille",
+			"level": 3,
+			"kind": "square",
+			"rect": [
+				134,
+				347,
+				17,
+				17
+			],
+			"about": "Runder Platz um die Wächterin des Glaskamms, Leitlinien im Pflaster, Arkaden."
+		},
+		{
+			"id": "hueterhalle",
+			"name": "DIE HÜTERHALLE",
+			"district": "stille",
+			"level": 3,
+			"kind": "hall",
+			"rect": [
+				134,
+				338,
+				12,
+				8
+			],
+			"about": "Ilvanes Halle, Wandbilder, Kerzenreihe."
+		},
+		{
+			"id": "rothalle",
+			"name": "DIE ROTHALLE",
+			"district": "stille",
+			"level": 3,
+			"kind": "hall",
+			"rect": [
+				143,
+				359,
+				11,
+				6
+			],
+			"about": "Die verlassene Garnison des roten Ordens."
+		},
+		{
+			"id": "archiv",
+			"name": "DAS STEINARCHIV",
+			"district": "stille",
+			"level": 3,
+			"kind": "hall",
+			"rect": [
+				122,
+				348,
+				9,
+				9
+			],
+			"about": "Sebalds Archiv, Regale aus Fels."
+		},
+		{
+			"id": "vogtshaus",
+			"name": "DAS VOGTSHAUS",
+			"district": "stille",
+			"level": 3,
+			"kind": "house",
+			"rect": [
+				127,
+				362,
+				9,
+				6
+			],
+			"about": "Ratsstube und Sitz der Vögtin."
+		},
+		{
+			"id": "mondturm",
+			"name": "DER MONDTURM",
+			"district": "stille",
+			"level": 3,
+			"kind": "tower",
+			"rect": [
+				125,
+				331,
+				5,
+				5
+			],
+			"about": "Höchster Punkt der Stadt, Glocke und Fernschau."
+		},
+		{
+			"id": "brunnenhof",
+			"name": "DER BRUNNENHOF",
+			"district": "stille",
+			"level": 3,
+			"kind": "square",
+			"rect": [
+				156,
+				347,
+				6,
+				6
+			],
+			"about": "Der einzige Springbrunnen mit echtem Wasserlauf."
+		},
+		{
+			"id": "steinmarkt",
+			"name": "DER STEINMARKT",
+			"district": "fuss",
+			"level": 0,
+			"kind": "square",
+			"rect": [
+				189,
+				338,
+				17,
+				15
+			],
+			"about": "Großer Platz vor dem Tor: Stände, Wasserspeier-Brunnen, Steinwaage."
+		},
+		{
+			"id": "gasthaus",
+			"name": "GASTHAUS ZUM STILLEN STEIN",
+			"district": "fuss",
+			"level": 0,
+			"kind": "house",
+			"rect": [
+				191,
+				328,
+				10,
+				8
+			],
+			"about": "Heddas Gasthaus (Innenraum)."
+		},
+		{
+			"id": "geisterzeile",
+			"name": "DIE GEISTERZEILE",
+			"district": "fuss",
+			"level": 0,
+			"kind": "row",
+			"rect": [
+				187,
+				355,
+				5,
+				17
+			],
+			"about": "Leere Häuser mit zugenagelten Läden an der Torstraße, mit dem Rücken an den Fels; hier öffnen sich mit Stadtstufe 1 die ersten Läden."
+		},
+		{
+			"id": "karrenhof",
+			"name": "DER KARRENHOF",
+			"district": "fuss",
+			"level": 0,
+			"kind": "yard",
+			"rect": [
+				198,
+				358,
+				14,
+				10
+			],
+			"about": "Hof der Karawanen mit Brunnentrog und Lagerhäusern; Joruns Platz, wenn er hier ist."
+		},
+		{
+			"id": "stallungen",
+			"name": "DIE STALLUNGEN",
+			"district": "fuss",
+			"level": 0,
+			"kind": "stable",
+			"rect": [
+				214,
+				366,
+				16,
+				9
+			],
+			"about": "Großer Steinstall mit Heuboden, Sattelkammer und acht Buchten. Später der Ort der Reittiere; eingeführt um Stufe 15 durch Jorun.",
+			"paddock": [
+				215,
+				376,
+				24,
+				13
+			]
+		},
+		{
+			"id": "felder",
+			"name": "DIE TERRASSENFELDER",
+			"district": "fuss",
+			"level": 0,
+			"kind": "fields",
+			"rect": [
+				196,
+				307,
+				18,
+				13
+			],
+			"about": "Linsen, Rüben und Kräuter hinter Trockenmauern."
+		},
+		{
+			"id": "windmuehle",
+			"name": "DIE WINDMÜHLE",
+			"district": "fuss",
+			"level": 0,
+			"kind": "tower",
+			"rect": [
+				217,
+				312,
+				4,
+				4
+			],
+			"about": "Halb verlassen; dreht sich im Wind."
+		},
+		{
+			"id": "torgasse",
+			"name": "DIE TORGASSE",
+			"district": "staffeln",
+			"level": 1,
+			"kind": "lane",
+			"rect": [
+				180,
+				335,
+				5,
+				34
+			],
+			"about": "Der schmale Ring hinter dem Tor."
+		},
+		{
+			"id": "steinmetzhof",
+			"name": "ODRIKS STEINMETZHOF",
+			"district": "staffeln",
+			"level": 2,
+			"kind": "yard",
+			"rect": [
+				165,
+				359,
+				11,
+				9
+			],
+			"about": "Quader, Kran, halbfertige Statuen."
+		},
+		{
+			"id": "glasschleiferei",
+			"name": "DIE GLASSCHLEIFEREI",
+			"district": "staffeln",
+			"level": 2,
+			"kind": "house",
+			"rect": [
+				166,
+				340,
+				9,
+				7
+			],
+			"about": "Tamsas Werkstatt."
+		},
+		{
+			"id": "lampenmacherei",
+			"name": "DIE LAMPENMACHEREI",
+			"district": "staffeln",
+			"level": 2,
+			"kind": "house",
+			"rect": [
+				167,
+				375,
+				9,
+				7
+			],
+			"about": "Laternenreihen, Glühfäden aus Klangstein."
+		},
+		{
+			"id": "brunnenmulde",
+			"name": "DIE BRUNNENMULDE",
+			"district": "staffeln",
+			"level": 1,
+			"kind": "gardens",
+			"rect": [
+				147,
+				376,
+				12,
+				12
+			],
+			"about": "Hängende Gärten über der Senke, Waschplatz und der Rundbogen zu den Zisternen."
+		},
+		{
+			"id": "zisternen",
+			"name": "DER ZISTERNENBOGEN",
+			"district": "staffeln",
+			"level": 1,
+			"kind": "entrance",
+			"rect": [
+				152,
+				388,
+				4,
+				3
+			],
+			"about": "Eingang zu den Zisternen unter dem Berg (Innenraum, Stufe 7)."
+		},
+		{
+			"id": "westmauer",
+			"name": "DIE WESTMAUER",
+			"district": "rand",
+			"level": 1,
+			"kind": "wall",
+			"rect": [
+				111,
+				336,
+				5,
+				26
+			],
+			"about": "Der Wehrgang auf dem Außenring, Blick in die Leere."
+		},
+		{
+			"id": "letzte_bruestung",
+			"name": "DIE LETZTE BRÜSTUNG",
+			"district": "rand",
+			"level": 1,
+			"kind": "lookout",
+			"rect": [
+				111,
+				340,
+				5,
+				5
+			],
+			"about": "Schalen mit Leitsteinlicht, die Wachen starren hinaus."
+		},
+		{
+			"id": "gedenkgarten",
+			"name": "DER GEDENKGARTEN",
+			"district": "rand",
+			"level": 0,
+			"kind": "garden",
+			"rect": [
+				108,
+				384,
+				10,
+				9
+			],
+			"about": "Gräber und die Namenswand hinter einer Eisenpforte."
+		},
+		{
+			"id": "glasbruch_mund",
+			"name": "DER MUND DES GLASBRUCHS",
+			"district": "glasbruch",
+			"level": 0,
+			"kind": "entrance",
+			"rect": [
+				149,
+				324,
+				9,
+				4
+			],
+			"about": "Die versunkene Mulde am Nordhang, aus der der alte Kristallbruch in den Berg führt."
+		}
+	],
+	"leitsteine": [
+		{
+			"id": "markt",
+			"tile": [
+				198,
+				346
+			],
+			"tone": 0
+		},
+		{
+			"id": "karrenhof",
+			"tile": [
+				205,
+				362
+			],
+			"tone": 2
+		},
+		{
+			"id": "stall",
+			"tile": [
+				212,
+				373
+			],
+			"tone": 1
+		},
+		{
+			"id": "torgasse_nord",
+			"tile": [
+				183,
+				338
+			],
+			"tone": 1
+		},
+		{
+			"id": "torgasse_sued",
+			"tile": [
+				183,
+				365
+			],
+			"tone": 3
+		},
+		{
+			"id": "werkgasse",
+			"tile": [
+				171,
+				355
+			],
+			"tone": 2
+		},
+		{
+			"id": "steinmetz",
+			"tile": [
+				170,
+				370
+			],
+			"tone": 0
+		},
+		{
+			"id": "mulde",
+			"tile": [
+				153,
+				383
+			],
+			"tone": 1
+		},
+		{
+			"id": "forum_nord",
+			"tile": [
+				142,
+				345
+			],
+			"tone": 3
+		},
+		{
+			"id": "forum_ost",
+			"tile": [
+				154,
+				355
+			],
+			"tone": 0
+		},
+		{
+			"id": "forum_west",
+			"tile": [
+				130,
+				355
+			],
+			"tone": 2
+		},
+		{
+			"id": "mondturm",
+			"tile": [
+				130,
+				335
+			],
+			"tone": 1
+		},
+		{
+			"id": "bruestung",
+			"tile": [
+				113,
+				346
+			],
+			"tone": 3
+		},
+		{
+			"id": "mauer_nord",
+			"tile": [
+				113,
+				338
+			],
+			"tone": 0
+		},
+		{
+			"id": "glasbruch",
+			"tile": [
+				156,
+				326
+			],
+			"tone": 2
+		},
+		{
+			"id": "verloren",
+			"tile": [
+				121,
+				320
+			],
+			"tone": 3,
+			"dead": true
+		}
+	],
+	"milestones": [
+		{
+			"id": "meile_50",
+			"number": 50,
+			"pos": [
+				3398,
+				6189
+			],
+			"tile": [
+				212,
+				386
+			]
+		},
+		{
+			"id": "meile_100",
+			"number": 100,
+			"pos": [
+				4012,
+				6619
+			],
+			"tile": [
+				250,
+				413
+			]
+		},
+		{
+			"id": "meile_150",
+			"number": 150,
+			"pos": [
+				4472,
+				7115
+			],
+			"tile": [
+				279,
+				444
+			]
+		},
+		{
+			"id": "meile_200",
+			"number": 200,
+			"pos": [
+				4814,
+				7781
+			],
+			"tile": [
+				300,
+				486
+			]
+		},
+		{
+			"id": "meile_250",
+			"number": 250,
+			"pos": [
+				5388,
+				8347
+			],
+			"tile": [
+				336,
+				521
+			]
+		},
+		{
+			"id": "meile_300",
+			"number": 300,
+			"pos": [
+				5627,
+				9058
+			],
+			"tile": [
+				351,
+				566
+			]
+		},
+		{
+			"id": "meile_350",
+			"number": 350,
+			"pos": [
+				6325,
+				9193
+			],
+			"tile": [
+				395,
+				574
+			]
+		},
+		{
+			"id": "meile_400",
+			"number": 400,
+			"pos": [
+				7048,
+				9131
+			],
+			"tile": [
+				440,
+				570
+			]
+		},
+		{
+			"id": "meile_450",
+			"number": 450,
+			"pos": [
+				7699,
+				8815
+			],
+			"tile": [
+				481,
+				550
+			]
+		},
+		{
+			"id": "meile_500",
+			"number": 500,
+			"pos": [
+				8476,
+				8727
+			],
+			"tile": [
+				529,
+				545
+			]
+		},
+		{
+			"id": "meile_550",
+			"number": 550,
+			"pos": [
+				9168,
+				9083
+			],
+			"tile": [
+				573,
+				567
+			]
+		},
+		{
+			"id": "meile_600",
+			"number": 600,
+			"pos": [
+				9935,
+				9164
+			],
+			"tile": [
+				620,
+				572
+			]
+		},
+		{
+			"id": "meile_650",
+			"number": 650,
+			"pos": [
+				10721,
+				9160
+			],
+			"tile": [
+				670,
+				572
+			]
+		},
+		{
+			"id": "meile_700",
+			"number": 700,
+			"pos": [
+				11376,
+				8777
+			],
+			"tile": [
+				711,
+				548
+			]
+		},
+		{
+			"id": "meile_750",
+			"number": 750,
+			"pos": [
+				12162,
+				8978
+			],
+			"tile": [
+				760,
+				561
+			]
+		}
+	],
+	"westweg": {
+		"paths": [
+			"westweg_1",
+			"westweg_2",
+			"westweg_3",
+			"westweg_4",
+			"westweg_5",
+			"westweg_6",
+			"westweg_7",
+			"westweg_8",
+			"westweg_9",
+			"westweg_10",
+			"westweg_11"
+		],
+		"from": [
+			788,
+			573
+		],
+		"to": [
+			190,
+			345
+		],
+		"tiles": 788
+	},
+	"milestone_text": {
+		"about": "Platzhalter für den Dialog-Writer: die Inschrift (%d = Zahl) und Ellies Gedanken je nach Entfernung (far > 400, mid > 150, near > 50, last = 50).",
+		"speaker": "MEILENSTEIN",
+		"inscription": "HALLGRAT  %d",
+		"thoughts": {
+			"far": [
+				"DIE ZAHL IST FAST WEGGEWASCHEN. JEMAND HAT HIER FRÜHER GEZÄHLT.",
+				"EIN STEIN, DER NOCH WEISS, WOHIN DER WEG GEHT. MEHR ALS ICH.",
+				"MOOS IN JEDER RILLE. HIER IST LANGE KEINER MEHR VORBEIGEKOMMEN."
+			],
+			"mid": [
+				"DIE STEINE WERDEN BESSER. ALS HÄTTE SIE JEMAND NICHT AUFGEGEBEN.",
+				"OBEN IN DER KRONE STECKT EIN KRISTALL. GRAU. TOT, GLAUBE ICH."
+			],
+			"near": [
+				"FRISCH NACHGEMEISSELT. DIE STADT KANN NICHT MEHR WEIT SEIN.",
+				"DER KRISTALL GLIMMT. GANZ SCHWACH, ABER ER GLIMMT."
+			],
+			"last": [
+				"ER SUMMT. WIE EINE GLOCKE, DIE SICH NICHT TRAUT."
+			]
+		}
+	},
+	"style_areas": [
+		{
+			"districts": [
+				"stille",
+				"staffeln",
+				"rand",
+				"fuss"
+			],
+			"style": 2,
+			"stairs": true,
+			"about": "Mauerwerk: die Terrassen sind Stützmauern, die Felsstufen gehauene Treppen."
+		},
+		{
+			"districts": [
+				"glasbruch"
+			],
+			"style": 3,
+			"about": "Kristalladern im Fels des Nordhangs (leuchten nachts violett)."
+		},
+		{
+			"districts": [
+				"verloren"
+			],
+			"style": 4,
+			"about": "Die Leere frisst das Verlorene Viertel (schwarzer Stein, magenta Risse)."
+		}
+	],
+	"paving": [
+		{
+			"id": "forum",
+			"style": "ring",
+			"centre": [
+				142,
+				355
+			],
+			"radius": [
+				198,
+				142
+			],
+			"wear": 0.12,
+			"about": "Das Forum: die Wächterin steht auf einem Podest aus großen Keilplatten mit einer niedrigen Stufe (dais), darum Lagen aus gesetzten Steinen; ihr wildes Steinbett ist hier ausgeblendet (waystones.json `paved`).",
+			"dais": 60
+		},
+		{
+			"id": "brunnenhof",
+			"style": "ring",
+			"centre": [
+				159,
+				350
+			],
+			"radius": [
+				46,
+				32
+			],
+			"hole": [
+				0,
+				0
+			],
+			"wear": 0.18
+		},
+		{
+			"id": "steige",
+			"style": "setts",
+			"way": "steige",
+			"width": 40,
+			"wear": 0.25
+		},
+		{
+			"id": "karrenrampe",
+			"style": "setts",
+			"way": "karrenrampe",
+			"width": 32,
+			"wear": 0.35
+		},
+		{
+			"id": "mauerweg",
+			"style": "setts",
+			"way": "mauerweg",
+			"width": 28,
+			"wear": 0.4
+		},
+		{
+			"id": "muldenstiege",
+			"style": "setts",
+			"way": "muldenstiege",
+			"width": 28,
+			"wear": 0.5
+		},
+		{
+			"id": "nordgasse",
+			"style": "flags",
+			"way": "nordgasse",
+			"width": 30,
+			"wear": 0.65
+		},
+		{
+			"id": "steinmarkt",
+			"style": "flags",
+			"poly": [
+				[
+					191.5,
+					338
+				],
+				[
+					203.5,
+					338
+				],
+				[
+					206,
+					340.5
+				],
+				[
+					206,
+					350.5
+				],
+				[
+					203.5,
+					353
+				],
+				[
+					191.5,
+					353
+				],
+				[
+					189,
+					350.5
+				],
+				[
+					189,
+					340.5
+				]
+			],
+			"wear": 0.45
+		},
+		{
+			"id": "karrenhof",
+			"style": "flags",
+			"poly": [
+				[
+					200,
+					358
+				],
+				[
+					210,
+					358
+				],
+				[
+					212,
+					360
+				],
+				[
+					212,
+					366
+				],
+				[
+					210,
+					368
+				],
+				[
+					200,
+					368
+				],
+				[
+					198,
+					366
+				],
+				[
+					198,
+					360
+				]
+			],
+			"wear": 0.65
+		}
+	],
+	"buildings": [
+		{
+			"id": "hueterhalle",
+			"type": "halle",
+			"view": "s",
+			"want": [
+				141,
+				343
+			],
+			"level": 3
+		},
+		{
+			"id": "rothalle",
+			"type": "halle",
+			"view": "s",
+			"want": [
+				150,
+				338
+			],
+			"level": 3,
+			"reach": 22
+		},
+		{
+			"id": "archiv",
+			"type": "giebel",
+			"view": "s",
+			"want": [
+				131,
+				347
+			],
+			"level": 3
+		},
+		{
+			"id": "mondturm",
+			"type": "torhaus",
+			"view": "s",
+			"want": [
+				126,
+				334
+			],
+			"level": 3
+		},
+		{
+			"id": "gasthaus",
+			"type": "haus_hoch",
+			"view": "s",
+			"want": [
+				196,
+				337
+			],
+			"level": 0
+		},
+		{
+			"id": "lagerhaus",
+			"type": "haus_b",
+			"view": "s",
+			"want": [
+				205,
+				357
+			],
+			"level": 0
+		},
+		{
+			"id": "stallungen",
+			"type": "stall",
+			"view": "s",
+			"want": [
+				222,
+				375
+			],
+			"level": 0
+		},
+		{
+			"id": "torhaus",
+			"type": "torhaus",
+			"view": "s",
+			"want": [
+				189,
+				341
+			],
+			"level": 0
+		}
+	],
+	"forum_market": {
+		"about": "Der Markt um die Wächterin: Stände eng im Ring ums Forum, jeder zu ihr gedreht (Vorder-, Rück- oder Seitenansicht); Osten und Westen (die Steige) bleiben frei.",
+		"radius": [
+			7.4,
+			5.4
+		],
+		"angles": [
+			-40,
+			-75,
+			-105,
+			-140,
+			40,
+			75,
+			105,
+			140
+		]
+	},
+	"rows": [
+		{
+			"id": "forum_nord",
+			"line": [
+				[
+					129.41,
+					351.65
+				],
+				[
+					130.4,
+					350.1
+				],
+				[
+					131.74,
+					348.7
+				],
+				[
+					133.39,
+					347.49
+				],
+				[
+					135.3,
+					346.51
+				],
+				[
+					137.42,
+					345.79
+				],
+				[
+					139.67,
+					345.35
+				],
+				[
+					142.0,
+					345.2
+				],
+				[
+					144.33,
+					345.35
+				],
+				[
+					146.58,
+					345.79
+				],
+				[
+					148.7,
+					346.51
+				],
+				[
+					150.61,
+					347.49
+				],
+				[
+					152.26,
+					348.7
+				],
+				[
+					153.6,
+					350.1
+				],
+				[
+					154.59,
+					351.65
+				]
+			],
+			"half": 2,
+			"level": 3,
+			"palette": [
+				"haus_hoch",
+				"giebel",
+				"haus_b",
+				"haus_a",
+				"giebel"
+			],
+			"sides": [
+				-1
+			],
+			"gap": 0,
+			"lane": 0.0
+		},
+		{
+			"street": "steige",
+			"level": 3,
+			"palette": [
+				"haus_hoch",
+				"giebel",
+				"haus_b",
+				"haus_a",
+				"giebel"
+			]
+		},
+		{
+			"street": "steige",
+			"level": 2,
+			"palette": [
+				"laden",
+				"haus_a",
+				"giebel",
+				"haus_b",
+				"laden",
+				"haus_hoch"
+			]
+		},
+		{
+			"street": "steige",
+			"level": 1,
+			"palette": [
+				"haus_a",
+				"giebel",
+				"laden",
+				"haus_b"
+			]
+		},
+		{
+			"street": "karrenrampe",
+			"level": 2,
+			"palette": [
+				"laden",
+				"haus_a",
+				"giebel",
+				"haus_b",
+				"laden",
+				"haus_hoch"
+			]
+		},
+		{
+			"street": "karrenrampe",
+			"level": 1,
+			"palette": [
+				"haus_a",
+				"giebel",
+				"laden",
+				"haus_b"
+			]
+		},
+		{
+			"street": "muldenstiege",
+			"level": 1,
+			"palette": [
+				"haus_a",
+				"verlassen_b",
+				"giebel"
+			]
+		},
+		{
+			"street": "nordgasse",
+			"level": 1,
+			"palette": [
+				"verlassen_a",
+				"haus_a",
+				"giebel"
+			]
+		},
+		{
+			"id": "markt_nord",
+			"line": [
+				[
+					189,
+					339
+				],
+				[
+					206,
+					339
+				]
+			],
+			"half": 4,
+			"level": 0,
+			"palette": [
+				"haus_b",
+				"laden",
+				"giebel"
+			],
+			"sides": [
+				-1
+			]
+		},
+		{
+			"id": "karrenhof_nord",
+			"line": [
+				[
+					198,
+					358
+				],
+				[
+					212,
+					358
+				]
+			],
+			"half": 4,
+			"level": 0,
+			"palette": [
+				"verlassen_a",
+				"haus_a"
+			],
+			"sides": [
+				-1
+			]
+		},
+		{
+			"id": "westweg_ende",
+			"line": [
+				[
+					236,
+					408
+				],
+				[
+					216,
+					392
+				],
+				[
+					200,
+					377
+				]
+			],
+			"half": 15,
+			"level": 0,
+			"palette": [
+				"verlassen_a",
+				"haus_a",
+				"verlassen_b",
+				"giebel",
+				"haus_b"
+			]
+		}
+	],
+	"placed": [
+		{
+			"id": "hueterhalle",
+			"type": "halle",
+			"view": "s",
+			"px": [
+				2264.0,
+				5496.0
+			],
+			"tile": [
+				141,
+				343
+			],
+			"flip": false
+		},
+		{
+			"id": "rothalle",
+			"type": "halle",
+			"view": "s",
+			"px": [
+				2199.4,
+				5360.1
+			],
+			"tile": [
+				137,
+				334
+			],
+			"flip": false
+		},
+		{
+			"id": "archiv",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2104.0,
+				5560.0
+			],
+			"tile": [
+				131,
+				347
+			],
+			"flip": false
+		},
+		{
+			"id": "mondturm",
+			"type": "torhaus",
+			"view": "s",
+			"px": [
+				2024.0,
+				5352.0
+			],
+			"tile": [
+				126,
+				334
+			],
+			"flip": false
+		},
+		{
+			"id": "gasthaus",
+			"type": "haus_hoch",
+			"view": "s",
+			"px": [
+				3144.0,
+				5400.0
+			],
+			"tile": [
+				196,
+				337
+			],
+			"flip": false
+		},
+		{
+			"id": "lagerhaus",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				3288.0,
+				5720.0
+			],
+			"tile": [
+				205,
+				357
+			],
+			"flip": false
+		},
+		{
+			"id": "stallungen",
+			"type": "stall",
+			"view": "s",
+			"px": [
+				3560.0,
+				6008.0
+			],
+			"tile": [
+				222,
+				375
+			],
+			"flip": false
+		},
+		{
+			"id": "torhaus",
+			"type": "torhaus",
+			"view": "s",
+			"px": [
+				3008.8,
+				5470.2
+			],
+			"tile": [
+				188,
+				341
+			],
+			"flip": false
+		},
+		{
+			"id": "steige_2_1_0",
+			"type": "laden",
+			"view": "s",
+			"px": [
+				2807.5,
+				5668.0
+			],
+			"tile": [
+				175,
+				354
+			],
+			"flip": false
+		},
+		{
+			"id": "steige_2_1_1",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2715.0,
+				5668.5
+			],
+			"tile": [
+				169,
+				354
+			],
+			"flip": false
+		},
+		{
+			"id": "karrenrampe_2_1_0",
+			"type": "laden",
+			"view": "s",
+			"px": [
+				2825.0,
+				5940.8
+			],
+			"tile": [
+				176,
+				371
+			],
+			"flip": false
+		},
+		{
+			"id": "nordgasse_1_1_0",
+			"type": "verlassen_a",
+			"view": "s",
+			"px": [
+				2922.3,
+				5430.8
+			],
+			"tile": [
+				182,
+				339
+			],
+			"flip": false
+		},
+		{
+			"id": "nordgasse_1_1_1",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2836.2,
+				5438.3
+			],
+			"tile": [
+				177,
+				339
+			],
+			"flip": false
+		},
+		{
+			"id": "markt_nord_0_-1_0",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				3302.0,
+				5425.0
+			],
+			"tile": [
+				206,
+				339
+			],
+			"flip": false
+		},
+		{
+			"id": "karrenhof_nord_0_-1_0",
+			"type": "verlassen_a",
+			"view": "s",
+			"px": [
+				3176.0,
+				5729.0
+			],
+			"tile": [
+				198,
+				358
+			],
+			"flip": false
+		},
+		{
+			"id": "karrenhof_nord_0_-1_1",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				3378.0,
+				5729.0
+			],
+			"tile": [
+				211,
+				358
+			],
+			"flip": false
+		},
+		{
+			"id": "westweg_ende_0_1_0",
+			"type": "verlassen_a",
+			"view": "s",
+			"px": [
+				3631.3,
+				6390.8
+			],
+			"tile": [
+				226,
+				399
+			],
+			"flip": false
+		},
+		{
+			"id": "westweg_ende_0_1_1",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				3548.5,
+				6324.5
+			],
+			"tile": [
+				221,
+				395
+			],
+			"flip": false
+		},
+		{
+			"id": "westweg_ende_0_1_2",
+			"type": "verlassen_b",
+			"view": "s",
+			"px": [
+				3463.0,
+				6254.4
+			],
+			"tile": [
+				216,
+				390
+			],
+			"flip": false
+		},
+		{
+			"id": "westweg_ende_0_1_3",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				3385.0,
+				6181.2
+			],
+			"tile": [
+				211,
+				386
+			],
+			"flip": false
+		},
+		{
+			"id": "westweg_ende_0_1_4",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				3305.5,
+				6106.7
+			],
+			"tile": [
+				206,
+				381
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_0",
+			"type": "haus_hoch",
+			"view": "s",
+			"px": [
+				1972.0,
+				5444
+			],
+			"tile": [
+				123,
+				340
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_1",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				2068.0,
+				5444
+			],
+			"tile": [
+				129,
+				340
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_2",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2152.0,
+				5456
+			],
+			"tile": [
+				134,
+				340
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_3",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2588.0,
+				5532
+			],
+			"tile": [
+				161,
+				345
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_4",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				1984.0,
+				5536
+			],
+			"tile": [
+				124,
+				345
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_5",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				1964.0,
+				5632
+			],
+			"tile": [
+				122,
+				351
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_6",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2036.0,
+				5632
+			],
+			"tile": [
+				127,
+				351
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_7",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				2516.0,
+				5736
+			],
+			"tile": [
+				157,
+				358
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_8",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				1968.0,
+				5752
+			],
+			"tile": [
+				123,
+				359
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_9",
+			"type": "haus_hoch",
+			"view": "s",
+			"px": [
+				2060.0,
+				5752
+			],
+			"tile": [
+				128,
+				359
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_10",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2600.0,
+				5752
+			],
+			"tile": [
+				162,
+				359
+			],
+			"flip": false
+		},
+		{
+			"id": "stille_3_12",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2140.0,
+				5836
+			],
+			"tile": [
+				133,
+				364
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_0",
+			"type": "laden",
+			"view": "s",
+			"px": [
+				2680.0,
+				5352
+			],
+			"tile": [
+				167,
+				334
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_1",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2300.0,
+				5360
+			],
+			"tile": [
+				143,
+				334
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_2",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				2580.0,
+				5416
+			],
+			"tile": [
+				161,
+				338
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_3",
+			"type": "haus_hoch",
+			"view": "s",
+			"px": [
+				2676.0,
+				5444
+			],
+			"tile": [
+				167,
+				340
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_4",
+			"type": "laden",
+			"view": "s",
+			"px": [
+				2376.0,
+				5464
+			],
+			"tile": [
+				148,
+				341
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_5",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2468.0,
+				5480
+			],
+			"tile": [
+				154,
+				342
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_6",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				2676.0,
+				5536
+			],
+			"tile": [
+				167,
+				345
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_7",
+			"type": "haus_hoch",
+			"view": "s",
+			"px": [
+				2772.0,
+				5560
+			],
+			"tile": [
+				173,
+				347
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_9",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2796.0,
+				5756
+			],
+			"tile": [
+				174,
+				359
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_10",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				2684.0,
+				5784
+			],
+			"tile": [
+				167,
+				361
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_11",
+			"type": "haus_hoch",
+			"view": "s",
+			"px": [
+				2788.0,
+				5848
+			],
+			"tile": [
+				174,
+				365
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_12",
+			"type": "laden",
+			"view": "s",
+			"px": [
+				2616.0,
+				5876
+			],
+			"tile": [
+				163,
+				367
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_2_13",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2624.0,
+				5968
+			],
+			"tile": [
+				164,
+				372
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_0",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2768.0,
+				5284
+			],
+			"tile": [
+				173,
+				330
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_1",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				2572.0,
+				5292
+			],
+			"tile": [
+				160,
+				330
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_2",
+			"type": "laden",
+			"view": "s",
+			"px": [
+				2384.0,
+				5320
+			],
+			"tile": [
+				149,
+				332
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_3",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				2480.0,
+				5336
+			],
+			"tile": [
+				155,
+				333
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_4",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2944.0,
+				5560
+			],
+			"tile": [
+				184,
+				347
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_5",
+			"type": "laden",
+			"view": "s",
+			"px": [
+				2936.0,
+				5720
+			],
+			"tile": [
+				183,
+				357
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_6",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				2372.0,
+				6008
+			],
+			"tile": [
+				148,
+				375
+			],
+			"flip": false
+		},
+		{
+			"id": "staffeln_1_7",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				2928.0,
+				6008
+			],
+			"tile": [
+				183,
+				375
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_0",
+			"type": "verlassen_a",
+			"view": "s",
+			"px": [
+				3408.0,
+				4832
+			],
+			"tile": [
+				213,
+				301
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_1",
+			"type": "verlassen_b",
+			"view": "s",
+			"px": [
+				3500.0,
+				4832
+			],
+			"tile": [
+				218,
+				301
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_2",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				3584.0,
+				4852
+			],
+			"tile": [
+				224,
+				303
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_3",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				3668.0,
+				4868
+			],
+			"tile": [
+				229,
+				304
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_4",
+			"type": "verlassen_a",
+			"view": "s",
+			"px": [
+				3324.0,
+				4916
+			],
+			"tile": [
+				207,
+				307
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_5",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				3412.0,
+				4924
+			],
+			"tile": [
+				213,
+				307
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_6",
+			"type": "verlassen_b",
+			"view": "s",
+			"px": [
+				3504.0,
+				4924
+			],
+			"tile": [
+				219,
+				307
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_7",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				3588.0,
+				4948
+			],
+			"tile": [
+				224,
+				309
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_8",
+			"type": "haus_b",
+			"view": "s",
+			"px": [
+				3672.0,
+				4960
+			],
+			"tile": [
+				229,
+				309
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_9",
+			"type": "verlassen_a",
+			"view": "s",
+			"px": [
+				3240.0,
+				5000
+			],
+			"tile": [
+				202,
+				312
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_10",
+			"type": "verlassen_b",
+			"view": "s",
+			"px": [
+				3332.0,
+				5016
+			],
+			"tile": [
+				208,
+				313
+			],
+			"flip": false
+		},
+		{
+			"id": "fuss_0_11",
+			"type": "giebel",
+			"view": "s",
+			"px": [
+				3756.0,
+				5016
+			],
+			"tile": [
+				234,
+				313
+			],
+			"flip": false
+		},
+		{
+			"id": "rand_1_0",
+			"type": "haus_a",
+			"view": "s",
+			"px": [
+				1872.0,
+				5260
+			],
+			"tile": [
+				117,
+				328
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_0",
+			"type": "stand_0_vorn",
+			"view": "s",
+			"px": [
+				2370.7,
+				5632.5
+			],
+			"tile": [
+				148,
+				351
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_1",
+			"type": "stand_1_vorn",
+			"view": "s",
+			"px": [
+				2310.6,
+				5604.5
+			],
+			"tile": [
+				144,
+				350
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_2",
+			"type": "stand_2_vorn",
+			"view": "s",
+			"px": [
+				2249.4,
+				5604.5
+			],
+			"tile": [
+				140,
+				350
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_3",
+			"type": "stand_0_vorn",
+			"view": "s",
+			"px": [
+				2189.3,
+				5632.5
+			],
+			"tile": [
+				136,
+				351
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_4",
+			"type": "stand_1_hinten",
+			"view": "s",
+			"px": [
+				2370.7,
+				5743.5
+			],
+			"tile": [
+				148,
+				358
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_5",
+			"type": "stand_2_hinten",
+			"view": "s",
+			"px": [
+				2310.6,
+				5771.5
+			],
+			"tile": [
+				144,
+				360
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_6",
+			"type": "stand_0_hinten",
+			"view": "s",
+			"px": [
+				2249.4,
+				5771.5
+			],
+			"tile": [
+				140,
+				360
+			],
+			"flip": false
+		},
+		{
+			"id": "stand_7",
+			"type": "stand_1_hinten",
+			"view": "s",
+			"px": [
+				2189.3,
+				5743.5
+			],
+			"tile": [
+				136,
+				358
+			],
+			"flip": false
+		}
+	],
+	"door_paths": [
+		{
+			"id": "hueterhalle",
+			"px": [
+				[
+					2266.0,
+					5498.0
+				],
+				[
+					2266.0,
+					5550.0
+				]
+			]
+		},
+		{
+			"id": "rothalle",
+			"px": [
+				[
+					2198.0,
+					5362.0
+				],
+				[
+					2198.0,
+					5562.0
+				]
+			]
+		},
+		{
+			"id": "archiv",
+			"px": [
+				[
+					2094.0,
+					5562.0
+				],
+				[
+					2094.0,
+					5614.0
+				],
+				[
+					2102.0,
+					5614.0
+				],
+				[
+					2102.0,
+					5630.0
+				]
+			]
+		},
+		{
+			"id": "mondturm",
+			"px": [
+				[
+					2026.0,
+					5354.0
+				],
+				[
+					2026.0,
+					5414.0
+				],
+				[
+					2022.0,
+					5414.0
+				],
+				[
+					2026.0,
+					5598.0
+				],
+				[
+					2002.0,
+					5598.0
+				],
+				[
+					2002.0,
+					5698.0
+				]
+			]
+		},
+		{
+			"id": "stallungen",
+			"px": [
+				[
+					3530.0,
+					6010.0
+				],
+				[
+					3530.0,
+					6014.0
+				],
+				[
+					3446.0,
+					6014.0
+				],
+				[
+					3446.0,
+					5858.0
+				],
+				[
+					3390.0,
+					5858.0
+				]
+			]
+		},
+		{
+			"id": "markt_nord_0_-1_0",
+			"px": [
+				[
+					3294.0,
+					5430.0
+				],
+				[
+					3294.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "karrenhof_nord_0_-1_0",
+			"px": [
+				[
+					3182.0,
+					5734.0
+				],
+				[
+					3182.0,
+					5750.0
+				]
+			]
+		},
+		{
+			"id": "karrenhof_nord_0_-1_1",
+			"px": [
+				[
+					3382.0,
+					5734.0
+				],
+				[
+					3382.0,
+					5754.0
+				]
+			]
+		},
+		{
+			"id": "westweg_ende_0_1_0",
+			"px": [
+				[
+					3638.0,
+					6394.0
+				],
+				[
+					3590.0,
+					6394.0
+				],
+				[
+					3590.0,
+					6026.0
+				],
+				[
+					3550.0,
+					6026.0
+				],
+				[
+					3550.0,
+					6014.0
+				],
+				[
+					3446.0,
+					6014.0
+				],
+				[
+					3446.0,
+					5858.0
+				],
+				[
+					3390.0,
+					5858.0
+				]
+			]
+		},
+		{
+			"id": "westweg_ende_0_1_1",
+			"px": [
+				[
+					3554.0,
+					6326.0
+				],
+				[
+					3554.0,
+					6330.0
+				],
+				[
+					3506.0,
+					6330.0
+				],
+				[
+					3506.0,
+					6014.0
+				],
+				[
+					3446.0,
+					6014.0
+				],
+				[
+					3446.0,
+					6002.0
+				],
+				[
+					3442.0,
+					6002.0
+				],
+				[
+					3442.0,
+					5858.0
+				],
+				[
+					3390.0,
+					5858.0
+				]
+			]
+		},
+		{
+			"id": "westweg_ende_0_1_2",
+			"px": [
+				[
+					3454.0,
+					6258.0
+				],
+				[
+					3418.0,
+					6258.0
+				],
+				[
+					3418.0,
+					5858.0
+				],
+				[
+					3390.0,
+					5858.0
+				]
+			]
+		},
+		{
+			"id": "westweg_ende_0_1_3",
+			"px": [
+				[
+					3378.0,
+					6186.0
+				],
+				[
+					3350.0,
+					6186.0
+				],
+				[
+					3350.0,
+					5886.0
+				]
+			]
+		},
+		{
+			"id": "westweg_ende_0_1_4",
+			"px": [
+				[
+					3298.0,
+					6110.0
+				],
+				[
+					3262.0,
+					6110.0
+				],
+				[
+					3262.0,
+					5882.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_0",
+			"px": [
+				[
+					1958.0,
+					5446.0
+				],
+				[
+					1958.0,
+					5490.0
+				],
+				[
+					1946.0,
+					5490.0
+				],
+				[
+					1946.0,
+					5506.0
+				],
+				[
+					1942.0,
+					5506.0
+				],
+				[
+					1942.0,
+					5598.0
+				],
+				[
+					1998.0,
+					5598.0
+				],
+				[
+					1998.0,
+					5698.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_1",
+			"px": [
+				[
+					2058.0,
+					5446.0
+				],
+				[
+					2058.0,
+					5490.0
+				],
+				[
+					2070.0,
+					5490.0
+				],
+				[
+					2070.0,
+					5630.0
+				],
+				[
+					2102.0,
+					5630.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_2",
+			"px": [
+				[
+					2142.0,
+					5458.0
+				],
+				[
+					2142.0,
+					5594.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_3",
+			"px": [
+				[
+					2578.0,
+					5534.0
+				],
+				[
+					2578.0,
+					5586.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_4",
+			"px": [
+				[
+					1990.0,
+					5538.0
+				],
+				[
+					1990.0,
+					5590.0
+				],
+				[
+					1998.0,
+					5590.0
+				],
+				[
+					1998.0,
+					5698.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_5",
+			"px": [
+				[
+					1954.0,
+					5634.0
+				],
+				[
+					1954.0,
+					5698.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_6",
+			"px": [
+				[
+					2026.0,
+					5634.0
+				],
+				[
+					2026.0,
+					5694.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_7",
+			"px": [
+				[
+					2506.0,
+					5738.0
+				],
+				[
+					2506.0,
+					5742.0
+				],
+				[
+					2462.0,
+					5742.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_8",
+			"px": [
+				[
+					1974.0,
+					5754.0
+				],
+				[
+					1974.0,
+					5758.0
+				],
+				[
+					2010.0,
+					5758.0
+				],
+				[
+					2010.0,
+					5722.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_9",
+			"px": [
+				[
+					2046.0,
+					5754.0
+				],
+				[
+					2046.0,
+					5758.0
+				],
+				[
+					2014.0,
+					5758.0
+				],
+				[
+					2014.0,
+					5722.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_10",
+			"px": [
+				[
+					2590.0,
+					5754.0
+				],
+				[
+					2590.0,
+					5758.0
+				],
+				[
+					2566.0,
+					5758.0
+				],
+				[
+					2566.0,
+					5702.0
+				]
+			]
+		},
+		{
+			"id": "stille_3_12",
+			"px": [
+				[
+					2130.0,
+					5838.0
+				],
+				[
+					2130.0,
+					5842.0
+				],
+				[
+					2174.0,
+					5842.0
+				],
+				[
+					2174.0,
+					5806.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_0",
+			"px": [
+				[
+					2702.0,
+					5354.0
+				],
+				[
+					2702.0,
+					5358.0
+				],
+				[
+					2726.0,
+					5358.0
+				],
+				[
+					2726.0,
+					5314.0
+				],
+				[
+					2718.0,
+					5314.0
+				],
+				[
+					2718.0,
+					5302.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_1",
+			"px": [
+				[
+					2290.0,
+					5362.0
+				],
+				[
+					2290.0,
+					5366.0
+				],
+				[
+					2334.0,
+					5366.0
+				],
+				[
+					2334.0,
+					5314.0
+				],
+				[
+					2318.0,
+					5314.0
+				],
+				[
+					2318.0,
+					5282.0
+				],
+				[
+					2302.0,
+					5282.0
+				],
+				[
+					2302.0,
+					5266.0
+				],
+				[
+					2286.0,
+					5266.0
+				],
+				[
+					2286.0,
+					5250.0
+				],
+				[
+					2270.0,
+					5250.0
+				],
+				[
+					2270.0,
+					5234.0
+				],
+				[
+					2158.0,
+					5234.0
+				],
+				[
+					2158.0,
+					5218.0
+				],
+				[
+					2126.0,
+					5218.0
+				],
+				[
+					2126.0,
+					5214.0
+				],
+				[
+					1998.0,
+					5214.0
+				],
+				[
+					1998.0,
+					5294.0
+				],
+				[
+					1938.0,
+					5294.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_2",
+			"px": [
+				[
+					2570.0,
+					5418.0
+				],
+				[
+					2570.0,
+					5422.0
+				],
+				[
+					2626.0,
+					5422.0
+				],
+				[
+					2626.0,
+					5406.0
+				],
+				[
+					2770.0,
+					5406.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_3",
+			"px": [
+				[
+					2662.0,
+					5446.0
+				],
+				[
+					2662.0,
+					5450.0
+				],
+				[
+					2722.0,
+					5450.0
+				],
+				[
+					2722.0,
+					5406.0
+				],
+				[
+					2770.0,
+					5406.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_4",
+			"px": [
+				[
+					2398.0,
+					5466.0
+				],
+				[
+					2398.0,
+					5482.0
+				],
+				[
+					2510.0,
+					5486.0
+				],
+				[
+					2510.0,
+					5426.0
+				],
+				[
+					2514.0,
+					5422.0
+				],
+				[
+					2626.0,
+					5422.0
+				],
+				[
+					2626.0,
+					5406.0
+				],
+				[
+					2770.0,
+					5406.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_5",
+			"px": [
+				[
+					2474.0,
+					5482.0
+				],
+				[
+					2474.0,
+					5486.0
+				],
+				[
+					2510.0,
+					5486.0
+				],
+				[
+					2510.0,
+					5426.0
+				],
+				[
+					2514.0,
+					5422.0
+				],
+				[
+					2626.0,
+					5422.0
+				],
+				[
+					2626.0,
+					5406.0
+				],
+				[
+					2770.0,
+					5406.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_6",
+			"px": [
+				[
+					2666.0,
+					5538.0
+				],
+				[
+					2666.0,
+					5674.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_7",
+			"px": [
+				[
+					2758.0,
+					5562.0
+				],
+				[
+					2758.0,
+					5670.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_9",
+			"px": [
+				[
+					2802.0,
+					5758.0
+				],
+				[
+					2802.0,
+					5762.0
+				],
+				[
+					2738.0,
+					5762.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_10",
+			"px": [
+				[
+					2674.0,
+					5786.0
+				],
+				[
+					2674.0,
+					5790.0
+				],
+				[
+					2726.0,
+					5790.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_11",
+			"px": [
+				[
+					2774.0,
+					5850.0
+				],
+				[
+					2774.0,
+					5854.0
+				],
+				[
+					2754.0,
+					5854.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_12",
+			"px": [
+				[
+					2638.0,
+					5878.0
+				],
+				[
+					2638.0,
+					5914.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_2_13",
+			"px": [
+				[
+					2630.0,
+					5970.0
+				],
+				[
+					2630.0,
+					6014.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_0",
+			"px": [
+				[
+					2774.0,
+					5286.0
+				],
+				[
+					2774.0,
+					5306.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_1",
+			"px": [
+				[
+					2562.0,
+					5294.0
+				],
+				[
+					2562.0,
+					5298.0
+				],
+				[
+					2606.0,
+					5298.0
+				],
+				[
+					2606.0,
+					5282.0
+				],
+				[
+					2686.0,
+					5282.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_2",
+			"px": [
+				[
+					2406.0,
+					5322.0
+				],
+				[
+					2406.0,
+					5338.0
+				],
+				[
+					2434.0,
+					5338.0
+				],
+				[
+					2434.0,
+					5342.0
+				],
+				[
+					2526.0,
+					5342.0
+				],
+				[
+					2526.0,
+					5298.0
+				],
+				[
+					2606.0,
+					5298.0
+				],
+				[
+					2606.0,
+					5282.0
+				],
+				[
+					2686.0,
+					5282.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_3",
+			"px": [
+				[
+					2470.0,
+					5338.0
+				],
+				[
+					2470.0,
+					5342.0
+				],
+				[
+					2526.0,
+					5342.0
+				],
+				[
+					2526.0,
+					5298.0
+				],
+				[
+					2606.0,
+					5298.0
+				],
+				[
+					2606.0,
+					5282.0
+				],
+				[
+					2686.0,
+					5282.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_4",
+			"px": [
+				[
+					2950.0,
+					5562.0
+				],
+				[
+					2950.0,
+					5570.0
+				],
+				[
+					2914.0,
+					5570.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_5",
+			"px": [
+				[
+					2958.0,
+					5722.0
+				],
+				[
+					2958.0,
+					5774.0
+				],
+				[
+					2950.0,
+					5774.0
+				],
+				[
+					2950.0,
+					5794.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_6",
+			"px": [
+				[
+					2362.0,
+					6010.0
+				],
+				[
+					2362.0,
+					6014.0
+				],
+				[
+					2418.0,
+					6014.0
+				],
+				[
+					2422.0,
+					6010.0
+				]
+			]
+		},
+		{
+			"id": "staffeln_1_7",
+			"px": [
+				[
+					2934.0,
+					6010.0
+				],
+				[
+					2934.0,
+					6018.0
+				],
+				[
+					2998.0,
+					6018.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_0",
+			"px": [
+				[
+					3414.0,
+					4834.0
+				],
+				[
+					3414.0,
+					4850.0
+				],
+				[
+					3386.0,
+					4850.0
+				],
+				[
+					3386.0,
+					4894.0
+				],
+				[
+					3370.0,
+					4894.0
+				],
+				[
+					3370.0,
+					4986.0
+				],
+				[
+					3286.0,
+					4986.0
+				],
+				[
+					3282.0,
+					5394.0
+				],
+				[
+					3258.0,
+					5394.0
+				],
+				[
+					3258.0,
+					5414.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_1",
+			"px": [
+				[
+					3490.0,
+					4834.0
+				],
+				[
+					3490.0,
+					4850.0
+				],
+				[
+					3462.0,
+					4850.0
+				],
+				[
+					3462.0,
+					4894.0
+				],
+				[
+					3458.0,
+					4894.0
+				],
+				[
+					3454.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_2",
+			"px": [
+				[
+					3574.0,
+					4854.0
+				],
+				[
+					3574.0,
+					4898.0
+				],
+				[
+					3562.0,
+					4898.0
+				],
+				[
+					3562.0,
+					4914.0
+				],
+				[
+					3554.0,
+					4914.0
+				],
+				[
+					3554.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_3",
+			"px": [
+				[
+					3658.0,
+					4870.0
+				],
+				[
+					3658.0,
+					4886.0
+				],
+				[
+					3630.0,
+					4886.0
+				],
+				[
+					3630.0,
+					4930.0
+				],
+				[
+					3626.0,
+					4930.0
+				],
+				[
+					3626.0,
+					5322.0
+				],
+				[
+					3622.0,
+					5322.0
+				],
+				[
+					3622.0,
+					5406.0
+				],
+				[
+					3354.0,
+					5406.0
+				],
+				[
+					3354.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_4",
+			"px": [
+				[
+					3330.0,
+					4918.0
+				],
+				[
+					3330.0,
+					4934.0
+				],
+				[
+					3302.0,
+					4934.0
+				],
+				[
+					3302.0,
+					4986.0
+				],
+				[
+					3286.0,
+					4986.0
+				],
+				[
+					3286.0,
+					5394.0
+				],
+				[
+					3258.0,
+					5394.0
+				],
+				[
+					3258.0,
+					5414.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_5",
+			"px": [
+				[
+					3418.0,
+					4926.0
+				],
+				[
+					3418.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_6",
+			"px": [
+				[
+					3494.0,
+					4926.0
+				],
+				[
+					3494.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_7",
+			"px": [
+				[
+					3578.0,
+					4950.0
+				],
+				[
+					3578.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_8",
+			"px": [
+				[
+					3662.0,
+					4962.0
+				],
+				[
+					3662.0,
+					5438.0
+				],
+				[
+					3318.0,
+					5438.0
+				],
+				[
+					3318.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_9",
+			"px": [
+				[
+					3246.0,
+					5002.0
+				],
+				[
+					3246.0,
+					5410.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_10",
+			"px": [
+				[
+					3322.0,
+					5018.0
+				],
+				[
+					3322.0,
+					5394.0
+				],
+				[
+					3258.0,
+					5394.0
+				],
+				[
+					3258.0,
+					5414.0
+				]
+			]
+		},
+		{
+			"id": "fuss_0_11",
+			"px": [
+				[
+					3746.0,
+					5018.0
+				],
+				[
+					3746.0,
+					5406.0
+				],
+				[
+					3350.0,
+					5406.0
+				],
+				[
+					3350.0,
+					5442.0
+				],
+				[
+					3286.0,
+					5442.0
+				]
+			]
+		},
+		{
+			"id": "rand_1_0",
+			"px": [
+				[
+					1878.0,
+					5262.0
+				],
+				[
+					1878.0,
+					5290.0
+				]
+			]
+		}
+	],
+	"fill": [
+		{
+			"district": "stille",
+			"level": 3,
+			"palette": [
+				"haus_hoch",
+				"giebel",
+				"haus_b",
+				"haus_a",
+				"giebel"
+			],
+			"max": 14
+		},
+		{
+			"district": "staffeln",
+			"level": 2,
+			"palette": [
+				"laden",
+				"haus_a",
+				"giebel",
+				"haus_b",
+				"haus_hoch"
+			],
+			"max": 14
+		},
+		{
+			"district": "staffeln",
+			"level": 1,
+			"palette": [
+				"haus_a",
+				"giebel",
+				"laden",
+				"haus_b"
+			],
+			"max": 8
+		},
+		{
+			"district": "fuss",
+			"level": 0,
+			"palette": [
+				"verlassen_a",
+				"haus_a",
+				"verlassen_b",
+				"giebel",
+				"haus_b"
+			],
+			"max": 12
+		},
+		{
+			"district": "rand",
+			"level": 1,
+			"palette": [
+				"haus_a",
+				"giebel"
+			],
+			"max": 3
+		}
+	],
+	"walls": [
+		{
+			"id": "westmauer",
+			"type": "mauer_ns",
+			"line": [
+				[
+					110.7,
+					334
+				],
+				[
+					110.7,
+					364
+				]
+			],
+			"about": "Der Wehrgang mit Zinnen auf dem Außenring über der Leere."
+		}
+	]
+}

@@ -1076,5 +1076,125 @@
    "whirl": "res://assets/audio/morwenna/whirl.wav",
    "volume_db": -6
   }
+ },
+ "quartz_golem": {
+  "name": "Quarzwächter",
+  "max_health": 42,
+  "wander_speed": 14,
+  "move_speed": 58,
+  "retreat_speed": 40,
+  "strafe_speed": 34,
+  "turn_speed": 7.0,
+  "preferred_min": 68,
+  "preferred_max": 116,
+  "provoke_range": 175,
+  "rustle_provoke_range": 115,
+  "wake_ally_range": 130,
+  "lose_range": 265,
+  "home_radius": 92,
+  "memory_seconds": 9.5,
+  "awaken_seconds": 0.62,
+  "hurt_stun": 0.24,
+  "heavy_knockback": 70,
+  "knockback_resistance": 0.5,
+  "flinch_cooldown": 0.85,
+  "pickaxe_multiplier": 1.35,
+  "blade": {
+   "trigger_range": 46,
+   "windup": 0.46,
+   "aim_lock": 0.18,
+   "strike": 0.22,
+   "hit_time": 0.11,
+   "recover": 0.68,
+   "cooldown": 2.1,
+   "reach": 44,
+   "arc": 115,
+   "damage": 13,
+   "knockback": 90
+  },
+  "shards": {
+   "min_range": 48,
+   "max_range": 165,
+   "count": 3,
+   "spread_deg": 18,
+   "windup": 0.68,
+   "aim_lock": 0.24,
+   "release": 0.24,
+   "recover": 0.78,
+   "cooldown": 2.8,
+   "range": 162,
+   "speed": 235,
+   "radius": 6,
+   "damage": 11,
+   "knockback": 58,
+   "fade_seconds": 0.22
+  },
+  "shock": {
+   "min_range": 42,
+   "max_range": 150,
+   "windup": 0.78,
+   "aim_lock": 0.28,
+   "strike": 0.28,
+   "hit_time": 0.08,
+   "recover": 0.88,
+   "cooldown": 4.6,
+   "radius": 26,
+   "damage": 14,
+   "knockback": 105
+  },
+  "navigation": {
+   "cell_size": 12,
+   "nodes_per_frame": 72,
+   "usec_per_frame": 1600,
+   "max_nodes": 5200,
+   "search_margin": 272,
+   "target_repath_distance": 24,
+   "refresh_seconds": 1.8,
+   "retry_seconds": 0.65,
+   "climb_penalty": 135
+  },
+  "loot": {
+   "award": "killer",
+   "xp": 15,
+   "copper": {
+    "min": 6,
+    "max": 13
+   },
+   "items": [
+    {
+     "id": "sun_quartz",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "stone",
+     "chance": 0.55,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "ruin_stone",
+     "chance": 0.28,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "prism_shard",
+     "chance": 0.18,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "audio": {
+   "awaken": "res://assets/audio/golem/awaken.wav",
+   "charge": "res://assets/audio/golem/charge.wav",
+   "shard_cast": "res://assets/audio/golem/shard_cast.wav",
+   "shock_erupt": "res://assets/audio/golem/shock_erupt.wav",
+   "blade_slash": "res://assets/audio/golem/blade_slash.wav",
+   "death": "res://assets/audio/golem/death.wav",
+   "volume_db": -7
+  }
  }
 }

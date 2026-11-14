@@ -90,7 +90,7 @@ func _painter(dump: bool) -> void:
 				var line: String = ""
 				for x: int in w:
 					var c: int = codes[y * w + x]
-					line += ("." if filled[y * w + x] == 0 else "o") if c < 0 else "abcdefghijkl"[c]
+					line += ("." if filled[y * w + x] == 0 else "o") if c < 0 else "abcdefghijklmnop"[c]
 				print(line)
 
 

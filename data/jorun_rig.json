@@ -1,0 +1,60 @@
+{
+  "frame": [
+    76,
+    96
+  ],
+  "feet": [
+    38,
+    80
+  ],
+  "frames": 52,
+  "rows": 8,
+  "height": 58,
+  "clips": {
+    "idle": {
+      "start": 0,
+      "count": 4,
+      "fps": 3
+    },
+    "walk": {
+      "start": 4,
+      "count": 6,
+      "fps": 7
+    },
+    "counter": {
+      "start": 10,
+      "count": 6,
+      "fps": 3
+    },
+    "arrange": {
+      "start": 16,
+      "count": 6,
+      "fps": 5
+    },
+    "count": {
+      "start": 22,
+      "count": 6,
+      "fps": 6
+    },
+    "call": {
+      "start": 28,
+      "count": 6,
+      "fps": 5
+    },
+    "wave": {
+      "start": 34,
+      "count": 6,
+      "fps": 7
+    },
+    "present": {
+      "start": 40,
+      "count": 6,
+      "fps": 5
+    },
+    "smoke": {
+      "start": 46,
+      "count": 6,
+      "fps": 3
+    }
+  }
+}

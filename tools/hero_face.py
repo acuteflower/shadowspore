@@ -46,8 +46,8 @@ def _ink(c, k=0.55):  # = art_hero3d.ink_color
     return (int(c[0] * k), int(c[1] * k * 0.95), int(c[2] * k))
 
 
-SKIN_INK = (0x52, 0x36, 0x44)
-FACE_INK = [_ink(EYE[0]), _ink(MOUTH[0]), _ink(SKIN[4], 0.5), _ink(SKIN[8])]  # outline pixels of eye, mouth and blush decals -> skin outline
+SKIN_INK = (0x10, 0x07, 0x16)
+FACE_INK = [_ink(EYE[0]), _ink(MOUTH[0]), _ink(SKIN[4], 0.5), _ink(SKIN[8]), (0x52, 0x36, 0x44)]  # outline pixels of eye, mouth and blush decals -> crisp silhouette ink
 
 
 def _mask(rgb: np.ndarray, colors) -> np.ndarray:
@@ -116,217 +116,15 @@ def _clean(arr: np.ndarray):
 
 
 def stamp(arr: np.ndarray, eyes) -> np.ndarray:
-    """arr: one frame (H, W, 4) RGBA as rendered; eyes: [(x, y, facing[, closed, up_x, up_y]), ...] in frame pixels."""
-    out, face = _clean(arr)
-    h, w = face.shape
-    alpha = arr[..., 3]
-    hair = _mask(arr[..., :3], HAIR) & (alpha == 255)
-    seen = sorted([e for e in eyes if e[2] > FACING_MIN], key=lambda e: -e[2])
-    if not seen:
-        return out
-    near = seen[0]
-    closed = bool(near[3]) if len(near) > 3 else False
-    up_x = float(near[4]) if len(near) > 4 else 0.0
-    up_y = float(near[5]) if len(near) > 5 else -1.0
-
-    def edge(x, y):
-        return not (0 <= x < w and 0 <= y < h) or alpha[y, x] < 255 or not (face[y, x] or hair[y, x])
-
-    # Lying / prone pose where the head's crown points sideways on screen rather than up: orient the eye with the head.
-    if abs(up_x) > abs(up_y) * 1.15:
-        ux = -1 if up_x < 0 else 1  # step toward the crown / brow
-        for idx, e in enumerate(seen[:2]):
-            ex, ey = int(np.floor(e[0])), int(np.floor(e[1]))
-            if idx == 1 and abs(ey - int(np.floor(near[1]))) < 2:
-                ey = int(np.floor(near[1])) + (2 if e[1] > near[1] else -2)
-            for dy in (0, -1, 1):
-                ry = ey + dy
-                if 0 <= ex < w and 0 <= ry < h and face[ry, ex]:
-                    if closed:
-                        out[ry, ex, :3] = LASH
-                    else:
-                        out[ry, ex, :3] = IRIS
-                        if 0 <= ex + ux < w and (face[ry, ex + ux] or hair[ry, ex + ux]):
-                            out[ry, ex + ux, :3] = LASH
-                    break
-        return out
-
-    row = int(np.floor(near[1] + 0.15)) - 1
-    # Keep the iris comfortably on skin (not clipped under low fringe and not hanging off the chin)
-    xn = int(np.floor(near[0]))
-    if 0 <= xn < w:
-        if 0 <= row + 1 < h and not face[row + 1, xn] and 0 <= row + 2 < h and face[row + 2, xn]:
-            row += 1
-        elif 0 <= row + 1 < h and face[row + 1, xn] and (row + 2 >= h or not face[row + 2, xn]) and row - 1 >= 0 and face[row, xn]:
-            row -= 1
-
-    cols = [(xn, row)]
-    if len(seen) > 1:
-        far = seen[1]
-        step = 1 if far[0] > near[0] else -1
-        turned = abs(far[0] - near[0]) < SEP_FRONT or far[2] < 0.72
-        span = (GAP_TURNED if turned else GAP) + 1
-        if not turned:
-            xm = 0.5 * (near[0] + far[0])
-            x_left = int(np.floor(xm - span * 0.5 + 0.5))
-            xn = x_left if step > 0 else x_left + span
-        xf = xn + step * span
-        # Ensure both eyes land on face skin and neither sits directly on the outer silhouette column when the face has room
-        if (not (0 <= xf < w and 0 <= row + 1 < h and face[row + 1, xf]) or edge(xf + step, row + 1)) and not edge(xn - step, row + 1) and 0 <= xn - step < w and 0 <= xf - step < w and face[row + 1, xn - step] and face[row + 1, xf - step]:
-            xn -= step
-            xf -= step
-        elif (not (0 <= xn < w and 0 <= row + 1 < h and face[row + 1, xn]) or edge(xn - step, row + 1)) and not edge(xf + step, row + 1) and 0 <= xf + step < w and 0 <= xn + step < w and face[row + 1, xf + step] and face[row + 1, xn + step]:
-            xn += step
-            xf += step
-        # Keep both eyes level on the same row unless the head itself is strongly rolled sideways
-        rf = row
-        if abs(up_x) > 0.38:
-            own = int(np.floor(far[1] + 0.15)) - 1
-            if abs(own - row) == 1 and 0 <= own + 1 < h and 0 <= xf < w and face[own + 1, xf]:
-                rf = own
-        cols = [(xn, row), (xf, rf)]
-    else:  # profile: sit 1 px inside the front face contour, never on the outer column
-        for d in (1, -1):
-            if edge(xn + d, row + 1) and not edge(xn - d, row + 1) and 0 <= xn - d < w and face[row + 1, xn - d]:
-                cols[0] = (xn - d, row)
-                break
-    for x, r in cols:
-        if not (0 <= x < w and 0 <= r + 1 < h) or not face[r + 1, x]:
-            continue
-        if closed:
-            out[r + 1, x, :3] = LASH
-            continue
-        out[r + 1, x, :3] = IRIS
-        if 0 <= r < h and (face[r, x] or hair[r, x]):
-            out[r, x, :3] = LASH
+    """Faceless stylized heroine: clean any stray decal pixels and leave smooth shaded porcelain skin (no eyes, no mouth)."""
+    out, _face = _clean(arr)
     return out
 
 
 def tidy(arr: np.ndarray, sector=None) -> np.ndarray:
-    """arr: (H, W, 4) uint8 RGBA (one frame or a strip of frames). Returns a tidied copy.
-    sector (0 E, 1 SE, 2 S, 3 SW, 4 W, 5 NW, 6 N, 7 NE), when known, fixes how many eyes the face shows: S two (gap 2),
-    SE/SW two (gap 1; the far eye is added on the far side when the render lost it), E/W one, the back views none.
-    Without it the eyes are guessed from what was rendered."""
-    arr = arr.copy()
-    rgb, alpha = arr[..., :3], arr[..., 3]
-    h, w = alpha.shape
-    solid = alpha == 255
-    skin = _mask(rgb, SKIN) & solid
-    # the mouth goes: skin where it was
-    mouth = _mask(rgb, MOUTH) & solid
-    for g in _clusters(mouth):
-        if len(g) <= 8 and _near_skin(skin, g, h, w):
-            fill = _skin_fill(rgb, skin, g, h, w)
-            for y, x in g:
-                arr[y, x, :3] = fill
-    skin = _mask(arr[..., :3], SKIN) & solid
-    eye = _mask(rgb, EYE) & solid
-    if not eye.any():
-        return arr
-    groups = []
-    for g in _clusters(eye):
-        if len(g) > 12 or not _near_skin(skin, g, h, w):
-            continue
-        ys = [p[0] for p in g]
-        xs = [p[1] for p in g]
-        cx = sum(xs) / len(xs)
-        groups.append({"px": g, "top": min(ys), "cx": cx, "cy": sum(ys) / len(ys), "n": len(g), "x": int(np.floor(cx + 0.5))})
-    if not groups:
-        return arr
-    paintable = eye | skin
-    ink_face = _mask(rgb, FACE_INK)
-    hair = _mask(rgb, HAIR) & solid
-    # the decals' own outline (where an eye poked out of the head) becomes the skin's outline
-    arr[ink_face, :3] = SKIN_INK
-
-    def fits(x, y):
-        return 0 <= x < w and 0 <= y < h and paintable[y, x]
-
-    def edge(x, y):
-        if not (0 <= x < w and 0 <= y < h) or alpha[y, x] < 255:
-            return True
-        return not (paintable[y, x] or hair[y, x])  # an outline, the collar ...
-
-    def ok(x, y):  # both pixels on the face, with face (or hair) on either side, never the head's edge
-        return all(fits(x, y + r) and not edge(x - 1, y + r) and not edge(x + 1, y + r) for r in (0, 1))
-
-    # eyes of one face (close together) share one top row: the lower of their tops (above it the fringe may already cover one)
-    for g in groups:
-        mates = [o for o in groups if abs(o["cx"] - g["cx"]) <= 7 and abs(o["cy"] - g["cy"]) <= 3]
-        g["row"] = max(o["top"] for o in mates)
-    if sector in (5, 6, 7):
-        for g in groups:
-            g["hidden"] = True
-    elif sector in (0, 4):  # profile: one eye, the biggest of each face
-        for g in groups:
-            mates = [o for o in groups if o["row"] == g["row"] and abs(o["cx"] - g["cx"]) <= 7]
-            if max(mates, key=lambda o: (o["n"], -abs(o["cx"]))) is not g:
-                g["hidden"] = True
-    # off the face's edge
-    for g in groups:
-        if ok(g["x"], g["row"]):
-            continue
-        for d in (-1, 1, -2, 2):
-            if ok(g["x"] + d, g["row"]):
-                g["x"] += d
-                break
-    # three-quarter views: the far eye the render lost comes back on the far side (SE: right, SW: left)
-    if sector in (1, 3):
-        side = 1 if sector == 1 else -1
-        for g in [o for o in groups if not o.get("hidden")]:
-            if any(o is not g and not o.get("hidden") and o["row"] == g["row"] and abs(o["x"] - g["x"]) <= 7 for o in groups):
-                continue
-            def under_fringe(x, y):  # the iris on the face; its lash may lie under the fringe (it reads as the fringe's shadow)
-                return fits(x, y + 1) and 0 <= x < w and (paintable[y, x] or hair[y, x]) and not edge(x, y + 1)
-            x, row = g["x"], g["row"]
-            for near, far, test in ((x, x + 2 * side, ok), (x, x + 2 * side, under_fringe), (x - side, x + side, under_fringe)):
-                if test(far, row) and (near == x or under_fringe(near, row)):
-                    g["x"] = near
-                    g["fringe"] = near != x
-                    groups.append({"px": [], "top": row, "cx": float(far), "cy": g["cy"], "n": 0, "x": far, "row": row, "fringe": True, "fixed": True})
-                    g["fixed"] = True
-                    break
-    # the same distance between the two eyes of every face
-    for a in groups:
-        for b in groups:
-            if a is b or a.get("hidden") or b.get("hidden") or a.get("fixed") or b.get("fixed") or a["row"] != b["row"] or not (a["x"], id(a)) < (b["x"], id(b)) or b["x"] - a["x"] > 8:
-                continue
-            gap = b["x"] - a["x"] - 1
-            turned = sector in (1, 3) if sector is not None else any(edge(g["x"] + d, g["row"] + r) for g, d in ((a, -1), (a, -2), (b, 1), (b, 2)) for r in (0, 1))
-            want = GAP_TURNED if turned else GAP
-            if gap == want:
-                continue
-            shift = want - gap  # + = further apart
-            small, big = (a, b) if a["n"] <= b["n"] else (b, a)
-            moved = False
-            for mover in (small, big):
-                nx = mover["x"] + (shift if mover is b else -shift)
-                if ok(nx, mover["row"]):
-                    mover["x"] = nx
-                    moved = True
-                    break
-            if not moved and b["x"] - a["x"] - 1 < GAP_TURNED:  # no room for two eyes: the far (smaller) one is hidden by the turn
-                small["hidden"] = True
-                continue
-            if not moved:  # split the move between both
-                for mover in (a, b):
-                    step = (1 if mover is b else -1) * (1 if shift > 0 else -1)
-                    if b["x"] - a["x"] - 1 != want and ok(mover["x"] + step, mover["row"]):
-                        mover["x"] += step
-    # clear the old blobs, then stamp
-    for g in groups:
-        fill = _skin_fill(rgb, skin, g["px"], h, w)
-        for y, x in g["px"]:
-            arr[y, x, :3] = fill
-    for g in groups:
-        if g.get("hidden"):
-            continue
-        for r, col in enumerate(STAMP):
-            y, x = g["row"] + r, g["x"]
-            if fits(x, y) or (r == 0 and g.get("fringe") and 0 <= x < w and 0 <= y < h and hair[y, x]):
-                arr[y, x, :3] = col
-                arr[y, x, 3] = 255
-    return arr
+    """Faceless stylized heroine: clean any stray eye/mouth pixels and leave smooth shaded porcelain skin."""
+    out, _face = _clean(arr)
+    return out
 
 
 def tidy_rows(rows, eyes=None):
@@ -347,31 +145,7 @@ FRAME_W = {"player_swim": 64, "player_swim_under": 64, "player_climb": None, "pl
 
 
 def _borrow(strip: np.ndarray, fw: int, sector: int) -> None:
-    """A facing that shows eyes, but a frame the render gave none (the fringe swung over a narrow face): copy the eyes of the
-    next frame at the same place when that is bare skin here too, so an idle or walk loop never blinks its eyes away."""
-    want = {0: 1, 4: 1, 1: 2, 3: 2, 2: 2}.get(sector, 0)
-    if not want:
-        return
-    h = strip.shape[0]
-    n = strip.shape[1] // fw
-    lash = np.all(strip[..., :3] == np.array(LASH, np.uint8), axis=-1)
-    skin = _mask(strip[..., :3], SKIN) & (strip[..., 3] == 255)
-    count = [len(set(np.nonzero(lash[:, c * fw:(c + 1) * fw])[1].tolist())) for c in range(n)]
-    for c in range(n):
-        if count[c] >= want:
-            continue
-        for d in (-1, 1, -2, 2):
-            o = c + d
-            if not (0 <= o < n) or count[o] < want:
-                continue
-            ys, xs = np.nonzero(lash[:, o * fw:(o + 1) * fw])
-            spots = [(y, x) for y, x in zip(ys, xs)]
-            if all(y + 1 < h and skin[y, c * fw + x] and skin[y + 1, c * fw + x] for y, x in spots if not lash[y, c * fw + x]):
-                for y, x in spots:
-                    strip[y, c * fw + x, :3] = LASH
-                    strip[y + 1, c * fw + x, :3] = IRIS
-                count[c] = want
-                break
+    return
 
 
 # animation cycles (column ranges) of a sheet: one facing shows the same number of eyes through a whole cycle
@@ -379,25 +153,7 @@ CYCLES = {"player": [(0, 6), (6, 12), (12, 16), (16, 22)]}
 
 
 def _even_cycles(strip: np.ndarray, fw: int, sector: int, cycles) -> None:
-    """Within a cycle of a three-quarter row, frames that show two eyes while most show one lose the far eye."""
-    if sector not in (1, 3):
-        return
-    lash = np.all(strip[..., :3] == np.array(LASH, np.uint8), axis=-1)
-    skin = _mask(strip[..., :3], SKIN) & (strip[..., 3] == 255)
-    far = 1 if sector == 1 else -1
-    for a, b in cycles:
-        cols = {c: sorted(set(np.nonzero(lash[:, c * fw:(c + 1) * fw])[1].tolist())) for c in range(a, b)}
-        ones = sum(1 for xs in cols.values() if len(xs) == 1)
-        if ones * 2 <= (b - a):
-            continue
-        for c, xs in cols.items():
-            if len(xs) < 2:
-                continue
-            x = c * fw + (xs[-1] if far > 0 else xs[0])
-            for y in np.nonzero(lash[:, x])[0]:
-                for yy in (y, y + 1):
-                    around = [tuple(int(v) for v in strip[yy, x + d, :3]) for d in (-far, -2 * far) if skin[yy, x + d]]
-                    strip[yy, x, :3] = around[0] if around else SKIN[2]
+    return
 
 
 def tidy_sheet(arr: np.ndarray, name: str) -> np.ndarray:

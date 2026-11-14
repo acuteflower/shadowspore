@@ -70,6 +70,10 @@
 		]
 	},
 	"stars": {},
+	"prism": {
+		"hold_time": 16.0,
+		"pad_radius": 26.0
+	},
 	"weave": {
 		"pulse_time": 0.28,
 		"rise_time": 0.85,
@@ -2262,6 +2266,28 @@
 			],
 			"linger": [
 				4
+			]
+		},
+		{
+			"id": "prism_sonnenquarz",
+			"kind": "prism_seal",
+			"tier": "rare",
+			"area": "Sonnenquarz-Öde",
+			"variant": 0,
+			"tile": [
+				642,
+				194
+			]
+		},
+		{
+			"id": "prism_ruinenfeld",
+			"kind": "prism_seal",
+			"tier": "rare",
+			"area": "Sonnenquarz-Öde",
+			"variant": 1,
+			"tile": [
+				993,
+				180
 			]
 		}
 	],

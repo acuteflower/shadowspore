@@ -124,8 +124,9 @@ func _breathe_mist() -> void:
 func _physics_process(delta: float) -> void:
 	_wood_check -= delta
 	if _wood_check <= 0.0 and multiplayer.is_server():
-		_wood_check = 1.0
+		_wood_check = 0.5
 		_breathe_mist()
+		_desert_heat()
 		_wisp_lure()
 	if _effects.is_empty():
 		return
@@ -166,6 +167,25 @@ func _wet() -> bool:
 	if player == null:
 		return false
 	return float(Terrain.surface_data(Terrain.surface_at(player.global_position)).get("submerge", 0.0)) > 0.0
+
+
+## Host: synchronizes ERHITZT (`sun_heat`) and oasis wading ERFRISCHT (`refreshed`) from `player.heat_amount`.
+func _desert_heat() -> void:
+	var player: Player = get_parent() as Player
+	if player == null or health == null or health.current <= 0.0:
+		return
+	if DesertHeat.is_in_cooling_water(player):
+		if has("sun_heat"):
+			clear("sun_heat")
+		if BiomeBlend.arid_at(player.global_position) >= 0.25 or player.heat_amount > 0.05:
+			apply("refreshed", DesertHeat.OASIS_REFRESH_SECONDS)
+		return
+	if has("refreshed") or player.heat_amount <= DesertHeat.HEAT_CLEAR_AT:
+		if has("sun_heat"):
+			clear("sun_heat")
+	elif player.heat_amount >= DesertHeat.HEAT_THRESHOLD:
+		apply("sun_heat", 4.5, clampf(player.heat_amount, 0.25, 1.0))
+
 
 
 ## Host, once a second: an Irrlichtsud wisp is seen from afar, the night's lure rises a little (the price of the light).

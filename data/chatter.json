@@ -253,6 +253,37 @@
      "Wir haben die Nacht gehalten."
     ]
    ]
+  },
+  {
+   "event": "caravan_arrived",
+   "lines": [
+    [
+     "gustav",
+     "Jorun ist da! Ich brauch Nägel, und ein Schwätzchen."
+    ],
+    [
+     "valdric",
+     "Ein Händler. Ich behalte ihn im Auge."
+    ]
+   ]
+  },
+  {
+   "event": "caravan_arrived",
+   "lines": [
+    [
+     "any",
+     "Die Glocke! Die Karawane ist wieder da."
+    ]
+   ]
+  },
+  {
+   "event": "caravan_leaving",
+   "lines": [
+    [
+     "any",
+     "Schon wieder weg. Gute Reise, Alter."
+    ]
+   ]
   }
  ]
 }

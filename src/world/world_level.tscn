@@ -40,14 +40,14 @@ script = ExtResource("8_fireflies")
 y_sort_enabled = true
 
 [node name="EnemySpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://src/entities/enemies/shadow_spider.tscn", "res://src/entities/enemies/void_listener.tscn", "res://src/entities/enemies/void_crusher.tscn", "res://src/entities/enemies/light_fisher.tscn", "res://src/entities/enemies/sky_cleaver.tscn", "res://src/entities/enemies/witch_boss/mirror_witch.tscn")
+_spawnable_scenes = PackedStringArray("res://src/entities/enemies/shadow_spider.tscn", "res://src/entities/enemies/void_listener.tscn", "res://src/entities/enemies/void_crusher.tscn", "res://src/entities/enemies/light_fisher.tscn", "res://src/entities/enemies/sky_cleaver.tscn", "res://src/entities/enemies/witch_boss/mirror_witch.tscn", "res://src/entities/enemies/quartz_golem.tscn")
 spawn_path = NodePath("../Enemies")
 
 [node name="EnemyProjectiles" type="Node2D" parent="."]
 y_sort_enabled = true
 
 [node name="ProjectileSpawner" type="MultiplayerSpawner" parent="."]
-_spawnable_scenes = PackedStringArray("res://src/entities/enemies/resonance_wave.tscn")
+_spawnable_scenes = PackedStringArray("res://src/entities/enemies/resonance_wave.tscn", "res://src/entities/enemies/quartz_shard.tscn")
 spawn_path = NodePath("../EnemyProjectiles")
 
 [node name="Drops" type="Node2D" parent="." groups=["drops"]]

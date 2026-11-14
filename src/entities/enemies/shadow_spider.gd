@@ -572,9 +572,8 @@ func _find_target() -> Player:
 	return best
 
 
-## Red pixels suddenly well up on the ground where the strike will land and flow outward:
-## sparse while the spider still aims, dense and fast once the direction is locked, a last surge
-## at the strike. No outline: the field just fades out at its edges.
+## Void-corrupted arachnid telegraphs: seething crimson-magenta abyssal floor rifts laced with
+## barbed shadow-silk web arcs (`_zone_fan`) or a writhing Void-snare rosette (`_zone_line`).
 func _draw_zone() -> void:
 	match state:
 		State.WINDUP, State.STRIKE:
@@ -583,99 +582,104 @@ func _draw_zone() -> void:
 			_zone_line()
 
 
-## Same red pixel flow along the path of the grapple: a band to the anchor and a disc where it lands.
+## Barbed shadow-silk grapple cord + 8-clawed arachnid Void-snare rosette where the spider lands.
 func _zone_line() -> void:
 	var grapple: Dictionary = _grapple()
 	var elapsed: float = (Time.get_ticks_msec() - _state_msec) / 1000.0
-	var density: float = 0.38
-	var strength: float = 0.75
-	var flow: float = 7.0
-	var color_hot: Color = ZONE_HOT
-	if state == State.GRAPPLE_WINDUP:
-		if elapsed >= float(grapple["windup"]) - float(_def["aim_lock_seconds"]):
-			density = 0.6
-			strength = 1.0 * (0.8 + 0.2 * signf(sin(elapsed * 40.0)))
-			flow = 13.0
-	else:
-		density = 0.9
+	var locked: bool = state != State.GRAPPLE_WINDUP or elapsed >= float(grapple["windup"]) - float(_def["aim_lock_seconds"])
+	var hot: bool = state != State.GRAPPLE_WINDUP
+	var strength: float = 0.78
+	if state == State.GRAPPLE_WINDUP and locked:
+		strength = 0.85 + 0.15 * sin(elapsed * 40.0)
+	elif hot:
 		strength = 1.0 - clampf(elapsed / float(grapple["throw"]), 0.0, 1.0)
-		flow = 26.0
-		color_hot = ZONE_FLASH
 	var end: Vector2 = anchor - global_position
 	var length: float = end.length()
-	if length < 4.0:
+	if length < 4.0 or strength <= 0.02:
 		return
 	var dir: Vector2 = end / length
-	var half_width: float = 2.0
+	var perp: Vector2 = dir.orthogonal()
 	var radius: float = float(grapple["radius"]) + ZONE_PAD
-	var low: Vector2 = Vector2(minf(0.0, end.x), minf(0.0, end.y)) - Vector2(radius, radius)
-	var high: Vector2 = Vector2(maxf(0.0, end.x), maxf(0.0, end.y)) + Vector2(radius, radius)
-	for y: int in range(floori(low.y), ceili(high.y) + 1):
-		for x: int in range(floori(low.x), ceili(high.x) + 1):
-			var point: Vector2 = Vector2(x, y)
-			var along: float = clampf(point.dot(dir), 0.0, length)
-			var line_distance: float = point.distance_to(dir * along)
-			var anchor_distance: float = point.distance_to(end)
-			var in_circle: bool = anchor_distance <= radius
-			var in_line: bool = line_distance <= half_width and along > 6.0
-			if not in_circle and not in_line:
-				continue
-			var h: float = fposmod(sin(float(x) * 12.9898 + float(y) * 78.233) * 43758.5453, 1.0)
-			if h > density * (1.6 if in_circle else 0.7):
-				continue
-			var wave: float = 0.5 + 0.5 * sin(along * 0.3 - elapsed * flow + h * TAU)
-			var edge: float = 0.0
-			if in_circle:
-				edge = 1.0 - smoothstep(radius * 0.7, radius, anchor_distance)
-			if in_line:
-				edge = maxf(edge, (1.0 - smoothstep(half_width * 0.5, half_width, line_distance)) * smoothstep(6.0, 14.0, along) * 0.22)
-			var alpha: float = strength * (0.4 + 0.6 * wave) * edge * 0.9
-			if alpha > 0.04:
-				_zone.draw_rect(Rect2(point, Vector2.ONE), Color(ZONE_DARK.lerp(color_hot, wave), alpha))
+	var abyss_a: float = 0.62 * strength
+	var silk_hot: Color = Color(ZONE_FLASH if hot else VoidZoneStyle.HOT_CRIMSON, 0.94 * strength)
+	var silk_void: Color = Color(VoidZoneStyle.VOID_MAGENTA, 0.86 * strength)
+
+	# 1) Twisting double-stranded barbed Void-silk tether from spider to landing snare
+	VoidZoneStyle.jagged_vein(_zone, dir * 6.0, end, elapsed, 2.2, silk_hot, silk_void, abyss_a, 1.3, true)
+	VoidZoneStyle.jagged_vein(_zone, dir * 6.0 + perp * 1.2, end - perp * 1.2, elapsed + 0.6, 1.6, Color(ZONE_DARK, 0.82 * strength), Color(VoidZoneStyle.VOID_VIOLET, 0.78 * strength), abyss_a * 0.6, 4.9, false)
+
+	# 2) Seething crimson-violet abyssal wash inside the landing circle
+	VoidZoneStyle.fill_void_fan(_zone, end, dir, radius, TAU, 1.0, elapsed, strength, locked, hot, 260)
+
+	# 3) Arachnid Void-snare web cross-threads + writhing 8-leg barbed rim around `end`
+	for leg_i: int in 4:
+		var a_leg: float = float(leg_i) * PI * 0.25 + sin(elapsed * 3.0 + float(leg_i)) * 0.06
+		var d_leg: Vector2 = Vector2.from_angle(a_leg)
+		VoidZoneStyle.jagged_vein(_zone, end - d_leg * (radius * 0.82), end + d_leg * (radius * 0.82), elapsed, 1.1, Color(ZONE_HOT, 0.72 * strength), silk_void, abyss_a * 0.5, float(leg_i) * 2.1, false)
+	# Inner spiral silk ring
+	VoidZoneStyle.sinuous_rim_arc(_zone, end, dir, radius * 0.52, TAU, 1.0, -elapsed * 1.2, strength * 0.72, hot, 0.0, 0)
+	# Outer barbed arachnid snare rim (8 inward/outward twitching spider-claw barbs)
+	VoidZoneStyle.sinuous_rim_arc(_zone, end, dir, radius - 0.8, TAU, 1.0, elapsed, strength, hot, -0.85 if locked else 0.75, 8)
 
 
 func _zone_fan() -> void:
 	var elapsed: float = (Time.get_ticks_msec() - _state_msec) / 1000.0
-	var density: float = 0.38
-	var strength: float = 0.75
-	var flow: float = 7.0
-	var color_hot: Color = ZONE_HOT
-	if state == State.WINDUP:
-		if elapsed >= float(_def["windup"]) - float(_def["aim_lock_seconds"]): ## direction locked: it will land here
-			density = 0.6
-			strength = 1.0 * (0.8 + 0.2 * signf(sin(elapsed * 40.0)))
-			flow = 13.0
-	else:
-		var fade: float = 1.0 - clampf(elapsed / float(_def["strike"]), 0.0, 1.0)
-		density = 0.9
-		strength = 1.0 * fade
-		flow = 26.0
-		color_hot = ZONE_FLASH
+	var locked: bool = state != State.WINDUP or elapsed >= float(_def["windup"]) - float(_def["aim_lock_seconds"])
+	var hot: bool = state != State.WINDUP
+	var strength: float = 0.78
+	if state == State.WINDUP and locked:
+		strength = 0.85 + 0.15 * sin(elapsed * 40.0)
+	elif hot:
+		strength = 1.0 - clampf(elapsed / float(_def["strike"]), 0.0, 1.0)
+	if strength <= 0.02:
+		return
 	var reach: float = float(_def["reach"]) + ZONE_PAD
-	var half_arc: float = deg_to_rad(float(_def["arc"])) / 2.0
-	var origin: Vector2 = attack_origin - global_position + Vector2(0, 2) ## where a hit player's feet would be, matching the hit fan
-	var span: int = ceili(reach)
-	for y: int in range(-span, span + 1):
-		for x: int in range(-span, span + 1):
-			var offset: Vector2 = Vector2(x, y)
-			var distance: float = offset.length()
-			if distance < 3.0 or distance > reach:
-				continue
-			var off_axis: float = absf(angle_difference(attack_dir.angle(), offset.angle()))
-			if off_axis > half_arc:
-				continue
-			var h: float = fposmod(sin(float(x) * 12.9898 + float(y) * 78.233) * 43758.5453, 1.0)
-			if h > density:
-				continue
-			var wave: float = 0.5 + 0.5 * sin(distance * 0.3 - elapsed * flow + h * TAU) ## ripples travelling outward
-			var edge: float = minf(smoothstep(3.0, 9.0, distance), 1.0 - smoothstep(reach - 7.0, reach, distance))
-			edge *= 1.0 - smoothstep(half_arc * 0.7, half_arc, off_axis)
-			var alpha: float = strength * (0.4 + 0.6 * wave) * edge * 0.9
-			if alpha > 0.04:
-				var color: Color = ZONE_DARK.lerp(color_hot, wave)
-				_zone.draw_rect(Rect2(origin + offset, Vector2.ONE), Color(color, alpha))
-				if wave > 0.55: ## a faint tail toward the spider makes the outward flow readable
-					_zone.draw_rect(Rect2(origin + (offset - offset / distance * 1.5).round(), Vector2.ONE), Color(color, alpha * 0.5))
+	var arc_rad: float = deg_to_rad(float(_def["arc"]))
+	var half_arc: float = arc_rad * 0.5
+	var origin: Vector2 = attack_origin - global_position + Vector2(0, 2)
+	var abyss_a: float = 0.60 * strength
+	var fang_col: Color = Color(ZONE_FLASH if hot else VoidZoneStyle.HOT_CRIMSON, 0.94 * strength)
+	var web_col: Color = Color(VoidZoneStyle.VOID_MAGENTA, 0.84 * strength)
+
+	# 1) Seething Void danger field across the exact bite cone
+	VoidZoneStyle.fill_void_fan(_zone, origin, attack_dir, reach, arc_rad, 1.0, elapsed, strength, locked, hot, 420)
+
+	# 2) 5 radial corrupted Void-silk fang spokes + left/right cone borders
+	for sp_i: int in 5:
+		var frac_sp: float = float(sp_i) / 4.0 - 0.5
+		var sp_dir: Vector2 = attack_dir.rotated(frac_sp * arc_rad)
+		var is_edge: bool = (sp_i == 0 or sp_i == 4)
+		VoidZoneStyle.jagged_vein(
+			_zone,
+			origin + sp_dir * 4.0,
+			origin + sp_dir * (reach - 0.6),
+			elapsed,
+			1.1 if is_edge else 1.6,
+			fang_col if is_edge else Color(ZONE_HOT, 0.78 * strength),
+			web_col,
+			abyss_a * (0.95 if is_edge else 0.55),
+			float(sp_i) * 1.9,
+			false
+		)
+
+	# 3) Sagging arachnid Void-web arcs stretched between the radial silk spokes!
+	for ring_k: int in [1, 2]:
+		var r_web: float = reach * (0.44 if ring_k == 1 else 0.73)
+		for seg_i: int in 4:
+			var a0: float = -half_arc + float(seg_i) * (arc_rad / 4.0)
+			var a1: float = -half_arc + float(seg_i + 1) * (arc_rad / 4.0)
+			var p0: Vector2 = origin + attack_dir.rotated(a0) * r_web
+			var p1: Vector2 = origin + attack_dir.rotated(a1) * r_web
+			var steps_w: int = maxi(4, roundi(p0.distance_to(p1) / 1.8))
+			for wi: int in range(steps_w + 1):
+				var wf: float = float(wi) / float(steps_w)
+				var sag: float = sin(wf * PI) * 2.4
+				var mid_dir: Vector2 = attack_dir.rotated(lerpf(a0, a1, wf))
+				var wp: Vector2 = p0.lerp(p1, wf) - mid_dir * sag
+				VoidZoneStyle.rift_px(_zone, wp, web_col if wi % 3 == 0 else Color(ZONE_HOT, 0.80 * strength), abyss_a * 0.55)
+
+	# 4) Writhing outer Void-membrane rim with inward venom-fang barbs
+	VoidZoneStyle.sinuous_rim_arc(_zone, origin, attack_dir, reach - 0.8, arc_rad, 1.0, elapsed, strength, hot, -0.95, 7)
 
 
 func _enter_state() -> void:

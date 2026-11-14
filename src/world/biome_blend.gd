@@ -199,7 +199,7 @@ static func oasis_at(pos: Vector2) -> float:
 ## True where the ground shader's glowing white quartz outcrops stand open at `pos` (px), synced bit-for-bit with `ground_tone.gdshader`.
 static func is_quartz_surface(pos: Vector2) -> bool:
 	var arid: float = arid_at(pos)
-	if arid < 0.62:
+	if arid < 0.62 or oasis_at(pos) >= 0.25:
 		return false
 	var px: Vector2 = pos.floor()
 	var w_big: Vector2 = Vector2(
@@ -222,6 +222,33 @@ static func is_quartz_surface(pos: Vector2) -> bool:
 		+ _vnoise(q / 5.0 + Vector2(29.0, 61.0)) * 0.15
 	)
 	return cl * (0.64 + 0.52 * pocket_t) > 0.72
+
+
+## Depth (0..1, or 0 outside a puddle) of a standing rain puddle at `pos` (px), synced bit-for-bit with `ground_tone.gdshader`.
+static func puddle_at(pos: Vector2, puddle_amount: float) -> float:
+	if puddle_amount <= 0.02:
+		return 0.0
+	var arid: float = arid_at(pos)
+	var pud_here: float = puddle_amount * (1.0 - smoothstep(0.18, 0.48, arid))
+	if pud_here <= 0.02:
+		return 0.0
+	var px: Vector2 = pos.floor()
+	var hollow: float = _vnoise(px / 150.0 + Vector2(51.0, 9.0))
+	if hollow < 0.2:
+		return 0.0
+	var warp: float = _vnoise(px / 8.0 + Vector2(7.0, 61.0)) - 0.5
+	var p_fbm: Vector2 = px / 27.0 + Vector2(133.0, 41.0) + Vector2(warp * 0.55, warp * 0.55)
+	var fbm_val: float = (
+		_vnoise(p_fbm) * 0.58
+		+ _vnoise(p_fbm * 2.07 + Vector2(7.3, 7.3)) * 0.28
+		+ _vnoise(p_fbm * 4.1 - Vector2(3.1, 3.1)) * 0.14
+	)
+	var pn: float = fbm_val + 0.55 * (hollow - 0.5)
+	var pthr: float = 0.815 - 0.12 * pud_here
+	var edge: float = _uhash(int(px.x) + 311, int(px.y) + 5)
+	if pn <= pthr + 0.018 * edge:
+		return 0.0
+	return clampf((pn - pthr) / 0.08, 0.08, 1.0)
 
 
 static func _sample(arr: PackedFloat32Array, pos: Vector2) -> float:

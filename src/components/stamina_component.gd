@@ -33,7 +33,30 @@ func _process(delta: float) -> void:
 	if _delay_left > 0.0:
 		_delay_left -= delta
 	elif current < max_stamina:
-		_set_current(current + regen_per_sec * delta)
+		_set_current(current + regen_per_sec * regen_scale() * delta)
+
+
+## Multiplier on continuous stamina regeneration: desert midday heat slows regen by up to -30 %, ERFRISCHT boosts it by +15 %.
+func regen_scale() -> float:
+	var heat: float = heat_amount()
+	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	var cool_bonus: float = DesertHeat.REFRESHED_REGEN_BONUS if (effects != null and effects.has("refreshed")) else 0.0
+	return clampf(1.0 - DesertHeat.STAMINA_REGEN_PENALTY * heat + cool_bonus, 0.35, 1.5)
+
+
+## 0..1 continuous desert sun-heat intensity on the owning player.
+func heat_amount() -> float:
+	var owner_node: Node = get_parent()
+	if owner_node is Player:
+		return clampf((owner_node as Player).heat_amount, 0.0, 1.0)
+	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	return clampf(effects.scale_of("sun_heat"), 0.0, 1.0) if (effects != null and effects.has("sun_heat")) else 0.0
+
+
+## True while the owning player has ERFRISCHT (`refreshed`).
+func is_refreshed() -> bool:
+	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	return effects != null and effects.has("refreshed")
 
 
 func _glutatem_tier() -> int:
@@ -62,11 +85,12 @@ func drain(rate: float, delta: float) -> bool:
 	return current > 0.0
 
 
-## The active Glutatem tier can reduce the cost of sprinting.
+## The active Glutatem tier can reduce the cost of sprinting; desert sun-heat (`sun_heat`) increases it by up to +15 %.
 func sprint_scale() -> float:
 	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
 	var tier: int = int(effects.scale_of("glutatem")) if effects != null else 0
-	return float(AlchemyRules.stamina_spec(tier)["sprint_scale"]) if tier > 0 else 1.0
+	var base: float = float(AlchemyRules.stamina_spec(tier)["sprint_scale"]) if tier > 0 else 1.0
+	return base * (1.0 + DesertHeat.STAMINA_COST_PENALTY * heat_amount())
 
 
 ## A new maximum (from the collected level); `grow` gives what was added right away.

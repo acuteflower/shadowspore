@@ -112,8 +112,8 @@
 			"color": "#2e2024",
 			"seconds": 10
 		},
-		"sound": "mud",
-		"sound_gain": -4.0
+		"sound": "bed",
+		"sound_gain": -1.0
 	},
 	"steppe": {
 		"speed": 1.0,
@@ -122,7 +122,7 @@
 			"color": "#d8be7e",
 			"amount": 2
 		},
-		"sound": "grass"
+		"sound": "steppe"
 	},
 	"sand": {
 		"speed": 0.94,
@@ -135,7 +135,7 @@
 			"color": "#744943",
 			"seconds": 9
 		},
-		"sound": "slope"
+		"sound": "sand"
 	},
 	"quartz": {
 		"speed": 1.04,
@@ -144,6 +144,15 @@
 			"color": "#e5e3f8",
 			"amount": 2
 		},
-		"sound": "stone"
+		"sound": "quartz"
+	},
+	"puddle": {
+		"speed": 0.96,
+		"step": {
+			"kind": "splash",
+			"color": "#bfe9ff",
+			"amount": 5
+		},
+		"sound": "puddle"
 	}
 }

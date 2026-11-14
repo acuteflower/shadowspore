@@ -4070,20 +4070,20 @@
   "name": "Sonnenquarz-Fels",
   "texture": "res://assets/props/sun_quartz_rock.png",
   "glow": "res://assets/props/sun_quartz_rock_glow.png",
-  "light_color": "#b8f4ff",
+  "light_color": "#dcebff",
   "light": [
-   0.28,
-   0.32,
-   0.38,
    0.26,
+   0.30,
    0.36,
-   0.24
+   0.24,
+   0.34,
+   0.26
   ],
   "chips": [
-   "#c69258",
-   "#7eb4cc",
-   "#e8ffff",
-   "#ffe69c"
+   "#8191b6",
+   "#a2b3d4",
+   "#d6e2f5",
+   "#ffffff"
   ],
   "columns": 6,
   "rows": 4,
@@ -4153,6 +4153,360 @@
    ]
   },
   "scene": "res://src/entities/props/rock.tscn",
+  "edge_margin": 4
+ },
+ "prism_vein": {
+  "name": "Prisma-Ader",
+  "texture": "res://assets/props/prism_vein.png",
+  "glow": "res://assets/props/prism_vein_glow.png",
+  "light_color": "#9cf8ff",
+  "light": [
+   0.34,
+   0.38,
+   0.42,
+   0.36
+  ],
+  "chips": [
+   "#78f4e6",
+   "#cbaaff",
+   "#ffd86b",
+   "#ffffff"
+  ],
+  "columns": 4,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   2
+  ],
+  "radius": [
+   15,
+   17,
+   18,
+   16
+  ],
+  "height": [
+   32,
+   36,
+   40,
+   34
+  ],
+  "hits": [
+   5,
+   5,
+   6,
+   5
+  ],
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 4,
+   "drops": [
+    {
+     "id": "sun_quartz",
+     "chance": 0.7,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "prism_shard",
+     "chance": 0.35,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "prism_shard",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "sun_quartz",
+     "chance": 0.85,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "lake_glimmer",
+     "chance": 0.16,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "lake_moonstone",
+     "chance": 0.12,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "scene": "res://src/entities/props/rock.tscn",
+  "edge_margin": 4
+ },
+ "ruin_sandstone": {
+  "name": "Ruinen-Bruchstein",
+  "texture": "res://assets/props/ruin_sandstone.png",
+  "glow": "res://assets/props/ruin_sandstone_glow.png",
+  "light_color": "#78f4e6",
+  "light": [
+   0.18,
+   0.22,
+   0.24,
+   0.18
+  ],
+  "chips": [
+   "#785042",
+   "#d8a868",
+   "#e6c468",
+   "#bfcde7"
+  ],
+  "columns": 4,
+  "rows": 4,
+  "weights": [
+   3,
+   3,
+   2,
+   2
+  ],
+  "radius": [
+   15,
+   14,
+   16,
+   17
+  ],
+  "height": [
+   28,
+   30,
+   28,
+   26
+  ],
+  "hits": [
+   4,
+   4,
+   5,
+   5
+  ],
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 4,
+   "drops": [
+    {
+     "id": "stone",
+     "chance": 0.65,
+     "min": 1,
+     "max": 1
+    },
+    {
+     "id": "ruin_stone",
+     "chance": 0.45,
+     "min": 1,
+     "max": 1
+    }
+   ],
+   "final_drops": [
+    {
+     "id": "ruin_stone",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "sun_quartz",
+     "chance": 0.45,
+     "min": 1,
+     "max": 1
+    }
+   ]
+  },
+  "scene": "res://src/entities/props/rock.tscn",
+  "edge_margin": 4
+ },
+ "ancient_fir": {
+  "name": "Urtanne",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/ancient_fir.png",
+  "growth": "res://assets/props/ancient_fir_growth.png",
+  "feet_row": 216,
+  "columns": 3,
+  "rows": 4,
+  "weights": [3, 3, 2],
+  "radius": [28, 32, 36],
+  "height": [178, 196, 210],
+  "hits": [10, 12, 14],
+  "crown_fade": [true, true, true],
+  "crown_half_width": [64, 72, 80],
+  "trunk_half_width": [13, 15, 17],
+  "clear": [26, 30, 34],
+  "sway": 0.005,
+  "light_color": "#5ce0d0",
+  "light_from": 0,
+  "light_energy": 0.34,
+  "rain_colors": ["#25564c", "#36745a", "#1a3b3e"],
+  "edge_margin": 8,
+  "min_gap": 6,
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 4,
+   "drops": [
+    {"id": "wood", "chance": 0.85, "min": 1, "max": 2},
+    {"id": "resin", "chance": 0.22, "min": 1, "max": 1}
+   ],
+   "final_drops": [
+    {"id": "wood", "chance": 1.0, "min": 4, "max": 6},
+    {"id": "resin", "chance": 0.65, "min": 1, "max": 2},
+    {"id": "glow_cap", "chance": 0.45, "min": 1, "max": 2}
+   ]
+  }
+ },
+ "orchard_apple": {
+  "name": "Alter Wiesenapfelbaum",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/orchard_apple.png",
+  "growth": "res://assets/props/orchard_apple_growth.png",
+  "ground_fruit": "res://assets/props/fallen_fruit.png",
+  "ground_fruit_columns": 6,
+  "ground_fruit_offset": 0,
+  "ground_fruit_feet": 18,
+  "columns": 3,
+  "rows": 6,
+  "weights": [3, 3, 2],
+  "radius": [14, 16, 18],
+  "height": [96, 108, 118],
+  "hits": [5, 6, 7],
+  "crown_fade": [true, true, true],
+  "crown_half_width": [32, 36, 40],
+  "trunk_half_width": [5, 6, 7],
+  "clear": [22, 25, 28],
+  "crown_shape": "dome",
+  "sway": 0.01,
+  "light_color": "#ffd08a",
+  "light_from": 1,
+  "light_energy": 0.22,
+  "rain_colors": ["#55985f", "#7cb96d", "#e85d4a"],
+  "edge_margin": 6,
+  "min_gap": 4,
+  "pickup": {
+   "item": "meadow_apple",
+   "amount": [2, 3, 4],
+   "regrow_days": 3,
+   "prompt": "FALLOBST SAMMELN",
+   "burst": ["#e85d4a", "#f6b85c", "#7cb96d"]
+  },
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 3,
+   "drops": [
+    {"id": "wood", "chance": 0.55, "min": 1, "max": 1}
+   ],
+   "final_drops": [
+    {"id": "wood", "chance": 1.0, "min": 2, "max": 3},
+    {"id": "meadow_apple", "chance": 1.0, "min": 1, "max": 2}
+   ]
+  }
+ },
+ "orchard_pear": {
+  "name": "Alter Mondbirnenbaum",
+  "scene": "res://src/entities/props/tree.tscn",
+  "texture": "res://assets/props/orchard_pear.png",
+  "growth": "res://assets/props/orchard_pear_growth.png",
+  "ground_fruit": "res://assets/props/fallen_fruit.png",
+  "ground_fruit_columns": 6,
+  "ground_fruit_offset": 3,
+  "ground_fruit_feet": 18,
+  "columns": 3,
+  "rows": 6,
+  "weights": [3, 3, 2],
+  "radius": [14, 16, 18],
+  "height": [98, 110, 120],
+  "hits": [5, 6, 7],
+  "crown_fade": [true, true, true],
+  "crown_half_width": [31, 35, 39],
+  "trunk_half_width": [5, 6, 7],
+  "clear": [22, 25, 28],
+  "crown_shape": "dome",
+  "sway": 0.01,
+  "fireflies": true,
+  "light_color": "#8cf2dc",
+  "light_from": 0,
+  "light_energy": 0.34,
+  "rain_colors": ["#4fa68e", "#78d8b8", "#fff8d0"],
+  "edge_margin": 6,
+  "min_gap": 4,
+  "pickup": {
+   "item": "moon_pear",
+   "amount": [2, 3, 3],
+   "regrow_days": 3,
+   "prompt": "MONDBIRNEN SAMMELN",
+   "burst": ["#78d8b8", "#d8f6b0", "#fff8d0"]
+  },
+  "harvest": {
+   "tool": "axe",
+   "regrow_days": 3,
+   "drops": [
+    {"id": "wood", "chance": 0.55, "min": 1, "max": 1}
+   ],
+   "final_drops": [
+    {"id": "wood", "chance": 1.0, "min": 2, "max": 3},
+    {"id": "moon_pear", "chance": 1.0, "min": 1, "max": 2}
+   ]
+  }
+ },
+ "dry_stone_wall": {
+  "name": "Überwachsene Trockensteinmauer",
+  "texture": "res://assets/props/dry_stone_wall.png",
+  "glow": "res://assets/props/dry_stone_wall_glow.png",
+  "light": [0.0, 0.0, 0.14, 0.0, 0.16, 0.0],
+  "light_color": "#78f4e6",
+  "chips": ["#5c587a", "#8580a6", "#3e7d56", "#423d5e"],
+  "columns": 6,
+  "rows": 4,
+  "weights": [3, 2, 2, 2, 2, 1],
+  "radius": [15, 14, 12, 11, 15, 13],
+  "height": [20, 18, 22, 20, 21, 16],
+  "hits": [3, 3, 4, 3, 3, 2],
+  "solid": true,
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 6,
+   "drops": [
+    {"id": "stone", "chance": 0.75, "min": 1, "max": 1}
+   ],
+   "final_drops": [
+    {"id": "stone", "chance": 1.0, "min": 1, "max": 2}
+   ]
+  },
+  "scene": "res://src/entities/props/rock.tscn",
+  "edge_margin": 4
+ },
+ "broken_fence": {
+  "name": "Verfallener Weidezaun",
+  "texture": "res://assets/props/broken_fence.png",
+  "stripped": "res://assets/props/broken_fence_stripped.png",
+  "sway": 0.004,
+  "leaf_colors": ["#7a6258", "#55985f", "#a89484"],
+  "columns": 5,
+  "rows": 1,
+  "weights": [3, 2, 1, 2, 2],
+  "radius": [12, 12, 13, 11, 10],
+  "height": [20, 18, 22, 20, 17],
+  "slow": 0.82,
+  "harvest": {
+   "tool": "axe",
+   "hits": 2,
+   "regrow_days": 6,
+   "drops": [
+    {"id": "stick", "chance": 0.5, "min": 1, "max": 1}
+   ],
+   "final_drops": [
+    {"id": "wood", "chance": 0.85, "min": 1, "max": 1},
+    {"id": "stick", "chance": 0.65, "min": 1, "max": 2}
+   ]
+  },
+  "scene": "res://src/entities/props/bush.tscn",
   "edge_margin": 4
  }
 }

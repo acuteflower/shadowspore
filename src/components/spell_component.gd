@@ -75,14 +75,22 @@ func _process(delta: float) -> void:
 		_aim.name = "SpellAim"
 		_aim.spells = self
 		_player.add_child(_aim)
+	var rate: float = recharge_rate()
 	for p: int in 2:
 		if _left[p] > 0.0:
-			_left[p] = maxf(_left[p] - delta, 0.0)
+			_left[p] = maxf(_left[p] - delta * rate, 0.0)
 			if _left[p] <= 0.0 and _sp[p] != "":
 				_flashes[p] = 1.0
 				if is_multiplayer_authority() and _player != null:
 					SpellZone.sound(_player, "ready", _player.global_position, -6.0 + 1.5 * float(p)) ## only she hears her crystal is full again
 		_flashes[p] = move_toward(_flashes[p], 0.0, delta * 2.5)
+
+
+## Multiplier (>= 1.0) on crystal recharge speed from Singender Resonanzwind (on white quartz), Arkanes Quarzgewitter, and Resonanz-Obelisken.
+func recharge_rate() -> float:
+	if _player == null or not _player.is_inside_tree():
+		return 1.0
+	return DesertHeat.spell_recharge_rate(_player.get_tree(), _player.global_position)
 
 
 func spell_of(prong: int) -> String:
@@ -312,6 +320,8 @@ func _rpc_zone(spell_item: String, gem_item: String, at: Vector2, caster: int, e
 	if not _from_host():
 		return
 	cast_done.emit(spell_item)
+	if is_inside_tree():
+		get_tree().call_group("desert_spell_listeners", "on_spell_cast", _player.global_position if _player != null else at, at, spell_item)
 	var p: Dictionary = SpellRules.empower(SpellRules.params(spell_item, gem_item), power)
 	p["prong"] = prong
 	var level: Node = get_tree().get_first_node_in_group("world") ## inside the y-sorted world, so roots and walls sort with everybody

@@ -9,18 +9,20 @@ const S: float = GripRig.SCALE
 const COAT: int = 0
 const LEATHER: int = 1
 const VIOLET: int = 2
+const SKIN: int = 3
 const SOLID_MIN: int = 6 ## art_hero3d to_pixels: >= 6 of 16 (4x4) subpixels makes a solid pixel
 const RAMPS: Array = [
-	[Color("171020"), Color("30203c"), Color("503359"), Color("795884")], ## art_hero3d COAT: the muted plum sleeve
-	[Color("09060f"), Color("150f22"), Color("2c2347"), Color("6a5aa6")], ## LEATHER: shoulder cap, bracer, glove
-	[Color("34185e"), Color("6636ad"), Color("9468ee"), Color("cbaaff")], ## VIOLET: the band below the elbow (emissive: never darker than band 2)
+	[Color("1a0d24"), Color("3a2144"), Color("593766"), Color("7e548c")], ## art_hero3d COAT: puffed wine-plum short sleeve
+	[Color("0e0716"), Color("1e112c"), Color("36224c"), Color("5e427e")], ## LEATHER: wrist bracer
+	[Color("34185e"), Color("6636ad"), Color("9468ee"), Color("cbaaff")], ## VIOLET: bracelet accent
+	[Color("dc9496"), Color("f2b8b2"), Color("fde0d2"), Color("fff3e8")], ## SKIN: bare porcelain forearm & hand
 ]
 const BANDS: Array[float] = [0.06, 0.34, 0.7] ## shade_band thresholds for cloth and leather
+const SKIN_BANDS: Array[float] = [-0.28, 0.06, 0.52] ## shade_band thresholds for skin
 const INK_DEPTH: float = 2.4 ## a pixel this much behind a neighbour gets its darkest shade (to_pixels)
 const NEIGHBOURS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const SUB_OFF: Array[float] = [-0.375, -0.125, 0.125, 0.375] ## 4x4 subpixel centres relative to pixel centre
 
-static var _inks: Array[Color] = []
 static var _depth_cache: Dictionary = {} ## Texture2D -> {bytes: PackedByteArray, w: int, h: int, valid: bool}
 
 
@@ -75,14 +77,26 @@ static func paint(canvas: CanvasItem, origin: Vector2, shoulder: Vector3, elbow:
 ## The arm as pixels (feet-relative screen grid): {x0, y0, w, h, colors (Array[Color]), filled (1 = a pixel), codes (material * 4 + band, -1 none)}.
 static func raster(shoulder: Vector3, elbow: Vector3, wrist: Vector3, fist: Vector3, depth_ctx: Dictionary = {}) -> Dictionary:
 	var has_depth: bool = bool(depth_ctx.get("valid", false))
-	var d2: Vector3 = (wrist - elbow).normalized() if wrist.distance_to(elbow) > 0.01 else Vector3.DOWN
-	## [a, b, radius a, radius b, material, ring start, ring end]; the sprite sheet already bakes her 1.75*S leather shoulder cap.
+	var arm_style: String = String(depth_ctx.get("arm_style", "default"))
+	var arm_tint: Color = depth_ctx.get("arm_tint", Color.WHITE) as Color
+	var bare_arm: bool = arm_style == "bare"
 	var parts: Array = []
-	if not has_depth:
-		parts.append([shoulder, shoulder, 1.55 * S, 1.55 * S, LEATHER, -1.0, -1.0])
-	parts.append([shoulder, elbow, 1.35 * S, 1.1 * S, COAT, -1.0, -1.0])
-	parts.append([elbow + d2 * 0.4 * S, wrist, 1.2 * S, 0.95 * S, LEATHER, 1.1 * S, 2.1 * S])
-	parts.append([fist, fist, 1.05 * S, 1.05 * S, LEATHER, -1.0, -1.0])
+	var puff_end: Vector3 = shoulder.lerp(elbow, 0.44)
+	var fore_mid: Vector3 = elbow.lerp(wrist, 0.52)
+	if bare_arm:
+		if not has_depth:
+			parts.append([shoulder, shoulder, 1.32 * S, 1.32 * S, SKIN, -1.0, -1.0])
+		parts.append([shoulder, elbow, 1.15 * S, 1.00 * S, SKIN, -1.0, -1.0])
+		parts.append([elbow, wrist, 1.00 * S, 0.88 * S, SKIN, -1.0, -1.0])
+		parts.append([fist, fist, 0.98 * S, 0.98 * S, SKIN, -1.0, -1.0])
+	else:
+		if not has_depth:
+			parts.append([shoulder, shoulder, 1.65 * S, 1.65 * S, COAT, -1.0, -1.0])
+		parts.append([shoulder, puff_end, 1.58 * S, 1.28 * S, COAT, -1.0, -1.0])
+		parts.append([puff_end, elbow, 1.06 * S, 1.00 * S, SKIN, -1.0, -1.0])
+		parts.append([elbow, fore_mid, 1.02 * S, 0.95 * S, SKIN, -1.0, -1.0])
+		parts.append([fore_mid, wrist, 1.12 * S, 0.96 * S, LEATHER, -1.0, -1.0])
+		parts.append([fist, fist, 0.98 * S, 0.98 * S, SKIN, -1.0, -1.0])
 	var lo: Vector2 = Vector2(INF, INF)
 	var hi: Vector2 = Vector2(-INF, -INF)
 	for part: Array in parts:
@@ -195,7 +209,10 @@ static func raster(shoulder: Vector3, elbow: Vector3, wrist: Vector3, fist: Vect
 				var band: int = inked[i] % 4
 				if mat == VIOLET:
 					band = maxi(band, 2)
-				colors[i] = (RAMPS[mat] as Array)[band] as Color
+				var col: Color = (RAMPS[mat] as Array)[band] as Color
+				if mat == COAT or mat == LEATHER:
+					col = _dye_cloth(col, arm_tint)
+				colors[i] = col
 				filled[i] = 1
 				continue
 			var best_nb: int = -1
@@ -289,16 +306,27 @@ static func _raster(part: Array, x0: int, y0: int, w: int, h: int, code: PackedI
 			var n: Vector3 = (Vector3(1.0, 0.0, 0.0) * off.x + GripRig.SCREEN_DOWN * off.y + GripRig.VIEW * dz) / maxf(r, 0.01)
 			var lam: float = 0.78 * n.dot(light) + 0.22 * (0.5 + 0.5 * n.z) - 0.06
 			var band: int = 0
-			for th: float in BANDS:
+			var th_arr: Array[float] = SKIN_BANDS if mat == SKIN else BANDS
+			for th: float in th_arr:
 				if lam >= th:
 					band += 1
 			code[i] = (VIOLET if ring else mat) * 4 + band
 
 
-## art_hero3d ink_color: the darkest shade of a material, darker still.
-static func _ink(mat: int) -> Color:
-	if _inks.is_empty():
-		for ramp: Array in RAMPS:
-			var c: Color = ramp[0] as Color
-			_inks.append(Color(c.r * 0.55, c.g * 0.55 * 0.95, c.b * 0.55))
-	return _inks[mat]
+## Matches `cosmetic_dye` in `hit_flash.gdshader` for cloth/leather ramps (`tint == white` is lossless).
+static func _dye_cloth(col: Color, tint: Color) -> Color:
+	if absf(tint.r - 1.0) + absf(tint.g - 1.0) + absf(tint.b - 1.0) < 0.005:
+		return col
+	var lum: float = col.r * 0.3 + col.g * 0.59 + col.b * 0.11
+	if lum < 0.055:
+		return col
+	var t: float = clampf((lum - 0.055) / 0.55, 0.0, 1.0)
+	var dark: Color = Color(tint.r * 0.22, tint.g * 0.22, tint.b * 0.22, col.a)
+	var light_c: Color = tint.lerp(Color(0.96, 0.92, 0.98, 1.0), 0.42)
+	light_c.a = col.a
+	return dark.lerp(light_c, t)
+
+
+## art_hero3d ink_color: unified crisp dark plum-obsidian silhouette outline (#100716).
+static func _ink(_mat: int) -> Color:
+	return Color("100716")

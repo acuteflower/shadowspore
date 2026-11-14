@@ -120,20 +120,40 @@ void fragment() {
 		float wave = 0.5 + 0.5 * sin(along * 0.26 - time * C.z + hash(floor(px * 0.5)) * 6.2831);
 		float h = hash(px);
 		float urg = C.w;
+		bool is_threat = C.x < 0.5;
+		// Living Void-rift veins & writhing thorny abyssal membrane for Mornath & Morwenna boss zones!
+		float vein_d = crack_dist(px + vec2(0.0, -time * (is_threat ? 4.5 : 1.8)), is_threat ? 13.5 : 11.0, time * 0.85);
+		float vein_on = step(vein_d, (is_threat ? 0.95 : 1.15) + 0.55 * urg) * step(hash(floor(px / 13.5) + 2.7), 0.48 + 0.50 * urg);
+		float wriggle = 0.55 * sin(along * 0.62 + time * 11.0);
+		float thorn = max(0.0, sin(along * 0.38 - time * 7.5) - 0.72) * 8.5; // periodic inward Void-thorns along the rim
+		float rim_band = 1.65 + wriggle + thorn;
 		float on = 0.0;
-		if (d < 1.5) {
-			on = 0.9;
-		} else if (wave > 0.48 - 0.12 * urg && h < 0.5 + 0.45 * urg) {
-			on = 0.35 + wave * 0.45;
+		vec3 col = vec3(0.0);
+		if (d < rim_band) {
+			on = 0.94;
+			vec3 rim_hot = is_threat ? mix(vec3(1.0, 0.20, 0.42), vec3(1.0, 0.85, 0.92), urg * 0.85) : vec3(0.80, 0.66, 1.0);
+			vec3 rim_void = is_threat ? vec3(1.0, 0.31, 0.85) : vec3(0.55, 0.34, 0.95);
+			col = mix(rim_hot, rim_void, step(0.68, fract(along * 0.13 + time * 1.4)));
+		} else if (d < rim_band + 1.15) {
+			// Dark purple-black Void-abyss crust directly inside the rim so it pops on bright flagstones & firelight
+			on = 0.62;
+			col = vec3(0.08, 0.02, 0.14);
+		} else if (vein_on > 0.5) {
+			on = 0.66 + 0.28 * urg;
+			vec3 v_crimson = is_threat ? vec3(1.0, 0.22, 0.45) : vec3(0.62, 0.38, 0.96);
+			vec3 v_magenta = is_threat ? mix(vec3(1.0, 0.31, 0.85), vec3(1.0, 0.88, 0.95), urg * 0.7) : vec3(0.86, 0.72, 1.0);
+			col = mix(v_crimson, v_magenta, step(0.45, wave));
+		} else if (wave > 0.47 - 0.12 * urg && h < 0.50 + 0.45 * urg) {
+			on = 0.36 + wave * 0.46;
+			vec3 low = is_threat ? vec3(0.72, 0.09, 0.23) : vec3(0.32, 0.16, 0.68);
+			vec3 high = is_threat ? mix(vec3(1.0, 0.26, 0.42), vec3(1.0, 0.82, 0.88), urg) : vec3(0.68, 0.52, 0.96);
+			col = mix(low, high, wave);
+			if (h < 0.10) {
+				col = mix(col, vec3(0.78, 0.34, 1.0), 0.55); // Void-violet spore glints
+			}
 		}
 		if (on <= 0.0) {
 			continue;
-		}
-		vec3 low = C.x < 0.5 ? vec3(0.76, 0.12, 0.23) : vec3(0.35, 0.20, 0.72);
-		vec3 high = C.x < 0.5 ? mix(vec3(1.0, 0.29, 0.39), vec3(1.0, 0.82, 0.84), urg) : vec3(0.66, 0.54, 0.94);
-		vec3 col = mix(low, high, wave);
-		if (d < 1.5) {
-			col = mix(col, C.x < 0.5 ? vec3(1.0, 0.7, 0.74) : vec3(0.82, 0.74, 1.0), 0.6);
 		}
 		float a = on * C.y;
 		if (a > best.a) {

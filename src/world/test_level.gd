@@ -7,7 +7,9 @@ const SPIDER_SCENE: PackedScene = preload("res://src/entities/enemies/shadow_spi
 const LISTENER_SCENE: PackedScene = preload("res://src/entities/enemies/void_listener.tscn")
 const CRUSHER_SCENE: PackedScene = preload("res://src/entities/enemies/void_crusher.tscn")
 const FISHER_SCENE: PackedScene = preload("res://src/entities/enemies/light_fisher.tscn")
-const RESONANCE_SCENE: PackedScene =preload("res://src/entities/enemies/resonance_wave.tscn")
+const RESONANCE_SCENE: PackedScene = preload("res://src/entities/enemies/resonance_wave.tscn")
+const QUARTZ_GOLEM_PATH: String = "res://src/entities/enemies/quartz_golem.tscn"
+const QUARTZ_SHARD_PATH: String = "res://src/entities/enemies/quartz_shard.tscn"
 const ARENA_LIMIT: Vector2 = Vector2(380, 220)
 
 const LUSH_KINDS: Array[String] = ["flower", "petal", "bloom", "clover", "tuft"]
@@ -191,6 +193,42 @@ func spawn_resonance(at: Vector2, dir: Vector2, mouth: Vector2 = Vector2.INF, da
 	return wave
 
 
+func spawn_quartz_shard(at: Vector2, dir: Vector2, emission: Vector2, variant: int = 0, damage_scale: float = 1.0) -> Node2D:
+	if not multiplayer.is_server():
+		return null
+	var shard_scene: PackedScene = load(QUARTZ_SHARD_PATH) as PackedScene
+	var shard: Node2D = shard_scene.instantiate() as Node2D
+	_wave_count += 1
+	shard.name = "QuartzShard%d" % _wave_count
+	shard.set("origin", at)
+	shard.set("direction", dir)
+	shard.set("emission_point", emission)
+	shard.set("variant", variant)
+	shard.set("damage_scale", damage_scale)
+	shard.position = at
+	get_node("EnemyProjectiles").add_child(shard)
+	return shard
+
+
+func spawn_quartz_golem(at: Vector2, heading: float, variant: int = 0, start_dormant: bool = false, health_scale: float = 1.0, damage_scale: float = 1.0, emerge: bool = false) -> Node2D:
+	if not multiplayer.is_server():
+		return null
+	var golem_scene: PackedScene = load(QUARTZ_GOLEM_PATH) as PackedScene
+	var golem: Node2D = golem_scene.instantiate() as Node2D
+	_enemy_count += 1
+	golem.name = "Enemy%d" % _enemy_count
+	golem.position = at
+	golem.set("home_pos", at)
+	golem.set("heading", heading)
+	golem.set("variant", variant)
+	golem.set("start_dormant", start_dormant)
+	golem.set("health_scale", health_scale)
+	golem.set("damage_scale", damage_scale)
+	golem.set("emerge_on_spawn", emerge)
+	_enemies.add_child(golem)
+	return golem
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_spawn_enemy(pos: Vector2) -> void:
 	if multiplayer.is_server():
@@ -231,6 +269,14 @@ func spawn_species(enemy_id: String, at: Vector2, heading: float, health_scale: 
 		fisher.damage_scale = damage_scale
 		fisher.emerge_on_spawn = emerge
 		enemy = fisher
+	elif enemy_id == "quartz_golem":
+		var golem_scene2: PackedScene = load(QUARTZ_GOLEM_PATH) as PackedScene
+		var golem2: Node2D = golem_scene2.instantiate() as Node2D
+		golem2.set("health_scale", health_scale)
+		golem2.set("damage_scale", damage_scale)
+		golem2.set("emerge_on_spawn", emerge)
+		golem2.set("home_pos", at)
+		enemy = golem2
 	else:
 		var spider: ShadowSpider = SPIDER_SCENE.instantiate() as ShadowSpider
 		spider.enemy_id = enemy_id

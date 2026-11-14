@@ -146,5 +146,27 @@
     "hot": "f2eeff",
     "glyph": "eye",
     "tiered": true
+  },
+  "sun_heat": {
+    "name": "ERHITZT",
+    "seconds": 4.5,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "extinguish": "water",
+    "permanent": true,
+    "color": "ffb347",
+    "hot": "fff2b8",
+    "glyph": "spark"
+  },
+  "refreshed": {
+    "name": "ERFRISCHT",
+    "seconds": 45.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "4fe6d8",
+    "hot": "e2fffc",
+    "glyph": "drop"
   }
 }

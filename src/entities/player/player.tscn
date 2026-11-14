@@ -19,6 +19,7 @@
 [ext_resource type="Script" path="res://src/components/attack_component.gd" id="12_attack"]
 [ext_resource type="Script" path="res://src/components/talisman_component.gd" id="19_talisman"]
 [ext_resource type="Script" path="res://src/components/wall_climb.gd" id="20_climb"]
+[ext_resource type="Script" path="res://src/components/appearance_component.gd" id="21_appearance"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flash"]
 resource_local_to_scene = true
@@ -69,6 +70,12 @@ properties/7/replication_mode = 2
 properties/8/path = NodePath(".:swim")
 properties/8/spawn = true
 properties/8/replication_mode = 2
+properties/9/path = NodePath("AppearanceComponent:outfit_id")
+properties/9/spawn = true
+properties/9/replication_mode = 2
+properties/10/path = NodePath("AppearanceComponent:hair_id")
+properties/10/spawn = true
+properties/10/replication_mode = 2
 
 [node name="Player" type="CharacterBody2D"]
 y_sort_enabled = true
@@ -204,6 +211,9 @@ script = ExtResource("11_inv")
 
 [node name="TalismanComponent" type="Node" parent="."]
 script = ExtResource("19_talisman")
+
+[node name="AppearanceComponent" type="Node" parent="."]
+script = ExtResource("21_appearance")
 
 [node name="AttackComponent" type="Node2D" parent="."]
 y_sort_enabled = true

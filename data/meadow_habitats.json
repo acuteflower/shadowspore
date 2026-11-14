@@ -1,0 +1,19 @@
+{
+  "settings": {
+    "macro_scale_tiles": 168.0,
+    "warp_tiles": 42.0,
+    "sanctuary_fade_tiles": 22.0,
+    "coast_fade_tiles": 16.0,
+    "shrine_xp_reward": 16,
+    "shrine_heal_ratio": 0.35,
+    "solitary_regen_rate": 0.65,
+    "wind_flowers": ["sunbloom", "moonbell", "spark_poppy", "puffseed"]
+  },
+  "super_affinity": {
+    "0": {"deep_forest": -0.18, "wind_meadow": 0.24, "old_pasture": 0.16},
+    "1": {"deep_forest": -0.06, "wind_meadow": 0.08, "old_pasture": 0.24},
+    "2": {"deep_forest": -0.10, "wind_meadow": 0.26, "old_pasture": 0.04},
+    "3": {"deep_forest": 0.32, "wind_meadow": -0.16, "old_pasture": 0.06},
+    "4": {"deep_forest": 0.16, "wind_meadow": 0.14, "old_pasture": -0.06}
+  }
+}

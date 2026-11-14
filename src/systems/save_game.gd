@@ -55,6 +55,7 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 			"equipment": player.inventory.equipment,
 			"raw_rolls": player.inventory.hidden, ## what the raw stones in the bag hide (Ilva's LÄUTERN)
 			"bandaged": player.bandaged,
+			"appearance": player.appearance.export_data() if player.appearance != null else {},
 			"quests": player.quests.export_data() if player.quests != null else {},
 			"board_local": player.tracked.export_data() if player.tracked != null else {}, ## journal focus, page and read notices
 		},
@@ -98,6 +99,12 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	var pets: PetRegistry = PetRegistry.of(tree)
 	if pets != null and not (pets.export_state()["bonds"] as Dictionary).is_empty():  ## (the birds' records only exist with a bond)
 		data["pets"] = pets.export_state() ## the bonds with wild birds (docs/pet_konzept.md)
+	var vistas: Vistas = Vistas.of(tree)
+	if vistas != null and vistas.discovered_count() > 0:
+		data["vistas"] = vistas.export_state() ## discovered meadow cliff vistas (docs/wiesenbiom_ausbau_konzept.md)
+	var m_landmarks: MeadowLandmarks = MeadowLandmarks.of(tree)
+	if m_landmarks != null and m_landmarks.blessed_count() > 0:
+		data["meadow_landmarks"] = m_landmarks.export_state() ## blessed Urforst shrines (docs/wiesenbiom_ausbau_konzept.md)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
@@ -149,6 +156,8 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	_restore_stacks(player.inventory, saved)
 	player.inventory.import_hidden(saved.get("raw_rolls", {}) as Dictionary)
 	player.set_bandaged(bool(saved.get("bandaged", false)))
+	if player.appearance != null:
+		player.appearance.import_data(saved.get("appearance", {}) as Dictionary)
 	player.sync_wound_visuals()
 	if player.quests != null and saved.has("quests"):
 		player.quests.import_data(saved.quests as Dictionary)
@@ -190,6 +199,12 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	var pets: PetRegistry = PetRegistry.of(tree)
 	if pets != null and data.has("pets"):
 		pets.import_state(data.pets as Dictionary)
+	var vistas: Vistas = Vistas.of(tree)
+	if vistas != null and data.has("vistas"):
+		vistas.import_state(data.vistas)
+	var m_landmarks: MeadowLandmarks = MeadowLandmarks.of(tree)
+	if m_landmarks != null and data.has("meadow_landmarks"):
+		m_landmarks.import_state(data.meadow_landmarks)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null and data.has("map"):
 		discovery.import_saved(Marshalls.base64_to_raw(String(data["map"])))
@@ -217,6 +232,7 @@ static func guest_economy(player: Player) -> Dictionary:
 		"slots": player.inventory.slots.duplicate(true), "equipment": player.inventory.equipment.duplicate(true),
 		"held": player.inventory.held.duplicate(true), "raw_rolls": player.inventory.hidden.duplicate(true), "xp": player.progress.xp, "copper": player.progress.copper,
 		"claimed": player.progress.claimed, "skill_tree": skills.export_data(),
+		"appearance": player.appearance.export_data() if player.appearance != null else {},
 	}
 
 
@@ -228,6 +244,8 @@ static func restore_guest_economy(player: Player, saved: Dictionary) -> void:
 	player.progress.changed.emit()
 	var skills: SkillTreeComponent = player.get_node("SkillTreeComponent") as SkillTreeComponent
 	skills.import_data(saved.get("skill_tree", {}) as Dictionary)
+	if player.appearance != null:
+		player.appearance.import_data(saved.get("appearance", {}) as Dictionary)
 	player.inventory.held = _stack(saved.get("held", {}))
 	_restore_stacks(player.inventory, saved)
 	player.inventory.import_hidden(saved.get("raw_rolls", {}) as Dictionary)

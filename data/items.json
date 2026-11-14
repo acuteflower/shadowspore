@@ -2155,9 +2155,10 @@
   "stats": {
    "heal": 6,
    "regen": 8,
-   "regen_seconds": 6
+   "regen_seconds": 6,
+   "cools": 30
   },
-  "description": "Prall und korallenrot vom Ohrenkaktus gepflückt. Kühlt die Kehle und schmeckt nach warmem Honig."
+  "description": "Prall und korallenrot vom Ohrenkaktus gepflückt. Kühlt die Kehle in der Mittagshitze und schmeckt nach warmem Honig."
  },
  "crown_fig": {
   "name": "Kronenfeige",
@@ -2170,9 +2171,10 @@
   "stats": {
    "heal": 12,
    "regen": 10,
-   "regen_seconds": 8
+   "regen_seconds": 8,
+   "cools": 35
   },
-  "description": "Seltene Goldfrucht aus der Krone eines alten Säulenkaktus, voll gespeicherter Mittagssonne."
+  "description": "Seltene Goldfrucht aus der Krone eines alten Säulenkaktus, erfrischend saftig trotz glühender Sonne."
  },
  "cactus_wood": {
   "name": "Kaktusholz",
@@ -2195,9 +2197,10 @@
   "stats": {
    "heal": 4,
    "regen": 6,
-   "regen_seconds": 6
+   "regen_seconds": 6,
+   "cools": 25
   },
-  "description": "Saftiges, blassgrünes Fruchtfleisch aus dem Inneren eines Wüstenkaktus. Stillt den Durst in der Öde."
+  "description": "Saftiges, blassgrünes Fruchtfleisch aus dem Inneren eines Wüstenkaktus. Löscht Hitze und Durst in der Öde."
  },
  "quartz_aloe": {
   "name": "Quarz-Aloe",
@@ -2210,9 +2213,10 @@
   "stats": {
    "heal": 10,
    "regen": 14,
-   "regen_seconds": 10
+   "regen_seconds": 10,
+   "cools": 45
   },
-  "description": "Durchscheinendes, kühles Blattgel von den weißen Quarzadern. Lindert Wunden fast augenblicklich."
+  "description": "Durchscheinendes, eiskühles Blattgel von den weißen Quarzadern. Kühlt sofort ab und lindert Wunden."
  },
  "night_cactus_bloom": {
   "name": "Königsblüte",
@@ -2235,7 +2239,8 @@
   "stats": {
    "heal": 8,
    "regen": 18,
-   "regen_seconds": 12
+   "regen_seconds": 12,
+   "cools": 25
   },
   "description": "Tief aus dem Dünensand gezogene Wasserknolle. Knackig, kühl und voller zäher Ausdauer."
  },
@@ -2260,9 +2265,10 @@
   "stats": {
    "heal": 10,
    "regen": 12,
-   "regen_seconds": 8
+   "regen_seconds": 8,
+   "cools": 30
   },
-  "description": "Goldbraune, süße Dattelfrucht aus der Krone einer Oasenpalme. Stärkt rasch nach langen Wegen durch den Sand."
+  "description": "Goldbraune, süße Dattelfrucht aus der Krone einer Oasenpalme. Kühlt die Stirn und stärkt nach langen Wegen."
  },
  "oasis_blossom": {
   "name": "Quellblüte",
@@ -2275,9 +2281,10 @@
   "stats": {
    "heal": 14,
    "regen": 14,
-   "regen_seconds": 10
+   "regen_seconds": 10,
+   "cools": 45
   },
-  "description": "Türkisleuchtender Blütenkelch vom Rand einer Quarzoase, kühl wie frisches Quellwasser."
+  "description": "Türkisleuchtender Blütenkelch vom Rand einer Quarzoase, erfrischend wie kühles Quellwasser."
  },
  "sun_quartz": {
   "name": "Sonnenquarz",
@@ -2288,5 +2295,55 @@
   "hotbar": false,
   "icon": "res://assets/items/sun_quartz.png",
   "description": "Klarer, weiß-türkiser Kristallsplitter aus den Felsen der Sonnenquarz-Öde. In seinen Kanten glimmt gespeichertes Sonnenlicht."
+ },
+ "prism_shard": {
+  "name": "Prismensplitter",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/prism_shard.png",
+  "description": "Seltener, vielfach geschliffener Quarzsplitter aus einer tiefen Prisma-Ader. Bricht jedes Licht in Türkis, Violett und Gold."
+ },
+ "ruin_stone": {
+  "name": "Ruinen-Sandstein",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/ruin_stone.png",
+  "description": "Behauener Wüstensandstein mit matten Goldklammern und feinen Quarzfugen aus den versunkenen Ruinen der Öde."
+ },
+ "meadow_apple": {
+  "name": "Wiesenapfel",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/meadow_apple.png",
+  "stats": {
+   "heal": 8,
+   "regen": 8,
+   "regen_seconds": 6
+  },
+  "description": "Knackiger, rotgoldener Fallapfel aus einem verwilderten Obstgarten der alten Gehöfte. Schmeckt herb-süß nach Spätsommer und stellt sofort 8 Leben sowie 8 über 6 Sekunden wieder her."
+ },
+ "moon_pear": {
+  "name": "Mondbirne",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/moon_pear.png",
+  "stats": {
+   "heal": 6,
+   "regen": 16,
+   "regen_seconds": 10
+  },
+  "description": "Schimmernde, blassgrüne Birne von uralten Weidebäumen. Im kühlen Fruchtfleisch glimmt sanftes Nachtlicht – stellt 6 Leben sofort und 16 über 10 Sekunden wieder her."
  }
 }

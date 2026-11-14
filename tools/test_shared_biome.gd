@@ -33,7 +33,9 @@ func _run() -> void:
 	var original: Image = Relief.TEXTURE.get_image()
 	original.convert(Image.FORMAT_RGBA8)
 	var old: PackedByteArray = original.get_data()
+	Relief.town_styles = false ## Hallgrat's stone (data/hallgrat.json style_areas) is the one deliberate exception, checked by tools/test_hallgrat.tscn
 	var relief: Relief = Relief.new()
+	Relief.town_styles = true
 	var geometry: bool = true
 	var materials: bool = true
 	for i: int in range(0, old.size(), 4):

@@ -25,6 +25,8 @@ var dim: float = 1.0
 var label: String = ""
 var alert: Color = Color(0, 0, 0, 0) ## pulsing warning color while in danger
 var trail_color: Color = Color(0, 0, 0, 0) ## alpha 0 = no trail
+var heat_shimmer: float = 0.0 ## 0..1 golden desert sun-heat rim on the stamina vine
+var cool_shimmer: float = 0.0 ## 0..1 crisp turquoise oasis-refresh sheen
 
 var _shown: float = 1.0
 var _trail: float = 1.0
@@ -115,7 +117,9 @@ func _process(delta: float) -> void:
 		or was_flashing
 		or has_drops
 		or label_alpha_changing
-		or alert.a > 0.0)
+		or alert.a > 0.0
+		or heat_shimmer > 0.05
+		or cool_shimmer > 0.05)
 
 	_redraw_timer += delta
 	if is_animating or _dirty or _redraw_timer >= IDLE_REDRAW_INTERVAL:
@@ -139,15 +143,23 @@ func _draw() -> void:
 		var top: float = roundf(p.y) - (thick - 1) / 2
 		var infected: float = VineStyle.infection(length - s, void_level, s / 2)
 		var rim: Color = VineStyle.OUTLINE.lerp(VineStyle.BARK_VOID_LIGHT, infected).lerp(alert, pulse * 0.7)
+		if heat_shimmer > 0.05:
+			var h_wave: float = 0.45 + 0.55 * sin(_time * 5.2 - float(s) * 0.16)
+			rim = rim.lerp(Color("ffb84a").lerp(Color("fff2b8"), h_wave * 0.55), clampf(heat_shimmer * (0.45 + 0.45 * h_wave), 0.0, 0.88))
+		elif cool_shimmer > 0.05:
+			var c_wave: float = 0.4 + 0.6 * sin(_time * 3.4 - float(s) * 0.12)
+			rim = rim.lerp(Color("52e3d4"), clampf(cool_shimmer * 0.42 * c_wave, 0.0, 0.55))
 		draw_rect(Rect2(p.x, top - 1, 1, thick + 2), rim)
 		var body: Color
 		if s <= head_s: ## sap
 			body = palette[1].lerp(palette[2], 0.5 * (1.0 - t)) * tint
 			var phase: float = fposmod(_time * 26.0 - s, length / 3.0) ## pulses ride outwards
 			if phase < 4.0:
-				body = body.lerp(alert if alert.a > 0.0 else palette[0], 1.0 - phase / 4.0)
+				var pulse_col: Color = alert if alert.a > 0.0 else (Color("ffeaa0") if heat_shimmer > 0.2 else palette[0])
+				body = body.lerp(pulse_col, 1.0 - phase / 4.0)
 			draw_rect(Rect2(p.x, top, 1, thick), body)
-			draw_rect(Rect2(p.x, top, 1, 1), palette[0] * tint)
+			var hi_col: Color = palette[0].lerp(Color("ffe294"), clampf(heat_shimmer * 0.55, 0.0, 0.55)) * tint
+			draw_rect(Rect2(p.x, top, 1, 1), hi_col)
 		elif s <= trail_s: ## sap that was just lost
 			draw_rect(Rect2(p.x, top, 1, thick), trail_color)
 		else: ## withered husk

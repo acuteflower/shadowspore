@@ -143,7 +143,21 @@ def render_job(job):
 
 
 def main() -> None:
-    specs = all_sheets()
+    only = None
+    pos_args = []
+    for a in sys.argv[1:]:
+        if a.startswith("--only="):
+            only = a.split("=", 1)[1]
+        else:
+            pos_args.append(a)
+
+    all_sp = all_sheets()
+    if only is not None:
+        assert only in all_sp, f"Unknown sheet '{only}', expected one of {sorted(all_sp)}"
+        specs = {only: all_sp[only]}
+    else:
+        specs = all_sp
+
     jobs = []
     buffers = {}
     arm_data = {}
@@ -154,8 +168,8 @@ def main() -> None:
         for idx, args in enumerate(frames):
             jobs.append((name, idx, *args))
 
-    workers = int(sys.argv[1]) if len(sys.argv) > 1 else min(8, os.cpu_count() or 1)
-    print(f"Rendering 13 hero depth blood maps + 3D arm rigs ({len(jobs)} frames, {workers} workers)...", flush=True)
+    workers = int(pos_args[0]) if pos_args else min(8, os.cpu_count() or 1)
+    print(f"Rendering {len(specs)} hero depth blood map(s) + 3D arm rigs ({len(jobs)} frames, {workers} workers)...", flush=True)
     with mp.Pool(workers) as pool:
         for done, (name, idx, blood_bytes, arm3) in enumerate(pool.imap_unordered(render_job, jobs, chunksize=8), 1):
             cols = specs[name][2]
@@ -172,21 +186,30 @@ def main() -> None:
             buffers[name][0, 0] = (255, 137, 42, 1)
         write_array(h.ROOT / "characters" / blood_file, buffers[name])
 
-    arm3_out = {
-        "scale": 20,
-        "stride": 12,
-        "sheets": {
-            specs[name][0]: {
+    arm3_path = h.ROOT.parent / "data" / "hero_arm3d.json"
+    if only is not None and arm3_path.exists():
+        arm3_out = json.loads(arm3_path.read_text())
+        for name in specs:
+            arm3_out["sheets"][specs[name][0]] = {
                 "cols": specs[name][2],
                 "rows": specs[name][3],
                 "data": [v for fr in arm_data[name] for v in fr],
             }
-            for name in specs
-        },
-    }
-    arm3_path = h.ROOT.parent / "data" / "hero_arm3d.json"
+    else:
+        arm3_out = {
+            "scale": 20,
+            "stride": 12,
+            "sheets": {
+                specs[name][0]: {
+                    "cols": specs[name][2],
+                    "rows": specs[name][3],
+                    "data": [v for fr in arm_data[name] for v in fr],
+                }
+                for name in specs
+            },
+        }
     arm3_path.write_text(json.dumps(arm3_out, separators=(",", ":")) + "\n")
-    print("Done: updated 13 *_blood.png depth maps and data/hero_arm3d.json.", flush=True)
+    print(f"Done: updated {len(specs)} *_blood.png depth map(s) and data/hero_arm3d.json.", flush=True)
 
 
 if __name__ == "__main__":

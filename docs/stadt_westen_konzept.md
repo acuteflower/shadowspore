@@ -106,6 +106,7 @@ Schwarze Mauer und **Verlorenes Viertel** liegen an der Nordwestflanke (Ebene 1�
 - **Osttor** an der Karrenrampe (≈ (179, 371)): zwei Torhäuser, eine eingelassene Winde, ein Fallgatter, das nie fällt, weil es verrostet ist (am Anfang offen; später ein Rätsel, siehe 10).
 - **Steinmarkt:** großer gepflasterter Platz mit Stein-Marktständen (nur Tischplatten und Wetterdächer aus Leinen), Brunnen mit Wasserspeier, **Waage** (Steinwaage, zum Einwiegen von Fängen und Erz).
 - **Karrenhof/Karawanserei:** offener Hof mit Brunnentrog, Stallbuchten (leer, später Karawanentiere, kein Tier wird verletzt), Lagerhäuser.
+- **Die Stallungen** (Beschluss 2026-11-13): ein großer Steinstall gleich neben dem Karrenhof, mit Heuboden, Sattelkammer, acht Buchten und einer Koppel dahinter. Er wird **später der Ort der Reittiere**. Ellie hört um **Stufe 15** zum ersten Mal davon: Jorun erzählt es ihr, wenn er mit der Karawane in Glimmrast steht. Bis dahin ist der Stall da, aber leer und verschlossen.
 - **Gasthaus „Zum Stillen Stein"** (Interior): Kamin, lange Steintische, Gästezimmer, kleine Bühne.
 - **Terrassenfelder** an der Nordost-Flanke: Linsen-, Rüben- und Kräuterbeete mit Trockenmauern, ein halb verlassener Windmühlturm (Wind aus `WorldWind`).
 - **Geisterstraße:** leere Häuser mit zugenagelten Läden, ein Bäcker ohne Bäcker (den Ofen gibt es noch), Wäscheleinen mit Fetzen. **Hier beginnt Stadtstufe 1**: nach und nach öffnen sich Läden.
@@ -302,6 +303,9 @@ Tamsa schleift **Kristalle für Talismane** (`glass_shard`, `leitstein_splitter`
 ### 8.19 **Pilgerweg und Wegsteinabkürzung**
 Der **Westweg** hat ein Echo: ein **Rückwärts-Weg** („Pilgerpfad"), den Ellie später gehen kann, um Kleinigkeiten zu bringen (Karawanenaufträge) oder Wegsteine auf dem Weg zu aktivieren. Mit jedem aktivierten Leitstein am Weg sinkt die Reisezeit (Haltezeit der Wegstein-Reise).
 
+### 8.19a **Die Stallungen (Reittiere, später)**
+Der Stall im Fuß ist bewusst größer als alles andere im Fuß (16 × 9 Kacheln, Koppel 24 × 13). Er gehört zum Karrenhof, an dem der Westweg ankommt: Wer mit einem Tier kommt, stellt es hier ab. Eingeführt wird er um **Stufe 15 durch Jorun** (Hinweis im Gespräch, vielleicht ein Aushang); die Reittiere selbst, ihr Kauf, ihre Pflege und das Reiten sind ein **eigenes, noch nicht besprochenes System**. Im Grundriss ist der Platz reserviert (`stallungen` in data/hallgrat.json).
+
 ### 8.20 **Die Schwarze Mauer als Entscheidung**
 Am Ende der Hauptquest kann Ellie die Schwarze Mauer **öffnen oder lassen** (siehe 12). Öffnen = neues Viertel, aber auch neue Gegner, Rückkehr der Toten (Gedenkmauer wird zu Tür), Lassen = sichere Stadt, aber verlorene Geschichte. Gleiche Frage wie bei der Ader.
 
@@ -356,6 +360,13 @@ Rezepte, Bau-Unlocks (Stein), Talismane, Waffen-Skins, Karten-Reveals, Wegsteina
 ---
 
 ## 12. Entscheidungen für dich
+
+**Beschlossen (2026-11-13):**
+- **Standort:** A, der Glaskamm (Mitte etwa (150, 350), Wegstein *Wächterin des Glaskamms* (142, 355) wird das Forum).
+- **Ton:** melancholisch-würdig.
+- **Ader und Leere:** die Ader ist mit der Leere verwachsen (Entscheidung reparieren/abschalten bleibt für den Glasbruch).
+- **Relief:** Stil-Rechteck um die Stadt (Mauerwerkwände, Treppen), nur Stil-Bytes, Test „Altland bytegleich".
+- **Noch offen** (blockieren Stufe 1 nicht): Name (Arbeitsname Hallgrat bleibt bis dahin), Valdric/Corvin, Nachtsicherheit, Umzug, Zeitpunkt im Spiel, Größe der Besetzung.
 
 1. **Standort:** A Glaskamm (empfohlen), B Klippenstock oder C Flachtal?
 2. **Name:** Hallgrat, oder etwas anderes (Vorschläge: Klangfels, Schieferglocke, Mauerlicht, Altstein)?
@@ -418,6 +429,134 @@ Alles folgt den harten Regeln aus CLAUDE.md: **host-autoritativ, streng typisier
 Jede Stufe endet mit Test, Vorschau-Capture (Tag und Nacht), Doku-Eintrag in CLAUDE.md und einem Check-in mit dir.
 
 ---
+
+### 14.1 Stand Stufe 1 (gebaut 2026-11-13)
+
+**Grundriss** in `data/hallgrat.json` (Kacheln): sechs Bezirke als Polygone auf dem echten Relief, 25 Orte mit Ebene und Bezirk, fünf Wege, drei Tore, 16 Leitsteine mit ihrem Ton (0–3 des Stadtmotivs), der Stil-Bereich für Stufe 2. `py -3 tools/preview_hallgrat_plan.py [--fix]` prüft den Plan gegen das Relief (jeder Ort steht auf seiner Ebene, jeder Weg wechselt die Ebene nur über einen Verbinder) und zeichnet `docs/img/hallgrat_plan.png`; `--fix` routet die Wege über ihre `via`-Punkte und rückt Orte zurecht, die nicht passen.
+
+Was das Gelände vorgibt (anders als im ersten Entwurf gedacht):
+- Vom Vorland kommt man nur über die **Felsstufen bei (186, 342)** auf den Gipfelrücken: Das ist das **Osttor**. Die Rampe bei (179, 371) führt nicht vom Vorland herauf, sondern von der Torgasse (Ebene 1) in die Staffeln (Ebene 2).
+- Die Hauptachse **„Die Steige"** läuft fast gerade nach Westen hinauf: Torstraße → Markt → Osttor → Torgasse → Torstufen (178, 355) → Werkgasse → Forumstufen (164, 354) → Forum um die Wächterin (142, 355).
+- Die Westmauer steht auf dem äußeren Ring (Ebene 1, x 111–115). Zu ihr steigt man vom Gipfel über den Westring (Ebene 2) hinab und geht an dessen Nordende über die Stufen (120, 329) auf den Wehrgang.
+- Der Mund des Glasbruchs liegt in der Senke nördlich des Gipfels (Ebene 0). Die Brunnenmulde ist eine Senke auf Ebene 1 im Süden der Staffeln.
+
+**Der Westweg**: `py -3 tools/bake_westweg.py` sucht die Trasse über das gebackene Gelände. Er zweigt bei (793, 573) von Joruns Karrenweg nördlich von Glimmrast ab und führt rund 790 Kacheln über flaches Land der Ebene 0 zwischen den Seen hindurch bis vor das Osttor. Er hält Abstand zu Klippen, Wasser, dem Einführungs-Korridor und allen handgesetzten Orten. Er ist eine **alte Straße**:
+- Unterwegs sind nur Reste der Pflasterung zu sehen.
+- Im letzten Drittel wird sie ganz gepflastert und bekommt Randsteine (`old_road` in `tools/bake_ground.py`).
+- Sie ist in 11 Stücke gebacken (`arc`, gemeinsames `seed`, in der Welt verankertes Rauschen), die ohne Naht aneinanderstoßen: `py -3 tools/bake_ground.py --path=westweg`.
+
+**Meilensteine** alle 50 Kacheln Weg (15 Stück, 750 bis 50):
+- Sie stehen am Wegrand (`Milestone`, Bilder von `py -3 tools/art_milestone.py`).
+- Fern der Stadt sind sie alt, schief und bemoost, ihr Kristall ist tot. Von 150 an glimmt er violett, beim letzten Stein (50) flackert er nachts türkis.
+- E liest die Inschrift und einen Gedanken von Ellie (Platzhalter, `milestone_text`). Dazu klingt der Ton des Steins aus dem Stadtmotiv (`py -3 tools/audio_hallgrat.py`).
+
+**In der Welt**:
+- Der Knoten `Hallgrat` stellt die Meilensteine auf und markiert die Stadt auf der Karte (Marker `hallgrat`, sobald das Forum gesehen wurde).
+- Er zeichnet für Entwickler den Plan auf den Boden: ENTWICKLER → HALLGRAT: PLAN ZEIGEN / ZUM OSTTOR / WESTWEG: ZUR GABELUNG.
+- Test: `tools/test_hallgrat.tscn` (74 Prüfungen, `HALLGRAT OK`). Mit `--rendering-driver opengl3 ... -- --dir=/abs` macht er dieselben Bilder: Gabelung, Weg, letzter Stein bei Nacht, Tor und Forum mit Plan.
+
+Noch nicht gebaut: Stil-Bereich (Stufe 2), Häuser, Mauern, Pflaster, Menschen; ein Wegweiser an der Gabelung; die Leitsteine am Weg (Vorboten ab Meile 150) als eigene Objekte.
+
+### 14.2 Stand Stufe 2 (gebaut 2026-11-14)
+
+**Stein statt Fels:**
+- Die Stadt bekommt ihr Aussehen beim Laden: `Relief._apply_town_styles` färbt nach `style_areas` in data/hallgrat.json die Kacheln ganzer Bezirke um. Das geschieht nach dem gemeinsamen Wiesen-Look.
+- `relief.png` wird **nicht neu gebacken**. Es ändern sich nur das Stil-Nibble und bei Mauerwerk die Art der Felsstufen (STEPS → STAIRS).
+- Höhen, Verbinder-Geometrie, Feld und Kollision bleiben so, wie sie gebacken sind. Beide Arten sind für jede Abfrage Verbinder (Höhe, Schritte „stone“, Kollision).
+
+**Die Bezirke:**
+- **Mauerwerk (2)** in der Stille, den Staffeln, der Randpromenade und dem Fuß. Die Terrassenwände werden Stützmauern aus Quadern, die Felsstufen gehauene Treppen mit Wangen (`relief.gdshader`: Mauerwerk-Treppen nutzen die steinerne `steps()`, nicht die grasigen `forest_steps()`).
+- **Kristall (3)** am Glasbruch: violette Adern, die nachts leuchten.
+- **Leere (4)** im Verlorenen Viertel.
+
+**Prüfung:** `tools/test_hallgrat.tscn` (jetzt 87 Prüfungen) vergleicht das Relief mit und ohne Stadtstil (`Relief.town_styles`):
+- Außerhalb der Bezirke ist jedes Byte gleich.
+- Kein Höhen-, Geometrie- oder Biom-Byte bewegt sich.
+- Nur Felsstufen werden zu Treppen.
+- Die Kollision ist die gebackene.
+
+`tools/test_shared_biome.tscn` prüft die Wiesen-Regel jetzt ohne die Stadtausnahme.
+
+**Grenze des Bilds:** Hohe Mauern zeigt das Relief nur an Südkanten. Ost- und Westränder sind schmale Kanten, die Westmauer sieht man darum erst mit den Mauer-Bauwerken aus Stufe 3. Das Verlorene Viertel zeigt die Leere nur an seinen Rändern, die Schwarze Mauer kommt in Stufe 8.
+
+### 14.3 Stufe 3 in drei Teilen, Stand 3a (gebaut 2026-11-14)
+
+Stufe 3 (Außenhülle) ist geteilt:
+- **3a Boden:** Plätze und Gassen. Gebaut.
+- **3b Häuser:** Steinhäuser als Fassaden mit Fensterlicht und Rauch.
+- **3c Mauern und Tore:** Westmauer mit Zinnen, Torhäuser, Leitsteine als leuchtende Objekte, Klang.
+
+**3a, der Boden:** `py -3 tools/bake_hallgrat_ground.py` legt die Flächen aus `paving` in data/hallgrat.json. Gepflastert wird nur auf dem Boden der eigenen Ebene, ein paar Pixel vor jeder Kante; Treppen und Rampen zeichnet das Relief.
+- **Forum (`ring`):** Ringpflaster in elliptischen Lagen um die Wächterin, jede vierte Lage dunkler, Randsteine am Saum. Ihr Steinbett bleibt frei.
+- **Brunnenhof:** kleiner Ring.
+- **Gassen (`setts`):** Steige, Karrenrampe, Mauerweg und Muldenstiege als gesetzte Steine im Verband mit Randsteinen. Die Linie folgt dem gerouteten Weg ohne Kachelstufen (Douglas-Peucker, dann Catmull).
+- **Alte Platten (`flags`):** Nordgasse, Steinmarkt und Karrenhof.
+- **Abnutzung (`wear`):** Sie nimmt Steine weg, lässt Gras in die Fugen und Moos auf die Steine und franst den Rand aus. Die Stille ist gepflegt, der Fuß halb verlassen.
+
+**Nach dem ersten Ansehen überarbeitet (2026-11-14):**
+- **Die Wächterin steht auf festem Grund.** Das Forum hat ein Podest (`dais`) aus großen Keilplatten mit einer niedrigen Stufe aus langen, dunklen Randsteinen, und ihr wildes Graspflaster ist ausgeblendet (`paved` in data/waystones.json, `WaystoneStatue.paved`). Das Leuchten ihrer Linien bleibt.
+- **Gassen weniger perfekt:**
+  - Die Steinreihen liegen quer zur Gasse in ihrem eigenen Verlauf statt am Weltraster. Die Steine sind 8 bis 12 px lang, manchmal zwei zu einem verschmolzen, die Reihen wackeln leicht.
+  - Jeder Stein hat einen eigenen Ton. Licht und Schatten an den Kanten kommen aus der Welt (von links oben), egal wie die Gasse läuft.
+  - Dazu gesunkene Steine, Risse, Fugen aus Mörtel, Erde oder Gras, eine in der Mitte glattgelaufene Spur und Randsteine.
+- **Passend zu den Treppen:**
+  - Das Pflaster läuft bis an die erste und letzte Stufe heran, ohne Grasstreifen. Vor jeder Treppe liegt eine Reihe breiter Absatzplatten parallel zu den Stufen.
+  - Gassen, Treppen und Mauern teilen jetzt denselben Stein (die MASON-Palette des Relief-Shaders).
+- **Treppen detaillierter** (`mason_stairs` in relief.gdshader):
+  - Stufen aus Platten verschiedener Länge mit heller Kante und dunkler Setzstufe, in der Mitte heller abgetreten.
+  - Abgeschlagene Kanten, einzelne Risse, Wangenmauern mit Decksteinen, Moos und Gras in Ecken und Fugen.
+
+Die Flächen kommen als Decals `hallgrat_<id>` (Oberfläche `stone`) in ground_baked.json. Die gepflasterten Kacheln stehen in `hallgrat_clear`; `WorldLevel` hält sie frei von erzeugten Pflanzen und Steinen. Test: `tools/test_hallgrat.tscn` (91 Prüfungen).
+
+### 14.4 Stand 3b: Häuser, Stall und der Markt um die Wächterin (2026-11-14)
+
+**Die Bilder:** `py -3 tools/art_hallgrat_houses.py [preview.png]` baut die Gebäude aus Ellipsoiden wie die Schmiede.
+- **Material:** Quader im Verband mit Ecksteinen und Sockel, Stürze und Bänke aus hellem Stein, Rundbogentüren, Fensterläden im staubigen Blau der Stadt, Schieferdächer in kalten Tönen, Schornsteine.
+- **Typen:**
+  - Wohnhäuser `haus_a`/`haus_b`/`haus_hoch`, dazu `giebel` und `laden` (Werkstatt mit türkisem Tuchvordach)
+  - verlassene Häuser `verlassen_a`/`_b` mit vernagelten Fenstern, Moos und Efeu
+  - `halle` mit türkiser Rosette und Strebepfeilern, `torhaus` mit Zinnen und Schießscharte
+  - **`stall`** (die Stallungen): lang, großes Doppeltor, Heuboden mit Lastbalken, kleine hohe Fenster
+- **Tiefe** (nach dem ersten Ansehen):
+  - Jedes Haus ist leicht gedreht, sodass eine Seitenwand im Schatten zu sehen ist.
+  - Die Traufe springt weit vor, mit dunklem Traufbrett, Sparrenköpfen und Ortgang.
+  - Unter jedem Dach und Tuch liegt ein gerasterter Schlagschatten auf der Wand (`eave_shadow`).
+- **Nacht:** Das Fensterglas leuchtet auf einem eigenen, unbeleuchteten Bild.
+- **Daten:** Größe, Fußpunkt, Grundfläche und Lichter stehen in data/hallgrat_art.json.
+
+**Der Markt um die Wächterin** (Wunsch 2026-11-14):
+- Zehn Marktstände stehen im Ring ums Forum (`forum_market` in data/hallgrat.json: Radius, Winkel). Jeder ist zur Statue gedreht, die Steige nach Osten und Westen bleibt frei.
+- Die Stände haben drei Tuchfarben mit eigener Ware: Türkis/Leinen mit Äpfeln und Rüben, Weinrot/Ocker mit Krügen und Kristallen, Violett/Leinen mit Stoffballen und Kräutern.
+- Jeder Stand gibt es von vorn, von hinten und von der Seite (die andere Seite gespiegelt). Das Dach ist ein durchhängendes, gewölbtes Tuch auf einem Firstbalken, mit Saum.
+
+**Platzierung (zweimal nach Kritik überarbeitet, 2026-11-14):**
+
+`py -3 tools/place_hallgrat_buildings.py` arbeitet nach drei Regeln:
+1. **Jede Tür ist sichtbar und führt auf einen Weg.** Häuser zeigen immer ihre Front mit dem Eingang (Ansicht `s`). Jede Tür bekommt einen kleinen gesetzten Steinweg zur nächsten Gasse. Der Weg wird per A* über den freien Boden der eigenen Ebene gesucht und von `bake_hallgrat_ground.py` als `hallgrat_zugang_<n>` gebacken. Ein Haus ohne möglichen Weg wird weggelassen.
+2. **Kein Haus steht vor einem anderen.** Vor jeder Tür bleibt ein Streifen von 60 px frei, so hoch steigt ein Dach über seine Grundfläche.
+3. **Häuser nur in den Bezirken der Stadt.** In Stille, Staffeln und Fuß wachsen außerdem keine erzeugten Bäume oder Büsche.
+
+**Ablauf:**
+- Zuerst kommen die benannten Gebäude aus `buildings`, dann die Häuserreihen an den Gassen (`rows`), dann die Füllung der Terrassen von hinten nach vorn (`fill`, je Bezirk und Ebene).
+- Danach kommen die Wege von den Türen, zum Schluss der Markt eng um die Wächterin.
+- Das Ergebnis landet in `placed` und `door_paths`.
+
+**Reihenfolge der Werkzeuge:** `bake_hallgrat_ground.py` (Gassen) → `place_hallgrat_buildings.py` → `bake_hallgrat_ground.py` (jetzt mit den Türwegen). `hallgrat_streets` hält die Gassen ohne die Türwege.
+
+**Im Spiel:**
+- `HallgratBuilding` zeichnet ein Gebäude: Sortierung an der Vorderkante, Leuchten nachts, Kollision auf der Grundfläche.
+- Steht der Spieler dahinter, blendet es halb aus wie eine Baumkrone.
+- `Hallgrat` hält den Boden darunter frei von erzeugten Pflanzen.
+
+### 14.5 Stand 3c: Westmauer, Leitsteine, Glocke (2026-11-14)
+- **Westmauer** (`walls` in data/hallgrat.json): Eine Brustwehr aus Quadern mit Wehrgang und Zinnen zur Leere hin. Sie läuft in 16-px-Stücken (`mauer_ns`) auf dem Außenring von (110.7, 334) bis (110.7, 364).
+- **Leitsteine** (`HallgratLeitstein`):
+  - schlanke sechseckige Pfosten mit eisernen Bändern und einem Klangstein-Kristall im Kopf (Bilder `leitstein`/`leitstein_wach`/`leitstein_tot`)
+  - Die Stadt schläft noch, darum erinnert sich der Kristall nur schwach violett an sein Licht, nachts kommt und geht es. Der Stein im Verlorenen Viertel ist tot.
+  - E „ANSCHLAGEN“: Der Stein klingt in seinem Ton (0–3) des Stadtmotivs, und der Kristall flammt kurz auf. Das ist die Vorbereitung für die Stimmsteine (8.1) und das Erwachen (Stufe 4).
+- **Glocke:** Zur Dämmerung (Uhrzeit 0.79) schlägt die Glocke im Mondturm dreimal, `glocke.wav` aus `py -3 tools/audio_hallgrat.py`, in der Stadt weit zu hören.
+- **Rothalle:** Sie hat ihren Platz nördlich der Hüterhalle, die benannten Gebäude suchen weiter (`reach`) und halten auch ihre Tür frei.
+- **Noch nicht gebaut:** Wachposten auf der Mauer, die Schwarze Mauer als Objekt, Gassenklang je Bezirk, Lichtrunde.
 
 ## 15. Ideenspeicher (alles, was noch nirgends hineinpasste)
 

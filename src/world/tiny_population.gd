@@ -77,6 +77,12 @@ func _process(_delta: float) -> void:
 			for cell: Vector2i in _settled:
 				if not _witch(cell): ## the Hexenwald's moths stay: it is always dusk there
 					(_settled[cell] as Dictionary).erase("moth")
+		else:
+			for node: Node in _animals.get_children():
+				if (node as TinyWildlife).species == "scarab":
+					node.queue_free()
+			for cell: Vector2i in _settled:
+				(_settled[cell] as Dictionary).erase("scarab")
 	if not _pending.is_empty():
 		var cell: Vector2i = _pending.pop_front()
 		if _active.has(cell):
@@ -86,10 +92,13 @@ func _process(_delta: float) -> void:
 func _populate(cell: Vector2i) -> void:
 	if not _settled.has(cell):
 		_settled[cell] = {}
-	var origin: Vector2 = Vector2(cell) * 512.0
-	if BiomeBlend.arid_at(origin + Vector2(256.0, 256.0)) >= 0.22 and BiomeBlend.arid_at(origin) >= 0.22 and BiomeBlend.arid_at(origin + Vector2(512.0, 512.0)) >= 0.22:
-		return
 	var settled: Dictionary = _settled[cell]
+	var origin: Vector2 = Vector2(cell) * 512.0
+	var mid_arid: float = BiomeBlend.arid_at(origin + Vector2(256.0, 256.0))
+	if mid_arid >= 0.35:
+		_populate_scarab(cell, settled)
+	if mid_arid >= 0.22 and BiomeBlend.arid_at(origin) >= 0.22 and BiomeBlend.arid_at(origin + Vector2(512.0, 512.0)) >= 0.22:
+		return
 	var witch: bool = _witch(cell)
 	for species: String in ["snail", "bee", "ladybug", "moth", "toad", "bat"]:
 		if settled.has(species) or (species == "moth" and not TimeManager.is_night() and not witch) or (species in ["toad", "bat"] and not witch):
@@ -101,7 +110,9 @@ func _populate(cell: Vector2i) -> void:
 			spec.merge(spec["witch_forest"] as Dictionary, true)
 		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 		rng.seed = hash(Vector3i(cell.x, cell.y, _seed + hash(species)))
-		if rng.randf() > float(spec["chunk_chance"]):
+		var w_wind_tiny: float = MeadowHabitats.wind_meadow_at(origin + Vector2(256.0, 256.0)) if species == "bee" else 0.0
+		var tiny_chance: float = float(spec["chunk_chance"]) * (1.0 + 1.45 * w_wind_tiny)
+		if rng.randf() > tiny_chance:
 			continue
 		var patch: Array[Vector2] = []
 		if species in ["bee", "ladybug", "moth"]:
@@ -136,13 +147,15 @@ func _populate(cell: Vector2i) -> void:
 					patch.append(trunk.global_position)
 			if patch.size() < 2:
 				continue
-		var count: int = rng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
+		var extra_bee: int = 3 if w_wind_tiny >= 0.40 else 0
+		var count: int = rng.randi_range(int(spec["group_min"]) + extra_bee, int(spec["group_max"]) + extra_bee)
+		var cap_tiny: int = int(spec["max_loaded"]) + (8 if w_wind_tiny >= 0.40 else 0)
 		for i: int in count:
 			var current: int = 0
 			for node: Node in _animals.get_children():
 				if (node as TinyWildlife).species == species and not node.is_queued_for_deletion():
 					current += 1
-			if current >= int(spec["max_loaded"]):
+			if current >= cap_tiny:
 				break
 			var at: Vector2 = Vector2(cell) * 512 + Vector2(rng.randf_range(55, 457), rng.randf_range(55, 457))
 			var tree: FirTree
@@ -183,3 +196,53 @@ func _populate(cell: Vector2i) -> void:
 				animal.tree_offset = Vector2((half - 1) * (-1 if i % 2 == 0 else 1), -rng.randf_range(9, 22))
 			animal.flowers = patch
 			_animals.add_child(animal)
+
+
+func _populate_scarab(cell: Vector2i, settled: Dictionary) -> void:
+	if settled.has("scarab") or TimeManager.is_night():
+		return
+	settled["scarab"] = true
+	var spec: Dictionary = DataRegistry.get_entry("wildlife", "scarab")
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 24793))
+	var oryx_spots: Array[Vector2] = []
+	for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
+		var m: WoodlandMammal = node as WoodlandMammal
+		if m != null and m.species == "oryx" and _cell(m.global_position) == cell:
+			oryx_spots.append(m.global_position)
+	var chance: float = float(spec["chunk_chance"]) + (0.20 if not oryx_spots.is_empty() else 0.0)
+	if rng.randf() > chance:
+		return
+	var count: int = rng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
+	for i: int in count:
+		var current: int = 0
+		for node: Node in _animals.get_children():
+			if (node as TinyWildlife).species == "scarab" and not node.is_queued_for_deletion():
+				current += 1
+		if current >= int(spec["max_loaded"]):
+			break
+		var at: Vector2 = Vector2.ZERO
+		var valid: bool = false
+		for attempt: int in 12:
+			if attempt < 4 and not oryx_spots.is_empty():
+				at = (oryx_spots[rng.randi_range(0, oryx_spots.size() - 1)] + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(16.0, 44.0)).round()
+			else:
+				at = Vector2(cell) * 512.0 + Vector2(rng.randf_range(55.0, 457.0), rng.randf_range(55.0, 457.0))
+			if BiomeBlend.arid_at(at) >= 0.40 and BiomeBlend.oasis_at(at) < 0.45 and can_crawl(at, at, "scarab"):
+				valid = true
+				break
+		if not valid:
+			continue
+		var animal: TinyWildlife = load("res://src/entities/wildlife/tiny_wildlife.tscn").instantiate() as TinyWildlife
+		_serial += 1
+		animal.name = "Tiny_scarab_%d" % _serial
+		animal.species = "scarab"
+		if BiomeBlend.is_quartz_surface(at):
+			animal.appearance = 2
+		elif BiomeBlend.oasis_at(at) > 0.14:
+			animal.appearance = 1
+		else:
+			animal.appearance = 0 if rng.randf() < 0.72 else rng.randi_range(1, 2)
+		animal.home = at
+		animal.position = at
+		_animals.add_child(animal)

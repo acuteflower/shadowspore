@@ -55,6 +55,24 @@ def vnoise(w, h, scale, seed):
     return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
 
 
+def vnoise_at(ox, oy, w, h, scale, seed):
+    """Like vnoise, but anchored in the world: the lattice is hashed from absolute coordinates (ox, oy = the image's top left), so two
+    pictures that share an edge see the same noise there (the pieces of a long road, `arc` in bake_path)."""
+    xs = (np.arange(w) + ox) / scale
+    ys = (np.arange(h) + oy) / scale
+    gx, gy = np.floor(xs).astype(np.int64), np.floor(ys).astype(np.int64)
+    fx, fy = xs - gx, ys - gy
+    fx, fy = (fx * fx * (3 - 2 * fx))[None, :], (fy * fy * (3 - 2 * fy))[:, None]
+
+    def lat(ix, iy):
+        v = (ix[None, :] * 374761393 + iy[:, None] * 668265263 + (seed * 2246822519) % 4294967296) & 0xFFFFFFFF
+        v = ((v ^ (v >> 13)) * 1274126177) & 0xFFFFFFFF
+        return ((v ^ (v >> 16)) & 0xFFFF) / 65535.0
+
+    a, b, c, d = lat(gx, gy), lat(gx + 1, gy), lat(gx, gy + 1), lat(gx + 1, gy + 1)
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy
+
+
 def tuft(img, x, y, h, rng, palette):
     for k in range(rng.randrange(3, 6)):
         lean = rng.choice((-2, -1, 0, 1, 2))
@@ -422,12 +440,12 @@ def _draw_path_pebble(img, mask, cx, cy, size):
                 )
 
 
-def _draw_path_slab(img, mask, cx, cy, rx, ry, angle_deg, seed, mossy=0.28):
+def _draw_path_slab(img, mask, cx, cy, rx, ry, angle_deg, seed, mossy=0.28, at=(0, 0)):
     """Cluster-clean crooked sunken flagstone slab (top-left bevel, mortar seat, moss cushions)."""
     h, w = img.shape[:2]
     ca, sa = math.cos(math.radians(angle_deg)), math.sin(math.radians(angle_deg))
     reach = int(max(rx, ry)) + 3
-    tone_shift = (noise(int(cx), int(cy), seed) / 255.0 - 0.5) * 0.65
+    tone_shift = (noise(int(cx) + at[0], int(cy) + at[1], seed) / 255.0 - 0.5) * 0.65  # `at`: the picture's origin, for stones that must match across pictures
     for y in range(int(cy) - reach, int(cy) + reach + 1):
         for x in range(int(cx) - reach, int(cx) + reach + 1):
             if not (0 <= x < w and 0 <= y < h):
@@ -448,13 +466,137 @@ def _draw_path_slab(img, mask, cx, cy, rx, ry, angle_deg, seed, mossy=0.28):
             if d > 0.78:
                 c = STONE[4] if lit > 0.22 else (STONE[1] if lit < -0.25 else STONE[2])
             else:
-                cush = (noise(x // 3, y // 3, seed + 9) / 255.0 - 0.5) * 0.85
+                cush = (noise((x + at[0]) // 3, (y + at[1]) // 3, seed + 9) / 255.0 - 0.5) * 0.85
                 val = 2.65 + tone_shift + lit * 0.85 + cush
                 c = STONE[clampi(int(round(val)), 1, 4)]
-                if mossy > 0 and noise(x // 2, y // 2, seed + 17) > int(255 * (1.0 - mossy)):
+                if mossy > 0 and noise((x + at[0]) // 2, (y + at[1]) // 2, seed + 17) > int(255 * (1.0 - mossy)):
                     c = MOSS[clampi(int(lit + 1.6), 0, 3)]
             img[y, x] = c
             mask[y, x] = (STONE_CODE, 0, 0, 255)
+
+
+QUARTZ_CARAVAN = [hexc(c) for c in ("5b698e", "8191b6", "a2b3d4", "bfcde7", "d6e2f5", "ffffff")]
+SANDSTONE_CARAVAN = [hexc(c) for c in ("483038", "785042", "aa7a4e", "d8a868", "f2cf8e")]
+SAND_DRIFT_RAMP = [hexc(c) for c in ("6b433e", "946247", "bd8754", "dfb06e", "f5d596")]
+CARAVAN_MORTAR = hexc("5c3d38")
+CARAVAN_GLOW_TEAL = hexc("78f4e6")
+CARAVAN_GLOW_GOLD = hexc("ffd86b")
+
+
+def bake_quartz_caravan_path(spec, seed, centre):
+    """Bakes the ancient sand-drifted Sonnenquarz-Öde caravan road:
+    - Weathered Voronoi pale-quartz (QUARTZ_W) & carved golden-sandstone flagstones
+    - Intermittently buried beneath wind-blown desert sand dunes (alpha=0, mask=0 in gaps)
+    - Feathered warm ochre-amber sand shoulders (zero green meadow grass!)
+    - Subtle inlaid turquoise-gold rune seams in *_glow.png."""
+    width = float(spec.get("width", 28))
+    curve = catmull(spec["points"], step=1.8)
+    seg = np.linalg.norm(np.diff(curve, axis=0), axis=1)
+    arc = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(arc[-1])
+    margin = int(width) + 18
+    x0, y0 = int(curve[:, 0].min()) - margin, int(curve[:, 1].min()) - margin
+    x1, y1 = int(curve[:, 0].max()) + margin, int(curve[:, 1].max()) + margin
+    w, h = x1 - x0, y1 - y0
+
+    rng = np.random.default_rng(seed)
+    phase = rng.random(8) * math.tau
+
+    taper_in = np.clip(arc / float(spec.get("taper_in", 48.0) or 1.0), 0.0, 1.0)
+    taper_out = np.clip((total - arc) / float(spec.get("taper_out", 48.0) or 1.0), 0.0, 1.0)
+    end_env = np.minimum(taper_in, taper_out)
+    # Wind-sand burial wave: > 0.68 buries the stones completely beneath live desert sand!
+    drift = (
+        0.48
+        + 0.34 * np.sin(arc / 58.0 + phase[0])
+        + 0.22 * np.sin(arc / 23.0 + phase[1])
+        + 0.16 * np.cos(arc / 105.0 + phase[2])
+    )
+    expose = np.clip((0.72 - drift) / 0.28, 0.0, 1.0) * end_env
+    half = width * 0.5 * (0.86 + 0.18 * np.sin(arc / 47.0 + phase[3])) * np.where(expose > 0.05, 0.45 + 0.55 * expose, 0.0)
+
+    d2_map = np.full((h, w), 1e9, dtype=np.float32)
+    idx_map = np.zeros((h, w), dtype=np.int32)
+    cx_local = curve[:, 0] - x0
+    cy_local = curve[:, 1] - y0
+    for i in range(len(curve)):
+        hw_i = float(half[i])
+        if hw_i < 1.5:
+            continue
+        reach = int(hw_i * 1.35) + 4
+        lx0, lx1 = max(0, int(cx_local[i]) - reach), min(w - 1, int(cx_local[i]) + reach)
+        ly0, ly1 = max(0, int(cy_local[i]) - reach), min(h - 1, int(cy_local[i]) + reach)
+        if lx1 < lx0 or ly1 < ly0:
+            continue
+        px = (np.arange(lx0, lx1 + 1, dtype=np.float32) + 0.5)[None, :]
+        py = (np.arange(ly0, ly1 + 1, dtype=np.float32) + 0.5)[:, None]
+        dd2 = (px - cx_local[i]) ** 2 + (py - cy_local[i]) ** 2
+        cur_sub = d2_map[ly0:ly1 + 1, lx0:lx1 + 1]
+        better = dd2 < cur_sub
+        cur_sub[better] = dd2[better]
+        idx_map[ly0:ly1 + 1, lx0:lx1 + 1][better] = i
+
+    img = np.zeros((h, w, 4), dtype=np.uint8)
+    mask = np.zeros((h, w, 4), dtype=np.uint8)
+    glow = np.zeros((h, w, 4), dtype=np.uint8)
+    ys_b, xs_b = np.nonzero(d2_map < 1e8)
+    if len(ys_b) == 0:
+        return img, mask, (x0, y0), glow
+
+    edge_wob = (vnoise(w, h, 7, seed + 21) - 0.5) * 0.30 + (vnoise(w, h, 3, seed + 22) - 0.5) * 0.12
+    sand_veil = vnoise(w, h, 6, seed + 25)
+
+    for py_i, px_i in zip(ys_b.tolist(), xs_b.tolist()):
+        ci = int(idx_map[py_i, px_i])
+        hw_v = float(half[ci])
+        if hw_v < 2.0:
+            continue
+        exp_v = float(expose[ci])
+        te = math.sqrt(float(d2_map[py_i, px_i])) / hw_v + float(edge_wob[py_i, px_i])
+        if te >= 1.05:
+            continue
+        gx, gy = px_i + x0 + seed * 3, py_i + y0 + seed * 5
+        # Soft warm drifted sand shoulder around exposed stones
+        if te > 0.80 or float(sand_veil[py_i, px_i]) > exp_v * 0.92 + 0.16:
+            if te < 0.98 and exp_v > 0.22 and (noise(gx // 2, gy // 2, seed + 31) % 100) < int(58 * exp_v):
+                st = clampi(int(round(2.4 - (te - 0.75) * 2.2 + (float(sand_veil[py_i, px_i]) - 0.5))), 1, 4)
+                sc = SAND_DRIFT_RAMP[st]
+                img[py_i, px_i] = (sc[0], sc[1], sc[2], 220)
+            continue
+        cid, d1, d2, (ccx, ccy) = cell_of(gx, gy)
+        # Skip whole Voronoi stone cells near sand-buried transitions so flagstones are never sliced cleanly in half
+        cell_keep = (noise(cid, 5, seed + 41) / 255.0)
+        if cell_keep > exp_v * 1.08 + 0.06:
+            if (noise(gx // 2, gy // 2, seed + 43) % 100) < 42:
+                sc = SAND_DRIFT_RAMP[2]
+                img[py_i, px_i] = (sc[0], sc[1], sc[2], 195)
+            continue
+        is_quartz_slab = (noise(cid, 11, seed + 53) % 100) < 62
+        mask[py_i, px_i] = (STONE_CODE, 0, 0, 255)
+        if d2 - d1 < 1.25:
+            # Sand-filled mortar joint, with rare inlaid rune seam on center slabs
+            if is_quartz_slab and te < 0.34 and (noise(cid, 19, seed + 61) % 100) < 16:
+                rc = CARAVAN_GLOW_TEAL if (cid % 2 == 0) else CARAVAN_GLOW_GOLD
+                img[py_i, px_i] = rc
+                glow[py_i, px_i] = (rc[0], rc[1], rc[2], 190)
+            else:
+                img[py_i, px_i] = SAND_DRIFT_RAMP[1] if (noise(gx, gy, 67) > 150) else CARAVAN_MORTAR
+        else:
+            lit = -0.56 * ((gx + 0.5 - ccx) + (gy + 0.5 - ccy)) / (CELL * 0.6)
+            c_cush = (noise(gx // 3, gy // 3, 71) / 255.0 - 0.5) * 0.55
+            if is_quartz_slab:
+                base_t = 2 + (noise(cid, 7, 73) % 2)
+                if d2 - d1 < 2.4 and (gx + 0.5 - ccx) + (gy + 0.5 - ccy) < -0.4:
+                    img[py_i, px_i] = QUARTZ_CARAVAN[5]
+                else:
+                    img[py_i, px_i] = QUARTZ_CARAVAN[clampi(int(round(base_t + 0.55 + lit + c_cush)), 1, 4)]
+            else:
+                base_t = 1 + (noise(cid, 7, 79) % 2)
+                if d2 - d1 < 2.4 and (gx + 0.5 - ccx) + (gy + 0.5 - ccy) < -0.4:
+                    img[py_i, px_i] = SANDSTONE_CARAVAN[4]
+                else:
+                    img[py_i, px_i] = SANDSTONE_CARAVAN[clampi(int(round(base_t + 0.6 + lit + c_cush)), 0, 3)]
+    return img, mask, (x0, y0), glow
 
 
 def bake_path(spec, seed, centre):
@@ -466,14 +608,34 @@ def bake_path(spec, seed, centre):
     - Scalloped overhanging NW turf & curved SE grass blades melting seamlessly into grass.png."""
     width = float(spec.get("width", 26))
     is_gloom = bool(spec.get("gloom", False))
+    seed = int(spec.get("seed", seed))  # the pieces of one road share a seed, so their widths, ruts and paving run on without a seam
     curve = catmull(spec["points"], step=1.6)
     seg = np.linalg.norm(np.diff(curve, axis=0), axis=1)
     arc = np.concatenate([[0.0], np.cumsum(seg)])
     total = float(arc[-1])
+    # A piece of a long road (`arc` [from, to] in px along the curve): everything is computed over the piece plus a margin of the
+    # neighbours, but only the pixels nearest to its own stretch are kept (`own_lo` .. `own_hi`), so the pictures meet on a clean cut.
+    piece = spec.get("arc")
+    own_lo, own_hi = 0, len(curve)
+    if piece:
+        own_lo = int(np.searchsorted(arc, float(piece[0])))
+        own_hi = len(curve) if float(piece[1]) >= total - 1.0 else int(np.searchsorted(arc, float(piece[1])))
+    pad = int((width + 40) / 1.6) if piece else 0
+    r_lo, r_hi = max(0, own_lo - pad), min(len(curve), own_hi + pad)
+    span = total if not piece else float(arc[own_hi - 1] - arc[own_lo])
     margin = int(width) + 18
-    x0, y0 = int(curve[:, 0].min()) - margin, int(curve[:, 1].min()) - margin
-    x1, y1 = int(curve[:, 0].max()) + margin, int(curve[:, 1].max()) + margin
+    x0, y0 = int(curve[r_lo:r_hi, 0].min()) - margin, int(curve[r_lo:r_hi, 1].min()) - margin
+    x1, y1 = int(curve[r_lo:r_hi, 0].max()) + margin, int(curve[r_lo:r_hi, 1].max()) + margin
     w, h = x1 - x0, y1 - y0
+    if piece:
+        vnoise_l = lambda w_, h_, sc, sd: vnoise_at(x0 + centre[0], y0 + centre[1], w_, h_, sc, sd)  # noqa: E731
+    else:
+        vnoise_l = vnoise
+
+    def own(ci):  # a feature centred on this curve index belongs to this picture (with room to spare at a cut)
+        if not piece:
+            return True
+        return own_lo <= ci < own_hi and arc[ci] - arc[own_lo] >= (16.0 if own_lo > 0 else -1.0) and arc[own_hi - 1] - arc[ci] >= (16.0 if own_hi < len(curve) else -1.0)
 
     rng = np.random.default_rng(seed)
     prng = random.Random(seed)
@@ -499,6 +661,20 @@ def bake_path(spec, seed, centre):
     ruin_boost = np.exp(-arc / 160.0) * (0.42 if spec.get("id") == "footpath_start" else 0.0)
     pave_amt = np.clip(0.45 * np.sin(arc / 95.0 + phase[6]) * np.sin(arc / 43.0 + phase[7]) + ruin_boost, 0.0, 1.0)
     island_amt = np.where((half >= 12.2) & (arc > 75.0) & (arc < total - 95.0), np.sin(arc / 145.0 + phase[8]), -1.0)
+    is_ruts = bool(spec.get("ruts", False))  # a cart road (the caravan's, docs/haendler_konzept.md 4.1): two worn wheel ruts, grass down the middle, no paving
+    mid_amt = np.zeros_like(arc)
+    city = np.zeros_like(arc)
+    if spec.get("old_road"):  # the Westweg (docs/stadt_westen_konzept.md 2.4): remnants of an old paved road that grows whole towards the city
+        u = np.clip((arc / max(total, 1.0) - 0.55) / 0.40, 0.0, 1.0)
+        city = u * u * (3.0 - 2.0 * u)
+        pave_amt = np.clip(pave_amt * (1.0 - city) + 0.10 + 0.22 * np.maximum(0.0, np.sin(arc / 211.0 + phase[10])) + city * 0.98, 0.0, 1.0)
+        rut_amt = rut_amt * (1.0 - 0.75 * city)
+        island_amt = np.where(city > 0.25, -1.0, island_amt)
+    if is_ruts:
+        rut_amt = np.clip(0.86 + 0.14 * np.sin(arc / 60.0 + phase[3]), 0.0, 1.0)
+        pave_amt = np.zeros_like(arc)
+        island_amt = np.full_like(arc, -1.0)
+        mid_amt = np.clip(0.75 + 0.45 * np.sin(arc / 70.0 + phase[9]), 0.0, 1.0) * np.clip(arc / 40.0, 0.0, 1.0)
 
     tangents = np.gradient(curve, axis=0)
     tangents /= np.linalg.norm(tangents, axis=1)[:, None] + 1e-9
@@ -508,7 +684,7 @@ def bake_path(spec, seed, centre):
     idx_map = np.zeros((h, w), dtype=np.int32)
     cx_local = curve[:, 0] - x0
     cy_local = curve[:, 1] - y0
-    for i in range(len(curve)):
+    for i in range(r_lo, r_hi):
         hw_i = float(half[i])
         if hw_i < 0.8:
             continue
@@ -532,8 +708,8 @@ def bake_path(spec, seed, centre):
     if len(ys_b) == 0:
         return img, mask, (x0, y0)
 
-    edge_wob = (vnoise(w, h, 8, seed + 11) - 0.5) * 0.28 + (vnoise(w, h, 3, seed + 12) - 0.5) * 0.10
-    cush = (vnoise(w, h, 9, seed + 13) - 0.5) * 1.55 + (vnoise(w, h, 4, seed + 14) - 0.5) * 0.55
+    edge_wob = (vnoise_l(w, h, 8, seed + 11) - 0.5) * 0.28 + (vnoise_l(w, h, 3, seed + 12) - 0.5) * 0.10
+    cush = (vnoise_l(w, h, 9, seed + 13) - 0.5) * 1.55 + (vnoise_l(w, h, 4, seed + 14) - 0.5) * 0.55
 
     c_idx = idx_map[ys_b, xs_b]
     d_val = np.sqrt(d2_map[ys_b, xs_b])
@@ -553,6 +729,10 @@ def bake_path(spec, seed, centre):
     te_val = eff_t + edge_wob[ys_b, xs_b]
 
     keep_sub = (te_val < 1.0) & (hw_val >= 1.0)
+    if is_ruts:  # the grass strip between the wheels: the meadow shows through, ragged at its edges
+        lat_frac = np.abs(lat_val * eff_t)
+        strip = 0.17 + (edge_wob[ys_b, xs_b] * 0.35)
+        keep_sub &= ~((lat_frac < strip) & (mid_amt[c_idx] > 0.35))
     ky, kx = ys_b[keep_sub], xs_b[keep_sub]
     k_cidx = c_idx[keep_sub]
     k_te = te_val[keep_sub]
@@ -611,8 +791,8 @@ def bake_path(spec, seed, centre):
     mask[solid_mask] = (PATH_CODE, 0, 0, 255)
 
     # Subtle 2-3 px horizontal soil ripples inside wide beds
-    for _ in range(int(total * 0.45)):
-        ci = prng.randrange(len(curve))
+    for _ in range(int(span * 0.45)):
+        ci = prng.randrange(own_lo, own_hi)
         if half[ci] < 5.0:
             continue
         off = prng.uniform(-0.65, 0.65) * half[ci]
@@ -629,13 +809,14 @@ def bake_path(spec, seed, centre):
     # Whole-cell Voronoi twilight-slate flagstones in weathered paved stretches (never sliced mid-stone!)
     stone_drawn = np.zeros((h, w), dtype=bool)
     pave_indices = np.nonzero(pave_amt > 0.16)[0]
+    whole_stones = bool(spec.get("old_road"))  # the old road: a stone is there or not as a whole (decided at its own centre), never cut by a box
     visited_boxes = set()
     for ci in pave_indices[::6]:
-        bx_c, by_c = int(cx_local[ci]) // 16, int(cy_local[ci]) // 16
+        bx_c, by_c = (int(cx_local[ci]) // 16, int(cy_local[ci]) // 16) if not piece else (int(curve[ci, 0]) // 16, int(curve[ci, 1]) // 16)  # pieces: world boxes, so both sides of a cut lay the same stones
         if (bx_c, by_c) in visited_boxes:
             continue
         visited_boxes.add((bx_c, by_c))
-        reach = int(half[ci]) + 4
+        reach = int(half[ci]) + (14 if whole_stones else 4)
         ya, yb = max(0, int(cy_local[ci]) - reach), min(h - 1, int(cy_local[ci]) + reach)
         xa, xb = max(0, int(cx_local[ci]) - reach), min(w - 1, int(cx_local[ci]) + reach)
         loc_thresh = 1.0 - pave_amt[ci] * 1.15
@@ -649,7 +830,7 @@ def bake_path(spec, seed, centre):
                 icy = clampi(int(round(ccy - seed * 3 - y0)), 0, h - 1)
                 if te_grid[icy, icx] >= 0.72:
                     continue
-                if (noise(cid, 3, seed + 91) / 255.0) < loc_thresh:
+                if (noise(cid, 3, seed + 91) / 255.0) < ((1.0 - pave_amt[idx_map[icy, icx]] * 1.15) if whole_stones else loc_thresh):
                     continue
                 stone_drawn[py_i, px_i] = True
                 mask[py_i, px_i] = (STONE_CODE, 0, 0, 255)
@@ -666,7 +847,9 @@ def bake_path(spec, seed, centre):
 
     # Crooked sunken stepping slabs, mossy island boulders, occasional puddles, and bank roots
     last_feature_a = -40.0
-    for ci in range(12, len(curve) - 12, 8):
+    for ci in range(max(12, own_lo), min(len(curve) - 12, own_hi), 8):
+        if not own(ci):
+            continue
         a_cur = float(arc[ci])
         if a_cur - last_feature_a < 26.0 or half[ci] < 7.5:
             continue
@@ -734,9 +917,25 @@ def bake_path(spec, seed, centre):
                             img[yy, xx] = ROOT_BARK[clampi(int(round(1.7 + lit * 1.2)), 0, 3)]
             last_feature_a = a_cur
 
+    if spec.get("old_road"):  # kerbstones along both edges where the old road was kept up (more and more towards the city)
+        def rnd(ci, k):  # hashed, not drawn from prng: the neighbour piece lays the very same stones in its margin
+            return noise(ci, k, seed + 613) / 255.0
+
+        for ci in range(max(4, r_lo - r_lo % 4), min(len(curve) - 4, r_hi), 4):
+            if half[ci] < 8.0 or rnd(ci, 0) > city[ci] * 0.9:
+                continue
+            ang = math.degrees(math.atan2(tangents[ci, 1], tangents[ci, 0]))
+            for k, side in ((1, -1.0), (2, 1.0)):
+                if rnd(ci, k) < 0.16:  # a stone gone here and there
+                    continue
+                off = side * (half[ci] - 2.4)
+                _draw_path_slab(img, mask, cx_local[ci] - tangents[ci, 1] * off, cy_local[ci] + tangents[ci, 0] * off,
+                                3.3 + rnd(ci, k + 2), 1.8 + 0.5 * rnd(ci, k + 4), ang - 7 + 14 * rnd(ci, k + 6), seed + ci * 7 + k,
+                                mossy=0.16 + 0.32 * (1.0 - float(city[ci])), at=(x0, y0))
+
     # Shaded 3D slate pebbles & occasional bark chips
-    for _ in range(int(total / 6.5)):
-        ci = prng.randrange(len(curve))
+    for _ in range(int(span / 6.5)):
+        ci = prng.randrange(own_lo, own_hi)
         if half[ci] < 4.0:
             continue
         off = prng.uniform(-0.82, 0.82) * half[ci]
@@ -795,8 +994,8 @@ def bake_path(spec, seed, centre):
                 img[by - 1, bx] = prng.choice(WILDFLOWERS)
 
     # Occasional grass tufts on outer shoulders and grassy median strips
-    for _ in range(int(total / 8.5)):
-        ci = prng.randrange(len(curve))
+    for _ in range(int(span / 8.5)):
+        ci = prng.randrange(own_lo, own_hi)
         if half[ci] <= 5.0:
             continue
         in_med = rut_amt[ci] > 0.68 and prng.random() < 0.42
@@ -805,6 +1004,14 @@ def bake_path(spec, seed, centre):
         y = int(cy_local[ci] + tangents[ci, 0] * lateral)
         if 4 <= x < w - 4 and 6 <= y < h - 2 and keep[y, x] and not stone_drawn[y, x]:
             tuft(img, x, y, prng.randrange(2, 5), prng, MEADOW_HI[:6])
+    if piece:  # keep only this piece's own stretch (the margin of the neighbours was only there so the edges match), cropped tight
+        owned = near_band & (idx_map >= own_lo) & (idx_map < own_hi)
+        img[~owned] = 0
+        mask[~owned] = 0
+        ys_o, xs_o = np.nonzero(img[..., 3] > 0)
+        if len(ys_o):
+            ya, yb, xa, xb = int(ys_o.min()), int(ys_o.max()) + 1, int(xs_o.min()), int(xs_o.max()) + 1
+            return img[ya:yb, xa:xb].copy(), mask[ya:yb, xa:xb].copy(), (x0 + xa, y0 + ya)
     return img, mask, (x0, y0)
 
 
@@ -1126,7 +1333,8 @@ def main():
     only_path = next((a[7:] for a in sys.argv[1:] if a.startswith("--path=")), "")  # bakes just that path (e.g. hexenwald_path) and merges it into data/ground_baked.json
     only_paths = "--paths" in sys.argv  # quick rebuild of all paths in data/ground.json (with stone_fields cut-out & gloom)
     if only_path or only_paths:
-        out = json.load(open(ROOT / "data" / "ground_baked.json"))
+        baked_json = ROOT / "data" / "ground_baked.json"
+        out = json.loads(baked_json.read_text(encoding="utf-8"))
         by_id = {d["id"]: d for d in out.get("decals", [])}
         loaded_stones = []
         for sf in data.get("stone_fields", []):
@@ -1134,23 +1342,31 @@ def main():
             sf_path = ROOT / "assets" / "world" / "ground" / (sf["id"] + ".png")
             if d_sf and sf_path.exists():
                 loaded_stones.append((load_png(str(sf_path)), None, (int(d_sf["x"]) - centre[0], int(d_sf["y"]) - centre[1])))
-        targets = [(i, p) for i, p in enumerate(data["paths"]) if (not only_path or p["id"] == only_path)]
+        targets = [(i, p) for i, p in enumerate(data["paths"]) if (not only_path or p["id"] == only_path or p["id"].startswith(only_path))]
         rebuilt = {}
         for i, spec in targets:
-            img, mask, (ox, oy) = bake_path(spec, seed + i * 101 + 7, centre)
+            glow_img = None
+            if spec.get("quartz_caravan"):
+                img, mask, (ox, oy), glow_img = bake_quartz_caravan_path(spec, seed + i * 101 + 7, centre)
+            else:
+                img, mask, (ox, oy) = bake_path(spec, seed + i * 101 + 7, centre)
             if loaded_stones:
                 cut_under_stones(img, mask, (ox, oy), loaded_stones)
             if spec.get("gloom"):
                 gloom_tone(img, (centre[0] + ox, centre[1] + oy))
             save(ROOT / "assets" / "world" / "ground" / (spec["id"] + ".png"), img)
             save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_mask.png"), mask)
-            rebuilt[spec["id"]] = {
+            entry_d = {
                 "id": spec["id"],
                 "texture": "res://assets/world/ground/%s.png" % spec["id"],
                 "mask": "res://assets/world/ground/%s_mask.png" % spec["id"],
                 "x": centre[0] + ox,
                 "y": centre[1] + oy,
             }
+            if glow_img is not None and np.any(glow_img[..., 3] > 0):
+                save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_glow.png"), glow_img)
+                entry_d["glow"] = "res://assets/world/ground/%s_glow.png" % spec["id"]
+            rebuilt[spec["id"]] = entry_d
             print("baked", spec["id"], img.shape[1], "x", img.shape[0])
         kept = []
         seen = set()
@@ -1165,7 +1381,10 @@ def main():
             if did not in seen:
                 kept.append(entry)
         out["decals"] = kept
-        json.dump(out, open(ROOT / "data" / "ground_baked.json", "w"), separators=(",", ":"))
+        payload = json.dumps(out, separators=(",", ":"))
+        tmp_json = ROOT / "data" / "ground_baked.json.tmp"
+        tmp_json.write_text(payload, encoding="utf-8")
+        os.replace(tmp_json, baked_json)
         return
     only_yards = "--yards" in sys.argv  # quick rebuild of the hut yards alone: the rest of data/ground_baked.json stays as it is
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -1174,7 +1393,11 @@ def main():
     stones = []
     for key, fn in jobs:
         for i, spec in enumerate(data.get(key, [])):
-            img, mask, (ox, oy) = fn(spec, seed + i * 101 + (7 if key == "paths" else 0), centre)
+            glow_img = None
+            if key == "paths" and spec.get("quartz_caravan"):
+                img, mask, (ox, oy), glow_img = bake_quartz_caravan_path(spec, seed + i * 101 + 7, centre)
+            else:
+                img, mask, (ox, oy) = fn(spec, seed + i * 101 + (7 if key == "paths" else 0), centre)
             if key == "stone_fields":
                 stones.append((img, mask, (ox, oy)))
             else:
@@ -1182,6 +1405,8 @@ def main():
                 if spec.get("gloom"):
                     gloom_tone(img, (centre[0] + ox, centre[1] + oy))
             save(ROOT / "assets" / "world" / "ground" / (spec["id"] + ".png"), img)
+            if glow_img is not None and np.any(glow_img[..., 3] > 0):
+                save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_glow.png"), glow_img)
             save(ROOT / "assets" / "world" / "ground" / (spec["id"] + "_mask.png"), mask)
             baked.append({"id": spec["id"], "texture": "res://assets/world/ground/%s.png" % spec["id"], "mask": "res://assets/world/ground/%s_mask.png" % spec["id"], "x": centre[0] + ox, "y": centre[1] + oy})
             shown.append((img, mask, (ox, oy)))

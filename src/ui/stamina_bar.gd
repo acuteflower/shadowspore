@@ -35,3 +35,5 @@ func _update_state(_delta: float) -> void:
 	dim = WAITING_DIM if _stamina.is_waiting() else 1.0
 	label = str(ceili(_stamina.current))
 	alert = Color("f2a58b") if low else Color(0, 0, 0, 0)
+	heat_shimmer = _stamina.heat_amount()
+	cool_shimmer = 1.0 if _stamina.is_refreshed() else 0.0

@@ -1,0 +1,747 @@
+{
+	"about": "Written by tools/art_hallgrat_houses.py: per picture its size, feet (middle of the front edge on the ground, px in the picture), foot (footprint w x d in px) and the window lights (px in the picture).",
+	"types": {
+		"haus_a": {
+			"size": [
+				98,
+				82
+			],
+			"feet": [
+				50,
+				78
+			],
+			"foot": [
+				74,
+				27
+			],
+			"lights": [
+				[
+					49,
+					65
+				]
+			]
+		},
+		"haus_a_n": {
+			"size": [
+				98,
+				79
+			],
+			"feet": [
+				48,
+				76
+			],
+			"foot": [
+				74,
+				27
+			],
+			"lights": [
+				[
+					30,
+					63
+				]
+			]
+		},
+		"haus_a_e": {
+			"size": [
+				82,
+				93
+			],
+			"feet": [
+				41,
+				90
+			],
+			"foot": [
+				61,
+				32
+			],
+			"lights": []
+		},
+		"haus_b": {
+			"size": [
+				104,
+				82
+			],
+			"feet": [
+				53,
+				78
+			],
+			"foot": [
+				81,
+				27
+			],
+			"lights": [
+				[
+					54,
+					65
+				]
+			]
+		},
+		"haus_b_n": {
+			"size": [
+				104,
+				78
+			],
+			"feet": [
+				51,
+				75
+			],
+			"foot": [
+				81,
+				27
+			],
+			"lights": [
+				[
+					32,
+					62
+				]
+			]
+		},
+		"haus_b_e": {
+			"size": [
+				82,
+				97
+			],
+			"feet": [
+				41,
+				94
+			],
+			"foot": [
+				61,
+				35
+			],
+			"lights": []
+		},
+		"haus_hoch": {
+			"size": [
+				104,
+				96
+			],
+			"feet": [
+				53,
+				92
+			],
+			"foot": [
+				81,
+				27
+			],
+			"lights": [
+				[
+					56,
+					66
+				]
+			]
+		},
+		"haus_hoch_n": {
+			"size": [
+				104,
+				95
+			],
+			"feet": [
+				51,
+				92
+			],
+			"foot": [
+				81,
+				27
+			],
+			"lights": [
+				[
+					32,
+					79
+				]
+			]
+		},
+		"haus_hoch_e": {
+			"size": [
+				84,
+				111
+			],
+			"feet": [
+				42,
+				108
+			],
+			"foot": [
+				63,
+				35
+			],
+			"lights": []
+		},
+		"giebel": {
+			"size": [
+				80,
+				99
+			],
+			"feet": [
+				40,
+				95
+			],
+			"foot": [
+				59,
+				30
+			],
+			"lights": [
+				[
+					45,
+					66
+				]
+			]
+		},
+		"giebel_n": {
+			"size": [
+				80,
+				96
+			],
+			"feet": [
+				40,
+				93
+			],
+			"foot": [
+				59,
+				30
+			],
+			"lights": [
+				[
+					26,
+					80
+				]
+			]
+		},
+		"giebel_e": {
+			"size": [
+				90,
+				80
+			],
+			"feet": [
+				46,
+				77
+			],
+			"foot": [
+				68,
+				26
+			],
+			"lights": []
+		},
+		"laden": {
+			"size": [
+				110,
+				84
+			],
+			"feet": [
+				55,
+				80
+			],
+			"foot": [
+				85,
+				27
+			],
+			"lights": [
+				[
+					45,
+					69
+				]
+			]
+		},
+		"laden_n": {
+			"size": [
+				110,
+				77
+			],
+			"feet": [
+				55,
+				74
+			],
+			"foot": [
+				85,
+				27
+			],
+			"lights": [
+				[
+					35,
+					61
+				]
+			]
+		},
+		"laden_e": {
+			"size": [
+				85,
+				100
+			],
+			"feet": [
+				41,
+				97
+			],
+			"foot": [
+				61,
+				37
+			],
+			"lights": []
+		},
+		"verlassen_a": {
+			"size": [
+				98,
+				82
+			],
+			"feet": [
+				50,
+				78
+			],
+			"foot": [
+				74,
+				27
+			],
+			"lights": []
+		},
+		"verlassen_a_n": {
+			"size": [
+				98,
+				78
+			],
+			"feet": [
+				48,
+				75
+			],
+			"foot": [
+				74,
+				27
+			],
+			"lights": []
+		},
+		"verlassen_a_e": {
+			"size": [
+				82,
+				93
+			],
+			"feet": [
+				41,
+				90
+			],
+			"foot": [
+				61,
+				32
+			],
+			"lights": []
+		},
+		"verlassen_b": {
+			"size": [
+				104,
+				82
+			],
+			"feet": [
+				53,
+				78
+			],
+			"foot": [
+				81,
+				27
+			],
+			"lights": []
+		},
+		"verlassen_b_n": {
+			"size": [
+				104,
+				78
+			],
+			"feet": [
+				51,
+				75
+			],
+			"foot": [
+				81,
+				27
+			],
+			"lights": []
+		},
+		"verlassen_b_e": {
+			"size": [
+				82,
+				97
+			],
+			"feet": [
+				41,
+				94
+			],
+			"foot": [
+				61,
+				35
+			],
+			"lights": []
+		},
+		"halle": {
+			"size": [
+				136,
+				128
+			],
+			"feet": [
+				68,
+				120
+			],
+			"foot": [
+				118,
+				37
+			],
+			"lights": [
+				[
+					68,
+					85
+				]
+			]
+		},
+		"halle_n": {
+			"size": [
+				136,
+				121
+			],
+			"feet": [
+				68,
+				118
+			],
+			"foot": [
+				118,
+				37
+			],
+			"lights": [
+				[
+					41,
+					105
+				]
+			]
+		},
+		"halle_e": {
+			"size": [
+				118,
+				110
+			],
+			"feet": [
+				53,
+				107
+			],
+			"foot": [
+				85,
+				52
+			],
+			"lights": []
+		},
+		"torhaus": {
+			"size": [
+				56,
+				81
+			],
+			"feet": [
+				28,
+				77
+			],
+			"foot": [
+				40,
+				18
+			],
+			"lights": []
+		},
+		"torhaus_n": {
+			"size": [
+				56,
+				81
+			],
+			"feet": [
+				28,
+				78
+			],
+			"foot": [
+				40,
+				18
+			],
+			"lights": []
+		},
+		"torhaus_e": {
+			"size": [
+				57,
+				80
+			],
+			"feet": [
+				27,
+				77
+			],
+			"foot": [
+				40,
+				18
+			],
+			"lights": []
+		},
+		"stall": {
+			"size": [
+				240,
+				86
+			],
+			"feet": [
+				121,
+				82
+			],
+			"foot": [
+				217,
+				35
+			],
+			"lights": [
+				[
+					166,
+					63
+				]
+			]
+		},
+		"stall_n": {
+			"size": [
+				240,
+				92
+			],
+			"feet": [
+				119,
+				89
+			],
+			"foot": [
+				217,
+				35
+			],
+			"lights": [
+				[
+					69,
+					76
+				]
+			]
+		},
+		"stall_e": {
+			"size": [
+				104,
+				160
+			],
+			"feet": [
+				52,
+				157
+			],
+			"foot": [
+				81,
+				95
+			],
+			"lights": []
+		},
+		"mauer_ns": {
+			"size": [
+				22,
+				40
+			],
+			"feet": [
+				11,
+				37
+			],
+			"foot": [
+				11,
+				16
+			],
+			"lights": []
+		},
+		"leitstein": {
+			"size": [
+				18,
+				30
+			],
+			"feet": [
+				9,
+				27
+			],
+			"foot": [
+				11,
+				4
+			],
+			"lights": [
+				[
+					8,
+					5
+				]
+			]
+		},
+		"leitstein_wach": {
+			"size": [
+				18,
+				30
+			],
+			"feet": [
+				9,
+				27
+			],
+			"foot": [
+				11,
+				4
+			],
+			"lights": [
+				[
+					8,
+					5
+				]
+			]
+		},
+		"leitstein_tot": {
+			"size": [
+				18,
+				26
+			],
+			"feet": [
+				9,
+				23
+			],
+			"foot": [
+				11,
+				4
+			],
+			"lights": []
+		},
+		"stand_0_vorn": {
+			"size": [
+				44,
+				37
+			],
+			"feet": [
+				22,
+				31
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		},
+		"stand_0_hinten": {
+			"size": [
+				44,
+				36
+			],
+			"feet": [
+				22,
+				28
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		},
+		"stand_0_seite": {
+			"size": [
+				36,
+				45
+			],
+			"feet": [
+				16,
+				37
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		},
+		"stand_1_vorn": {
+			"size": [
+				44,
+				37
+			],
+			"feet": [
+				22,
+				31
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		},
+		"stand_1_hinten": {
+			"size": [
+				44,
+				36
+			],
+			"feet": [
+				22,
+				28
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		},
+		"stand_1_seite": {
+			"size": [
+				36,
+				45
+			],
+			"feet": [
+				16,
+				37
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": [
+				[
+					17,
+					25
+				]
+			]
+		},
+		"stand_2_vorn": {
+			"size": [
+				44,
+				37
+			],
+			"feet": [
+				22,
+				31
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		},
+		"stand_2_hinten": {
+			"size": [
+				44,
+				36
+			],
+			"feet": [
+				22,
+				28
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		},
+		"stand_2_seite": {
+			"size": [
+				36,
+				45
+			],
+			"feet": [
+				16,
+				37
+			],
+			"foot": [
+				35,
+				10
+			],
+			"lights": []
+		}
+	},
+	"doors": {
+		"haus_a": 5.5,
+		"haus_b": -9.2,
+		"verlassen_a": 5.5,
+		"verlassen_b": -9.2,
+		"haus_hoch": -12.9,
+		"giebel": -8.3,
+		"laden": 23.9,
+		"halle": 0.0,
+		"torhaus": 0.0,
+		"stall": -31.3
+	}
+}

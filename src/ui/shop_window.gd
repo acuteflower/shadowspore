@@ -23,6 +23,7 @@ var _craft_left: float = 0.0
 var _craft_total: float = 1.0
 var _craft_id: String = ""
 var _brew_tiers: Dictionary = {}
+var _caravan: CaravanManager ## a `dynamic` "caravan" shop: the rows come from the visit of the travelling merchant (docs/haendler_konzept.md)
 
 
 static func open(tree: SceneTree, for_player: Player, for_town: TownManager, id: String = "gustav_bench") -> ShopWindow:
@@ -51,6 +52,10 @@ func _setup_board() -> void:
 	town.refresh_done.connect(_on_refresh_done)
 	player.inventory.changed.connect(_on_town_changed) ## the bag and the purse change what can be bought and sold
 	player.progress.changed.connect(_on_town_changed)
+	if String(def.get("dynamic", "")) == "caravan":
+		_caravan = town.caravan
+		if _caravan != null:
+			_caravan.stock_changed.connect(_on_town_changed)
 	_say_line("open")
 
 
@@ -72,6 +77,8 @@ func _on_refresh_done(raw: String, stones: Array) -> void:
 
 
 func _exit_tree() -> void:
+	if _caravan != null and _caravan.stock_changed.is_connected(_on_town_changed):
+		_caravan.stock_changed.disconnect(_on_town_changed)
 	if town != null and town.refresh_done.is_connected(_on_refresh_done):
 		town.refresh_done.disconnect(_on_refresh_done)
 	if town != null and town.brew_done.is_connected(_on_brew_done):
@@ -198,6 +205,12 @@ func _rebuild() -> void:
 			_rebuild_refine()
 		"brew":
 			_rebuild_brew()
+		"buy", "sell" when _caravan != null:
+			for row: Dictionary in _caravan.rows(_kind(), player):
+				row["name"] = _item_name(String(row.item))
+				if bool(row.get("curio", false)):
+					row["ring"] = Color("ffd27a")
+				rows.append(row)
 		"buy":
 			for entry: Variant in def.get("buy", []) as Array:
 				var offer: Dictionary = entry as Dictionary
@@ -481,6 +494,8 @@ func _num(value: float) -> String:
 
 func _process(delta: float) -> void:
 	super(delta)
+	if _caravan != null and not _closing and not _caravan.is_open(): ## the stall closes (evening, storm, leaving): so does the window
+		_close()
 	if _craft_left > 0.0:
 		_craft_left -= delta
 		if _craft_left <= 0.0:
@@ -542,10 +557,20 @@ func _press(id: String, bulk: bool) -> void:
 			_say_line("refine")
 			_play_refine("hand_in")
 		"buy", "buy10":
+			if _caravan != null:
+				_caravan.request_trade("buy", String(row.item), 10 if (id == "buy10" or bulk) else 1)
+				_sound("coin")
+				_say_line("buy")
+				return
 			town.request_trade(shop_id, "buy", String(row.item), 10 if (id == "buy10" or bulk) else 1)
 			_sound("coin")
 			_say_line("buy")
 		"sell", "sell_all":
+			if _caravan != null:
+				_caravan.request_trade("sell", String(row.item), int(row.count) if (id == "sell_all" or bulk) else 1)
+				_sound("coin")
+				_say_line("sell")
+				return
 			town.request_trade(shop_id, "sell", String(row.item), int(row.count) if (id == "sell_all" or bulk) else 1)
 			_sound("coin")
 			_say_line("sell")

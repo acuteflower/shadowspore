@@ -1,0 +1,88 @@
+{
+	"_doc": "Die Karawane (docs/haendler_konzept.md). Zeiten als Anteil des Tages (0.25 = Sonnenaufgang = neuer Tag). Alle Zahlen und Waren sind Platzhalter.",
+	"merchant": "jorun",
+	"shop": "caravan",
+	"first_delay": 1,
+	"gap": [[2, 2], [3, 4], [4, 3], [5, 1]],
+	"stay": [[1, 3], [2, 1]],
+	"storm": 0.5,
+	"storm_shift_max": 3,
+	"arrive": 0.36,
+	"leave": 0.58,
+	"open": 0.36,
+	"close": 0.78,
+	"drive_seconds": 130.0,
+	"setup_seconds": 14.0,
+	"teardown_seconds": 10.0,
+	"road": "caravan_road",
+	"come_from": 340.0,
+	"reach": 72.0,
+	"talk_trust": 10,
+	"trust_discount": 0.1,
+	"jitter": [0.85, 1.15],
+	"slots": [
+		{"id": "w", "at": [-62, 10], "foot": [80, 26], "front": [56, 18], "side": -1},
+		{"id": "e", "at": [62, 10], "foot": [80, 26], "front": [56, 18], "side": 1},
+		{"id": "nw", "at": [-62, -30], "foot": [80, 26], "front": [56, 18], "side": -1},
+		{"id": "ne", "at": [62, -30], "foot": [80, 26], "front": [56, 18], "side": 1}
+	],
+	"goods": {
+		"far": {"count": [3, 4], "items": [
+			{"item": "sun_date", "price": 14, "stock": [4, 8], "weight": 3},
+			{"item": "sun_fig", "price": 12, "stock": [4, 8], "weight": 3},
+			{"item": "quartz_aloe", "price": 18, "stock": [3, 6], "weight": 2},
+			{"item": "cactus_pulp", "price": 10, "stock": [4, 8], "weight": 2},
+			{"item": "sand_tuber", "price": 9, "stock": [4, 8], "weight": 2},
+			{"item": "oasis_blossom", "price": 26, "stock": [2, 4], "weight": 1},
+			{"item": "palm_wood", "price": 8, "stock": [6, 12], "weight": 2},
+			{"item": "sun_quartz", "price": 40, "stock": [1, 3], "weight": 1, "level": 1},
+			{"item": "lake_moonstone", "price": 34, "stock": [1, 3], "weight": 1, "level": 2}
+		]},
+		"seed": {"count": [1, 2], "items": [
+			{"item": "tuber_seed", "price": 12, "stock": [4, 8], "weight": 3},
+			{"item": "ember_carrot_seed", "price": 16, "stock": [3, 6], "weight": 2},
+			{"item": "night_beet_seed", "price": 18, "stock": [3, 6], "weight": 2},
+			{"item": "wound_leaf_seed", "price": 14, "stock": [3, 6], "weight": 2}
+		]},
+		"basic": {"count": [2, 3], "items": [
+			{"item": "rope", "price": 14, "stock": [5, 10], "weight": 3},
+			{"item": "plank", "price": 18, "stock": [5, 10], "weight": 2},
+			{"item": "vial_empty", "price": 6, "stock": [6, 12], "weight": 2},
+			{"item": "potion_heal_1", "price": 45, "stock": [2, 4], "weight": 2},
+			{"item": "potion_stamina_1", "price": 45, "stock": [2, 4], "weight": 2},
+			{"item": "potion_heal_2", "price": 110, "stock": [1, 2], "weight": 1, "level": 2}
+		]},
+		"curio": {"count": [1, 1], "items": [
+			{"item": "gem_lens_1", "price": 260, "stock": [1, 1], "weight": 3},
+			{"item": "gem_wild_1", "price": 260, "stock": [1, 1], "weight": 3},
+			{"item": "crystal_roots_1", "price": 320, "stock": [1, 1], "weight": 2},
+			{"item": "crystal_banish_1", "price": 320, "stock": [1, 1], "weight": 2},
+			{"item": "silver_chain", "price": 480, "stock": [1, 1], "weight": 1, "trust": 30},
+			{"item": "gem_lens_2", "price": 620, "stock": [1, 1], "weight": 1, "trust": 50, "level": 2}
+		]}
+	},
+	"buys": [
+		{"item": "wood", "price": 2},
+		{"item": "stone", "price": 2},
+		{"item": "plank", "price": 7},
+		{"item": "plant_fiber", "price": 1},
+		{"item": "glow_cap", "price": 5},
+		{"item": "dusk_berry", "price": 3},
+		{"item": "ember_berry", "price": 4},
+		{"item": "moonbell", "price": 4},
+		{"item": "mist_lily", "price": 8},
+		{"item": "spark_poppy", "price": 4},
+		{"item": "willow_thread", "price": 6},
+		{"item": "dusk_blossom", "price": 4},
+		{"item": "birch_bark", "price": 3},
+		{"item": "resin", "price": 6},
+		{"item": "iron_ore", "price": 8},
+		{"item": "iron_ingot", "price": 20},
+		{"item": "void_splinter", "price": 7},
+		{"item": "shadow_core", "price": 38},
+		{"item": "void_slag", "price": 16},
+		{"item": "moon_parasol", "price": 7},
+		{"item": "iris_bloom", "price": 7}
+	],
+	"wanted": {"count": [2, 3], "factor": [1.5, 2.2], "limit": [6, 14]}
+}

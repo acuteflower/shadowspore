@@ -123,6 +123,10 @@ func spot_position(spot: String) -> Vector2:
 		anchor = home_position()
 	elif of == "center":
 		anchor = town.center
+	elif of == "caravan": ## the travelling merchant's stall while it stands (docs/haendler_konzept.md 5.3); without it the spot's fallback
+		if town.caravan == null or not town.caravan.visitable():
+			return spot_position(String(cfg.get("fallback", "fire")))
+		anchor = town.caravan.customer_point()
 	else: ## the first finished piece of that kind (the bench, the stockpile); without one the spot is the fallback's
 		var ids: Array[int] = town.built_ids(of)
 		if ids.is_empty():
@@ -135,6 +139,8 @@ func spot_position(spot: String) -> Vector2:
 func resolve_spot(spot: String) -> String:
 	var cfg: Dictionary = (spec.get("spots", {}) as Dictionary).get(spot, {}) as Dictionary
 	var of: String = String(cfg.get("of", "home"))
+	if of == "caravan":
+		return spot if town.caravan != null and town.caravan.visitable() else String(cfg.get("fallback", "fire"))
 	if of != "home" and of != "center" and town.built_ids(of).is_empty():
 		return String(cfg.get("fallback", "work"))
 	return spot
@@ -639,6 +645,9 @@ func _chat_line(player: Player) -> String:
 	var for_night: Array = chat.get("night", []) as Array
 	if TimeManager.is_night() and not for_night.is_empty():
 		pools.append([for_night, 3])
+	var for_order: Array = chat.get("order_trace", []) as Array
+	if player.quests != null and player.quests.has_flag("found_order_trace") and not for_order.is_empty():
+		pools.append([for_order, 3])
 	pools.append([chat.get("any", []) as Array, 2])
 	var total: int = 0
 	for pool: Array in pools:

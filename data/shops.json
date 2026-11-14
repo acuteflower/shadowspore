@@ -928,5 +928,39 @@
     "Der See hat ihn so gemacht. Nicht ich."
    ]
   }
+ },
+ "caravan": {
+  "title": "KARAWANE",
+  "npc": "jorun",
+  "role": "caravan",
+  "reach": 150.0,
+  "dynamic": "caravan",
+  "tabs": [
+   {
+    "id": "buy",
+    "name": "WAREN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "ANKAUF",
+    "kind": "sell"
+   }
+  ],
+  "lines": {
+   "open": [
+    "SCHAU DICH UM!",
+    "FRISCH VOM WEG.",
+    "WAS SUCHST DU?"
+   ],
+   "buy": [
+    "GUTE WAHL.",
+    "DAS HÄLT EWIG. FAST."
+   ],
+   "sell": [
+    "DAFÜR FINDE ICH EINEN KÄUFER.",
+    "ABGEMACHT."
+   ]
+  }
  }
 }

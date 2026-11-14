@@ -19,7 +19,7 @@ func _run() -> void:
 	player.set_physics_process(false)
 	player.set_multiplayer_authority(1)
 	check(player._rig_standby_hand.size() == 8 * Player.STANDBY_COLS and player._rig_standby_shoulder.size() == 8 * Player.STANDBY_COLS, "all eight directions have matching hand and shoulder positions")
-	check(Player.STANDBY_SHEET.get_size() == Vector2(Player.STANDBY_COLS * 48, 8 * 56), "standby atlas has three 24-frame clips in eight directions")
+	check(Player.STANDBY_SHEET.get_size() == Vector2(Player.STANDBY_COLS * 48, 8 * 56), "standby atlas has four 24-frame clips in eight directions")
 	check(Player.STANDBY_SHEET.get_size() == Player.STANDBY_BLOOD.get_size(), "blood atlas matches standby sprites")
 	for sector: int in 8:
 		player.facing = Vector2.RIGHT.rotated(float(sector) * PI / 4.0)
@@ -105,6 +105,17 @@ func _run() -> void:
 		last = player._standby_clip
 		seen[last] = true
 	check(seen.size() == 3, "all three gestures can be chosen")
+	# When heated in Sonnenquarz-Öde, Ellie picks her 4th standby clip ('sweat' brow-wipe)
+	player.heat_amount = 0.85
+	player._stop_standby()
+	player._standby_last = -1
+	player._standby_wait = 0.0
+	player._idle_time = 0.0
+	player._animate(0.0)
+	check(player._standby_clip == Player.HEAT_STANDBY_CLIP, "heated Ellie chooses the brow-wipe sweat standby gesture")
+	player.heat_amount = 0.0
+	player._stop_standby()
+	player._start_standby(0)
 	player._standby_time = 1.99
 	player._animate(0.02)
 	check(player._standby_clip == -1 and player._sprite.frame == Player.IDLE_COL, "completed gesture returns to the matching idle frame")

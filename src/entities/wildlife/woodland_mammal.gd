@@ -63,11 +63,11 @@ func _ready() -> void:
 	_end = global_position
 	_visual_facing = facing
 	add_to_group("woodland_mammals")
-	if species in ["fox", "lynx"]:
+	if species in ["fox", "lynx", "fennec"]:
 		add_to_group("wildlife_hunters")
 	if species == "lynx":
 		add_to_group("apex_hunters")
-	if species in ["boar", "hex_goat"] and not is_young():
+	if species in ["boar", "hex_goat", "oryx"] and not is_young():
 		add_to_group("tough_ungulates")
 	if multiplayer.is_server():
 		_duration = _range("rest_seconds")
@@ -100,8 +100,34 @@ func is_kid() -> bool:
 	return species == "hex_goat" and appearance == 3
 
 
+func is_calf() -> bool:
+	return species == "oryx" and appearance == 3
+
+
 func is_young() -> bool:
-	return is_fawn() or is_piglet() or is_kid() or (species == "badger" and appearance == 2)
+	return is_fawn() or is_piglet() or is_kid() or is_calf() or (species == "badger" and appearance == 2) or (species in ["fennec", "jerboa", "agama"] and appearance == 3)
+
+
+var captured: bool = false
+var _zigzag_sign: float = 1.0
+
+
+func caught_by_predator() -> void:
+	if captured:
+		return
+	captured = true
+	if multiplayer.is_server():
+		_despawn_caught.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _despawn_caught() -> void:
+	captured = true
+	visible = false
+	set_physics_process(false)
+	set_process(false)
+	if multiplayer.is_server():
+		queue_free()
 
 
 func _range(key: String) -> float:
@@ -112,6 +138,8 @@ func _range(key: String) -> float:
 func _rest_hours() -> bool:
 	if species == "squirrel":
 		return TimeManager.night_amount() > 0.55
+	if species == "agama":
+		return TimeManager.night_amount() > 0.38
 	if not bool(_spec["nocturnal"]):
 		return false
 	return TimeManager.night_amount() < float(_spec.get("awake_threshold", 0.4))
@@ -149,10 +177,10 @@ func _process(delta: float) -> void:
 	var cols: int = int(_spec.get("sheet_cols", 44))
 	var builds: int = int(_spec.get("builds", 3))
 	var col: int = int(_elapsed * 2.2) % 4
-	if species in ["deer", "boar", "hex_goat"] and cols >= 52:
+	if species in ["deer", "boar", "hex_goat", "oryx"] and cols >= 52:
 		match mood:
 			Mood.FORAGE:
-				if species == "deer":
+				if species in ["deer", "oryx"]:
 					var remaining: float = _duration - _elapsed
 					if _elapsed < 0.5:
 						col = 4 + mini(1, int(_elapsed / 0.25))
@@ -172,7 +200,7 @@ func _process(delta: float) -> void:
 				col = 32 + int(_elapsed * 2.8) % 4
 			Mood.SLEEP:
 				col = 36 + int(_elapsed * 1.4) % 4
-			Mood.BARK, Mood.REAR:
+			Mood.BARK, Mood.REAR, Mood.LOWER:
 				col = 40 + mini(5, int(clampf(_elapsed / _duration, 0.0, 0.999) * 6.0))
 			Mood.SPECIAL:
 				if species == "boar":
@@ -181,7 +209,7 @@ func _process(delta: float) -> void:
 					col = 40 + mini(5, int(clampf(_elapsed / _duration, 0.0, 0.999) * 6.0))
 			Mood.STAND_UP:
 				col = 46 + mini(5, int(clampf(_elapsed / _duration, 0.0, 0.999) * 6.0))
-	elif species in ["fox", "lynx", "squirrel", "badger"] and cols >= 52:
+	elif species in ["fox", "lynx", "squirrel", "badger", "fennec"] and cols >= 52:
 		match mood:
 			Mood.FORAGE:
 				col = 4 + int(_elapsed * 5.0) % 6
@@ -209,24 +237,24 @@ func _process(delta: float) -> void:
 				col = 46 + int(_gait_phase * 6.0) % 6
 			Mood.CLIMB:
 				col = 46 + int(_elapsed * 10.5) % 6
-	elif species == "hex_toad" and cols >= 52:
+	elif species in ["hex_toad", "jerboa", "agama"] and cols >= 52:
 		match mood:
 			Mood.FORAGE:
-				col = 4 + int(_elapsed * 3.5) % 6
-			Mood.WALK, Mood.RETURN:
-				col = 10 + mini(7, int(progress * 8.0))
+				col = 4 + int(_elapsed * 4.2) % 6
+			Mood.WALK, Mood.RETURN, Mood.EMERGE:
+				col = (10 + int(_gait_phase * 8.0) % 8) if species == "agama" else (10 + mini(7, int(progress * 8.0)))
 			Mood.ALERT, Mood.LISTEN:
 				col = 18 + int(_elapsed * 2.4) % 4
-			Mood.FLEE:
-				col = 22 + mini(7, int(progress * 8.0))
+			Mood.FLEE, Mood.CHASE:
+				col = (22 + int(_gait_phase * 8.0) % 8) if species == "agama" else (22 + mini(7, int(progress * 8.0)))
 			Mood.GROOM:
 				col = 30 + int(_elapsed * 3.2) % 4
 			Mood.SLEEP:
 				col = 34 + int(_elapsed * 1.1) % 4
 			Mood.BARK:
-				col = 38 + mini(5, int(clampf(_elapsed / _duration, 0.0, 0.999) * 6.0))
+				col = (38 + int(_elapsed * 10.0) % 6) if species in ["jerboa", "agama"] else (38 + mini(5, int(clampf(_elapsed / _duration, 0.0, 0.999) * 6.0)))
 			Mood.SPECIAL:
-				col = 44 + mini(7, int(clampf(_elapsed / _duration, 0.0, 0.999) * 8.0))
+				col = (44 + int(_elapsed * 6.0) % 8) if species in ["jerboa", "agama"] else (44 + mini(7, int(clampf(_elapsed / _duration, 0.0, 0.999) * 8.0)))
 	else:
 		match mood:
 			Mood.FORAGE:
@@ -249,12 +277,15 @@ func _process(delta: float) -> void:
 	_sprite.frame = (clampi(appearance, 0, builds - 1) * 8 + sector) * cols + col
 	_sprite.modulate.a = smoothstep(0.0, 0.7, _elapsed / _duration) if mood == Mood.EMERGE else 1.0
 	var lift_y: float = 0.0
-	if species in ["fox", "lynx"] and mood == Mood.SPECIAL and _moving:
+	if species in ["fox", "lynx", "fennec"] and mood == Mood.SPECIAL and _moving:
 		lift_y = sin(progress * PI) * float(_spec["pounce_height"])
-	elif species in ["deer", "lynx", "squirrel", "hex_goat"] and mood == Mood.FLEE and _moving:
+	elif species in ["deer", "lynx", "squirrel", "hex_goat", "oryx"] and mood == Mood.FLEE and _moving:
 		lift_y = absf(sin(_gait_phase * PI)) * float(_spec.get("bound_height", 3.5)) * (0.78 if is_young() else 1.0)
 	elif species == "hex_toad" and mood in [Mood.WALK, Mood.RETURN, Mood.FLEE] and _moving:
 		lift_y = sin(progress * PI) * float(_spec.get("hop_height", 4.2)) * (1.25 if mood == Mood.FLEE else 0.85)
+	elif species == "jerboa" and mood in [Mood.WALK, Mood.RETURN, Mood.FLEE] and _moving:
+		var hop_peak: float = float(_spec.get("flee_hop_height", 8.8)) if mood == Mood.FLEE else float(_spec.get("hop_height", 4.8))
+		lift_y = sin(progress * PI) * hop_peak * (0.78 if is_young() else 1.0)
 	_sprite.position.y = -roundf(_climb_height + lift_y)
 	_sprite.z_index = 2 if _climb_height >= 12.0 else 0
 	queue_redraw()
@@ -273,6 +304,16 @@ func _draw() -> void:
 		for i: int in 3:
 			var t: float = fposmod(_elapsed * 2.2 + i * 0.31, 1.0)
 			draw_rect(Rect2(Vector2((i - 1) * (2.0 + t * 4.5), -2.0 - _climb_height - sin(t * PI) * 4.5).round(), Vector2.ONE), dirt_col)
+	elif (species == "fennec" and mood == Mood.FORAGE) or (species == "jerboa" and mood in [Mood.SPECIAL, Mood.BARK]):
+		var sand_col: Color = Color("e2b46d") if species == "jerboa" else Color("cfa05e")
+		for i: int in 3:
+			var ts: float = fposmod(_elapsed * 2.8 + i * 0.33, 1.0)
+			draw_rect(Rect2(Vector2((i - 1) * (1.8 + ts * 3.8), -1.5 - sin(ts * PI) * 3.6).round(), Vector2.ONE), sand_col)
+	elif species == "oryx" and mood == Mood.FORAGE and BiomeBlend.oasis_at(global_position) > 0.35:
+		var ripple_t: float = fposmod(_elapsed * 1.4, 1.0)
+		var muzzle: Vector2 = (Vector2.from_angle(_visual_facing) * 9.0 + Vector2(0.0, 1.0)).round()
+		draw_rect(Rect2(muzzle + Vector2(-roundf(ripple_t * 3.0), 0.0), Vector2(2, 1)), Color(0.72, 0.95, 0.94, 0.45 * (1.0 - ripple_t)))
+		draw_rect(Rect2(muzzle + Vector2(roundf(ripple_t * 3.0), 0.0), Vector2(2, 1)), Color(0.72, 0.95, 0.94, 0.45 * (1.0 - ripple_t)))
 	elif species == "squirrel" and mood == Mood.SPECIAL:
 		for i: int in 2:
 			var t: float = fposmod(_elapsed * 1.9 + i * 0.47, 1.0)
@@ -289,12 +330,15 @@ func _sense() -> void:
 	var candidates: Array[Node] = []
 	candidates.append_array(Player.all)
 	candidates.append_array(get_tree().get_nodes_in_group("predators"))
-	if species in ["deer", "hedgehog", "squirrel", "boar", "badger", "hex_goat", "hex_toad"]:
-		candidates.append_array(get_tree().get_nodes_in_group("wildlife_hunters"))
+	if species in ["deer", "hedgehog", "squirrel", "boar", "badger", "hex_goat", "hex_toad", "oryx", "jerboa", "agama"]:
+		var oasis_truce: bool = species in ["oryx", "jerboa"] and BiomeBlend.oasis_at(global_position) > 0.35 and TimeManager.night_amount() >= 0.14 and TimeManager.night_amount() <= 0.45
+		if not oasis_truce:
+			candidates.append_array(get_tree().get_nodes_in_group("wildlife_hunters"))
 		candidates.append_array(get_tree().get_nodes_in_group("apex_hunters"))
-	elif species == "fox":
+	elif species in ["fox", "fennec"]:
 		candidates.append_array(get_tree().get_nodes_in_group("apex_hunters"))
-		candidates.append_array(get_tree().get_nodes_in_group("tough_ungulates"))
+		if not (species == "fennec" and BiomeBlend.oasis_at(global_position) > 0.35 and TimeManager.night_amount() >= 0.14 and TimeManager.night_amount() <= 0.45):
+			candidates.append_array(get_tree().get_nodes_in_group("tough_ungulates"))
 	for node: Node in candidates:
 		var actor: Node2D = node as Node2D
 		if actor == null or actor == self:
@@ -328,15 +372,18 @@ func _sense() -> void:
 			if species == "boar" and not is_piglet():
 				alert = 84.0
 				flee = 0.0
+			elif species == "oryx" and not is_calf():
+				alert = 78.0
+				flee = 0.0
 			elif species == "badger" and not is_young():
 				alert = 52.0
 				flee = 0.0
-			elif species == "squirrel":
-				alert = 104.0
-				flee = 72.0
+			elif species in ["squirrel", "jerboa", "agama"]:
+				alert = 98.0
+				flee = 64.0
 			else:
-				alert = 95.0 if is_fawn() else 65.0
-				flee = 55.0 if is_fawn() else 25.0
+				alert = 95.0 if (is_fawn() or is_calf()) else 65.0
+				flee = 55.0 if (is_fawn() or is_calf()) else 25.0
 		else:
 			var health: HealthComponent = actor.get_node_or_null("HealthComponent") as HealthComponent
 			if health != null and health.current <= 0.0:
@@ -385,12 +432,14 @@ func _sense() -> void:
 		elif not _moving and mood not in [Mood.ALERT, Mood.BARK]:
 			_issue(Mood.ALERT, 1.2, (_threat - global_position).angle())
 		return
-	if species == "hex_goat":
+	if species in ["hex_goat", "oryx"]:
 		if close:
-			if not is_kid() and mood not in [Mood.REAR, Mood.FLEE] and _bluff_cool <= 0.0:
+			if not is_young() and mood not in [Mood.REAR, Mood.LOWER, Mood.FLEE] and _bluff_cool <= 0.0:
 				_bluff_cool = 6.5
-				_issue(Mood.REAR, float(_spec.get("rear_seconds", 1.25)), (_threat - global_position).angle())
-			elif mood != Mood.FLEE and mood != Mood.REAR:
+				if species == "oryx":
+					_alarm_family()
+				_issue(Mood.LOWER if species == "oryx" else Mood.REAR, float(_spec.get("rear_seconds", 1.25)), (_threat - global_position).angle())
+			elif mood not in [Mood.FLEE, Mood.REAR, Mood.LOWER]:
 				_step((global_position - _threat).normalized(), Mood.FLEE)
 		else:
 			facing = (_threat - global_position).angle()
@@ -398,6 +447,29 @@ func _sense() -> void:
 				_issue(Mood.STAND_UP, float(_spec.get("stand_up_seconds", 0.80)), facing)
 			elif not _moving and mood != Mood.ALERT:
 				_issue(Mood.ALERT, 1.8, facing)
+		return
+	if species == "jerboa":
+		if close:
+			if mood not in [Mood.BARK, Mood.FLEE] and _bluff_cool <= 0.0:
+				_bluff_cool = 5.0
+				_broadcast_squirrel_alarm()
+				_issue(Mood.BARK, 0.42, (_threat - global_position).angle())
+			elif mood != Mood.FLEE:
+				var home_ok: bool = bool(_population.call("home_loaded", home)) if _population.has_method("home_loaded") else true
+				if home_ok and global_position.distance_to(home) <= 10.0 and home.distance_to(_threat) > 20.0:
+					_issue(Mood.HIDDEN, _range("sleep_seconds"))
+				else:
+					_step((global_position - _threat).normalized(), Mood.FLEE)
+		elif not _moving and mood not in [Mood.ALERT, Mood.BARK]:
+			_issue(Mood.ALERT, 1.1, (_threat - global_position).angle())
+		return
+	if species == "agama":
+		if close:
+			if mood != Mood.FLEE:
+				var cover_dir: Vector2 = _nearest_desert_rock_dir()
+				_step(cover_dir if cover_dir != Vector2.ZERO else (global_position - _threat).normalized(), Mood.FLEE)
+		elif not _moving and mood != Mood.ALERT:
+			_issue(Mood.ALERT, 1.2, (_threat - global_position).angle())
 		return
 	if species == "hedgehog":
 		if close and mood != Mood.SPECIAL:
@@ -412,9 +484,9 @@ func _sense() -> void:
 				_perch_node = null
 				_climb_action(Mood.FLEE, global_position + (global_position - _threat).normalized() * 34.0, 0.42, _climb_height, 0.0)
 				return
-			if species == "badger":
+			if species in ["badger", "fennec"]:
 				var home_loaded: bool = bool(_population.call("home_loaded", home)) if _population.has_method("home_loaded") else true
-				if home_loaded and global_position.distance_to(home) < 145.0 and home.distance_to(_threat) > 22.0:
+				if home_loaded and global_position.distance_to(home) < 135.0 and home.distance_to(_threat) > 22.0:
 					if global_position.distance_to(home) <= 10.0:
 						_issue(Mood.HIDDEN, _range("sleep_seconds"))
 					else:
@@ -438,17 +510,49 @@ func _sense() -> void:
 			_issue(Mood.ALERT, 1.4, (_threat - global_position).angle())
 
 
-## Cross-species woodland sentinel reaction: rabbit thumps, squirrel chatter, and corvid warning calls alert nearby roe deer & boars.
+## Cross-species woodland & desert sentinel reaction: rabbit thumps, jerboa foot-drums, squirrel chatter, and corvid warning calls alert nearby herd/burrow neighbors.
 func hear_external_alarm(from: Vector2) -> void:
-	if not multiplayer.is_server() or species not in ["deer", "boar"] or _danger:
+	if not multiplayer.is_server() or species not in ["deer", "boar", "oryx", "jerboa"] or _danger or mood == Mood.HIDDEN:
 		return
 	if global_position.distance_to(from) > float(_spec.get("alert_range", 165.0)) * 1.1:
 		return
 	_threat = from
+	if species == "jerboa":
+		if not _moving and mood != Mood.FLEE:
+			_step((global_position - from).normalized(), Mood.FLEE)
+		return
 	if mood == Mood.SLEEP:
 		_issue(Mood.STAND_UP, float(_spec.get("stand_up_seconds", 0.85)), (from - global_position).angle())
 	elif not _moving and mood in [Mood.REST, Mood.FORAGE, Mood.GROOM]:
 		_issue(Mood.ALERT, 1.4, (from - global_position).angle())
+
+
+## Desert raptor shadow reaction: when a soaring Sonnenfalke passes overhead, agamas flatten in camouflage freeze and jerboas foot-drum & bolt!
+func hear_raptor_overhead(from: Vector2) -> void:
+	if not multiplayer.is_server() or _danger or mood == Mood.HIDDEN:
+		return
+	if species == "agama" and not _moving and mood != Mood.SLEEP:
+		_issue(Mood.SLEEP, 2.4, facing)
+	elif species == "jerboa" and mood not in [Mood.FLEE, Mood.BARK]:
+		_threat = from
+		_broadcast_squirrel_alarm()
+		_issue(Mood.BARK, 0.42, (from - global_position).angle())
+
+
+func _nearest_desert_rock_dir() -> Vector2:
+	var best: Vector2 = Vector2.ZERO
+	var best_d: float = 95.0
+	for world: Node in get_tree().get_nodes_in_group("world"):
+		var props: Node = world.get_node_or_null("Props")
+		if props != null:
+			for node: Node in props.get_children():
+				var prop: WorldProp = node as WorldProp
+				if prop != null and prop.kind in ["sun_quartz_rock", "crown_cactus", "prickly_pear"]:
+					var d: float = prop.global_position.distance_to(global_position)
+					if d > 8.0 and d < best_d and prop.global_position.distance_to(_threat) > 22.0:
+						best_d = d
+						best = (prop.global_position - global_position).normalized()
+	return best
 
 
 func _broadcast_squirrel_alarm() -> void:
@@ -530,10 +634,10 @@ func _think() -> void:
 		if not _danger and _safe_time >= float(_spec["safe_seconds"]) and _elapsed >= _duration:
 			_issue(Mood.UNROLL, float(_spec["uncurl_seconds"]))
 		return
-	if species == "hex_goat" and mood == Mood.REAR and _elapsed >= _duration:
+	if (species == "hex_goat" and mood == Mood.REAR and _elapsed >= _duration) or (species == "oryx" and mood in [Mood.REAR, Mood.LOWER] and _elapsed >= _duration) or (species == "jerboa" and mood == Mood.BARK and _danger and _elapsed >= _duration):
 		_step((global_position - _threat).normalized(), Mood.FLEE)
 		return
-	if species == "badger" and mood == Mood.RETURN and _danger and global_position.distance_to(home) <= 10.0:
+	if species in ["badger", "fennec", "jerboa"] and mood == Mood.RETURN and _danger and global_position.distance_to(home) <= 10.0:
 		_issue(Mood.HIDDEN, _range("sleep_seconds"))
 		return
 	if species == "squirrel" and mood == Mood.FLEE and _danger and _climb_height < 1.0:
@@ -545,7 +649,7 @@ func _think() -> void:
 			_broadcast_squirrel_alarm()
 			return
 	if _danger and mood != Mood.FLEE:
-		if species == "hex_goat" and mood == Mood.ALERT and _elapsed >= _duration:
+		if species in ["hex_goat", "oryx"] and mood == Mood.ALERT and _elapsed >= _duration:
 			_issue(Mood.ALERT, 1.6, (_threat - global_position).angle())
 		return
 	if mood == Mood.FLEE and visit.is_finite(): ## scared off: it gives the visit up and leaves
@@ -567,20 +671,21 @@ func _think() -> void:
 		if species == "hedgehog":
 			_issue(Mood.UNROLL, float(_spec["uncurl_seconds"]))
 			return
-		elif species in ["deer", "boar", "hex_goat"]:
+		elif species in ["deer", "boar", "hex_goat", "oryx"]:
 			if _elapsed >= _duration:
 				_issue(Mood.STAND_UP, float(_spec.get("stand_up_seconds", 0.85)))
 			return
 		else:
-			_issue(Mood.ALERT, 1.0)
+			if _elapsed >= _duration:
+				_issue(Mood.ALERT, 1.0)
 			return
 	if _elapsed < _duration:
 		return
-	if species in ["deer", "boar", "hex_goat"] and mood == Mood.STAND_UP:
+	if species in ["deer", "boar", "hex_goat", "oryx"] and mood == Mood.STAND_UP:
 		_issue(Mood.ALERT if _danger else Mood.REST, 1.1)
 		return
-	if species == "badger" and mood == Mood.EMERGE:
-		_issue(Mood.ALERT, 1.35, facing + _rng.randf_range(-0.4, 0.4))
+	if species in ["badger", "fennec", "jerboa", "agama"] and mood == Mood.EMERGE:
+		_issue(Mood.ALERT, 1.15, facing + _rng.randf_range(-0.4, 0.4))
 		return
 	if species == "deer" and mood == Mood.ALERT and _bark_pending and not is_fawn():
 		_bark_pending = false
@@ -601,9 +706,11 @@ func _think() -> void:
 			return
 		if home_loaded and global_position.distance_to(home) > 8.0:
 			_step((home - global_position).normalized(), Mood.RETURN)
-		elif species == "badger" and home_loaded:
+		elif species in ["badger", "jerboa", "agama"] and home_loaded:
 			_issue(Mood.HIDDEN, _range("sleep_seconds"))
-		elif species == "fox" and mood == Mood.SLEEP and _rng.randf() < 0.2:
+		elif species == "fennec" and home_loaded and _rng.randf() < 0.55:
+			_issue(Mood.HIDDEN, _range("sleep_seconds"))
+		elif species in ["fox", "fennec"] and mood == Mood.SLEEP and _rng.randf() < 0.2:
 			_issue(Mood.GROOM, _range("groom_seconds"))
 		else:
 			_issue(Mood.SLEEP, _range("sleep_seconds"))
@@ -628,6 +735,14 @@ func _think() -> void:
 			_hex_goat_life()
 		"hex_toad":
 			_hex_toad_life()
+		"oryx":
+			_oryx_life()
+		"fennec":
+			_fennec_life()
+		"jerboa":
+			_jerboa_life()
+		"agama":
+			_agama_life()
 		_:
 			_hedgehog_life()
 
@@ -908,6 +1023,183 @@ func _hedgehog_life() -> void:
 		_roam()
 
 
+func _find_desert_shade() -> Vector2:
+	var best: Vector2 = Vector2.INF
+	var best_score: float = INF
+	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
+		var tree: FirTree = node as FirTree
+		if tree == null or tree.is_depleted() or tree._falling or not (tree.kind in ["sun_palm", "crown_cactus"]):
+			continue
+		var shade_spot: Vector2 = tree.global_position + Vector2(-10.0, -8.0)
+		var d: float = global_position.distance_to(shade_spot)
+		if d < 125.0 and d < best_score and _can_step(shade_spot):
+			best_score = d
+			best = shade_spot
+	if not best.is_finite() and is_instance_valid(DaylightField.current):
+		for i: int in 8:
+			var sample: Vector2 = global_position + Vector2.from_angle(i * TAU / 8.0) * 32.0
+			if DaylightField.current.light_at(sample) < 0.76 and _can_step(sample):
+				return sample
+	return best
+
+
+func _oryx_life() -> void:
+	var leader: WoodlandMammal = _adult_leader("oryx")
+	if is_calf() and leader != null:
+		var calf_spot: Vector2 = leader.global_position - Vector2.from_angle(leader.facing) * 16.0 + Vector2.from_angle(leader.facing + 1.2) * 8.0
+		if global_position.distance_to(calf_spot) > 22.0:
+			_step_limit = global_position.distance_to(calf_spot)
+			_step((calf_spot - global_position).normalized(), Mood.WALK)
+			_step_limit = INF
+			return
+		if leader.mood == Mood.SLEEP:
+			_issue(Mood.SLEEP, _range("sleep_seconds") * 0.85)
+			return
+	elif leader != null and appearance != 0 and leader.appearance == 0:
+		# Single-file desert herd march behind the lead ivory bull
+		var file_spot: Vector2 = leader.global_position - Vector2.from_angle(leader.facing) * 28.0
+		if leader._moving and global_position.distance_to(file_spot) > 24.0:
+			_step_limit = global_position.distance_to(file_spot)
+			_step((file_spot - global_position).normalized(), Mood.WALK)
+			_step_limit = INF
+			return
+		if leader.mood == Mood.SLEEP and global_position.distance_to(leader.global_position) < 48.0 and _rng.randf() < 0.72:
+			_issue(Mood.SLEEP, _range("sleep_seconds") * 0.9)
+			return
+	var tod: float = TimeManager.time_of_day
+	var night: float = TimeManager.night_amount()
+	var midday_heat: bool = tod >= 0.42 and tod <= 0.60 and night < 0.1
+	if midday_heat:
+		var in_shade: bool = is_instance_valid(DaylightField.current) and DaylightField.current.light_at(global_position) < 0.78
+		if not in_shade:
+			var shade_pt: Vector2 = _find_desert_shade()
+			if shade_pt.is_finite():
+				if global_position.distance_to(shade_pt) > 14.0:
+					_step_limit = global_position.distance_to(shade_pt)
+					_step((shade_pt - global_position).normalized(), Mood.WALK)
+					_step_limit = INF
+					return
+				in_shade = true
+		if in_shade or _rng.randf() < 0.52:
+			_issue(Mood.SLEEP, _range("sleep_seconds"))
+			return
+	# Morning & golden dusk oasis watering
+	var oasis: float = BiomeBlend.oasis_at(global_position)
+	var crepuscular: bool = (tod >= 0.16 and tod <= 0.30) or (tod >= 0.70 and tod <= 0.84)
+	if crepuscular and oasis > 0.08 and oasis < 0.52:
+		var best_oasis_dir: Vector2 = Vector2.ZERO
+		var best_o: float = oasis
+		for i: int in 8:
+			var probe: Vector2 = global_position + Vector2.from_angle(i * TAU / 8.0) * 28.0
+			var ov: float = BiomeBlend.oasis_at(probe)
+			if ov > best_o and _can_step(probe):
+				best_o = ov
+				best_oasis_dir = (probe - global_position).normalized()
+		if best_oasis_dir != Vector2.ZERO and _rng.randf() < 0.62:
+			_step(best_oasis_dir, Mood.WALK)
+			return
+	var roll: float = _rng.randf()
+	if night > 0.72 and roll < 0.42:
+		_issue(Mood.SLEEP, _range("sleep_seconds"))
+	elif roll < (0.62 if oasis > 0.35 else 0.46):
+		_issue(Mood.FORAGE, _range("forage_seconds"))
+	elif roll < 0.78:
+		_roam()
+	elif roll < 0.90:
+		_issue(Mood.ALERT, _range("rest_seconds"), facing + _rng.randf_range(-0.6, 0.6))
+	else:
+		_issue(Mood.GROOM, _range("groom_seconds"))
+
+
+func _fennec_life() -> void:
+	if is_young():
+		var parent: WoodlandMammal = _adult_leader("fennec")
+		if parent != null and global_position.distance_to(parent.global_position) > float(_spec.get("family_range", 36.0)):
+			_step((parent.global_position - global_position).normalized(), Mood.WALK)
+			return
+	if mood == Mood.LISTEN:
+		if _rng.randf() < 0.52:
+			var leap: Vector2 = global_position + Vector2.from_angle(facing) * _range("pounce_distance")
+			if _can_step(leap) and not test_move(global_transform, leap - global_position):
+				_move_action(Mood.SPECIAL, leap, float(_spec["pounce_seconds"]))
+				return
+		_issue(Mood.FORAGE, _range("forage_seconds"))
+		return
+	if mood == Mood.STALK:
+		_issue(Mood.LISTEN, _range("listen_seconds"), facing)
+		return
+	if mood == Mood.SPECIAL:
+		_issue(Mood.FORAGE, _range("forage_seconds"))
+		return
+	var roll: float = _rng.randf()
+	var oasis_truce: bool = BiomeBlend.oasis_at(global_position) > 0.35 and TimeManager.night_amount() <= 0.45
+	if roll < 0.44 and not oasis_truce:
+		var target: Vector2 = global_position + Vector2.from_angle(facing + _rng.randf_range(-0.85, 0.85)) * 28.0
+		for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
+			var prey: WoodlandMammal = node as WoodlandMammal
+			if prey != null and prey.species == "jerboa" and prey.mood != Mood.HIDDEN and global_position.distance_to(prey.global_position) < 95.0:
+				target = prey.global_position
+				break
+		if _rng.randf() < 0.48:
+			_step((target - global_position).normalized(), Mood.STALK)
+		else:
+			_issue(Mood.LISTEN, _range("listen_seconds"), (target - global_position).angle())
+	elif roll < 0.74:
+		_roam()
+	elif roll < 0.90:
+		_issue(Mood.FORAGE, _range("forage_seconds"))
+	else:
+		_issue(Mood.GROOM, _range("groom_seconds"))
+
+
+func _jerboa_life() -> void:
+	var roll: float = _rng.randf()
+	var on_sand: bool = Terrain.surface_at(global_position) == "sand" and BiomeBlend.oasis_at(global_position) < 0.25
+	if on_sand and roll < 0.16 and mood != Mood.SPECIAL:
+		_issue(Mood.SPECIAL, _range("bath_seconds"))
+	elif roll < 0.46:
+		_roam()
+	elif roll < 0.74:
+		_issue(Mood.FORAGE, _range("forage_seconds"))
+	elif roll < 0.88:
+		_issue(Mood.GROOM, _range("groom_seconds"))
+	else:
+		_issue(Mood.ALERT, _range("rest_seconds"), facing + _rng.randf_range(-0.9, 0.9))
+
+
+func _agama_life() -> void:
+	# Territorial push-up & head-bob display when another agama is on a nearby rock/quartz slab
+	if mood not in [Mood.BARK, Mood.SPECIAL] and _rng.randf() < 0.42:
+		for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
+			var rival: WoodlandMammal = node as WoodlandMammal
+			if rival != null and rival != self and rival.species == "agama" and rival.mood != Mood.HIDDEN and rival.global_position.distance_to(global_position) < 76.0:
+				_issue(Mood.BARK, float(_spec.get("bob_seconds", 1.15)), (rival.global_position - global_position).angle())
+				return
+	# Midday scorching-sand diagonal foot-lifting dance ("Heißer-Sand-Tanz")
+	var hot_sun: bool = TimeManager.night_amount() < 0.16 and not BiomeBlend.is_quartz_surface(global_position) and BiomeBlend.oasis_at(global_position) < 0.18
+	if hot_sun and Terrain.surface_at(global_position) == "sand" and mood != Mood.SPECIAL and _rng.randf() < 0.46:
+		_issue(Mood.SPECIAL, _range("sand_dance_seconds"))
+		return
+	# Prefer walking onto sunny white quartz outcrops when nearby
+	if not BiomeBlend.is_quartz_surface(global_position) and _rng.randf() < 0.38:
+		for i: int in 8:
+			var q_probe: Vector2 = global_position + Vector2.from_angle(i * TAU / 8.0) * 24.0
+			if BiomeBlend.is_quartz_surface(q_probe) and _can_step(q_probe):
+				_step((q_probe - global_position).normalized(), Mood.WALK)
+				return
+	var roll: float = _rng.randf()
+	if roll < 0.34:
+		_issue(Mood.REST, _range("rest_seconds"), facing + _rng.randf_range(-0.5, 0.5))
+	elif roll < 0.56:
+		_roam()
+	elif roll < 0.76:
+		_issue(Mood.FORAGE, _range("forage_seconds"))
+	elif roll < 0.90:
+		_issue(Mood.BARK, float(_spec.get("bob_seconds", 1.15)))
+	else:
+		_issue(Mood.GROOM, _range("groom_seconds"))
+
+
 func _roam() -> void:
 	var direction: Vector2 = Vector2.from_angle(facing + _rng.randf_range(-1.15, 1.15))
 	if global_position.distance_to(home) > float(_spec["home_radius"]):
@@ -939,6 +1231,18 @@ func _step(direction: Vector2, action: Mood) -> void:
 			direction = ((sow._end if sow._moving else sow.global_position) - global_position).normalized()
 	elif is_kid():
 		speed *= float(_spec.get("kid_speed_factor", 0.92))
+	elif is_calf():
+		speed *= float(_spec.get("calf_speed_factor", 0.92))
+		var herd_lead: WoodlandMammal = _adult_leader("oryx")
+		if fleeing and herd_lead != null and global_position.distance_to(herd_lead.global_position) > 34.0:
+			direction = ((herd_lead._end if herd_lead._moving else herd_lead.global_position) - global_position).normalized()
+	elif species == "jerboa" and fleeing:
+		# Unpredictable high-angle zigzag kangaroo hops toward burrow or open dune!
+		_zigzag_sign = -_zigzag_sign
+		var home_ok: bool = bool(_population.call("home_loaded", home)) if _population.has_method("home_loaded") else true
+		if home_ok and global_position.distance_to(home) > 12.0 and global_position.distance_to(home) < 95.0 and home.distance_to(_threat) > 26.0:
+			direction = (home - global_position).normalized()
+		direction = direction.rotated(_zigzag_sign * _rng.randf_range(0.62, 1.08))
 	if direction == Vector2.ZERO:
 		direction = Vector2.RIGHT
 	for fraction: float in [1.0, 0.6, 0.3]:
@@ -1000,6 +1304,9 @@ const VOICES: Dictionary = {
 	"squirrel": {Mood.BARK: ["squirrel_chatter", 0.92], Mood.ALERT: ["squirrel_chatter", 0.45]},
 	"hex_goat": {Mood.REAR: ["goat_bleat", 0.92], Mood.BARK: ["goat_bleat", 0.85], Mood.ALERT: ["goat_bleat", 0.18]},
 	"hex_toad": {Mood.BARK: ["toad_croak", 0.92]},
+	"oryx": {Mood.LOWER: ["oryx_snort", 0.92], Mood.REAR: ["oryx_snort", 0.92], Mood.ALERT: ["oryx_snort", 0.20]},
+	"fennec": {Mood.ALERT: ["fennec_yip", 0.38], Mood.LISTEN: ["fennec_yip", 0.14], Mood.CHASE: ["fennec_yip", 0.32]},
+	"jerboa": {Mood.BARK: ["jerboa_drum", 0.95]},
 	"hedgehog": {Mood.FORAGE: ["hedgehog_snuffle", 0.4], Mood.UNROLL: ["hedgehog_snuffle", 0.6]},
 	"bear": {Mood.REAR: ["bear_roar", 1.0], Mood.LOWER: ["bear_growl", 0.8], Mood.SWIPE: ["bear_growl", 0.5], Mood.ALERT: ["bear_growl", 0.35]},
 }
@@ -1022,7 +1329,7 @@ func _voice_for(next: Mood) -> void:
 
 
 func _route_progress(t: float) -> float:
-	if mood in [Mood.SPECIAL, Mood.CLIMB] or species == "hex_toad":
+	if mood in [Mood.SPECIAL, Mood.CLIMB] or species in ["hex_toad", "jerboa"]:
 		return smoothstep(0.0, 1.0, t)
 	var ramp_in: float = 0.0 if _rolling else float(_spec["motion_ramp"])
 	var ramp_out: float = 0.0 if mood in [Mood.FLEE, Mood.CHASE] or (mood == Mood.RETURN and _end.distance_to(home) > 8.0) else float(_spec["motion_ramp"])
@@ -1047,10 +1354,13 @@ func _advance() -> void:
 			hit = move_and_collide(point - global_position)
 		_gait_phase = _gait_start + _start.distance_to(global_position) / float(_spec["run_stride"] if mood in [Mood.FLEE, Mood.CHASE] else _spec["walk_stride"])
 		if hit == null and t >= 1.0:
+			if species == "jerboa" and mood == Mood.FLEE and global_position.distance_to(home) <= 12.0 and home.distance_to(_threat) > 20.0:
+				_issue(Mood.HIDDEN, _range("sleep_seconds"))
+				return
 			if mood == Mood.FLEE and _safe_time < float(_spec["safe_seconds"]) and _climb_to < 0.5:
 				_step((global_position - _threat).normalized(), Mood.FLEE)
 				return
-			if mood == Mood.RETURN and (_rest_hours() or (_danger and species == "badger")) and global_position.distance_to(home) > 8.0:
+			if mood == Mood.RETURN and (_rest_hours() or (_danger and species in ["badger", "fennec", "jerboa"])) and global_position.distance_to(home) > 8.0:
 				_step((home - global_position).normalized(), Mood.RETURN)
 				return
 		if hit != null or t >= 1.0:

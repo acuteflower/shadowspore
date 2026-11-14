@@ -65,7 +65,7 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 			sprite.centered = false
 			sprite.offset = Vector2(-16, -34)
 			sprite.position = at
-			sprite.z_index = -6 if row in [0, 4, 5] else 0
+			sprite.z_index = -6 if row in [0, 4] else (-5 if row == 5 else 0)
 			if row in [0, 4]:
 				sprite.modulate = Color(0.70, 0.94, 0.88, 0.68) if arid_w else Color(0.65, 0.85, 0.8, 0.65)
 			if row in [0, 1]:
@@ -97,7 +97,7 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 		pad.centered = false
 		pad.offset = Vector2(-16, -34)
 		pad.position = at
-		pad.z_index = -6
+		pad.z_index = -5
 		add_child(pad)
 		_sprites.append(pad)
 		_rows.append(5)
@@ -221,8 +221,7 @@ func _water_flora(rivers: WorldRivers, cell: Vector2i) -> void:
 				for i: int in rng.randi_range(2, 4):
 					if placed >= budget: break
 					var at: Vector2 = (centre + Vector2(rng.randf_range(-16, 16), rng.randf_range(-8, 8)) * (1.0 if i > 0 else 0.0)).round()
-					var spot: Vector2 = rivers.field_at(at)
-					if spot.x > -4.0 or spot.y < 0.04: continue
+					if not _water_plant_fits(rivers, at, kind): continue
 					var w_sheet: Texture2D = sheet
 					var w_glow: Texture2D = glow_sheet
 					if BiomeBlend.arid_at(at) > 0.42:
@@ -235,6 +234,21 @@ func _water_flora(rivers: WorldRivers, cell: Vector2i) -> void:
 					_add_water_sprite(w_sheet, w_glow, at, kind, variant if i == 0 or rng.randf() < 0.6 else rng.randi() % 6, rng)
 					placed += 1
 
+func _water_plant_fits(rivers: WorldRivers, at: Vector2, kind: int) -> bool:
+	var spot: Vector2 = rivers.field_at(at)
+	var min_edge: float = -6.5 if kind != 22 else -5.0
+	if spot.x > min_edge or spot.y < 0.04:
+		return false
+	# Ensure the visual pad/rosette footprint (+ drift margin) stays inside water and never beaches onto shore rocks.
+	var rx: float = 9.0 if kind != 22 else 6.0
+	var up: float = 8.0 if kind == 21 else (6.5 if kind == 20 else 10.0)
+	var down: float = 3.5
+	if rivers.field_at(at + Vector2(-rx, 0.0)).x > -1.5: return false
+	if rivers.field_at(at + Vector2(rx, 0.0)).x > -1.5: return false
+	if rivers.field_at(at + Vector2(0.0, -up)).x > -1.5: return false
+	if rivers.field_at(at + Vector2(0.0, down)).x > -1.5: return false
+	return true
+
 func _add_water_sprite(sheet: Texture2D, glow_sheet: Texture2D, at: Vector2, kind: int, variant: int, rng: RandomNumberGenerator) -> void:
 	var sprite: Sprite2D = Sprite2D.new()
 	sprite.texture = sheet
@@ -244,7 +258,8 @@ func _add_water_sprite(sheet: Texture2D, glow_sheet: Texture2D, at: Vector2, kin
 	sprite.centered = false
 	sprite.offset = Vector2(-16, -28)
 	sprite.position = at
-	sprite.z_index = -6
+	# Floating pads/rosettes (20, 21) lie ON the surface (-5), strictly above submerged underwater weeds (-6).
+	sprite.z_index = -6 if kind == 22 else -5
 	sprite.flip_h = rng.randf() < 0.5
 	sprite.set_meta("variant", variant)
 	if kind == 22:

@@ -1,0 +1,68 @@
+{
+	"default_outfit": "default",
+	"default_hair": "default",
+	"outfits": {
+		"default": {
+			"name": "Reisegewand",
+			"folder": "default",
+			"tint": "#ffffff",
+			"arm_style": "default",
+			"arm_tint": "#ffffff"
+		},
+		"crimson": {
+			"name": "Blutsamt",
+			"folder": "default",
+			"tint": "#c43658",
+			"arm_style": "default",
+			"arm_tint": "#c43658"
+		},
+		"forest": {
+			"name": "Waldläufer",
+			"folder": "default",
+			"tint": "#3e7d5e",
+			"arm_style": "default",
+			"arm_tint": "#3e7d5e"
+		},
+		"midnight": {
+			"name": "Nachtseide",
+			"folder": "default",
+			"tint": "#4a3b8c",
+			"arm_style": "default",
+			"arm_tint": "#4a3b8c"
+		},
+		"none": {
+			"name": "Basis-Körper",
+			"folder": "",
+			"tint": "#ffffff",
+			"arm_style": "bare",
+			"arm_tint": "#ffffff"
+		}
+	},
+	"hairs": {
+		"default": {
+			"name": "Silberflieder",
+			"folder": "default",
+			"tint": "#ffffff"
+		},
+		"obsidian": {
+			"name": "Rabenfeder",
+			"folder": "default",
+			"tint": "#3a3054"
+		},
+		"blonde": {
+			"name": "Sonnenblond",
+			"folder": "default",
+			"tint": "#f0c878"
+		},
+		"rose": {
+			"name": "Rosenquarz",
+			"folder": "default",
+			"tint": "#e47b9a"
+		},
+		"none": {
+			"name": "Keine Haare",
+			"folder": "",
+			"tint": "#ffffff"
+		}
+	}
+}

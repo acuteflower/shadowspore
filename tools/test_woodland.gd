@@ -383,7 +383,7 @@ func _run() -> void:
 	for node: Node in population._residents.get_children():
 		var resident: WoodlandMammal = node as WoodlandMammal
 		resident.set_physics_process(false)
-		_check(resident.species in ["deer", "fox", "boar", "lynx", "squirrel", "badger", "hex_goat", "hex_toad"], "Unapproved woodland species spawned in live world: %s" % resident.species)
+		_check(resident.species in ["deer", "fox", "boar", "lynx", "squirrel", "badger", "hex_goat", "hex_toad", "oryx", "fennec", "jerboa", "agama"], "Unapproved woodland species spawned in live world: %s" % resident.species)
 		_check(world._fauna_habitat(resident.home, resident.species), "Woodland resident spawned outside its habitat")
 		if resident.is_fawn():
 			_check(resident._adult() != null, "World spawned an orphaned fawn or piglet")

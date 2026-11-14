@@ -1,0 +1,128 @@
+{
+  "settings": {
+    "zoom": 0.56,
+    "pan_px": 108.0,
+    "zoom_in_seconds": 1.85,
+    "zoom_out_seconds": 0.85,
+    "reveal_delay": 1.9,
+    "reveal_cells": 22.0,
+    "reveal_shift_tiles": 16.0,
+    "xp_reward": 12,
+    "regen_rate": 0.55,
+    "clear_radius": 3
+  },
+  "vistas": [
+    {
+      "id": "nebel_seeblick",
+      "name": "KANZEL AM SPIEGELSEE",
+      "sub": "AUSBLICK ÜBER DEN NEBELWALD",
+      "tile": [852, 492],
+      "sector": 2,
+      "variant": 0
+    },
+    {
+      "id": "nebel_suedhang",
+      "name": "MOOSBANK ÜBER DEM AUENTAL",
+      "sub": "AUSBLICK ÜBER DEN SÜDSTROM",
+      "tile": [644, 762],
+      "sector": 2,
+      "variant": 1
+    },
+    {
+      "id": "nebel_hochgrat",
+      "name": "GLIMMRAST-HOCHKANZEL",
+      "sub": "AUSBLICK ÜBER DAS HEIMATTAL",
+      "tile": [694, 618],
+      "sector": 2,
+      "variant": 2
+    },
+    {
+      "id": "glas_ostkante",
+      "name": "WÄCHTERSTUFE AM GROSSEN SEE",
+      "sub": "AUSBLICK ÜBER DIE GLASKLIPPEN",
+      "tile": [318, 416],
+      "sector": 1,
+      "variant": 2
+    },
+    {
+      "id": "glas_stromblick",
+      "name": "WINDSTEIN AM WESTBECKEN",
+      "sub": "AUSBLICK ZWISCHEN KLIPPE UND LICHTUNG",
+      "tile": [384, 684],
+      "sector": 1,
+      "variant": 0
+    },
+    {
+      "id": "glas_nordsporn",
+      "name": "STILLER GRAT ÜBER DEM NORDTAL",
+      "sub": "AUSBLICK ÜBER DIE HOHEN KLIPPEN",
+      "tile": [242, 258],
+      "sector": 2,
+      "variant": 0
+    },
+    {
+      "id": "ruinen_seewarte",
+      "name": "ALTE SEEWARTE",
+      "sub": "AUSBLICK AUF DAS MITTELMEER DER SEEN",
+      "tile": [494, 504],
+      "sector": 1,
+      "variant": 2
+    },
+    {
+      "id": "ruinen_mauerblick",
+      "name": "RASTSTEIN DER ALTEN MAUERN",
+      "sub": "AUSBLICK ÜBER DIE VERSUNKENEN RUINEN",
+      "tile": [650, 406],
+      "sector": 2,
+      "variant": 2
+    },
+    {
+      "id": "lichtung_hochstein",
+      "name": "SONNENKUPPE DER LICHTUNG",
+      "sub": "AUSBLICK ÜBER DIE OFFENEN WIESEN",
+      "tile": [486, 628],
+      "sector": 2,
+      "variant": 1
+    },
+    {
+      "id": "lichtung_suedwacht",
+      "name": "WEITBLICK AM SÜDSAUM",
+      "sub": "AUSBLICK ÜBER DIE SÜDWIESEN",
+      "tile": [278, 868],
+      "sector": 2,
+      "variant": 0
+    },
+    {
+      "id": "lichtung_altstamm",
+      "name": "RUHESTAMM AM WIESENHANG",
+      "sub": "AUSBLICK ÜBER DIE GROSSE SENKE",
+      "tile": [490, 764],
+      "sector": 2,
+      "variant": 1
+    },
+    {
+      "id": "blueten_suedgrat",
+      "name": "SCHWELLENFELS DES LEERENBLÜHENS",
+      "sub": "AUSBLICK ÜBER DEN NORDPASS",
+      "tile": [432, 352],
+      "sector": 2,
+      "variant": 0
+    },
+    {
+      "id": "blueten_hochplatte",
+      "name": "HOCHPLATTE DER STILLEN WEITE",
+      "sub": "AUSBLICK ÜBER DAS NÖRDLICHE HOCHLAND",
+      "tile": [358, 234],
+      "sector": 2,
+      "variant": 1
+    },
+    {
+      "id": "blueten_westkliff",
+      "name": "ABENDKANTE AM WELTRAND",
+      "sub": "AUSBLICK NACH WESTEN",
+      "tile": [274, 142],
+      "sector": 4,
+      "variant": 0
+    }
+  ]
+}

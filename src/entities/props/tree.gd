@@ -45,6 +45,9 @@ var _tree_clear: float = 0.0
 var _tree_half: float = 0.0
 var _tree_trunk_half: float = 0.0
 var _tree_sway: float = 0.0
+var _feet_row: float = FEET_ROW
+var _frame_w: float = 112.0
+var _ground_fruit: Sprite2D
 var _crown_shape_name: String = "cone"
 var _crown_dome_height: float = 0.0
 var _fades_crown: bool = true
@@ -67,6 +70,29 @@ static var _vine_glow_material: ShaderMaterial
 func _setup_prop() -> void:
 	add_to_group("bird_perches")
 	add_to_group("day_canopies")
+	_feet_row = float(_spec.get("feet_row", FEET_ROW))
+	var base_tex: Texture2D = load(String(_spec.texture)) as Texture2D
+	if base_tex != null:
+		_frame_w = float(base_tex.get_width()) / float(maxi(int(_spec.columns), 1))
+	var dyn_offset: Vector2 = Vector2(-_frame_w * 0.5, -_feet_row)
+	_sprite.offset = dyn_offset
+	_trunk_glow.offset = dyn_offset
+	_crown.offset = dyn_offset
+	_crown_glow.offset = dyn_offset
+	if _spec.has("ground_fruit"):
+		var gtex: Texture2D = load(String(_spec.ground_fruit)) as Texture2D
+		if gtex != null:
+			_ground_fruit = Sprite2D.new()
+			_ground_fruit.texture = gtex
+			_ground_fruit.hframes = int(_spec.get("ground_fruit_columns", 6))
+			_ground_fruit.vframes = 1
+			_ground_fruit.frame = int(_spec.get("ground_fruit_offset", 0)) + (variant % maxi(int(_spec.columns), 1))
+			_ground_fruit.centered = false
+			var fw_g: float = float(gtex.get_width()) / float(maxi(_ground_fruit.hframes, 1))
+			_ground_fruit.offset = Vector2(-fw_g * 0.5, -float(_spec.get("ground_fruit_feet", 18.0)))
+			_ground_fruit.material = _day_material()
+			add_child(_ground_fruit)
+			move_child(_ground_fruit, 0)
 	_crown.material = _day_material()
 	_tree_top = float((_spec.height as Array)[variant])
 	_tree_clear = float((_spec.clear as Array)[variant])
@@ -434,6 +460,8 @@ func _show() -> void:
 			_light.visible = false
 		if _petals != null:
 			_petals.emitting = false
+		if _ground_fruit != null:
+			_ground_fruit.visible = false
 	else:
 		_sprite.texture = load(String(_spec.texture)) as Texture2D
 		_sprite.vframes = int(_spec.rows)
@@ -442,6 +470,8 @@ func _show() -> void:
 		_crown.hframes = _sprite.hframes
 		_crown.vframes = _sprite.vframes
 		var picked: bool = _picked() and _spec.has("pickup")
+		if _ground_fruit != null:
+			_ground_fruit.visible = not picked
 		_crown.frame = variant + int(_spec.columns) * (PETAL_PICKED_ROW if picked else 1)
 		_crown.visible = true
 		_crown.modulate.a = FADE_ALPHA if _covering else 1.0
@@ -454,6 +484,9 @@ func _show() -> void:
 		_crown_glow.frame = variant + int(_spec.columns) * (PETAL_PICKED_ROW + 1 if picked else 2)
 		if _light != null:
 			_light.visible = true
+			if _spec.has("pickup"):
+				_light.base_energy = (float(_spec.get("light_energy", 0.28)) + 0.05 * variant) * (0.25 if picked else 1.0)
+				_light.set_night(TimeManager.night_amount())
 		if _petals != null:
 			_petals.emitting = not picked
 	_body_shape.set_deferred("disabled", felled)
@@ -490,15 +523,17 @@ func _fell() -> void:
 		_light.visible = false
 	if _petals != null:
 		_petals.emitting = false
+	if _ground_fruit != null:
+		_ground_fruit.visible = false
 	var sheet: Texture2D = load(String(_spec.texture)) as Texture2D
 	var frame_w: float = sheet.get_width() / float(_spec.columns)
 	var frame_h: float = sheet.get_height() / float(_spec.rows)
 	_fall = Node2D.new()
 	_fall.position = Vector2(0, -cut)
 	add_child(_fall)
-	var trunk_piece: Sprite2D = _piece(sheet, Rect2(variant * frame_w, 0.0, frame_w, FEET_ROW - cut + 1.0), frame_w, cut) ## trunk above the cut
+	var trunk_piece: Sprite2D = _piece(sheet, Rect2(variant * frame_w, 0.0, frame_w, _feet_row - cut + 1.0), frame_w, cut) ## trunk above the cut
 	_fall.add_child(trunk_piece)
-	trunk_piece.add_child(_glow_piece(sheet, Rect2(variant * frame_w, 3.0 * frame_h, frame_w, FEET_ROW - cut + 1.0), frame_w, cut))
+	trunk_piece.add_child(_glow_piece(sheet, Rect2(variant * frame_w, 3.0 * frame_h, frame_w, _feet_row - cut + 1.0), frame_w, cut))
 	_fall_crown = _piece(sheet, Rect2(variant * frame_w, frame_h, frame_w, frame_h), frame_w, cut)
 	_fall.add_child(_fall_crown)
 	_fall_crown.add_child(_glow_piece(sheet, Rect2(variant * frame_w, 2.0 * frame_h, frame_w, frame_h), frame_w, cut))
@@ -530,7 +565,7 @@ func _piece(sheet: Texture2D, region: Rect2, frame_w: float, cut: float) -> Spri
 	atlas.region = region
 	piece.texture = atlas
 	piece.centered = false
-	piece.offset = Vector2(-frame_w / 2.0, -FEET_ROW + cut)
+	piece.offset = Vector2(-frame_w / 2.0, -_feet_row + cut)
 	return piece
 
 

@@ -7,6 +7,7 @@ extends Node
 
 signal state_changed(id: String)
 signal lightning_struck(info: Dictionary) ## {x, y, far, seed, bolt, double, color: Color} a flash is starting now
+signal arcane_lightning_struck(world_pos: Vector2, info: Dictionary) ## dry prism-quartz lightning in Sonnenquarz-Öde
 signal thunder_rolled(far: float) ## the sound reaches the listener now
 
 static var current: WeatherManager
@@ -29,6 +30,8 @@ var flash: float = 0.0 ## the lightning's light right now, 0..1
 var flash_info: Dictionary = {}
 var flash_age: float = 99.0
 var local_rain: float = 0.0 ## rain on the camera's ground right now (a rain cell passes over)
+var desert_resonance: float = 0.0 ## 0..1 Singender Resonanzwind (translates rain regimes in quartz_desert)
+var desert_arcane_storm: float = 0.0 ## 0..1 Arkanes Quarzgewitter (translates storm regimes in quartz_desert, dry lightning)
 var focus: Vector2 = Vector2.ZERO
 
 var _target: WeatherRules.State = WeatherRules.State.new()
@@ -114,6 +117,8 @@ func follow(is_indoors: bool, delta: float) -> void:
 		_target = WeatherRules.named("clear") ## the night of the opening: a clear sky
 	else:
 		_target = WeatherRules.state_at(world_seed, _epoch)
+	var raw_rain: float = _target.rain
+	var raw_storm: float = _target.storm
 	_apply_region(_target)
 	# the eye follows with a short lag: a time jump (F4, sleep) melts instead of snapping
 	var k: float = 1.0 - exp(-delta / 1.4)
@@ -122,6 +127,19 @@ func follow(is_indoors: bool, delta: float) -> void:
 	wind = lerpf(wind, _target.wind, k)
 	storm = lerpf(storm, _target.storm, k)
 	fog = lerpf(fog, _target.fog, k)
+	var arid_here: float = BiomeBlend.arid_at(focus)
+	var arid_dry: float = 1.0 - smoothstep(0.18, 0.42, arid_here)
+	var desert_share: float = 0.0 if indoors else smoothstep(0.28, 0.65, arid_here)
+	var want_res: float = clampf(raw_rain * 1.35 + raw_storm * 0.35, 0.0, 1.0) * desert_share
+	var want_arc: float = clampf(raw_storm * 1.25, 0.0, 1.0) * desert_share
+	desert_resonance = lerpf(desert_resonance, want_res, k) * (0.0 if desert_share <= 0.001 else 1.0)
+	desert_arcane_storm = lerpf(desert_arcane_storm, want_arc, k) * (0.0 if desert_share <= 0.001 else 1.0)
+	rain *= arid_dry
+	storm *= arid_dry
+	fog *= arid_dry
+	if arid_dry <= 0.001 and desert_arcane_storm < 0.05:
+		_pending_flash.clear()
+		_pending_thunder.clear()
 	dir = lerp_angle(dir, _target.dir, k)
 	drift = WeatherRules.drift_at(world_seed, _epoch)
 	_update_wetness(delta, world_seed)
@@ -146,24 +164,32 @@ func _current_state() -> WeatherRules.State:
 	return s
 
 
-## The Hexenwald keeps its own sky: always a little overcast and misty (docs/wetter_konzept.md section 8).
+## The Hexenwald keeps its own sky (overcast and misty); the Sonnenquarz-Öde is bone-dry and rainless.
 func _apply_region(s: WeatherRules.State) -> void:
 	var hex: float = BiomeBlend.amount_at(focus)
-	if hex <= 0.001:
-		return
-	var r: Dictionary = (_cfg.get("regions", {}) as Dictionary).get("hexenwald", {}) as Dictionary
-	s.cloud = lerpf(s.cloud, maxf(s.cloud, float(r.get("cloud_min", 0.58))), hex)
-	s.fog = lerpf(s.fog, maxf(s.fog, float(r.get("fog_min", 0.22))), hex)
+	if hex > 0.001:
+		var r: Dictionary = (_cfg.get("regions", {}) as Dictionary).get("hexenwald", {}) as Dictionary
+		s.cloud = lerpf(s.cloud, maxf(s.cloud, float(r.get("cloud_min", 0.58))), hex)
+		s.fog = lerpf(s.fog, maxf(s.fog, float(r.get("fog_min", 0.22))), hex)
+	var arid: float = BiomeBlend.arid_at(focus)
+	if arid > 0.05:
+		var dry: float = smoothstep(0.12, 0.42, arid)
+		var d: Dictionary = (_cfg.get("regions", {}) as Dictionary).get("quartz_desert", {}) as Dictionary
+		s.rain = lerpf(s.rain, minf(s.rain, float(d.get("rain_max", 0.0))), dry)
+		s.storm = lerpf(s.storm, minf(s.storm, float(d.get("storm_max", 0.0))), dry)
+		s.fog = lerpf(s.fog, minf(s.fog, float(d.get("fog_max", 0.0))), dry)
+		s.cloud = lerpf(s.cloud, minf(s.cloud, float(d.get("cloud_max", 0.28))), smoothstep(0.22, 0.65, arid))
 
 
 func _update_wetness(delta: float, world_seed: int) -> void:
+	var arid_dry: float = 1.0 - smoothstep(0.18, 0.42, BiomeBlend.arid_at(focus))
 	var from_rules: float = WeatherRules.ground_wet(world_seed, _epoch) if override_id == "" and WeatherRules.enabled() and _opened else 0.0
 	# a held state (dev/story) soaks and dries the ground by itself
 	_extra_wet = move_toward(_extra_wet, clampf(rain * 1.2 + fog * 0.3, 0.0, 1.0) if override_id != "" else 0.0, (0.05 if override_id != "" else 0.01) * delta)
-	var target: float = maxf(from_rules, _extra_wet)
-	ground_wet = lerpf(ground_wet, target, 1.0 - exp(-delta / 3.0))
+	var target: float = maxf(from_rules, _extra_wet) * arid_dry
+	ground_wet = lerpf(ground_wet, target, 1.0 - exp(-delta / 3.0)) * (0.0 if arid_dry <= 0.001 else 1.0)
 	puddle = smoothstep(0.35, 0.95, ground_wet) * (0.4 + 0.6 * clampf(rain * 1.6, 0.0, 1.0)) + smoothstep(0.55, 1.0, ground_wet) * 0.3
-	puddle = clampf(puddle, 0.0, 1.0)
+	puddle = clampf(puddle * arid_dry, 0.0, 1.0)
 
 
 func _update_field() -> void:
@@ -207,7 +233,7 @@ func _push_globals() -> void:
 func _push_wind() -> void:
 	var w: WorldWind = WorldWind.current
 	if w != null:
-		w.set_weather(wind, dir, storm, rain)
+		w.set_weather(maxf(wind, desert_resonance * 0.58), dir, maxf(storm, desert_arcane_storm * 0.78), rain)
 
 
 # ---------------------------------------------------------------- lightning and thunder
@@ -217,12 +243,13 @@ func _run_lightning(delta: float, world_seed: int) -> void:
 	var slice_len: float = float(l.get("slice", 1.0))
 	var now: float = _epoch * WeatherRules.DAY_SEC
 	var slice: int = floori(now / slice_len)
+	var storm_drive: float = maxf(storm, desert_arcane_storm)
 	if _slice_seen < 0 or slice < _slice_seen or slice - _slice_seen > 3:
 		_slice_seen = slice ## a jump in time: no thunder from the past
 	else:
 		while _slice_seen < slice:
 			_slice_seen += 1
-			var event: Dictionary = WeatherRules.lightning(world_seed, _slice_seen, storm)
+			var event: Dictionary = WeatherRules.lightning(world_seed, _slice_seen, storm_drive)
 			if not event.is_empty():
 				event["time"] = float(_slice_seen) * slice_len + float(event.at)
 				_pending_flash.append(event)
@@ -264,18 +291,39 @@ func _strike(event: Dictionary, now: float) -> void:
 	var l: Dictionary = _cfg.get("lightning", {}) as Dictionary
 	var far: float = float(event.far)
 	var tint: Color = Color(0.80, 0.84, 1.0)
+	var arid: float = BiomeBlend.arid_at(focus)
 	var hex: float = BiomeBlend.amount_at(focus)
-	if hex > 0.05:
+	if arid > 0.35:
+		var arcane_cols: Array[Color] = [Color(0.86, 0.54, 1.0), Color(1.0, 0.78, 0.42), Color(0.46, 0.96, 0.90)]
+		var pick_col: Color = arcane_cols[posmod(int(event.seed), arcane_cols.size())]
+		tint = tint.lerp(pick_col, smoothstep(0.32, 0.68, arid))
+	elif hex > 0.05:
 		var rr: Array = ((_cfg.get("regions", {}) as Dictionary).get("hexenwald", {}) as Dictionary).get("flash", [0.62, 1.0, 0.36]) as Array
 		tint = tint.lerp(Color(float(rr[0]), float(rr[1]), float(rr[2])), clampf(hex * 1.4, 0.0, 1.0))
 	var level: Node = get_parent().get_parent() if get_parent() != null else null
-	if level != null and level.has_method("coast_tiles"):
+	if level != null and level.has_method("coast_tiles") and arid < 0.35:
 		var coast: float = float(level.call("coast_tiles", focus))
 		if coast < 18.0: ## at the edge of the void the light turns magenta
 			tint = tint.lerp(Color(0.95, 0.42, 1.0), 1.0 - clampf((coast + 2.0) / 20.0, 0.0, 1.0))
-	flash_info = {"x": event.x, "y": event.y, "far": far, "seed": event.seed, "bolt": event.bolt, "double": event.double, "color": tint, "peak": lerpf(1.0, 0.42, far)}
+	var strike_x: float = float(event.x)
+	var strike_y: float = float(event.y)
+	var strike_world: Vector2 = focus + Vector2((strike_x - 0.5) * 420.0, (strike_y - 0.55) * 240.0)
+	if arid > 0.35 and is_inside_tree():
+		var best_d2: float = 220.0 * 220.0
+		for node: Node in get_tree().get_nodes_in_group("resonance_obelisks"):
+			var ob: Node2D = node as Node2D
+			if ob != null and ob.global_position.distance_squared_to(strike_world) < best_d2:
+				best_d2 = ob.global_position.distance_squared_to(strike_world)
+				strike_world = ob.global_position
+				strike_x = clampf(0.5 + (strike_world.x - focus.x) / 640.0, 0.08, 0.92)
+				strike_y = clampf(0.5 + (strike_world.y - focus.y) / 360.0, 0.12, 0.88)
+	flash_info = {"x": strike_x, "y": strike_y, "far": far, "seed": event.seed, "bolt": event.bolt, "double": event.double, "color": tint, "peak": lerpf(1.0, 0.42, far), "arcane": arid > 0.35}
 	flash_age = 0.0
 	lightning_struck.emit(flash_info)
+	if arid > 0.35:
+		arcane_lightning_struck.emit(strike_world, flash_info)
+		if is_inside_tree():
+			get_tree().call_group("desert_arcane_listeners", "on_arcane_lightning", strike_world, flash_info)
 	var d: Array = l.get("delay", [0.25, 3.2]) as Array
 	_pending_thunder.append({"time": now + lerpf(float(d[0]), float(d[1]), far), "far": far})
 
@@ -317,6 +365,15 @@ func canopy_at(pos: Vector2) -> float:
 
 
 func display_name() -> String:
+	if BiomeBlend.arid_at(focus) > 0.45:
+		if desert_arcane_storm > 0.25:
+			return "QUARZGEWITTER"
+		if desert_resonance > 0.25:
+			return "RESONANZWIND"
+		if wind > 0.55:
+			return "DÜNENWIND"
+		if TimeManager.sun_amount() > 0.68:
+			return "GLUTSONNE"
 	return WeatherRules.display_name(state_id)
 
 
@@ -357,3 +414,11 @@ static func sky_wet() -> bool:
 
 static func alarm_scale() -> float:
 	return current.alarm_factor() if current != null else 1.0
+
+
+static func resonance_now() -> float:
+	return current.desert_resonance if current != null else 0.0
+
+
+static func arcane_storm_now() -> float:
+	return current.desert_arcane_storm if current != null else 0.0

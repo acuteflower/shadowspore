@@ -36,6 +36,8 @@ func _init() -> void:
 	_bytes = image.get_data()
 	_side = image.get_width()
 	_apply_world_biome()
+	if town_styles:
+		town_cells = _apply_town_styles()
 	var field: Image = FIELD.get_image()
 	field.convert(Image.FORMAT_RGB8)
 	_field = field.get_data()
@@ -43,6 +45,51 @@ func _init() -> void:
 	block.convert(Image.FORMAT_L8)
 	_block = block.get_data()
 	_block_side = block.get_width()
+
+
+## Hallgrat's stone (docs/stadt_westen_konzept.md 14.2): data/hallgrat.json `style_areas` restyle the tiles of whole districts at load time,
+## after the shared meadow look: masonry walls (2) in the town, crystal veins (3) in the Glasbruch, the void (4) eating the lost quarter, and
+## the rock steps in masonry areas become cut stairs (`stairs`: kind STEPS -> STAIRS). Only the style nibble and that connector kind change;
+## heights, connector geometry, the field and the collision stay as baked (both kinds are connectors to every query). Returns the cells it changed.
+## `town_styles` false (tests) leaves the bake's look alone.
+static var town_styles: bool = true
+var town_cells: int = 0
+
+
+func _apply_town_styles() -> int:
+	var data: Dictionary = DataRegistry.table("hallgrat")
+	var areas: Array = data.get("style_areas", []) as Array
+	var box: Array = data.get("style_rect", []) as Array
+	if areas.is_empty() or box.size() != 4:
+		return 0
+	var polys: Dictionary = {}
+	for d: Dictionary in data.get("districts", []) as Array:
+		var poly: PackedVector2Array = PackedVector2Array()
+		for at: Array in d.poly as Array:
+			poly.append(Vector2(float(at[0]), float(at[1])))
+		polys[String(d.id)] = poly
+	var changed: int = 0
+	for y: int in range(maxi(0, int(box[1])), mini(_side, int(box[3]))):
+		for x: int in range(maxi(0, int(box[0])), mini(_side, int(box[2]))):
+			var idx: int = (y * _side + x) * 4
+			if _bytes[idx + 3] == 0:
+				continue
+			var centre: Vector2 = Vector2(x + 0.5, y + 0.5)
+			var pick: Dictionary = {}
+			for area: Dictionary in areas: ## later areas win where districts overlap
+				for id: Variant in area.districts as Array:
+					if polys.has(String(id)) and Geometry2D.is_point_in_polygon(centre, polys[String(id)] as PackedVector2Array):
+						pick = area
+			if pick.is_empty():
+				continue
+			var k: int = _bytes[idx + 1] & 15
+			if bool(pick.get("stairs", false)) and k == STEPS:
+				k = STAIRS
+			var value: int = k | (int(pick.style) << 4)
+			if value != _bytes[idx + 1]:
+				_bytes[idx + 1] = value
+				changed += 1
+	return changed
 
 
 ## Restyle materials without moving heights, walls, connectors or collision cells.

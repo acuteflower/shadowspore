@@ -11,6 +11,7 @@ var home: Vector2
 var tree_path: String = ""
 var tree_offset: Vector2 = Vector2.ZERO
 var flowers: Array[Vector2] = []
+var ambient_event: bool = false
 var state: State = State.REST
 var _spec: Dictionary
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -102,6 +103,9 @@ func _physics_process(delta: float) -> void:
 		if species == "moth" and not TimeManager.is_night() and not _dusk:
 			queue_free()
 			return
+		if species == "scarab" and TimeManager.is_night():
+			queue_free()
+			return
 		if not tree_path.is_empty():
 			var tree: FirTree = _tree()
 			if (tree == null or int(tree.state.get("f", 0)) != 0 or tree.is_queued_for_deletion()) and species == "bat":
@@ -118,10 +122,13 @@ func _physics_process(delta: float) -> void:
 		if _sense <= 0.0:
 			_sense = 0.35
 			for player: Player in Player.all:
-				if player.health.current > 0 and global_position.distance_to(player.global_position) < float(_spec["scatter_range"]):
-					if species == "snail" and state != State.WITHDRAW:
+				var scare_r: float = float(_spec["scatter_range"])
+				if species == "scarab" and not player.sprinting:
+					scare_r *= 0.55
+				if player.health.current > 0 and global_position.distance_to(player.global_position) < scare_r:
+					if species in ["snail", "scarab"] and state != State.WITHDRAW:
 						_choose(State.WITHDRAW, _range("withdraw_seconds"))
-					elif species == "snail" and state == State.WITHDRAW:
+					elif species in ["snail", "scarab"] and state == State.WITHDRAW:
 						_elapsed = minf(_elapsed, _duration - 0.4)
 					elif species in ["bee", "ladybug", "moth"] and state == State.FEED and ((TimeManager.is_night() or _dusk) if species == "moth" else TimeManager.night_amount() < 0.5):
 						_fly(player.global_position)
@@ -131,6 +138,12 @@ func _physics_process(delta: float) -> void:
 					elif species == "bat" and state == State.REST:
 						_bat_fly()
 					break
+			if species == "scarab" and state != State.WITHDRAW and not ambient_event:
+				for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
+					var m: WoodlandMammal = node as WoodlandMammal
+					if m != null and m.mood != WoodlandMammal.Mood.HIDDEN and m.global_position.distance_to(global_position) < 20.0:
+						_choose(State.WITHDRAW, _range("withdraw_seconds"))
+						break
 	var t: float = clampf(_elapsed / _duration, 0.0, 1.0)
 	if state in [State.MOVE, State.FLY]:
 		var point: Vector2 = _from.lerp(_to, smoothstep(0.0, 1.0, t) if _flying() else t)
@@ -141,7 +154,16 @@ func _physics_process(delta: float) -> void:
 		else:
 			tree_offset = point
 		_heading = (_to - _from).angle()
-	if multiplayer.is_server() and t >= 1.0:
+	if multiplayer.is_server() and t >= 1.0 and not ambient_event:
+		if species == "scarab":
+			if state == State.MOVE and _has_ball() and _rng.randf() < 0.18:
+				# Ball briefly slips 3..4 px down-slope on a dune ripple; beetle pauses then scrambles after it!
+				_choose(State.FEED, _rng.randf_range(0.7, 1.3))
+			elif state == State.MOVE and _rng.randf() < 0.34:
+				_choose(State.REST, _range("rest_seconds"))
+			else:
+				_crawl_scarab()
+			return
 		if species == "toad":
 			if state == State.MOVE and _bout > 0:
 				_hop()
@@ -340,6 +362,9 @@ func _request() -> void:
 
 
 func _draw_animal() -> void:
+	if species == "scarab":
+		_draw_scarab()
+		return
 	if species == "toad":
 		_draw_toad()
 		return
@@ -450,3 +475,92 @@ func _draw_bat() -> void:
 	_visual.draw_rect(Rect2(-1, -1, 3, 3), body)
 	_visual.draw_rect(Rect2(-1, -2, 1, 1), body)
 	_visual.draw_rect(Rect2(1, -2, 1, 1), body)
+
+
+func _has_ball() -> bool:
+	return posmod(hash(name), 5) < 3
+
+
+func _crawl_scarab() -> void:
+	var at: Vector2 = global_position
+	var dir: Vector2 = Vector2.from_angle(_heading + _rng.randf_range(-0.85, 0.85)) if _from != _to else Vector2.from_angle(_rng.randf() * TAU)
+	if at.distance_to(home) > float(_spec["home_radius"]) * 0.72:
+		dir = (home - at).normalized()
+	for angle: float in [0.0, 0.55, -0.55, 1.15, -1.15, PI]:
+		var dist: float = _rng.randf_range(8.0, 18.0)
+		var end: Vector2 = (at + dir.rotated(angle) * dist).round()
+		if end.distance_to(home) <= float(_spec["home_radius"]) and _population.can_crawl(at, end, "scarab"):
+			_act.rpc(State.MOVE, at, end, maxf(1.2, at.distance_to(end) / float(_spec["crawl_speed"])), "", Vector2.ZERO, 0.0)
+			return
+	_choose(State.REST, _range("rest_seconds"))
+
+
+func _draw_scarab() -> void:
+	var sector: int = posmod(roundi(_heading / (PI / 4.0)), 8)
+	var dirs: Array[Vector2] = [
+		Vector2(1, 0), Vector2(1, 1).normalized(), Vector2(0, 1), Vector2(-1, 1).normalized(),
+		Vector2(-1, 0), Vector2(-1, -1).normalized(), Vector2(0, -1), Vector2(1, -1).normalized(),
+	]
+	var fwd: Vector2 = dirs[sector]
+	var side: Vector2 = fwd.orthogonal()
+	# Natural daylight metallic chitin palettes (Sonnenbronze, Oasensmaragd, Saphir-Schwarz — zero unlit glow)
+	var coats: Array[Array] = [
+		[Color("22140e"), Color("6e421c"), Color("b8792c"), Color("f0c45c")],
+		[Color("10221f"), Color("1d594b"), Color("389c7e"), Color("98e6b8")],
+		[Color("101322"), Color("263250"), Color("4d648f"), Color("bdd0e6")],
+	]
+	var pal: Array = coats[posmod(appearance, 3)]
+	var ink: Color = pal[0]
+	var dark: Color = pal[1]
+	var mid: Color = pal[2]
+	var spec_hi: Color = pal[3]
+	if state == State.WITHDRAW:
+		# Burrowing backward into loose sand with a tiny sand puff, leaving a small sand dimple
+		_visual.draw_rect(Rect2(-2, -1, 4, 2), Color("b88346", 0.72))
+		_visual.draw_rect(Rect2(-1, -2, 3, 1), Color("dfad68", 0.85))
+		if _elapsed < 0.50:
+			var bt: float = _elapsed / 0.50
+			_visual.draw_rect(Rect2(-1, -1, 3, 2), dark)
+			_visual.draw_rect(Rect2(0, -1, 1, 1), mid)
+			for k: int in 2:
+				var sx: float = (k * 2 - 1) * (1.2 + bt * 3.2)
+				var sy: float = -1.5 - sin(bt * PI) * 3.0
+				_visual.draw_rect(Rect2(Vector2(sx, sy).round(), Vector2.ONE), Color("e5b873"))
+		return
+	var has_ball: bool = _has_ball()
+	# Faint twin sand trail behind a ball-rolling scarab
+	if has_ball and state in [State.MOVE, State.FEED]:
+		for step_i: int in range(1, 5):
+			var back: Vector2 = -fwd * float(step_i * 2 + 2)
+			_visual.draw_rect(Rect2((back + side * 1.4).round(), Vector2.ONE), Color("9e6b38", 0.34 - step_i * 0.06))
+			_visual.draw_rect(Rect2((back - side * 1.4).round(), Vector2.ONE), Color("9e6b38", 0.34 - step_i * 0.06))
+	# Rolled 4x4 sand/humus sphere pushed along the direction of travel
+	if has_ball:
+		var slip: float = (2.6 * sin(clampf(_elapsed / maxf(_duration, 0.2), 0.0, 1.0) * PI)) if state == State.FEED else 0.0
+		var ball_c: Vector2 = (fwd * (4.2 + slip)).round()
+		_visual.draw_rect(Rect2(ball_c + Vector2(-1, 1), Vector2(4, 1)), Color(0.04, 0.025, 0.06, 0.25))
+		_visual.draw_rect(Rect2(ball_c + Vector2(-2, -2), Vector2(4, 4)), Color("4a3320"))
+		_visual.draw_rect(Rect2(ball_c + Vector2(-1, -2), Vector2(2, 4)), Color("735132"))
+		_visual.draw_rect(Rect2(ball_c + Vector2(-2, -1), Vector2(4, 2)), Color("735132"))
+		_visual.draw_rect(Rect2(ball_c + Vector2(-1, -2), Vector2(2, 2)), Color("a87d4e"))
+		var roll_dot: Vector2 = Vector2(roundf(cos(_clock * (7.0 if state == State.MOVE else 0.0))), roundf(sin(_clock * (7.0 if state == State.MOVE else 0.0)))) * 0.6
+		_visual.draw_rect(Rect2((ball_c + roll_dot - Vector2.ONE).round(), Vector2.ONE), Color("caa16c"))
+	# Ground contact shadow
+	_visual.draw_rect(Rect2(-2, 1, 5, 1), Color(0.03, 0.02, 0.05, 0.26))
+	# Animated 6 chitin legs in 8 discrete directions
+	var leg_phase: int = int(_clock * 14.0) % 2 if state in [State.MOVE, State.FEED] else 0
+	for s_i: int in [-1, 1]:
+		var leg_a: Vector2 = (side * float(s_i) * 2.4 + fwd * (0.8 if (leg_phase == 0) == (s_i > 0) else -0.6)).round()
+		var leg_b: Vector2 = (side * float(s_i) * 2.4 - fwd * (1.2 if (leg_phase == 0) == (s_i > 0) else 0.2)).round()
+		_visual.draw_rect(Rect2(leg_a, Vector2.ONE), ink)
+		_visual.draw_rect(Rect2(leg_b, Vector2.ONE), ink)
+	# Oval scarab carapace (head oriented opposite to ball when pushing backward with hind legs!)
+	var head_dir: Vector2 = -fwd if has_ball else fwd
+	_visual.draw_rect(Rect2(-2, -2, 5, 4), ink)
+	_visual.draw_rect(Rect2(-1, -2, 3, 3), dark)
+	_visual.draw_rect(Rect2(-1, -1, 3, 2), mid)
+	# Pronotum & clypeus crown-notches on head end
+	var head_px: Vector2 = (head_dir * 2.0).round()
+	_visual.draw_rect(Rect2(head_px + Vector2(0, -1), Vector2.ONE), dark)
+	# Crisp natural sun-glint pixel on upper-left elytra
+	_visual.draw_rect(Rect2(-1, -2, 1, 1), spec_hi)

@@ -424,10 +424,19 @@ void fragment() {
 		if (day > 0.0) {
 			float fleck = fbm(px / 38.0 + vec2(effect_time * 0.020, effect_time * 0.012) + vec2(21.0, 8.0));
 			float cloud = day_cloud(px);
+			float cover = day_cover(px);
 			spot = smoothstep(0.63 - SOFT, 0.63 + SOFT, fleck) * day * day_local(px) * (1.0 - 0.8 * gloom);
 			shift += spot;
 			shift -= (1.0 - cloud) * day * 0.65 * (1.0 - 0.45 * arid);
-			shift += day_dapple(px) * day_cover(px) * day * 0.7 * (1.0 - 0.8 * gloom);
+			shift += day_dapple(px) * cover * day * 0.7 * (1.0 - 0.8 * gloom);
+			// Open sunlit meadow wind-waves: gentle silvery-green gusts rolling across tree-free grass hills
+			float open_meadow = (1.0 - smoothstep(0.05, 0.35, cover)) * (1.0 - smoothstep(0.02, 0.14, gloom)) * (1.0 - smoothstep(0.02, 0.18, arid));
+			if (open_meadow > 0.02) {
+				vec2 wdir = length(g_wind_dir) > 0.01 ? normalize(g_wind_dir) : vec2(0.96, 0.28);
+				float w_along = dot(px, wdir) * 0.032 - g_wind_clock * 1.45 + (vnoise(px / 44.0 + vec2(17.0, 53.0)) - 0.5) * 2.2;
+				float w_ripple = pow(max(0.0, sin(w_along)), 3.0);
+				shift += open_meadow * w_ripple * min(g_wind_gust, 1.35) * day * 0.28;
+			}
 		}
 		float eff_shift = clamp(shift * 0.56, -1.65, 1.42);
 		float swell = (fbm(px / 24.0 + vec2(5.0, 13.0)) - 0.5) * 0.42;

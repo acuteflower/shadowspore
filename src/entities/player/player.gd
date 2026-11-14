@@ -59,7 +59,9 @@ const SWIM_SOUNDS: Dictionary = { ## tools/audio_swim.py
 const STANDBY_SHEET: Texture2D = preload("res://assets/characters/player_standby.png")
 const STANDBY_BLOOD: Texture2D = preload("res://assets/characters/player_standby_blood.png")
 const STANDBY_FRAMES: int = 24
-const STANDBY_CLIPS: int = 3
+const STANDBY_CLIPS: int = 4
+const NORMAL_STANDBY_CLIPS: int = 3
+const HEAT_STANDBY_CLIP: int = 3
 const STANDBY_FPS: float = 12.0
 const STANDBY_COLS: int = STANDBY_FRAMES * STANDBY_CLIPS
 const BLOOD_MAPS: Array[Texture2D] = [ ## the baked blood thresholds of each sheet (main, sword, pick, eat), see hit_flash.gdshader
@@ -291,6 +293,7 @@ var bandaged: bool = false ## the rescuer dressed the wound: no blood, no red bo
 @onready var inventory: InventoryComponent = $InventoryComponent
 @onready var attack: AttackComponent = $AttackComponent
 @onready var talismans: TalismanComponent = $TalismanComponent
+@onready var appearance: AppearanceComponent = $AppearanceComponent
 @onready var climb: WallClimb = $WallClimb
 @onready var _camera: Camera2D = $Camera2D
 @onready var _sprite: Sprite2D = $Sprite2D
@@ -441,6 +444,42 @@ var _face_dir: Vector2 = Vector2.DOWN ## the walking direction her facing follow
 var _face_hold: float = 0.0
 var _last_surface_tile: Vector2i = Vector2i(1 << 30, 1 << 30)
 var _last_surface_result: Dictionary = {}
+var heat_amount: float = 0.0 ## 0..1 continuous Sonnenquarz-Öde midday heat pressure (local & deterministic on every peer)
+
+
+## True while desert midday heat is pressing on her (`ERHITZT` or >= threshold).
+func is_heated() -> bool:
+	return heat_amount >= DesertHeat.HEAT_THRESHOLD or (effects != null and effects.has("sun_heat"))
+
+
+## Host & local cooling relief (eating cooling desert fruits or oasis plunge): clears `sun_heat` and grants `refreshed`.
+func cool_down(seconds: float = DesertHeat.OASIS_REFRESH_SECONDS) -> void:
+	heat_amount = 0.0
+	if multiplayer.is_server():
+		if effects != null:
+			effects.clear("sun_heat")
+			effects.apply("refreshed", seconds)
+		if multiplayer.has_multiplayer_peer() and not multiplayer.get_peers().is_empty():
+			_rpc_reset_heat.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_reset_heat() -> void:
+	heat_amount = 0.0
+
+
+func _update_desert_heat(delta: float) -> void:
+	if health.current <= 0.0 or intro != null:
+		heat_amount = 0.0
+		return
+	if DesertHeat.is_in_cooling_water(self):
+		heat_amount = 0.0
+		return
+	if effects != null and effects.has("refreshed"):
+		heat_amount = move_toward(heat_amount, 0.0, DesertHeat.COOL_REFRESHED_RATE * delta)
+		return
+	var drive: float = DesertHeat.heat_drive(get_tree(), global_position)
+	heat_amount = clampf(heat_amount + drive * delta, 0.0, 1.0)
 
 func _physics_process(delta: float) -> void:
 	var tile_pos: Vector2i = Vector2i((global_position / 16.0).floor())
@@ -499,6 +538,7 @@ func _physics_process(delta: float) -> void:
 		_cancel_standby()
 	_update_run_dust()
 	_update_water(delta)
+	_update_desert_heat(delta)
 
 
 ## Dust shoots out behind the player at the moment of the dash. Runs on every peer.
@@ -555,9 +595,9 @@ func _try_shadow_step(input_dir: Vector2) -> bool:
 	return true
 
 
-## Stamina one shadow step costs: 14 + 1 per level (level 1 = 15).
+## Stamina one shadow step costs: 14 + 1 per level (level 1 = 15), increased up to +15 % under desert midday heat.
 func step_cost() -> float:
-	return step_stamina + float(progress.level)
+	return (step_stamina + float(progress.level)) * (1.0 + DesertHeat.STAMINA_COST_PENALTY * heat_amount)
 
 
 ## The shadow step on every peer: she dips, pushes off, dissolves into the void from her leading edge, is put down at `to` and condenses
@@ -892,7 +932,7 @@ func _update_swim_slot() -> void:
 
 ## Called at every footfall (also for remote players, driven by the walk animation).
 func _on_step() -> void:
-	_footsteps.step(_surface, velocity, stealth.sneaking, _wet)
+	_footsteps.step(_surface, velocity, stealth.sneaking, _wet, 0 if carry_stone != 0 else _gait)
 	if (wounded or _wound > 0.55) and not bandaged:
 		BloodSplat.drop(get_tree().current_scene, global_position + Vector2(randf_range(-3.0, 3.0), randf_range(-1.0, 2.0)), 1 + int(randf() < 0.4))
 	if bool(_surface.get("ripples", false)):
@@ -1103,8 +1143,12 @@ func _animate_carry(delta: float) -> void:
 				_sprite.offset = Vector2(0.0, -23.0)
 				return
 	elif velocity.length() > 5.0:
+		var prev_carry_step: int = int(_carry_walk)
 		_carry_walk = fposmod(_carry_walk + CARRY_WALK_FPS * clampf(velocity.length() / (max_speed * CARRY_SPEED), 0.4, 1.4) * delta, 8.0)
-		col = 8 + int(_carry_walk)
+		var carry_step: int = int(_carry_walk)
+		col = 8 + carry_step
+		if carry_step != prev_carry_step and carry_step % 4 == 0:
+			_on_step()
 	else:
 		_carry_walk = 0.0
 	_sprite.frame_coords = Vector2i(col, sector)
@@ -1463,13 +1507,19 @@ func _update_standby(delta: float, moving: bool) -> void:
 	if not is_multiplayer_authority() or _rig_standby_hand.size() != 8 * STANDBY_COLS or _rig_standby_shoulder.size() != 8 * STANDBY_COLS:
 		return
 	if _standby_wait < 0.0:
-		_standby_wait = _standby_rng.randf_range(8.0, 16.0)
+		_standby_wait = _standby_rng.randf_range(4.5, 8.5) if is_heated() else _standby_rng.randf_range(8.0, 16.0)
 	_standby_wait = maxf(_standby_wait - delta, 0.0)
 	if _standby_wait > 0.0 or int(_idle_time) != 0:
 		return
-	var clip: int = _standby_rng.randi_range(0, STANDBY_CLIPS - 1) if _standby_last < 0 else _standby_rng.randi_range(0, STANDBY_CLIPS - 2)
-	if _standby_last >= 0 and clip >= _standby_last:
-		clip += 1 ## each next gesture differs from the previous one
+	var clip: int = 0
+	if is_heated() and HEAT_STANDBY_CLIP < STANDBY_CLIPS and _standby_last != HEAT_STANDBY_CLIP:
+		clip = HEAT_STANDBY_CLIP ## heated in the sun: she wipes the sweat from her brow
+	else:
+		var pool_n: int = NORMAL_STANDBY_CLIPS
+		var prev_normal: int = _standby_last if (_standby_last >= 0 and _standby_last < pool_n) else -1
+		clip = _standby_rng.randi_range(0, pool_n - 1) if prev_normal < 0 else _standby_rng.randi_range(0, pool_n - 2)
+		if prev_normal >= 0 and clip >= prev_normal:
+			clip += 1 ## each next gesture differs from the previous one
 	if multiplayer.has_multiplayer_peer() and not multiplayer.get_peers().is_empty():
 		_start_standby.rpc(clip)
 	else:
@@ -1923,9 +1973,16 @@ func _animate(delta: float) -> void:
 			"foot_y": roundi(float(ch) * 0.5 - _sprite.offset.y),
 			"skew": _sprite.skew,
 			"dy": vert_dy,
+			"arm_style": appearance.arm_style() if appearance != null else "default",
+			"arm_tint": appearance.arm_tint() if appearance != null else Color.WHITE,
+			"arm_token": appearance.arm_pose_token() if appearance != null else 0.0,
 		}
 	else:
-		attack.depth_ctx = {}
+		attack.depth_ctx = {
+			"arm_style": appearance.arm_style() if appearance != null else "default",
+			"arm_tint": appearance.arm_tint() if appearance != null else Color.WHITE,
+			"arm_token": appearance.arm_pose_token() if appearance != null else 0.0,
+		}
 	attack.carrying = moving and _gait == 2 and not attack.is_swinging() ## the blade trails back only in the real sprint
 	attack.body_dir = Vector2.from_angle(float(_sector) * PI / 4.0) ## the item rests relative to the facing the sheet shows, not the cursor
 	attack.free_hand = free_hand

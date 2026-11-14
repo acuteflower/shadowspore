@@ -1403,6 +1403,7 @@ func _arm_pose_key() -> PackedFloat32Array:
 		key.append(roundf(p.y * 4.0))
 		key.append(roundf(p.z * 4.0))
 	key.append(_arm_sort.position.y)
+	key.append(float(depth_ctx.get("arm_token", 0.0)))
 	if bool(depth_ctx.get("valid", false)):
 		key.append(float(int(depth_ctx.get("tex_id", 0))))
 		key.append(float(int(depth_ctx.get("cell_x", -1))))

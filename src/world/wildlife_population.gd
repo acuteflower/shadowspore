@@ -39,6 +39,8 @@ func chunk_loaded(cell: Vector2i) -> void:
 		return
 	$Corvids.chunk_loaded(cell)
 	$Woodland.chunk_loaded(cell)
+	if BiomeBlend.arid_at(Vector2(cell) * CHUNK_PIXELS + Vector2(256.0, 256.0)) >= 0.35:
+		$SmallResidents.chunk_loaded(cell)
 	_active[cell] = true
 	if not _populations.has(cell) and not _pending.has(cell):
 		_pending.append(cell)

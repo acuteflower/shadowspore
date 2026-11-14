@@ -149,12 +149,16 @@ func thick(p: Vector2) -> float:
 
 
 ## The rain falling on the ground at a world position, 0..1: only under cloud, heaviest in its cores (a rain cell passes over you).
+## Never rains in the arid Sonnenquarz-Öde (`BiomeBlend.arid_at`).
 func rain_at(p: Vector2) -> float:
 	if rain_regime <= 0.001:
 		return 0.0
+	var dry: float = 1.0 - smoothstep(0.18, 0.45, BiomeBlend.arid_at(p))
+	if dry <= 0.001:
+		return 0.0
 	var th: float = thick(p)
 	var core: float = smoothstep(0.1, 0.75, th)
-	return clampf(rain_regime * (0.45 + 0.75 * core) * smoothstep(0.02, 0.25, th), 0.0, 1.0)
+	return clampf(rain_regime * dry * (0.45 + 0.75 * core) * smoothstep(0.02, 0.25, th), 0.0, 1.0)
 
 
 ## The light that is left under the cloud above a world position (the shadow): 1 in the sun, `shadow` under the thickest cloud.

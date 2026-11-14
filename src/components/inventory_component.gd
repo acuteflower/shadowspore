@@ -397,6 +397,9 @@ func _use(index: int) -> bool:
 			player.health.heal(float(stats.heal))
 		if stats.has("regen"):
 			player.health.regen(float(stats.regen), float(stats.get("regen_seconds", 5)))
+		var cools: float = float(stats.get("cools", 0.0))
+		if cools > 0.0:
+			player.cool_down(cools)
 	elif kind == "potion":
 		_drink(player, AlchemyRules.of(stack))
 	else:
@@ -421,6 +424,8 @@ static func usable(player: Player, def: Dictionary) -> bool:
 		return false
 	if kind == "consumable":
 		var stats: Dictionary = def.get("stats", {})
+		if float(stats.get("cools", 0.0)) > 0.0 and player.is_heated():
+			return true
 		return not (float(stats.get("heal", 0)) + float(stats.get("regen", 0)) > 0.0 and not player.health.can_heal())
 	var info: Dictionary = def.get("potion", {}) as Dictionary
 	if String(info.get("type", "")) == "heal":

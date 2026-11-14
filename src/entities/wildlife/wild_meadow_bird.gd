@@ -10,6 +10,12 @@ extends WildCorvid
 var _chip_wait: float = 0.0
 var _drum_sound_wait: float = 0.0
 var _trunk_hops_done: int = 0
+var _soar_laps_left: int = 0
+var _soar_center: Vector2 = Vector2.ZERO
+var _soar_angle: float = 0.0
+var _soar_radius: float = 74.0
+var _soar_dir: float = 1.0
+var _raptor_shadow_tick: float = 0.0
 
 
 func _init() -> void:
@@ -63,6 +69,21 @@ func _process(delta: float) -> void:
 		col = int(_elapsed * 1.4) % 4
 	elif species == "hoopoe" and state == State.WATCH and _call_pose <= 0.0:
 		col = 22 + mini(3, int(_elapsed * 6.0))
+	elif species == "desert_falcon" and cols >= 62:
+		if state == State.FLY and _height_from > 36.0 and _height_to > 36.0:
+			# Wide lazy thermal soaring: outstretched scythe wings with only rare corrective wingbeats
+			if fmod(_elapsed, 4.4) < 3.85:
+				col = 50 + int(_elapsed * 2.2) % 4
+			else:
+				col = 30 + int(_elapsed * float(_spec["flap_fps"])) % 8
+		elif state == State.WATCH and _perch_path.is_empty() and _height > 36.0:
+			# Brief mid-air wind-hover ("Rüttelflug") scanning the dunes below
+			col = 30 + int(_elapsed * 15.0) % 8
+		if multiplayer.is_server() and _height > 26.0 and state in [State.FLY, State.WATCH]:
+			_raptor_shadow_tick -= delta
+			if _raptor_shadow_tick <= 0.0:
+				_raptor_shadow_tick = 0.38
+				_cast_falcon_shadow_alarm()
 	_sprite.frame = (_sprite.frame / cols) * cols + col
 
 
@@ -135,6 +156,8 @@ func _think() -> void:
 			_jay_life()
 		"robin":
 			_robin_life()
+		"desert_falcon":
+			_desert_falcon_life()
 		_:
 			_hoopoe_life()
 
@@ -397,3 +420,85 @@ func _spook_night_prey() -> void:
 		var prey: Node2D = node as Node2D
 		if prey != null and prey.global_position.distance_to(global_position) < 115.0 and prey.has_method("hear_alarm"):
 			prey.call("hear_alarm", global_position)
+
+
+func _cast_falcon_shadow_alarm() -> void:
+	for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
+		var m: WoodlandMammal = node as WoodlandMammal
+		if m != null and m.species in ["agama", "jerboa"] and m.global_position.distance_to(global_position) < 88.0:
+			m.hear_raptor_overhead(global_position)
+
+
+func _desert_falcon_life() -> void:
+	if _rest_time():
+		_soar_laps_left = 0
+		if not _perch_path.is_empty():
+			_set_mood(State.ROOST, _range("roost_seconds"))
+			return
+		if _take_wing(false, false, false, true):
+			return
+		if _height > 2.0:
+			var descend: Vector2 = home
+			_act.rpc(State.FLY, 2.2, (descend - global_position).angle(), global_position, descend, Vector2.ZERO, _height, 0.0, maxf(_height, 42.0), "", 0.0)
+			return
+		_set_mood(State.ROOST, _range("roost_seconds"))
+		return
+	if _elapsed < _duration and not (_perch_path.is_empty() and _height > 36.0 and state == State.WATCH and _soar_laps_left > 0 and _elapsed >= 1.2):
+		return
+	# Continue or finish high-altitude thermal circle flight
+	if _soar_laps_left > 0:
+		if _height > 45.0 and state != State.WATCH and _rng.randf() < 0.22:
+			# Brief stationary wind-hover ("Rüttelflug") scanning sand & quartz below
+			_set_mood(State.WATCH, _rng.randf_range(1.1, 1.7))
+			return
+		_soar_laps_left -= 1
+		var step_ang: float = (PI * 0.52) * _soar_dir
+		var next_ang: float = _soar_angle + step_ang
+		var goal: Vector2 = _soar_center + Vector2.from_angle(next_ang) * _soar_radius
+		var chord: Vector2 = goal - global_position
+		var sagitta: Vector2 = Vector2.from_angle(_soar_angle + step_ang * 0.5) * (_soar_radius * 0.28)
+		var soar_h: float = _height if _height > 54.0 else _range("soar_height")
+		var dur: float = maxf(2.0, (chord.length() + sagitta.length()) / (float(_spec["flight_speed"]) * 0.62))
+		_soar_angle = next_ang
+		_act.rpc(State.FLY, dur, chord.angle(), global_position, goal, sagitta, _height, soar_h, maxf(_height, soar_h) + 3.0, "", 0.0)
+		return
+	# Descending from thermal soar to a cactus/palm/monolith perch (or desert ridge)
+	if _perch_path.is_empty() and _height > 20.0:
+		if not _take_wing(false, false, false, true):
+			if not _take_wing(false, false, true, false):
+				_start_thermal_soar()
+		return
+	# Perched on crown_cactus, sun_palm, or sun_quartz_rock
+	if not _perch_path.is_empty():
+		var p_roll: float = _rng.randf()
+		if p_roll < 0.42:
+			_start_thermal_soar()
+			return
+		if p_roll < 0.72:
+			_set_mood(State.WATCH, _range("watch_seconds"))
+		elif p_roll < 0.88:
+			_set_mood(State.PECK, _range("peck_seconds"))
+		else:
+			_set_mood(State.PREEN, _range("preen_seconds"))
+		return
+	# On ground: launch into thermal updrafts or hop/scan
+	if _rng.randf() < 0.68:
+		_start_thermal_soar()
+	else:
+		_set_mood(State.WATCH, _range("watch_seconds") * 0.7)
+
+
+func _start_thermal_soar() -> void:
+	if _population != null and _population.has_method("release_perch"):
+		_population.call("release_perch", self)
+	_soar_center = home + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(0.0, 42.0)
+	_soar_radius = _range("soar_radius")
+	_soar_dir = 1.0 if _rng.randf() < 0.5 else -1.0
+	_soar_angle = (global_position - _soar_center).angle()
+	_soar_laps_left = _rng.randi_range(3, 6)
+	var first_ang: float = _soar_angle + (PI * 0.5) * _soar_dir
+	var goal: Vector2 = _soar_center + Vector2.from_angle(first_ang) * _soar_radius
+	var soar_h: float = _range("soar_height")
+	var dur: float = maxf(2.3, global_position.distance_to(goal) / (float(_spec["flight_speed"]) * 0.72))
+	_soar_angle = first_ang
+	_act.rpc(State.FLY, dur, (goal - global_position).angle(), global_position, goal, (goal - global_position).orthogonal().normalized() * (_soar_dir * 26.0), _height, soar_h, soar_h + 6.0, "", 0.0)

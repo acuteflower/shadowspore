@@ -681,34 +681,69 @@ func _draw_zone() -> void:
 		return
 	var spec: Dictionary = _spec_for(state)
 	var lane: bool = state in [State.RUSH_WINDUP, State.RUSH]
-	var locked: bool = winding and _state_time >= float(spec["windup"]) - float(spec["aim_lock"])
-	var strength: float = 0.75 + (0.2 * sin(_state_time * 38.0) if locked else 0.0)
+	var sweep: bool = state in [State.SWEEP_WINDUP, State.SWEEP]
+	var locked: bool = not winding or _state_time >= float(spec["windup"]) - float(spec["aim_lock"])
+	var hot: bool = not winding
+	var strength: float = 0.82 + (0.16 * sin(_state_time * 38.0) if (winding and locked) else 0.0)
 	if not winding:
 		strength = 1.0 - clampf(_state_time / float(spec["max_time"] if lane else spec["strike"]), 0.0, 1.0)
+	if strength <= 0.02:
+		return
 	var origin: Vector2 = attack_origin - global_position
 	var across: Vector2 = attack_dir.orthogonal()
-	var arc: float = deg_to_rad(float(spec["arc"])) if not lane else 0.0
-	var width: float = (float(spec["width"]) + ZONE_PAD * 2.0) if lane else 0.0
-	var length: float = (warning_length + float(spec["width"]) * 0.5 + 12.0 + ZONE_PAD) if lane else float(spec["reach"]) + ZONE_PAD
-	# Stable sparse pixels flow outward like cracking lava; the area drawn is the area that hurts.
-	for i: int in (420 if lane else 560):
-		var u: float = fposmod(sin(float(i) * 12.9898) * 43758.5453, 1.0)
-		var v: float = fposmod(sin(float(i) * 78.233 + 3.1) * 19642.349, 1.0)
-		var point: Vector2
-		var distance: float
-		if lane:
-			distance = u * length
-			point = attack_dir * distance + across * (v - 0.5) * width
-		else:
-			distance = sqrt(u) * length
-			point = attack_dir.rotated((v - 0.5) * arc) * distance
-		if distance < 5.0:
-			continue
-		var wave: float = 0.5 + 0.5 * sin(distance * 0.26 - _state_time * (18.0 if locked or not winding else 9.0) + v * TAU)
-		if wave < 0.48:
-			continue
-		var color: Color = Color("c21f3b").lerp(Color("ffd0d6") if not winding else Color("ff4a63"), wave)
-		_zone.draw_rect(Rect2((origin + point).round(), Vector2.ONE), Color(color, strength * (0.35 + wave * 0.45)))
+	var abyss_a: float = 0.62 * strength
+	var main_col: Color = Color(VoidZoneStyle.SURGE_PALE if hot else VoidZoneStyle.HOT_CRIMSON, 0.95 * strength)
+	var void_col: Color = Color(VoidZoneStyle.VOID_MAGENTA, 0.88 * strength)
+	var vio_col: Color = Color(VoidZoneStyle.VOID_VIOLET, 0.82 * strength)
+
+	if lane:
+		# Bull-Rush Stampede Rift-Furrow: clawed Void edge-scars + surging torn-rift wakes!
+		var half_w: float = float(spec["width"]) * 0.5 + ZONE_PAD
+		var length_l: float = warning_length + float(spec["width"]) * 0.5 + 12.0 + ZONE_PAD
+		VoidZoneStyle.fill_void_lane(_zone, origin, attack_dir, length_l, half_w, _state_time, strength, locked, hot, 480)
+		VoidZoneStyle.jagged_vein(_zone, origin + attack_dir * 6.0 + across * half_w, origin + attack_dir * length_l + across * half_w, _state_time, 1.8, main_col, void_col, abyss_a, 1.2, true)
+		VoidZoneStyle.jagged_vein(_zone, origin + attack_dir * 6.0 - across * half_w, origin + attack_dir * length_l - across * half_w, _state_time, 1.8, main_col, void_col, abyss_a, 4.1, true)
+		var rush_scroll: float = fposmod(_state_time * (64.0 if locked else 30.0), 22.0)
+		var d_rip: float = 14.0 + rush_scroll
+		while d_rip < length_l - 8.0:
+			var apex: Vector2 = origin + attack_dir * (d_rip + 5.5)
+			VoidZoneStyle.jagged_vein(_zone, origin + attack_dir * (d_rip - 2.0) + across * (half_w * 0.78), apex, _state_time, 1.2, main_col, void_col, abyss_a * 0.8, d_rip, false)
+			VoidZoneStyle.jagged_vein(_zone, origin + attack_dir * (d_rip - 2.0) - across * (half_w * 0.78), apex, _state_time, 1.2, main_col, void_col, abyss_a * 0.8, d_rip + 2.0, false)
+			d_rip += 22.0
+		VoidZoneStyle.sinuous_rim_arc(_zone, origin + attack_dir * (length_l - half_w), attack_dir, half_w, PI, 1.0, _state_time, strength, hot, -0.85, 6)
+		return
+
+	var arc_rad: float = deg_to_rad(float(spec["arc"]))
+	var reach: float = float(spec["reach"]) + ZONE_PAD
+	VoidZoneStyle.fill_void_fan(_zone, origin, attack_dir, reach, arc_rad, 1.0, _state_time, strength, locked, hot, 540)
+	if arc_rad < TAU - 0.1:
+		var edge_l: Vector2 = attack_dir.rotated(-arc_rad * 0.5)
+		var edge_r: Vector2 = attack_dir.rotated(arc_rad * 0.5)
+		VoidZoneStyle.jagged_vein(_zone, origin + edge_l * 6.0, origin + edge_l * (reach - 0.8), _state_time, 1.7, main_col, void_col, abyss_a, 0.7, true)
+		VoidZoneStyle.jagged_vein(_zone, origin + edge_r * 6.0, origin + edge_r * (reach - 0.8), _state_time, 1.7, main_col, void_col, abyss_a, 2.8, true)
+
+	if sweep:
+		# Spinning Void-Scythe Vortex: 3 spiralling abyssal claw-trails twisting in `_spin` direction!
+		var spin_s: float = _spin if absf(_spin) > 0.1 else 1.0
+		for arm_i: int in 3:
+			var base_a: float = attack_dir.angle() + (float(arm_i) - 1.0) * (arc_rad * 0.28) - spin_s * _state_time * (5.5 if locked else 2.8)
+			for step_k: int in 18:
+				var f_k: float = float(step_k) / 17.0
+				var r_k: float = lerpf(8.0, reach - 2.0, f_k)
+				var a_k: float = base_a + spin_s * f_k * 1.15
+				var p_k: Vector2 = origin + Vector2.from_angle(a_k) * r_k
+				if absf(angle_difference(attack_dir.angle(), (p_k - origin).angle())) <= arc_rad * 0.5:
+					VoidZoneStyle.rift_px(_zone, p_k, void_col if step_k % 3 == 0 else main_col, abyss_a * 0.75)
+		VoidZoneStyle.sinuous_rim_arc(_zone, origin, attack_dir, reach - 0.8, arc_rad, 1.0, _state_time * spin_s, strength, hot, -0.9, 10)
+	else:
+		# Heavy Overhead Fist Slam: pulsing Void epicenter + 5 branching tectonic reality-fault cracks!
+		var epicenter: Vector2 = origin + attack_dir * (reach * 0.42)
+		VoidZoneStyle.sinuous_rim_arc(_zone, epicenter, attack_dir, 5.5 + sin(_state_time * 16.0) * 1.0, TAU, 1.0, _state_time, strength, true, 0.0, 0)
+		for f_idx: int in 5:
+			var f_frac: float = float(f_idx) / 4.0 - 0.5
+			var rim_target: Vector2 = origin + attack_dir.rotated(f_frac * arc_rad * 0.88) * (reach - 1.2)
+			VoidZoneStyle.jagged_vein(_zone, epicenter, rim_target, _state_time, 2.3, main_col, vio_col if f_idx % 2 == 0 else void_col, abyss_a * 0.85, float(f_idx) * 2.3, true)
+		VoidZoneStyle.sinuous_rim_arc(_zone, origin, attack_dir, reach - 0.8, arc_rad, 1.0, _state_time, strength, hot, -1.0, 9)
 
 
 func _draw_fx() -> void:

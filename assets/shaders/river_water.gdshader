@@ -33,7 +33,8 @@ void fragment() {
 	float calm = texture(bank_map, UV).b;
     float distance_to_water = texture(bank_map, UV).r * bank_width;
     vec2 pixel = floor(UV * vec2(textureSize(TEXTURE, 0))) + floor(world_origin);
-    float oasis_m = g_gloom_rect.z > 0.0 ? smoothstep(0.42, 0.68, texture(g_arid, (pixel - g_gloom_rect.xy) / g_gloom_rect.zw).r) : 0.0;
+    float arid_w = g_gloom_rect.z > 0.0 ? texture(g_arid, clamp((pixel - g_gloom_rect.xy) / g_gloom_rect.zw, vec2(0.0), vec2(1.0))).r : 0.0;
+    float oasis_m = smoothstep(0.42, 0.68, arid_w);
     vec4 out_color = vec4(0.0);
     if (mask.r > 0.5) {
         vec2 flow = mask.ba * 2.0 - 1.0;
@@ -85,8 +86,8 @@ void fragment() {
                 color = mix(color, vec3(0.78, 0.88, 1.0), 0.8 * g_night);
             }
         }
-        if (g_rain > 0.02) { // rain: little rings spread where drops land (docs/wetter_konzept.md 6.3)
-            float rl = rain_local(pixel);
+        if (g_rain > 0.02 && arid_w < 0.45) { // rain: little rings spread where drops land (docs/wetter_konzept.md 6.3); never in the desert
+            float rl = rain_local(pixel) * (1.0 - smoothstep(0.18, 0.45, arid_w));
             if (rl > 0.03) {
                 vec2 rc = floor(pixel / 9.0);
                 float rh = hash21(rc + 311.0);

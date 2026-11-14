@@ -37,7 +37,8 @@
 			"name": "WÄCHTERIN DES GLASKAMMS",
 			"tile": [142, 355],
 			"reveal": 15.0,
-			"clear_radius": 5
+			"clear_radius": 5,
+			"paved": true
 		},
 		{
 			"id": "bluete_wachterin",

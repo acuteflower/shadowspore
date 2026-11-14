@@ -7,7 +7,7 @@ extends Node2D
 ## may keep progress of its own (`export_progress`); save key `"puzzles"`, a joining peer gets the list (`_rpc_snapshot`). Dev: `debug_reset(id)`,
 ## `trial_spot(id)` for the teleport (ENTWICKLER -> IRRLICHT / HORTKRÄHE).
 
-const KINDS: Dictionary = {"wisp": "wisp", "crow_hoard": "crow", "raven_trade": "raven", "root_weave": "weave", "star_mirror": "stars"} ## kind -> tuning block of data/puzzles.json
+const KINDS: Dictionary = {"wisp": "wisp", "crow_hoard": "crow", "raven_trade": "raven", "root_weave": "weave", "star_mirror": "stars", "prism_seal": "prism"} ## kind -> tuning block of data/puzzles.json
 
 var _trials: Dictionary = {} ## id -> WorldTrial
 var _specs: Dictionary = {} ## id -> entry of data/puzzles.json
@@ -38,6 +38,8 @@ func _ready() -> void:
 				node = RootWeave.new()
 			"star_mirror":
 				node = StarMirror.new()
+			"prism_seal":
+				node = PrismSeal.new()
 		node.name = "Trial_" + trial_id
 		node.setup(entry, table.get(String(KINDS[kind]), {}) as Dictionary)
 		node.solved.connect(_on_trial_solved)
@@ -70,6 +72,8 @@ static func clear_spots() -> Array:
 				var fo: Array = entry.get("field", [0, 9]) as Array
 				var tl: Array = entry.get("tile", [0, 0]) as Array
 				keep = [[tl, 7], [[float(tl[0]) + float(fo[0]), float(tl[1]) + float(fo[1])], 8]]
+			"prism_seal":
+				keep = [[entry.get("tile", [0, 0]), 7]]
 		for k: Array in keep:
 			var t: Array = k[0] as Array
 			out.append([Vector2(float(t[0]), float(t[1])) * 16.0 + Vector2(8, 8), int(k[1])])

@@ -1,6 +1,6 @@
 # Die Magische Quarzwüste – Konzept („Sonnenquarz-Öde“)
 
-> Arbeitsnamen **Sonnenquarz-Öde** / **Die Singenden Dünen** (`biome: "quartz_desert"`). Alle Eigennamen und Zahlenwerte sind Startwerte zum gemeinsamen Abstimmen. Status: **Stufe 1 + Relief/Quarz/Wind-Sand + Wüstenflora + 4 variable Quarzoasen mit Sonnenpalmen & abbaubaren Sonnenquarz-Felsen (13 Arten, 11 Items, ohne umgefallene Baumstämme) gebaut (2026-11-13)** – Weltkarte (`165.784` Tiles in Überregion 6 / Regionen `5, 6, 32, 33, 34` mit nahtloser Land-Anbindung im Westen an *Das Leerenblühen*), 96-Tile-Übergang (`g_arid`), dynamisch mit `WorldWind` ziehende Sanddünen & Sandfahnen (`g_wind_sand`), seltene organische **strahlend weiße** Quarz-Ausbisse (~3,6 % Fläche, Tag & Nacht leuchtend), Sandstein-Wandtexturen (`Style 6`), **4 variable Quarzoasen im Wassersystem (`oasis_west`, `oasis_lagoon`, `oasis_twins`, `oasis_spring`)** mit grünem Ufersaum, klarem Türkiswasser, Sonnenpalmen, Quarzschilf, Quellblumen sowie die abbaubaren Sonnenquarz-Felsen (`sun_quartz_rock`) sind live; Wetter, Hitze, Hauptort und Zauberstab-Überarbeitung folgen in den nächsten Stufen.
+> Arbeitsnamen **Sonnenquarz-Öde** / **Die Singenden Dünen** (`biome: "quartz_desert"`). Alle Eigennamen und Zahlenwerte sind Startwerte zum gemeinsamen Abstimmen. Status: **Stufen 1–5 komplett gebaut & verifiziert (2026-11-13)** – Weltkarte (`165.784` Tiles in Überregion 6 / Regionen `5, 6, 32, 33, 34`), 96-Tile-Übergang (`g_arid`), dynamisch mit `WorldWind` ziehende Sanddünen (`g_wind_sand`), weiße Quarz-Ausbisse (~3,6 % Fläche), Sandstein-Wandtexturen (`Style 6`), **4 variable Quarzoasen (`oasis_west`, `oasis_lagoon`, `oasis_twins`, `oasis_spring`)**, 15 Wüsten-Pflanzen & Erze (`sun_quartz_rock`, `prism_vein`, `ruin_sandstone`), **6 Wüstentierarten mit 5 Ökosystem-Events**, **Mittagshitze (`sun_heat` / `ERHITZT` + `refreshed` / `ERFRISCHT`, Ellies `'sweat'`-Standgeste, Ausdauerranken-Schimmer)**, **Magisches Wüstenwetter (`Singender Resonanzwind` & `Arkanes Quarzgewitter` ohne nassen Regen)**, **verwehte Karawanenstraße (`desert_caravan_*`)** sowie **aktive Quarzruinen (`QuartzArch`, `LightConduit`, `ResonanceObelisk`, `QuartzSeal` & 2 `PrismSeal`-Wächterinnen-Prüfungen)** sind live; als Nächstes folgen **Stufe 6 (Quarz- und Steinkolosse)** und **Stufe 7 (Hauptort, Zauberstab-Ausbau & Quests)**.
 
 ---
 
@@ -183,7 +183,7 @@ Ab `arid > 0.35` wachsen keine Wiesenbäume, Tannen, Kleefelder, Waldpilze oder 
 
 ### 7.2 Abbaubare Quarz- und Ruinen-Rohstoffe (Spitzhacke)
 
-- **Sonnenquarz-Fels (`sun_quartz_rock`, `rock.tscn`, 6 Varianten × 4 Stufen):** Warmer Sandsteinsockel mit klaren weiß-türkis-goldenen Quarzspitzen in Felsgruppen an Quarzadern/Klippen und als einzelne Ausbisse (mit Spitzhacke abbaubar → `sun_quartz` *Sonnenquarz* + `stone`, wächst in 3 Tagen nach).
+- **Sonnenquarz-Fels (`sun_quartz_rock`, `rock.tscn`, 6 Varianten × 4 Stufen):** Reiner, facettierter Kristallquarz in der silber-perlweißen `QUARTZ_W`-Bodenpalette (Sternendruse, Zwillingskamm, Kathedralen-Monolith, Zepter-Säule, Stufendruse, Kristall-Geodenkrone), der ausschließlich und nahtlos direkt aus weißen Bodenquarz-Ausbissen entspringt (mit Spitzhacke abbaubar → `sun_quartz` *Sonnenquarz* + `stone`, wächst in 3 Tagen nach).
 - **Prisma-Ader (`prism_vein`, geplant):** Seltene, mehrfarbig schillernde Quarzdrusen in Region 33/34 → gibt **Prismensplitter** und rohe ungeläuterte Zauber-/Verstärkersteine höherer Güte.
 - **Ruinen-Bruchstein (`ruin_sandstone`):** Behauene alte Sandsteinblöcke mit Goldfugen → für spätere Bau- und Handwerksrezepte.
 
@@ -197,14 +197,30 @@ Schon **bevor** wir später den großen Hauptort festlegen, ist die Wüste (beso
 
 ---
 
-## 8. Natürliche Tierwelt der Wüste (Stufe 5)
+## 8. Natürliche Tierwelt der Wüste (Stufe 5 — implementiert)
 
-Alle gewöhnlichen Tiere folgen den Regeln aus `docs/design_guide.md`: 8 echte Blickrichtungen aus dem 3D-Pixelrenderer, kein eigenes Leuchten, keine Kampf-/Tötungsmechanik, natürliches Flucht- und Ruheverhalten:
+Alle 6 Wüstenarten folgen strikt den Regeln aus `docs/design_guide.md`: **8 echte gerenderte Blickrichtungen** (`tools/art_desert_wildlife.py`), **kein eigenes Leuchten** (`Unlit` frei), **keine Kampf-/Tötungsmechanik durch die Spielerin**, deterministisches Habitat-Gating (`arid_at >= 0.35`, Biome `quartz_desert`) ohne Beeinflussung des alten Landes sowie vernetztes Tag-/Nacht-Ökosystem (`WildlifeEvents` + Oasen-Burgfrieden):
 
-- **Wüstenfuchs / Fennek (`desert_fox`):** Kleiner, sand- und cremefarbener Fuchs mit übergroßen Ohren. Tagsüber zusammengerollt im Schatten von Felsen und Ruinenbögen schlafend; in der Dämmerung und nachts flink auf Nahrungssuche, lauscht mit drehenden Ohren nach Insekten im Sand.
-- **Quarz-Eidechse (`quartz_lizard`, `TinyWildlife`):** Kleine türkis-sandfarbene Agame/Eidechse. Sonnt sich tagsüber auf warmen Quarzplatten und Ruinensteinen (Liegestütz-Nicken!), flitzt bei Annäherung blitzschnell in die nächste Felsspalte.
-- **Wüstenbussard / Geier (`desert_hawk`):** Nutzt das bestehende Vogelflug-System mit weiten, langsamen Gleitkreisen in der heißen Aufwind-Thermik; landet auf hohen Tafelberg-Kanten, Kaktusspitzen und gebrochenen Ruinenpfeilern.
-- **Gold-Skarabäus (`scarab`, `TinyWildlife` / `LeafCritter`-Verwandter):** Metallisch gold-türkis schimmernder Käfer, der kurze Spuren in den Dünensand zieht und sich bei schnellen Schritten eingräbt.
+1. **Kronen-Oryx (`oryx`, `WoodlandMammal`, 4 Varianten):**
+   - *Varianten:* `0` Elfenbein-Leitbulle, `1` Sand-Kuh, `2` Rotsand-Oryx, `3` zimtfarbenes Oryx-Kalb (`is_young`, ohne schwarze Gesichtsmaske).
+   - *Verhalten:* Zieht in kleinen Herden (2–4 Tiere) im Gänsemarsch durch Steppe und Dünenränder; trinkt morgens und in der Abenddämmerung am Oasenwasser (mit türkisen Wasserwellen); sucht zur Mittagshitze echten Schatten unter `sun_palm`, `crown_cactus` oder Klippen (`DaylightField`); senkt bei zu naher Bedrohung defensiv die langen Säbelhörner (`Mood.LOWER`, `oryx_snort`), um Kälber abzuschirmen, bevor die Herde geschlossen abzieht.
+2. **Dünen-Fennek (`fennec`, `WoodlandMammal`, 4 Varianten):**
+   - *Varianten:* `0` Sahara-Creme, `1` Dünen-Zimt, `2` Quarz-Silber (auf weißen Quarz-Ausbissen), `3` Fennek-Welpe (`is_young`).
+   - *Verhalten:* Dämmerungs- und nachtaktiv (`awake_threshold: 0.22`), gräbt eigene Sandbauten (`desert_burrow` in `WildlifeShelter`). Schläft tagsüber zusammengerollt im Schatten oder im Bau (`HIDDEN`); lauscht nachts mit geneigtem Kopf und rotierenden Riesenohren (`LISTEN`), scharrt Sand auf (`FORAGE` mit Sandpartikeln), pirscht und vollführt hohe Mäuselsprünge (`SPECIAL`); wahrt in der Dämmerung den **Burgfrieden an der Oase** (`oasis_at > 0.35`).
+3. **Pinselohr-Springmaus (`jerboa`, `WoodlandMammal`, 4 Varianten):**
+   - *Varianten:* `0` Dünengold, `1` Steppen-Umbra, `2` Mondquarz, `3` Jung-Springmaus (`is_young`).
+   - *Verhalten:* Rein zweibeiniger Känguru-Hüpfer mit langem schwarz-weißem Quastenschwanz; verschläft die Tageshitze unterirdisch im `desert_burrow` (`HIDDEN`) und erwacht in der Dämmerung (`awake_threshold: 0.18`). Putzt die Schwanzquaste (`GROOM`), nimmt trockene Sand-Staub-Bäder (`SPECIAL`), trommelt bei Gefahr mit den Hinterfüßen Alarm auf den Wüstensand (`BARK` → `jerboa_drum` + `hear_external_alarm`) und flieht in unberechenbaren Zickzack-Sätzen zurück in den Bau.
+4. **Sonnenquarz-Agame (`agama`, `WoodlandMammal`, 4 Varianten):**
+   - *Varianten:* `0` Azurkamm-Männchen (türkis-kobaltblauer Prachtkopf & Kehlsack), `1` Terrakotta-Weibchen, `2` Quarz-Bleichschuppe (perfekt auf `QUARTZ_W` getarnt), `3` Streifen-Jungtier (`is_young`).
+   - *Verhalten:* Tagaktiver Wärmespezialist (nachts in Felsspalten verborgen, `HIDDEN`); liebt weiße Sinterquarz-Platten (`BiomeBlend.is_quartz_surface`), zeigt revierverteidigendes Liegestütz-Kopfnicken (`BARK`), hebt zur Mittagshitze auf heißem Sand diagonal die Füße im **Thermoregulations-Tanz** (`SPECIAL`), erstarrt flach gedrückt bei überfliegendem `desert_falcon` (`hear_raptor_overhead`) und sprintet bei Annäherung in die nächste Felsdeckung.
+5. **Sonnenfalke (`desert_falcon`, `WildMeadowBird`, 3 Varianten):**
+   - *Varianten:* `0` Schiefer-Lanner, `1` Dünensperber, `2` Heller Quarzfalke.
+   - *Verhalten:* Kreist tagsüber mit V-förmig gespreizten Sichelflügeln (`cols 50..53`) in weiten, ruhigen Thermik-Bahnen (`76..102 px` Flughöhe) samt wanderndem Bodenschatten, steht kurz rüttelnd im Wüstenwind, landet auf `crown_cactus`-Armen, `sun_palm`-Kronen und hohen `sun_quartz_rock`-Monolithen, ruht nachts und lässt Agamen & Springmäuse unter seinem Schatten erstarren bzw. abtauchen.
+6. **Gold-Skarabäus (`scarab`, `TinyWildlife`, 3 metallische Tag-Färbungen):**
+   - *Varianten:* `0` Sonnenbronze, `1` Oasensmaragd, `2` Saphir-Schwarz (in 8 diskreten Richtungssektoren gerendert).
+   - *Verhalten:* Tagaktiv auf Wüstensand und Steppe (gehäuft nahe `oryx`-Herden); ~60 % rollen rückwärts mit den Hinterbeinen eine `4×4 px` Sand-/Humuskugel samt feiner Doppelspur im Sand (die an Dünenhängen gelegentlich kurz abrutscht, `State.FEED`) und graben sich bei nahem Sprinten oder Huftritt blitzschnell mit kleinem Sandwölkchen ein (`State.WITHDRAW`).
+7. **Ökosystem-Begegnungen (`WildlifeEvents`):**
+   - `fennec_hunt` (Fennek-Pirsch & Mäuselsprung vs. Zickzack-Flucht der Springmaus), `agama_duel` (synchrones Liegestütz-Duell zweier Agamen auf Quarz), `agama_scarab` (Agame schnappt nach Skarabäus, der sich rechtzeitig eingräbt), `scarab_tussle` (kurzes Gerangel zweier Pillendreher um eine Kugel) und `desert_play` (spielende Fennek-Welpen oder Oryx-Kälber).
 
 ---
 
@@ -218,16 +234,21 @@ Hier bricht das Biom bewusst das Muster „nur schwarze Schattenwesen“ auf und
 - **Am Tag UND in der Nacht aktiv:** Anders als Schattenwesen verbrennen Ruinenwächter nicht bei Sonnenaufgang! Tagsüber liegen viele von ihnen **getarnt als scheinbar leblose Ruinen-Steinhaufen oder eingeklappte Obelisken** im Sand und setzen sich erst mit einem tiefen Steinmahlen und aufblitzendem Quarzkern zusammen, wenn man in ihren Siegelkreis tritt oder daneben zaubert.
 - **Lesbare Warnflächen (`design_guide.md`):** Alle Stein- und Strahlenangriffe kündigen sich über präzise Boden-Warnflächen an; beim Tod zerbirst das Magnetfeld in Quarzsplitter und lässt hochwertige Kristall- und Ruinenmaterialien zurück.
 
-### 9.2 Die ersten drei geplanten Gegnertypen (Ausarbeitung in eigenem Gegner-Konzept)
+### 9.2 Die Gegner der Sonnenquarz-Öde
 
-1. **Quarz-Koloss (`quartz_colossus` – schwerer Ruinenwächter):**
+1. **Quarzwächter (`quartz_golem` – kleiner arkaner Quarz- & Sandstein-Wächter, umgesetzt):**
+   Kompakter, magisch zusammengehaltener Golem (~`29 px` hoch, `42 LP`) aus schwebenden Wüstensandstein-Blöcken und facettierten Sonnenquarz-Kristallen (3 Varianten: Sonnenquarz/Ocker, Mesa-Terrakotta/Bernstein, seltener Prisma-Wächter in Region 33/34).
+   - *Vorkommen & Auslöser:* Spawnt **rund um die Uhr** (Tag & Nacht, brennt nicht in der Sonne) ausschließlich auf weißen **Bodenquarz-Adern** (`BiomeBlend.is_quartz_surface`). Ruht getarnt als Quarz-Steinhaufen (`DORMANT`) oder streift friedlich umher (`PEACEFUL`) — erwacht erst, sobald Ellie in seiner Nähe Quarz abbaut, Pflanzen erntet/ausreißt, Sträucher schneidet oder ihn direkt angreift.
+   - *3 Magische Angriffe:* **Magischer Quarzspitzen-Beschuss** (3 schwebende Schulterspitzen kristallisieren sich und feuern als `QuartzShard`-Fächer), **Unterirdischer Sandstein-Schock** (Sandstein-Naht wandert unter Ellie und lässt geschichtete Steinplatten + Quarzspitzen ausbrechen) und **Quarzkristall-Armklinge** (schneller Nahkampfhieb mit langem, aus dem rechten Unterarm wachsendem Quarzkristall-Schwert).
+   - *Besonderheit:* Spitzhacken (`pickaxe`) verursachen `+35 %` Bruchschaden (`1.35x`); Schock & Salve pulsen nahe `LightConduit`-Rinnen.
+2. **Quarz-Koloss (`quartz_colossus` – schwerer Ruinenwächter, geplant):**
    Massiver, breitbeiniger Koloss (ca. 56–68 px hoch) aus schwebend gekoppelten Sandsteinquadern mit einem offenen Prisma-Kern in der Brust.
    - *Angriffe:* **Quarz-Erdstoß** (schlägt die Faust in den Sand → eine Linie scharfer Quarzspitzen bricht verzögert auf das Ziel zu aus dem Boden), **Prismen-Beben** (runder Schockring, der lose Quarzbrocken hochschleudert) und **Brennstrahl** (bündelt Sonnen-/Arkanlicht aus der Brust in einem langsam schwenkenden Strahl).
    - *Taktik:* Während er den Brennstrahl auflädt, liegt sein offener Brustquarz frei (Schwachpunkt für schwere Treffer / Gegen-Schulen).
-2. **Spiegel-Obelisk / Prismenwächter (`prism_sentinel` – taktischer Fernkämpfer):**
+3. **Spiegel-Obelisk / Prismenwächter (`prism_sentinel` – taktischer Fernkämpfer, geplant):**
    Schwebender, dreiteiliger Quarz-Obelisk aus den Ruinen, der sich im Kampf wie eine Blüte aus Steinplatten auffächert.
    - *Besonderheit:* Seine polierten Quarzschilde **brechen oder reflektieren frontale Geschosszauber** während seiner Schildphase – zwingt zum Umrunden, Schattenschritt in den Rücken oder gezielten Nahkampf/Flächenzauber!
-3. **Dünen-Skorpion / Quarzpanzer-Lauerer (`dune_stalker` – Hinterhalt im Sand):**
+4. **Dünen-Skorpion / Quarzpanzer-Lauerer (`dune_stalker` – Hinterhalt im Sand, geplant):**
    Mit Quarzkrusten überwachsenes Wüstenwesen, das unter der Sandoberfläche lauert (nur eine kleine Quarzspitze ragt wie ein gewöhnlicher Sammelstein heraus!) und auf laute Schritte, Sprinten oder Zaubervibrationen im weichen Sand mit einem Ausbruch aus der Düne reagiert – wer auf festen **Quarzplatten** bleibt, verrät sich ihm kaum.
 
 *(Nachts mischen sich am Küstenrand der Leere zusätzlich abgehärtete Schattenwesen unter die Ruinenkonstrukte – teilweise geraten Schattenwesen und erwachte Ruinenwächter sogar aneinander.)*
@@ -241,8 +262,8 @@ Diese Punkte sind als feste Leitplanken gesetzt, werden aber erst **nach dem Wel
 1. **Neustaffelung der Magie-Progression:**
    - **Frühes/mittleres Spiel bei Ilva (Seehexe):** Bodenständiger, klarer Einstieg – erste Holz-/Knochenstäbe, Läutern von Rohsteinen und einfache Schliffe (untere Stufen), ohne das System schon früh zu überfrachten.
    - **Spätes Spiel in der Quarzwüste:** Erst hier öffnet sich die **tiefe Kristall-Veredelung** (Hochschmieden/Resonanz-Schliff auf Herzstein & Sternstein, Verknüpfung mit Sonnenquarz/Prismensplittern und Ruinen-Resonanz) sowie **neue Stab-Archetypen** (z. B. Prismen-/Quarzstäbe mit eigenen Stabwerten, Mehrfach-Verstärkern oder Resonanz-Überladung).
-2. **Zentraler Hauptort & Quests:**
-   Ein großes Ruinen-Herzstück im Norden (z. B. großer Quarz-Tempel, Sonnenturm oder versunkene Sternwarte) samt Questreihe wird entworfen, sobald Landschaft, Boden, Quarzfelder und Höhenstufen im Spiel begehbar stehen.
+2. **Zentraler Hauptort & Quests (Außenbau umgesetzt, Innenraum/Quests offen):**
+   **Die Zenitwarte (*Das Zerbrochene Himmelswerk*)** krönt das gestufte Tafelberg-Massiv am Nordende der Karawanenstraße (Region 34, Ebenen 0 bis 3): Gespaltenes Ekliptik-Tor, monumentale 180°-Sonnenuhr mit Echtzeit-Gnomonschatten & Mittags-Zenitpuls, Windharfen-Prismentrasse über den Sattel, die Gipfel-Rotunde mit 3 versiegelten Sternenschlössern, drehender Armillar-Himmelssphäre, drei schwebenden Teleskop-Linsen samt nächtlichem Sternenlichtstrahl, Geisterkuppel-Drahtgitter, versunkenem Sternenspiegel-Becken (kühlend + Sternbilder-Shader), Polar-Okular (Kartenaufdeckung) und offenem Prisma-Altar. Innenraum, tiefe Kristall-Veredelung und Hauptquests folgen in Stufe 7b.
 
 ---
 
@@ -252,10 +273,10 @@ Genau wie beim Hexenwald bauen wir die Wüste Schicht für Schicht auf, sodass j
 
 | Stufe | Fokus | Konkreter Inhalt & Dateien |
 |---|---|---|
-| **Stufe 1 (Start jetzt!)** | **Land, Übergang, Sand- & Quarztexturen** | • `tools/bake_desert_map.py`: Überregion 6 + Regionen 32–34 im Norden (`~85k` Tiles), Küsten-SDF, flaches Basis-Relief (Biom-Byte `206`), Altland 100 % byte-gleich.<br>• `BiomeBlend`: zweiter Kanal `g_arid` (`fade: 96` Tiles + Windzungen).<br>• `ground_tone.gdshader` & Bodenkacheln: 3-Phasen-Übergang (`STEPPE` → `SAND` mit Windriffeln → `QUARTZ`-Platten & Adern inkl. Tag-Glitzern & Nacht-Nachleuchten).<br>• `data/terrain.json`: Oberflächen `steppe`, `sand` (Spuren, Staub, `0.94x`), `quartz` (Klang/Funken, `1.04x`).<br>• Props-Sperre für Wiesenbewuchs + Weltkarte (`M`) mit Wüstenpalette & Symbolen + Entwickler-Teleport `IN DIE QUARZWÜSTE` + Tests (`test_desert_bake.py`, `tools/test_desert.tscn`). |
-| **Stufe 2** | **Wüsten-Relief, Klippen, Oase & Karawanenweg** | • `tools/bake_desert_terrain.py`: Dünenmulden, Tafelberge (*Mesas*), Sandrampen & Quarz-Ruinentreppen.<br>• `relief.gdshader` Stil 6: geschichteter Sandstein mit leuchtenden Quarzadern.<br>• `lakes.json` Quarz-Oase + halb verwehte Quarz-Pflasterstraße (`ground.json`). |
-| **Stufe 3** | **Klima, Mittagshitze & Magisches Wetter** | • Regensperre in der Wüste; Übersetzung in Sengende Sonne, Dünenwind, Resonanzwind & **Arkanes Quarzgewitter**.<br>• Status `sun_heat` (Ausdauerdruck am Tag, Abkühlung im Schatten / auf Quarz / an der Oase) + **Ellies Schweiß-Abwisch-Standgeste** (`art_hero3d.py`). |
-| **Stufe 4** | **Wüstenflora, Quarz-Erze & Ruinenfragmente** | • `tools/art_desert.py`: Sonnenpalme, Glutdorn-Akazie, Glasaloe, Sternkaktus, Nacht-Wüstenrose, Sonnenquarz- & Prisma-Adern.<br>• Verstreute Lichtleit-Rinnen, gebrochene Quarz-Bögen und Resonanz-Obelisken. |
-| **Stufe 5** | **Tierwelt der Wüste** | • Fennek, Quarz-Eidechsen, Wüstenbussard und Gold-Skarabäen. |
-| **Stufe 6** | **Quarz- und Steinkolosse** | • Neue Gegnerfamilie (`Quarz-Koloss`, `Prismenwächter`, `Dünen-Skorpion`) inkl. Tag-Tarnung als Ruinensteine. |
-| **Stufe 7** | **Hauptort, Zauberstab-Ausbau & Quests** | • Zentraler Ruinen-Hauptort, Überarbeitung des Zauberstab-Systems (neue Stabtypen & hohe Veredelung) und spätere Questreihen. |
+| **Stufe 1 (Fertig)** | **Land, Übergang, Sand- & Quarztexturen** | • `tools/bake_desert_map.py`: Überregion 6 + Regionen 32–34 im Norden (`165.784` Tiles), Küsten-SDF, flaches Basis-Relief (Biom-Byte `206`), Altland 100 % byte-gleich.<br>• `BiomeBlend`: zweiter Kanal `g_arid` (`fade: 96` Tiles + Windzungen).<br>• `ground_tone.gdshader` & Bodenkacheln: 3-Phasen-Übergang (`STEPPE` → `SAND` mit Windriffeln → `QUARTZ`-Platten & Adern inkl. Tag-Glitzern & Nacht-Nachleuchten).<br>• `data/terrain.json`: Oberflächen `steppe`, `sand` (Spuren, Staub, `0.94x`), `quartz` (Klang/Funken, `1.04x`).<br>• Props-Sperre für Wiesenbewuchs + Weltkarte (`M`) mit Wüstenpalette & Symbolen + Entwickler-Teleport `IN DIE QUARZWÜSTE` + Tests (`test_desert_bake.py`, `tools/test_desert.tscn`). |
+| **Stufe 2 (Fertig)** | **Wüsten-Relief, Klippen, Oasen & Karawanenweg** | • `tools/bake_desert_terrain.py`: Dünenmulden, Tafelberge (*Mesas*), Sandrampen & Quarz-Ruinentreppen.<br>• `relief.gdshader` Stil 6: geschichteter Sandstein mit leuchtenden Quarzadern.<br>• `lakes.json` 4 Quarz-Oasen + `tools/bake_desert_path.py` halb verwehte Quarz-Karawanenstraße (`desert_caravan_south/oases/ruins` inkl. Runenfugen-Glow). |
+| **Stufe 3 (Fertig)** | **Klima, Mittagshitze & Magisches Wetter** | • `DesertHeat` (`src/systems/desert_heat.gd`): Status `sun_heat` (`ERHITZT`, bis `-30 %` Ausdauer-Regeneration, `+15 %` Sprint-/Schattenschritt-Kosten, goldener Ausdauerranken-Schimmer) + `refreshed` (`ERFRISCHT`), Kühlung in echtem Schatten, 50 % Aufbau auf Bodenquarz, Oasenwasser & essbare Kühlfrüchte.<br>• **Ellies Schweiß-Abwisch-Standgeste** (`'sweat'`, Clip 3 in `tools/art_hero_standby.py`).<br>• Regensperre in der Wüste; Übersetzung in **Singenden Resonanzwind** (`RESONANZWIND`) & **Arkanes Quarzgewitter** (`QUARZGEWITTER` mit trockenen violett-bernsteinfarbenen Magieblitzen & schnellerer Stab-Aufladung). |
+| **Stufe 4 (Fertig)** | **Wüstenflora, Quarz-/Prisma-Erze & Aktive Ruinen** | • `tools/art_desert.py` & `tools/art_desert_ruins.py`: Sonnenpalme, Kronenkaktus, Glasaloe, Nachtkaktus, Sonnenquarz-Fels (`sun_quartz_rock`), **Prisma-Ader (`prism_vein` → `prism_shard`)** & **Ruinen-Bruchstein (`ruin_sandstone` → `ruin_stone`)**.<br>• `DesertRuins` (`src/world/desert_ruins.gd`) & `PrismSeal` (`src/entities/puzzles/prism_seal.gd`): Schattenwerfende `QuartzArch`-Torbögen, zauberleitende `LightConduit`-Rinnen, `ResonanceObelisk`en (Stab-Auflade-Aura & Prismen-Ringe), `QuartzSeal`-Kreise & 2 platzierte Wächterinnen-Prüfungen (`prism_sonnenquarz`, `prism_ruinenfeld`). |
+| **Stufe 5 (Fertig)** | **Tierwelt der Wüste** | • Sonnenquarz-Oryx, Wüstenfennek, Quarz-Springmaus, Sonnenkamm-Agame, Sonnenfalke & Gold-Skarabäus inkl. Tag-/Nacht-Schichtwechsel & 5 `WildlifeEvents`. |
+| **Stufe 6 (Begonnen)** | **Quarz- und Steinkonstrukte** | • **Quarzwächter (`quartz_golem`)** umgesetzt (`DesertGuardians`, 3 Angriffe, Tarnung auf Bodenquarz, Territorial-Auslöser beim Abbauen/Ernten, Spitzhacken-Bonus). Offen: `Quarz-Koloss`, `Prismenwächter`, `Dünen-Skorpion`. |
+| **Stufe 7 (Außenbau fertig)** | **Hauptort (Außenanlage), Zauberstab-Ausbau & Quests** | • **Die Zenitwarte (*Das Zerbrochene Himmelswerk*)**: 5-zoniges Gipfel-Wahrzeichen in Region 34 (`src/world/desert_observatory.gd`, `tools/art_desert_observatory.py`, `tools/audio_observatory.py`, `desert_star_mirror.gdshader`, `observatory_beam.gdshader`, `data/map_markers.json`). Offen: Begehbarer Innenraum hinter dem Sternentor, neue Zauberstab-Archetypen, Kristall-Veredelung & Hauptquestreihe. |

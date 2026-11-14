@@ -56,6 +56,7 @@ const CALL_SFX: Dictionary = {
 	"raven": ["raven_croak", "raven_call"],
 	"owl": ["owl_hoot"],
 	"hoopoe": ["hoopoe_call"],
+	"desert_falcon": ["falcon_cry"],
 }
 var _calls: Array[AudioStream] = []
 
@@ -296,8 +297,8 @@ func _process(_delta: float) -> void:
 func _draw_shadow() -> void:
 	if not _perch_path.is_empty() and state != State.FLY:
 		return
-	var fade: float = clampf(1.0 - _height / 280.0, 0.12, 1.0)
-	var s_rad: float = 7.4 if species == "owl" else (7.0 if species == "raven" else (3.3 if species == "robin" else (4.3 if species == "woodpecker" else 5.0)))
+	var fade: float = clampf(1.0 - _height / (215.0 if species == "desert_falcon" else 280.0), 0.24 if species == "desert_falcon" else 0.12, 1.0)
+	var s_rad: float = 7.4 if species == "owl" else (7.0 if species == "raven" else (6.8 if species == "desert_falcon" else (3.3 if species == "robin" else (4.3 if species == "woodpecker" else 5.0))))
 	_shadow.draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0 - minf(_height / 400.0, 0.4), 0.3))
 	_shadow.draw_circle(Vector2.ZERO, s_rad, Color(0.03, 0.025, 0.07, 0.23 * fade))
 
@@ -806,9 +807,10 @@ func _advance() -> void:
 	if t >= 1.0:
 		if multiplayer.is_server():
 			if state == State.FLY:
+				var soaring_waypoint: bool = species == "desert_falcon" and _perch_path.is_empty() and _height_to > 10.0
 				var tree: Node = get_node_or_null(NodePath(_perch_path)) if not _perch_path.is_empty() else null
 				var valid_perch: bool = tree != null and not bool(tree.call("is_depleted"))
-				if (_perch_path.is_empty() and (_height_to > 0.0 or not _can_land(_end))) or (not _perch_path.is_empty() and not valid_perch):
+				if not soaring_waypoint and ((_perch_path.is_empty() and (_height_to > 0.0 or not _can_land(_end))) or (not _perch_path.is_empty() and not valid_perch)):
 					_reroute()
 					return
 			_finish.rpc(global_position, _height_to, _perch_path)

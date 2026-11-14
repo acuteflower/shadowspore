@@ -91,6 +91,7 @@ var _quest_preview: String = ""
 
 var _ways: MapWaystones = MapWaystones.new()
 var _pet_marks: MapPets = MapPets.new() ## the named crows and ravens (docs/pet_konzept.md)
+var _vista_marks: MapVistas = MapVistas.new() ## discovered meadow cliff vistas (docs/wiesenbiom_ausbau_konzept.md)
 var _ws_mouse: bool = false ## the left button is held on a waystone (travel mode)
 var _present_left: float = 0.0 ## `present`: seconds the map stays open on its own (a waystone woke up)
 var _present_age: float = 0.0
@@ -274,6 +275,7 @@ func _process(delta: float) -> void:
 	if _hover_t <= 0.0 and _hover_id.is_empty():
 		_hover_marker.clear()
 	_pet_marks.update(get_tree(), _cursor, _to_screen)
+	_vista_marks.update(get_tree(), _cursor, _to_screen)
 	var pick: String = _ways.update(delta, get_tree(), _cursor, _to_screen, _ws_mouse, InputManager.interact_held() and _opening, InputManager.map_select_step() if _opening else 0)
 	if pick != "":
 		var from_id: String = _ways.travel_from
@@ -415,6 +417,7 @@ func _path_texture() -> ImageTexture:
 	image.fill(Color.BLACK)
 	for spec: Dictionary in DataRegistry.table("ground_baked").get("decals", []) as Array:
 		var mask: Image = (load(String(spec.mask)) as Texture2D).get_image()
+		var is_caravan: bool = String(spec.get("id", "")).begins_with("desert_caravan_")
 		var origin: Vector2i = Vector2i(int(spec.x), int(spec.y))
 		var first: Vector2i = Vector2i(floori(origin.x / 16.0), floori(origin.y / 16.0))
 		var last: Vector2i = Vector2i(ceili((origin.x + mask.get_width()) / 16.0), ceili((origin.y + mask.get_height()) / 16.0))
@@ -424,8 +427,10 @@ func _path_texture() -> ImageTexture:
 				for sy: int in 4:
 					for sx: int in 4:
 						var at: Vector2i = Vector2i(x * 16 + sx * 4 + 2, y * 16 + sy * 4 + 2) - origin
-						if at.x >= 0 and at.y >= 0 and at.x < mask.get_width() and at.y < mask.get_height() and mask.get_pixelv(at).r8 == 80:
-							covered += 1
+						if at.x >= 0 and at.y >= 0 and at.x < mask.get_width() and at.y < mask.get_height():
+							var mval: int = mask.get_pixelv(at).r8
+							if mval == 80 or (is_caravan and mval == 60):
+								covered += 1
 				var coverage: float = maxf(image.get_pixel(x, y).r, covered / 16.0)
 				image.set_pixel(x, y, Color(coverage, 0, 0))
 	return ImageTexture.create_from_image(image)
@@ -588,6 +593,7 @@ func _draw_overlay() -> void:
 	_draw_start(fade)
 	_draw_town(fade)
 	_ways.draw(_overlay, _scale, fade, _time, size, [_present_tile, _present_ring, _present_age] if _present_ring > 0.0 else [])
+	_vista_marks.draw(_overlay, _scale, fade, _time, size, _player_tile())
 	_pet_marks.draw(_overlay, _scale, fade, _time, size, get_tree())
 	var tracked: TrackedQuests = _player.get("tracked") as TrackedQuests if is_instance_valid(_player) else null
 	if tracked != null:

@@ -1,0 +1,621 @@
+{
+  "plaza_mosaic": {
+    "file": "plaza_mosaic.png",
+    "glow": "plaza_mosaic_glow.png",
+    "size": [
+      352,
+      260
+    ],
+    "center": [
+      176,
+      128
+    ],
+    "outer_radii": [
+      156,
+      95
+    ],
+    "rings": [
+      [
+        125,
+        76
+      ],
+      [
+        84,
+        51
+      ],
+      [
+        46,
+        28
+      ]
+    ],
+    "medallions": [
+      [
+        176,
+        46
+      ],
+      [
+        238,
+        56
+      ],
+      [
+        283,
+        84
+      ],
+      [
+        300,
+        122
+      ],
+      [
+        283,
+        159
+      ],
+      [
+        238,
+        187
+      ],
+      [
+        176,
+        197
+      ],
+      [
+        114,
+        187
+      ],
+      [
+        69,
+        159
+      ],
+      [
+        52,
+        122
+      ],
+      [
+        69,
+        84
+      ],
+      [
+        114,
+        56
+      ]
+    ]
+  },
+  "rotunda_vault": {
+    "file": "rotunda_vault.png",
+    "glow": "rotunda_vault_glow.png",
+    "size": [
+      256,
+      236
+    ],
+    "feet": [
+      128,
+      206
+    ],
+    "apex": [
+      128,
+      20
+    ],
+    "oculus": [
+      128,
+      80
+    ],
+    "drum_radius": 82,
+    "courtyard_span_x": [
+      72,
+      184
+    ],
+    "star_nodes": [
+      [
+        55,
+        112
+      ],
+      [
+        60,
+        102
+      ],
+      [
+        67,
+        94
+      ],
+      [
+        78,
+        95
+      ],
+      [
+        82,
+        85
+      ],
+      [
+        95,
+        76
+      ],
+      [
+        50,
+        131
+      ],
+      [
+        79,
+        83
+      ]
+    ]
+  },
+  "rotunda_flanks": {
+    "file": "rotunda_flanks.png",
+    "glow": "rotunda_flanks_glow.png",
+    "grid": [
+      2,
+      1
+    ],
+    "frame": [
+      104,
+      144
+    ],
+    "feet": [
+      52,
+      122
+    ],
+    "variants": [
+      "west_astrolabe",
+      "east_stairs"
+    ],
+    "astrolabe_hub": [
+      58,
+      94
+    ]
+  },
+  "rotunda_portal": {
+    "file": "rotunda_portal.png",
+    "glow": "rotunda_portal_glow.png",
+    "size": [
+      136,
+      140
+    ],
+    "feet": [
+      68,
+      114
+    ],
+    "locks": [
+      [
+        68,
+        68
+      ],
+      [
+        56,
+        87
+      ],
+      [
+        80,
+        87
+      ]
+    ],
+    "keystone": [
+      68,
+      56
+    ]
+  },
+  "assembly": {
+    "origin_note": "Offsets relative to plaza_mosaic center [176, 128] / rotunda_vault feet [128, 206]",
+    "vault_offset": [
+      0,
+      0
+    ],
+    "flank_w_offset": [
+      -78,
+      10
+    ],
+    "flank_e_offset": [
+      78,
+      10
+    ],
+    "portal_offset": [
+      0,
+      14
+    ]
+  },
+  "armillary_rings": {
+    "file": "armillary_rings.png",
+    "glow": "armillary_rings_glow.png",
+    "grid": [
+      12,
+      1
+    ],
+    "frame": [
+      144,
+      144
+    ],
+    "center": [
+      72,
+      72
+    ],
+    "core_radius": 12,
+    "sun_lugs": [
+      [
+        124,
+        57
+      ],
+      [
+        110,
+        34
+      ],
+      [
+        84,
+        24
+      ],
+      [
+        56,
+        27
+      ],
+      [
+        34,
+        40
+      ],
+      [
+        21,
+        58
+      ],
+      [
+        18,
+        78
+      ],
+      [
+        24,
+        99
+      ],
+      [
+        41,
+        114
+      ],
+      [
+        67,
+        119
+      ],
+      [
+        96,
+        108
+      ],
+      [
+        118,
+        85
+      ]
+    ],
+    "moon_lugs": [
+      [
+        20,
+        87
+      ],
+      [
+        34,
+        110
+      ],
+      [
+        60,
+        120
+      ],
+      [
+        88,
+        117
+      ],
+      [
+        110,
+        104
+      ],
+      [
+        123,
+        86
+      ],
+      [
+        126,
+        66
+      ],
+      [
+        120,
+        45
+      ],
+      [
+        103,
+        30
+      ],
+      [
+        77,
+        25
+      ],
+      [
+        48,
+        36
+      ],
+      [
+        26,
+        59
+      ]
+    ]
+  },
+  "telescope_lenses": {
+    "file": "telescope_lenses.png",
+    "glow": "telescope_lenses_glow.png",
+    "grid": [
+      3,
+      1
+    ],
+    "frame": [
+      64,
+      64
+    ],
+    "center": [
+      32,
+      32
+    ],
+    "variants": [
+      "primary_mirror",
+      "dispersion_prism",
+      "objective_ring"
+    ],
+    "hubs": [
+      [
+        32,
+        32
+      ],
+      [
+        32,
+        32
+      ],
+      [
+        32,
+        32
+      ]
+    ],
+    "axis": "SW->NE"
+  },
+  "sundial_court": {
+    "file": "sundial_court.png",
+    "glow": "sundial_court_glow.png",
+    "size": [
+      240,
+      152
+    ],
+    "center": [
+      120,
+      96
+    ],
+    "socket": [
+      120,
+      96
+    ],
+    "fan_radii": [
+      104,
+      65
+    ],
+    "hour_markers": [
+      [
+        190,
+        86
+      ],
+      [
+        185,
+        75
+      ],
+      [
+        176,
+        65
+      ],
+      [
+        163,
+        57
+      ],
+      [
+        147,
+        51
+      ],
+      [
+        129,
+        48
+      ],
+      [
+        111,
+        48
+      ],
+      [
+        93,
+        51
+      ],
+      [
+        77,
+        57
+      ],
+      [
+        64,
+        65
+      ],
+      [
+        55,
+        75
+      ],
+      [
+        50,
+        86
+      ]
+    ]
+  },
+  "sundial_gnomon": {
+    "file": "sundial_gnomon.png",
+    "glow": "sundial_gnomon_glow.png",
+    "size": [
+      96,
+      148
+    ],
+    "feet": [
+      48,
+      130
+    ],
+    "apex": [
+      52,
+      17
+    ],
+    "eyelet": [
+      50,
+      40
+    ]
+  },
+  "ecliptic_gate": {
+    "file": "ecliptic_gate.png",
+    "glow": "ecliptic_gate_glow.png",
+    "size": [
+      160,
+      136
+    ],
+    "feet": [
+      80,
+      120
+    ],
+    "walkable_span_x": [
+      48,
+      112
+    ],
+    "ocular_anchor": [
+      80,
+      26
+    ],
+    "horn_tips": [
+      [
+        58,
+        24
+      ],
+      [
+        102,
+        26
+      ]
+    ]
+  },
+  "gate_ocular": {
+    "file": "gate_ocular.png",
+    "glow": "gate_ocular_glow.png",
+    "size": [
+      48,
+      48
+    ],
+    "center": [
+      24,
+      24
+    ],
+    "lens_hub": [
+      24,
+      24
+    ]
+  },
+  "star_mirror_rim": {
+    "file": "star_mirror_rim.png",
+    "glow": "star_mirror_rim_glow.png",
+    "size": [
+      184,
+      116
+    ],
+    "center": [
+      92,
+      58
+    ],
+    "outer_radii": [
+      88,
+      54
+    ],
+    "pool_radii": [
+      65,
+      35
+    ],
+    "compass_points": [
+      [
+        168,
+        56
+      ],
+      [
+        146,
+        85
+      ],
+      [
+        92,
+        97
+      ],
+      [
+        38,
+        85
+      ],
+      [
+        16,
+        56
+      ],
+      [
+        38,
+        23
+      ],
+      [
+        92,
+        9
+      ],
+      [
+        146,
+        23
+      ]
+    ]
+  },
+  "causeway_pillar": {
+    "file": "causeway_pillar.png",
+    "glow": "causeway_pillar_glow.png",
+    "grid": [
+      4,
+      1
+    ],
+    "frame": [
+      56,
+      96
+    ],
+    "feet": [
+      28,
+      84
+    ],
+    "variants": [
+      "harp_left",
+      "harp_right",
+      "polar_ocular",
+      "prism_altar"
+    ],
+    "focal_points": [
+      [
+        38,
+        49
+      ],
+      [
+        18,
+        49
+      ],
+      [
+        36,
+        23
+      ],
+      [
+        28,
+        53
+      ]
+    ]
+  },
+  "floating_debris": {
+    "file": "floating_debris.png",
+    "glow": "floating_debris_glow.png",
+    "grid": [
+      6,
+      1
+    ],
+    "frame": [
+      40,
+      40
+    ],
+    "center": [
+      20,
+      20
+    ],
+    "variants": [
+      "dome_tile",
+      "gear_arc",
+      "baluster",
+      "quartz_spire",
+      "arch_keystone",
+      "star_globe"
+    ]
+  }
+}

@@ -35,6 +35,7 @@ var next_id: int = 1
 var unlocks: Dictionary = {} ## name -> true: what the town has learned to do (docs/farming.md: "farming" opens the fields once Gustav has made the first hoe or can)
 var board: BoardManager ## the quest board's notices (docs/questtafel_konzept.md); a child created on every peer
 var farm: FarmManager ## the state of the fields (cells, crops); a child created on every peer
+var caravan: CaravanManager ## the travelling merchant who visits the fountain square (docs/haendler_konzept.md); a child created on every peer
 
 var _build: BuildMode ## the local builder (made once a local player exists)
 var _banner: TownBanner
@@ -143,6 +144,9 @@ func _ready() -> void:
 	board.name = "Board"
 	add_child(board)
 	board.setup(self)
+	caravan = CaravanManager.new()
+	add_child(caravan)
+	caravan.setup(self)
 	_seat_root = Node2D.new()
 	_seat_root.name = "Seats"
 	_seat_root.y_sort_enabled = true
@@ -759,6 +763,10 @@ func check_site(piece: String, pos: Vector2, check_world: bool = true) -> String
 	var rect: Rect2 = TownRules.foot_rect(piece, pos.x, pos.y)
 	var front: Rect2 = TownRules.front_rect(piece, pos.x, pos.y)
 	var walks: bool = bool(spec.get("walk", false))
+	if caravan != null and piece != "plaza":
+		var parked: String = caravan.blocks(rect)
+		if parked != "":
+			return parked
 	for id: int in structures:
 		var data: Dictionary = structures[id] as Dictionary
 		var other: Dictionary = TownRules.piece(String(data.p))
@@ -1088,6 +1096,8 @@ func _walk_context(at: Vector2) -> Dictionary:
 	for sid: int in structures:
 		if not bool(TownRules.piece(String((structures[sid] as Dictionary).p)).get("walk", false)):
 			solids.append(rect_of(sid))
+	if caravan != null and CaravanRules.parked(caravan.state()): ## the stall on the square: people walk round it
+		solids.append(caravan.footprint())
 	var trails: Array[PackedVector2Array] = []
 	for way: Variant in paths:
 		if int((way as Dictionary).d) == 1:
@@ -1167,7 +1177,7 @@ func _check_walk_cache() -> void:
 	var finished: int = 0
 	for way: Variant in paths:
 		finished += int((way as Dictionary).d)
-	var key: int = next_id * 1000003 + structures.size() * 1009 + paths.size() * 31 + finished
+	var key: int = next_id * 1000003 + structures.size() * 1009 + paths.size() * 31 + finished + (7 if caravan != null and CaravanRules.parked(caravan.state()) else 0)
 	var now: int = Time.get_ticks_msec()
 	if key != _walk_key or now - _walk_time > 20000:
 		_walk_key = key
@@ -1506,6 +1516,10 @@ func register_outpost(role: String, at: Vector2) -> void:
 
 
 ## Somebody who is no `Settler` of the town but can be traded with (the witch): the shop window frames them and lets them answer.
+func clear_outpost(role: String) -> void:
+	_outposts.erase(role)
+
+
 func register_person(id: String, node: Node2D) -> void:
 	_persons[id] = node
 
@@ -1600,6 +1614,8 @@ func has_met(id: String) -> bool:
 func met_residents() -> Dictionary:
 	var met: Dictionary = {}
 	for sid: String in residents:
+		if settler_spec(sid).has("visitor"):
+			continue ## the merchant comes and goes: he hangs no notices
 		if has_met(sid):
 			met[sid] = residents[sid]
 	return met
@@ -2699,6 +2715,7 @@ func export_state(snapshot: bool = false) -> Dictionary:
 		"fear": fear_on, "brewed": brewed.duplicate(), "alchemy_gift": alchemy_gift,
 		"unlocks": unlocks.keys(), "farm": farm.export_state() if farm != null else {},
 		"board": board.export_state(snapshot) if board != null else {},
+		"caravan": caravan.export_state() if caravan != null else {},
 	}
 
 
@@ -2768,6 +2785,8 @@ func import_state(data: Dictionary) -> void:
 		farm.import_state(data.get("farm", {}) as Dictionary)
 	if board != null:
 		board.import_state(data.get("board", {}) as Dictionary)
+	if caravan != null:
+		caravan.import_state(data.get("caravan", {}) as Dictionary)
 	_apply_all()
 
 

@@ -67,7 +67,11 @@ func _populate(cell: Vector2i) -> void:
 	var spec: Dictionary = DataRegistry.get_entry("wildlife", "butterfly")
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 8147))
-	if rng.randf() > float(spec["chunk_chance"]) or _butterflies.get_child_count() >= int(spec["max_loaded"]):
+	var mid_px: Vector2 = Vector2(cell) * 512.0 + Vector2(256.0, 256.0)
+	var w_wind: float = MeadowHabitats.wind_meadow_at(mid_px)
+	var bf_chance: float = float(spec["chunk_chance"]) * (1.0 + 1.35 * w_wind)
+	var bf_cap: int = int(spec["max_loaded"]) + (8 if w_wind >= 0.40 else 0)
+	if rng.randf() > bf_chance or _butterflies.get_child_count() >= bf_cap:
 		return
 	var flowers: Array[Vector2] = []
 	for point: Vector2 in _source.call(cell):
@@ -81,9 +85,10 @@ func _populate(cell: Vector2i) -> void:
 			patch.append(point)
 	if patch.size() < 3:
 		return
-	var count: int = rng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
+	var extra_bf: int = 3 if w_wind >= 0.40 else 0
+	var count: int = rng.randi_range(int(spec["group_min"]) + extra_bf, int(spec["group_max"]) + extra_bf)
 	for i: int in count:
-		if _butterflies.get_child_count() >= int(spec["max_loaded"]):
+		if _butterflies.get_child_count() >= bf_cap:
 			break
 		var animal: MeadowButterfly = load(String(spec["scene"])).instantiate() as MeadowButterfly
 		_serial += 1

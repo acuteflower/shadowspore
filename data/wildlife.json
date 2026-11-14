@@ -1618,5 +1618,388 @@
     "relocate_chance": 0.10,
     "night_roost": true,
     "flock_watch": false
+  },
+  "oryx": {
+    "name": "Kronen-Oryx",
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "texture": "res://assets/wildlife/oryx.png",
+    "biomes": [
+      "quartz_desert"
+    ],
+    "builds": 4,
+    "sheet_cols": 52,
+    "chunk_chance": 0.34,
+    "max_loaded": 28,
+    "max_species_loaded": 6,
+    "group_min": 2,
+    "group_max": 4,
+    "family_range": 46,
+    "spawn_margin": 60,
+    "spawn_attempts": 20,
+    "home_radius": 155,
+    "sense_interval": 0.15,
+    "alert_range": 150,
+    "flee_range": 52,
+    "safe_range": 175,
+    "sneak_multiplier": 0.62,
+    "sprint_multiplier": 1.38,
+    "swing_range": 108,
+    "safe_seconds": 3.2,
+    "body_radius": 6.0,
+    "walk_speed": 31,
+    "run_speed": 124,
+    "walk_distance": [
+      38,
+      72
+    ],
+    "run_distance": [
+      56,
+      92
+    ],
+    "walk_stride": 22,
+    "run_stride": 40,
+    "rest_seconds": [
+      2.2,
+      4.6
+    ],
+    "forage_seconds": [
+      2.6,
+      5.2
+    ],
+    "groom_seconds": [
+      1.8,
+      3.0
+    ],
+    "sleep_seconds": [
+      9,
+      17
+    ],
+    "nocturnal": false,
+    "calf_speed_factor": 0.92,
+    "rear_seconds": 1.25,
+    "stand_up_seconds": 0.85,
+    "bound_height": 3.6,
+    "motion_ramp": 0.18
+  },
+  "fennec": {
+    "name": "D\u00fcnen-Fennek",
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "texture": "res://assets/wildlife/fennec.png",
+    "biomes": [
+      "quartz_desert"
+    ],
+    "builds": 4,
+    "sheet_cols": 52,
+    "chunk_chance": 0.30,
+    "max_loaded": 28,
+    "max_species_loaded": 4,
+    "group_min": 1,
+    "group_max": 2,
+    "family_range": 36,
+    "spawn_margin": 54,
+    "spawn_attempts": 18,
+    "home_radius": 115,
+    "sense_interval": 0.14,
+    "alert_range": 118,
+    "flee_range": 54,
+    "safe_range": 155,
+    "sneak_multiplier": 0.58,
+    "sprint_multiplier": 1.45,
+    "swing_range": 98,
+    "safe_seconds": 3.0,
+    "body_radius": 3.5,
+    "walk_speed": 38,
+    "run_speed": 112,
+    "walk_distance": [
+      24,
+      48
+    ],
+    "run_distance": [
+      42,
+      70
+    ],
+    "walk_stride": 15,
+    "run_stride": 26,
+    "rest_seconds": [
+      1.6,
+      3.4
+    ],
+    "forage_seconds": [
+      2.0,
+      3.8
+    ],
+    "groom_seconds": [
+      1.6,
+      2.7
+    ],
+    "sleep_seconds": [
+      9,
+      17
+    ],
+    "nocturnal": true,
+    "awake_threshold": 0.22,
+    "listen_seconds": [
+      1.3,
+      2.4
+    ],
+    "stalk_speed": 22,
+    "stalk_distance": [
+      18,
+      32
+    ],
+    "pounce_seconds": 0.68,
+    "pounce_height": 8.5,
+    "pounce_distance": [
+      20,
+      32
+    ],
+    "emerge_seconds": 0.95,
+    "motion_ramp": 0.15
+  },
+  "jerboa": {
+    "name": "Pinselohr-Springmaus",
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "texture": "res://assets/wildlife/jerboa.png",
+    "biomes": [
+      "quartz_desert"
+    ],
+    "builds": 4,
+    "sheet_cols": 52,
+    "chunk_chance": 0.42,
+    "max_loaded": 28,
+    "max_species_loaded": 6,
+    "group_min": 1,
+    "group_max": 3,
+    "spawn_margin": 48,
+    "spawn_attempts": 20,
+    "home_radius": 88,
+    "sense_interval": 0.13,
+    "alert_range": 104,
+    "flee_range": 52,
+    "safe_range": 145,
+    "sneak_multiplier": 0.58,
+    "sprint_multiplier": 1.48,
+    "swing_range": 92,
+    "safe_seconds": 2.8,
+    "body_radius": 2.6,
+    "walk_speed": 36,
+    "run_speed": 108,
+    "walk_distance": [
+      14,
+      26
+    ],
+    "run_distance": [
+      26,
+      42
+    ],
+    "walk_stride": 14,
+    "run_stride": 22,
+    "rest_seconds": [
+      1.4,
+      3.0
+    ],
+    "forage_seconds": [
+      1.8,
+      3.4
+    ],
+    "groom_seconds": [
+      1.6,
+      2.6
+    ],
+    "sleep_seconds": [
+      9,
+      18
+    ],
+    "nocturnal": true,
+    "awake_threshold": 0.18,
+    "hop_height": 4.8,
+    "flee_hop_height": 8.8,
+    "drum_seconds": 0.72,
+    "bath_seconds": [
+      1.8,
+      2.9
+    ],
+    "emerge_seconds": 0.75,
+    "motion_ramp": 0.10
+  },
+  "agama": {
+    "name": "Sonnenquarz-Agame",
+    "scene": "res://src/entities/wildlife/woodland_mammal.tscn",
+    "texture": "res://assets/wildlife/agama.png",
+    "biomes": [
+      "quartz_desert"
+    ],
+    "builds": 4,
+    "sheet_cols": 52,
+    "chunk_chance": 0.44,
+    "max_loaded": 28,
+    "max_species_loaded": 6,
+    "group_min": 1,
+    "group_max": 2,
+    "spawn_margin": 46,
+    "spawn_attempts": 24,
+    "home_radius": 74,
+    "sense_interval": 0.14,
+    "alert_range": 92,
+    "flee_range": 42,
+    "safe_range": 122,
+    "sneak_multiplier": 0.56,
+    "sprint_multiplier": 1.42,
+    "swing_range": 86,
+    "safe_seconds": 2.8,
+    "body_radius": 2.8,
+    "walk_speed": 34,
+    "run_speed": 118,
+    "walk_distance": [
+      12,
+      24
+    ],
+    "run_distance": [
+      28,
+      48
+    ],
+    "walk_stride": 12,
+    "run_stride": 19,
+    "rest_seconds": [
+      2.4,
+      5.4
+    ],
+    "forage_seconds": [
+      1.4,
+      2.6
+    ],
+    "groom_seconds": [
+      1.4,
+      2.4
+    ],
+    "sleep_seconds": [
+      10,
+      18
+    ],
+    "nocturnal": false,
+    "bob_seconds": 1.15,
+    "sand_dance_seconds": [
+      1.6,
+      2.6
+    ],
+    "emerge_seconds": 0.70,
+    "motion_ramp": 0.12
+  },
+  "desert_falcon": {
+    "name": "Sonnenfalke",
+    "scene": "res://src/entities/wildlife/wild_meadow_bird.tscn",
+    "texture": "res://assets/wildlife/desert_falcon.png",
+    "sheet_cols": 62,
+    "builds": 3,
+    "build_offset": 0,
+    "feet": [
+      32,
+      48
+    ],
+    "biomes": [
+      "quartz_desert"
+    ],
+    "chunk_chance": 0.34,
+    "group_min": 1,
+    "group_max": 1,
+    "group_radius": 40,
+    "max_loaded": 22,
+    "max_species_loaded": 3,
+    "spawn_attempts": 18,
+    "spawn_margin": 56,
+    "sense_interval": 0.16,
+    "alarm_range": 180,
+    "alert_range": 132,
+    "flee_range": 56,
+    "sneak_multiplier": 0.62,
+    "sprint_multiplier": 1.45,
+    "swing_range": 118,
+    "perch_fear_multiplier": 0.58,
+    "personal_space": 22,
+    "walk_distance": [
+      8,
+      14
+    ],
+    "hop_distance": [
+      7,
+      12
+    ],
+    "walk_speed": 22,
+    "flight_distance": [
+      165,
+      310
+    ],
+    "flight_speed": 96,
+    "flight_height": 84,
+    "soar_height": [
+      76,
+      102
+    ],
+    "soar_radius": [
+      58,
+      92
+    ],
+    "flight_seconds_min": 2.4,
+    "flight_clearance": 24.0,
+    "perch_chance": 0.62,
+    "safe_landing_range": 96,
+    "calm_seconds": 3.4,
+    "idle_seconds": [
+      1.6,
+      3.4
+    ],
+    "peck_seconds": [
+      1.8,
+      3.4
+    ],
+    "watch_seconds": [
+      2.6,
+      5.2
+    ],
+    "preen_seconds": [
+      2.0,
+      3.6
+    ],
+    "roost_seconds": [
+      8,
+      16
+    ],
+    "call_seconds": [
+      18,
+      36
+    ],
+    "call_volume_db": -20,
+    "flap_fps": 10.5,
+    "takeoff_fraction": 0.14,
+    "landing_fraction": 0.84,
+    "glide_from": 0.16,
+    "glide_to": 0.84,
+    "social_chance": 0.0,
+    "relocate_chance": 0.24,
+    "night_roost": true,
+    "requires_perch": false,
+    "flock_watch": false
+  },
+  "scarab": {
+    "name": "Gold-Skarab\u00e4us",
+    "biomes": [
+      "quartz_desert"
+    ],
+    "body_radius": 1,
+    "max_loaded": 18,
+    "chunk_chance": 0.65,
+    "group_min": 2,
+    "group_max": 3,
+    "home_radius": 44,
+    "crawl_speed": 4.8,
+    "rest_seconds": [
+      2.2,
+      5.4
+    ],
+    "withdraw_seconds": [
+      2.4,
+      4.5
+    ],
+    "scatter_range": 46
   }
 }

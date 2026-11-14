@@ -38,9 +38,28 @@ func _exit_tree() -> void:
 	Terrain.patches.erase(self)
 
 
-## `Terrain.patches`: the floor of the mine.
+## `Terrain.patches`: the floor of the mine (slate rock, plus shallow cave puddles in wet rooms).
 func surface_at(pos: Vector2) -> String:
-	return "mine_stone" if in_mine(pos) else ""
+	var lvl: int = level_at(pos)
+	if lvl <= 0:
+		return ""
+	if _layouts.has(lvl):
+		var l: MineLayout = _layouts[lvl] as MineLayout
+		var local: Vector2 = pos - origin(lvl)
+		var cell: Vector2i = MineLayout.chunk_of(local)
+		for dx: int in range(-1, 2):
+			for dy: int in range(-1, 2):
+				var props: Array = l.chunk_props.get(cell + Vector2i(dx, dy), []) as Array
+				for entry: Dictionary in props:
+					var kind: String = String(entry.get("kind", ""))
+					if kind == "puddle_a" or kind == "puddle_b":
+						var rx: float = 20.0 if kind == "puddle_a" else 13.0
+						var ry: float = 9.0 if kind == "puddle_a" else 6.5
+						var ex: float = (local.x - float(entry.get("x", 0.0))) / rx
+						var ey: float = (local.y - float(entry.get("y", 0.0))) / ry
+						if ex * ex + ey * ey <= 1.0:
+							return "puddle"
+	return "mine_stone"
 
 
 func setup(seed_value: int) -> void:

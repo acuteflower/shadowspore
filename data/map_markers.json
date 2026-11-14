@@ -82,5 +82,39 @@
         "..XX.XX.XX."
       ]
     ]
+  },
+  "jorun": {
+    "color": "7fa6e0",
+    "rows": [
+      ".XXX.",
+      "XXXXX",
+      "X.X.X",
+      "XXXXX",
+      ".X.X."
+    ]
+  },
+  "hallgrat": {
+    "name": "HALLGRAT",
+    "title": "DIE STILLE STADT",
+    "color": "9fe8dc",
+    "rows": [
+      "..X..",
+      "X.X.X",
+      "XXXXX",
+      "X.X.X",
+      "XXXXX"
+    ]
+  },
+  "zenitwarte": {
+    "name": "DIE ZENITWARTE",
+    "title": "ZERBROCHENES HIMMELSWERK",
+    "color": "ffd98a",
+    "rows": [
+      "..X..",
+      ".X.X.",
+      "XX.XX",
+      "XXXXX",
+      "X...X"
+    ]
   }
 }

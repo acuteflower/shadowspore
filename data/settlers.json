@@ -158,6 +158,19 @@
      0
     ],
     "clip": "idle"
+   },
+   "caravan": {
+    "of": "caravan",
+    "at": [
+     -16,
+     0
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "idle",
+    "fallback": "fire"
    }
   },
   "schedule": [
@@ -179,7 +192,7 @@
    [
     0.56,
     0.6,
-    "fire"
+    "caravan"
    ],
    [
     0.6,
@@ -503,6 +516,12 @@
     "Bleib im Licht. Dafür baut man es.",
     "Ich schlafe nicht viel. Geh ruhig."
    ],
+   "order_trace": [
+    "Du hast die alten Wachtürme im Gras gesehen? Ja… ich trug einst das rote Wappen.",
+    "Wir ließen die Klingen im Boden zurück, als die Leere kam. Niemand sollte glauben, wir seien geflohen.",
+    "Die Grenzsteine stehen noch? Gut. Solange jemand sie liest, war unsere Wacht nicht umsonst.",
+    "Der Rote Orden ist Geschichte. Glimmrast ist das, was davon bleiben durfte."
+   ],
    "any": [
     "Wir haben nicht viel. Aber wir haben das hier.",
     "Du hast dich gut gehalten, für den Anfang.",
@@ -613,6 +632,19 @@
      -15,
      -6
     ]
+   },
+   "caravan": {
+    "of": "caravan",
+    "at": [
+     16,
+     2
+    ],
+    "face": [
+     0,
+     -1
+    ],
+    "clip": "idle",
+    "fallback": "fire"
    }
   },
   "schedule": [
@@ -634,7 +666,7 @@
    [
     0.56,
     0.62,
-    "fire"
+    "caravan"
    ],
    [
     0.62,
@@ -1041,5 +1073,52 @@
    ]
   },
   "shop": "lake_counter"
+ },
+ "jorun": {
+  "name": "JORUN",
+  "title": "FAHRENDER HÄNDLER",
+  "stranger": "FREMDER HÄNDLER",
+  "art": "jorun",
+  "enabled": false,
+  "away": true,
+  "visitor": "caravan",
+  "counts": false,
+  "role": "caravan",
+  "shop": "caravan",
+  "chat": {
+   "first": [
+    "Na sieh an, ein Brunnen! Wo ein Brunnen ist, da wird gehandelt. Jorun heiße ich.",
+    "Ein neuer Platz am Weg. Ich bin Jorun, und ich hab Waren von weit her."
+   ],
+   "any": [
+    "Die Straße war ruhig. Zu ruhig, wenn du mich fragst.",
+    "Schau dich um, aber fass nichts an, das du nicht bezahlen willst.",
+    "Im Westen reden sie schon von eurem Licht.",
+    "Jede Ware hat eine Geschichte. Die meisten sind sogar wahr."
+   ],
+   "wanted": [
+    "Was ich diesmal suche, steht oben auf dem Zettel. Ich zahle gut.",
+    "Bring mir, was auf dem Zettel steht, dann reden wir über Preise."
+   ],
+   "evening": [
+    "Bald wird es dunkel. Dann ist der Stand zu.",
+    "Kauf, solange die Laterne noch nicht brennen muss."
+   ],
+   "knock": [
+    "Morgen früh, Kind. Ich schlafe.",
+    "Der Stand ist zu. Die Nacht gehört den anderen.",
+    "Klopf nicht so laut, der Ochse wird unruhig."
+   ],
+   "call": [
+    "Waren aus der Ferne!",
+    "Kommt her, schaut nur!",
+    "Frisch vom Weg, heute nur!",
+    "Datteln aus dem Süden!"
+   ],
+   "knock_storm": [
+    "Bei dem Wetter klappe ich nichts auf!",
+    "Warte, bis der Sturm vorbei ist."
+   ]
+  }
  }
 }

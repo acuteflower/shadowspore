@@ -36,6 +36,7 @@ var _ground_glow: Sprite2D
 var _ground_mat: ShaderMaterial
 var _ground_glow_mat: ShaderMaterial
 var _ground_info: Dictionary = {}
+var paved: bool = false ## the statue stands on a town's paving (data/waystones.json `paved`, Hallgrat's forum): its overgrown bed is not drawn, the glow of its lines stays
 var _crystals: Array[Dictionary] = [] ## ground crystals round the plinth: {body, glow, delay}; sibling nodes of the statue so they sort like any prop
 var _crystal_dim: float = 0.0
 var _lit_strength: float = 1.0
@@ -131,6 +132,7 @@ func _make_ground() -> void:
 	_ground.material = _ground_mat
 	add_child(_ground)
 	move_child(_ground, 0)
+	_ground.visible = not paved
 	_ground_glow = Sprite2D.new()
 	_ground_glow.texture = load(DIR + "ground_dim.png") as Texture2D
 	_ground_glow.z_index = -8

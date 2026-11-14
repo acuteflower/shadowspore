@@ -1,0 +1,259 @@
+{
+  "_doc": "Hand-verifizierte Entdecker-Orte des Standard-Wiesenbioms (docs/wiesenbiom_ausbau_konzept.md, Stufen 3 & 4). Alle Kacheln liegen garantiert in den 5 Wiesen-Superregionen (0..4) außerhalb von Schutzringen, Hallgrat, Hexenwald und Sonnenquarz-Öde.",
+  "red_order": {
+    "xp_reward": 12,
+    "reveal_cells": 11.0,
+    "watchtowers": [
+      {
+        "id": "order_tower_nordgrat",
+        "name": "WACHTURM DES ROTEN ORDENS",
+        "sub": "HALB EINGESTÜRZTE KLIPPENBASTION",
+        "tile": [368, 188],
+        "variant": 0,
+        "chest_tier": "rare",
+        "chest_offset": [-34, 18],
+        "speaker": "STEININSCHRIFT",
+        "text": "»DRITTE NORDWACHT DES ROTEN ORDENS. SOLANGE EIN FUNKE IN DER LATERNE GLÜHT, SCHWEIGT DER ABGRUND UNTER DEM GRAT.«",
+        "thought": "Die Zinnen sind längst gebrochen… aber in der Nische glimmt noch immer ein warmer Splitter. Valdric hat einst genau solche Türme gehütet."
+      },
+      {
+        "id": "order_tower_seeblick",
+        "name": "RUINENTURM DER SEEWACHT",
+        "sub": "VERLASSENER AUSSENPOSTEN ÜBER DEN ALTEN MAUERN",
+        "tile": [548, 404],
+        "variant": 1,
+        "chest_tier": "rare",
+        "chest_offset": [36, 16],
+        "speaker": "ORDENSCHRONIK",
+        "text": "»HERBST DES LETZTEN JAHRES: WIR ZIEHEN DIE BESATZUNG NACH SÜDEN AB. WER NACH UNS KOMMT, MÖGE DAS SIEGEL IN EHREN HALTEN.«",
+        "thought": "Weinroter Mörtel zwischen bemoostem Stein. Sie sind nicht im Kampf gefallen – sie mussten ihre Posten vor der wachsenden Leere räumen."
+      },
+      {
+        "id": "order_tower_westklamm",
+        "name": "BASTION AM GLASKAMM",
+        "sub": "ORDENSWACHT ÜBER DEM WESTLICHEN PASS",
+        "tile": [254, 446],
+        "variant": 0,
+        "chest_tier": "common",
+        "chest_offset": [-34, 18],
+        "speaker": "WACHSTEIN",
+        "text": "»KEIN SCHATTEN ÜBERSCHREITE DIE FURT UNBEMERKT. KOMMANDANT V. HAT DIE SPÄHER INS TAL GESANDT.«",
+        "thought": "Kommandant V.… Das muss Valdric gewesen sein, lange bevor Glimmrast gegründet wurde."
+      }
+    ],
+    "patrol_camps": [
+      {
+        "id": "order_camp_lichtung",
+        "name": "ÜBERWUCHERTER SPÄHERRASTPLATZ",
+        "sub": "ROSTIGES ORDENSSCHWERT & ZERRISSENES BANNER",
+        "tile": [538, 654],
+        "variant": 0,
+        "banner_offset": [22, -4],
+        "chest_tier": "common",
+        "chest_offset": [-28, 12],
+        "speaker": "FELDTAGEBUCH",
+        "text": "»VIERTE NACHT IM HOHEN GRAS. UNSER BANNER IST ZERFETZT, DIE KLINGE SCHWER VOM TAU. MORGEN KEHREN WIR ZUM LICHT ZURÜCK.«",
+        "thought": "Das Schwert steckt tief in der Narbe, wie ein stummer Gruß an jene, die den Weg nach ihnen gehen."
+      },
+      {
+        "id": "order_camp_ruinen",
+        "name": "RASTPLATZ DER OSTPATROUILLE",
+        "sub": "VERGESSENES FELDLAGER DES ROTEN ORDENS",
+        "tile": [750, 330],
+        "variant": 1,
+        "banner_offset": [24, -3],
+        "chest_tier": "rare",
+        "chest_offset": [-30, 12],
+        "speaker": "VERBLASSTER BEFEHL",
+        "text": "»LASST DEN KESSEL UND DIE ERSATZKLINGEN HIER. NEHMT NUR DIE VERWUNDETEN MIT ÜBER DEN STROM.«",
+        "thought": "Selbst auf dem Rückzug hat der Rote Orden niemanden zurückgelassen. Ich sollte Valdric davon erzählen."
+      },
+      {
+        "id": "order_camp_nebelwald",
+        "name": "LAGER AM DÄMMERSAUM",
+        "sub": "ALTES NACHTLAGER UNTER DEN TANNEN",
+        "tile": [718, 518],
+        "variant": 0,
+        "banner_offset": [22, -4],
+        "chest_tier": "common",
+        "chest_offset": [-28, 12],
+        "speaker": "ROSTIGE KLINGE",
+        "text": "AUF DEM HEFT IST DER SONNENSCHILD DES ROTEN ORDENS EINGESCHLAGEN: »TREU IM DUNKEL, STILL IM WIND.«",
+        "thought": "Das rote Tuch flattert noch immer im Wiesenwind, obwohl die Feuerstelle längst kalt und voller Klee ist."
+      },
+      {
+        "id": "order_camp_nordweiten",
+        "name": "LETZTES MARSCHLAGER IM NORDEN",
+        "sub": "VERWEHTER RASTPLATZ AM HOCHLANDRAND",
+        "tile": [346, 110],
+        "variant": 1,
+        "banner_offset": [24, -3],
+        "chest_tier": "rare",
+        "chest_offset": [-30, 12],
+        "speaker": "SPÄHERBERICHT",
+        "text": "»BIS HIERHER REICHTE UNSERE KARTE. DAHINTER BLÜHT NUR NOCH DIE STILLE WEITE.«",
+        "thought": "Sie sind bis an den äußersten Rand der Wiesen gezogen."
+      }
+    ],
+    "boundary_stones": [
+      {
+        "id": "order_stone_suedweg",
+        "tile": [534, 714],
+        "variant": 0,
+        "speaker": "ALTER GRENZSTEIN",
+        "text": "»MARK DER OFFENEN LICHTUNG — UNTER DEM SCHUTZ DES ROTEN ORDENS. HALTET DIE BRUNNEN REIN.«",
+        "thought": "Die Schrift ist voller Flechten, aber das Wappen leuchtet noch schwach, wenn man darüberstreicht."
+      },
+      {
+        "id": "order_stone_ostfurt",
+        "tile": [626, 354],
+        "variant": 1,
+        "speaker": "ALTER GRENZSTEIN",
+        "text": "»SCHWELLE DER ALTEN MAUERN — DREIUNDZWANZIG SCHRITT OSTWÄRTS BEGINNT DAS SEEGEBIET.«",
+        "thought": "Jemand hat vor langer Zeit ein schmales rotes Tuchband um den Stein geknotet."
+      },
+      {
+        "id": "order_stone_nordpass",
+        "tile": [346, 214],
+        "variant": 2,
+        "speaker": "ALTER GRENZSTEIN",
+        "text": "»HOCHPASS DER GLASKLIPPEN — WANDERER, RASTE VOR EINBRUCH DER DÄMMERUNG.«",
+        "thought": "Ein guter Rat. Auch heute noch."
+      },
+      {
+        "id": "order_stone_seesaum",
+        "tile": [574, 502],
+        "variant": 0,
+        "speaker": "ALTER GRENZSTEIN",
+        "text": "»MITTELFURT AM GROSSEN SEE — GEZÄHLT UND VERMESSEN IM SIEBTEN JAHR DER WACHT.«",
+        "thought": "Früher verbanden feste Wege alle fünf Wiesenlande miteinander."
+      },
+      {
+        "id": "order_stone_hochland",
+        "tile": [514, 182],
+        "variant": 1,
+        "speaker": "ALTER GRENZSTEIN",
+        "text": "»NORDMARK DES LEERENBLÜHENS — WER WEITER GEHT, TRAGE LICHT BEI SICH.«",
+        "thought": "Hier oben pfeift der Wind ungebremst über die Kuppen."
+      },
+      {
+        "id": "order_stone_westweide",
+        "tile": [274, 758],
+        "variant": 2,
+        "speaker": "ALTER GRENZSTEIN",
+        "text": "»WEIDEGRENZE DER SÜDHÄNGE — KEIN SCHWERT ZIEHE, WER HIER OBST UND ÄHREN TEILT.«",
+        "thought": "Hier lagen einst die großen Obstgärten und Schafweiden der alten Siedler."
+      }
+    ]
+  },
+  "water_works": {
+    "watermills": [
+      {
+        "id": "mill_auental",
+        "name": "ALTE AUENMÜHLE",
+        "sub": "DAS MÜHLRAD DREHT SICH WIEDER IM STROM",
+        "tile": [789, 725],
+        "wheel_side": "east",
+        "chest_tier": "rare"
+      },
+      {
+        "id": "mill_nebelbach",
+        "name": "MOOSMÜHLE AM NEBELBACH",
+        "sub": "DIE ALTE MÜHLENKAMMER IST GEÖFFNET",
+        "tile": [857, 561],
+        "wheel_side": "east",
+        "chest_tier": "rare"
+      },
+      {
+        "id": "mill_suedfurt",
+        "name": "VERLASSENE KORNMÜHLE",
+        "sub": "WASSERRAD VOM TREIBHOLZ BEFREIT",
+        "tile": [643, 803],
+        "wheel_side": "east",
+        "chest_tier": "common"
+      }
+    ],
+    "broken_bridges": [
+      {
+        "id": "bridge_auental",
+        "tile": [725, 697],
+        "axis": "ew",
+        "neg_bank": [721, 697],
+        "pos_bank": [727, 697],
+        "chest_tier": "common",
+        "chest_bank": "pos"
+      },
+      {
+        "id": "bridge_oststrom",
+        "tile": [817, 633],
+        "axis": "ew",
+        "neg_bank": [814, 633],
+        "pos_bank": [820, 633],
+        "chest_tier": "rare",
+        "chest_bank": "pos"
+      },
+      {
+        "id": "bridge_waldbach",
+        "tile": [775, 589],
+        "axis": "ns",
+        "neg_bank": [775, 586],
+        "pos_bank": [775, 592],
+        "chest_tier": "common",
+        "chest_bank": "neg"
+      },
+      {
+        "id": "bridge_hochwasser",
+        "tile": [857, 593],
+        "axis": "ew",
+        "neg_bank": [854, 593],
+        "pos_bank": [860, 593],
+        "chest_tier": "common",
+        "chest_bank": "pos"
+      }
+    ],
+    "fisher_piers": [
+      {
+        "id": "pier_glassee",
+        "lake": "lake_336_412",
+        "tile": [347, 467],
+        "dir": 2,
+        "boat_tile": [345, 468]
+      },
+      {
+        "id": "pier_mittelsee_ost",
+        "lake": "lake_516_464",
+        "tile": [629, 487],
+        "dir": 2,
+        "boat_tile": [627, 488]
+      },
+      {
+        "id": "pier_ruinensee",
+        "lake": "lake_768_376",
+        "tile": [775, 439],
+        "dir": 0,
+        "boat_tile": [776, 441]
+      },
+      {
+        "id": "pier_mittelsee_west",
+        "lake": "lake_516_464",
+        "tile": [527, 487],
+        "dir": 0,
+        "boat_tile": [528, 489]
+      },
+      {
+        "id": "pier_spiegelsee",
+        "lake": "lake_784_484",
+        "tile": [829, 507],
+        "dir": 2,
+        "boat_tile": [827, 508]
+      },
+      {
+        "id": "pier_klippenteich",
+        "lake": "lake_248_476",
+        "tile": [255, 475],
+        "dir": 2,
+        "boat_tile": [253, 476]
+      }
+    ]
+  }
+}

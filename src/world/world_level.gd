@@ -67,6 +67,7 @@ var _barriers: Dictionary = {} ## id -> StaticBody2D: the invisible walls that k
 var _stone_cells: Dictionary = {} ## tiles lying on the old flagstones: no trees there
 var opening_over: bool = false
 var witch_arena: WitchArena
+var hallgrat: Hallgrat ## the stone town in the west and the milestones of the Westweg (docs/stadt_westen_konzept.md)
 var _cover_at: Vector2 = Vector2.ZERO ## the manhole cover (world px), where the story starts; zero = none baked
 var _building: ChunkBuild
 var _gen_pool: Array[PropGenerator] = [] ## forks of `_generator` for the worker jobs (each has its own cluster cache)
@@ -74,11 +75,32 @@ var _gen_lock: Mutex = Mutex.new()
 var _paused_builds: Dictionary = {} ## Vector2i -> ChunkBuild: half-prepared chunks the stream moved away from; kept while still wanted
 var _pending_commit: ChunkBuild ## committed ground waiting one frame for its props (see `_finish_commit`)
 var night: NightDirector ## host: spawns and steers the creatures of the night
+var desert_observatory: DesertObservatory ## Die Zenitwarte: grand 5-zone observatory landmark in Region 34
+var desert_ruins: DesertRuins ## active quartz arches, conduits, obelisks & seals across Sonnenquarz-Öde
+var desert_guardians: DesertGuardians ## host: spawns 24/7 QuartzGolem guardians exclusively on ground-quartz outcrops
+var meadow_landmarks: MeadowLandmarks ## SolitaryTree hilltop oaks, ForestShrines & SunbeamShafts across the 3 meadow macro-landscapes
+var _moss_carpet_tex: Texture2D
+var _pasture_paving_tex: Texture2D
 var knight_taken: bool = false ## Valdric is a settler (`take_knight`): the story actor stays hidden
 var torben_taken: bool = false ## Torben is a settler (`take_torben`): the story actor stays hidden
 var _town_node: TownManager ## the player's town (docs/town.md): what it has cleared stays cleared
 var _tiles: Dictionary
 var loading_in_steps: bool = false ## launcher pumps the existing cooperative stream while gameplay is paused
+var _vista_focus_cell: Vector2i = Vector2i(-999, -999) ## local panoramic VistaPoint centre chunk (-999 = inactive)
+var _vista_focus_radius: int = 0
+
+
+func set_vista_focus(world_pos: Vector2, chunk_radius: int = 2) -> void:
+	_vista_focus_cell = Vector2i(world_pos / (16.0 * CHUNK))
+	_vista_focus_radius = maxi(chunk_radius, 1)
+	_stream_settled = false
+
+
+func clear_vista_focus() -> void:
+	if _vista_focus_radius != 0:
+		_vista_focus_cell = Vector2i(-999, -999)
+		_vista_focus_radius = 0
+		_stream_settled = false
 
 @onready var _wildlife: WildlifePopulation = $Wildlife
 
@@ -127,6 +149,7 @@ class ChunkBuild:
 	var patches_seen: Array[Node] = [] ## Terrain.patches as this chunk last saw them (compared per candidate)
 	var job: Jobs.Job ## phases 0-4 (generator, ground, cliffs, prop nodes) run on a worker thread (Jobs); null = not started / sliced on the main thread
 	var beds_pending: Array[Dictionary] = [] ## forest beds that passed the worker checks; the surface patches decide on the main thread
+	var decals_pending: Array[Dictionary] = [] ## moss_carpet & pasture_paving ground decals checked against surface patches on the main thread
 	var gen_ready: bool = false ## the job delivered: phases 0-4 are done, the build is the main thread's again
 	var filtered: bool = false ## the prepared props were checked against the live world (`_filter_prepared`)
 	var young: Dictionary = {} ## cell -> sapling record, applied to `_young` by `_filter_prepared`
@@ -164,6 +187,9 @@ func _fill_ground() -> void:
 	var waystones: Waystones = Waystones.new() ## the goddess statues (teleport points): which are awake (docs/waystones.md)
 	waystones.name = "Waystones"
 	add_child(waystones)
+	var vistas: Vistas = Vistas.new() ## the panoramic cliff-edge VistaPoints (docs/wiesenbiom_ausbau_konzept.md)
+	vistas.name = "Vistas"
+	add_child(vistas)
 	var relics: BossRelics = BossRelics.new() ## what the bosses leave to one player alone (docs/rissfeder.md)
 	relics.name = "BossRelics"
 	add_child(relics)
@@ -200,6 +226,11 @@ func _fill_ground() -> void:
 	Moisture.world_seed = _map.world_seed
 	_generator.bare = _map.bare_cells()
 	BiomeBlend.install(_map)
+	MeadowHabitats.install(_map, _relief, _sdf)
+	if ResourceLoader.exists("res://assets/props/moss_carpet.png"):
+		_moss_carpet_tex = load("res://assets/props/moss_carpet.png") as Texture2D
+	if ResourceLoader.exists("res://assets/props/pasture_paving.png"):
+		_pasture_paving_tex = load("res://assets/props/pasture_paving.png") as Texture2D
 	_generator.blocked_cells = _add_ground_decals()
 	_generator.extra_props = _extra_props()
 	_rivers = WorldRivers.new()
@@ -207,6 +238,27 @@ func _fill_ground() -> void:
 	add_child(_rivers)
 	_generator.water_clear = _rivers.clear_for_prop
 	_generator.water_dist = func(at: Vector2) -> float: return _rivers.field_at(at).x
+	desert_observatory = DesertObservatory.new()
+	desert_observatory.name = "DesertObservatory"
+	var obs_spec: Dictionary = desert_observatory.setup(self, _generator.blocked_cells)
+	_generator.blocked_cells.merge(obs_spec.get("blocked", {}) as Dictionary)
+	_stone_cells.merge(obs_spec.get("stones", {}) as Dictionary)
+	add_child(desert_observatory)
+	desert_ruins = DesertRuins.new()
+	desert_ruins.name = "DesertRuins"
+	var ruin_blocked: Dictionary = desert_ruins.setup(self, _generator.blocked_cells)
+	_generator.blocked_cells.merge(ruin_blocked)
+	_generator.extra_props.append_array(desert_ruins.extra_masonry())
+	add_child(desert_ruins)
+	desert_guardians = DesertGuardians.new()
+	desert_guardians.name = "DesertGuardians"
+	desert_guardians.setup(self, _generator.blocked_cells)
+	add_child(desert_guardians)
+	meadow_landmarks = MeadowLandmarks.new()
+	meadow_landmarks.name = "MeadowLandmarks"
+	var ml_blocked: Dictionary = meadow_landmarks.setup(self, _generator.blocked_cells)
+	_generator.blocked_cells.merge(ml_blocked)
+	add_child(meadow_landmarks)
 	_generator.tree_free_cells = _stone_cells
 	_generator.berry_free_cells = _berry_free
 	var scenes: Array[String] = []
@@ -293,6 +345,15 @@ func _add_ground_decals() -> Dictionary:
 		post.flag = String(sign_spec.get("flag", ""))
 		add_child(post)
 		_clear_around(clear, post.position, int(sign_spec.get("clear_radius", 3)))
+	hallgrat = Hallgrat.new()
+	for spot: Vector2 in hallgrat.setup():
+		_clear_around(clear, spot, 2) ## no bush or tree on a milestone
+	for cell: Vector2i in hallgrat.clear_cells():
+		clear[cell] = true
+	for run: Array in baked.get("hallgrat_clear", []) as Array: ## Hallgrat's paved squares and streets (tools/bake_hallgrat_ground.py) stay free
+		for tx: int in range(int(run[1]), int(run[2]) + 1):
+			clear[Vector2i(tx, int(run[0]))] = true
+	add_child(hallgrat)
 	var crow_site: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/crow_tree_site.json")) as Dictionary
 	var crow_tree: CrowTree = CrowTree.new()
 	crow_tree.name = "CrowTree"
@@ -316,9 +377,24 @@ func _add_ground_decals() -> Dictionary:
 		statue.id = String(stone_spec.id)
 		statue.display_name = String(stone_spec.get("name", ""))
 		statue.reveal_cells = float(stone_spec.get("reveal", 15.0))
+		statue.paved = bool(stone_spec.get("paved", false)) ## stands on a town's paving (Hallgrat's forum): no wild bed of its own
 		statue.position = Vector2(float(wtile[0]), float(wtile[1])) * 16.0 + Vector2(8, 8)
 		add_child(statue)
 		_clear_around(clear, statue.position, int(stone_spec.get("clear_radius", 5)))
+	var vista_table: Dictionary = DataRegistry.table("vistas")
+	var vista_clear: int = int((vista_table.get("settings", {}) as Dictionary).get("clear_radius", 3))
+	for vista_spec: Dictionary in vista_table.get("vistas", []) as Array: ## panoramic cliff-edge resting places (VistaPoint)
+		var vista: VistaPoint = VistaPoint.new()
+		var vtile: Array = vista_spec.tile as Array
+		vista.name = "Vista_" + String(vista_spec.id)
+		vista.vista_id = String(vista_spec.id)
+		vista.vista_name = String(vista_spec.get("name", ""))
+		vista.vista_sub = String(vista_spec.get("sub", ""))
+		vista.sector = int(vista_spec.get("sector", 2))
+		vista.variant = int(vista_spec.get("variant", 0))
+		vista.position = Vector2(float(vtile[0]), float(vtile[1])) * 16.0 + Vector2(8, 8)
+		add_child(vista)
+		_clear_around(clear, vista.position, int(vista_spec.get("clear_radius", vista_clear)))
 	for hut_spec: Dictionary in DataRegistry.table("ground").get("huts", []) as Array: ## buildings with an interior behind their door
 		var hut: Hut = Hut.new()
 		var htile: Array = hut_spec.tile as Array
@@ -386,6 +462,12 @@ func _add_ground_decals() -> Dictionary:
 		var gat: Array = guard.at as Array
 		_clear_around(clear, centre + Vector2(float(gat[0]), float(gat[1])), 3) ## no bush or tree beside a guard
 	for path: Dictionary in DataRegistry.table("ground").get("paths", []) as Array:
+		if bool(path.get("quartz_caravan", false)): ## sand-drifted ancient caravan trail: clear only exposed flagstone cells so desert scrub grows in buried gaps
+			for cell_v: Variant in _stone_cells.keys():
+				var sc: Vector2i = cell_v as Vector2i
+				if _generator.is_desert_bare(sc):
+					clear[sc] = true
+			continue
 		var points: Array = path.points as Array
 		var reach: int = ceili((float(path.get("width", 24.0)) * 0.5 + 14.0) / 16.0)
 		for i: int in range(points.size() - 1):
@@ -1145,6 +1227,8 @@ func _stream(all: bool) -> void:
 			var forward: Vector2i = Vector2i((at + velocity * LOOKAHEAD_SECONDS) / (16.0 * CHUNK))
 			if forward != own and not ahead.has(forward):
 				ahead.append(forward)
+	if _vista_focus_radius > 0:
+		centers.append(_vista_focus_cell)
 	if is_instance_valid(editor_camera):
 		centers.append(Vector2i(editor_camera.position / (16.0 * CHUNK)))
 	# Nothing changed since a pass that left nothing to load or drop: only a moved player, a pending build or the editor needs the loops.
@@ -1163,6 +1247,8 @@ func _stream(all: bool) -> void:
 		var center: Vector2i = centers[center_index]
 		var penalty: int = 0 if center_index < own_count else 3 ## the look-ahead ring waits for the rings the players stand in
 		var radius: int = LOAD_RADIUS
+		if _vista_focus_radius > 0 and center == _vista_focus_cell:
+			radius = maxi(radius, _vista_focus_radius)
 		if is_instance_valid(editor_camera) and center == Vector2i(editor_camera.position / (16.0 * CHUNK)):
 			radius = clampi(ceili(get_viewport_rect().size.x / editor_camera.zoom.x / (16.0 * CHUNK) * 0.5 + 0.5), 1, 4)
 		for dy: int in range(-radius, radius + 1):
@@ -1225,6 +1311,8 @@ func _stream(all: bool) -> void:
 		var near: bool = false
 		for center: Vector2i in centers:
 			var radius: int = UNLOAD_RADIUS
+			if _vista_focus_radius > 0 and center == _vista_focus_cell:
+				radius = maxi(radius, _vista_focus_radius + 1)
 			if is_instance_valid(editor_camera) and center == Vector2i(editor_camera.position / (16.0 * CHUNK)):
 				radius = clampi(ceili(get_viewport_rect().size.x / editor_camera.zoom.x / (16.0 * CHUNK) * 0.5 + 0.5), 1, 4) + 1
 			if maxi(absi(c.x - center.x), absi(c.y - center.y)) <= radius:
@@ -1397,6 +1485,8 @@ func _filter_prepared(build: ChunkBuild) -> void:
 	build.chunk.things = kept
 	for bed: Dictionary in build.beds_pending:
 		_add_forest_bed(build.chunk.node, bed.pos as Vector2, int(bed.variant), true)
+	for dec: Dictionary in build.decals_pending:
+		_add_habitat_decal(build.chunk.node, String(dec.kind), dec.pos as Vector2, int(dec.variant))
 
 
 func _advance_to(build: ChunkBuild, deadline: int, last_phase: int) -> bool:
@@ -1440,6 +1530,9 @@ func _advance_to(build: ChunkBuild, deadline: int, last_phase: int) -> bool:
 				elif String(spec.kind) == "forestbed":
 					if _forest_bed_ok(spec.pos as Vector2, int(spec.variant), false): ## (the surface patches are asked on the main thread, `_filter_prepared`)
 						build.beds_pending.append({"pos": spec.pos, "variant": spec.variant})
+				elif String(spec.kind) == "moss_carpet" or String(spec.kind) == "pasture_paving":
+					if _habitat_decal_ok(String(spec.kind), spec.pos as Vector2):
+						build.decals_pending.append({"kind": String(spec.kind), "pos": spec.pos, "variant": int(spec.variant)})
 				elif not edits.props.has(WorldEdits.key(spec.cell as Vector2i)):
 					_prepare_thing(build, spec.cell, String(spec.kind), int(spec.variant), spec)
 			4:
@@ -1488,6 +1581,11 @@ func _advance_to(build: ChunkBuild, deadline: int, last_phase: int) -> bool:
 				if build.index == 0:
 					build.clover_rng.seed = hash(Vector4i(build.cell.x, build.cell.y, _map.world_seed, 6151))
 					build.clover_count = 2 + (1 if build.clover_rng.randf() < 0.6 else 0) + (1 if build.clover_rng.randf() < 0.3 else 0)
+					var mid_chunk_px: Vector2 = Vector2(build.cell * CHUNK + Vector2i(16, 16)) * 16.0
+					if MeadowHabitats.wind_meadow_at(mid_chunk_px) >= 0.38:
+						build.clover_count += 3 ## broad clover-and-blossom seas across open Windwiesen
+					elif MeadowHabitats.deep_forest_at(mid_chunk_px) >= 0.45:
+						build.clover_count = 0 ## almost no grass/clover beneath the dark Urforst fir dome
 				if build.index < build.clover_count:
 					for _attempt: int in 5: ## a spot that is not open ground is given up on, the next try is somewhere else
 						if _try_clover_field(build, build.clover_rng):
@@ -1619,6 +1717,10 @@ func _finish_commit(deadline: int = 0) -> void:
 		_pending_commit = null
 		if sowing != null:
 			sowing.populate(build.cell, chunk)
+		if desert_ruins != null:
+			desert_ruins.populate_chunk(build.cell)
+		if meadow_landmarks != null:
+			meadow_landmarks.populate_chunk(build.cell)
 		_rivers.attach_chunk(chunk.node, build.cell)
 		_chunks[build.cell] = chunk
 		LeafCritter.settle_chunk(chunk.things)
@@ -1811,6 +1913,10 @@ func _unload_chunk(c: Vector2i) -> void:
 		_unregister_harvest(field)
 		_props.remove_child(field)
 		field.queue_free()
+	if desert_ruins != null:
+		desert_ruins.free_chunk(c)
+	if meadow_landmarks != null:
+		meadow_landmarks.free_chunk(c)
 	remove_child(chunk.node)
 	chunk.node.queue_free()
 	_chunks.erase(c)
@@ -1819,14 +1925,20 @@ func _unload_chunk(c: Vector2i) -> void:
 # ---------------------------------------------------------------------------------- props
 ## Insert obstacle discs into every covered bucket, including moved/scaled authored props.
 func _index_detail_obstacle(build: ChunkBuild, obstacle: Dictionary) -> void:
-	if String(obstacle.kind) == "forestbed": ## the forest floor does not block small plants, it changes which ones grow
+	var obs_kind: String = String(obstacle.kind)
+	if obs_kind == "forestbed": ## the forest floor does not block small plants, it changes which ones grow
 		if _forest_bed_ok(obstacle.pos as Vector2, int(obstacle.variant)):
 			build.beds.append({"pos": obstacle.pos, "rx": PropGenerator.FOREST_BED_RX[int(obstacle.variant) % PropGenerator.FOREST_BED_RX.size()]})
 		return
+	if obs_kind == "moss_carpet":
+		build.beds.append({"pos": obstacle.pos, "rx": 64.0})
+		return
+	if obs_kind == "pasture_paving":
+		return
 	if not bool(obstacle.get("custom", false)) and obstacle.has("cell") and edits.props.has(WorldEdits.key(obstacle.cell as Vector2i)): return
 	var radius: float = 60.0
-	if String(obstacle.kind) != "stonebed":
-		var plant: Dictionary = DataRegistry.get_entry("plants", String(obstacle.kind))
+	if obs_kind != "stonebed":
+		var plant: Dictionary = DataRegistry.get_entry("plants", obs_kind)
 		radius = float((plant.radius as Array)[int(obstacle.variant)]) * float(obstacle.get("scale", 1.0))
 	radius += 8.0
 	var pos: Vector2 = obstacle.pos
@@ -1846,6 +1958,13 @@ func _detail_candidate(build: ChunkBuild) -> void:
 		return
 	var biome: String = _land_biome(cell)
 	var density: float = float(build.density.get(biome, 0.3))
+	var cell_px: Vector2 = Vector2(cell) * 16.0 + Vector2(8.0, 8.0)
+	var w_deep_det: float = MeadowHabitats.deep_forest_at(cell_px)
+	var w_wind_det: float = MeadowHabitats.wind_meadow_at(cell_px)
+	if w_wind_det > 0.25:
+		density *= 1.0 + 0.48 * w_wind_det
+	elif w_deep_det > 0.35:
+		density *= 1.0 - 0.35 * w_deep_det
 	var patch: float = _zone.get_noise_2d(cell.x * 2.3, cell.y * 2.3)
 	if build.rng.randf() > density * (0.8 + patch):
 		return
@@ -1891,9 +2010,9 @@ func _detail_candidate(build: ChunkBuild) -> void:
 		kind = [9,10,11,18,19,20,21][build.rng.randi_range(0,6)]
 	elif biome == "glass_cliffs":
 		kind = [0,2,5,7][build.rng.randi_range(0,3)]
-	if in_bed:
-		if build.rng.randf() < (0.15 if biome == "witch_forest" else 0.45): return ## the Hexenwald's floor is its own ground cover: little is left bare
-		kind = [9,10,11,18,19,24,24,25,25,25][build.rng.randi_range(0,9)] ## ferns and shade moss
+	if in_bed or w_deep_det >= 0.42:
+		if build.rng.randf() < (0.15 if biome == "witch_forest" else (0.35 if w_deep_det >= 0.42 else 0.45)): return ## the Hexenwald's floor is its own ground cover: little is left bare
+		kind = [9,10,11,18,19,24,24,25,25,25][build.rng.randi_range(0,9)] ## ferns and shade moss (no open meadow grass under the Urforst dome!)
 	else:
 		var slope: float = _generator.aspect(pos / 16.0)
 		if slope < -0.35 and build.rng.randf() < 0.65:
@@ -1943,10 +2062,26 @@ func _detail_candidate(build: ChunkBuild) -> void:
 func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 	var field: Dictionary = CloverField.plan(rng)
 	var tile: Vector2i = build.cell * CHUNK + Vector2i(rng.randi_range(5, CHUNK - 6), rng.randi_range(5, CHUNK - 6))
-	var open: float = 1.0 - smoothstep(0.5, 0.78, 1.0 - (_zone.get_noise_2d(tile.x, tile.y) * 0.5 + 0.5)) ## clover likes the open ground
+	var center: Vector2 = Vector2(tile) * 16.0 + Vector2(8, 8)
+	if MeadowHabitats.deep_forest_at(center) >= 0.38:
+		return false
+	var w_wind_cf: float = MeadowHabitats.wind_meadow_at(center)
+	var open: float = maxf(w_wind_cf, 1.0 - smoothstep(0.5, 0.78, 1.0 - (_zone.get_noise_2d(tile.x, tile.y) * 0.5 + 0.5))) ## clover likes the open ground
 	if rng.randf() > 0.6 + 0.4 * open:
 		return false
-	var center: Vector2 = Vector2(tile) * 16.0 + Vector2(8, 8)
+	if w_wind_cf >= 0.38:
+		var wf_kind: String = MeadowHabitats.wind_flower_at(Vector2(tile))
+		var wf_colors: Array[int] = [3] ## golden (Goldauge / sunbloom)
+		if wf_kind == "moonbell":
+			wf_colors = [4, 2] ## pale blue & lilac
+		elif wf_kind == "spark_poppy":
+			wf_colors = [5, 1] ## peach & rose
+		elif wf_kind == "puffseed":
+			wf_colors = [0] ## white
+		field["flower_colors"] = wf_colors
+		field["flower_share"] = rng.randf_range(0.18, 0.32)
+		field["rx"] = float(field.rx) * 1.18
+		field["ry"] = float(field.ry) * 1.18
 	var square: TownManager = town()
 	if square != null and square.cleared.has(Vector2i((center / 16.0).floor())):
 		return false ## a town piece cleared this field for good (`town_clear_clover`)
@@ -2047,6 +2182,35 @@ func _add_forest_bed(parent: Node2D, at: Vector2, variant: int, checked: bool = 
 	parent.add_child(bed)
 
 
+func _habitat_decal_ok(kind: String, at: Vector2) -> bool:
+	var rx: float = 68.0 if kind == "moss_carpet" else 42.0
+	if not _rivers.clear_for_prop(at, rx * 0.78) or not _relief.flat_around(at, rx * 0.55):
+		return false
+	for angle: float in [0.0, PI * 0.5, PI, PI * 1.5]:
+		var edge: Vector2 = at + Vector2.from_angle(angle) * Vector2(rx, rx * 0.65) * 0.75
+		var cell: Vector2i = Vector2i((edge / 16.0).floor())
+		if not _land_at(cell.x, cell.y) or _generator.blocked_cells.has(cell) or _stone_cells.has(cell):
+			return false
+	return true
+
+
+func _add_habitat_decal(parent: Node2D, kind: String, at: Vector2, variant: int) -> void:
+	if not _forest_bed_patches_ok(at):
+		return
+	var tex: Texture2D = _moss_carpet_tex if kind == "moss_carpet" else _pasture_paving_tex
+	if tex == null:
+		return
+	var fw: int = 160 if kind == "moss_carpet" else 96
+	var fh: int = 108 if kind == "moss_carpet" else 64
+	var dec: Sprite2D = Sprite2D.new()
+	dec.texture = tex
+	dec.region_enabled = true
+	dec.region_rect = Rect2(clampi(variant, 0, 3) * fw, 0, fw, fh)
+	dec.position = at
+	dec.z_index = -9
+	parent.add_child(dec)
+
+
 func _create_thing(cell: Vector2i, prop_kind: String, variant: int, extra: Dictionary = {}) -> WorldProp:
 	var scene: PackedScene = load(String(DataRegistry.get_entry("plants", prop_kind).scene)) as PackedScene
 	var thing: WorldProp = scene.instantiate() as WorldProp
@@ -2073,6 +2237,9 @@ func export_things() -> Dictionary:
 		out["h:" + key] = _harvest_states[key]
 	if sowing != null:
 		out.merge(sowing.export()) ## plants that seeded themselves: "s:x,y"
+	if desert_ruins != null:
+		for seal_id_v: Variant in desert_ruins.export_state():
+			out["r:" + String(seal_id_v)] = {"a": 1}
 	return out
 
 
@@ -2082,8 +2249,14 @@ func import_things(saved: Dictionary) -> void:
 	_harvest_states.clear()
 	if sowing != null:
 		sowing.import_saved(saved)
+	var saved_seals: Array = []
+	for key_r: String in saved:
+		if key_r.begins_with("r:"):
+			saved_seals.append(key_r.substr(2))
+	if desert_ruins != null:
+		desert_ruins.import_state(saved_seals)
 	for key: String in saved:
-		if key.begins_with("s:"):
+		if key.begins_with("s:") or key.begins_with("r:"):
 			continue
 		var state: Dictionary = {}
 		for field: String in (saved[key] as Dictionary):
@@ -2156,6 +2329,7 @@ func _host_pick(cell: Vector2i, peer: int) -> void:
 	if thing.reach_distance(player.global_position) > Interactable.INTERACT_RANGE + PICK_SLACK:
 		return
 	_pick_thing(thing)
+	DesertGuardians.notify_disturbance(get_tree(), thing.global_position, player, false)
 
 
 ## Host: hand over what `thing` gives when picked and mark it picked (E, or a sickle blow on a plant that is picked).
@@ -2250,13 +2424,16 @@ func harvest_hit(thing: WorldProp, source: int) -> void:
 	if harvest.is_empty() and thing.spec().has("pickup") and not thing.spec().has("pull"): ## plants E picks: the sickle cuts them too
 		if tool_id == "sickle" and thing.prompt() != "":
 			_pick_thing(thing)
+			DesertGuardians.notify_disturbance(get_tree(), thing.global_position, player, false)
 		elif thing.prompt() != "":
 			_rpc_thing_state.rpc(thing.cell, thing.state, "rustle")
+			DesertGuardians.notify_disturbance(get_tree(), thing.global_position, player, true)
 		return
 	if harvest.is_empty() or thing.is_depleted():
 		return
 	if tool_id != String(harvest.tool):
 		_rpc_thing_state.rpc(thing.cell, thing.state, "rustle")
+		DesertGuardians.notify_disturbance(get_tree(), thing.global_position, player, true)
 		return
 	var hits: int = int(thing.state.get("h", 0)) + 1
 	var next: Dictionary = thing.state.duplicate()
@@ -2270,6 +2447,7 @@ func harvest_hit(thing: WorldProp, source: int) -> void:
 			next["f"] = 1
 	DropComponent.spawn_drops(get_tree(), entries, thing.global_position + Vector2(0, -10))
 	_rpc_thing_state.rpc(thing.cell, next, "strip" if strip else "hit")
+	DesertGuardians.notify_disturbance(get_tree(), thing.global_position, player, false)
 
 
 ## Host, every sunrise: each harvested prop gets one slot back per `regrow_days` of its kind, picked
@@ -2328,6 +2506,7 @@ func harvest_field_hit(node: Node, source: int) -> void:
 	var state: Dictionary = (_harvest_states.get(key, {}) as Dictionary).duplicate()
 	if tool_id != String(spec.get("tool", "")):
 		_rpc_harvest_state.rpc(key, state, "rustle", at)
+		DesertGuardians.notify_disturbance(get_tree(), (node as Node2D).global_position, player, true)
 		return
 	state["h"] = int(state.get("h", 0)) + 1
 	var strip: bool = int(state["h"]) >= int(spec.get("hits", 1))
@@ -2343,6 +2522,7 @@ func harvest_field_hit(node: Node, source: int) -> void:
 		entries.append_array(spec.final_drops as Array)
 	DropComponent.spawn_drops(get_tree(), entries, (node as Node2D).global_position + Vector2(0, -6))
 	_rpc_harvest_state.rpc(key, state, "strip" if strip else "hit", at)
+	DesertGuardians.notify_disturbance(get_tree(), (node as Node2D).global_position, player, false)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -2406,7 +2586,11 @@ func _rabbit_habitat(at: Vector2) -> bool:
 
 
 func _bird_habitat(at: Vector2, species: String) -> bool:
-	if BiomeBlend.arid_at(at) >= 0.22:
+	var arid: float = BiomeBlend.arid_at(at)
+	if species == "desert_falcon":
+		if arid < 0.35:
+			return false
+	elif arid >= 0.22:
 		return false
 	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
 	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
@@ -2416,7 +2600,11 @@ func _bird_habitat(at: Vector2, species: String) -> bool:
 
 
 func _fauna_habitat(at: Vector2, species: String) -> bool:
-	if BiomeBlend.arid_at(at) >= 0.22:
+	var arid: float = BiomeBlend.arid_at(at)
+	if species in ["oryx", "fennec", "jerboa", "agama", "scarab"]:
+		if arid < 0.35:
+			return false
+	elif arid >= 0.22:
 		return false
 	var cell: Vector2i = Vector2i(floori(at.x / 16.0), floori(at.y / 16.0))
 	if not _land_at(cell.x, cell.y) or _sdf[cell.y * RegionMap.WORLD_TILES + cell.x] < 152:
@@ -2440,6 +2628,16 @@ func _flower_targets(chunk: Vector2i) -> Array[Vector2]:
 				var px: Vector2 = Vector2(cell) * 16.0 + Vector2(8, 8)
 				if BiomeBlend.arid_at(px) < 0.22 and _land_biome(cell) != "quartz_desert":
 					result.append(px)
+	# Also feed standing flower props (`sunbloom`, `moonbell`, `spark_poppy`, `puffseed`, `mist_lily`) and blooming CloverFields
+	# so butterflies and bees genuinely swarm across the monoculture flower seas of Windwiesen!
+	if _chunks.has(chunk):
+		var loaded_chunk: Chunk = _chunks[chunk] as Chunk
+		for thing: WorldProp in loaded_chunk.things:
+			if thing != null and not thing.is_depleted() and thing.kind in ["sunbloom", "moonbell", "spark_poppy", "puffseed", "mist_lily", "orchard_apple", "orchard_pear"]:
+				result.append(thing.global_position)
+		for cf: CloverField in loaded_chunk.clover:
+			if cf != null and not cf.cut:
+				result.append(cf.global_position)
 	return result
 
 
@@ -2551,7 +2749,7 @@ func _town_soft(thing: WorldProp) -> bool:
 		return true
 	if thing.kind in PropGenerator.TREE_KINDS:
 		return thing.state.has("f") ## felled: stump and sapling have no collision (a young tree grows back by itself otherwise)
-	return (thing.kind == "rock" or thing.kind == "iron_rock" or thing.kind == "curse_rock" or thing.kind == "sun_quartz_rock") and thing.is_depleted()
+	return thing.kind in ["rock", "iron_rock", "curse_rock", "sun_quartz_rock", "prism_vein", "ruin_sandstone"] and thing.is_depleted()
 
 
 ## The loaded props a foundation on `rect` sweeps away (cells): bushes, grass, pebbles, mushrooms, stumps and spent rocks.

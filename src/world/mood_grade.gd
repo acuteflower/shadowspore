@@ -10,6 +10,8 @@ var _material: ShaderMaterial
 var _keys: Array[Dictionary] = []
 var _indoors: Dictionary = {}
 var _hex: Dictionary = {}
+var _desert: Dictionary = {}
+var _desert_storm: Dictionary = {}
 var _strength: float = 1.0
 var _scale: float = -1.0
 
@@ -23,6 +25,8 @@ func _ready() -> void:
 		_keys.append(_parse(entry as Dictionary))
 	_indoors = _parse(data.get("indoors", {}) as Dictionary)
 	_hex = _parse(data.get("hex", {}) as Dictionary)
+	_desert = _parse(data.get("desert", {}) as Dictionary)
+	_desert_storm = _parse(data.get("desert_storm", {}) as Dictionary)
 	var copy: BackBufferCopy = BackBufferCopy.new() ## a fresh copy of the picture with moonlight and fog already in it
 	copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
 	add_child(copy)
@@ -55,13 +59,20 @@ static func blend(a: Dictionary, b: Dictionary, weight: float) -> Dictionary:
 	return out
 
 
-## Every frame (DayNight): `indoors` = a room or the mine, `gloom` = the Hexenwald's share at the camera (0..1).
-func follow(indoors: bool, gloom: float) -> void:
+## Every frame (DayNight): `indoors` = a room or the mine, `gloom` = the Hexenwald's share, `arid` = Sonnenquarz-Öde's share, `arcane_storm` = Arkanes Quarzgewitter.
+func follow(indoors: bool, gloom: float, arid: float = 0.0, arcane_storm: float = 0.0) -> void:
 	if not visible:
 		return
 	var mood: Dictionary = _indoors if indoors else mood_at(TimeManager.time_of_day)
-	if not indoors and gloom > 0.0:
-		mood = blend(mood, _hex, gloom)
+	if not indoors:
+		if gloom > 0.0:
+			mood = blend(mood, _hex, gloom)
+		if arid > 0.02:
+			var sun_desert: float = clampf(arid * TimeManager.sun_amount() * 0.65, 0.0, 0.65)
+			if sun_desert > 0.01:
+				mood = blend(mood, _desert, sun_desert)
+			if arcane_storm > 0.02:
+				mood = blend(mood, _desert_storm, clampf(arcane_storm * 0.90, 0.0, 0.92))
 	var shadow: Color = mood["shadow"] as Color
 	var light: Color = mood["light"] as Color
 	_material.set_shader_parameter("shadow_tint", Vector3(shadow.r, shadow.g, shadow.b))

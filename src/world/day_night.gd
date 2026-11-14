@@ -116,8 +116,8 @@ func _update() -> void:
 		_sun_glow.set_shader_parameter("sun", sun)
 		_sun_glow.set_shader_parameter("golden", 0.0 if indoors else golden)
 	## water glints, crystal and flora sparkle, void lip: only sent when they really moved
-	var night: float = TimeManager.night_amount()
-	night = lerpf(night, 1.0, gloom) ## its glowing plants, moon patches and mist are always at night strength
+	var clock_night: float = TimeManager.night_amount()
+	var night: float = lerpf(clock_night, 1.0, gloom) ## its glowing plants, moon patches and mist are always at night strength
 	var g_night: float = 0.0 if indoors else night
 	var g_dew: float = 0.0 if indoors else maxf(TimeManager.dew_amount(), 0.7 * Moisture.wetness()) ## the wet ground shows dew drops
 	if absf(sun - _g_sun) > GLOBAL_EPSILON:
@@ -136,10 +136,13 @@ func _update() -> void:
 		get_tree().call_group("night_lights", "set_night", night)
 	_ambience.follow(sun * (1.0 - 0.8 * _weather.local_rain), night, indoors, get_process_delta_time())
 	_sky.update(indoors, get_process_delta_time(), TimeManager.ambient_color() if not indoors else Color(1, 1, 1))
-	_music.night = night if not indoors else TimeManager.night_amount()
+	_music.night = clock_night
+	if not indoors:
+		_music.gloom = gloom
+		_music.arid = _arid_here()
 	_music.indoors = indoors
 	_atmosphere.update(indoors)
-	_mood.follow(indoors, gloom)
+	_mood.follow(indoors, gloom, _arid_here() if not indoors else 0.0, _weather.desert_arcane_storm if not indoors else 0.0)
 	if _glow != null:
 		_glow.set_shader_parameter("night", night)
 
@@ -157,3 +160,9 @@ func _camera_in_room() -> bool:
 func _gloom_here() -> float:
 	var camera: Camera2D = get_viewport().get_camera_2d()
 	return BiomeBlend.amount_at(camera.get_screen_center_position()) if camera != null else 0.0
+
+
+## 0 on the meadow .. 1 deep in the Sonnenquarz-Öde, at the middle of what the camera sees (BiomeBlend).
+func _arid_here() -> float:
+	var camera: Camera2D = get_viewport().get_camera_2d()
+	return BiomeBlend.arid_at(camera.get_screen_center_position()) if camera != null else 0.0

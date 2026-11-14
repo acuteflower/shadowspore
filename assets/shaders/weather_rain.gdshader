@@ -21,6 +21,8 @@ uniform float clock = 0.0;
 uniform vec3 ambient : source_color = vec3(1.0);
 uniform vec2 wind_dir = vec2(1.0, 0.0);
 uniform vec3 tint : source_color = vec3(1.0); // the Hexenwald's rain is a little green
+global uniform sampler2D g_arid : filter_linear, repeat_disable;
+global uniform vec4 g_gloom_rect;
 
 // One sheet of streaks. Returns 0 (nothing) or the brightness step 1..3 (tail, body, head) of the streak at this pixel.
 int streak(vec2 s, float parallax, float period, float len, float speed, float dens, float seed, float rate, float shear) {
@@ -41,7 +43,16 @@ int streak(vec2 s, float parallax, float period, float len, float speed, float d
 void fragment() {
 	vec2 s = floor(UV * view_px + 0.001);
 	vec2 w = world_origin + s;
-	float rate = rain_local(w);
+	float arid = 0.0;
+	if (g_gloom_rect.z > 0.0) {
+		vec2 auv = (w - g_gloom_rect.xy) / g_gloom_rect.zw;
+		if (all(greaterThanEqual(auv, vec2(0.0))) && all(lessThanEqual(auv, vec2(1.0)))) {
+			arid = texture(g_arid, auv).r;
+		}
+	}
+	float desert_dry = 1.0 - smoothstep(0.18, 0.45, arid);
+	float rate = rain_local(w) * desert_dry;
+	float fog_here = fog * desert_dry;
 	float canopy = day_cover(w);
 	float dry = 1.0 - 0.82 * canopy;
 	float r = rate * dry;
@@ -85,11 +96,11 @@ void fragment() {
 		}
 	}
 	// mist banks (the weather's fog, dawn mist after rain)
-	if (fog > 0.02) {
+	if (fog_here > 0.02) {
 		float m = n_fbm(w / 120.0 + vec2(clock * 0.012, clock * 0.005) + 21.0);
-		float bank = smoothstep(0.36, 0.76, m) * fog;
+		float bank = smoothstep(0.36, 0.76, m) * fog_here;
 		if (bank > n_bayer(s) * 0.95 + 0.03 && out_color.a < 0.25) {
-			out_color = vec4(vec3(0.82, 0.86, 0.90) * ambient, (0.08 + 0.07 * fog) * visibility);
+			out_color = vec4(vec3(0.82, 0.86, 0.90) * ambient, (0.08 + 0.07 * fog_here) * visibility);
 		}
 	}
 	COLOR = out_color;

@@ -28,8 +28,11 @@ const IDLE_FADE_IN: float = 0.25 ## seconds to come back on activity
 const IDLE_PARTS: Array[String] = ["ClockVine", "PurseVine", "Hotbar", "HealthBar", "StaminaBar", "BlinkIcon", "StatusTags", "QuestVine", "HintCard", "FishingHud"]
 
 var _player: Node2D
+var _heat_haze: HeatHaze
 var _idle_time: float = 0.0
 var _idle_alpha: float = 1.0 ## 1 = HUD shown, 0 = hidden by idling
+var vista_hide: bool = false ## panoramic VistaPoint seating gently hides the HUD right away
+var _vista_alpha: float = 1.0
 var _cover_alpha: Dictionary = {} ## part name -> fade of the full-screen menus (QuestVine, HintCard)
 var _last_pos: Vector2 = Vector2.INF
 var _fold_base: Dictionary = {} ## part -> its offsets from hud.tscn, before the hotbar fold moved it
@@ -72,10 +75,12 @@ func _apply_idle_fade(delta: float, covered: bool) -> void:
 	var fade_out: bool = _idle_time >= IDLE_HIDE_SECONDS
 	var speed: float = 1.0 / (IDLE_FADE_OUT if fade_out else IDLE_FADE_IN)
 	_idle_alpha = move_toward(_idle_alpha, 0.0 if fade_out else 1.0, delta * speed)
+	var vista_active: bool = vista_hide and not covered and not InputManager.menu_open
+	_vista_alpha = move_toward(_vista_alpha, 0.0 if vista_active else 1.0, delta / (0.85 if vista_active else 0.35))
 	for part: String in IDLE_PARTS:
 		var node: CanvasItem = get_node_or_null(part) as CanvasItem
 		if node != null:
-			node.modulate.a = _idle_alpha * float(_cover_alpha.get(part, 1.0))
+			node.modulate.a = _idle_alpha * _vista_alpha * float(_cover_alpha.get(part, 1.0))
 
 
 ## Full-screen menus cover the quest branch and tutorial card.
@@ -127,6 +132,7 @@ func _ready() -> void:
 ## `player` is untyped on purpose: the player scene preloads this HUD.
 func bind(player: Node) -> void:
 	_player = player as Node2D
+	_heat_haze = HeatHaze.attach(self, player)
 	if player.health != null:
 		player.health.damaged.connect(_on_player_damaged)
 	$SneakVignette.bind(player.stealth)

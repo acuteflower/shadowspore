@@ -292,9 +292,11 @@ def main():
         core = core & np.roll(core, 1, 0) & np.roll(core, -1, 0) & np.roll(core, 1, 1) & np.roll(core, -1, 1)
     ramp_cells = np.zeros((H, W), bool)
     n_towers = 0
+    tower_xy = []  # every tower so far: two stretches meeting at a gate share one tower each side, never two on one spot
     for line in contours(core):
-        if len(line) < 30:
-            continue
+        rows_, cols_ = [q[0] for q in line], [q[1] for q in line]
+        if len(line) < 30 or math.hypot(max(rows_) - min(rows_), max(cols_) - min(cols_)) * C < 220:
+            continue  # a little island of high ground: no town wall round it
         pts = resample(chaikin(chaikin(chaikin([(bx0 + c_ * C + C / 2, by0 + r * C + C / 2) for r, c_ in line]))), 3.0)
         info_pts = []
         for x, y in pts:
@@ -358,6 +360,13 @@ def main():
                 n_more = int((t1 - t0) // 170)
                 fill_t += [t0 + (t1 - t0) * (m_ + 1) / (n_more + 1) for m_ in range(n_more)]
             towers = sorted(towers + fill_t)
+            kept = []
+            for t in towers:
+                q = min(range(len(arc)), key=lambda i_: abs(arc[i_] - t))
+                if all(math.hypot(seg[q][0] - tx_, seg[q][1] - ty_) > 44 for tx_, ty_ in tower_xy):
+                    kept.append(t)
+                    tower_xy.append((seg[q][0], seg[q][1]))
+            towers = kept
             run = {"id": len(wall_runs), "style": "stadt", "seed": rng.randint(0, 99999),
                    "pts": [[round(p[0], 1), round(p[1], 1)] for p in seg],
                    "n": [[round(p[2], 2), round(p[3], 2)] for p in seg],

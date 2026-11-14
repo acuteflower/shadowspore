@@ -227,7 +227,7 @@ def build_tower(m, base, q, top, rng):
         m.ell(base + V(math.cos(a) * (r0 + 0.9), height + 0.6, math.sin(a) * (r0 + 0.9)), (1.9, 1.1, 1.3), STONE_L, R=h.rot_y(-a - math.pi / 2))
     for yy in (top - 8.0, top - 19.0):  # slits
         if yy > 3:
-            m.ell(base + V(0, yy, r0 + 0.3), (0.5, 1.9, 0.9), DARK)
+            m.ell(base + V(0, yy, r0 + 0.3), (0.38, 1.5, 0.9), DARK)
     if q < 0.55:  # crenellated
         m.ell(base + V(0, height + 1.4, 0), (r0 + 0.4, 0.8, r0 + 0.4), STONE_L)
         for i in range(8):
@@ -297,7 +297,7 @@ def build_piece(run, things, at, lo, hi, feet):
             m.ell(base + out_ * 1.2 + V(0, top + 2.2, 0), (2.4, 2.5, 1.5), STONE_L, R=R)
             m.ell(base + out_ * 1.2 + V(0, top + 4.7, 0), (2.6, 0.6, 1.7), STONE_L, R=R)
         elif kind == "slit":
-            m.ell(base + V(0, a[0], 0), (0.5, 1.9, 3.2), DARK, R=R)
+            m.ell(base + V(0, a[0], 0), (0.38, 1.5, 3.2), DARK, R=R)
         elif kind == "buttress":
             top, q = a
             for k in range(5):

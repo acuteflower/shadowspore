@@ -4,6 +4,76 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.8.4 Beta] – 2026-11-14
+### 🌅 Horizonte im Aufbruch (V0.9-Vorbote): Zenitwarte, Wüsten-Ökosystem, Karawane, Hallgrat & Lebendige Wiese
+
+![Die Zenitwarte der Quarzwüste bei Tag und Nacht](docs/img/desert_observatory_qa.png)
+
+> *Über den Golddünen flimmert die Mittagshitze, während an der fernen Nordspitze die alten Ringe der Zenitwarte wieder im Sternenlicht drehen. Auf dem neuen Westweg mahnen moosbewachsene Meilensteine an das steinerne Hallgrat im Glaskamm, im heimischen Tal läutet die Karawanenglocke am Brunnenplatz – und zwischen Urtannen, Windwiesen und Aussichtsklippen erwacht das ganze Land zum Leben.*
+
+---
+
+> [!IMPORTANT]
+> **Ein großes „Mid-Work“-Zwischenupdate auf dem direkten Weg zu V0.9!** V0.8.4 legt die mächtigen Fundamente für das kommende Groß-Update: Die **Quarzwüste** wächst um Hitze, Wetter, 6 Tierarten, aktive Ruinen, den ersten Quarzwächter & die **Zenitwarte**; dazu starten **Joruns Karawane**, die ersten Stufen der Weststadt **Hallgrat**, der **Wiesenbiom-Ausbau** sowie Ellies neues **Outfit- & Haar-Layer-System**. Einige Teile befinden sich bewusst noch im Aufbau und werden gemeinsam mit den nächsten Schritten zu **V0.9** vollendet.
+
+---
+
+### ☀️ 1. Quarzwüste Stufen 3–7a: Hitze, Tierwelt, Aktive Ruinen & die Zenitwarte (`🟣 NEU`)
+
+<details open>
+<summary><b>🏜️ Von der Mittagshitze bis zum Zerbrochenen Himmelswerk – alle neuen Wüsten-Systeme</b></summary>
+
+#### 🔥 Klima, Mittagshitze & Magisches Wüstenwetter
+* **Sonnenhitze (`ERHITZT` / `ERFRISCHT`):** Tagsüber unter freiem Himmel bremst die Mittagssonne Ellies Ausdauer-Regeneration um bis zu **`30 %`** und erhöht Sprint-/Schattenschritt-Kosten um **`+15 %`** (sichtbar am goldenen Schimmer der Ausdauerranke und Ellies neuer **Schweiß-Abwisch-Geste**). Schatten unter Palmen/Torbögen, Oasenwasser (`ERFRISCHT`), Kühlfrüchte sowie weiße Sinterquarz-Platten (halbierter Hitzeaufbau) bringen schnelle Abkühlung.
+* **Kein Regen – stattdessen Resonanzwind & Quarzgewitter:** Normales Regenwetter wird in der Wüste vollständig abgefangen und in **Singenden Resonanzwind** sowie trockene **Arkane Quarzgewitter** (violett-bernsteinfarbene Magieblitze & schneller ladende Zauberkristalle) übersetzt.
+
+#### 🦊 6 neue Wüstentiere im eigenen Tag-/Nacht-Ökosystem
+![Die neue Tierwelt der Quarzwüste in allen 8 Blickrichtungen](docs/img/desert_wildlife.png)
+* **Kronen-Oryx:** Zieht in kleinen Herden im Gänsemarsch, trinkt am Oasenwasser, sucht mittags echten Schatten und senkt bei Gefahr die langen Säbelhörner.
+* **Dünen-Fennek:** Dämmerungs- und nachtaktiver Fuchs mit rotierenden Riesenohren, eigenen Sandbauten und hohen Mäuselsprüngen.
+* **Pinselohr-Springmaus:** Zweibeiniger Hüpfer mit Quastenschwanz, Sand-Staubbad und Hinterfuß-Trommelalarm.
+* **Sonnenquarz-Agame:** Tagaktiver Wärmespezialist auf weißen Quarzplatten, dazu **Sonnenfalke** am Himmel und **Gold-Skarabäus** im Sand.
+
+#### 🔮 Aktive Quarzruinen, neue Erze & erster Quarzwächter
+![Prisma-Adern, Ruinen-Bruchstein, Torbögen, Obelisken & Siegelkreise](docs/img/desert_ruins.png)
+* **Neue Rohstoffe & Prüfungen:** Abbaubare **Prisma-Adern** (*Prismensplitter*) & **Ruinen-Bruchstein**, schattenwerfende **Quarz-Torbögen**, zauberleitende **Lichtleit-Rinnen**, **Resonanz-Obelisken**, **Quarz-Siegelkreise** sowie **2 neue Prismensiegel-Prüfungen der Wächterin**.
+* **Quarzwächter (`🟣 NEU`, Stufe 6 begonnen):** Der erste Gegner der neuen Konstrukt-Familie tarnt sich unscheinbar auf weißem Bodenquarz, erwacht beim Abbauen oder Betreten seines Reviers mit drei Stein-/Strahlenangriffen und ist besonders anfällig gegen die **Spitzhacke**.
+
+#### 🔭 Die Zenitwarte (*Das Zerbrochene Himmelswerk*) (Außenanlage)
+* Am Nordende der Karawanenstraße krönt die monumentale **Zenitwarte** das Tafelberg-Massiv: mit gespaltenem Ekliptik-Tor, **180°-Sonnenuhr** samt Echtzeit-Schattenwurf, Windharfen-Prismentrasse, Gipfel-Rotunde mit **3 Sternenschlössern**, drehender **Armillarsphäre**, Teleskop-Linsen, **Sternenspiegel-Becken** und **Polar-Okular** zur Kartenaufdeckung. *(Begehbarer Innenraum, neue Zauberstäbe & Quests folgen bis V0.9.)*
+
+</details>
+
+---
+
+### 🐂 2. Die Karawane: Fahrender Händler Jorun am Brunnenplatz (`🟣 NEU`)
+
+* **Lebendiger Marktbesuch:** Sobald euer **Brunnenplatz** steht, reist Händler **Jorun** mit seinem **Planwagen** und einem zotteligen **Moosbüffel** in unregelmäßigen Abständen (`2–5 Tage`) über den alten Karrenweg ins Dorf und bleibt **`1–2 Tage`**.
+* **Aufklappbarer Stand & echte Waren:** Am Platz klappt der Wagen zur Theke auf und legt Joruns wechselndes Angebot sichtbar aus. Er verkauft seltene Güter sowie Saatgut und zahlt Aufpreise für **„Gesuchtes“**; nachts und bei Sturm schließt der Stand. Karte und Stadt-Tab zeigen Anreise und Verbleib. *(Mid-Work: eigenes Porträt & finale Dialogtexte folgen bis V0.9.)*
+
+---
+
+### 🏰 3. Hallgrat im Westen & der Westweg (Stufen 1 & 2) (`🟣 NEU`)
+
+* **Der 790-Tile-Westweg:** Nördlich von Glimmrast zweigt eine alte, gepflasterte Straße bis vor das **Osttor** auf dem fernen Glaskamm ab – gesäumt von **15 alten Meilensteinen** (alle 50 Tiles), deren Kristalle in Stadtnähe violett und am letzten Stein nachts türkis flackern.
+* **Stadtgrundriss & Mauerwerk:** Die sechs Bezirke von **Hallgrat** (u. a. Forum um die Wächterin, Markt, Torstraße, Westmauer & reservierte Stallungen) stehen bereits im Gelände samt umgefärbtem **Mauerwerk und gemeißelten Steintreppen**. *(Gebäude, Mauern & Bewohner folgen auf dem Weg zu V0.9.)*
+
+---
+
+### 🌲 4. „Die Lebendige Wiese“ & Anpassbares Aussehen (`🟣 NEU`)
+
+* **Makro-Landschaften & Entdecker-Orte im Wiesenbiom:** Neue Großzonen wie **Tiefer Urforst** (mit riesigen **Urtannen**, goldenen/silbernen **Lichtschächten**, Moosteppichen, Pilzringen & versteckten **Waldschreinen**), offene **Windwiesen** mit Leitblumenmeeren und alte **Weideflächen** (Obstbäume, Wassermühlen, Einzel-Eiche).
+* **Panorama-Aussichtspunkte & Roter Orden:** Hochgelegene **Aussichtspunkte** belohnen Klettertouren mit weitem Kamera-Schwenk, ruhiger Entdecker-Stimmung und großzügiger Kartenaufdeckung; verlassene **Wachtürme & Patrouillenlager des Roten Ordens** erzählen von Valdrics Vergangenheit.
+* **Ellies Outfit- & Haar-Layer-System (`🟣 NEU`):** Ellies Sprites wurden auf modulare Haar- und Gewand-Ebenen umgestellt (inkl. erster Farbvarianten wie *Reisegewand*, *Blutsamt*, *Waldläufer* & *Nachtseide* als Grundlage für kommende Garderobe-Features).
+
+---
+
+> [!WARNING]
+> **Mid-Work-Hinweis für diese Zwischen-Beta:**
+> V0.8.4 bündelt mehrere noch wachsende Großbaustellen auf dem Weg zu **V0.9**: Bei **Hallgrat** fehlen noch die finalen Häuser-Assets (im Log zeigt sich noch ein fehlendes Gebäude-Bild), **Joruns Karawane** nutzt noch Platzhalter-Texte ohne eigenes Porträt, und beim neuen **Quarzwächter** schlägt 1 von 16 automatisierten Prüfungen noch fehl. All das wächst in den kommenden Schritten sauber zu **V0.9** zusammen!
+
+✦ ──────────────── ❖ ──────────────── ✦
+
 ## [V0.8.3 Beta] – 2026-11-13
 ### 🏜️ Die Singenden Dünen & das Herz der Stadt: Quarzwüste, Brunnenplatz, Stadtbau 2.0 & neue Prüfungen
 

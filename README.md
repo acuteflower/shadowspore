@@ -5,11 +5,19 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.8.3 Beta – „Die Singenden Dünen & das Herz der Stadt“
+## 🚀 Aktuelle Version: V0.8.4 Beta – „Horizonte im Aufbruch (V0.9-Vorbote)“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 
-### Highlights von V0.8.3 Beta:
+### Highlights von V0.8.4 Beta *(Mid-Work auf dem Weg zu V0.9)*:
+* **Quarzwüste Stufen 3–7a:** **Sonnenhitze** (`ERHITZT`/`ERFRISCHT`), **Singender Resonanzwind & Arkane Quarzgewitter** ohne Regen, **6 neue Wüstentiere** (*Kronen-Oryx*, *Dünen-Fennek*, *Springmaus*, *Agame*, *Sonnenfalke*, *Gold-Skarabäus*), aktive Quarzruinen & Prisma-Adern, der erste **Quarzwächter** sowie die monumentale **Zenitwarte** im Norden.
+* **Die Karawane (Jorun):** Nach dem Bau des Brunnenplatzes besucht Händler **Jorun** mit Planwagen und Moosbüffel alle `2–5 Tage` euer Dorf, klappt seine Theke auf und handelt mit Raritäten & „Gesuchtem“.
+* **Hallgrat & der Westweg:** Der **790 Tiles lange Westweg** mit **15 Meilensteinen** führt zum steinernen Grundriss von **Hallgrat** auf dem Glaskamm (inkl. 6 Bezirken & Mauerwerk im Relief).
+* **„Die Lebendige Wiese“ & Outfit-Layer:** Makro-Landschaften (*Tiefer Urforst*, *Windwiesen*, *Weiden*), **Aussichtspunkte** mit weitem Zoom, Spuren des **Roten Ordens** sowie Ellies neues **Outfit- & Haar-Layer-System**.
+
+---
+
+### Vorherige Highlights (V0.8.3 Beta – „Die Singenden Dünen & das Herz der Stadt“):
 * **Neues Biom – Die Quarzwüste („Sonnenquarz-Öde“):** Über `165.000` Tiles im Norden mit `96`-Tile-Klimaübergang, flirrenden Golddünen, schnellen Sinterquarz-Adern (`1,04×` Tempo), geschichteten Sandstein-Klippen, **4 variablen Quarzoasen**, **13 neuen Pflanzen/Felsen** und **11 frischen Items**.
 * **Brunnenplatz & Stadtbau 2.0:** Erst der **Brunnenplatz** gründet die Stadt; das neue **Bauplan-Menü**, Grundsteinsetzung, mitwachsendes Gerüst, aktives **`E` Anpacken (`3×` Bautempo)**, eine erntende **Druckwelle** bei Fertigstellung sowie **8 Stadtfarben & 12 Wappen** machen jedes Bauwerk zum Ereignis.
 * **Zwei neue Prüfungen der Wächterin:** **Wurzelgeflecht** (kippende Runen-, Keim-, Dorn- & Einwegwürfel) und **Sternenspiegel** (Mondsteine frei tragen & Sternbilder am Teich spiegeln) stehen in je 3 Stufen in der Rätselwelt bereit.

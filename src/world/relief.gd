@@ -29,22 +29,94 @@ var _field: PackedByteArray ## RGB per tile
 var _block: PackedByteArray ## one byte per 4 px cell, non-zero = blocked
 var _block_side: int
 
+static var _cache_key: String = ""
+static var _cache_bytes: PackedByteArray = PackedByteArray()
+static var _cache_field: PackedByteArray = PackedByteArray()
+static var _cache_block: PackedByteArray = PackedByteArray()
+static var _cache_side: int = 0
+static var _cache_block_side: int = 0
+static var _cache_town_cells: int = 0
+static var _cache_wobble: Image = null
+
+
+static func cache_key_for(active_biome: String, own_biomes: Array, use_town_styles: bool) -> String:
+	return "%s:%s:%d" % [active_biome, str(own_biomes), 1 if use_town_styles else 0]
+
+
+static func has_cache(expected_key: String) -> bool:
+	return _cache_key == expected_key and not _cache_bytes.is_empty()
+
+
+## Pure byte-array computation of base relief data; safe to run on a worker thread (all Images & tables passed in).
+static func build_base_data(tex_img: Image, field_img: Image, block_img: Image, active_biome: String, own_biomes: Array, biomes_keys: Array, hallgrat_data: Dictionary, use_town_styles: bool) -> Dictionary:
+	var img: Image = tex_img.duplicate() as Image
+	img.convert(Image.FORMAT_RGBA8)
+	var bytes: PackedByteArray = img.get_data()
+	var side: int = img.get_width()
+	_apply_world_biome_bytes(bytes, active_biome, own_biomes, biomes_keys)
+	var changed_cells: int = _apply_town_styles_bytes(bytes, side, hallgrat_data) if use_town_styles else 0
+	var f_img: Image = field_img.duplicate() as Image
+	f_img.convert(Image.FORMAT_RGB8)
+	var b_img: Image = block_img.duplicate() as Image
+	b_img.convert(Image.FORMAT_L8)
+	return {
+		"key": cache_key_for(active_biome, own_biomes, use_town_styles),
+		"bytes": bytes,
+		"field": f_img.get_data(),
+		"block": b_img.get_data(),
+		"side": side,
+		"block_side": b_img.get_width(),
+		"town_cells": changed_cells,
+	}
+
+
+static func store_cache(built: Dictionary, wobble_img: Image) -> void:
+	_cache_key = String(built.get("key", ""))
+	_cache_bytes = built.get("bytes", PackedByteArray()) as PackedByteArray
+	_cache_field = built.get("field", PackedByteArray()) as PackedByteArray
+	_cache_block = built.get("block", PackedByteArray()) as PackedByteArray
+	_cache_side = int(built.get("side", 0))
+	_cache_block_side = int(built.get("block_side", 0))
+	_cache_town_cells = int(built.get("town_cells", 0))
+	_cache_wobble = wobble_img
+	Jobs.register_cleanup(Relief.clear_cache)
+
+
+static func clear_cache() -> void:
+	_cache_key = ""
+	_cache_bytes = PackedByteArray()
+	_cache_field = PackedByteArray()
+	_cache_block = PackedByteArray()
+	_cache_side = 0
+	_cache_block_side = 0
+	_cache_town_cells = 0
+	_cache_wobble = null
+
 
 func _init() -> void:
-	var image: Image = TEXTURE.get_image()
-	image.convert(Image.FORMAT_RGBA8)
-	_bytes = image.get_data()
-	_side = image.get_width()
-	_apply_world_biome()
-	if town_styles:
-		town_cells = _apply_town_styles()
-	var field: Image = FIELD.get_image()
-	field.convert(Image.FORMAT_RGB8)
-	_field = field.get_data()
-	var block: Image = BLOCK.get_image()
-	block.convert(Image.FORMAT_L8)
-	_block = block.get_data()
-	_block_side = block.get_width()
+	var world_map_data: Dictionary = DataRegistry.table("world_map")
+	var active: String = String(world_map_data.get("biome", ""))
+	var own: Array = world_map_data.get("own_biomes", []) as Array
+	var expected: String = cache_key_for(active, own, town_styles)
+	if not has_cache(expected):
+		var built: Dictionary = build_base_data(
+			TEXTURE.get_image(),
+			FIELD.get_image(),
+			BLOCK.get_image(),
+			active,
+			own,
+			DataRegistry.table("biomes").keys(),
+			DataRegistry.table("hallgrat"),
+			town_styles
+		)
+		store_cache(built, WOBBLE.get_image())
+	_side = _cache_side
+	_block_side = _cache_block_side
+	town_cells = _cache_town_cells
+	_bytes = _cache_bytes.duplicate()
+	_field = _cache_field.duplicate()
+	_block = _cache_block
+	_wobble_image = _cache_wobble
 
 
 ## Hallgrat's stone (docs/stadt_westen_konzept.md 14.2): data/hallgrat.json `style_areas` restyle the tiles of whole districts at load time,
@@ -57,7 +129,10 @@ var town_cells: int = 0
 
 
 func _apply_town_styles() -> int:
-	var data: Dictionary = DataRegistry.table("hallgrat")
+	return _apply_town_styles_bytes(_bytes, _side, DataRegistry.table("hallgrat"))
+
+
+static func _apply_town_styles_bytes(bytes: PackedByteArray, side: int, data: Dictionary) -> int:
 	var areas: Array = data.get("style_areas", []) as Array
 	var box: Array = data.get("style_rect", []) as Array
 	if areas.is_empty() or box.size() != 4:
@@ -69,10 +144,10 @@ func _apply_town_styles() -> int:
 			poly.append(Vector2(float(at[0]), float(at[1])))
 		polys[String(d.id)] = poly
 	var changed: int = 0
-	for y: int in range(maxi(0, int(box[1])), mini(_side, int(box[3]))):
-		for x: int in range(maxi(0, int(box[0])), mini(_side, int(box[2]))):
-			var idx: int = (y * _side + x) * 4
-			if _bytes[idx + 3] == 0:
+	for y: int in range(maxi(0, int(box[1])), mini(side, int(box[3]))):
+		for x: int in range(maxi(0, int(box[0])), mini(side, int(box[2]))):
+			var idx: int = (y * side + x) * 4
+			if bytes[idx + 3] == 0:
 				continue
 			var centre: Vector2 = Vector2(x + 0.5, y + 0.5)
 			var pick: Dictionary = {}
@@ -82,12 +157,12 @@ func _apply_town_styles() -> int:
 						pick = area
 			if pick.is_empty():
 				continue
-			var k: int = _bytes[idx + 1] & 15
+			var k: int = bytes[idx + 1] & 15
 			if bool(pick.get("stairs", false)) and k == STEPS:
 				k = STAIRS
 			var value: int = k | (int(pick.style) << 4)
-			if value != _bytes[idx + 1]:
-				_bytes[idx + 1] = value
+			if value != bytes[idx + 1]:
+				bytes[idx + 1] = value
 				changed += 1
 	return changed
 
@@ -95,24 +170,28 @@ func _apply_town_styles() -> int:
 ## Restyle materials without moving heights, walls, connectors or collision cells.
 ## The immutable bake keeps its original material ids for future authoring.
 func _apply_world_biome() -> void:
-	var active: String = String(DataRegistry.table("world_map").get("biome", ""))
+	var world_map_data: Dictionary = DataRegistry.table("world_map")
+	var active: String = String(world_map_data.get("biome", ""))
+	_apply_world_biome_bytes(_bytes, active, world_map_data.get("own_biomes", []) as Array, DataRegistry.table("biomes").keys())
+
+
+static func _apply_world_biome_bytes(bytes: PackedByteArray, active: String, own_biomes: Array, ids: Array) -> void:
 	if active.is_empty():
 		return
-	var biome: int = DataRegistry.table("biomes").keys().find(active)
+	var biome: int = ids.find(active)
 	if biome < 0:
 		return
 	var own: Array = []
-	var ids: Array = DataRegistry.table("biomes").keys()
-	for id: Variant in DataRegistry.table("world_map").get("own_biomes", []): ## biomes of their own keep the bake's biome byte
+	for id: Variant in own_biomes: ## biomes of their own keep the bake's biome byte
 		own.append(200 + ids.find(String(id)))
-	for i: int in range(0, _bytes.size(), 4):
-		if _bytes[i + 3] == 0 or own.has(int(_bytes[i + 3])):
+	for i: int in range(0, bytes.size(), 4):
+		if bytes[i + 3] == 0 or own.has(int(bytes[i + 3])):
 			continue
-		_bytes[i + 3] = 200 + biome
+		bytes[i + 3] = 200 + biome
 		if active == "meadow":
-			var style: int = _bytes[i + 1] >> 4
+			var style: int = bytes[i + 1] >> 4
 			if style >= 2:
-				_bytes[i + 1] = (_bytes[i + 1] & 15) | ((0 if style == 4 else 1) << 4)
+				bytes[i + 1] = (bytes[i + 1] & 15) | ((0 if style == 4 else 1) << 4)
 
 
 func _at(x: int, y: int, channel: int) -> int:
@@ -161,27 +240,40 @@ func walkable(x: int, y: int) -> bool:
 
 ## The height a point stands at: the smooth level (what the shader draws), plus the fraction up a ramp or flight of stairs.
 func level_at(pos: Vector2) -> float:
+	return sample_level_at(_bytes, _field, _side, pos)
+
+
+static func sample_level_at(bytes: PackedByteArray, field: PackedByteArray, side: int, pos: Vector2) -> float:
 	var u: Vector2 = pos / TILE - Vector2(0.5, 0.5)
 	var x0: int = floori(u.x)
 	var y0: int = floori(u.y)
 	var height: float = 0.0
 	for channel: int in 3:
-		var amount: float = lerpf(lerpf(_field_at(x0, y0, channel), _field_at(x0 + 1, y0, channel), u.x - x0), lerpf(_field_at(x0, y0 + 1, channel), _field_at(x0 + 1, y0 + 1, channel), u.x - x0), u.y - y0)
+		var amount: float = lerpf(
+			lerpf(_sample_field_at(field, side, x0, y0, channel), _sample_field_at(field, side, x0 + 1, y0, channel), u.x - x0),
+			lerpf(_sample_field_at(field, side, x0, y0 + 1, channel), _sample_field_at(field, side, x0 + 1, y0 + 1, channel), u.x - x0),
+			u.y - y0
+		)
 		if amount > 0.5:
 			height += 1.0
 	var x: int = floori(pos.x / TILE)
 	var y: int = floori(pos.y / TILE)
-	if kind(x, y) >= RAMP:
-		var geom: int = _at(x, y, 2)
+	var k: int = 0 if (x < 0 or y < 0 or x >= side or y >= side) else (bytes[(y * side + x) * 4 + 1] & 15)
+	if k >= RAMP:
+		var geom: int = bytes[(y * side + x) * 4 + 2]
 		var depth: int = ((geom >> 2) & 3) + 1
 		height += (depth - (geom & 3) - fposmod(pos.y, TILE) / TILE) / depth
 	return height
 
 
+static func _sample_field_at(field: PackedByteArray, side: int, x: int, y: int, channel: int) -> float:
+	var cx: int = clampi(x, 0, side - 1)
+	var cy: int = clampi(y, 0, side - 1)
+	return field[(cy * side + cx) * 3 + channel] / 255.0
+
+
 func _field_at(x: int, y: int, channel: int) -> float:
-	x = clampi(x, 0, _side - 1)
-	y = clampi(y, 0, _side - 1)
-	return _field[(y * _side + x) * 3 + channel] / 255.0
+	return _sample_field_at(_field, _side, x, y, channel)
 
 
 ## Terrain.json surface for the footsteps ("" = whatever the ground layers say).
@@ -257,16 +349,26 @@ var _base_bytes: PackedByteArray
 var _base_field: PackedByteArray
 var _base_block: PackedByteArray
 var _wobble_image: Image
+var _block_dirty: bool = false
 
 func editor_apply(edits: Dictionary) -> void:
-	if editor_texture == null:
-		_base_bytes = _bytes.duplicate()
-		_base_field = _field.duplicate()
-		_base_block = _block.duplicate()
-		_wobble_image = WOBBLE.get_image()
-	_bytes = _base_bytes.duplicate()
-	_field = _base_field.duplicate()
-	_block = _base_block.duplicate()
+	var first_apply: bool = editor_texture == null
+	if first_apply:
+		var world_map_data: Dictionary = DataRegistry.table("world_map")
+		var expected: String = cache_key_for(String(world_map_data.get("biome", "")), world_map_data.get("own_biomes", []) as Array, town_styles)
+		_base_bytes = _cache_bytes if has_cache(expected) else _bytes.duplicate()
+		_base_field = _cache_field if has_cache(expected) else _field.duplicate()
+		_base_block = _cache_block if has_cache(expected) else _block.duplicate()
+		if _wobble_image == null:
+			_wobble_image = WOBBLE.get_image()
+	if not first_apply or not edits.is_empty():
+		_bytes = _base_bytes.duplicate()
+		_field = _base_field.duplicate()
+		if _block_dirty or not edits.is_empty():
+			_block = _base_block.duplicate()
+			_block_dirty = false
+		else:
+			_block = _base_block
 	var dirty: Dictionary = {}
 	for key_string: String in edits:
 		var cell: Vector2i = WorldEdits.cell(key_string)
@@ -297,6 +399,9 @@ func editor_apply(edits: Dictionary) -> void:
 			for x: int in range(maxi(0, cell.x - 1), mini(_side, cell.x + 2)):
 				patches[Vector2i(x, y)] = true
 	var heights: Dictionary = {}
+	if not patches.is_empty() and not _block_dirty:
+		_block = _base_block.duplicate()
+		_block_dirty = true
 	for cell: Vector2i in patches:
 		for dy: int in CELLS:
 			for dx: int in CELLS:

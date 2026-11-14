@@ -60,7 +60,15 @@ var _second: bool = false ## the morning after the first night in the hut (nothi
 var _blanket: Sprite2D ## the blanket over her, fixed to the bed (its own sheet: the same frame as hers)
 
 
-func start(player: Player, world: WorldLevel, ready_to_get_up: bool = false, second_morning: bool = false, rest: bool = false) -> void:
+func start(
+	player: Player,
+	world: WorldLevel,
+	ready_to_get_up: bool = false,
+	second_morning: bool = false,
+	rest: bool = false,
+	wake_time: float = -1.0,
+	advance_time: bool = true
+) -> void:
 	_second = second_morning
 	_rest = rest
 	_spoke = rest
@@ -108,8 +116,12 @@ func start(player: Player, world: WorldLevel, ready_to_get_up: bool = false, sec
 	if not _second:
 		player.set_bandaged(true)
 	player.z_index = 1 ## above the bed she lies on
-	TimeManager.set_time(MORNING)
-	TimeManager.unlock() ## the day runs normally from the moment she wakes up
+	if advance_time:
+		if second_morning:
+			TimeManager.mark_story_rested()
+		TimeManager.set_time(wake_time if wake_time >= 0.0 else MORNING)
+	if multiplayer.is_server():
+		TimeManager.unlock() ## the day runs normally from the moment she wakes up
 	if not _second:
 		player.inventory.clear_all() ## whatever she carried (the knight's sword) is gone: she starts again with empty hands
 	_interiors.place_player(player, "hut", _bed)

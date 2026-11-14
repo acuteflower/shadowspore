@@ -222,6 +222,17 @@ func _show(id: String) -> void:
 		(get_parent() as Node2D).add_child(fx)
 		fx.bind(self)
 		_fx[id] = fx
+	if id == "moon_glow" and not _fx.has(id) and DisplayServer.get_name() != "headless":
+		var light: NightLight = NightLight.new()
+		light.name = "MoonGlowLight"
+		light.position = Vector2(0.0, -14.0)
+		light.radius = 78
+		light.squash = 0.8
+		light.base_energy = 0.65
+		light.glow_color = Color("8af6e0")
+		light.pulse = 0.18
+		(get_parent() as Node2D).add_child(light)
+		_fx[id] = light
 
 
 func _remove(id: String) -> void:

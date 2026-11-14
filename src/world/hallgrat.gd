@@ -10,6 +10,8 @@ var forum: Vector2 = Vector2.INF ## px: the Wächterin des Glaskamms in the midd
 var milestones: Array[Milestone] = []
 var plan: HallgratPlan
 var buildings: Array[HallgratBuilding] = []
+var deco: Array[HallgratBuilding] = [] ## the small things of the streets
+var low_walls: Array[HallgratBuilding] = [] ## the pieces of the low walls along the ways
 var leitsteine: Array[HallgratLeitstein] = []
 var bell_at: Vector2 = Vector2.INF ## px: the moon tower's bell
 var _last_time: float = -1.0
@@ -44,6 +46,21 @@ func setup() -> Array[Vector2]:
 		add_child(house)
 		buildings.append(house)
 		_clear.append_array(house.footprint_cells())
+	for spec: Dictionary in data.get("deco", []) as Array: ## the street furniture (tools/place_hallgrat_deco.py): low walls, barrels, lanterns, planters
+		var feet2: Array = spec.px as Array
+		var thing: HallgratBuilding = HallgratBuilding.new()
+		thing.setup(String(spec.type), Vector2(float(feet2[0]), float(feet2[1])), bool(spec.get("flip", false)))
+		thing.name = "Deco_%d" % deco.size()
+		add_child(thing)
+		deco.append(thing)
+		_clear.append_array(thing.footprint_cells())
+	for spec: Dictionary in DataRegistry.table("hallgrat_art").get("wall_pieces", []) as Array: ## the low walls along the ways, every piece its own stones (tools/art_hallgrat_walls.py)
+		var at3: Array = spec.px as Array
+		var piece: HallgratBuilding = HallgratBuilding.new()
+		piece.setup(String(spec.type), Vector2(float(at3[0]), float(at3[1])), false)
+		piece.name = "Wand_%d" % low_walls.size()
+		add_child(piece)
+		low_walls.append(piece)
 	for wall: Dictionary in data.get("walls", []) as Array: ## stage 3c: the west wall, one stretch of parapet with merlons every 16 px
 		var line: Array = wall.line as Array
 		var a: Vector2 = Vector2(float((line[0] as Array)[0]), float((line[0] as Array)[1])) * 16.0
@@ -82,6 +99,16 @@ func setup() -> Array[Vector2]:
 				if Geometry2D.is_point_in_polygon(Vector2(tx + 0.5, ty + 0.5), poly):
 					_clear.append(Vector2i(tx, ty))
 	return spots
+
+
+## The town's trees, bushes, grass and flowers on its free grass (data/hallgrat.json `greenery`): real world plants, handed to the
+## `PropGenerator` as hand-placed props, so they sway, glow and can be picked or felled like any other.
+func extra_props() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for spec: Dictionary in DataRegistry.table("hallgrat").get("greenery", []) as Array:
+		var tile: Array = spec.tile as Array
+		out.append({"cell": Vector2i(int(tile[0]), int(tile[1])), "kind": String(spec.kind), "variant": int(spec.variant)})
+	return out
 
 
 ## Tiles under and round the buildings (no generated plant or stone grows there).

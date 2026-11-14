@@ -43,6 +43,10 @@ var _counter: int = 0
 var _closing: bool = false
 
 var stats: Dictionary = {"submitted": 0, "completed": 0, "cancelled": 0, "inline": 0, "work_usec": 0, "peak_queue": 0}
+var _warmed_paths: Dictionary = {}
+var _warm_stall_path: String = ""
+var _warm_stall_ticks: int = 0
+var _cleanup_callbacks: Array[Callable] = []
 
 
 func _ready() -> void:
@@ -61,8 +65,20 @@ func _process(_delta: float) -> void:
 	_pump()
 
 
+func register_cleanup(cb: Callable) -> void:
+	if not _cleanup_callbacks.has(cb):
+		_cleanup_callbacks.append(cb)
+
+
 func _exit_tree() -> void:
 	shutdown()
+	for cb: Callable in _cleanup_callbacks:
+		if cb.is_valid():
+			cb.call()
+	_cleanup_callbacks.clear()
+	_warmed_paths.clear()
+	_warm_stall_path = ""
+	_warm_stall_ticks = 0
 
 
 ## Reicht `work` ein (läuft auf einem Worker, sobald ein Platz frei ist). `on_done.call(result)` kommt auf dem Main-Thread.
@@ -131,10 +147,64 @@ func wait(job: Job) -> Variant:
 ## `load()` / `instantiate()` im Worker sind sicher. Jeder Job, der Szenen erzeugt, braucht vorher ein `warm`.
 func warm(paths: Array) -> void:
 	for path: Variant in paths:
-		var res: Resource = load(String(path))
-		if res is PackedScene: ## (instanziieren übersetzt auch die Skripte der Kinder)
-			var probe: Node = (res as PackedScene).instantiate()
-			probe.free()
+		warm_one(String(path))
+
+
+## Starts asynchronous background resource loading for `paths` when threaded loading is enabled.
+func request_warm(paths: Array[String]) -> void:
+	if not threaded:
+		return
+	for path: String in paths:
+		if path.is_empty() or _warmed_paths.has(path) or not ResourceLoader.exists(path):
+			continue
+		if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+			ResourceLoader.load_threaded_request(path)
+
+
+## Warms one scene or resource on the main thread (no-op if already warmed).
+func warm_one(path: String) -> void:
+	if path.is_empty() or _warmed_paths.has(path) or not ResourceLoader.exists(path):
+		return
+	var st: ResourceLoader.ThreadLoadStatus = ResourceLoader.load_threaded_get_status(path)
+	var res: Resource = null
+	if st == ResourceLoader.THREAD_LOAD_LOADED or st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		res = ResourceLoader.load_threaded_get(path)
+	else:
+		res = load(path)
+	_warmed_paths[path] = res
+	if res is PackedScene: ## (instanziieren übersetzt auch die Skripte der Kinder)
+		var probe: Node = (res as PackedScene).instantiate()
+		probe.free()
+
+
+## Warms up to the frame deadline (usec) and returns the next index in `paths`.
+func warm_step(paths: Array[String], start_index: int, deadline_usec: int) -> int:
+	var index: int = start_index
+	while index < paths.size():
+		var path: String = paths[index]
+		if _warmed_paths.has(path) or not ResourceLoader.exists(path):
+			index += 1
+			continue
+		if deadline_usec > 0 and threaded:
+			var st: ResourceLoader.ThreadLoadStatus = ResourceLoader.load_threaded_get_status(path)
+			if st == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				ResourceLoader.load_threaded_request(path)
+				st = ResourceLoader.load_threaded_get_status(path)
+			if st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+				if _warm_stall_path == path:
+					_warm_stall_ticks += 1
+				else:
+					_warm_stall_path = path
+					_warm_stall_ticks = 1
+				if _warm_stall_ticks <= 15:
+					break
+		_warm_stall_path = ""
+		_warm_stall_ticks = 0
+		warm_one(path)
+		index += 1
+		if deadline_usec > 0 and index > start_index and Time.get_ticks_usec() >= deadline_usec:
+			break
+	return index
 
 
 func wait_all(jobs: Array) -> void:
@@ -311,12 +381,22 @@ func _deliver_job(job: Job) -> void:
 	job.state = State.DELIVERED
 	stats.completed = int(stats.completed) + 1
 	stats.work_usec = int(stats.work_usec) + job.work_usec
-	if job.on_done.is_valid():
-		job.on_done.call(job.result)
+	var cb: Callable = job.on_done
+	var res: Variant = job.result
+	job.work = Callable()
+	job.on_done = Callable()
+	job.on_discard = Callable()
+	job.result = null
+	if cb.is_valid():
+		cb.call(res)
 
 
 func _discard(job: Job) -> void:
+	var cb: Callable = job.on_discard
 	var result: Variant = job.result
+	job.work = Callable()
+	job.on_done = Callable()
+	job.on_discard = Callable()
 	job.result = null
-	if job.on_discard.is_valid():
-		job.on_discard.call(result)
+	if cb.is_valid():
+		cb.call(result)

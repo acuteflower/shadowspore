@@ -35,9 +35,9 @@ func _run() -> void:
 # ---------------------------------------------------------------------------------- pure rules
 
 func _pure() -> void:
-	# the window: starts at 0.80, ends at 0.20, wraps at midnight
-	_check(_near(NightRules.progress(0.8), 0.0), "the window opens at 0.80")
-	_check(_near(NightRules.progress(0.0), 0.5), "midnight is the middle of the window")
+	# the window: starts at 0.86, ends at 0.185, wraps at midnight
+	_check(_near(NightRules.progress(0.86), 0.0), "the window opens at 0.86")
+	_check(_near(NightRules.progress(0.0225), 0.5), "the middle of the window wraps past midnight")
 	_check(NightRules.progress(0.5) < 0.0 and NightRules.progress(0.21) < 0.0, "no window by day")
 	_check(NightRules.spawning(0.5) and not NightRules.spawning(0.9) and not NightRules.spawning(-1.0), "spawning stops late in the night")
 	_check(_near(NightRules.released(0.0), 0.10) and _near(NightRules.released(0.12), 0.25) and _near(NightRules.released(0.36), 0.55) and _near(NightRules.released(0.43), 0.55) and _near(NightRules.released(0.9), 1.0) and NightRules.released(-1.0) == 0.0, "the release curve: slow start, a lull in the middle, everything by the peak")

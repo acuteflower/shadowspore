@@ -98,6 +98,8 @@ var _prism_fx: PrismAltarFx
 var _harp_overlays: Array[WindHarpOverlay] = []
 var _debris_entries: Array[Dictionary] = []
 var _vista_discovered: bool = false
+var _setup_sub: int = 0
+var _reserved_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -114,35 +116,78 @@ func _ready() -> void:
 ## Initializes the Observatory across Region 34 and returns `{"blocked": ..., "stones": ...}`
 ## for WorldLevel so procedural foliage/boulders/ruins never collide with its courts or pillars.
 func setup(world: Node2D, _prior_blocked: Dictionary) -> Dictionary:
-	_world = world
-	_load_art_meta()
-	_preload_sfx()
+	while not setup_step(world, 0):
+		pass
+	return _reserved_cache
 
-	_gate_pos = _tile_center(GATE_TILE)
-	_sundial_pos = _tile_center(SUNDIAL_TILE)
-	_rotunda_pos = _tile_center(ROTUNDA_TILE)
-	_mirror_pos = _tile_center(MIRROR_TILE)
-	_ocular_pos = _tile_center(OCULAR_TILE)
-	_altar_pos = _tile_center(PRISM_ALTAR_TILE)
-	_globe_pos = _tile_center(GLOBE_TILE)
-	_causeway_center = _tile_center(Vector2i(942, 165))
 
-	var ysort_parent: Node2D = self
-	if world != null:
-		var props_node: Node2D = world.get_node_or_null("Props") as Node2D
+func reserved_cells() -> Dictionary:
+	return _reserved_cache
+
+
+func _ysort_target() -> Node2D:
+	if _world != null:
+		var props_node: Node2D = _world.get_node_or_null("Props") as Node2D
 		if props_node != null:
-			ysort_parent = props_node
+			return props_node
+	return self
 
-	_build_zone_gate(ysort_parent)
-	_build_zone_sundial(ysort_parent)
-	_build_zone_causeway(ysort_parent)
-	_build_zone_rotunda(ysort_parent)
-	_build_zone_terraces(ysort_parent)
-	_build_conduits()
-	_register_surface_patch()
-	set_night(TimeManager.night_amount() if TimeManager != null else 0.0)
 
-	return _compute_reserved_cells()
+## Performs Observatory setup incrementally across frames within `deadline_usec` (0 = finish synchronously).
+func setup_step(world: Node2D, deadline_usec: int) -> bool:
+	if _setup_sub >= 8:
+		return true
+	if _setup_sub == 0:
+		_world = world
+		_load_art_meta()
+		_gate_pos = _tile_center(GATE_TILE)
+		_sundial_pos = _tile_center(SUNDIAL_TILE)
+		_rotunda_pos = _tile_center(ROTUNDA_TILE)
+		_mirror_pos = _tile_center(MIRROR_TILE)
+		_ocular_pos = _tile_center(OCULAR_TILE)
+		_altar_pos = _tile_center(PRISM_ALTAR_TILE)
+		_globe_pos = _tile_center(GLOBE_TILE)
+		_causeway_center = _tile_center(Vector2i(942, 165))
+		_setup_sub = 1
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _setup_sub == 1:
+		_preload_sfx()
+		_setup_sub = 2
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _setup_sub == 2:
+		_build_zone_gate(_ysort_target())
+		_setup_sub = 3
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _setup_sub == 3:
+		_build_zone_sundial(_ysort_target())
+		_setup_sub = 4
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _setup_sub == 4:
+		_build_zone_causeway(_ysort_target())
+		_setup_sub = 5
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _setup_sub == 5:
+		_build_zone_rotunda(_ysort_target())
+		_setup_sub = 6
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _setup_sub == 6:
+		_build_zone_terraces(_ysort_target())
+		_setup_sub = 7
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _setup_sub == 7:
+		_build_conduits()
+		_register_surface_patch()
+		set_night(TimeManager.night_amount() if TimeManager != null else 0.0)
+		_reserved_cache = _compute_reserved_cells()
+		_setup_sub = 8
+	return true
 
 
 func _cleanup_owned_nodes() -> void:

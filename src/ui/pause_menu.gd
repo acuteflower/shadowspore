@@ -19,16 +19,17 @@ const ROW_H: float = 17.0
 const HEAD_H: float = 15.0
 const INFO_H: float = 12.0
 const FOOT_Y: float = 268.0
-const FOOT_LEN: float = 300.0
+const FOOT_LEN: float = 346.0
 const VALUE_X: float = 104.0 ## where a row's control starts, from the column's left
 const SLIDER_W: float = 86.0
 const ACCENT_WARM: Color = Color("ffd98a")
 const DANGER: Color = Color("e0556e")
 const TABS: Array[Dictionary] = [
-	{"id": "settings", "name": "EINSTELLUNGEN", "x": -92.0, "sealed": false},
-	{"id": "map", "name": "KARTE", "x": -34.0, "sealed": true},
-	{"id": "town", "name": "STADT", "x": 52.0, "sealed": false}, ## the skill graph stays on F / Start (and the settings page lists its key)
-	{"id": "pets", "name": "VÖGEL", "x": 98.0, "sealed": false}, ## the book of the named crows and ravens (docs/pet_konzept.md)
+	{"id": "settings", "name": "EINSTELLUNGEN", "x": -118.0, "sealed": false},
+	{"id": "map", "name": "KARTE", "x": -56.0, "sealed": true},
+	{"id": "town", "name": "STADT", "x": 16.0, "sealed": false}, ## the skill graph stays on F / Start (and the settings page lists its key)
+	{"id": "pets", "name": "VÖGEL", "x": 66.0, "sealed": false}, ## the book of the named crows and ravens (docs/pet_konzept.md)
+	{"id": "coop", "name": "KOOP", "x": 118.0, "sealed": false}, ## multiplayer session info, code, IP and player roster
 ]
 const CONTROLS: Array[Array] = [
 	["BEWEGEN", "", "WASD"], ["SPRINTEN", "sprint", ""], ["SCHATTENSCHRITT", "shadow_step", ""],
@@ -43,15 +44,15 @@ var _tab: int = 0
 var _test_tools: bool = false
 var _tab_t: float = 1.0 ## 0 -> 1 after switching: the page grows again
 var _bloom_x: float = 0.0
-var _tab_lift: Array[float] = [0.0, 0.0, 0.0, 0.0]
-var _tab_deny: Array[float] = [0.0, 0.0, 0.0, 0.0] ## a sealed tag shivers when clicked
+var _tab_lift: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
+var _tab_deny: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0] ## a sealed tag shivers when clicked
 var _hover_tab: int = -1
 var _items: Array[Dictionary] = []
 var _cursor: Array[float] = [0.0, 0.0]
 var _focus: int = -1
 var _drag: int = -1
 var _footer: Array[Dictionary] = []
-var _foot_lift: Array[float] = [0.0, 0.0, 0.0]
+var _foot_lift: Array[float] = [0.0, 0.0, 0.0, 0.0]
 var _hover_foot: int = -1
 var _armed: String = "" ## a risky action waiting for a second click
 var _armed_left: float = 0.0
@@ -59,21 +60,27 @@ var _saved_flash: float = 0.0
 var _failed_flash: float = 0.0
 var _save_info: Dictionary = {}
 var _quit_t: float = -1.0
+var _quit_to_menu: bool = false
 var _dirty: bool = false
 var _paused_here: bool = false
 var _vignette: GradientTexture2D
 var _tp_text: String = "" ## the test tools' teleport field: "x, y" in tiles
 var _scrolls: Array[float] = [0.0, 0.0] ## per column: how far it is scrolled up (px); a column taller than the screen scrolls on its own
 var _editing: bool = false ## a text field takes the keys
-var _field: String = "tp" ## which one: "tp" (test tools' teleport) or "pet" (the name of a bird)
+var _field: String = "tp" ## which one: "tp", "pet", or "name"
 var _pet_sel: String = "" ## the bird whose page is open in the VÖGEL tab
 var _pet_text: String = "" ## the new name being typed
+var _name_text: String = "" ## the player display name being typed
+var _coop_toast: String = "" ## feedback flash inside KOOP tab
+var _coop_toast_t: float = 0.0
 
 
 func _ready() -> void:
 	visible = false
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_vignette = VineStyle.make_vignette()
+	_name_text = String(GameSettings.get_value("player_name"))
+	NetworkManager.session_changed.connect(_on_session_changed)
 
 
 ## `player` is untyped on purpose (the player scene preloads the HUD).
@@ -92,6 +99,7 @@ func _process(delta: float) -> void:
 	_tab_t = minf(_tab_t + delta / 0.5, 1.0)
 	_saved_flash = maxf(_saved_flash - delta, 0.0)
 	_failed_flash = maxf(_failed_flash - delta, 0.0)
+	_coop_toast_t = maxf(_coop_toast_t - delta, 0.0)
 	if _armed != "":
 		_armed_left -= delta
 		if _armed_left <= 0.0:
@@ -106,6 +114,12 @@ func _process(delta: float) -> void:
 	if _quit_t >= 0.0:
 		_quit_t += delta
 		if _quit_t >= QUIT_DELAY:
+			if _quit_to_menu:
+				_quit_to_menu = false
+				_quit_t = -1.0
+				_set_open(false)
+				GameLauncher.launch(get_tree(), {})
+				return
 			get_tree().quit()
 	queue_redraw()
 
@@ -154,11 +168,13 @@ func _can_save() -> bool:
 func _refresh_footer() -> void:
 	_footer.clear()
 	if _can_save():
-		_footer.append({"id": "discard", "text": "OHNE SPEICHERN", "from_right": 213.0, "len": 13.0})
-		_footer.append({"id": "quit", "text": "SPEICHERN & BEENDEN", "from_right": 128.0, "len": 17.0})
-		_footer.append({"id": "save", "text": "SPEICHERN", "from_right": 52.0, "len": 11.0})
+		_footer.append({"id": "menu", "text": "HAUPTMENÜ", "from_right": 284.0, "len": 9.0})
+		_footer.append({"id": "discard", "text": "OHNE SPEICHERN", "from_right": 208.0, "len": 11.0})
+		_footer.append({"id": "quit", "text": "SPEICHERN & ENDE", "from_right": 122.0, "len": 17.0})
+		_footer.append({"id": "save", "text": "SPEICHERN", "from_right": 46.0, "len": 11.0})
 	else:
-		_footer.append({"id": "quit", "text": "SPIEL VERLASSEN", "from_right": 52.0, "len": 15.0})
+		_footer.append({"id": "menu", "text": "HAUPTMENÜ", "from_right": 152.0, "len": 13.0})
+		_footer.append({"id": "quit", "text": "SPIEL VERLASSEN", "from_right": 56.0, "len": 15.0})
 
 
 func _select_tab(index: int) -> void:
@@ -226,6 +242,8 @@ func _build_test_tools() -> void:
 		_add(0, "button", "WUNDER: GLOCKENTEICH", "", {"action": "wonder_bell"})
 		_add(0, "button", "WUNDER: SCHLAFENDE WÄCHTER", "", {"action": "wonder_guardians"})
 		_add(0, "button", "WUNDER: BLUMEN-AMPHITHEATER", "", {"action": "wonder_amphitheater"})
+		_add(0, "button", "NACHTWUNDER: STERNSCHNUPPE", "", {"action": "wonder_starfall"})
+		_add(0, "button", "NACHTWUNDER: KRONENHIRSCH", "", {"action": "wonder_stag"})
 		_add(0, "button", "QUARZWÄCHTER SPAWNEN", "", {"action": "quartz_golem_spawn"})
 		_add(0, "button", "ZUR SEEHEXE", "", {"action": "lake_witch"}) ## docs/seehexe_konzept.md: in front of her house at the Hexenwald lake
 		_add(0, "button", "SEEHEXE: QUEST STARTEN", "", {"action": "lake_witch_quest"}) ## the entry quest from the start, the ring asleep (host)
@@ -353,6 +371,56 @@ func _build_tab() -> void:
 			_build_town_page()
 		"pets":
 			_build_pets_page()
+		"coop":
+			_build_coop_page()
+
+
+func _on_session_changed() -> void:
+	if _opening and String(TABS[_tab]["id"]) == "coop" and not _editing:
+		_build_items()
+
+
+func _build_coop_page() -> void:
+	if not NetworkManager.is_multiplayer_session():
+		_add(0, "heading", "EINZELSPIELER")
+		_add(0, "info", "KEINE KOOP-SITZUNG AKTIV", "", {"text": ""})
+		_add(0, "info", "NEUE WELT ODER BEITRITT", "", {"text": ""})
+		_add(0, "info", "IM HAUPTMENÜ UNTER", "", {"text": ""})
+		_add(0, "info", "MEHRSPIELER STARTEN", "", {"text": ""})
+		_add(0, "button", "ZUM HAUPTMENÜ", "", {"action": "coop_to_menu"})
+		_add(1, "heading", "SPIELERNAME")
+		_add(1, "field", "NAME", "player_name", {"hint": "ELLIE"})
+		_add(1, "button", "NAME ÜBERNEHMEN", "", {"action": "coop_apply_name"})
+		return
+	var code: String = NetworkManager.active_room_code if not NetworkManager.active_room_code.is_empty() else "OFFEN"
+	_add(0, "heading", NetworkManager.active_world_name)
+	_add(0, "info", "JOIN-CODE", "", {"text": code})
+	_add(0, "button", "CODE KOPIEREN", "", {"action": "coop_copy_code"})
+	_add(0, "button", "EINLADUNG KOPIEREN", "", {"action": "coop_copy_invite"})
+	if multiplayer.is_server():
+		_add(0, "button", "NEUEN CODE ERZEUGEN", "", {"action": "coop_new_code"})
+	_add(0, "heading", "HOST-ADRESSE")
+	var ips: PackedStringArray = NetworkManager.local_ips()
+	for i: int in mini(ips.size(), 2):
+		var label_str: String = "LAN-IP" if i == 0 else "WEITERE IP"
+		var addr_str: String = "%s:%d" % [ips[i], NetworkManager.active_port]
+		_add(0, "info", label_str, "", {"text": addr_str})
+	_add(0, "button", "IP KOPIEREN", "", {"action": "coop_copy_ip"})
+	if _coop_toast_t > 0.0 and not _coop_toast.is_empty():
+		_add(0, "info", _coop_toast, "", {"text": ""})
+	var crew: Array[Dictionary] = NetworkManager.roster()
+	_add(1, "heading", "SPIELER %d/%d" % [maxi(crew.size(), 1), NetworkManager.active_max_players])
+	for entry: Dictionary in crew:
+		var pid: int = int(entry.get("id", 0))
+		var is_host: bool = bool(entry.get("is_host", false))
+		var pname: String = String(entry.get("name", "SPIELER"))
+		var role_txt: String = "HOST" if is_host else ("%d MS" % NetworkManager.last_ping_ms if pid == multiplayer.get_unique_id() and NetworkManager.last_ping_ms > 0 else "ONLINE")
+		_add(1, "info", pname, "", {"text": role_txt})
+		if multiplayer.is_server() and not is_host:
+			_add(1, "button", "%s ENTFERNEN" % pname, "", {"action": "coop_kick:%d" % pid, "risky": true})
+	_add(1, "heading", "DEIN NAME")
+	_add(1, "field", "NAME", "player_name", {"hint": "ELLIE"})
+	_add(1, "button", "NAME ÜBERNEHMEN", "", {"action": "coop_apply_name"})
 
 
 func _on_pets_changed(_key: String = "") -> void:
@@ -677,6 +745,56 @@ func _run_action(action: String) -> void:
 			_editing = false
 		else:
 			_failed_flash = 2.5
+		return
+	if action == "coop_copy_code":
+		var code_txt: String = NetworkManager.active_room_code if not NetworkManager.active_room_code.is_empty() else ("%s:%d" % [NetworkManager.primary_ip(), NetworkManager.active_port])
+		DisplayServer.clipboard_set(code_txt)
+		_coop_toast = "CODE KOPIERT"
+		_coop_toast_t = 2.4
+		_build_items()
+		return
+	if action == "coop_copy_ip":
+		DisplayServer.clipboard_set("%s:%d" % [NetworkManager.primary_ip(), NetworkManager.active_port])
+		_coop_toast = "IP KOPIERT"
+		_coop_toast_t = 2.4
+		_build_items()
+		return
+	if action == "coop_copy_invite":
+		var ip_txt: String = "%s:%d" % [NetworkManager.primary_ip(), NetworkManager.active_port]
+		var inv: String = ip_txt if NetworkManager.active_room_code.is_empty() else ("%s %s" % [ip_txt, NetworkManager.active_room_code])
+		DisplayServer.clipboard_set(inv)
+		_coop_toast = "EINLADUNG KOPIERT"
+		_coop_toast_t = 2.4
+		_build_items()
+		return
+	if action == "coop_new_code":
+		NetworkManager.set_room_code("")
+		_coop_toast = "NEUER CODE: %s" % NetworkManager.active_room_code
+		_coop_toast_t = 2.6
+		_build_items()
+		return
+	if action == "coop_apply_name":
+		var clean_name: String = MultiplayerWorlds.sanitize_name(_name_text, "ELLIE")
+		_name_text = clean_name
+		GameSettings.set_value("player_name", clean_name)
+		GameSettings.save()
+		NetworkManager.refresh_local_name()
+		_coop_toast = "NAME GESPEICHERT"
+		_coop_toast_t = 2.2
+		_editing = false
+		_build_items()
+		return
+	if action == "coop_to_menu":
+		_begin_quit(true)
+		return
+	if action.begins_with("coop_kick:"):
+		var target_id: int = action.trim_prefix("coop_kick:").to_int()
+		if _armed != action:
+			_arm(action)
+		else:
+			_armed = ""
+			NetworkManager.kick_peer(target_id)
+			_build_items()
 		return
 	match action:
 		"skills":
@@ -1031,6 +1149,25 @@ func _run_action(action: String) -> void:
 			var w_off: Vector2 = Vector2(-8.0, 8.0) if action == "wonder_bell" else (Vector2(8.0, 42.0) if action == "wonder_guardians" else Vector2(8.0, 62.0))
 			(_player as Player).request_teleport(Vector2(w_tile) * 16.0 + w_off)
 			_set_open(false)
+		"wonder_starfall", "wonder_stag": ## dev, host: trigger clear night + nearby Starfall crater or peaceful SpiritStag
+			var nw: NightWonders = NightWonders.of(get_tree())
+			if nw == null or not (_player is Player) or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if not TimeManager.is_night():
+				TimeManager.set_time(0.95)
+			if WeatherManager.current != null:
+				WeatherManager.current.force("clear")
+			var p_pos: Vector2 = (_player as Player).global_position
+			if action == "wonder_starfall":
+				var target: Vector2 = _nearby_night_wonder_pos(p_pos, 118.0)
+				if not nw.trigger_starfall(target).is_finite():
+					nw.trigger_starfall()
+			else:
+				var stag_pos: Vector2 = _nearby_night_wonder_pos(p_pos, 210.0)
+				if nw.spawn_spirit_stag(stag_pos) == null:
+					nw.spawn_spirit_stag()
+			_set_open(false)
 		"quartz_golem_spawn": ## dev, host: spawn a peaceful Quarzwächter near Ellie
 			var world_node: Node = get_tree().get_first_node_in_group("world")
 			if world_node == null or not world_node.has_method("spawn_quartz_golem") or not (_player is Player) or not multiplayer.is_server():
@@ -1102,7 +1239,18 @@ func _reset_and_restart() -> void:
 	var path: String = SaveGame.path_for(get_tree())
 	SaveGame.delete(path)
 	_set_open(false)
-	GameLauncher.launch(get_tree(), {"mode": "host" if path == SaveGame.COOP_PATH else "new"})
+	if NetworkManager.is_multiplayer_session():
+		GameLauncher.launch(get_tree(), {
+			"mode": "host",
+			"port": NetworkManager.active_port,
+			"code": NetworkManager.active_room_code,
+			"max_players": NetworkManager.active_max_players,
+			"world_id": NetworkManager.active_world_id,
+			"world_name": NetworkManager.active_world_name,
+			"save_path": NetworkManager.active_save_path,
+		})
+	else:
+		GameLauncher.launch(get_tree(), {"mode": "new"})
 
 
 func _arm(action: String) -> void:
@@ -1117,30 +1265,36 @@ func _footer_click(index: int) -> void:
 			_do_save(false)
 		"quit":
 			if not _can_save():
-				_begin_quit()
+				_begin_quit(false)
 			else:
-				_do_save(true)
+				_do_save(true, false)
+		"menu":
+			if not _can_save():
+				_begin_quit(true)
+			else:
+				_do_save(true, true)
 		"discard":
 			if _armed != id:
 				_arm(id)
 			else:
-				_begin_quit()
+				_begin_quit(false)
 
 
-func _do_save(then_quit: bool) -> void:
+func _do_save(then_quit: bool, to_menu: bool = false) -> void:
 	if SaveGame.save(get_tree()):
 		_save_info = SaveGame.info(SaveGame.path_for(get_tree()))
 		_saved_flash = 2.0
 		if then_quit:
-			_begin_quit()
+			_begin_quit(to_menu)
 	else:
 		_failed_flash = 2.5
 
 
-func _begin_quit() -> void:
+func _begin_quit(to_menu: bool = false) -> void:
 	if _dirty:
 		GameSettings.save()
 		_dirty = false
+	_quit_to_menu = to_menu
 	_quit_t = 0.0
 
 
@@ -1196,14 +1350,15 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Enter confirms (goes / renames), Escape leaves the field.
 func _type_into_field(key: InputEventKey) -> void:
 	var pet: bool = _field == "pet"
-	var text_now: String = _pet_text if pet else _tp_text
+	var name_field: bool = _field == "player_name"
+	var text_now: String = _pet_text if pet else (_name_text if name_field else _tp_text)
 	match key.physical_keycode:
 		KEY_ESCAPE:
 			_editing = false
 			return
 		KEY_ENTER, KEY_KP_ENTER:
 			_editing = false
-			_run_action("pet_rename" if pet else "teleport")
+			_run_action("pet_rename" if pet else ("coop_apply_name" if name_field else "teleport"))
 			return
 		KEY_BACKSPACE:
 			text_now = text_now.substr(0, text_now.length() - 1)
@@ -1215,11 +1370,14 @@ func _type_into_field(key: InputEventKey) -> void:
 				text = char(key.unicode)
 			var limit: int = int(((PetRules.table()["register"] as Dictionary)["max_name"])) if pet else 18
 			for c: String in text:
-				var allowed: bool = (c.to_upper() >= "A" and c.to_upper() <= "Z") or c in "ÄÖÜäöüß0123456789 -" if pet else c in "0123456789-, "
+				var is_word_char: bool = (c.to_upper() >= "A" and c.to_upper() <= "Z") or c in "ÄÖÜäöüß0123456789 -"
+				var allowed: bool = is_word_char if (pet or name_field) else c in "0123456789-, "
 				if allowed and text_now.length() < limit:
-					text_now += c.to_upper() if pet else c
+					text_now += c.to_upper() if (pet or name_field) else c
 	if pet:
 		_pet_text = text_now
+	elif name_field:
+		_name_text = text_now
 	else:
 		_tp_text = text_now
 
@@ -1492,6 +1650,11 @@ func _draw_page(void_level: float) -> void:
 		last[int(item["col"])] = maxf(last[int(item["col"])], float(item["y"]) + float(item["h"]) - _scrolls[int(item["col"])])
 	for col: int in 2:
 		if last[col] > 0.0:
+			if String(TABS[_tab]["id"]) == "coop":
+				var card: Rect2 = Rect2(_column_x(col) - 4.0, TOP_Y - 6.0, COLUMN_W + 10.0, minf(last[col], _view_bottom()) - TOP_Y + 12.0)
+				draw_rect(card, Color(VineStyle.OUTLINE, 0.72 * reach))
+				draw_rect(card.grow(-1.0), Color(0.08, 0.06, 0.14, 0.72 * reach))
+				draw_rect(Rect2(card.position + Vector2(2.0, 2.0), Vector2(card.size.x - 4.0, 1.0)), Color("4a4180", 0.55 * reach))
 			_draw_column_vine(_column_x(col) + 2.0, TOP_Y - 10.0, minf(last[col], _view_bottom()), reach, void_level)
 	for item: Dictionary in _items:
 		var p: float = _row_p(item)
@@ -1587,9 +1750,10 @@ func _draw_row(item: Dictionary, p: float, void_level: float) -> void:
 			if _editing and _field == String(item["key"]):
 				draw_rect(Rect2(box.position.x, box.end.y - 1.0, box.size.x, 1.0), Color(tone, p)) ## a lit lower edge while it takes the keys
 				VineStyle.glow(self, box.get_center(), 50.0, tone, 0.12 * p)
-			var pet_field: bool = String(item["key"]) == "pet"
-			var typed: String = _pet_text if pet_field else _tp_text
-			var shown: String = typed if (typed != "" or (_editing and _field == String(item["key"]))) else (String(item.get("hint", "NEUER NAME")) if pet_field else "X, Y")
+			var field_key: String = String(item["key"])
+			var typed: String = _pet_text if field_key == "pet" else (_name_text if field_key == "player_name" else _tp_text)
+			var placeholder: String = String(item.get("hint", "NEUER NAME")) if (field_key == "pet" or field_key == "player_name") else "X, Y"
+			var shown: String = typed if (typed != "" or (_editing and _field == field_key)) else placeholder
 			_text(shown, Vector2(box.position.x + 4.0, box.position.y + 3.0), UiStyle.TEXT if typed != "" else Color(UiStyle.TEXT_DIM, 0.6), p)
 			if _editing and _field == String(item["key"]) and int(_time * 2.0) % 2 == 0:
 				draw_rect(Rect2(box.position.x + 4.0 + PixelText.width(typed) + 2.0, box.position.y + 2.0, 1.0, 8.0), Color(tone, p))
@@ -1729,8 +1893,27 @@ func _draw_outro() -> void:
 		var x: float = VineStyle.rand(k + 900) * size.x
 		var y: float = size.y - fposmod(q * (1.5 + VineStyle.rand(k + 950)) + VineStyle.rand(k), 1.0) * size.y
 		draw_rect(Rect2(roundf(x), roundf(y), 1, 1), Color(VineStyle.VOID_GLOW, q))
-	var word: String = "BIS BALD"
+	var word: String = "ZUM HAUPTMENÜ" if _quit_to_menu else "BIS BALD"
 	var fade: float = clampf((q - 0.35) / 0.4, 0.0, 1.0)
 	draw_set_transform(Vector2(size.x / 2.0 - PixelText.width(word), size.y / 2.0 - 7.0), 0.0, Vector2(2, 2))
 	PixelText.draw(self, word, Vector2i.ZERO, Color(VineStyle.PETAL, fade), Color(VineStyle.BARK_VOID_LIGHT, fade))
 	draw_set_transform(Vector2.ZERO)
+
+
+func _nearby_night_wonder_pos(origin: Vector2, dist: float) -> Vector2:
+	var w: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+	if w == null:
+		return Vector2.INF
+	for k: int in 8:
+		var cand: Vector2 = (origin + Vector2.from_angle(float(k) * (TAU / 8.0)) * dist).round()
+		var tile: Vector2i = Vector2i((cand / 16.0).floor())
+		if w._biome_at(tile) != "meadow":
+			continue
+		if w._rivers != null and w._rivers.depth_amount(cand) >= 0.0:
+			continue
+		if w._relief != null and not w._relief.flat_around(cand, 18.0):
+			continue
+		if w._generator != null and w._generator.blocked_cells.has(tile):
+			continue
+		return cand
+	return Vector2.INF

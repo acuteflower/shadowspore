@@ -14,6 +14,65 @@ static func piece(id: String) -> Dictionary:
 	return (config().get("pieces", {}) as Dictionary).get(id, {}) as Dictionary
 
 
+static func upgrades_of(id: String) -> Array:
+	return piece(id).get("upgrades", []) as Array
+
+
+static func max_level(id: String) -> int:
+	var best: int = 1
+	for raw: Variant in upgrades_of(id):
+		best = maxi(best, int((raw as Dictionary).get("lv", 1)))
+	return best
+
+
+static func upgrade_spec(id: String, lv: int) -> Dictionary:
+	for raw: Variant in upgrades_of(id):
+		var entry: Dictionary = raw as Dictionary
+		if int(entry.get("lv", 0)) == lv:
+			return entry
+	return {}
+
+
+## Piece catalogue merged with any upgrade definitions up through `lv` (1 = base piece).
+static func piece_at_level(id: String, lv: int) -> Dictionary:
+	var base: Dictionary = piece(id)
+	if base.is_empty() or lv <= 1:
+		return base
+	var out: Dictionary = base.duplicate(true)
+	for tier: int in range(2, lv + 1):
+		var up: Dictionary = upgrade_spec(id, tier)
+		for key: String in up:
+			if key == "lv" or key == "cost" or key == "need_level" or key == "build_seconds":
+				continue
+			if key == "stand" and out.get("stand") is Dictionary and up[key] is Dictionary:
+				var merged_stand: Dictionary = (out["stand"] as Dictionary).duplicate(true)
+				for sk: String in up["stand"] as Dictionary:
+					merged_stand[sk] = (up["stand"] as Dictionary)[sk]
+				out["stand"] = merged_stand
+			elif key == "aura" and out.get("aura") is Dictionary and up[key] is Dictionary:
+				var merged_aura: Dictionary = (out["aura"] as Dictionary).duplicate(true)
+				for ak: String in up["aura"] as Dictionary:
+					merged_aura[ak] = (up["aura"] as Dictionary)[ak]
+				out["aura"] = merged_aura
+			else:
+				out[key] = up[key]
+	return out
+
+
+static func piece_value(id: String, key: String, lv: int = 1, fallback: Variant = null) -> Variant:
+	return piece_at_level(id, lv).get(key, fallback)
+
+
+## Cumulative material cost of a piece including every completed upgrade through `lv`.
+static func total_cost(id: String, lv: int = 1) -> Dictionary:
+	var out: Dictionary = (piece(id).get("cost", {}) as Dictionary).duplicate()
+	for tier: int in range(2, lv + 1):
+		var up_cost: Dictionary = upgrade_spec(id, tier).get("cost", {}) as Dictionary
+		for item: String in up_cost:
+			out[item] = int(out.get(item, 0)) + int(up_cost[item])
+	return out
+
+
 ## The pieces a player can choose in the build menu, in the catalogue's order (the house is not one of them).
 static func buildable() -> Array[String]:
 	var out: Array[String] = []

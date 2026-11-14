@@ -194,13 +194,19 @@ def pole(m, x, y0, y1, z, bar=3.8):
     m.ell(V(x, y1 + 1.0, z), (1.1, 1.1, 1.1), IRON)
 
 
-# ------------------------------------------------------------------ lamp post
+# ------------------------------------------------------------------ lamp post & scarecrow
 def lamp_post():
     """Redone in tools/art_lamp.py (twisted post, cairn, curling arm, hanging cage lantern, animated unlit sheets); this only calls it."""
     import art_lamp  # noqa: E402
     art_lamp.make()
     from PIL import Image
     return np.array(Image.open(OUT / "lamp_post.png").convert("RGBA"))
+
+
+def scarecrow():
+    """Field scarecrow in tools/art_scarecrow.py (36x48, feet row 42, footprint [12, 8], + _glow and _preview)."""
+    import art_scarecrow  # noqa: E402
+    return art_scarecrow.make()
 
 
 # ------------------------------------------------------------------ fence
@@ -588,7 +594,7 @@ def rope_icon(grid):
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     hut_lib.set_fresh()  # the renewed hut's warmer plum-violet wood: the town is new work next to it
-    pieces = {"lamp_post": lamp_post, "fence": fence, "bench": bench, "path_stone": path_stone, "stockpile": stockpile, "workshop": workshop}
+    pieces = {"lamp_post": lamp_post, "scarecrow": scarecrow, "fence": fence, "bench": bench, "path_stone": path_stone, "stockpile": stockpile, "workshop": workshop}
     only = [a for a in sys.argv[1:] if a in pieces]
     arrays = {}
     for name, fn in pieces.items():

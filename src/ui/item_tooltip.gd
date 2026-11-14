@@ -71,6 +71,10 @@ func show_stack(stack: Dictionary, equip_hint: bool, replaces: Dictionary = {}) 
 			var value: float = Items.stat(stack, String(entry[0])) ## with the refinement
 			var bonus: String = "+" + _number(value - base) if level > 0 and not is_equal_approx(value, base) else ""
 			stat_rows.append({"type": "stat", "text": String(entry[1]), "value": _number(value), "bonus": bonus, "level": level, "fill": clampf(value / float(entry[2]), 0.0, 1.0)})
+	var w_max: int = Items.water_max(stack)
+	if w_max > 0:
+		var w_now: int = Items.water(stack)
+		stat_rows.append({"type": "stat", "text": "Wasser", "value": "%d/%d" % [w_now, w_max], "bonus": "", "level": 0, "fill": float(w_now) / float(w_max)})
 	var description: Array[String] = _wrap(String(def.get("description", "")))
 	if not stat_rows.is_empty():
 		_rows.append({"type": "rule"})

@@ -525,7 +525,13 @@ func _draw_demolish(leaf: Rect2, fade: float) -> void:
 	var state: String = "FERTIG" if finished else "BAUSTELLE"
 	PixelText.draw(_canvas, state, Vector2i(int(leaf.end.x) - 9 - PixelText.width(state), y), Color(DIM, fade), SHADOW)
 	PixelText.draw(_canvas, "GIBT ZURÜCK, LANDET IM STADTLAGER", Vector2i(x, y + 9), Color(DIM, fade), SHADOW)
-	var back: Dictionary = TownRules.refund(spec.get("cost", {}) as Dictionary, finished)
+	var lv: int = mode.town.structure_level(mode.target_id)
+	var spent: Dictionary = TownRules.total_cost(String(data.p), lv)
+	if data.has("ug"):
+		var up_cost: Dictionary = TownRules.upgrade_spec(String(data.p), lv + 1).get("cost", {}) as Dictionary
+		for item: String in up_cost:
+			spent[item] = int(spent.get(item, 0)) + int(up_cost[item])
+	var back: Dictionary = TownRules.refund(spent, finished)
 	var cx: float = float(x)
 	for item: String in back:
 		cx += _chip(Vector2(cx, float(y) + 18.0), item, "+%d" % int(back[item]), LIT, 1.0, fade)

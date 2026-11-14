@@ -46,6 +46,12 @@ func _draw() -> void:
 		draw_texture(icon, Vector2(2, 2))
 	if SpellRules.is_staff(item):
 		StaffCrystals.draw_icon_stones(self, item, Vector2(2, 2)) ## the stones set into a staff show in its icon
+	var w_max: int = Items.water_max(item)
+	if w_max > 0:
+		var fill: float = float(Items.water(item)) / float(w_max)
+		draw_rect(Rect2(2, SIZE - 4, SIZE - 4, 2), UiStyle.OUTLINE)
+		if fill > 0.0:
+			draw_rect(Rect2(2, SIZE - 4, maxi(1, roundi(float(SIZE - 4) * fill)), 2), Color("5ed2f4"))
 	RefineStyle.draw_badge(self, Items.refine(item), SIZE - 2, SIZE - 2) ## "+7" of a refined weapon
 	var count: int = int(item.get("count", 1))
 	if count > 1:

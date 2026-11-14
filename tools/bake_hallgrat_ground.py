@@ -364,7 +364,7 @@ def main():
     shown = []
     jobs = [(spec, 7100 + i * 37) for i, spec in enumerate(town.get("paving", []))]
     for k, dp in enumerate(town.get("door_paths", [])):  # the lanes from the doors (tools/place_hallgrat_buildings.py)
-        jobs.append(({"id": "zugang_%d" % k, "style": "setts", "line_px": dp["px"], "width": 13, "wear": 0.35, "kerb": False}, 9100 + k * 11))
+        jobs.append(({"id": "zugang_%d" % k, "style": "setts", "line_px": dp["px"], "width": 19, "wear": 0.35, "kerb": False}, 9100 + k * 11))
     street_runs = None
     for spec, sd in jobs:
         if spec["id"].startswith("zugang_") and street_runs is None:

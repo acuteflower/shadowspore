@@ -24,6 +24,7 @@ var manager: TownManager
 var id: int = -1
 var piece: String = ""
 var progress: int = 0
+var upgrade_progress: int = -1 ## 0..999 while an existing built piece is upgrading to the next tier (-1 = idle)
 var _spec: Dictionary = {}
 var _frame: Vector2 = Vector2.ZERO
 var _feet: float = 0.0
@@ -79,10 +80,11 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	id = structure_id
 	var data: Dictionary = manager.structures[id] as Dictionary
 	piece = String(data.p)
-	_spec = TownRules.piece(piece)
+	_spec = TownRules.piece_at_level(piece, manager.structure_level(id))
 	position = Vector2(float(data.x), float(data.y))
 	_flipped = int(data.get("f", 0)) == 1
 	progress = int(data.g)
+	upgrade_progress = int(data.get("ug", -1))
 	var texture_name: String = String(_spec.get("texture", piece))
 	var frame: Array = _spec.get("frame", [16, 16]) as Array
 	_frame = Vector2(float(frame[0]), float(frame[1]))
@@ -550,6 +552,10 @@ func _apply_progress() -> void:
 		_spill.visible = done
 	set_night(TimeManager.night_amount())
 	queue_redraw()
+	if _over != null:
+		_over.queue_redraw()
+	if _scaffold != null:
+		_scaffold.queue_redraw()
 
 
 func set_progress(value: int, done: bool = false) -> void:
@@ -563,6 +569,21 @@ func set_progress(value: int, done: bool = false) -> void:
 	_apply_progress()
 	if done:
 		_finish_fx()
+
+
+func set_upgrade_progress(value: int) -> void:
+	if value >= 0 and value > upgrade_progress:
+		_last_gain_msec = Time.get_ticks_msec()
+	upgrade_progress = value
+	if value >= 0:
+		var quarter: int = int(float(value) / float(TownManager.PROGRESS_FULL) * 4.0)
+		if quarter > _milestone and quarter < 4 and value < TownManager.PROGRESS_FULL:
+			_milestone = quarter
+			_mark_milestone()
+	else:
+		_milestone = 4
+	if _over != null:
+		_over.queue_redraw()
 
 
 func set_night(amount: float) -> void:
@@ -806,6 +827,7 @@ func _burst(amount: int, color: Color, speed: float) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_update_build(delta)
+	var overlay_active: bool = _found_t >= 0.0 or not _sparks_out.is_empty()
 	if _found_t >= 0.0:
 		_found_t += delta
 		if _found_t > 0.22 and _found_t - delta <= 0.22:
@@ -819,7 +841,7 @@ func _process(delta: float) -> void:
 		_sparks_out[i].t = float(_sparks_out[i].t) + delta * 2.6
 		if float(_sparks_out[i].t) >= 1.0:
 			_sparks_out.remove_at(i)
-	if progress < TownManager.PROGRESS_FULL or _found_t >= 0.0 or not _sparks_out.is_empty():
+	if progress < TownManager.PROGRESS_FULL or upgrade_progress >= 0 or overlay_active:
 		_over.queue_redraw()
 		_scaffold.queue_redraw()
 	if progress < TownManager.PROGRESS_FULL:
@@ -859,8 +881,9 @@ func _process(delta: float) -> void:
 	if _light != null and _flicker > 0.0 and _light.visible:
 		var level: float = lerpf(0.4, 1.0, _active) if _spec.has("smoke") else 1.0 ## the forge sinks to embers when nobody tends it
 		_light.base_energy = _light_base * (1.0 + attention * 1.2) * level * _lamp_k * (1.0 - _flicker * (0.5 + 0.5 * sin(_time * 11.0 + float(id)) * sin(_time * 4.3 + 1.0)))
-	if progress < TownManager.PROGRESS_FULL:
-		queue_redraw()
+	if progress < TownManager.PROGRESS_FULL or upgrade_progress >= 0:
+		if progress < TownManager.PROGRESS_FULL:
+			queue_redraw()
 		if Time.get_ticks_msec() - _last_gain_msec < 700:
 			_hammer_clock -= delta
 			if _hammer_clock <= 0.0:
@@ -1011,12 +1034,12 @@ func _draw_over() -> void:
 		var tail: Vector2 = a.lerp(b, maxf(t2 - 0.12, 0.0)) + Vector2(0, -18.0 * sin(PI * maxf(t2 - 0.12, 0.0)))
 		_over.draw_line(tail.round(), q.round(), Color(SITE, 0.5), 1.0)
 		_over.draw_rect(Rect2(q.round(), Vector2.ONE), Color(0.92, 1.0, 0.98))
-	if progress >= TownManager.PROGRESS_FULL:
+	if progress >= TownManager.PROGRESS_FULL and upgrade_progress < 0:
 		return
 	var me: Player = manager.local_player() if manager != null else null
 	if me == null or me.global_position.distance_to(global_position) > 130.0:
 		return
-	var fraction: float = clampf(_shown, 0.0, 1.0)
+	var fraction: float = clampf(float(upgrade_progress) / float(TownManager.PROGRESS_FULL) if upgrade_progress >= 0 else _shown, 0.0, 1.0)
 	var top: float = roundf(-_feet - 12.0)
 	var w: float = 44.0
 	var x0: float = -w / 2.0
@@ -1024,19 +1047,38 @@ func _draw_over() -> void:
 	_over.draw_rect(Rect2(x0, top, w, 2.0), Color(0.12, 0.08, 0.2))
 	_over.draw_rect(Rect2(x0, top, roundf(w * fraction), 2.0), SITE)
 	_over.draw_rect(Rect2(x0 + roundf(w * fraction) - 1.0, top - 1.0, 2.0, 4.0), Color(0.92, 1.0, 0.98, 0.6 + 0.4 * sin(_time * 8.0)))
-	var label: String = "%d %%" % int(fraction * 100.0) + ("  X3" if helping_here else "")
+	var prefix: String = "AUSBAU " if upgrade_progress >= 0 else ""
+	var label: String = "%s%d %%" % [prefix, int(fraction * 100.0)] + ("  X3" if helping_here else "")
 	PixelText.draw(_over, label, Vector2i(int(-float(PixelText.width(label)) / 2.0), int(top) - 8), Color(0.92, 1.0, 0.98) if helping_here else SITE, INK)
 
 
 # ---------- use ----------
 
+func _holding_unfull_can() -> bool:
+	var me: Player = manager.local_player() if manager != null else null
+	if me == null or me.inventory == null:
+		return false
+	var stack: Dictionary = me.inventory.active_stack()
+	return String(Items.definition(stack).get("tool", "")) == "can" and Items.water(stack) < Items.water_max(stack)
+
+
 func prompt() -> String:
 	if InputManager.ui_blocking:
 		return ""
+	if upgrade_progress >= 0:
+		return "" if helping_here else "ANPACKEN"
 	if progress < TownManager.PROGRESS_FULL:
 		return "" if helping_here or bool(_spec.get("walk", false)) else "ANPACKEN"
 	if _spec.has("fuel"):
 		return manager.lamp_prompt(id)
+	if piece == "plaza":
+		if _holding_unfull_can():
+			return "KANNE FÜLLEN"
+		if manager.has_next_upgrade(id):
+			return manager.upgrade_prompt(id)
+		var me: Player = manager.local_player()
+		if FarmManager.has_unfull_can(me):
+			return "KANNE FÜLLEN"
 	match String(_spec.get("role", "")):
 		"stock":
 			return "LAGER ÖFFNEN"
@@ -1045,10 +1087,20 @@ func prompt() -> String:
 	return ""
 
 
+func prompt_hint() -> String:
+	if InputManager.ui_blocking or upgrade_progress >= 0 or progress < TownManager.PROGRESS_FULL:
+		return ""
+	if piece == "plaza" and not _holding_unfull_can() and manager.has_next_upgrade(id):
+		return manager.upgrade_hint(id)
+	return ""
+
+
 func reach_distance(from: Vector2) -> float:
+	if piece == "plaza" and progress >= TownManager.PROGRESS_FULL and upgrade_progress < 0:
+		return maxf(from.distance_to(position) - 22.0, 0.0)
 	var rect: Rect2 = TownRules.foot_rect(piece, position.x, position.y)
 	var nearest: Vector2 = Vector2(clampf(from.x, rect.position.x, rect.end.x), clampf(from.y, rect.position.y, rect.end.y))
-	return maxf(from.distance_to(nearest) - (16.0 if progress < TownManager.PROGRESS_FULL else 0.0), 0.0) ## a site can be taken in hand from a little further off
+	return maxf(from.distance_to(nearest) - (16.0 if progress < TownManager.PROGRESS_FULL or upgrade_progress >= 0 else 0.0), 0.0) ## a site can be taken in hand from a little further off
 
 
 func prompt_position() -> Vector2:
@@ -1056,13 +1108,22 @@ func prompt_position() -> Vector2:
 
 
 func interact(player: Player) -> void:
-	if progress < TownManager.PROGRESS_FULL:
+	if upgrade_progress >= 0 or progress < TownManager.PROGRESS_FULL:
 		if player.is_multiplayer_authority():
 			manager.lend_hand(player, id)
 		return
 	if _spec.has("fuel"):
 		if prompt() != "" and player.is_multiplayer_authority():
 			manager.request_lamp(id)
+		return
+	if piece == "plaza":
+		if not player.is_multiplayer_authority():
+			return
+		if _holding_unfull_can() or not manager.has_next_upgrade(id):
+			if manager.farm != null and FarmManager.has_unfull_can(player):
+				manager.farm.request_refill()
+		else:
+			manager.request_upgrade(id)
 		return
 	if String(_spec.get("role", "")) == "stock":
 		open_shutters()

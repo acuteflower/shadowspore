@@ -176,7 +176,7 @@ func play_awaken_fx() -> void:
 	_play_hum()
 	var chests: LootChests = LootChests.of(get_tree())
 	if chests != null:
-		chests.appear(wonder_id + "_chest", chest_tier, global_position + Vector2(0.0, 54.0), false, true, true)
+		chests.appear(wonder_id + "_chest", chest_tier, global_position + Vector2(0.0, 54.0), true, false, true)
 	_refresh_visuals()
 
 

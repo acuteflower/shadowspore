@@ -7,7 +7,8 @@ extends RefCounted
 ## teardown, going (drives off).
 
 const DAY_START: float = 0.25
-const DAY_SEC: float = 720.0
+static func _day_sec() -> float:
+	return TimeManager.DAY_LENGTH_SEC
 const GROUPS: Array[String] = ["curio", "far", "seed", "basic"] ## the order of the WAREN rows (the curiosity first)
 
 static var _cache_key: String = ""
@@ -22,6 +23,11 @@ static func cfg() -> Dictionary:
 	return DataRegistry.table("caravan")
 
 
+## Earliest day a caravan may arrive after the square stands (respecting `min_day`, Etappe 1).
+static func first_possible_day(founded_or_plaza_day: int) -> int:
+	return maxi(founded_or_plaza_day + int(cfg().get("first_delay", 1)), int(cfg().get("min_day", 1)))
+
+
 static func epoch(day: int, time_of_day: float) -> float:
 	return float(day) + fposmod(time_of_day - DAY_START, 1.0)
 
@@ -32,7 +38,7 @@ static func clock_of(e: float) -> float:
 
 
 static func days(seconds: float) -> float:
-	return seconds / DAY_SEC
+	return seconds / _day_sec()
 
 
 static func _num(key: String, fallback: float) -> float:
@@ -155,7 +161,7 @@ static func phase(v: Dictionary, e: float, storm: bool = false) -> Dictionary:
 
 
 static func _timed(state: String, gone: float, length: float) -> Dictionary:
-	return {"state": state, "k": clampf(gone / maxf(length, 0.000001), 0.0, 1.0), "t": gone * DAY_SEC}
+	return {"state": state, "k": clampf(gone / maxf(length, 0.000001), 0.0, 1.0), "t": gone * _day_sec()}
 
 
 ## Is the stall standing (unfolded or closed) in this state?

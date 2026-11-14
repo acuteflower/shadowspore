@@ -97,5 +97,25 @@ func _run() -> void:
 		_check(gustav.resolve_spot("bench") == "bench", "the checkpoint town has a bench for his evening")
 		var plan: Dictionary = gustav.plan_at(0.35)
 		_check(String(plan.spot) == "split", "the morning has a splitting spell")
+	# --- scarecrow guards nearby perches and repels crows
+	if crow != null:
+		var scare_pos: Vector2 = store
+		var guard_perch: RoofPerch = null
+		for node: Node in perches:
+			var p: RoofPerch = node as RoofPerch
+			if p != null and town.critters._perches().has(p):
+				guard_perch = p
+				scare_pos = p.global_position + Vector2(16.0, 0.0)
+				break
+		if guard_perch != null:
+			var sc_id: int = town.next_id
+			town.next_id += 1
+			town._rpc_added(sc_id, {"p": "scarecrow", "x": scare_pos.x, "y": scare_pos.y, "f": 0, "g": TownManager.PROGRESS_FULL, "d": TimeManager.day}, [])
+			await _frames(2)
+			_check(town.scared_at(guard_perch.global_position) != Vector2.INF, "scarecrow guards nearby perches")
+			_check(not town.critters._perches().has(guard_perch), "guarded perch is skipped for new landings")
+			crow.global_position = guard_perch.global_position
+			await _frames(15)
+			_check(crow.state == WildCorvid.State.FLEE or crow.state == WildCorvid.State.FLY, "crow near scarecrow flees/flies away (%d)" % crow.state)
 	print("TOWN CRITTERS: ", "ok" if _ok else "FAILED")
 	get_tree().quit()

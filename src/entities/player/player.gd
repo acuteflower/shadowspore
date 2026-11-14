@@ -418,6 +418,11 @@ func _ready() -> void:
 		attack.lunged.connect(func(impulse: Vector2) -> void: velocity += impulse)
 		attack.hit_landed.connect(func(strength: float) -> void: _shake = maxf(_shake, strength))
 		_on_inventory_changed()
+	else:
+		var plate: _CoopNameplate = _CoopNameplate.new()
+		plate.name = "CoopNameplate"
+		plate.owner_id = name.to_int()
+		add_child(plate)
 
 
 ## The camera, for windows that frame a scene (zoom and `view_shift`).
@@ -2426,3 +2431,33 @@ func sync_wound_visuals() -> void:
 	_wound = _wound_target()
 	(_sprite.material as ShaderMaterial).set_shader_parameter("wound", _wound)
 	attack.wound = _wound
+
+
+class _CoopNameplate extends Node2D:
+	var owner_id: int = 1
+	var _timer: float = 0.0
+
+	func _ready() -> void:
+		z_index = 40
+		material = Unlit.material()
+		NetworkManager.session_changed.connect(func() -> void: queue_redraw())
+
+	func _process(delta: float) -> void:
+		_timer += delta
+		if _timer >= 0.4:
+			_timer = 0.0
+			queue_redraw()
+
+	func _draw() -> void:
+		if not NetworkManager.is_multiplayer_session():
+			return
+		var pname: String = NetworkManager.player_name_for(owner_id)
+		if pname.is_empty():
+			return
+		var slot: int = NetworkManager.player_slot_for(owner_id)
+		var tone: Color = MapWindow.PLAYER_TONES[clampi(slot, 0, MapWindow.PLAYER_TONES.size() - 1)]
+		var tw: int = PixelText.width(pname)
+		var x: int = -tw / 2
+		var y: int = -30
+		draw_rect(Rect2(float(x - 5), float(y + 2), 3.0, 3.0), tone)
+		PixelText.draw(self, pname, Vector2i(x, y), Color(tone, 0.92), Color(VineStyle.OUTLINE, 0.9))

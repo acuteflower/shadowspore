@@ -82,6 +82,9 @@ func _age(step: float) -> void:
 	var birds: CorvidPopulation = _population("CorvidPopulation") as CorvidPopulation
 	if birds != null:
 		for bird: WildCorvid in birds.visitors():
+			var scare: Vector2 = town.scared_at(bird.global_position)
+			if scare != Vector2.INF and bird.species != "robin":
+				bird.hear_alarm(scare)
 			_expire(bird, step, _rng.randf_range(BIRD_LIFE.x, BIRD_LIFE.y), 300.0, birds)
 	var woods: WoodlandPopulation = _population("WoodlandPopulation") as WoodlandPopulation
 	if woods != null:
@@ -108,8 +111,17 @@ func _perches() -> Array[RoofPerch]:
 	var out: Array[RoofPerch] = []
 	for node: Node in get_tree().get_nodes_in_group("town_perches"):
 		var perch: RoofPerch = node as RoofPerch
-		if perch != null and not perch.is_depleted():
+		if perch != null and not perch.is_depleted() and town.scared_at(perch.global_position) == Vector2.INF:
 			out.append(perch)
+	return out
+
+
+func _unguarded_fields() -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for id: int in town.built_ids("field"):
+		var center_pos: Vector2 = town.rect_of(id).get_center()
+		if town.scared_at(center_pos) == Vector2.INF:
+			out.append(center_pos)
 	return out
 
 
@@ -118,21 +130,24 @@ func _bird_visit() -> void:
 		return
 	var birds: CorvidPopulation = _population("CorvidPopulation") as CorvidPopulation
 	var perches: Array[RoofPerch] = _perches()
-	if birds == null or perches.is_empty():
+	var fields: Array[Vector2] = _unguarded_fields()
+	if birds == null or (perches.is_empty() and fields.is_empty()):
 		return
-	var wanted: int = clampi(1 + perches.size() / 4, 1, 3)
+	var wanted: int = clampi(1 + (perches.size() + fields.size()) / 4, 1, 3)
 	if birds.visitors().size() >= wanted:
 		return
-	var goal: Vector2 = perches[_rng.randi() % perches.size()].global_position
+	var prefer_field: bool = perches.is_empty() or (not fields.is_empty() and _rng.randf() < 0.35)
+	var goal: Vector2 = fields[_rng.randi() % fields.size()] if prefer_field else perches[_rng.randi() % perches.size()].global_position
 	for attempt: int in 14:
 		var point: Vector2 = goal + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(SPAWN_RING.x, SPAWN_RING.y)
 		if not _alive_players_far(point, 340.0):
 			continue
 		var roll_sp: float = _rng.randf()
-		var species: String = "robin" if roll_sp < 0.24 else ("raven" if roll_sp < 0.36 else "crow")
+		var species: String = "crow" if prefer_field else ("robin" if roll_sp < 0.24 else ("raven" if roll_sp < 0.36 else "crow"))
 		var bird: WildCorvid = birds.spawn_visitor(species, point, "town")
 		if bird != null:
-			bird._take_wing(false, false, false, true) ## straight to a roof
+			bird.visit_roof = not prefer_field
+			bird._take_wing(false, false, prefer_field, not prefer_field)
 			return
 
 

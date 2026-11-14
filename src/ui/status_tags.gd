@@ -45,6 +45,24 @@ const DROP: Array[String] = [
 	".###.",
 ]
 
+const REST: Array[String] = [
+	".#...",
+	"##.#.",
+	"##...",
+	"##...",
+	".####",
+	"..##.",
+]
+
+const DROWSE: Array[String] = [
+	".....",
+	"#####",
+	"#.#.#",
+	".###.",
+	".....",
+	".###.",
+]
+
 var _effects: StatusEffects
 var _time: float = 0.0
 var _shown: Dictionary = {} ## id -> 0..1 (how far its tag has dropped in)
@@ -138,6 +156,10 @@ func _glyph_of(glyph: String) -> Array[String]:
 			return SPARK
 		"drop":
 			return DROP
+		"rest":
+			return REST
+		"drowse":
+			return DROWSE
 	return GLYPH
 
 
@@ -146,13 +168,25 @@ func _draw_glyph(at: Vector2i, color: Color, a: float, shape: Array[String] = GL
 	if shape == EYE and fmod(_time, 3.7) > 3.5: ## it blinks
 		draw_rect(Rect2(at.x, at.y + 3, 5, 1), Color(color, a))
 		return
+	if shape == DROWSE and fmod(_time, 4.6) > 3.9: ## heavy sleepy lids nod shut
+		draw_rect(Rect2(at.x, at.y + 2, 5, 1), Color(color, a * 0.9))
+		draw_rect(Rect2(at.x + 1, at.y + 3, 3, 1), Color(color, a * 0.8))
+		draw_rect(Rect2(at.x + 1, at.y + 5, 3, 1), Color(color, a * 0.5))
+		return
 	for row: int in shape.size():
 		var line: String = shape[row]
 		for col: int in line.length():
 			if line[col] == "#":
 				var shift: int = wob if row < 2 and col % 2 == 0 else 0
 				draw_rect(Rect2(at.x + col, at.y + row - shift, 1, 1), Color(color, a * (1.0 - 0.1 * float(row))))
-	draw_rect(Rect2(at.x + 2, at.y + (2 if shape == EYE else 4), 1, 2), Color(CORE_HOT, a * 0.8))
+	if shape == REST:
+		var twinkle: float = 0.55 + 0.45 * (0.5 + 0.5 * sin(_time * 3.2))
+		draw_rect(Rect2(at.x + 3, at.y + 1, 1, 1), Color(CORE_HOT, a * 0.9 * twinkle))
+		draw_rect(Rect2(at.x + 1, at.y + 2, 1, 1), Color(CORE_HOT, a * 0.75))
+	elif shape == DROWSE:
+		draw_rect(Rect2(at.x + 2, at.y + 2, 1, 1), Color(CORE_HOT, a * 0.65))
+	else:
+		draw_rect(Rect2(at.x + 2, at.y + (2 if shape == EYE else 4), 1, 2), Color(CORE_HOT, a * 0.8))
 
 
 func _inset(x: int, bottom: bool, width: int, salt: int) -> int:

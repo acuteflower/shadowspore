@@ -26,6 +26,7 @@ var _night: float = 0.0
 var _pop: Tween
 var _sway: ShaderMaterial
 var _active: bool = true
+var _firefly_anchor: Node2D
 
 
 func setup(owner_field: FarmField, cell_index: int, center: Vector2, sway: ShaderMaterial) -> void:
@@ -58,6 +59,9 @@ func setup(owner_field: FarmField, cell_index: int, center: Vector2, sway: Shade
 	shape.position = Vector2(0.0, -6.0 - LIFT)
 	_hurtbox.add_child(shape)
 	add_child(_hurtbox)
+	_firefly_anchor = Node2D.new()
+	_firefly_anchor.position = Vector2(0.0, -10.0)
+	add_child(_firefly_anchor)
 	add_to_group("night_lights")
 	refresh("")
 
@@ -96,6 +100,12 @@ func refresh(fx: String) -> void:
 		if grew and fx == "grow":
 			_pop_in()
 	_glow.visible = _glow.texture != null and _stage >= FarmRules.STAGES - 1
+	if _firefly_anchor != null:
+		var firefly_ripe: bool = _active and _crop != "" and bool(FarmRules.crop(_crop).get("glow", false)) and FarmRules.is_ripe(state)
+		if firefly_ripe and not _firefly_anchor.is_in_group("flora_glow"):
+			_firefly_anchor.add_to_group("flora_glow")
+		elif not firefly_ripe and _firefly_anchor.is_in_group("flora_glow"):
+			_firefly_anchor.remove_from_group("flora_glow")
 	_apply_night()
 	match fx:
 		"till":

@@ -12,7 +12,7 @@ extends Node
 
 const STUMP: Vector2 = Vector2(84.0, 64.0) ## the seats' feet, from the hut's feet (data/ground.json seat_e, seat_s)
 const LOG: Vector2 = Vector2(34.0, 92.0)
-const EVENING: float = 0.80
+const EVENING: float = 0.86
 const SIT_FPS: float = 24.0
 const SPEED: float = 46.0
 const DOOR_OPEN: AudioStream = preload("res://assets/audio/hut/door_open.wav")

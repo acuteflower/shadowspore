@@ -19,34 +19,66 @@ static var _pasture: PackedFloat32Array = PackedFloat32Array()
 static var _flower_idx: PackedByteArray = PackedByteArray()
 static var _wind_flowers: PackedStringArray = PackedStringArray(["sunbloom", "moonbell", "spark_poppy", "puffseed"])
 static var _installed: bool = false
+static var _installed_key: String = ""
 
 
 static func is_installed() -> bool:
 	return _installed and _side > 0
 
 
-## Installs the immutable macro-habitat grids on the main thread right after `BiomeBlend.install`.
-static func install(map: RegionMap, relief: Relief, sdf: PackedByteArray) -> void:
-	var cfg_table: Dictionary = DataRegistry.table("meadow_habitats")
+static func cache_key_for(map: RegionMap) -> String:
+	return "%d:%s:%d" % [map.world_seed, map.world_biome, 1 if Relief.town_styles else 0]
+
+
+static func has_cache(expected_key: String) -> bool:
+	return _installed and _installed_key == expected_key and _side > 0
+
+
+## Worker-safe pure computation of the macro-habitat grids. `tables` contains read-only snapshots of
+## "meadow_habitats", "hallgrat", "ground", "waystones", "vistas", and "puzzles".
+static func compute_bundle(
+	map: RegionMap,
+	relief_bytes: PackedByteArray,
+	relief_field: PackedByteArray,
+	relief_side: int,
+	sdf: PackedByteArray,
+	lake_bytes: PackedByteArray,
+	lake_side: int,
+	gloom_cells: PackedFloat32Array,
+	arid_cells: PackedFloat32Array,
+	blend_side: int,
+	tables: Dictionary,
+	expected_key: String
+) -> Dictionary:
+	var cfg_table: Dictionary = tables.get("meadow_habitats", {}) as Dictionary
 	var settings: Dictionary = cfg_table.get("settings", {}) as Dictionary
 	var affinities: Dictionary = cfg_table.get("super_affinity", {}) as Dictionary
 	var wf_arr: Array = settings.get("wind_flowers", ["sunbloom", "moonbell", "spark_poppy", "puffseed"]) as Array
-	_wind_flowers.clear()
+	var wind_flowers: PackedStringArray = PackedStringArray()
 	for entry: Variant in wf_arr:
-		_wind_flowers.append(String(entry))
-	if _wind_flowers.is_empty():
-		_wind_flowers = PackedStringArray(["sunbloom", "moonbell", "spark_poppy", "puffseed"])
+		wind_flowers.append(String(entry))
+	if wind_flowers.is_empty():
+		wind_flowers = PackedStringArray(["sunbloom", "moonbell", "spark_poppy", "puffseed"])
 
 	var side: int = map.grid_size
-	_side = side
 	var total: int = side * side
-	_deep.resize(total)
-	_wind.resize(total)
-	_pasture.resize(total)
-	_flower_idx.resize(total)
+	var deep: PackedFloat32Array = PackedFloat32Array()
+	var wind: PackedFloat32Array = PackedFloat32Array()
+	var pasture: PackedFloat32Array = PackedFloat32Array()
+	var flower_idx: PackedByteArray = PackedByteArray()
+	deep.resize(total)
+	wind.resize(total)
+	pasture.resize(total)
+	flower_idx.resize(total)
 
-	var sanctuaries: PackedVector3Array = _collect_sanctuaries(map)
-	var hallgrat_rect: Rect2 = _hallgrat_rect()
+	var sanctuaries: PackedVector3Array = _collect_sanctuaries_from(
+		map,
+		tables.get("ground", {}) as Dictionary,
+		tables.get("waystones", {}) as Dictionary,
+		tables.get("vistas", {}) as Dictionary,
+		tables.get("puzzles", {}) as Dictionary
+	)
+	var hallgrat_rect: Rect2 = _hallgrat_rect_from(tables.get("hallgrat", {}) as Dictionary)
 
 	var macro_scale: float = maxf(float(settings.get("macro_scale_tiles", 168.0)), 64.0)
 	var warp_amp: float = float(settings.get("warp_tiles", 42.0))
@@ -69,43 +101,41 @@ static func install(map: RegionMap, relief: Relief, sdf: PackedByteArray) -> voi
 			var tile_i: Vector2i = Vector2i(int(tx), int(ty))
 			var super_id: int = map.super_at(tile_i)
 			if super_id < 0 or super_id >= 5:
-				_deep[idx] = 0.0
-				_wind[idx] = 0.0
-				_pasture[idx] = 0.0
-				_flower_idx[idx] = 0
+				deep[idx] = 0.0
+				wind[idx] = 0.0
+				pasture[idx] = 0.0
+				flower_idx[idx] = 0
 				continue
 
 			var pos_px: Vector2 = Vector2(tx, ty) * 16.0
-			var gloom: float = BiomeBlend.amount_at(pos_px)
-			var arid: float = BiomeBlend.arid_at(pos_px)
+			var gloom: float = BiomeBlend.sample_field(gloom_cells, blend_side, pos_px)
+			var arid: float = BiomeBlend.sample_field(arid_cells, blend_side, pos_px)
 			if gloom >= 0.12 or arid >= 0.12:
-				_deep[idx] = 0.0
-				_wind[idx] = 0.0
-				_pasture[idx] = 0.0
-				_flower_idx[idx] = 0
+				deep[idx] = 0.0
+				wind[idx] = 0.0
+				pasture[idx] = 0.0
+				flower_idx[idx] = 0
 				continue
 
 			var biome_mask: float = (1.0 - smoothstep(0.01, 0.12, gloom)) * (1.0 - smoothstep(0.01, 0.12, arid))
 
-			# Coast distance mask (keep extreme void shore intact)
 			var sdf_idx: int = clampi(tile_i.y, 0, RegionMap.WORLD_TILES - 1) * RegionMap.WORLD_TILES + clampi(tile_i.x, 0, RegionMap.WORLD_TILES - 1)
 			var coast_tiles: float = (float(sdf[sdf_idx]) - 128.0) / 8.0
 			var coast_mask: float = smoothstep(5.0, 5.0 + coast_fade, coast_tiles)
 			if coast_mask <= 0.001:
-				_deep[idx] = 0.0
-				_wind[idx] = 0.0
-				_pasture[idx] = 0.0
-				_flower_idx[idx] = 0
+				deep[idx] = 0.0
+				wind[idx] = 0.0
+				pasture[idx] = 0.0
+				flower_idx[idx] = 0
 				continue
 
-			# Sanctuary protection mask (Glimmrast corridor, Hallgrat, Arena, Waystones, Vistas, Puzzles)
 			var sanc_mask: float = _sanctuary_mask(Vector2(tx, ty), sanctuaries, hallgrat_rect, sanc_fade)
 			var total_mask: float = biome_mask * coast_mask * sanc_mask
 			if total_mask <= 0.001:
-				_deep[idx] = 0.0
-				_wind[idx] = 0.0
-				_pasture[idx] = 0.0
-				_flower_idx[idx] = 0
+				deep[idx] = 0.0
+				wind[idx] = 0.0
+				pasture[idx] = 0.0
+				flower_idx[idx] = 0
 				continue
 
 			var wx: float = tx + n_warp_x.get_noise_2d(tx, ty) * warp_amp
@@ -116,39 +146,87 @@ static func install(map: RegionMap, relief: Relief, sdf: PackedByteArray) -> voi
 			var bias_wind: float = float(aff.get("wind_meadow", 0.0))
 			var bias_past: float = float(aff.get("old_pasture", 0.0))
 
-			var elev: float = relief.level_at(pos_px)
-			var lake_d: float = BiomeBlend.lake_tiles_at(pos_px)
+			var elev: float = Relief.sample_level_at(relief_bytes, relief_field, relief_side, pos_px)
+			var lake_d: float = BiomeBlend.sample_lake_tiles(lake_bytes, lake_side, pos_px)
 			var dry_land_mask: float = smoothstep(1.0, 5.5, lake_d) if lake_d > -90.0 else 1.0
 
-			# Raw macro fields in [0..1]
 			var r_deep: float = (n_deep.get_noise_2d(wx, wy) * 0.5 + 0.5) + bias_deep * 0.45 - maxf(elev - 1.8, 0.0) * 0.14
 			var r_wind: float = (n_wind.get_noise_2d(wx, wy) * 0.5 + 0.5) + bias_wind * 0.45 + clampf(elev * 0.06, 0.0, 0.14)
 			var r_past: float = (n_pasture.get_noise_2d(wx, wy) * 0.5 + 0.5) + bias_past * 0.42 - maxf(elev - 1.35, 0.0) * 0.24
 
-			# Mutual exclusivity so macro-landscapes never mush into one another and ~40% remains classic mixed meadow:
 			var w_deep: float = smoothstep(0.57, 0.76, r_deep) * total_mask * dry_land_mask
 			var w_wind: float = smoothstep(0.56, 0.74, r_wind) * (1.0 - smoothstep(0.15, 0.48, w_deep)) * total_mask * dry_land_mask
 			var w_past: float = smoothstep(0.58, 0.76, r_past) * (1.0 - smoothstep(0.15, 0.45, w_deep)) * (1.0 - smoothstep(0.20, 0.55, w_wind)) * total_mask * dry_land_mask
 
-			_deep[idx] = clampf(w_deep, 0.0, 1.0)
-			_wind[idx] = clampf(w_wind, 0.0, 1.0)
-			_pasture[idx] = clampf(w_past, 0.0, 1.0)
+			deep[idx] = clampf(w_deep, 0.0, 1.0)
+			wind[idx] = clampf(w_wind, 0.0, 1.0)
+			pasture[idx] = clampf(w_past, 0.0, 1.0)
 
-			# Dominant monoculture flower index per contiguous Windwiese basin
 			var fn: float = n_flower.get_noise_2d(wx * 0.85, wy * 0.85) * 0.5 + 0.5
-			var slope_s: float = clampf((relief.level_at(pos_px + Vector2(0.0, -48.0)) - relief.level_at(pos_px + Vector2(0.0, 48.0))) * 1.1, -1.0, 1.0)
+			var up_elev: float = Relief.sample_level_at(relief_bytes, relief_field, relief_side, pos_px + Vector2(0.0, -48.0))
+			var down_elev: float = Relief.sample_level_at(relief_bytes, relief_field, relief_side, pos_px + Vector2(0.0, 48.0))
+			var slope_s: float = clampf((up_elev - down_elev) * 1.1, -1.0, 1.0)
 			var f_pick: int = 0
 			if fn < 0.34:
-				f_pick = 0 ## sunbloom (Goldauge / Sonnenwende)
+				f_pick = 0
 			elif fn < 0.58:
-				f_pick = 2 if slope_s >= -0.1 else 1 ## spark_poppy on sunny crests, moonbell on cooler basins
+				f_pick = 2 if slope_s >= -0.1 else 1
 			elif fn < 0.80:
-				f_pick = 1 ## moonbell
+				f_pick = 1
 			else:
-				f_pick = 3 ## puffseed
-			_flower_idx[idx] = clampi(f_pick, 0, _wind_flowers.size() - 1)
+				f_pick = 3
+			flower_idx[idx] = clampi(f_pick, 0, wind_flowers.size() - 1)
 
-	_installed = true
+	return {
+		"key": expected_key,
+		"side": side,
+		"deep": deep,
+		"wind": wind,
+		"pasture": pasture,
+		"flower_idx": flower_idx,
+		"wind_flowers": wind_flowers,
+	}
+
+
+static func apply_bundle(bundle: Dictionary) -> void:
+	_side = int(bundle.get("side", 0))
+	_deep = bundle.get("deep", PackedFloat32Array()) as PackedFloat32Array
+	_wind = bundle.get("wind", PackedFloat32Array()) as PackedFloat32Array
+	_pasture = bundle.get("pasture", PackedFloat32Array()) as PackedFloat32Array
+	_flower_idx = bundle.get("flower_idx", PackedByteArray()) as PackedByteArray
+	_wind_flowers = bundle.get("wind_flowers", PackedStringArray(["sunbloom", "moonbell", "spark_poppy", "puffseed"])) as PackedStringArray
+	_installed_key = String(bundle.get("key", ""))
+	_installed = _side > 0
+
+
+## Installs the immutable macro-habitat grids on the main thread right after `BiomeBlend.install`.
+static func install(map: RegionMap, relief: Relief, sdf: PackedByteArray) -> void:
+	var expected: String = cache_key_for(map)
+	if has_cache(expected):
+		return
+	var tables: Dictionary = {
+		"meadow_habitats": DataRegistry.table("meadow_habitats"),
+		"hallgrat": DataRegistry.table("hallgrat"),
+		"ground": DataRegistry.table("ground"),
+		"waystones": DataRegistry.table("waystones"),
+		"vistas": DataRegistry.table("vistas"),
+		"puzzles": DataRegistry.table("puzzles"),
+	}
+	var bundle: Dictionary = compute_bundle(
+		map,
+		relief._bytes,
+		relief._field,
+		relief._side,
+		sdf,
+		BiomeBlend._lake_bytes,
+		BiomeBlend._lake_side,
+		BiomeBlend._cells,
+		BiomeBlend._arid_cells,
+		BiomeBlend._side,
+		tables,
+		expected
+	)
+	apply_bundle(bundle)
 
 
 static func _make_noise(seed_val: int, freq: float, octaves: int) -> FastNoiseLite:
@@ -163,7 +241,11 @@ static func _make_noise(seed_val: int, freq: float, octaves: int) -> FastNoiseLi
 
 
 static func _hallgrat_rect() -> Rect2:
-	var bounds: Array = DataRegistry.table("hallgrat").get("bounds", [94, 290, 246, 412]) as Array
+	return _hallgrat_rect_from(DataRegistry.table("hallgrat"))
+
+
+static func _hallgrat_rect_from(hallgrat_data: Dictionary) -> Rect2:
+	var bounds: Array = hallgrat_data.get("bounds", [94, 290, 246, 412]) as Array
 	if bounds.size() == 4:
 		var x0: float = float(bounds[0])
 		var y0: float = float(bounds[1])
@@ -174,6 +256,16 @@ static func _hallgrat_rect() -> Rect2:
 
 
 static func _collect_sanctuaries(map: RegionMap) -> PackedVector3Array:
+	return _collect_sanctuaries_from(
+		map,
+		DataRegistry.table("ground"),
+		DataRegistry.table("waystones"),
+		DataRegistry.table("vistas"),
+		DataRegistry.table("puzzles")
+	)
+
+
+static func _collect_sanctuaries_from(map: RegionMap, ground: Dictionary, waystones_table: Dictionary, vistas_table: Dictionary, puzzles_table: Dictionary) -> PackedVector3Array:
 	var list: PackedVector3Array = PackedVector3Array()
 	var start_t: Vector2 = Vector2(map.start if map.start.x >= 0 else Vector2i(463, 616))
 	# Opening footpath & Glimmrast / Valdric / Quarry / Mine / Torben / Gustav story sanctuaries (tile_x, tile_y, inner_radius_tiles)
@@ -181,7 +273,6 @@ static func _collect_sanctuaries(map: RegionMap) -> PackedVector3Array:
 	list.append(Vector3(482.0, 660.0, 38.0))
 	list.append(Vector3(501.0, 685.0, 36.0)) ## FallenKnight
 
-	var ground: Dictionary = DataRegistry.table("ground")
 	for hut_v: Variant in ground.get("huts", []) as Array:
 		var h: Dictionary = hut_v as Dictionary
 		var t: Array = h.get("tile", []) as Array
@@ -196,19 +287,19 @@ static func _collect_sanctuaries(map: RegionMap) -> PackedVector3Array:
 				var rad: float = 42.0 if key_arr == "arenas" else 30.0
 				list.append(Vector3(float(t2[0]), float(t2[1]), rad))
 
-	for st_v: Variant in DataRegistry.table("waystones").get("statues", []) as Array:
+	for st_v: Variant in waystones_table.get("statues", []) as Array:
 		var st: Dictionary = st_v as Dictionary
 		var t3: Array = st.get("tile", []) as Array
 		if t3.size() == 2:
 			list.append(Vector3(float(t3[0]), float(t3[1]), 14.0))
 
-	for vp_v: Variant in DataRegistry.table("vistas").get("vistas", []) as Array:
+	for vp_v: Variant in vistas_table.get("vistas", []) as Array:
 		var vp: Dictionary = vp_v as Dictionary
 		var t4: Array = vp.get("tile", []) as Array
 		if t4.size() == 2:
 			list.append(Vector3(float(t4[0]), float(t4[1]), 12.0))
 
-	for pz_v: Variant in DataRegistry.table("puzzles").get("placed", []) as Array:
+	for pz_v: Variant in puzzles_table.get("placed", []) as Array:
 		var pz: Dictionary = pz_v as Dictionary
 		var t5: Array = pz.get("tile", []) as Array
 		if t5.size() == 2:

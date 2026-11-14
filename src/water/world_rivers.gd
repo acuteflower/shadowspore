@@ -15,18 +15,46 @@ var _spring_glows: Array[Sprite2D] = []
 var _clock: float = 0.0
 var fauna: RiverFauna
 const LAKE_SDF: Texture2D = preload("res://assets/world/lakes_sdf.png")
+static var _shared_data: Dictionary = {}
+static var _shared_queries: Dictionary = {}
+static var _shared_lake_bytes: PackedByteArray = PackedByteArray()
+
+
+static func clear_cache() -> void:
+	_shared_data.clear()
+	_shared_queries.clear()
+	_shared_lake_bytes = PackedByteArray()
+
 var _lake_bytes: PackedByteArray
+var defer_warm_queries: bool = false
+var _warm_keys: Array[String] = []
+var _warm_index: int = 0
+
 
 func _ready() -> void:
-	_data = DataRegistry.table("rivers_baked").duplicate(true)
-	var lakes: Dictionary = DataRegistry.table("lakes_baked")
-	(_data["chunks"] as Dictionary).merge(lakes.get("chunks", {}) as Dictionary, true)
-	_data["lakes"] = lakes.get("lakes", [])
-	var lake_image: Image = LAKE_SDF.get_image()
-	lake_image.convert(Image.FORMAT_L8)
-	_lake_bytes = lake_image.get_data()
+	Jobs.register_cleanup(WorldRivers.clear_cache)
+	if _shared_data.is_empty():
+		var merged: Dictionary = DataRegistry.table("rivers_baked").duplicate(true)
+		var lakes: Dictionary = DataRegistry.table("lakes_baked")
+		(merged["chunks"] as Dictionary).merge(lakes.get("chunks", {}) as Dictionary, true)
+		merged["lakes"] = lakes.get("lakes", [])
+		_shared_data = merged
+	_data = _shared_data
+	if _shared_lake_bytes.is_empty():
+		var lake_image: Image = LAKE_SDF.get_image()
+		lake_image.convert(Image.FORMAT_L8)
+		_shared_lake_bytes = lake_image.get_data()
+	_lake_bytes = _shared_lake_bytes
 	_spec = DataRegistry.table("rivers")
-	_warm_queries()
+	_query_lock.lock()
+	_queries.merge(_shared_queries, true)
+	for key: String in (_data["chunks"] as Dictionary):
+		var cell: Vector2i = Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+		if not _queries.has(cell):
+			_warm_keys.append(key)
+	_query_lock.unlock()
+	if not defer_warm_queries:
+		_warm_queries()
 	y_sort_enabled = true
 	fauna = load("res://src/water/river_fauna.tscn").instantiate() as RiverFauna
 	add_child(fauna)
@@ -43,9 +71,25 @@ func lake_at(point: Vector2) -> bool:
 
 ## Loads the query fields on the main thread: a first `load()` inside a chunk worker would deadlock against the waiting main thread (Jobs.warm).
 func _warm_queries() -> void:
-	for key: String in (_data["chunks"] as Dictionary):
+	warm_queries_step(0)
+
+
+## Loads chunk river/lake query images on the main thread up to `deadline_usec` (0 = all remaining).
+func warm_queries_step(deadline_usec: int = 0) -> bool:
+	var chunks: Dictionary = _data["chunks"] as Dictionary
+	var start: int = _warm_index
+	while _warm_index < _warm_keys.size():
+		var key: String = _warm_keys[_warm_index]
+		_warm_index += 1
 		var cell: Vector2i = Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
-		_queries[cell] = (load(String((_data["chunks"][key] as Dictionary)["query"])) as Texture2D).get_image()
+		var img: Image = (load(String((chunks[key] as Dictionary)["query"])) as Texture2D).get_image()
+		_shared_queries[cell] = img
+		_query_lock.lock()
+		_queries[cell] = img
+		_query_lock.unlock()
+		if deadline_usec > 0 and _warm_index > start and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	return _warm_index >= _warm_keys.size()
 
 func _query(cell: Vector2i) -> Image:
 	var key: String = _key(cell)

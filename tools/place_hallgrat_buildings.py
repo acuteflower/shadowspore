@@ -209,7 +209,7 @@ def main():
             seg = [(pts[j], pts[j + 1]) for j in range(len(pts) - 1)]
             lens = [math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in seg]
             total = sum(lens)
-            while s_pos < total:
+            while s_pos < total and k < row.get("max", 999):
                 # the point and the normal at arc length s_pos
                 acc, j = 0.0, 0
                 while j < len(lens) - 1 and acc + lens[j] < s_pos:
@@ -228,6 +228,19 @@ def main():
                     view = "e" if nx < 0 else "w"
                 btype = pal[i % len(pal)]
                 ex, ey = px + nx * (half + 3), py + ny * (half + 3)
+                if view not in DIAG and view in row.get("views", ["s", "e", "w"]):
+                    # a crooked old town: when the house does not fit here, try one a little further back or another of the palette
+                    for back in (0, 5, 10):
+                        hit = None
+                        for o in range(len(pal)):
+                            bt = pal[(i + o) % len(pal)]
+                            rr = rect_for(bt, view, ex + nx * back, ey + ny * back)
+                            if fits(rr, row["level"]) and inside_town(rr) and doorway_free(rr, view):
+                                hit = bt
+                                break
+                        if hit:
+                            btype, ex, ey = hit, ex + nx * back, ey + ny * back
+                            break
                 if view in DIAG:
                     shape = diag_shape(btype, view, ex, ey)
                     why = "view" if shape is None or view not in row.get("views", ["s", "e", "w", "se", "sw"]) else ""
@@ -269,19 +282,22 @@ def main():
                         s_pos += 18
                 else:
                     s_pos += 6
-    # fill the terraces: in every district and level, from the back (north) to the front, houses that face the camera; the strip in
-    # front of each door stays free, so no house stands in front of another, and every door gets its own path to the streets (below)
+    # fill the terraces: in every district and level, from the back (north) to the front, ROWS of houses that face the camera, their fronts
+    # on one line with gaps of varying width between them (a little lane, a yard); the next row starts where its roofs leave the lane in
+    # front of this row free (no roof hides a door). The doors' paths (below) join into one lane along every row.
     for fill in town.get("fill", []):
         pal = list(fill["palette"])
         rng = random.Random(sum(ord(ch) for ch in fill["district"]) * 7 + fill["level"])
         poly = next(dd["poly"] for dd in town["districts"] if dd["id"] == fill["district"])
         xs = [p_[0] * 16 for p_ in poly]
         ys = [p_[1] * 16 for p_ in poly]
+        tall = max(art[key(t, "s")]["size"][1] for t in pal) - 12  # (the chimney may overlap the lane)
         k = i = 0
-        for fy in range(int(min(ys)) + 32, int(max(ys)), 4):
-            for fx in range(int(min(xs)), int(max(xs)), 4):
-                if k >= fill.get("max", 99):
-                    break
+        fy = int(min(ys)) + 32
+        while fy < int(max(ys)) and k < fill.get("max", 99):
+            in_row = False
+            fx = int(min(xs))
+            while fx < int(max(xs)) and k < fill.get("max", 99):
                 btype = pal[i % len(pal)]
                 fw, fd = foot(btype, "s")
                 r = (fx - fw / 2.0, fy - fd, fw, fd)
@@ -291,6 +307,11 @@ def main():
                     put("%s_%d_%d" % (fill["district"], fill["level"], k), btype, "s", r)
                     k += 1
                     i += 1 + (1 if rng.random() < 0.3 else 0)
+                    in_row = True
+                    fx += int(fw / 2 + rng.choice((14, 18, 24, 32, 46, 64)) + foot(pal[i % len(pal)], "s")[0] / 2)
+                else:
+                    fx += 4
+            fy += (tall + 20) if in_row else 4
     # a path from every door to the nearest street: A* over the free floor of the door's level on a 4 px grid
     street_px = np.zeros((N, N), bool)
     for dd in baked["decals"]:
@@ -304,42 +325,72 @@ def main():
     paths = []
     lost = set()
     import heapq
-    for b in placed:
-        if b["type"].startswith("stand_"):
-            continue
-        if not b.get("door"):
-            continue
+    near_solid = solid.copy()  # a path keeps a step off the walls of the houses
+    for dy_ in (-1, 0, 1):
+        for dx_ in (-1, 0, 1):
+            near_solid |= np.roll(np.roll(solid, dy_, 0), dx_, 1)
+    joined = np.zeros((N, N), bool)  # cells of the paths laid so far: a later path may end on one (the paths of a quarter grow into one lane)
+
+    def route(b, join):
         sx, sy = int(b["door"][0] // CELL), int(b["door"][1] // CELL)
         lv = int(level[int(b["px"][1] // 16), int(b["px"][0] // 16)])
-        if street_px[sy:sy + 3, sx - 1:sx + 2].any():
-            continue  # the door opens right onto a street
         start = (sx, sy)
-        best, came, heap, goal = {start: 0.0}, {}, [(0.0, start)], None
-        while heap and len(best) < 120000:
-            _, cur = heapq.heappop(heap)
-            if street_px[cur[1], cur[0]]:
+        best, came, heap, goal = {start: 0.0}, {}, [(0.0, 0.0, start)], None
+        while heap and len(best) < 160000:
+            _, g, cur = heapq.heappop(heap)
+            if g > best.get(cur, 1e18):
+                continue
+            if street_px[cur[1], cur[0]] or (join and joined[cur[1], cur[0]]):
                 goal = cur
                 break
-            for ddx, ddy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                q = (cur[0] + ddx, cur[1] + ddy)
-                tx, ty = q[0] * CELL // 16, q[1] * CELL // 16
-                if not land[ty, tx] or kind[ty, tx] == 1 or (kind[ty, tx] == 0 and level[ty, tx] != lv):
-                    continue
-                if solid[q[1], q[0]]:
-                    continue
-                ng = best[cur] + 1.0 + (0.6 if ddy == 0 else 0.0)  # straight out of the door first, then along
-                if ng < best.get(q, 1e18):
-                    best[q], came[q] = ng, cur
-                    heapq.heappush(heap, (ng, q))
+            for ddx in (-1, 0, 1):
+                for ddy in (-1, 0, 1):
+                    if not ddx and not ddy:
+                        continue
+                    q = (cur[0] + ddx, cur[1] + ddy)
+                    tx, ty = q[0] * CELL // 16, q[1] * CELL // 16
+                    if not land[ty, tx] or kind[ty, tx] == 1 or (kind[ty, tx] == 0 and level[ty, tx] != lv):
+                        continue
+                    if solid[q[1], q[0]]:
+                        continue
+                    step = 1.414 if ddx and ddy else 1.0
+                    if near_solid[q[1], q[0]]:
+                        step += 1.2
+                    if abs(q[1] - sy) < 4 and ddy <= 0:  # out of the door first
+                        step += 0.8
+                    ng = g + step
+                    if ng < best.get(q, 1e18):
+                        best[q], came[q] = ng, cur
+                        heapq.heappush(heap, (ng, ng, q))
         if goal is None:
-            print("no path from the door of", b["id"], "- left out (every house opens onto a way)")
-            lost.add(b["id"])
-            continue
+            return None, 0.0
         line = [goal]
         while line[-1] != start:
             line.append(came[line[-1]])
-        line.reverse()
-        pts = hg.simplify([(x * CELL + 2.0, y * CELL + 2.0) for x, y in line], 3.0)
+        return line[::-1], best[goal]
+
+    doors = []
+    for b in placed:
+        if b["type"].startswith("stand_") or not b.get("door"):
+            continue
+        sx, sy = int(b["door"][0] // CELL), int(b["door"][1] // CELL)
+        if street_px[sy:sy + 3, sx - 1:sx + 2].any():
+            continue  # the door opens right onto a street
+        line, cost = route(b, False)
+        if line is None:
+            print("no path from the door of", b["id"], "- left out (every house opens onto a way)")
+            lost.add(b["id"])
+            continue
+        doors.append((cost, b))
+    for cost, b in sorted(doors, key=lambda q: q[0]):  # the nearest first: the farther houses' paths join them
+        line, _ = route(b, True)
+        for x, y in line:
+            joined[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
+        pts = hg.simplify([(x * CELL + 2.0, y * CELL + 2.0) for x, y in line], 2.5)
+        for _ in range(2):  # rounded like a trodden way
+            if len(pts) > 2:
+                pts = [pts[0]] + [q for (ax, ay), (bx_, by_) in zip(pts, pts[1:])
+                                  for q in ((0.75 * ax + 0.25 * bx_, 0.75 * ay + 0.25 * by_), (0.25 * ax + 0.75 * bx_, 0.25 * ay + 0.75 * by_))] + [pts[-1]]
         paths.append({"id": b["id"], "px": [[round(x, 1), round(y, 1)] for x, y in pts]})
     placed[:] = [b for b in placed if b["id"] not in lost]
     town["door_paths"] = paths
@@ -353,14 +404,11 @@ def main():
         for i, deg in enumerate(market["angles"]):
             a = math.radians(deg)
             sx, sy = cx + rx * 16 * math.cos(a), cy + ry * 16 * math.sin(a)
-            c, s = math.cos(a), math.sin(a)
-            face = "hinten" if s > 0.5 else ("vorn" if s < -0.5 else "seite")
-            btype = "stand_%d_%s" % (i % 3, face)
-            fw, fd = art[btype]["foot"]
-            r = (sx - fw / 2, sy - fd, fw, fd)
+            btype = "stand_ring_%d" % i  # rendered for exactly this angle: the counter looks at the Wächterin
+            info = art[btype]
             stalls.append({"id": "stand_%d" % i, "type": btype, "view": "s", "px": [round(sx, 1), round(sy, 1)],
-                           "tile": [int(sx // 16), int((sy - 1) // 16)], "flip": face == "seite" and c < 0})
-            take(r)
+                           "tile": [int(sx // 16), int((sy - 1) // 16)], "flip": False})
+            take_poly([(sx + q[0], sy + q[1]) for q in info["poly"]])
         placed.extend(stalls)
         print("forum market: %d stalls" % len(stalls))
     town["placed"] = placed

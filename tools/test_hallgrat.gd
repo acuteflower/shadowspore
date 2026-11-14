@@ -144,12 +144,58 @@ func _run() -> void:
 	for house: HallgratBuilding in town.buildings:
 		stable_found = stable_found or house.type_id == "stall"
 	_check(stable_found, "the stables stand in the Fuß")
-	# stage 3c: the west wall, the guide stones, the bell
+	# stage 3d: the life of the streets (tools/place_hallgrat_deco.py)
+	var deco_specs: Array = data.get("deco", []) as Array
+	var bare: int = 0
+	var lanterns: int = 0
+	for thing: HallgratBuilding in town.deco:
+		bare += 1 if thing._sprite == null else 0
+		lanterns += 1 if thing.type_id == "deko_laterne" else 0
+	_check(town.deco.size() == deco_specs.size() and deco_specs.size() >= 50 and bare == 0, "the street furniture stands (%d things, %d without a picture)" % [town.deco.size(), bare])
+	var wall_specs: Array = DataRegistry.table("hallgrat_art").get("wall_pieces", []) as Array
+	var walls_bare: int = 0
+	for piece: HallgratBuilding in town.low_walls:
+		walls_bare += 1 if piece._sprite == null else 0
+	_check(lanterns >= 5 and town.low_walls.size() == wall_specs.size() and wall_specs.size() >= 40 and walls_bare == 0,
+			"lantern posts and low walls line the ways (%d lanterns, %d wall pieces of %d runs)" % [lanterns, town.low_walls.size(), (data.get("wall_runs", []) as Array).size()])
+	var greens: Array[Dictionary] = town.extra_props()
+	var known: int = 0
+	for green: Dictionary in greens:
+		known += 1 if DataRegistry.table("plants").has(String(green.kind)) else 0
+	_check(greens.size() >= 300 and known == greens.size(), "trees, bushes and flowers grow on the town's free grass (%d)" % greens.size())
+	# stage 3c: the town wall (once the west wall), the guide stones, the bell
 	_check(town.leitsteine.size() == (data.get("leitsteine", []) as Array).size() and town.leitsteine.size() >= 12, "every guide stone stands (%d)" % town.leitsteine.size())
-	var walls: int = 0
-	for node: Node in town.get_children():
-		walls += 1 if String(node.name).begins_with("Wall_") else 0
-	_check(walls >= 20, "the west wall stands on the outer ring (%d stretches)" % walls)
+	var types: Dictionary = DataRegistry.table("hallgrat_art").get("types", {}) as Dictionary
+	var town_wall: int = 0
+	var towers: int = 0
+	var unsolid: int = 0
+	for piece: HallgratBuilding in town.low_walls:
+		var info: Dictionary = types.get(piece.type_id, {}) as Dictionary
+		if info.has("towers"):
+			town_wall += 1
+			towers += (info.towers as Array).size()
+		var shapes: int = 0
+		for child: Node in piece.get_children():
+			if child is StaticBody2D:
+				shapes += child.get_child_count()
+		unsolid += 1 if shapes == 0 else 0
+	_check(town_wall >= 40 and towers >= 20, "the town wall runs round the terraces' brink (%d pieces, %d towers)" % [town_wall, towers])
+	_check(unsolid == 0, "every piece of wall stops a walker (%d without a collider)" % unsolid)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var probe: PhysicsPointQueryParameters2D = PhysicsPointQueryParameters2D.new()
+	var blocked: int = 0
+	var probed: int = 0
+	for piece: HallgratBuilding in town.low_walls:
+		var chain: Array = (types.get(piece.type_id, {}) as Dictionary).get("chain", []) as Array
+		if chain.size() < 2 or probed >= 30:
+			continue
+		var a: Array = chain[chain.size() / 2] as Array
+		probe.position = piece.global_position + Vector2(float(a[0]), float(a[1]) - 1.0)
+		probe.collide_with_bodies = true
+		probed += 1
+		blocked += 1 if not piece.get_world_2d().direct_space_state.intersect_point(probe, 4).is_empty() else 0
+	_check(probed > 0 and blocked == probed, "the walls' lines are solid in the physics world (%d of %d probes)" % [blocked, probed])
 	_check(town.bell_at.is_finite(), "the moon tower carries the dusk bell")
 	var struck: HallgratLeitstein = town.leitsteine[0]
 	struck.interact(player)
@@ -188,7 +234,8 @@ func _run() -> void:
 		TimeManager.set_time(0.45)
 	if _dir != "": ## stage 2: the stone look of the town (day, and the glowing rock at night)
 		for spot: Array in [["gate", Vector2(191, 346)], ["steige", Vector2(171, 359)], ["forum", Vector2(150, 360)], ["westwall", Vector2(113, 352)],
-				["verloren", Vector2(127, 334)], ["glasbruch", Vector2(166, 327)], ["stall", Vector2(219, 378)], ["markt_forum", Vector2(142, 362)]]:
+				["verloren", Vector2(127, 334)], ["glasbruch", Vector2(166, 327)], ["stall", Vector2(219, 378)], ["markt_forum", Vector2(142, 362)],
+				["deko", Vector2(178, 351)], ["deko_fuss", Vector2(206, 372)], ["deko_staffeln", Vector2(160, 375)]]:
 			await _go(player, (spot[1] as Vector2) * 16.0 + Vector2(8, 8), 150)
 			await _shot(String(spot[0]))
 		TimeManager.set_time(0.93)
@@ -196,6 +243,8 @@ func _run() -> void:
 		await _shot("glasbruch_night")
 		await _go(player, Vector2(113, 352) * 16.0 + Vector2(8, 8), 120)
 		await _shot("westwall_night")
+		await _go(player, Vector2(178, 351) * 16.0 + Vector2(8, 8), 120)
+		await _shot("deko_night")
 		TimeManager.set_time(0.45)
 	town.show_plan(true)
 	await _go(player, town.gate_point(), 180)

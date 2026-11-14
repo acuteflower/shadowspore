@@ -81,6 +81,31 @@
    "worth": 10,
    "aura": {"color": "9ff6ea", "radius": 84, "energy": 0.35},
    "stand": {"texture": "plaza_fountain", "frame": [56, 48], "feet": 41, "frames": 4, "fps": 5, "glow": true, "solid": [40, 14], "window": [0.3, 1.0]},
+   "upgrades": [
+    {
+     "lv": 2,
+     "need_level": 2,
+     "cost": {"stone": 18, "plank": 8, "iron_ingot": 4},
+     "build_seconds": 12.0,
+     "texture": "plaza_2",
+     "reach": 128.0,
+     "worth": 16,
+     "aura": {"color": "9ff6ea", "radius": 100, "energy": 0.42},
+     "stand": {"texture": "plaza_fountain_2", "frame": [56, 56], "feet": 49, "frames": 4, "fps": 5, "glow": true, "solid": [40, 14], "window": [0.3, 1.0]}
+    },
+    {
+     "lv": 3,
+     "need_level": 4,
+     "cost": {"stone": 24, "plank": 12, "iron_ingot": 6, "glow_cap": 6},
+     "build_seconds": 16.0,
+     "texture": "plaza_3",
+     "glow": true,
+     "reach": 148.0,
+     "worth": 24,
+     "aura": {"color": "9ff6ea", "radius": 118, "energy": 0.5},
+     "stand": {"texture": "plaza_fountain_3", "frame": [56, 64], "feet": 57, "frames": 4, "fps": 5, "glow": true, "solid": [40, 14], "window": [0.3, 1.0]}
+    }
+   ],
    "info": "DAS HERZ DER STADT. ERST MIT IHM IST SIE GEGRÜNDET, VON HIER GEHEN DIE WEGE AUS."
   },
   "house": {
@@ -363,15 +388,15 @@
    "limit": 1,
    "salon": true,
    "cost": {
-    "wood": 10,
-    "stone": 3,
-    "plant_fiber": 4,
-    "glow_cap": 1
+    "plank": 12,
+    "iron_ingot": 4,
+    "willow_thread": 6,
+    "prism_shard": 4
    },
-   "build_seconds": 8.0,
+   "build_seconds": 18.0,
    "wave": 32,
-   "worth": 3,
-   "info": "EIN FRISIERPLATZ UNTER FREIEM HIMMEL. HIER WIRD ELLIE BALD IHR AUSSEHEN ÄNDERN.",
+   "worth": 8,
+   "info": "EIN FRISIERPLATZ UNTER FREIEM HIMMEL. HIER KANNST DU DEIN AUSSEHEN ÄNDERN.",
    "glow": true,
    "anim": {
     "frames": 8,
@@ -1238,6 +1263,35 @@
     "margin": 4,
     "front": false
    }
+  },
+  "scarecrow": {
+   "needs": "plaza",
+   "name": "VOGELSCHEUCHE",
+   "category": "farm",
+   "texture": "scarecrow",
+   "frame": [
+    36,
+    48
+   ],
+   "feet": 42,
+   "foot": [
+    12,
+    8
+   ],
+   "snap": 8,
+   "glow": true,
+   "preview": "scarecrow_preview",
+   "scare_radius": 112.0,
+   "needs_unlock": "farming",
+   "cost": {
+    "wood": 6,
+    "plant_fiber": 6,
+    "earth_tuber": 2
+   },
+   "build_seconds": 5.0,
+   "wave": 0,
+   "worth": 4,
+   "info": "VERTREIBT KRÄHEN UND RABEN VOM ACKER"
   }
  },
  "rest": {

@@ -125,7 +125,8 @@
 					"in": {
 						"ember_berry": 3,
 						"brook_mint": 3,
-						"spark_poppy": 2
+						"spark_poppy": 2,
+						"amber_grain": 2
 					}
 				},
 				{
@@ -254,7 +255,8 @@
 					"in": {
 						"ghost_frond": 3,
 						"mist_lily": 2,
-						"toad_cap": 1
+						"toad_cap": 1,
+						"oasis_melon": 1
 					}
 				},
 				{
@@ -309,7 +311,8 @@
 						"glow_cap": 4,
 						"marsh_gold": 2,
 						"moonbell": 2,
-						"grave_candle": 1
+						"grave_candle": 1,
+						"moon_leek": 2
 					}
 				},
 				{

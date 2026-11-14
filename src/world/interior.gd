@@ -134,6 +134,7 @@ func setup(interior_id: String, data: Dictionary) -> void:
 		corpse.axe_at = _vec((data.body as Dictionary).axe)
 		add_child(corpse)
 	if data.has("bed_anchor"): ## story: "go to sleep" (the first night in the hut) and, later, "rest until morning" (the town quest's first night)
+		var bed_stories: Array[StorySpot] = []
 		for entry: Array in [["sleep", false], ["town_night", true]]:
 			var spot: StorySpot = StorySpot.new()
 			spot.name = "BedSpot" if not bool(entry[1]) else "BedRest"
@@ -148,6 +149,12 @@ func setup(interior_id: String, data: Dictionary) -> void:
 				if world is WorldLevel:
 					(world as WorldLevel).start_sleep(player, rest)
 			add_child(spot)
+			bed_stories.append(spot)
+		var sleep_spot: BedRestSpot = BedRestSpot.new()
+		sleep_spot.name = "BedSleep"
+		sleep_spot.position = _vec(data.bed_anchor) + Vector2(0, -4)
+		sleep_spot.story_spots = bed_stories
+		add_child(sleep_spot)
 
 
 ## The room together with the rooms next to it (global): what the camera frames and the dark and the creeping shadow go round.

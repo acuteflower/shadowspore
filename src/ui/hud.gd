@@ -25,7 +25,7 @@ var _prepared: Array[Dictionary] = [] ## {node, material, children: [[child, mat
 const IDLE_HIDE_SECONDS: float = 10.0 ## no input, no cursor movement and no movement of her for this long: the HUD fades away
 const IDLE_FADE_OUT: float = 1.4 ## seconds to fade away
 const IDLE_FADE_IN: float = 0.25 ## seconds to come back on activity
-const IDLE_PARTS: Array[String] = ["ClockVine", "PurseVine", "Hotbar", "HealthBar", "StaminaBar", "BlinkIcon", "StatusTags", "QuestVine", "HintCard", "FishingHud"]
+const IDLE_PARTS: Array[String] = ["ClockVine", "PurseVine", "Hotbar", "HealthBar", "StaminaBar", "BlinkIcon", "StatusTags", "QuestVine", "HintCard", "FishingHud", "MultiplayerHud"]
 
 var _player: Node2D
 var _heat_haze: HeatHaze
@@ -92,7 +92,7 @@ func _process(delta: float) -> void:
 	var boss: BossBar = get_node_or_null("BossBar") as BossBar
 	if boss != null:
 		boss.set_covered(covered)
-	for part: String in ["QuestVine", "HintCard"]:
+	for part: String in ["QuestVine", "HintCard", "MultiplayerHud"]:
 		_cover_alpha[part] = move_toward(float(_cover_alpha.get(part, 1.0)), 0.0 if covered else 1.0, delta * 8.0)
 	_apply_idle_fade(delta, covered)
 	_follow_hotbar_fold()
@@ -172,6 +172,10 @@ func bind(player: Node) -> void:
 	fishing_hud.name = "FishingHud"
 	add_child(fishing_hud)
 	fishing_hud.bind(player)
+	var mp_hud: MultiplayerHud = MultiplayerHud.new()
+	mp_hud.name = "MultiplayerHud"
+	add_child(mp_hud)
+	move_child(mp_hud, $PauseMenu.get_index())
 	var river_book: RiverBook = RiverBook.new()
 	river_book.name = "RiverBook"
 	add_child(river_book)

@@ -525,9 +525,10 @@ Die Flächen kommen als Decals `hallgrat_<id>` (Oberfläche `stone`) in ground_b
 - **Daten:** Größe, Fußpunkt, Grundfläche und Lichter stehen in data/hallgrat_art.json.
 
 **Der Markt um die Wächterin** (Wunsch 2026-11-14):
-- Zehn Marktstände stehen im Ring ums Forum (`forum_market` in data/hallgrat.json: Radius, Winkel). Jeder ist zur Statue gedreht, die Steige nach Osten und Westen bleibt frei.
+- Acht Marktstände stehen im Ring ums Forum (`forum_market` in data/hallgrat.json: Radius, Winkel). Jeder ist zur Statue gedreht, die Steige nach Osten und Westen bleibt frei.
 - Die Stände haben drei Tuchfarben mit eigener Ware: Türkis/Leinen mit Äpfeln und Rüben, Weinrot/Ocker mit Krügen und Kristallen, Violett/Leinen mit Stoffballen und Kräutern.
-- Jeder Stand gibt es von vorn, von hinten und von der Seite (die andere Seite gespiegelt). Das Dach ist ein durchhängendes, gewölbtes Tuch auf einem Firstbalken, mit Saum.
+- Seit der Überarbeitung (2026-11-14) wird jeder der acht Stände einzeln gerendert (`stand_ring_<i>`), genau um seinen Winkel im Ring gedreht: die Theke schaut zur Wächterin, auch schräg. Der Winkel auf dem Bildschirm wird in einen Modell-Gierwinkel umgerechnet (`ring_facings`, mit SINP für die Draufsicht). Ihr Grundriss ist ein gedrehtes Rechteck (`poly` in hallgrat_art.json, Kollision als Polygon). Die alten neun Ansichten `stand_<n>_vorn/hinten/seite` sind gelöscht.
+- Das Dach ist ein durchhängendes, gewölbtes Tuch auf einem Firstbalken, mit Saum.
 
 **Platzierung (zweimal nach Kritik überarbeitet, 2026-11-14):**
 
@@ -576,6 +577,56 @@ Die Flächen kommen als Decals `hallgrat_<id>` (Oberfläche `stone`) in ground_b
 - **Fensterlicht:** Lampenlicht hinter Glas in einem ruhigen Honigton (`GLASS`, 4 Stufen), statt der flackernden Feuer-Rampe, die wie Flammen in den Fenstern aussah. Oberste Reihe und Seiten liegen eine Stufe dunkler, manche Fenster brennen schwächer.
 - **Plätze im Gassenpflaster:** Steinmarkt, Karrenhof und Nordgasse sind jetzt `setts` statt `flags`. Ein Platz (`poly`) bekommt `paint_square`: dieselben Steinreihen wie die Gassen (Ost-West), einen Rand aus langen Steinen und weniger Abnutzung (`wear` 0,22 / 0,3).
 - **Offen:** Die Rothalle findet in der neuen Größe keinen Platz. Sie braucht einen eigenen Ort (zum Beispiel die Brunnenmulde) oder eine schmalere Form.
+
+### 14.7 Stand 3d: Leben in den Gassen (2026-11-14)
+
+Wunsch: überall passende Dekoration, Mauern am Wegrand, Pflanzen und Bäume, und das Ganze soll gewachsen wirken, nicht wie hingestellter Kleinkram (zweiter Durchgang nach Kritik am ersten).
+
+**Die Mauern** sind keine Einzelstücke mehr, sondern durchgehende Läufe entlang der Pflasterkante.
+- `py -3 tools/place_hallgrat_deco.py` sucht die Linie etwa 10 px neben dem Pflaster (Marching Squares über das gebackene Pflaster, geglättet). Die Linie läuft um jede Kurve und jeden Platz herum.
+- Wo ein Türweg sie kreuzt, endet sie mit einem Torpfosten (Steinkugel oder Blumentopf obenauf). Sie endet auch an Häusern und wo der Boden die Ebene wechselt.
+- Lange Strecken werden in Läufe mit gelegentlichen Lücken geschnitten.
+- Stil je Bezirk:
+  - `garten` (gesetzte Lagen, Decksteine, Blumen schauen darüber) im Kern
+  - `feld` (rohe Feldsteine, wandernde Krone, Moos) am Rand
+  - `ruine` (kniehoch und tiefer, Lücken, herabgefallene Steine) im Fuß und im verlorenen Viertel
+- `py -3 tools/art_hallgrat_walls.py` legt jeden Lauf Stein für Stein entlang seiner eigenen Kurve, keine zwei Stücke sind gleich.
+- Gerendert wird in Stücken von etwa 40 px (`assets/town/hallgrat/walls/wand_<lauf>_<k>.png`). Jedes Stück sortiert sich an seiner Vorderkante. Die Steine werden für den ganzen Lauf gelegt, damit die Stücke nahtlos anschließen.
+- Kollision: ein exaktes Polygon entlang der Mauer.
+- Liste: `wall_pieces` in hallgrat_art.json.
+
+**Die Dinge** (`py -3 tools/art_hallgrat_deco.py`, gleicher Renderer wie die Häuser; `deko_*`):
+- Kleinkram: Fässer, Kisten, Säcke, Krüge, Holzstoß, Heu, Karren.
+- Am Platz: Bank, Trog, Laterne (das Glas leuchtet nachts), Kübel, Urne, Beet, Prellstein, Schutt, Säulenstumpf, Brunnen.
+
+**Szenen statt Einzelteile:**
+- An Wohnhäusern: ein Paar Kübel oder Urnen links und rechts der Tür. Dazu an der türfernen Ecke ein Holzstoß an der Seitenwand oder vor der Ecke, eine Bank unterm Fenster mit Krug, oder Fass und Säcke.
+- An Läden: Kisten, daneben ein Fass, Säcke davor, Krüge neben der Tür.
+- An verlassenen Häusern: Schutt und ein umgekipptes Fass.
+- Am Stall: zwei Heuballen, ein Karren und ein Trog.
+- Am Torhaus: Fass und Kisten.
+- An Mauern (straßenseitig): Bänke und Tröge an geraden Stücken.
+- Laternen etwa alle 120 px an der Pflasterkante.
+
+**Das Grün** sind echte Weltpflanzen (`greenery`). Sie kommen über `Hallgrat.extra_props()` in `PropGenerator.extra_props`, wiegen sich also, leuchten und lassen sich pflücken und fällen. Es gibt drei Arten:
+- Angeschmiegt an den Fuß jeder Mauer auf der Gartenseite:
+  - `garten`: Blumen und Büsche
+  - `feld`: Gras, Pusteblumen, Wundblatt
+  - `ruine`: Gestrüpp, Glimmfarn
+- An Hausecken und Seitenwänden: Blumen und Büsche.
+- Auf freiem Gras: Bäume in Hainen (Rauschen statt gleichmäßiger Streuung, je Bezirk andere Arten). Büsche sammeln sich in den Hainen, Blumen in Driften an deren Rändern.
+
+**Regeln:**
+- Nichts steht auf Türwegen, Türschwellen, auf anderem oder hinter einem Hausbild.
+- Alles steht auf ebenem Boden einer Ebene.
+- Dinge an Häusern dürfen auf den Rand der Gasse.
+
+**Stand:**
+- 41 Mauerläufe in 85 Stücken
+- etwa 70 Dinge
+- 260 Bäume, 85 angeschmiegte Pflanzen, 300 Büsche und Gräser, 290 Blumen
+
+Aufnahmen: `docs/img/hallgrat_deko.png`, `hallgrat_deko_staffeln.png`.
 
 ## 15. Ideenspeicher (alles, was noch nirgends hineinpasste)
 

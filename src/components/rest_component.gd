@@ -264,6 +264,8 @@ func warm_fx() -> void:
 
 
 func _show_prompt() -> void:
+	if is_instance_valid(seat) and not seat.show_stand_prompt():
+		return
 	if _prompt == null:
 		_prompt = InteractPrompt.new()
 		_prompt.position = Vector2(0, -46)

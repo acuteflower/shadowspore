@@ -10,6 +10,8 @@ signal reset ## the whole table was replaced (load, snapshot)
 
 const REACH: float = 52.0 ## how far from a cell's middle the one who works it may stand (the swing's fan reaches about 22 px from her chest)
 const PLANT_REACH: float = 44.0
+const WATER_REFILL_REACH: float = 40.0 ## px: fountain stand, rain barrel or water bank
+const RAIN_REFILL_MIN: float = 0.25 ## outdoors rain strength that lets an upward/air swing catch rainwater
 
 var town: TownManager
 var fields: Dictionary = {} ## int field id -> {int cell index -> cell Dictionary (see FarmRules)}
@@ -98,7 +100,117 @@ func host_hit(field_id: int, index: int, source: int) -> void:
 	var fx: String = String(result.fx)
 	if fx == "":
 		return
+	if fx == "water":
+		if not player.inventory.spend_water():
+			town._tell(source, "GIESSKANNE LEER", false)
+			return
 	_rpc_cell.rpc(field_id, index, result.cell, fx)
+
+
+## Local player asks the host to refill an unfull watering can from a nearby source (fountain, barrel, river/lake or rain).
+func request_refill() -> void:
+	if multiplayer.is_server():
+		_host_refill(multiplayer.get_unique_id())
+	else:
+		_rpc_refill.rpc_id(1)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_refill() -> void:
+	if multiplayer.is_server():
+		_host_refill(multiplayer.get_remote_sender_id())
+
+
+func _host_refill(peer: int, aim_dir: Vector2 = Vector2.ZERO) -> bool:
+	var player: Player = _player(peer)
+	if player == null or player.health.current <= 0.0:
+		return false
+	if not has_unfull_can(player):
+		return false
+	if not can_refill_at(player, aim_dir):
+		return false
+	if not player.inventory.refill_water():
+		return false
+	_rpc_refill_fx.rpc(player.global_position + Vector2(0.0, -8.0))
+	return true
+
+
+## Host only: swinging the watering can near a water source or outdoors in the rain fills it back up.
+func host_swing_refill(player: Player, aim_dir: Vector2) -> bool:
+	if not multiplayer.is_server() or player == null:
+		return false
+	return _host_refill(player.get_multiplayer_authority(), aim_dir)
+
+
+static func has_unfull_can(player: Player) -> bool:
+	if player == null or player.inventory == null:
+		return false
+	for stack: Variant in player.inventory.slots:
+		var dict: Dictionary = stack as Dictionary
+		var limit: int = Items.water_max(dict)
+		if limit > 0 and Items.water(dict) < limit:
+			return true
+	return false
+
+
+func can_refill_at(player: Player, aim_dir: Vector2 = Vector2.ZERO) -> bool:
+	if player == null:
+		return false
+	var pos: Vector2 = player.global_position
+	var tree: SceneTree = get_tree()
+	## 1. Built Brunnenplatz fountain stand
+	for id: int in town.built_ids("plaza"):
+		if pos.distance_to(town.position_of(id)) <= WATER_REFILL_REACH + 10.0:
+			return true
+	## 2. Hut yard rain barrel
+	if tree != null:
+		for node: Node in tree.get_nodes_in_group("water_barrels"):
+			var spot: Node2D = node as Node2D
+			if spot != null and is_instance_valid(spot) and pos.distance_to(spot.global_position) <= WATER_REFILL_REACH:
+				return true
+	## 3. Rivers, ponds or lakes (foot or a short reach ahead)
+	var probe: Vector2 = pos + aim_dir.normalized() * 18.0 if aim_dir.length_squared() > 0.01 else pos + player.facing * 18.0
+	if town.world != null and town.world.has_method("water_depth"):
+		if town.world.water_depth(pos) >= 0.0 or town.world.water_depth(probe) >= 0.0:
+			return true
+	## 4. Outdoors while it is raining
+	var indoors: bool = Interiors.slot_at(pos) >= 0 or MineManager.in_mine(pos)
+	if not indoors and WeatherManager.rain_now() >= RAIN_REFILL_MIN:
+		return true
+	return false
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_refill_fx(at: Vector2) -> void:
+	var parent: Node = town.get_parent() if town != null and town.get_parent() != null else self
+	if parent == null or not is_inside_tree():
+		return
+	var puff: CPUParticles2D = CPUParticles2D.new()
+	puff.one_shot = true
+	puff.emitting = true
+	puff.amount = 14
+	puff.lifetime = 0.55
+	puff.explosiveness = 0.92
+	puff.direction = Vector2.UP
+	puff.spread = 80.0
+	puff.gravity = Vector2(0.0, 110.0)
+	puff.initial_velocity_min = 18.0
+	puff.initial_velocity_max = 42.0
+	puff.scale_amount_min = 1.1
+	puff.scale_amount_max = 1.8
+	puff.color = Color("64d8f5")
+	puff.global_position = at
+	puff.z_index = 6
+	parent.add_child(puff)
+	get_tree().create_timer(1.0).timeout.connect(puff.queue_free)
+	if ResourceLoader.exists("res://assets/audio/farming/water.wav"):
+		var audio: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
+		audio.stream = load("res://assets/audio/farming/water.wav") as AudioStream
+		audio.global_position = at
+		audio.volume_db = -8.0
+		parent.add_child(audio)
+		audio.play()
+		audio.finished.connect(audio.queue_free)
 
 
 func request_plant(field_id: int, index: int) -> void:

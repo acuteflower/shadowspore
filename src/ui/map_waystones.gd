@@ -1,6 +1,7 @@
 class_name MapWaystones
 extends RefCounted
-## The waystones on the map (M), drawn and operated for `MapWindow` (docs/waystones.md). Awakened statues stand there as a small pixel emblem: a halo ring with
+## The waystones on the map (M), drawn and operated for `MapWindow` (docs/waystones.md). Every statue is on the map; a sleeping one is a cold grey emblem without
+## rays or halo (its name only once its place has been seen), an awakened one a small pixel emblem: a halo ring with
 ## crystal rays over a crystal on its plinth, breathing teal and gold. Normally they are just marks with a name. In TRAVEL mode (the map was opened at a statue,
 ## `MapWindow.open_travel`) every other awakened statue is highlighted: bigger, with rings that pulse outwards, the one the mouse is over (or the arrow keys
 ## selected) with a dotted route from here and a card; HOLDING the left mouse button (or E) on it fills a ring of light, and when it closes `update` returns its id.
@@ -25,6 +26,7 @@ var _screen: Dictionary = {} ## id -> screen position
 var _tile: Dictionary = {} ## id -> tile
 var _name: Dictionary = {} ## id -> name
 var _awake: Dictionary = {} ## id -> bool
+var _seen: Dictionary = {} ## id -> its place has been seen (the name shows)
 var _age: float = 0.0
 
 
@@ -48,6 +50,7 @@ func destinations() -> Array[String]:
 func update(delta: float, tree: SceneTree, cursor: Vector2, to_screen: Callable, mouse_hold: bool, key_hold: bool, key_step: int) -> String:
 	_age += delta
 	var manager: Waystones = Waystones.of(tree)
+	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	_ids.clear()
 	if manager != null:
 		for entry: Dictionary in manager.entries():
@@ -57,6 +60,7 @@ func update(delta: float, tree: SceneTree, cursor: Vector2, to_screen: Callable,
 			_tile[id] = Vector2(float(tile[0]), float(tile[1]))
 			_name[id] = String(entry.name)
 			_awake[id] = bool(entry.awake)
+			_seen[id] = discovery != null and discovery.is_seen(_tile[id] as Vector2)
 			_screen[id] = to_screen.call(_tile[id]) as Vector2
 	hover = ""
 	var best: float = 15.0
@@ -100,6 +104,7 @@ func draw(canvas: CanvasItem, scale: float, fade: float, time: float, size: Vect
 		_draw_route(canvas, fade, time)
 	for id: String in _ids:
 		if not bool(_awake[id]):
+			_draw_sleeping(canvas, id, scale, fade, size)
 			continue
 		var at: Vector2 = _screen[id] as Vector2
 		if not ring.is_empty() and (_tile[id] as Vector2).distance_to(ring[0] as Vector2) < 2.0:
@@ -133,6 +138,30 @@ func _draw_marker(canvas: CanvasItem, at: Vector2, id: String, here: bool, choic
 		var label: String = "HIER" if here else String(_name[id])
 		var y: float = 9.0 + (9.0 * big if choice else 0.0) * 0.5
 		PixelText.draw(canvas, label, Vector2i(roundi(at.x) - PixelText.width(label) / 2, roundi(at.y + y)), Color(tone.lerp(Color("f1e6ff"), 0.25 if lit else 0.0), 0.95 * fade), Color(VineStyle.OUTLINE, 0.9 * fade))
+
+
+## A statue that still sleeps: the same emblem in cold grey stone, the crystal dark, no rays, no halo; its name (dim) once its place was seen.
+func _draw_sleeping(canvas: CanvasItem, id: String, scale: float, fade: float, size: Vector2) -> void:
+	var at: Vector2 = _screen[id] as Vector2
+	if at.x < -30.0 or at.y < -30.0 or at.x > size.x + 30.0 or at.y > size.y + 30.0:
+		return
+	var dim: float = fade * (0.9 if bool(_seen[id]) else 0.6)
+	canvas.draw_set_transform(at.round(), 0.0, Vector2.ONE)
+	for pass_index: int in 2:
+		for shape: Array in [PLINTH, CRYSTAL]:
+			for cell: Vector2i in shape:
+				if pass_index == 0:
+					for edge: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+						canvas.draw_rect(Rect2(Vector2(cell + edge), Vector2.ONE), Color(VineStyle.OUTLINE, 0.9 * dim))
+				else:
+					var color: Color = Color("4e4a6c") if shape == PLINTH else Color("6f6a8e")
+					if shape == CRYSTAL and cell.x <= 0 and cell.y <= -1:
+						color = Color("9a94b8")
+					canvas.draw_rect(Rect2(Vector2(cell), Vector2.ONE), Color(color, dim))
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if bool(_seen[id]) and scale > 0.45:
+		var label: String = String(_name[id])
+		PixelText.draw(canvas, label, Vector2i(roundi(at.x) - PixelText.width(label) / 2, roundi(at.y + 9.0)), Color(Color("9a94b8"), 0.85 * fade), Color(VineStyle.OUTLINE, 0.9 * fade))
 
 
 ## The emblem in local pixels (0,0 = the middle of the crystal): crown rays over a halo ring, a crystal, a plinth. Outline first, then the colour.

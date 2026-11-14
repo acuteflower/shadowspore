@@ -36,7 +36,7 @@ func _ready() -> void:
 	_foot = Vector2(float((info.foot as Array)[0]), float((info.foot as Array)[1]))
 	_rect = Rect2(-feet, size)
 	for glow: bool in [false, true]:
-		var path: String = DIR + type_id + ("_glow.png" if glow else ".png")
+		var path: String = DIR + String(info.get("dir", "")) + type_id + ("_glow.png" if glow else ".png")
 		if not ResourceLoader.exists(path):
 			continue
 		var sprite: Sprite2D = Sprite2D.new()
@@ -60,16 +60,46 @@ func _ready() -> void:
 		light.base_energy = 0.45
 		light.glow_color = Color("ffb35a")
 		add_child(light)
+	_time = fposmod(position.x * 0.01, 7.0)
+	if not bool(info.get("solid", true)): ## a flower bed, a heap of rubble: walked over
+		return
 	var body: StaticBody2D = StaticBody2D.new()
+	if info.has("chain"): ## a wall: a row of turned boxes along its line (a thin band polygon of a curved wall failed to decompose)
+		var chain: Array = info.chain as Array
+		var thick: float = float(info.get("thick", 7.0)) ## the town wall is thicker than a garden wall
+		for t: Variant in info.get("towers", []) as Array: ## the town wall's round towers: a circle each
+			var tower: Array = t as Array
+			var round_shape: CollisionShape2D = CollisionShape2D.new()
+			var circle: CircleShape2D = CircleShape2D.new()
+			circle.radius = float(tower[2])
+			round_shape.shape = circle
+			round_shape.position = Vector2(float(tower[0]) * (-1.0 if flip else 1.0), float(tower[1]))
+			body.add_child(round_shape)
+		for k: int in chain.size() - 1:
+			var a: Vector2 = Vector2(float((chain[k] as Array)[0]), float((chain[k] as Array)[1]))
+			var b: Vector2 = Vector2(float((chain[k + 1] as Array)[0]), float((chain[k + 1] as Array)[1]))
+			if flip:
+				a.x = -a.x
+				b.x = -b.x
+			var piece: CollisionShape2D = CollisionShape2D.new()
+			var wall_box: RectangleShape2D = RectangleShape2D.new()
+			wall_box.size = Vector2(a.distance_to(b) + 3.0, thick)
+			piece.shape = wall_box
+			piece.position = (a + b) / 2.0 + Vector2(0, -1)
+			piece.rotation = (b - a).angle()
+			body.add_child(piece)
+		add_child(body)
+		return
 	if info.has("poly"):  # a house turned halfway to a diagonal way: its footprint is a turned rectangle, shrunk a little towards its middle
 		var pts: PackedVector2Array = PackedVector2Array()
 		var mid: Vector2 = Vector2.ZERO
 		for q: Variant in info.poly as Array:
 			var corner: Vector2 = Vector2(float((q as Array)[0]) * (-1.0 if flip else 1.0), float((q as Array)[1]))
 			pts.append(corner)
-			mid += corner / 4.0
-		for k: int in pts.size():
-			pts[k] = pts[k] + (mid - pts[k]).normalized() * 4.0
+			mid += corner
+		mid /= float(maxi(1, pts.size()))
+		for k: int in pts.size(): ## shrunk a little towards its middle
+			pts[k] = pts[k] + (mid - pts[k]).normalized() * minf(4.0, (mid - pts[k]).length() * 0.3)
 		var polygon: CollisionPolygon2D = CollisionPolygon2D.new()
 		polygon.polygon = pts
 		body.add_child(polygon)

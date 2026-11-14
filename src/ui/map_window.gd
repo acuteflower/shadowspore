@@ -40,6 +40,11 @@ const BOSS_WINGS: Array = [
 	[".....X.....", "....XXX....", ".XXXXXXXXX.", "XXXXXXXXXXX", "XX.XXXXX.XX", "X...XXX...X", ".....X....."],
 ]
 
+static var _cached_paths_tex: ImageTexture = null
+static var _cached_areas_tex: ImageTexture = null
+static var _cached_cell_area: PackedByteArray = PackedByteArray()
+static var _cached_land_total: PackedInt32Array = PackedInt32Array()
+
 var _player: Node2D
 var _discovery: MapDiscovery
 var _canvas: ColorRect
@@ -50,6 +55,32 @@ var _fog_image: Image
 var _fog_texture: ImageTexture
 var _fading: Dictionary = {} ## cell index -> 0..1 while it clears
 var _loaded: bool = false
+var _warm_sub: int = 0
+var _warm_decals: Array = []
+var _warm_decal_idx: int = 0
+var _warm_decal_y: int = -1
+var _warm_decal_y1: int = 0
+var _warm_decal_x0: int = 0
+var _warm_decal_x1: int = 0
+var _warm_decal_origin: Vector2i = Vector2i.ZERO
+var _warm_decal_caravan: bool = false
+var _warm_mask_data: PackedByteArray = PackedByteArray()
+var _warm_mask_w: int = 0
+var _warm_mask_h: int = 0
+var _warm_mask_stride: int = 1
+var _warm_path_bytes: PackedByteArray = PackedByteArray()
+var _warm_map: RegionMap = null
+var _warm_relief_data: PackedByteArray = PackedByteArray()
+var _warm_relief_side: int = 0
+var _warm_areas_bytes: PackedByteArray = PackedByteArray()
+var _warm_area_cy: int = 0
+
+
+static func clear_cache() -> void:
+	_cached_paths_tex = null
+	_cached_areas_tex = null
+	_cached_cell_area = PackedByteArray()
+	_cached_land_total = PackedInt32Array()
 
 var _area_ids: Array[int] = []
 var _area_names: Array[String] = []
@@ -91,6 +122,7 @@ var _quest_preview: String = ""
 
 var _ways: MapWaystones = MapWaystones.new()
 var _pet_marks: MapPets = MapPets.new() ## the named crows and ravens (docs/pet_konzept.md)
+var _hallgrat_map: MapHallgrat = MapHallgrat.new() ## the stone town as a plan of itself
 var _vista_marks: MapVistas = MapVistas.new() ## discovered meadow cliff vistas (docs/wiesenbiom_ausbau_konzept.md)
 var _ws_mouse: bool = false ## the left button is held on a waystone (travel mode)
 var _present_left: float = 0.0 ## `present`: seconds the map stays open on its own (a waystone woke up)
@@ -124,62 +156,202 @@ func bind(player: Node) -> void:
 
 # ---------- data ----------
 
+func warm() -> void:
+	if not _loaded:
+		_load_data()
+
+
 func _load_data() -> void:
-	_discovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
-	if _discovery == null:
-		return
-	_loaded = true
-	var biomes: Dictionary = DataRegistry.table("biomes")
-	var palette: PackedVector3Array = PackedVector3Array()
-	for id: String in biomes:
-		var entry: Dictionary = biomes[id]
-		var base: Color = Color(entry.color as String)
-		for tone: Color in [base.lerp(Color(0.04, 0.025, 0.09), 0.78), base.lerp(Color(0.14, 0.1, 0.26), 0.58), base.lerp(Color(0.9, 0.86, 1.0), 0.22)]:
-			palette.append(Vector3(tone.r, tone.g, tone.b))
-	_material.shader = SHADER
-	_material.set_shader_parameter("pal", palette)
-	_material.set_shader_parameter("relief", Relief.TEXTURE)
-	_material.set_shader_parameter("field", Relief.FIELD)
-	_material.set_shader_parameter("sdf", load("res://assets/world/outer_sdf.png"))
-	_material.set_shader_parameter("paths", _path_texture())
-	var water: Texture2D = load("res://assets/world/map_water.png") as Texture2D
-	_material.set_shader_parameter("water", water)
-	_water_image = water.get_image()
-	_lake_image = (load("res://assets/world/lakes_sdf.png") as Texture2D).get_image()
-	_material.set_shader_parameter("lake_shore", load("res://assets/world/lakes_sdf.png"))
-	_material.set_shader_parameter("world_tiles", float(RegionMap.WORLD_TILES))
-	var map: RegionMap = RegionMap.new(0, DataRegistry.table("world_map"))
-	var area_biomes: PackedInt32Array = PackedInt32Array()
-	for area: Dictionary in map.supers:
-		var biome: String = RegionMap.active_biome(String(area.biome))
-		_area_ids.append(int(area.id))
-		_area_names.append(map.area_name(int(area.id)))
-		_area_colors.append(Color(String((biomes[biome] as Dictionary).color)))
-		area_biomes.append(maxi(biomes.keys().find(biome), 0))
-	_material.set_shader_parameter("area_biomes", area_biomes)
-	_start_tile = Vector2(map.start if map.start.x >= 0 else map.anchor(map.start_region))
-	var image: Image = Relief.TEXTURE.get_image()
-	image.convert(Image.FORMAT_RGBA8)
-	var data: PackedByteArray = image.get_data()
-	var side: int = image.get_width()
-	var grid: int = MapDiscovery.GRID
-	var areas: Image = Image.create(grid, grid, false, Image.FORMAT_R8)
-	_cell_area.resize(grid * grid)
-	_land_total.resize(map.supers.size())
-	for cy: int in grid:
-		for cx: int in grid:
-			var alpha: int = data[(((cy * RegionMap.CELL + 2) * side) + cx * RegionMap.CELL + 2) * 4 + 3]
-			var tile: Vector2i = Vector2i(cx, cy) * RegionMap.CELL + Vector2i(2, 2)
-			var area: int = map.super_at(tile)
-			areas.set_pixel(cx, cy, Color((area + 1) / 255.0, 0, 0))
-			var land_area: int = _area_near(map, tile) if alpha >= 200 else 255
-			_cell_area[cy * grid + cx] = land_area
-			if land_area < _land_total.size():
-				_land_total[land_area] += 1
-	_material.set_shader_parameter("areas", ImageTexture.create_from_image(areas))
-	_rebuild_fog()
-	_discovery.revealed.connect(_on_revealed)
-	_discovery.replaced.connect(_rebuild_fog)
+	while not warm_step(0):
+		pass
+
+
+## Incrementally builds map textures & lookup tables within `deadline_usec` (0 = synchronous).
+func warm_step(deadline_usec: int) -> bool:
+	if _loaded:
+		return true
+	if _warm_sub == 0:
+		_discovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
+		if _discovery == null:
+			return true
+		var biomes: Dictionary = DataRegistry.table("biomes")
+		var palette: PackedVector3Array = PackedVector3Array()
+		for id: String in biomes:
+			var entry: Dictionary = biomes[id]
+			var base: Color = Color(entry.color as String)
+			for tone: Color in [base.lerp(Color(0.04, 0.025, 0.09), 0.78), base.lerp(Color(0.14, 0.1, 0.26), 0.58), base.lerp(Color(0.9, 0.86, 1.0), 0.22)]:
+				palette.append(Vector3(tone.r, tone.g, tone.b))
+		_material.shader = SHADER
+		_material.set_shader_parameter("pal", palette)
+		_material.set_shader_parameter("relief", Relief.TEXTURE)
+		_material.set_shader_parameter("field", Relief.FIELD)
+		_material.set_shader_parameter("sdf", load("res://assets/world/outer_sdf.png"))
+		var water: Texture2D = load("res://assets/world/map_water.png") as Texture2D
+		_material.set_shader_parameter("water", water)
+		_water_image = water.get_image()
+		var lake_tex: Texture2D = load("res://assets/world/lakes_sdf.png") as Texture2D
+		_lake_image = lake_tex.get_image()
+		_material.set_shader_parameter("lake_shore", lake_tex)
+		_material.set_shader_parameter("world_tiles", float(RegionMap.WORLD_TILES))
+		_warm_map = RegionMap.new(0, DataRegistry.table("world_map"))
+		var area_biomes: PackedInt32Array = PackedInt32Array()
+		for area: Dictionary in _warm_map.supers:
+			var biome: String = RegionMap.active_biome(String(area.biome))
+			_area_ids.append(int(area.id))
+			_area_names.append(_warm_map.area_name(int(area.id)))
+			_area_colors.append(Color(String((biomes[biome] as Dictionary).color)))
+			area_biomes.append(maxi(biomes.keys().find(biome), 0))
+		_material.set_shader_parameter("area_biomes", area_biomes)
+		_start_tile = Vector2(_warm_map.start if _warm_map.start.x >= 0 else _warm_map.anchor(_warm_map.start_region))
+		if _cached_paths_tex != null:
+			_material.set_shader_parameter("paths", _cached_paths_tex)
+			_warm_sub = 2
+		else:
+			_warm_decals = DataRegistry.table("ground_baked").get("decals", []) as Array
+			_warm_decal_idx = 0
+			_warm_decal_y = -1
+			_warm_path_bytes.resize(RegionMap.WORLD_TILES * RegionMap.WORLD_TILES)
+			_warm_path_bytes.fill(0)
+			_warm_sub = 1
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _warm_sub == 1:
+		var world_tiles: int = RegionMap.WORLD_TILES
+		while _warm_decal_idx < _warm_decals.size():
+			if _warm_decal_y < 0:
+				var spec: Dictionary = _warm_decals[_warm_decal_idx] as Dictionary
+				var mask_tex: Texture2D = load(String(spec.mask)) as Texture2D
+				var mask: Image = mask_tex.get_image() if mask_tex != null else null
+				if mask == null:
+					_warm_decal_idx += 1
+					continue
+				var fmt: Image.Format = mask.get_format()
+				if fmt == Image.FORMAT_R8 or fmt == Image.FORMAT_L8:
+					_warm_mask_stride = 1
+				elif fmt == Image.FORMAT_RGBA8:
+					_warm_mask_stride = 4
+				elif fmt == Image.FORMAT_RGB8:
+					_warm_mask_stride = 3
+				elif fmt == Image.FORMAT_RG8 or fmt == Image.FORMAT_LA8:
+					_warm_mask_stride = 2
+				else:
+					mask = mask.duplicate() as Image
+					mask.convert(Image.FORMAT_R8)
+					_warm_mask_stride = 1
+				_warm_mask_data = mask.get_data()
+				_warm_mask_w = mask.get_width()
+				_warm_mask_h = mask.get_height()
+				_warm_decal_caravan = String(spec.get("id", "")).begins_with("desert_caravan_")
+				_warm_decal_origin = Vector2i(int(spec.x), int(spec.y))
+				var first: Vector2i = Vector2i(floori(_warm_decal_origin.x / 16.0), floori(_warm_decal_origin.y / 16.0))
+				var last: Vector2i = Vector2i(ceili((_warm_decal_origin.x + _warm_mask_w) / 16.0), ceili((_warm_decal_origin.y + _warm_mask_h) / 16.0))
+				_warm_decal_y = maxi(first.y, 0)
+				_warm_decal_y1 = mini(last.y, world_tiles)
+				_warm_decal_x0 = maxi(first.x, 0)
+				_warm_decal_x1 = mini(last.x, world_tiles)
+			while _warm_decal_y < _warm_decal_y1:
+				var base_y: int = _warm_decal_y * 16 + 2 - _warm_decal_origin.y
+				if base_y + 12 >= 0 and base_y < _warm_mask_h:
+					var out_row: int = _warm_decal_y * world_tiles
+					for x: int in range(_warm_decal_x0, _warm_decal_x1):
+						var base_x: int = x * 16 + 2 - _warm_decal_origin.x
+						if base_x + 12 < 0 or base_x >= _warm_mask_w:
+							continue
+						var covered: int = 0
+						for sy: int in 4:
+							var at_y: int = base_y + sy * 4
+							if at_y < 0 or at_y >= _warm_mask_h:
+								continue
+							var in_row: int = at_y * _warm_mask_w
+							for sx: int in 4:
+								var at_x: int = base_x + sx * 4
+								if at_x >= 0 and at_x < _warm_mask_w:
+									var mval: int = _warm_mask_data[(in_row + at_x) * _warm_mask_stride]
+									if mval == 80 or (_warm_decal_caravan and mval == 60):
+										covered += 1
+						if covered > 0:
+							var val: int = clampi(roundi((float(covered) / 16.0) * 255.0), 0, 255)
+							var out_idx: int = out_row + x
+							if val > _warm_path_bytes[out_idx]:
+								_warm_path_bytes[out_idx] = val
+				_warm_decal_y += 1
+				if deadline_usec > 0 and (_warm_decal_y & 7) == 0 and Time.get_ticks_usec() >= deadline_usec:
+					return false
+			_warm_decal_idx += 1
+			_warm_decal_y = -1
+			_warm_mask_data = PackedByteArray()
+			if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+				return false
+		var path_img: Image = Image.create_from_data(world_tiles, world_tiles, false, Image.FORMAT_R8, _warm_path_bytes)
+		_cached_paths_tex = ImageTexture.create_from_image(path_img)
+		Jobs.register_cleanup(MapWindow.clear_cache)
+		_material.set_shader_parameter("paths", _cached_paths_tex)
+		_warm_path_bytes = PackedByteArray()
+		_warm_decals = []
+		_warm_sub = 2
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _warm_sub == 2:
+		if _cached_areas_tex != null:
+			_cell_area = _cached_cell_area.duplicate()
+			_land_total = _cached_land_total.duplicate()
+			_material.set_shader_parameter("areas", _cached_areas_tex)
+			_warm_sub = 4
+		else:
+			var grid: int = MapDiscovery.GRID
+			_cell_area.resize(grid * grid)
+			_land_total.resize(_warm_map.supers.size())
+			_land_total.fill(0)
+			_warm_areas_bytes.resize(grid * grid)
+			if Terrain.relief != null:
+				_warm_relief_data = Terrain.relief._bytes
+				_warm_relief_side = Terrain.relief._side
+			else:
+				var image: Image = Relief.TEXTURE.get_image()
+				image.convert(Image.FORMAT_RGBA8)
+				_warm_relief_data = image.get_data()
+				_warm_relief_side = image.get_width()
+			_warm_area_cy = 0
+			_warm_sub = 3
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _warm_sub == 3:
+		var grid: int = MapDiscovery.GRID
+		while _warm_area_cy < grid:
+			var cy: int = _warm_area_cy
+			var row_offset: int = cy * grid
+			var relief_row: int = (cy * RegionMap.CELL + 2) * _warm_relief_side
+			for cx: int in grid:
+				var alpha: int = _warm_relief_data[(relief_row + cx * RegionMap.CELL + 2) * 4 + 3]
+				var tile: Vector2i = Vector2i(cx, cy) * RegionMap.CELL + Vector2i(2, 2)
+				var area: int = _warm_map.super_at(tile)
+				_warm_areas_bytes[row_offset + cx] = clampi(area + 1, 0, 255)
+				var land_area: int = _area_near(_warm_map, tile) if alpha >= 200 else 255
+				_cell_area[row_offset + cx] = land_area
+				if land_area < _land_total.size():
+					_land_total[land_area] += 1
+			_warm_area_cy += 1
+			if deadline_usec > 0 and (_warm_area_cy & 7) == 0 and Time.get_ticks_usec() >= deadline_usec:
+				return false
+		var areas_img: Image = Image.create_from_data(grid, grid, false, Image.FORMAT_R8, _warm_areas_bytes)
+		_cached_areas_tex = ImageTexture.create_from_image(areas_img)
+		_cached_cell_area = _cell_area.duplicate()
+		_cached_land_total = _land_total.duplicate()
+		Jobs.register_cleanup(MapWindow.clear_cache)
+		_material.set_shader_parameter("areas", _cached_areas_tex)
+		_warm_areas_bytes = PackedByteArray()
+		_warm_relief_data = PackedByteArray()
+		_warm_sub = 4
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	if _warm_sub == 4:
+		_warm_map = null
+		_loaded = true
+		_rebuild_fog()
+		_discovery.revealed.connect(_on_revealed)
+		_discovery.replaced.connect(_rebuild_fog)
+		return true
+	return true
 
 
 func _area_near(map: RegionMap, tile: Vector2i) -> int:
@@ -410,32 +582,6 @@ func _player_tile() -> Vector2:
 	return Interiors.outer(get_tree(), _player.global_position) / 16.0 if _player != null else _center
 
 
-## Read the same baked surface masks as the world, including future paths. Four by four
-## samples per tile retain narrow bends without loading a world-sized ground image.
-func _path_texture() -> ImageTexture:
-	var image: Image = Image.create(RegionMap.WORLD_TILES, RegionMap.WORLD_TILES, false, Image.FORMAT_R8)
-	image.fill(Color.BLACK)
-	for spec: Dictionary in DataRegistry.table("ground_baked").get("decals", []) as Array:
-		var mask: Image = (load(String(spec.mask)) as Texture2D).get_image()
-		var is_caravan: bool = String(spec.get("id", "")).begins_with("desert_caravan_")
-		var origin: Vector2i = Vector2i(int(spec.x), int(spec.y))
-		var first: Vector2i = Vector2i(floori(origin.x / 16.0), floori(origin.y / 16.0))
-		var last: Vector2i = Vector2i(ceili((origin.x + mask.get_width()) / 16.0), ceili((origin.y + mask.get_height()) / 16.0))
-		for y: int in range(maxi(first.y, 0), mini(last.y, RegionMap.WORLD_TILES)):
-			for x: int in range(maxi(first.x, 0), mini(last.x, RegionMap.WORLD_TILES)):
-				var covered: int = 0
-				for sy: int in 4:
-					for sx: int in 4:
-						var at: Vector2i = Vector2i(x * 16 + sx * 4 + 2, y * 16 + sy * 4 + 2) - origin
-						if at.x >= 0 and at.y >= 0 and at.x < mask.get_width() and at.y < mask.get_height():
-							var mval: int = mask.get_pixelv(at).r8
-							if mval == 80 or (is_caravan and mval == 60):
-								covered += 1
-				var coverage: float = maxf(image.get_pixel(x, y).r, covered / 16.0)
-				image.set_pixel(x, y, Color(coverage, 0, 0))
-	return ImageTexture.create_from_image(image)
-
-
 func _record_trail() -> void:
 	if _player == null:
 		return
@@ -592,6 +738,7 @@ func _draw_overlay() -> void:
 	_draw_labels(fade)
 	_draw_start(fade)
 	_draw_town(fade)
+	_hallgrat_map.draw(_overlay, _scale, fade, size, _to_screen, _seen_tile)
 	_ways.draw(_overlay, _scale, fade, _time, size, [_present_tile, _present_ring, _present_age] if _present_ring > 0.0 else [])
 	_vista_marks.draw(_overlay, _scale, fade, _time, size, _player_tile())
 	_pet_marks.draw(_overlay, _scale, fade, _time, size, get_tree())
@@ -933,6 +1080,10 @@ func _live_markers() -> Array[Dictionary]:
 			"title": "", "tone": tones[id], "position": other.global_position,
 			"inside": Interiors.slot_at(other.global_position) >= 0 or MineManager.in_mine(other.global_position)})
 	return markers
+
+
+func _seen_tile(tile: Vector2) -> bool:
+	return _discovery != null and _discovery.is_seen(tile)
 
 
 func _world_tile(tile: Vector2) -> bool:

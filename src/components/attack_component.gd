@@ -722,6 +722,11 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 		if _talismans != null:
 			_talismans.spend_dive() ## it connected: the dive is used up
 		_on_hit.rpc(_hit_point(targets[0]), dir, float(step["shake"]), float(step.get("hit_stop", 0.0)))
+	if String(Items.definition(stack).get("tool", "")) == "can":
+		var owner_player: Player = get_parent() as Player
+		var town_node: TownManager = get_tree().get_first_node_in_group("town") as TownManager if is_inside_tree() else null
+		if town_node != null and town_node.farm != null and owner_player != null:
+			town_node.farm.host_swing_refill(owner_player, dir)
 	_rift(origin, dir, step, stack, damage, targets)
 
 

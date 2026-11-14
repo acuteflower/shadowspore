@@ -1,24 +1,14 @@
 class_name SalonSeat
 extends BenchSeat
 ## The chair of the open-air salon (`docs/salon_konzept.md`, piece `salon` with `"salon": true`): the same host-confirmed sitting as a bench (`RestComponent`),
-## but on the sitting player's own peer the camera moves close to her (zoom, a little towards the mirror), the HUD steps aside and a line says what the place
-## will be for. On every peer the mirror wakes while somebody sits (`TownStructure.set_glow_boost`, a few sparks rising from the glass).
-## Stage 2 opens the look window from here (`_apply_local`).
+## opening `SalonWindow` on the sitting player's peer while hiding the HUD and framing Ellie + the glowing mirror on the left.
+## On every peer the mirror wakes while somebody sits (`TownStructure.set_glow_boost`, rising sparks from the glass).
 
-const ZOOM: float = 2.2
-const ZOOM_IN_SECONDS: float = 1.4
-const ZOOM_OUT_SECONDS: float = 0.8
-const HEAD: float = 24.0 ## how far above her seat the camera looks (her face, seated)
-const TOWARDS_MIRROR: float = 10.0
-const HINT: String = "HIER KANNST DU BALD DEIN AUSSEHEN ÄNDERN"
+const SALON_WINDOW_SCRIPT: GDScript = preload("res://src/ui/salon_window.gd")
 
 var _local_sitting: bool = false
 var _occupied_shown: bool = false
-var _cam_tween: Tween
-var _hint: CanvasLayer
-var _hint_canvas: Control
-var _hint_alpha: float = 0.0
-var _hint_goal: float = 0.0
+var _window: BoardWindow
 var _sparks: CPUParticles2D
 
 
@@ -42,6 +32,11 @@ func regen_rate() -> float:
 	return 0.0
 
 
+## SalonWindow shows its own controls at the bottom of the board.
+func show_stand_prompt() -> bool:
+	return false
+
+
 ## Which way the mirror stands from the chair: right, or left on a mirrored piece.
 func _mirror_side() -> float:
 	if manager == null or not manager.structures.has(structure_id):
@@ -58,7 +53,7 @@ func mirror_point() -> Vector2:
 	return Vector2(float(data.x) + float(at[0]) * _mirror_side(), float(data.y) + float(at[1]))
 
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	var player: Player = _local_player()
 	var sitting_now: bool = false
 	if player != null:
@@ -71,13 +66,6 @@ func _process(delta: float) -> void:
 	if someone != _occupied_shown:
 		_occupied_shown = someone
 		_wake(someone)
-	if _hint_canvas != null:
-		_hint_alpha = move_toward(_hint_alpha, _hint_goal, delta * 1.6)
-		_hint_canvas.queue_redraw()
-		if _hint_alpha <= 0.0 and _hint_goal <= 0.0:
-			_hint.queue_free()
-			_hint = null
-			_hint_canvas = null
 
 
 ## Somebody (any player) sits on this chair right now (not walking up, not getting up).
@@ -89,54 +77,49 @@ func _seated_by_anyone() -> bool:
 	return false
 
 
-## The local player sat down or got up: the camera, the HUD and the hint (stage 2: the look window opens and closes here).
+## The local player sat down or got up: hide the HUD and open/close `SalonWindow`.
 func _apply_local(player: Player, active: bool) -> void:
 	if player == null or not is_instance_valid(player):
+		if not active and _window != null and is_instance_valid(_window):
+			_window.call("close_from_seat")
+			_window = null
 		return
 	var hud: Node = player.get("_hud") as Node
 	if hud == null:
 		hud = player.get_node_or_null("Hud")
 	if hud != null:
 		hud.set("vista_hide", active)
-	var camera: Camera2D = player.view_camera()
-	if camera != null:
-		if _cam_tween != null:
-			_cam_tween.kill()
-		_cam_tween = player.create_tween().set_parallel(true)
-		_cam_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		if active:
-			_cam_tween.tween_property(camera, "zoom", Vector2(ZOOM, ZOOM), ZOOM_IN_SECONDS)
-			_cam_tween.tween_property(player, "view_shift", Vector2(TOWARDS_MIRROR * _mirror_side(), -HEAD).round(), ZOOM_IN_SECONDS)
-		else:
-			_cam_tween.tween_property(camera, "zoom", Vector2.ONE, ZOOM_OUT_SECONDS)
-			_cam_tween.tween_property(player, "view_shift", Vector2.ZERO, ZOOM_OUT_SECONDS)
-	_show_hint(active)
+	if active:
+		if _window == null or not is_instance_valid(_window) or _window._closing:
+			_window = SALON_WINDOW_SCRIPT.call("open", get_tree(), player, manager, self) as BoardWindow
+	elif _window != null and is_instance_valid(_window):
+		_window.call("close_from_seat")
+		_window = null
 
 
-func _show_hint(on: bool) -> void:
-	_hint_goal = 1.0 if on else 0.0
-	if on and _hint == null:
-		_hint = CanvasLayer.new()
-		_hint.layer = 24
-		_hint_canvas = Control.new()
-		_hint_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		_hint_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_hint_canvas.draw.connect(_draw_hint)
-		_hint.add_child(_hint_canvas)
-		add_child(_hint)
-
-
-func _draw_hint() -> void:
-	var fade: float = clampf(_hint_alpha * 1.4 - 0.4, 0.0, 1.0) ## it comes once the camera has nearly arrived
-	if fade <= 0.0:
-		return
-	var size: Vector2 = _hint_canvas.size
-	var width: int = PixelText.width(HINT)
-	var at: Vector2i = Vector2i(int(size.x / 2.0) - width / 2, int(size.y) - 34)
-	_hint_canvas.draw_rect(Rect2(Vector2(at) - Vector2(8, 5), Vector2(width + 16, 16)), Color(0.04, 0.02, 0.08, 0.55 * fade))
-	PixelText.draw(_hint_canvas, HINT, at, Color(Color("e9dcff"), fade), Color(Color("0a0612"), fade))
-	var sub: String = "E ODER BEWEGEN: AUFSTEHEN"
-	PixelText.draw(_hint_canvas, sub, Vector2i(int(size.x / 2.0) - PixelText.width(sub) / 2, at.y + 14), Color(Color("8f7fb0"), fade), Color(Color("0a0612"), fade))
+## Celebratory prism burst from the mirror when a new look is applied.
+func sparkle_burst() -> void:
+	var burst: CPUParticles2D = CPUParticles2D.new()
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.amount = 16
+	burst.lifetime = 0.85
+	burst.spread = 180.0
+	burst.gravity = Vector2(0.0, -14.0)
+	burst.initial_velocity_min = 14.0
+	burst.initial_velocity_max = 36.0
+	burst.color = Color(0.84, 1.0, 0.96, 0.95)
+	var ramp: Gradient = Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.45, 1.0])
+	ramp.colors = PackedColorArray([Color(0.47, 0.96, 0.90, 1.0), Color(0.91, 0.86, 1.0, 0.9), Color(1.0, 1.0, 1.0, 0.0)])
+	burst.color_ramp = ramp
+	burst.material = Unlit.material()
+	burst.z_index = 8
+	burst.top_level = true
+	burst.global_position = mirror_point()
+	burst.emitting = true
+	add_child(burst)
+	burst.finished.connect(burst.queue_free)
 
 
 ## The mirror wakes while somebody sits (every peer): the glow brightens and sparks rise from the glass.
@@ -184,3 +167,6 @@ func _exit_tree() -> void:
 	if _local_sitting:
 		_local_sitting = false
 		_apply_local(_local_player(), false)
+	if _window != null and is_instance_valid(_window):
+		_window.call("close_from_seat")
+		_window = null

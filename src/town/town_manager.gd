@@ -99,6 +99,7 @@ var _surfaces: Dictionary = {} ## Vector2i (16 px cell) -> surface name
 var _progress: Dictionary = {} ## host: id -> float progress
 var _progress_clock: float = 0.0
 var _progress_dirty: Dictionary = {}
+var _upgrade_dirty: Dictionary = {}
 var _stream_clock: float = 0.0
 var _found_clock: float = 0.0
 var _arrival_clock: float = 0.0
@@ -289,6 +290,43 @@ func is_built(id: int) -> bool:
 	return structures.has(id) and int((structures[id] as Dictionary).g) >= PROGRESS_FULL
 
 
+func structure_level(id: int) -> int:
+	if not structures.has(id):
+		return 1
+	return maxi(int((structures[id] as Dictionary).get("lv", 1)), 1)
+
+
+func is_upgrading(id: int) -> bool:
+	return structures.has(id) and (structures[id] as Dictionary).has("ug")
+
+
+func is_working(id: int) -> bool:
+	return structures.has(id) and (int((structures[id] as Dictionary).g) < PROGRESS_FULL or (structures[id] as Dictionary).has("ug"))
+
+
+func plaza_level() -> int:
+	var best: int = 0
+	for id: int in built_ids("plaza"):
+		best = maxi(best, structure_level(id))
+	return best
+
+
+## Nearest built scarecrow guarding `point` within its `scare_radius`, or `Vector2.INF` when unguarded.
+func scared_at(point: Vector2) -> Vector2:
+	var radius: float = float(TownRules.piece("scarecrow").get("scare_radius", 112.0))
+	if radius <= 0.0:
+		return Vector2.INF
+	var best: Vector2 = Vector2.INF
+	var best_d2: float = radius * radius
+	for id: int in built_ids("scarecrow"):
+		var pos: Vector2 = position_of(id)
+		var d2: float = point.distance_squared_to(pos)
+		if d2 <= best_d2:
+			best_d2 = d2
+			best = pos
+	return best
+
+
 func rect_of(id: int) -> Rect2:
 	var data: Dictionary = structures[id] as Dictionary
 	return TownRules.foot_rect(String(data.p), float(data.x), float(data.y))
@@ -352,7 +390,7 @@ func worth() -> float:
 	for id: int in structures:
 		var data: Dictionary = structures[id] as Dictionary
 		if int(data.g) >= PROGRESS_FULL:
-			total += float(TownRules.piece(String(data.p)).get("worth", 0))
+			total += float(TownRules.piece_at_level(String(data.p), structure_level(id)).get("worth", 0))
 	return total
 
 
@@ -377,7 +415,7 @@ func circles() -> Array[Vector3]:
 		var grow: float = light_grow()
 		for id: int in structures:
 			var data: Dictionary = structures[id] as Dictionary
-			var reach: float = float(TownRules.piece(String(data.p)).get("reach", 0.0)) * grow
+			var reach: float = float(TownRules.piece_at_level(String(data.p), structure_level(id)).get("reach", 0.0)) * grow
 			if reach > 0.0 and int(data.g) >= PROGRESS_FULL:
 				_circles.append(Vector3(float(data.x), float(data.y) - 8.0, reach))
 		_circles_dirty = false
@@ -477,13 +515,23 @@ func _rpc_lamp(id: int, fuel: int, lit: int, spark: bool) -> void:
 func _burn_lamps() -> void:
 	if not TimeManager.is_night():
 		return
+	burn_lamps_for_hours(1.0)
+
+
+## Consumes `hours` worth of lamp fuel (1h per dark hour tick, or the remaining night hours when sleeping).
+func burn_lamps_for_hours(hours: float) -> void:
+	if not multiplayer.is_server() or hours <= 0.0:
+		return
+	var night_hrs: float = maxf(TimeManager.night_hours(), 1.0)
 	var out: int = 0
 	for id: int in structures.keys():
 		var spec: Dictionary = lamp_spec(id)
 		if spec.is_empty() or not is_built(id) or not is_lamp_burning(id):
 			continue
-		var per_hour: int = int(round(1000.0 / (float(spec.get("nights", 3.0)) * 8.0)))
-		var fuel: int = maxi(int(lamp_u(id).f) - per_hour, 0)
+		var step: int = int(round(1000.0 * hours / (float(spec.get("nights", 3.0)) * night_hrs)))
+		if step <= 0:
+			continue
+		var fuel: int = maxi(int(lamp_u(id).f) - step, 0)
 		_rpc_lamp.rpc(id, fuel, 1, false)
 		if fuel == 0:
 			out += 1
@@ -1238,6 +1286,124 @@ func _refresh_ways() -> void:
 	_rebuild_surfaces()
 
 
+# ---------- upgrades ----------
+
+func upgrade_spec_next(id: int) -> Dictionary:
+	if not structures.has(id) or not is_built(id):
+		return {}
+	return TownRules.upgrade_spec(String((structures[id] as Dictionary).p), structure_level(id) + 1)
+
+
+func has_next_upgrade(id: int) -> bool:
+	return not upgrade_spec_next(id).is_empty()
+
+
+func upgrade_hint(id: int, builder: Player = null) -> String:
+	var up: Dictionary = upgrade_spec_next(id)
+	if up.is_empty():
+		return ""
+	if is_upgrading(id):
+		return "AUSBAU LÄUFT"
+	var req: int = int(up.get("need_level", 0))
+	if level() < req:
+		return "BRAUCHT %s" % TownRules.level_name(req).to_upper()
+	var who: Player = builder if builder != null else local_player()
+	return missing_text(up.get("cost", {}) as Dictionary, who)
+
+
+func upgrade_prompt(id: int) -> String:
+	var up: Dictionary = upgrade_spec_next(id)
+	if up.is_empty() or is_upgrading(id):
+		return ""
+	return "AUSBAUEN (STUFE %d)" % int(up.get("lv", structure_level(id) + 1))
+
+
+func request_upgrade(id: int) -> void:
+	if multiplayer.is_server():
+		_host_upgrade(id, multiplayer.get_unique_id())
+	else:
+		_rpc_upgrade_request.rpc_id(1, id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_upgrade_request(id: int) -> void:
+	if multiplayer.is_server():
+		_host_upgrade(id, multiplayer.get_remote_sender_id())
+
+
+func _host_upgrade(id: int, peer: int) -> void:
+	var builder: Player = player_of(peer)
+	if not founded or not structures.has(id) or not is_built(id) or is_upgrading(id):
+		return
+	var up: Dictionary = upgrade_spec_next(id)
+	if up.is_empty():
+		return
+	var reach: float = float((TownRules.config().get("limits", {}) as Dictionary).get("build_reach", 240.0))
+	if builder != null and builder.global_position.distance_to(position_of(id)) > reach:
+		_tell(peer, "ZU WEIT WEG", false)
+		return
+	var reason: String = upgrade_hint(id, builder)
+	if reason != "":
+		_tell(peer, reason, false)
+		return
+	var cost: Dictionary = up.get("cost", {}) as Dictionary
+	_pay(cost, builder)
+	_sync_stock()
+	_progress[id] = 0.0
+	_rpc_upgrade_started.rpc(id, builder.global_position + Vector2(0.0, -20.0) if builder != null else Vector2.INF)
+	_tell(peer, "AUSBAU BEGONNEN", true)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_upgrade_started(id: int, _from: Vector2) -> void:
+	if not structures.has(id):
+		return
+	var data: Dictionary = structures[id] as Dictionary
+	data["ug"] = 0
+	if _views.has(id):
+		(_views[id] as TownStructure).set_upgrade_progress(0)
+	changed.emit()
+
+
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_upgrade_progress(ids: PackedInt32Array, values: PackedInt32Array) -> void:
+	for i: int in ids.size():
+		if structures.has(ids[i]):
+			var data: Dictionary = structures[ids[i]] as Dictionary
+			if data.has("ug"):
+				data["ug"] = values[i]
+				if _views.has(ids[i]):
+					(_views[ids[i]] as TownStructure).set_upgrade_progress(values[i])
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_upgrade_done(id: int, new_lv: int) -> void:
+	if not structures.has(id):
+		return
+	var data: Dictionary = structures[id] as Dictionary
+	data.erase("ug")
+	data["lv"] = new_lv
+	_refresh_ways()
+	_circles_dirty = true
+	if _views.has(id):
+		var old_view: TownStructure = _views[id] as TownStructure
+		old_view.name = "OldS%d" % id
+		old_view.queue_free()
+		_views.erase(id)
+	_register(id)
+	_stream_views(true)
+	if _views.has(id):
+		(_views[id] as TownStructure).set_upgrade_progress(-1)
+		(_views[id] as TownStructure).set_progress(PROGRESS_FULL, true)
+		if not _quiet:
+			_consecrate(id)
+	_sync_seats()
+	built.emit(String(data.p), id)
+	if multiplayer.is_server():
+		_check_level()
+	changed.emit()
+
+
 # ---------- demolishing ----------
 
 func request_demolish(id: int) -> void:
@@ -1265,7 +1431,12 @@ func _host_demolish(id: int, peer: int) -> void:
 	if builder != null and builder.global_position.distance_to(Vector2(float(data.x), float(data.y))) > float((TownRules.config().get("limits", {}) as Dictionary).get("build_reach", 240.0)):
 		_tell(peer, "ZU WEIT WEG", false)
 		return
-	var back: Dictionary = TownRules.refund(spec.get("cost", {}) as Dictionary, int(data.g) >= PROGRESS_FULL)
+	var spent: Dictionary = TownRules.total_cost(String(data.p), structure_level(id))
+	if data.has("ug"):
+		var up_cost: Dictionary = TownRules.upgrade_spec(String(data.p), structure_level(id) + 1).get("cost", {}) as Dictionary
+		for item: String in up_cost:
+			spent[item] = int(spent.get(item, 0)) + int(up_cost[item])
+	var back: Dictionary = TownRules.refund(spent, int(data.g) >= PROGRESS_FULL)
 	for item: String in back:
 		_add_stock(item, int(back[item]))
 	_progress.erase(id)
@@ -1379,9 +1550,10 @@ func _physics_process(delta: float) -> void:
 			players.append(p)
 	for id: int in structures.keys():
 		var data: Dictionary = structures[id] as Dictionary
-		if int(data.g) >= PROGRESS_FULL:
+		var upgrading: bool = data.has("ug")
+		if int(data.g) >= PROGRESS_FULL and not upgrading:
 			continue
-		var spec: Dictionary = TownRules.piece(String(data.p))
+		var spec: Dictionary = upgrade_spec_next(id) if upgrading else TownRules.piece(String(data.p))
 		var middle: Vector2 = rect_of(id).get_center()
 		var helpers: float = 0.0
 		for p: Player in players:
@@ -1392,25 +1564,43 @@ func _physics_process(delta: float) -> void:
 				helpers += 1.0
 		if helpers <= 0.0:
 			continue
-		var rate: float = float(PROGRESS_FULL) / maxf(float(spec.get("build_seconds", 5.0)), 0.5) * (1.0 + 0.5 * (helpers - 1.0))
-		var now: float = float(_progress.get(id, float(data.g))) + rate * delta
+		var rate: float = float(PROGRESS_FULL) / maxf(float(spec.get("build_seconds", 6.0)), 0.5) * (1.0 + 0.5 * (helpers - 1.0))
+		var cur: float = float(_progress.get(id, float(data.get("ug", 0)) if upgrading else float(data.g)))
+		var now: float = cur + rate * delta
 		_progress[id] = now
 		var value: int = mini(int(now), PROGRESS_FULL)
-		if value != int(data.g):
-			data.g = value
-			_progress_dirty[id] = value
-			if _views.has(id) and value < PROGRESS_FULL:
-				(_views[id] as TownStructure).set_progress(value)
-		if value >= PROGRESS_FULL:
-			_progress.erase(id)
-			_progress_dirty.erase(id)
-			_host_wave(id)
-			_rpc_done.rpc(id)
+		if upgrading:
+			if value != int(data.ug):
+				data["ug"] = value
+				_upgrade_dirty[id] = value
+				if _views.has(id) and value < PROGRESS_FULL:
+					(_views[id] as TownStructure).set_upgrade_progress(value)
+			if value >= PROGRESS_FULL:
+				_progress.erase(id)
+				_upgrade_dirty.erase(id)
+				var next_lv: int = structure_level(id) + 1
+				_host_wave(id, next_lv)
+				_rpc_upgrade_done.rpc(id, next_lv)
+		else:
+			if value != int(data.g):
+				data.g = value
+				_progress_dirty[id] = value
+				if _views.has(id) and value < PROGRESS_FULL:
+					(_views[id] as TownStructure).set_progress(value)
+			if value >= PROGRESS_FULL:
+				_progress.erase(id)
+				_progress_dirty.erase(id)
+				_host_wave(id)
+				_rpc_done.rpc(id)
 	_progress_clock += delta
-	if _progress_clock >= 0.25 and not _progress_dirty.is_empty():
+	if _progress_clock >= 0.25 and (not _progress_dirty.is_empty() or not _upgrade_dirty.is_empty()):
 		_progress_clock = 0.0
-		_rpc_progress.rpc(PackedInt32Array(_progress_dirty.keys()), PackedInt32Array(_progress_dirty.values()))
-		_progress_dirty.clear()
+		if not _progress_dirty.is_empty():
+			_rpc_progress.rpc(PackedInt32Array(_progress_dirty.keys()), PackedInt32Array(_progress_dirty.values()))
+			_progress_dirty.clear()
+		if not _upgrade_dirty.is_empty():
+			_rpc_upgrade_progress.rpc(PackedInt32Array(_upgrade_dirty.keys()), PackedInt32Array(_upgrade_dirty.values()))
+			_upgrade_dirty.clear()
 
 
 @rpc("authority", "call_remote", "unreliable")
@@ -1434,7 +1624,7 @@ static func wave_radius(piece: String) -> float:
 ## Local player, E at a site: she lends a hand there. Each round of her working clip (the picking motion: she stoops, takes, sets) is a grab; the host
 ## counts her as three helpers while the grabs keep coming. Any movement or a finished site ends it (`_update_help`).
 func lend_hand(player: Player, id: int) -> void:
-	if not structures.has(id) or is_built(id) or player.is_busy():
+	if not is_working(id) or player.is_busy():
 		return
 	_help_site = id
 	_grab(player)
@@ -1457,7 +1647,7 @@ func _update_help() -> void:
 	if _help_site < 0:
 		return
 	var player: Player = local_player()
-	var stop: bool = player == null or not structures.has(_help_site) or is_built(_help_site) or player.health.current <= 0.0 or player.story_lock
+	var stop: bool = player == null or not is_working(_help_site) or player.health.current <= 0.0 or player.story_lock
 	if not stop and InputManager.move_vector().length() > 0.2:
 		stop = true
 	if not stop and player.global_position.distance_to(rect_of(_help_site).get_center()) > float((TownRules.config().get("limits", {}) as Dictionary).get("helper_radius", 100.0)):
@@ -1473,7 +1663,7 @@ func _update_help() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_hand(id: int) -> void:
-	if not multiplayer.is_server() or not structures.has(id) or is_built(id):
+	if not multiplayer.is_server() or not is_working(id):
 		return
 	var peer: int = multiplayer.get_remote_sender_id()
 	if peer == 0:
@@ -1504,9 +1694,10 @@ func _hand_weight(peer: int, id: int) -> float:
 
 ## Host, the moment a piece is finished: its pressure wave (data `wave` px, docs/stadtbau_konzept.md 4) tears the soft props and small plants round it out
 ## (only inside the light, the new piece's own circle included) and what they would give goes into the stock. Sent before `_rpc_done` on the same channel.
-func _host_wave(id: int) -> void:
+func _host_wave(id: int, target_lv: int = -1) -> void:
 	var data: Dictionary = structures[id] as Dictionary
-	var spec: Dictionary = TownRules.piece(String(data.p))
+	var lv: int = target_lv if target_lv > 0 else structure_level(id)
+	var spec: Dictionary = TownRules.piece_at_level(String(data.p), lv)
 	var radius: float = wave_radius(String(data.p))
 	if radius <= 0.0 or world == null:
 		return
@@ -1544,16 +1735,18 @@ func _consecrate(id: int) -> void:
 		_wave_gains.erase(id)
 		return
 	var data: Dictionary = structures[id] as Dictionary
-	var spec: Dictionary = TownRules.piece(String(data.p))
+	var lv: int = structure_level(id)
+	var spec: Dictionary = TownRules.piece_at_level(String(data.p), lv)
 	var target: Vector2 = Vector2.INF
 	var stocks: Array[int] = built_ids("stockpile")
 	if not stocks.is_empty() and stocks[0] != id:
 		target = door_of(stocks[0])
 	var light: Dictionary = (spec.get("aura", spec.get("light", {})) as Dictionary)
+	var consecrate_title: String = "%s · STUFE %d" % [String(spec.get("name", "")).to_upper(), lv] if lv > 1 else String(spec.get("name", "")).to_upper()
 	TownConsecration.play(view.get_parent(), view.position, {
 		"radius": wave_radius(String(data.p)),
 		"reach": float(spec.get("reach", 0.0)),
-		"title": String(spec.get("name", "")).to_upper(),
+		"title": consecrate_title,
 		"worth": float(spec.get("worth", 0.0)),
 		"light_color": Color(String(light.get("color", "ffd27a"))),
 		"gains": _wave_gains.get(id, []),
@@ -2715,6 +2908,17 @@ func build_mode() -> BuildMode:
 	return _build
 
 
+## Pre-initializes BuildMode and town wear/views during the loading screen so frame 1 after reveal is smooth.
+func warm_for_gameplay() -> void:
+	if _build == null and local_player() != null:
+		_build = BuildMode.new()
+		add_child(_build)
+		_build.setup(self)
+	if founded:
+		_stream_views(true)
+		_update_wear()
+
+
 func _process(delta: float) -> void:
 	_update_help()
 	if _build == null and local_player() != null:
@@ -2823,6 +3027,7 @@ func import_state(data: Dictionary) -> void:
 	paths.clear()
 	orders.clear()
 	_progress.clear()
+	_upgrade_dirty.clear()
 	unlocks.clear()
 	for view: Variant in _views.values():
 		(view as TownStructure).queue_free()
@@ -2851,11 +3056,19 @@ func import_state(data: Dictionary) -> void:
 	var saved: Dictionary = data.get("structures", {}) as Dictionary
 	for key: String in saved:
 		var entry: Dictionary = saved[key] as Dictionary
-		structures[int(key)] = {"p": String(entry.p), "x": float(entry.x), "y": float(entry.y), "f": int(entry.get("f", 0)), "g": int(entry.get("g", PROGRESS_FULL)), "b": int(entry.get("b", founded_day))}
+		var sid: int = int(key)
+		structures[sid] = {"p": String(entry.p), "x": float(entry.x), "y": float(entry.y), "f": int(entry.get("f", 0)), "g": int(entry.get("g", PROGRESS_FULL)), "b": int(entry.get("b", founded_day))}
+		var dest: Dictionary = structures[sid] as Dictionary
+		if int(entry.get("lv", 1)) > 1:
+			dest["lv"] = int(entry.lv)
+		if entry.has("ug"):
+			dest["ug"] = int(entry.ug)
 		if entry.get("u", null) is Dictionary:
-			(structures[int(key)] as Dictionary).u = {"f": int((entry.u as Dictionary).get("f", 0)), "l": int((entry.u as Dictionary).get("l", 0))}
-		if int((structures[int(key)] as Dictionary).g) < PROGRESS_FULL:
-			_progress[int(key)] = float((structures[int(key)] as Dictionary).g)
+			dest.u = {"f": int((entry.u as Dictionary).get("f", 0)), "l": int((entry.u as Dictionary).get("l", 0))}
+		if int(dest.g) < PROGRESS_FULL:
+			_progress[sid] = float(dest.g)
+		elif dest.has("ug"):
+			_progress[sid] = float(dest.ug)
 	if data.has("stock_slots"):
 		box.import_slots(data.get("stock_slots", []) as Array)
 	else: ## an older save: item -> count

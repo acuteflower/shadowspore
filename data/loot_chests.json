@@ -92,7 +92,10 @@
 			{"id": "gem_hunger_1", "w": 1, "n": [1, 1]},
 			{"id": "crystal_banish_1", "w": 1, "n": [1, 1]},
 			{"id": "crystal_roots_1", "w": 1, "n": [1, 1]},
-			{"id": "silver_chain", "w": 1, "n": [1, 1]}
+			{"id": "silver_chain", "w": 1, "n": [1, 1]},
+			{"id": "amber_grain_seed", "w": 2, "n": [1, 2]},
+			{"id": "moon_leek_seed", "w": 2, "n": [1, 2]},
+			{"id": "oasis_melon_seed", "w": 1, "n": [1, 2]}
 		],
 		"rare_mats": [
 			{"id": "iron_plate", "w": 5, "n": [1, 2]},
@@ -106,7 +109,8 @@
 			{"id": "crystal_embers_2", "w": 1, "n": [1, 1]},
 			{"id": "crystal_veil_2", "w": 1, "n": [1, 1]},
 			{"id": "gem_lens_2", "w": 1, "n": [1, 1]},
-			{"id": "gem_wild_2", "w": 1, "n": [1, 1]}
+			{"id": "gem_wild_2", "w": 1, "n": [1, 1]},
+			{"id": "star_shard", "w": 2, "n": [1, 2]}
 		],
 		"rare_finds": [
 			{"id": "crystal_banish_3", "w": 2, "n": [1, 1]},
@@ -161,5 +165,42 @@
 			{"id": "curse_silver", "w": 2, "n": [2, 3]}
 		]
 	},
-	"placed": []
+	"placed": [
+		{"id": "meadow_chest_01", "tier": "legendary", "tile": [316, 183], "flip": false},
+		{"id": "meadow_chest_02", "tier": "rare", "tile": [393, 246], "flip": true},
+		{"id": "meadow_chest_03", "tier": "rare", "tile": [442, 330], "flip": false},
+		{"id": "meadow_chest_04", "tier": "rare", "tile": [596, 456], "flip": true},
+		{"id": "meadow_chest_05", "tier": "legendary", "tile": [890, 477], "flip": true},
+		{"id": "meadow_chest_06", "tier": "rare", "tile": [260, 547], "flip": true},
+		{"id": "meadow_chest_07", "tier": "rare", "tile": [526, 589], "flip": false},
+		{"id": "meadow_chest_08", "tier": "rare", "tile": [722, 603], "flip": true},
+		{"id": "meadow_chest_09", "tier": "rare", "tile": [526, 750], "flip": false},
+		{"id": "meadow_chest_10", "tier": "rare", "tile": [239, 764], "flip": true},
+		{"id": "meadow_chest_11", "tier": "rare", "tile": [302, 372], "flip": false},
+		{"id": "meadow_chest_12", "tier": "rare", "tile": [302, 855], "flip": true},
+		{"id": "meadow_chest_13", "tier": "common", "tile": [547, 246], "flip": false},
+		{"id": "meadow_chest_14", "tier": "common", "tile": [470, 505], "flip": true},
+		{"id": "meadow_chest_15", "tier": "common", "tile": [246, 673], "flip": false},
+		{"id": "meadow_chest_16", "tier": "common", "tile": [533, 372], "flip": true},
+		{"id": "meadow_chest_17", "tier": "common", "tile": [596, 687], "flip": false},
+		{"id": "meadow_chest_18", "tier": "common", "tile": [666, 750], "flip": true},
+		{"id": "meadow_chest_19", "tier": "common", "tile": [344, 1009], "flip": false},
+		{"id": "meadow_chest_20", "tier": "common", "tile": [701, 435], "flip": true},
+		{"id": "meadow_chest_21", "tier": "common", "tile": [358, 652], "flip": false},
+		{"id": "meadow_chest_22", "tier": "common", "tile": [400, 862], "flip": true},
+		{"id": "meadow_chest_23", "tier": "common", "tile": [239, 232], "flip": false},
+		{"id": "meadow_chest_24", "tier": "common", "tile": [834, 750], "flip": true},
+		{"id": "meadow_chest_25", "tier": "common", "tile": [673, 841], "flip": false},
+		{"id": "meadow_chest_26", "tier": "common", "tile": [337, 743], "flip": true},
+		{"id": "meadow_chest_27", "tier": "common", "tile": [477, 932], "flip": false},
+		{"id": "meadow_chest_28", "tier": "common", "tile": [239, 120], "flip": true},
+		{"id": "meadow_chest_29", "tier": "common", "tile": [470, 148], "flip": false},
+		{"id": "meadow_chest_30", "tier": "common", "tile": [939, 400], "flip": true},
+		{"id": "meadow_chest_31", "tier": "common", "tile": [141, 435], "flip": false},
+		{"id": "meadow_chest_32", "tier": "common", "tile": [351, 519], "flip": true},
+		{"id": "meadow_chest_33", "tier": "common", "tile": [967, 540], "flip": false},
+		{"id": "meadow_chest_34", "tier": "common", "tile": [883, 603], "flip": true},
+		{"id": "meadow_chest_35", "tier": "common", "tile": [428, 743], "flip": false},
+		{"id": "meadow_chest_36", "tier": "common", "tile": [512, 841], "flip": true}
+	]
 }

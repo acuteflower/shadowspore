@@ -324,18 +324,54 @@ def giebel(rng):
     return m, dict(W=W, D=D, lights=[[14.0, 16.0], [0.0, 54.0]], moss=0.08)
 
 
+def awning(m, x0, x1, y_wall=30.5, y_edge=23.0, z_edge=13.0):
+    """A striped cloth awning over a shop window: a rolled-up spare round its roller at the wall, the cloth bellying a little between
+    the wall and the front rail and sagging between the stays, every stripe folded a little (alternate stripes catch the light), a
+    scalloped valance hanging from the front (a band, then one rounded tongue per stripe with a dark notch between), iron stays from the
+    wall under it, a wine-red trim along the rail. Its shadow falls on the wall (`build`: the cloth counts as a cover)."""
+    span = x1 - x0
+    stripe = 3.0
+    col = lambda x: BANNER if int((x - x0) // stripe) % 2 == 0 else CREAM  # noqa: E731
+
+    def edge(x, t):  # the cloth's point at x, t (0 wall .. 1 front)
+        sag_x = math.sin(math.pi * (x - x0) / span) ** 2 * 1.0 * t
+        belly = math.sin(math.pi * t) * 0.6
+        return V(x, y_wall + (y_edge - y_wall) * t - sag_x - belly, 1.6 + (z_edge - 1.6) * t)
+    x = x0 + 0.5
+    while x < x1:
+        fold = ((x - x0) % stripe) / stripe          # 0 .. 1 across a stripe: a soft ridge in its middle
+        lift = math.sin(math.pi * fold) * 0.35
+        for a_, b_ in ((0.0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0)):
+            slab(m, edge(x, a_) + V(0, lift, 0), edge(x, b_) + V(0, lift, 0), 0.72, 0.3, col(x), (0, 1, 0.45), step=1.0)
+        x += 1.0
+    for k in range(int(round(span / stripe))):      # the valance
+        xc = x0 + (k + 0.5) * stripe
+        e = edge(xc, 1.0)
+        m.ell(e + V(0, -0.55, 0.3), (stripe / 2 * 0.97, 0.6, 0.28), col(xc))
+        m.ell(e + V(0, -1.35, 0.3), (stripe / 2 * 0.62, 0.85, 0.26), col(xc))
+        m.ell(e + V(0, -2.05, 0.3), (stripe / 2 * 0.34, 0.45, 0.24), col(xc))
+    log(m, V(x0, y_wall + 0.7, 1.4), V(x1, y_wall + 0.7, 1.4), 1.15, CREAM, step=1.0)       # the roller with the spare cloth
+    log(m, V(x0, y_wall + 0.2, 2.3), V(x1, y_wall + 0.2, 2.3), 0.35, BANNER, step=1.0)      # its outer turn
+    for xx in (x0 - 0.6, x1 + 0.6):
+        m.ell(V(xx, y_wall + 0.7, 1.4), (0.6, 1.3, 1.3), IRON)
+        log(m, V(xx, y_wall + 0.7, 0.2), V(xx, y_wall + 0.7, 1.4), 0.4, IRON, step=0.6)
+    e0, e1 = edge(x0, 1.0), edge(x1, 1.0)
+    log(m, e0 + V(-0.4, -0.15, -0.35), e1 + V(0.4, -0.15, -0.35), 0.38, IRON, step=0.8)       # the front rail
+    log(m, e0 + V(0, 0.2, 0.1), e1 + V(0, 0.2, 0.1), 0.3, WINE, step=0.8)                       # its trim
+    for xx in (x0 + 0.4, (x0 + x1) / 2, x1 - 0.4):                                              # the stays
+        e = edge(xx, 1.0)
+        log(m, V(xx, y_wall - 10.0, 0.9), e + V(0, -0.5, -0.5), 0.34, IRON, step=0.7)
+        m.ell(V(xx, y_wall - 10.0, 0.7), (0.9, 0.9, 0.5), IRON)
+        m.ell(e + V(0, -0.5, -0.5), (0.5, 0.5, 0.5), IRON)
+
+
 def laden(rng):
     m = h.Model()
     W, D, eave, ridge = 46.0, 66.0, 40.0, 62.0
     body(m, rng, W, D, eave, ridge=ridge)
     door(m, 26.0, 11.0, 20.0, 0.0, arch=False)
     window(m, -10.0, 6.0, 26.0, 16.0, 0.0, shutters=False, arch=True)        # the wide shop window
-    for k in range(int(52 / 3.0)):                                          # a teal cloth awning over it, sagging between two irons
-        x = -26.0 + k * 3.0
-        sag = math.sin(k / 17.0 * math.pi) * 1.2
-        slab(m, V(x, 28.5 - sag * 0.3, 1.5), V(x, 25.0 - sag, 10.0), 1.6, 0.6, BANNER, (0, 1, 0.3), step=1.2)
-    for sx in (-27.0, 7.0):
-        log(m, V(sx, 28.0, 1.0), V(sx, 25.0, 10.5), 0.45, IRON, step=0.8)
+    awning(m, -28.0, 8.0)
     log(m, V(-W + 2, 26.0, 1.5), V(-W - 7, 26.0, 1.5), 0.6, IRON, step=0.8)  # the sign bracket (the sign itself is a swaying part, later)
     roof_along_x(m, rng, -W, W, -D, 0.0, eave, ridge)
     chimney(m, rng, W * 0.6, -D * 0.6, ridge - 8, ridge + 8)
@@ -430,6 +466,8 @@ PLUM = len(h.RAMPS)
 h.RAMPS.append([hexc(c) for c in ("2a1838", "4a2c60", "71488e", "a07cbc")])   # dyed violet
 FRUIT = len(h.RAMPS)
 h.RAMPS.append([hexc(c) for c in ("4a1418", "8a2a24", "c8543a", "f09a6a")])   # apples and roots
+CREAM = len(h.RAMPS)
+h.RAMPS.append([hexc(c) for c in ("4a3c34", "8a765e", "c8b28c", "f0e2bc")])   # unbleached awning cloth
 GREEN = len(h.RAMPS)
 h.RAMPS.append([hexc(c) for c in ("1c3420", "2e5a30", "4e8a44", "86c070")])   # herbs and greens
 CLOTHS = ((BANNER, LINEN), (WINE, OCHRE), (PLUM, LINEN))
@@ -499,7 +537,9 @@ def stand(rng, variant, facing):
     for p in m.prims:
         p.c = Ry @ p.c
         p.R = Ry @ p.R
-    return m, dict(W=W + 3, D=2 * D + 8, lights=[], moss=0.0, stall=True)
+    body = [Ry @ V(x, 0.0, z) for x, z in ((-W - 1, D + 2), (W + 1, D + 2), (W + 1, -D - 7), (-W - 1, -D - 7))]   # counter, posts, crates
+    roof = [Ry @ V(x, 0.0, z) for x, z in ((-W - 3, D + 5), (W + 3, D + 5), (W + 3, -D - 9), (-W - 3, -D - 9))]
+    return m, dict(W=W + 3, D=2 * D + 8, lights=[], moss=0.0, stall=True, body=body, roof=roof)
 
 
 # ------------------------------------------------------------------ the west wall and the guide stones (stage 3c)
@@ -565,9 +605,19 @@ TYPES = {
     "leitstein_wach": lambda r: leitstein(r, "wach"),
     "leitstein_tot": lambda r: leitstein(r, "tot"),
 }
-for _v in range(3):  # three stalls (cloth and goods), each from the front, the back and the side (the other side is the mirror)
-    for _o, _yaw in (("vorn", 0.0), ("hinten", math.pi), ("seite", -math.pi / 2)):
-        TYPES["stand_%d_%s" % (_v, _o)] = (lambda v, yaw: (lambda r: stand(r, v, yaw)))(_v, _yaw)
+def ring_facings():
+    """One stall per angle of hallgrat.json `forum_market`, each turned so its counter looks straight at the Wächterin in the middle of the
+    ring (the ground is squashed by SINP, so the model yaw is taken from the squashed direction)."""
+    town = json.loads((DATA.parent / "hallgrat.json").read_text(encoding="utf-8"))
+    out = []
+    for deg in town.get("forum_market", {}).get("angles", []):
+        a = math.radians(deg)
+        out.append(math.atan2(-math.cos(a), -math.sin(a) / h.SINP))
+    return out
+
+
+for _i, _yaw in enumerate(ring_facings()):  # stand_ring_<i>: three kinds of cloth and goods in turn
+    TYPES["stand_ring_%d" % _i] = (lambda v, yaw: (lambda r: stand(r, v, yaw)))(_i % 3, _yaw)
 
 
 DOORS = {"haus_a": 6.0, "haus_b": -10.0, "verlassen_a": 6.0, "verlassen_b": -10.0, "haus_hoch": -14.0, "giebel": -9.0, "laden": 26.0,
@@ -755,8 +805,13 @@ def build(name, seed, view="s"):
         p_.c = p_.c * g
         p_.r = p_.r * g
     W, D = W * g, D * g
+    if "body" in info:  # a turned market stall: its feet are its middle; the polygon for the collision, the box round its roof for the placing
+        k_ = S * g
+        extra = {"poly": [[round(float(q[0]) * k_, 1), round(float(q[2]) * h.SINP * k_, 1)] for q in info["body"]],
+                 "box": [round(float(min(q[0] for q in info["roof"])) * k_, 1), round(float(min(q[2] for q in info["roof"])) * h.SINP * k_, 1),
+                         round(float(max(q[0] for q in info["roof"])) * k_, 1), round(float(max(q[2] for q in info["roof"])) * h.SINP * k_, 1)]}
     raw = to_array(hut_lib.render(m, CANVAS[0], CANVAS[1], CANVAS[2]))
-    cover = mask_of(raw, (ROOF, BARK_D) if not info.get("stall") else (BANNER, LINEN, WINE, OCHRE, PLUM))
+    cover = mask_of(raw, (ROOF, BARK_D, BANNER, CREAM) if not info.get("stall") else (BANNER, LINEN, WINE, OCHRE, PLUM))
     arr = hut_lib.roof_pass(raw, seed, moss=info["moss"], shadow=6)
     arr = eave_shadow(arr, cover, reach=8 if not info.get("stall") else 6)
     arr = wall_pass(arr, seed)
@@ -783,6 +838,11 @@ def main():
     hut_lib.ROOF_TONES = SLATE
     OUT.mkdir(parents=True, exist_ok=True)
     data = {"about": "Written by tools/art_hallgrat_houses.py: per picture its size, feet (middle of the front edge on the ground, px in the picture), foot (footprint w x d in px) and the window lights (px in the picture).", "types": {}}
+    if DATA.exists():  # the street furniture of tools/art_hallgrat_deco.py lives in the same table: keep it
+        old = json.loads(DATA.read_text(encoding="utf-8"))  # and the walls of tools/art_hallgrat_walls.py
+        data["types"].update({k: v for k, v in old.get("types", {}).items() if k.startswith(("deko_", "wand_"))})
+        if "wall_pieces" in old:
+            data["wall_pieces"] = old["wall_pieces"]
     shown = []
     for i, name in enumerate(TYPES):
         views = ("s",) if name.startswith(("stand_", "mauer", "leitstein")) else ("s", "n", "e") + (("se", "ne") if name in DIAG_TYPES else ())

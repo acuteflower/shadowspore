@@ -6,6 +6,7 @@ extends Node
 ## synced across multiplayer peers via `MultiplayerSynchronizer`, and composited cleanly in `hit_flash.gdshader`.
 
 signal changed
+signal unlocked(kind: String, id: String)
 
 const TABLE_NAME: String = "hero_cosmetics"
 const OUTFITS_ROOT: String = "res://assets/characters/outfits/"
@@ -16,6 +17,13 @@ const HAIR_ROOT: String = "res://assets/characters/hair/"
 @export var hair_id: String = "default":
 	set = set_hair
 
+var unlocked_hair_styles: Array[String] = []
+var unlocked_hair_colors: Array[String] = []
+var unlocked_outfits: Array[String] = []
+var unlocked_outfit_colors: Array[String] = []
+
+var _preview_outfit: String = ""
+var _preview_hair: String = ""
 var _sprite: Sprite2D = null
 var _tex_cache: Dictionary = {} ## String resource path -> Texture2D or false sentinel
 
@@ -37,6 +45,33 @@ func bind_sprite(sprite: Sprite2D) -> void:
 	_sprite = sprite
 	if _sprite != null and not _sprite.texture_changed.is_connected(_sync_material):
 		_sprite.texture_changed.connect(_sync_material)
+	_sync_material()
+
+
+func effective_outfit_id() -> String:
+	return _preview_outfit if _preview_outfit != "" else outfit_id
+
+
+func effective_hair_id() -> String:
+	return _preview_hair if _preview_hair != "" else hair_id
+
+
+## Local-only salon mirror preview (does not touch replicated `outfit_id` / `hair_id` until confirmed).
+func set_preview(preview_outfit: String = "", preview_hair: String = "") -> void:
+	var next_outfit: String = preview_outfit if (preview_outfit != "" and is_valid_outfit(preview_outfit)) else ""
+	var next_hair: String = preview_hair if (preview_hair != "" and is_valid_hair(preview_hair)) else ""
+	if _preview_outfit == next_outfit and _preview_hair == next_hair:
+		return
+	_preview_outfit = next_outfit
+	_preview_hair = next_hair
+	_sync_material()
+
+
+func clear_preview() -> void:
+	if _preview_outfit == "" and _preview_hair == "":
+		return
+	_preview_outfit = ""
+	_preview_hair = ""
 	_sync_material()
 
 
@@ -86,6 +121,40 @@ func request_hair(id: String) -> void:
 		_rpc_set_hair.rpc_id(1, id)
 
 
+## Host-authoritative unlock for world-discovered hairstyles, dyes, and outfits.
+func unlock_cosmetic(kind: String, id: String) -> bool:
+	if not _is_unlockable(kind, id):
+		return false
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		return false
+	if _has_unlock(kind, id):
+		return false
+	if multiplayer.multiplayer_peer == null:
+		return _apply_unlock(kind, id)
+	_rpc_apply_unlock.rpc(kind, id)
+	return true
+
+
+func unlock_hair_style(style_id: String) -> bool:
+	return unlock_cosmetic("hair_style", style_id)
+
+
+func unlock_hair_color(color_id: String) -> bool:
+	return unlock_cosmetic("hair_color", color_id)
+
+
+func unlock_outfit(id: String) -> bool:
+	return unlock_cosmetic("outfit", id)
+
+
+func unlock_outfit_style(style_id: String) -> bool:
+	return unlock_cosmetic("outfit", style_id)
+
+
+func unlock_outfit_color(color_id: String) -> bool:
+	return unlock_cosmetic("outfit_color", color_id)
+
+
 @rpc("any_peer", "call_local", "reliable")
 func _rpc_set_outfit(id: String) -> void:
 	if not multiplayer.is_server():
@@ -120,6 +189,11 @@ func _rpc_apply_hair(id: String) -> void:
 	set_hair(id)
 
 
+@rpc("authority", "call_local", "reliable")
+func _rpc_apply_unlock(kind: String, id: String) -> void:
+	_apply_unlock(kind, id)
+
+
 func default_outfit_id() -> String:
 	var tbl: Dictionary = DataRegistry.table(TABLE_NAME)
 	return String(tbl.get("default_outfit", "default"))
@@ -146,30 +220,162 @@ func hair_ids() -> PackedStringArray:
 	return out
 
 
+func salon_hair_styles() -> PackedStringArray:
+	return _salon_table_ids(_hair_styles_table(), is_hair_style_unlocked, true)
+
+
+func salon_hair_colors() -> PackedStringArray:
+	return _salon_table_ids(_hair_colors_table(), is_hair_color_unlocked, true)
+
+
+func salon_outfit_styles() -> PackedStringArray:
+	return _salon_table_ids(_outfit_styles_table(), is_outfit_unlocked, true)
+
+
+func salon_outfit_colors() -> PackedStringArray:
+	return _salon_table_ids(_outfit_colors_table(), is_outfit_color_unlocked, true)
+
+
+func salon_outfits() -> PackedStringArray:
+	var via_styles: PackedStringArray = salon_outfit_styles()
+	if not via_styles.is_empty():
+		return via_styles
+	return _salon_table_ids(_outfits_table(), is_outfit_unlocked, false)
+
+
+func is_hair_style_unlocked(style_id: String) -> bool:
+	return _entry_unlocked(_hair_styles_table(), unlocked_hair_styles, style_id)
+
+
+func is_hair_color_unlocked(color_id: String) -> bool:
+	return _entry_unlocked(_hair_colors_table(), unlocked_hair_colors, color_id)
+
+
+func is_outfit_unlocked(id: String) -> bool:
+	var styles: Dictionary = _outfit_styles_table()
+	if styles.has(id):
+		return _entry_unlocked(styles, unlocked_outfits, id)
+	return _entry_unlocked(_outfits_table(), unlocked_outfits, id)
+
+
+func is_outfit_color_unlocked(color_id: String) -> bool:
+	return _entry_unlocked(_outfit_colors_table(), unlocked_outfit_colors, color_id)
+
+
 func is_valid_outfit(id: String) -> bool:
 	var outfits: Dictionary = _outfits_table()
-	return outfits.is_empty() and id == "default" or outfits.has(id)
+	var styles: Dictionary = _outfit_styles_table()
+	var colors: Dictionary = _outfit_colors_table()
+	if outfits.has(id) or styles.has(id) or colors.has(id):
+		return true
+	if id.contains(":"):
+		var parts: PackedStringArray = id.split(":", false)
+		return parts.size() == 2 and styles.has(parts[0]) and colors.has(parts[1])
+	return outfits.is_empty() and styles.is_empty() and id == "default"
 
 
 func is_valid_hair(id: String) -> bool:
 	var hairs: Dictionary = _hairs_table()
-	return hairs.is_empty() and id == "default" or hairs.has(id)
+	var styles: Dictionary = _hair_styles_table()
+	var colors: Dictionary = _hair_colors_table()
+	if hairs.has(id) or styles.has(id) or colors.has(id):
+		return true
+	if id.contains(":"):
+		var parts: PackedStringArray = id.split(":", false)
+		return parts.size() == 2 and styles.has(parts[0]) and colors.has(parts[1])
+	return hairs.is_empty() and id == "default"
+
+
+func parse_outfit_id(id: String = "") -> Dictionary:
+	var key: String = id if id != "" else effective_outfit_id()
+	return _parse_layered_id(key, _outfit_styles_table(), _outfit_colors_table())
+
+
+func compose_outfit_id(style_id: String, color_id: String) -> String:
+	return _compose_layered_id(style_id, color_id, _outfit_styles_table(), _outfit_colors_table())
+
+
+func parse_hair_id(id: String = "") -> Dictionary:
+	var key: String = id if id != "" else effective_hair_id()
+	return _parse_layered_id(key, _hair_styles_table(), _hair_colors_table())
+
+
+func compose_hair_id(style_id: String, color_id: String) -> String:
+	return _compose_layered_id(style_id, color_id, _hair_styles_table(), _hair_colors_table())
+
+
+func outfit_style_entry(style_id: String = "") -> Dictionary:
+	var key: String = style_id if style_id != "" else String(parse_outfit_id().get("style", "default"))
+	var styles: Dictionary = _outfit_styles_table()
+	if styles.has(key):
+		return styles[key] as Dictionary
+	var outfits: Dictionary = _outfits_table()
+	if outfits.has(key):
+		return outfits[key] as Dictionary
+	return {"name": "Reisegewand", "folder": "default", "arm_style": "default", "starter": true, "info": ""}
+
+
+func outfit_color_entry(color_id: String = "") -> Dictionary:
+	var key: String = color_id if color_id != "" else String(parse_outfit_id().get("color", "default"))
+	var colors: Dictionary = _outfit_colors_table()
+	if colors.has(key):
+		return colors[key] as Dictionary
+	return {"name": "Original", "tint": "#ffffff", "arm_tint": "#ffffff", "swatch": ["#281d3d", "#4a3870", "#7c64a8", "#f0c878"], "starter": true, "info": ""}
 
 
 func outfit_entry(id: String = "") -> Dictionary:
-	var key: String = id if id != "" else outfit_id
+	var key: String = id if id != "" else effective_outfit_id()
 	var outfits: Dictionary = _outfits_table()
+	if key == "none" and outfits.has("none"):
+		return outfits["none"] as Dictionary
+	var styles: Dictionary = _outfit_styles_table()
+	var colors: Dictionary = _outfit_colors_table()
+	if key.contains(":") or styles.has(key) or colors.has(key):
+		var parts: Dictionary = parse_outfit_id(key)
+		var style_cfg: Dictionary = outfit_style_entry(String(parts.get("style", "default")))
+		var color_cfg: Dictionary = outfit_color_entry(String(parts.get("color", "default")))
+		return {
+			"name": String(style_cfg.get("name", "Reisegewand")),
+			"folder": String(style_cfg.get("folder", "default")),
+			"tint": String(color_cfg.get("tint", "#ffffff")),
+			"arm_style": String(style_cfg.get("arm_style", "default")),
+			"arm_tint": String(color_cfg.get("arm_tint", color_cfg.get("tint", "#ffffff"))),
+			"info": String(style_cfg.get("info", "")),
+		}
 	if outfits.has(key):
 		return outfits[key] as Dictionary
 	return {"name": "Reisegewand", "folder": "default", "tint": "#ffffff", "arm_style": "default", "arm_tint": "#ffffff"}
 
 
+func hair_style_entry(style_id: String = "") -> Dictionary:
+	var key: String = style_id if style_id != "" else String(parse_hair_id().get("style", "default"))
+	var styles: Dictionary = _hair_styles_table()
+	if styles.has(key):
+		return styles[key] as Dictionary
+	return {"name": "Silberwellen", "folder": "default", "starter": true, "info": ""}
+
+
+func hair_color_entry(color_id: String = "") -> Dictionary:
+	var key: String = color_id if color_id != "" else String(parse_hair_id().get("color", "default"))
+	var colors: Dictionary = _hair_colors_table()
+	if colors.has(key):
+		return colors[key] as Dictionary
+	return {"name": "Silberflieder", "tint": "#ffffff", "swatch": ["#3e3152", "#8e79a8", "#d6cbe6", "#f4f0ff"], "starter": true, "info": ""}
+
+
 func hair_entry(id: String = "") -> Dictionary:
-	var key: String = id if id != "" else hair_id
+	var key: String = id if id != "" else effective_hair_id()
 	var hairs: Dictionary = _hairs_table()
 	if hairs.has(key):
 		return hairs[key] as Dictionary
-	return {"name": "Silberflieder", "folder": "default", "tint": "#ffffff"}
+	var parts: Dictionary = parse_hair_id(key)
+	var style_cfg: Dictionary = hair_style_entry(String(parts.get("style", "default")))
+	var color_cfg: Dictionary = hair_color_entry(String(parts.get("color", "default")))
+	return {
+		"name": String(color_cfg.get("name", style_cfg.get("name", "Silberflieder"))),
+		"folder": String(style_cfg.get("folder", "default")),
+		"tint": String(color_cfg.get("tint", "#ffffff")),
+	}
 
 
 func arm_style() -> String:
@@ -182,27 +388,161 @@ func arm_tint() -> Color:
 
 ## Stable numeric key for `AttackComponent._arm_pose_key()` so changing outfit triggers an immediate arm redraw.
 func arm_pose_token() -> float:
-	return float((outfit_id.hash() & 0xFFFF))
+	return float((effective_outfit_id().hash() & 0xFFFF))
 
 
 func export_data() -> Dictionary:
 	return {
 		"outfit": outfit_id,
 		"hair": hair_id,
+		"unlocked_hair_styles": unlocked_hair_styles.duplicate(),
+		"unlocked_hair_colors": unlocked_hair_colors.duplicate(),
+		"unlocked_outfits": unlocked_outfits.duplicate(),
+		"unlocked_outfit_colors": unlocked_outfit_colors.duplicate(),
 	}
 
 
 func import_data(data: Dictionary) -> void:
+	unlocked_hair_styles.clear()
+	for item: Variant in data.get("unlocked_hair_styles", []) as Array:
+		var s: String = String(item)
+		if _hair_styles_table().has(s) and not unlocked_hair_styles.has(s):
+			unlocked_hair_styles.append(s)
+	unlocked_hair_colors.clear()
+	for item: Variant in data.get("unlocked_hair_colors", []) as Array:
+		var c: String = String(item)
+		if _hair_colors_table().has(c) and not unlocked_hair_colors.has(c):
+			unlocked_hair_colors.append(c)
+	unlocked_outfits.clear()
+	for item: Variant in data.get("unlocked_outfits", []) as Array:
+		var o: String = String(item)
+		if (_outfits_table().has(o) or _outfit_styles_table().has(o)) and not unlocked_outfits.has(o):
+			unlocked_outfits.append(o)
+	unlocked_outfit_colors.clear()
+	for item: Variant in data.get("unlocked_outfit_colors", []) as Array:
+		var oc: String = String(item)
+		if _outfit_colors_table().has(oc) and not unlocked_outfit_colors.has(oc):
+			unlocked_outfit_colors.append(oc)
 	set_outfit(String(data.get("outfit", default_outfit_id())))
 	set_hair(String(data.get("hair", default_hair_id())))
+
+
+func _is_unlockable(kind: String, id: String) -> bool:
+	match kind:
+		"hair_style":
+			return _hair_styles_table().has(id)
+		"hair_color":
+			return _hair_colors_table().has(id)
+		"outfit":
+			return _outfits_table().has(id) or _outfit_styles_table().has(id)
+		"outfit_color":
+			return _outfit_colors_table().has(id)
+	return false
+
+
+func _has_unlock(kind: String, id: String) -> bool:
+	match kind:
+		"hair_style":
+			return is_hair_style_unlocked(id)
+		"hair_color":
+			return is_hair_color_unlocked(id)
+		"outfit":
+			return is_outfit_unlocked(id)
+		"outfit_color":
+			return is_outfit_color_unlocked(id)
+	return true
+
+
+func _apply_unlock(kind: String, id: String) -> bool:
+	match kind:
+		"hair_style":
+			if not _hair_styles_table().has(id) or unlocked_hair_styles.has(id):
+				return false
+			unlocked_hair_styles.append(id)
+		"hair_color":
+			if not _hair_colors_table().has(id) or unlocked_hair_colors.has(id):
+				return false
+			unlocked_hair_colors.append(id)
+		"outfit":
+			if (not _outfits_table().has(id) and not _outfit_styles_table().has(id)) or unlocked_outfits.has(id):
+				return false
+			unlocked_outfits.append(id)
+		"outfit_color":
+			if not _outfit_colors_table().has(id) or unlocked_outfit_colors.has(id):
+				return false
+			unlocked_outfit_colors.append(id)
+		_:
+			return false
+	unlocked.emit(kind, id)
+	changed.emit()
+	return true
+
+
+func _salon_table_ids(table: Dictionary, unlock_fn: Callable, default_salon: bool) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	for k: Variant in table.keys():
+		var id: String = String(k)
+		var cfg: Dictionary = table[k] as Dictionary
+		if bool(cfg.get("salon", default_salon)) and bool(unlock_fn.call(id)):
+			out.append(id)
+	return out
+
+
+func _entry_unlocked(table: Dictionary, unlocked_list: Array[String], id: String) -> bool:
+	if not table.has(id):
+		return false
+	var cfg: Dictionary = table[id] as Dictionary
+	return bool(cfg.get("starter", false)) or unlocked_list.has(id)
+
+
+func _parse_layered_id(key: String, styles: Dictionary, colors: Dictionary) -> Dictionary:
+	if key == "none":
+		return {"style": "none", "color": "default"}
+	if key.contains(":"):
+		var parts: PackedStringArray = key.split(":", false)
+		if parts.size() == 2:
+			var s: String = parts[0] if styles.has(parts[0]) else "default"
+			var c: String = parts[1] if colors.has(parts[1]) else "default"
+			return {"style": s, "color": c}
+	if styles.has(key):
+		return {"style": key, "color": "default"}
+	if colors.has(key):
+		return {"style": "default", "color": key}
+	return {"style": "default", "color": "default"}
+
+
+func _compose_layered_id(style_id: String, color_id: String, styles: Dictionary, colors: Dictionary) -> String:
+	var s: String = style_id if styles.has(style_id) else "default"
+	var c: String = color_id if colors.has(color_id) else "default"
+	if s == "default":
+		return c
+	if c == "default":
+		return s
+	return "%s:%s" % [s, c]
 
 
 func _outfits_table() -> Dictionary:
 	return DataRegistry.table(TABLE_NAME).get("outfits", {}) as Dictionary
 
 
+func _outfit_styles_table() -> Dictionary:
+	return DataRegistry.table(TABLE_NAME).get("outfit_styles", {}) as Dictionary
+
+
+func _outfit_colors_table() -> Dictionary:
+	return DataRegistry.table(TABLE_NAME).get("outfit_colors", {}) as Dictionary
+
+
 func _hairs_table() -> Dictionary:
 	return DataRegistry.table(TABLE_NAME).get("hairs", {}) as Dictionary
+
+
+func _hair_styles_table() -> Dictionary:
+	return DataRegistry.table(TABLE_NAME).get("hair_styles", {}) as Dictionary
+
+
+func _hair_colors_table() -> Dictionary:
+	return DataRegistry.table(TABLE_NAME).get("hair_colors", {}) as Dictionary
 
 
 func _load_cached(path: String) -> Texture2D:

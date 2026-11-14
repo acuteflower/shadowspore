@@ -64,7 +64,8 @@ func _run() -> void:
 	await get_tree().process_frame
 	world.finish_opening()
 	TimeManager.set_time(0.38)
-	WeatherManager.force_weather("clear")
+	if WeatherManager.current != null:
+		WeatherManager.current.force("clear")
 
 	var player: Player = world._players.get_child(0) as Player
 	if player.intro != null:
@@ -187,6 +188,7 @@ func _run() -> void:
 		player.request_teleport(ring.global_position + Vector2(0.0, 18.0))
 		player.health.set_health(player.health.max_health - 15.0)
 		player.stamina._set_current(40.0)
+		player.stamina._delay_left = 5.0
 		var hp_low: float = player.health.current
 		var stam_low: float = player.stamina.current
 		await get_tree().create_timer(1.15).timeout

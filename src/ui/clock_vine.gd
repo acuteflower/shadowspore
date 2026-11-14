@@ -10,6 +10,31 @@ const BASE_Y: float = 14.0
 const SUN: Color = Color("ffd98a")
 const SUN_LIGHT: Color = Color("fff3c4")
 const MOON: Color = Color("dcd3ff")
+const SLEEP_SEPAL_DARK: Color = Color("233b45")
+const SLEEP_SEPAL: Color = Color("3b616b")
+const SLEEP_BUD_DARK: Color = Color("463980")
+const SLEEP_BUD_MID: Color = Color("6d5eb5")
+const SLEEP_BUD_LIGHT: Color = Color("aba0eb")
+const SLEEP_PETAL_SHADE: Color = Color("c79846")
+const SLEEP_PETAL_GOLD: Color = Color("e0b864")
+const SLEEP_PETAL_CREAM: Color = Color("f7e4b2")
+const SLEEP_PETAL_LIGHT: Color = Color("fff7df")
+const SLEEP_CORE_WARM: Color = Color("e6b95c")
+const SLEEP_CORE_HOT: Color = Color("fffbe8")
+const SLEEP_BUD_CLOSED: Array[String] = [
+	"..L..",
+	".LMD.",
+	".sMd.",
+	".sdd.",
+	"..d..",
+]
+const SLEEP_BUD_OPEN: Array[String] = [
+	"LL.LM",
+	"LMgMD",
+	".gCg.",
+	"LMgDD",
+	"MD.DS",
+]
 const HANG_X: float = 28.0
 const CLOCK_POS: Vector2 = Vector2(56, 27)
 
@@ -53,7 +78,7 @@ func _phase_word(t: float) -> String:
 		return "NACHT"
 	if t < 0.28:
 		return "MORGEN"
-	if t < 0.72:
+	if t < 0.78:
 		return "TAG"
 	return "ABEND"
 
@@ -62,6 +87,8 @@ func _draw() -> void:
 	var now: float = TimeManager.time_of_day
 	var night: float = TimeManager.night_amount()
 	var tone: Color = SUN.lerp(VineStyle.VOID_GLOW, night)
+	var bud_x: float = clampf(roundf(TimeManager.sleep_unlock_time() * WIDTH), 6.0, WIDTH - 4.0)
+	var can_sleep: bool = TimeManager.can_sleep_now()
 
 	for xi: int in int(WIDTH) + 1: ## the vine: lit where the day has been, black where the void lies
 		var u: float = xi / WIDTH
@@ -86,10 +113,14 @@ func _draw() -> void:
 			continue
 		var n: float = TimeManager.night_at(x / WIDTH)
 		var up: int = -1 if k % 2 == 0 else 1
+		if up == -1 and absf(x - bud_x) < 6.0:
+			continue
 		VineStyle.leaf(self, Vector2(x, roundf(arc_y(x))) + Vector2(0, up * 2), 1, up, 3, VineStyle.LEAF.lerp(VineStyle.LEAF_VOID, n), VineStyle.LEAF_LIGHT.lerp(VineStyle.LEAF_VOID_LIGHT, n))
 
 	for hour: float in [0.25, 0.5, 0.75]: ## buds at 06:00, noon and 18:00
 		var x: float = hour * WIDTH
+		if absf(x - bud_x) < 5.0:
+			continue
 		var y: float = roundf(arc_y(x)) - 3.0
 		var reached: bool = now >= hour
 		draw_rect(Rect2(x, y, 1, 1), VineStyle.PETAL if reached else VineStyle.BARK_LIGHT)
@@ -102,8 +133,58 @@ func _draw() -> void:
 		if n > 0.8:
 			VineStyle.tendril(self, Vector2(x, arc_y(x)), Vector2(0.3 * (k % 2 * 2 - 1), 0.9 if k % 2 == 0 else -0.9).normalized(), 4 + k % 3 * 2, _time, k)
 
+	if not can_sleep:
+		_draw_sleep_bud(bud_x, false)
 	_draw_bead(now, night)
+	if can_sleep:
+		_draw_sleep_bud(bud_x, true)
 	_draw_text(now, night, tone)
+
+
+## Schlaf-Knospe: closed cool-indigo moonflower bud until tired enough, blooming into a warm 4-petal moonflower when sleep unlocks.
+func _draw_sleep_bud(bud_x: float, open: bool) -> void:
+	var cx: int = int(bud_x)
+	var cy: int = int(roundf(arc_y(bud_x))) - 3
+	var pulse: float = 0.5 + 0.5 * sin(_time * 2.6)
+	if open:
+		VineStyle.glow(self, Vector2(float(cx), float(cy)), 8.0, SUN, 0.55 + 0.3 * pulse)
+	var rows: Array[String] = SLEEP_BUD_OPEN if open else SLEEP_BUD_CLOSED
+	var row_offset: int = -2 if open else -3
+	for pass_i: int in 2:
+		for row: int in rows.size():
+			var line: String = rows[row]
+			for col: int in line.length():
+				var ch: String = line[col]
+				if ch == ".":
+					continue
+				var px: int = cx + col - 2
+				var py: int = cy + row + row_offset
+				if pass_i == 0:
+					for d: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+						draw_rect(Rect2(float(px + d.x), float(py + d.y), 1.0, 1.0), VineStyle.OUTLINE)
+				else:
+					draw_rect(Rect2(float(px), float(py), 1.0, 1.0), _sleep_bud_pixel(ch, open, pulse))
+
+
+func _sleep_bud_pixel(ch: String, open: bool, pulse: float) -> Color:
+	match ch:
+		"s":
+			return SLEEP_SEPAL
+		"d":
+			return SLEEP_SEPAL_DARK
+		"L":
+			return SLEEP_PETAL_LIGHT if open else SLEEP_BUD_LIGHT
+		"M":
+			return SLEEP_PETAL_CREAM if open else SLEEP_BUD_MID
+		"D":
+			return SLEEP_PETAL_GOLD if open else SLEEP_BUD_DARK
+		"S":
+			return SLEEP_PETAL_SHADE
+		"g":
+			return SLEEP_CORE_WARM.lerp(SUN_LIGHT, pulse)
+		"C":
+			return SUN.lerp(SLEEP_CORE_HOT, 0.4 + 0.6 * pulse)
+	return VineStyle.PETAL
 
 
 func _draw_bead(now: float, night: float) -> void:

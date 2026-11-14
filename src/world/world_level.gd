@@ -12,12 +12,15 @@ const CHUNK: int = 32 ## tiles per chunk side
 const STREAM_BUDGET_USEC: int = 2000 ## cooperative CPU preparation per frame
 const STREAM_URGENT_USEC: int = 5000 ## ... while the chunk being built touches a player's own ring (it may come into view soon)
 const STREAM_OWN_CHUNK_USEC: int = 4000 ## cooperative CPU preparation when the player stands in the building chunk
+const LOAD_INIT_BUDGET_USEC: int = 5500 ## cooperative initialization budget during LoadingScreen
+const LOAD_STREAM_BUDGET_USEC: int = 6500 ## chunk preparation/commit budget while LoadingScreen is active
 const MAX_UNLOADS_PER_FRAME: int = 1 ## unloads are queued to avoid frame spikes from clearing multiple chunks at once
 const LOOKAHEAD_SECONDS: float = 2.5 ## the ring round where a moving player will be this soon is loaded too (ahead of the camera)
 const LOOKAHEAD_MAX_SPEED: float = 420.0 ## px/s; faster jumps are teleports, not running
 const DETAIL_BUCKET: float = 64.0
 const GEN_PHASES: int = 5 ## phases 0-4 only read static inputs and build detached nodes: they run as one job on a worker thread
 const PREFETCH: int = 4 ## chunks whose worker job is started ahead (nearest first)
+const LOAD_PREFETCH: int = 9 ## warm up the full 3x3 start ring on workers during loading screen
 const LOAD_RADIUS: int = 1 ## chunks around every player that are kept painted
 const UNLOAD_RADIUS: int = 2 ## farther chunks are dropped (the gap stops flicker at the border)
 const BORDER_WARP: float = 5.0 ## tiles; jitter that roughens the 4-tile lookup grid of the map
@@ -81,15 +84,40 @@ var desert_guardians: DesertGuardians ## host: spawns 24/7 QuartzGolem guardians
 var meadow_landmarks: MeadowLandmarks ## SolitaryTree hilltop oaks, ForestShrines & SunbeamShafts across the 3 meadow macro-landscapes
 var meadow_pois: MeadowPois ## Red Order monuments, OldWatermills, BrokenStoneBridges & FisherPiers across the meadow biome
 var meadow_wonders: MeadowWonders ## Die 3 einmaligen Weltwunder: BellPond, SleepingGuardians & FlowerAmphitheater
+var night_wonders: NightWonders ## Nacht-exklusive Wunder im Wiesenbiom: Sternschnuppen & Weißer Kronenhirsch
+static var _cached_sdf: PackedByteArray = PackedByteArray()
+static var _cached_outer_sdf: PackedByteArray = PackedByteArray()
+static var _cached_stone_cells: Dictionary = {}
+
 var _moss_carpet_tex: Texture2D
 var _pasture_paving_tex: Texture2D
 var knight_taken: bool = false ## Valdric is a settler (`take_knight`): the story actor stays hidden
 var torben_taken: bool = false ## Torben is a settler (`take_torben`): the story actor stays hidden
 var _town_node: TownManager ## the player's town (docs/town.md): what it has cleared stays cleared
 var _tiles: Dictionary
-var loading_in_steps: bool = false ## launcher pumps the existing cooperative stream while gameplay is paused
 var _vista_focus_cell: Vector2i = Vector2i(-999, -999) ## local panoramic VistaPoint centre chunk (-999 = inactive)
 var _vista_focus_radius: int = 0
+var _init_stage: int = -1
+var _bed_ready: Dictionary = {} ## host: peer_id -> true while waiting in bed for co-op sleep
+var _bed_waiting_peers: Dictionary = {} ## synced copy of waiting peer ids
+var _sleeping_now: bool = false
+var _init_job: Jobs.Job = null
+var _init_worker_done: bool = false
+var _init_scenes: Array[String] = []
+var _init_scene_index: int = 0
+var _init_interiors: Interiors = null
+var _init_interiors_done: bool = false
+var _init_decals: Array = []
+var _init_decal_index: int = -1
+var _init_decal_sub: int = 0
+var _init_clear: Dictionary = {}
+var _init_arenas: Array = []
+var _init_arena_index: int = 0
+var _init_stage4_sub: int = 0
+var _warm_stage: int = 0
+var _warm_paths: Array[String] = []
+var _warm_index: int = 0
+var _teardown_started: bool = false
 
 
 func set_vista_focus(world_pos: Vector2, chunk_radius: int = 2) -> void:
@@ -169,12 +197,16 @@ func _fill_ground() -> void:
 	_zone = _noise(11, 0.035, 2)
 	_warp_x = _noise(21, 1.0 / 14.0, 1)
 	_warp_y = _noise(22, 1.0 / 14.0, 1)
-	var image: Image = SDF_TEXTURE.get_image()
-	image.convert(Image.FORMAT_L8)
-	_sdf = image.get_data()
-	var outer_image: Image = OUTER_SDF.get_image()
-	outer_image.convert(Image.FORMAT_L8)
-	_outer_sdf = outer_image.get_data()
+	if _cached_sdf.is_empty():
+		var image: Image = SDF_TEXTURE.get_image()
+		image.convert(Image.FORMAT_L8)
+		_cached_sdf = image.get_data()
+	_sdf = _cached_sdf
+	if _cached_outer_sdf.is_empty():
+		var outer_image: Image = OUTER_SDF.get_image()
+		outer_image.convert(Image.FORMAT_L8)
+		_cached_outer_sdf = outer_image.get_data()
+	_outer_sdf = _cached_outer_sdf
 	var interiors: Interiors = Interiors.new() ## the pocket spaces behind the doors (huts, houses)
 	add_child(interiors)
 	var mines: MineManager = MineManager.new() ## the mine: fixed levels far outside the world (docs/mine.md)
@@ -235,6 +267,7 @@ func _fill_ground() -> void:
 		_pasture_paving_tex = load("res://assets/props/pasture_paving.png") as Texture2D
 	_generator.blocked_cells = _add_ground_decals()
 	_generator.extra_props = _extra_props()
+	_generator.extra_props.append_array(hallgrat.extra_props()) ## Hallgrat's trees, bushes and flowers (set up by _add_ground_decals)
 	_rivers = WorldRivers.new()
 	_rivers.name = "Rivers"
 	add_child(_rivers)
@@ -271,6 +304,26 @@ func _fill_ground() -> void:
 	var mw_blocked: Dictionary = meadow_wonders.setup(self)
 	_generator.blocked_cells.merge(mw_blocked)
 	add_child(meadow_wonders)
+	night_wonders = NightWonders.new()
+	night_wonders.name = "NightWonders"
+	night_wonders.setup(self)
+	add_child(night_wonders)
+	var chests_table: Dictionary = DataRegistry.table("loot_chests")
+	var placed_chests: Array = chests_table.get("placed", []) as Array
+	for chest_entry_v: Variant in placed_chests:
+		if not (chest_entry_v is Dictionary):
+			continue
+		var chest_entry: Dictionary = chest_entry_v as Dictionary
+		var tile_v: Variant = chest_entry.get("tile", [])
+		if not (tile_v is Array):
+			continue
+		var tile_arr: Array = tile_v as Array
+		if tile_arr.size() < 2:
+			continue
+		var c_tile: Vector2i = Vector2i(int(tile_arr[0]), int(tile_arr[1]))
+		for dy: int in range(-2, 3):
+			for dx: int in range(-2, 3):
+				_generator.blocked_cells[c_tile + Vector2i(dx, dy)] = true
 	_generator.tree_free_cells = _stone_cells
 	_generator.berry_free_cells = _berry_free
 	var scenes: Array[String] = []
@@ -308,6 +361,9 @@ func _fill_ground() -> void:
 		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_thing_snapshot.rpc_id(id, _thing_states))
 		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_harvest_snapshot.rpc_id(id, _harvest_states))
 		TimeManager.day_started.connect(_grow_things)
+		TimeManager.day_started.connect(_on_day_started_sleep)
+		multiplayer.peer_disconnected.connect(_on_peer_disconnected_sleep)
+		multiplayer.peer_connected.connect(_on_peer_connected_sleep)
 		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_editor_snapshot.rpc_id(id, edits.data()))
 
 
@@ -316,16 +372,43 @@ func _fill_ground() -> void:
 func _add_ground_decals() -> Dictionary:
 	var baked: Dictionary = DataRegistry.table("ground_baked")
 	var decals: Array = baked.get("decals", []) as Array
+	var compute_stones: bool = _cached_stone_cells.is_empty()
+	if not compute_stones:
+		_stone_cells = _cached_stone_cells.duplicate()
 	for i: int in range(decals.size() - 1, -1, -1): ## the footpath first, the stones lie over its start
-		var spec: Dictionary = decals[i] as Dictionary
-		var decal: GroundDecal = GroundDecal.new()
-		decal.setup(String(spec.texture), String(spec.mask), Vector2(float(spec.x), float(spec.y)), String(spec.get("glow", "")))
-		add_child(decal)
-		var size: Vector2 = decal.texture.get_size()
-		for ty: int in range(int(spec.y) / 16, int((float(spec.y) + size.y) / 16.0) + 1):
-			for tx: int in range(int(spec.x) / 16, int((float(spec.x) + size.x) / 16.0) + 1):
-				if decal.surface_at(Vector2(tx, ty) * 16.0 + Vector2(8, 8)) == "stone":
-					_stone_cells[Vector2i(tx, ty)] = true
+		_add_single_decal(decals[i] as Dictionary, compute_stones)
+	if compute_stones:
+		_cached_stone_cells = _stone_cells.duplicate()
+	var clear: Dictionary = {}
+	_add_world_structures(baked, clear)
+	_add_arenas(clear)
+	_finish_clear_paths(baked, clear)
+	return clear
+
+
+func _add_single_decal(spec: Dictionary, compute_stones: bool) -> void:
+	var decal: GroundDecal = GroundDecal.new()
+	decal.setup(String(spec.texture), String(spec.mask), Vector2(float(spec.x), float(spec.y)), String(spec.get("glow", "")))
+	add_child(decal)
+	if not compute_stones:
+		return
+	var size: Vector2 = decal.texture.get_size()
+	for ty: int in range(int(spec.y) / 16, int((float(spec.y) + size.y) / 16.0) + 1):
+		for tx: int in range(int(spec.x) / 16, int((float(spec.x) + size.x) / 16.0) + 1):
+			if decal.surface_at(Vector2(tx, ty) * 16.0 + Vector2(8, 8)) == "stone":
+				_stone_cells[Vector2i(tx, ty)] = true
+
+
+func _add_world_structures(baked: Dictionary, clear: Dictionary) -> void:
+	_add_structures_barriers_and_signs(baked, clear)
+	_add_structures_hallgrat(baked, clear)
+	_add_structures_witch_and_towers(clear)
+	_add_structures_statues_and_vistas(clear)
+	_add_structures_huts(clear)
+	_add_structures_sites(clear)
+
+
+func _add_structures_barriers_and_signs(baked: Dictionary, clear: Dictionary) -> void:
 	for barrier: Dictionary in baked.get("barriers", []) as Array:
 		var body: StaticBody2D = StaticBody2D.new()
 		body.name = "Barrier_" + String(barrier.id)
@@ -341,7 +424,6 @@ func _add_ground_decals() -> Dictionary:
 	for run: Array in baked.get("berry_free", []) as Array:
 		for tx: int in range(int(run[0]), int(run[2]) + 1):
 			_berry_free[Vector2i(tx, int(run[1]))] = true
-	var clear: Dictionary = {}
 	var knight: Dictionary = DataRegistry.get_entry("ground", "fallen_knight")
 	var tile: Array = knight.get("tile", [501,685])
 	_clear_around(clear, Vector2(float(tile[0]), float(tile[1])) * 16 + Vector2(8,8), int(knight.get("clear_radius", 4)))
@@ -357,6 +439,9 @@ func _add_ground_decals() -> Dictionary:
 		post.flag = String(sign_spec.get("flag", ""))
 		add_child(post)
 		_clear_around(clear, post.position, int(sign_spec.get("clear_radius", 3)))
+
+
+func _add_structures_hallgrat(baked: Dictionary, clear: Dictionary) -> void:
 	hallgrat = Hallgrat.new()
 	for spot: Vector2 in hallgrat.setup():
 		_clear_around(clear, spot, 2) ## no bush or tree on a milestone
@@ -366,6 +451,9 @@ func _add_ground_decals() -> Dictionary:
 		for tx: int in range(int(run[1]), int(run[2]) + 1):
 			clear[Vector2i(tx, int(run[0]))] = true
 	add_child(hallgrat)
+
+
+func _add_structures_witch_and_towers(clear: Dictionary) -> void:
 	var crow_site: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/crow_tree_site.json")) as Dictionary
 	var crow_tree: CrowTree = CrowTree.new()
 	crow_tree.name = "CrowTree"
@@ -382,6 +470,9 @@ func _add_ground_decals() -> Dictionary:
 		tower.position = Vector2(float(ttile[0]), float(ttile[1])) * 16.0 + Vector2(8, 8)
 		add_child(tower)
 		_clear_around(clear, tower.position + Vector2(0, -16), 9) ## the body and the yard stay free of generated plants
+
+
+func _add_structures_statues_and_vistas(clear: Dictionary) -> void:
 	for stone_spec: Dictionary in DataRegistry.table("waystones").get("statues", []) as Array: ## the waystones, goddess statues on their plinths (WaystoneStatue)
 		var statue: WaystoneStatue = WaystoneStatue.new()
 		var wtile: Array = stone_spec.tile as Array
@@ -407,6 +498,9 @@ func _add_ground_decals() -> Dictionary:
 		vista.position = Vector2(float(vtile[0]), float(vtile[1])) * 16.0 + Vector2(8, 8)
 		add_child(vista)
 		_clear_around(clear, vista.position, int(vista_spec.get("clear_radius", vista_clear)))
+
+
+func _add_structures_huts(clear: Dictionary) -> void:
 	for hut_spec: Dictionary in DataRegistry.table("ground").get("huts", []) as Array: ## buildings with an interior behind their door
 		var hut: Hut = Hut.new()
 		var htile: Array = hut_spec.tile as Array
@@ -429,6 +523,9 @@ func _add_ground_decals() -> Dictionary:
 				var story: LakeWitchStory = LakeWitchStory.new()
 				story.setup(hut, ring)
 				add_child(story)
+
+
+func _add_structures_sites(clear: Dictionary) -> void:
 	for quarry_spec: Dictionary in DataRegistry.table("ground").get("quarries", []) as Array: ## the quarry where the knight is mining
 		var quarry: Quarry = Quarry.new()
 		var qtile: Array = quarry_spec.tile as Array
@@ -460,7 +557,9 @@ func _add_ground_decals() -> Dictionary:
 		add_child(gate)
 		(get_node("Mines") as MineManager).entrance = gate.exit_position
 		_clear_around(clear, gate.position + Vector2(0, -20), int(mine_spec.get("clear_radius", 10)))
-	_add_arenas(clear)
+
+
+func _finish_clear_paths(baked: Dictionary, clear: Dictionary) -> void:
 	if baked.has("manhole"):
 		var at: Vector2 = Vector2(float((baked.manhole as Array)[0]), float((baked.manhole as Array)[1]))
 		var cover: ManholeCover = ManholeCover.new()
@@ -487,57 +586,511 @@ func _add_ground_decals() -> Dictionary:
 			var b: Vector2 = centre + Vector2(float((points[i + 1] as Array)[0]), float((points[i + 1] as Array)[1]))
 			for step: int in range(int(a.distance_to(b) / 8.0) + 1):
 				_clear_around(clear, a.lerp(b, step * 8.0 / maxf(a.distance_to(b), 1.0)), reach)
-	return clear
 
 
 ## Boss arenas (data/ground.json "arenas": a flagstone floor baked as a ground decal, plus pillars): every tile inside the drawn polygon
 ## (and `clear_margin` px around it) stays free of generated trees, bushes and plants, so the stage is empty but for what is placed by hand.
 func _add_arenas(clear: Dictionary) -> void:
 	for spec: Dictionary in DataRegistry.table("ground").get("arenas", []) as Array:
-		var tile: Array = spec.tile as Array
-		var origin: Vector2 = Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8)
-		var poly: PackedVector2Array = PackedVector2Array()
-		for point: Array in spec.poly as Array:
-			poly.append(origin + Vector2(float(point[0]), float(point[1])))
-		var zones: Array[PackedVector2Array] = [poly]
-		for grown: PackedVector2Array in Geometry2D.offset_polygon(poly, float(spec.get("clear_margin", 16.0))):
-			zones.append(grown)
-		var lo: Vector2i = Vector2i(poly[0] / 16.0)
-		var hi: Vector2i = lo
-		for p: Vector2 in poly:
-			lo = Vector2i(mini(lo.x, int(p.x / 16.0)), mini(lo.y, int(p.y / 16.0)))
-			hi = Vector2i(maxi(hi.x, int(p.x / 16.0)), maxi(hi.y, int(p.y / 16.0)))
-		for ty: int in range(lo.y - 3, hi.y + 4):
-			for tx: int in range(lo.x - 3, hi.x + 4):
-				var centre: Vector2 = Vector2(tx, ty) * 16.0 + Vector2(8, 8)
-				for zone: PackedVector2Array in zones:
-					if Geometry2D.is_point_in_polygon(centre, zone):
-						clear[Vector2i(tx, ty)] = true
-						break
-		for pillar_spec: Dictionary in spec.get("pillars", []) as Array:
-			var at: Array = pillar_spec.pos as Array
-			var pillar: ArenaPillar = ArenaPillar.new()
-			pillar.index = (spec.pillars as Array).find(pillar_spec)
-			pillar.arena = String(spec.id)
-			pillar.name = "Pillar_%s_%d" % [String(spec.id), pillar.index]
-			pillar.variant = int(pillar_spec.get("variant", 0))
-			pillar.position = origin + Vector2(float(at[0]), float(at[1]))
-			add_child(pillar)
-			_clear_around(clear, pillar.position, 2)
-		for item: Dictionary in spec.get("decor", []) as Array: ## rubble, stumps, braziers, banners ... (tools/art_arena_decor.py): one HutYard each, so every piece sorts by its own feet
-			var at_item: Array = item.pos as Array
-			var yard: HutYard = HutYard.new()
-			yard.name = "Decor_%s_%s" % [String(spec.id), String(item.get("id", "item"))]
-			yard.position = origin + Vector2(float(at_item[0]), float(at_item[1]))
-			var prop: Dictionary = item.duplicate()
-			prop["pos"] = [0, 0]
-			yard.setup([prop], "res://assets/props/arena/")
-			add_child(yard)
-		if spec.has("story"): ## the quest, the dead knight at the pillar and the hologram (ArenaStory)
-			var story: ArenaStory = ArenaStory.new()
-			story.name = "ArenaStory_%s" % String(spec.id)
-			add_child(story)
-			story.setup(self, spec, origin)
+		_add_single_arena(spec, clear)
+
+
+func _add_single_arena(spec: Dictionary, clear: Dictionary) -> void:
+	var tile: Array = spec.tile as Array
+	var origin: Vector2 = Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8)
+	var poly: PackedVector2Array = PackedVector2Array()
+	for point: Array in spec.poly as Array:
+		poly.append(origin + Vector2(float(point[0]), float(point[1])))
+	var zones: Array[PackedVector2Array] = [poly]
+	for grown: PackedVector2Array in Geometry2D.offset_polygon(poly, float(spec.get("clear_margin", 16.0))):
+		zones.append(grown)
+	var lo: Vector2i = Vector2i(poly[0] / 16.0)
+	var hi: Vector2i = lo
+	for p: Vector2 in poly:
+		lo = Vector2i(mini(lo.x, int(p.x / 16.0)), mini(lo.y, int(p.y / 16.0)))
+		hi = Vector2i(maxi(hi.x, int(p.x / 16.0)), maxi(hi.y, int(p.y / 16.0)))
+	for ty: int in range(lo.y - 3, hi.y + 4):
+		for tx: int in range(lo.x - 3, hi.x + 4):
+			var centre: Vector2 = Vector2(tx, ty) * 16.0 + Vector2(8, 8)
+			for zone: PackedVector2Array in zones:
+				if Geometry2D.is_point_in_polygon(centre, zone):
+					clear[Vector2i(tx, ty)] = true
+					break
+	for pillar_spec: Dictionary in spec.get("pillars", []) as Array:
+		var at: Array = pillar_spec.pos as Array
+		var pillar: ArenaPillar = ArenaPillar.new()
+		pillar.index = (spec.pillars as Array).find(pillar_spec)
+		pillar.arena = String(spec.id)
+		pillar.name = "Pillar_%s_%d" % [String(spec.id), pillar.index]
+		pillar.variant = int(pillar_spec.get("variant", 0))
+		pillar.position = origin + Vector2(float(at[0]), float(at[1]))
+		add_child(pillar)
+		_clear_around(clear, pillar.position, 2)
+	for item: Dictionary in spec.get("decor", []) as Array: ## rubble, stumps, braziers, banners ... (tools/art_arena_decor.py): one HutYard each, so every piece sorts by its own feet
+		var at_item: Array = item.pos as Array
+		var yard: HutYard = HutYard.new()
+		yard.name = "Decor_%s_%s" % [String(spec.id), String(item.get("id", "item"))]
+		yard.position = origin + Vector2(float(at_item[0]), float(at_item[1]))
+		var prop: Dictionary = item.duplicate()
+		prop["pos"] = [0, 0]
+		yard.setup([prop], "res://assets/props/arena/")
+		add_child(yard)
+	if spec.has("story"): ## the quest, the dead knight at the pillar and the hologram (ArenaStory)
+		var story: ArenaStory = ArenaStory.new()
+		story.name = "ArenaStory_%s" % String(spec.id)
+		add_child(story)
+		story.setup(self, spec, origin)
+
+
+func _begin_stepped_load() -> void:
+	super._begin_stepped_load()
+	_init_stage = 0
+	_init_worker_done = false
+	_init_scenes.clear()
+	_init_scene_index = 0
+	_init_interiors = null
+	_init_interiors_done = false
+
+
+func loading_init_step() -> bool:
+	if _stepped_init_done:
+		return true
+	var deadline: int = Time.get_ticks_usec() + LOAD_INIT_BUDGET_USEC
+	match _init_stage:
+		0:
+			_init_step_stage0()
+			return false
+		1:
+			if _init_scene_index < _init_scenes.size():
+				_init_scene_index = Jobs.warm_step(_init_scenes, _init_scene_index, deadline)
+			if _init_scene_index >= _init_scenes.size() and not _init_interiors_done and Time.get_ticks_usec() < deadline:
+				_init_interiors_done = _init_interiors.setup_step(deadline)
+			if _init_scene_index >= _init_scenes.size() and _init_interiors_done and _init_worker_done:
+				_init_stage = 2
+			return false
+		2:
+			_init_step_stage2()
+			return false
+		3:
+			_init_step_stage3(deadline)
+			return false
+		4:
+			_init_step_stage4(deadline)
+			return false
+		5:
+			_init_step_stage5()
+			return false
+		6:
+			_init_server_players()
+			_init_stage = -1
+			_stepped_init_done = true
+			return true
+	return true
+
+
+func _init_step_stage0() -> void:
+	RenderingServer.set_default_clear_color(Color("120e1f"))
+	LightTexture.prewarm(PackedInt32Array([24, 26, 28, 34, 36, 40]))
+	_map = RegionMap.new(0, DataRegistry.table("world_map"))
+	_tiles = DataRegistry.table("grass_tiles")
+	_props = Node2D.new()
+	_props.name = "Props"
+	_props.y_sort_enabled = true
+	add_child(_props)
+	_zone = _noise(11, 0.035, 2)
+	_warp_x = _noise(21, 1.0 / 14.0, 1)
+	_warp_y = _noise(22, 1.0 / 14.0, 1)
+	_init_interiors = Interiors.new()
+	_init_interiors.defer_setup = true
+	add_child(_init_interiors)
+	var mines: MineManager = MineManager.new()
+	mines.setup(_map.world_seed)
+	add_child(mines)
+	_town_node = TownManager.new()
+	_town_node.setup(self)
+	add_child(_town_node)
+	var discovery: MapDiscovery = MapDiscovery.new()
+	discovery.name = "MapDiscovery"
+	add_child(discovery)
+	var waystones: Waystones = Waystones.new()
+	waystones.name = "Waystones"
+	add_child(waystones)
+	var vistas: Vistas = Vistas.new()
+	vistas.name = "Vistas"
+	add_child(vistas)
+	var relics: BossRelics = BossRelics.new()
+	relics.name = "BossRelics"
+	add_child(relics)
+	var loot_chests: LootChests = LootChests.new()
+	loot_chests.name = "LootChests"
+	add_child(loot_chests)
+	var puzzles: Puzzles = Puzzles.new()
+	puzzles.name = "Puzzles"
+	add_child(puzzles)
+	var pets: PetRegistry = PetRegistry.new()
+	pets.name = "PetRegistry"
+	add_child(pets)
+	for plant: Variant in DataRegistry.table("plants").values():
+		var path: String = String((plant as Dictionary).get("scene", ""))
+		if not path.is_empty() and not _init_scenes.has(path):
+			_init_scenes.append(path)
+	Jobs.request_warm(_init_scenes)
+	var world_map_data: Dictionary = DataRegistry.table("world_map")
+	var active_biome: String = String(world_map_data.get("biome", ""))
+	var own_biomes: Array = (world_map_data.get("own_biomes", []) as Array).duplicate()
+	var use_town_styles: bool = Relief.town_styles
+	var relief_key: String = Relief.cache_key_for(active_biome, own_biomes, use_town_styles)
+	var need_sdf: bool = _cached_sdf.is_empty()
+	var need_outer: bool = _cached_outer_sdf.is_empty()
+	var need_relief: bool = not Relief.has_cache(relief_key)
+	var need_blend: bool = not BiomeBlend.has_cache(BiomeBlend.cache_key_for(_map))
+	var mh_key: String = MeadowHabitats.cache_key_for(_map)
+	var need_mh: bool = not MeadowHabitats.has_cache(mh_key)
+	if (need_sdf or need_outer or need_relief or need_blend or need_mh) and Jobs.threaded:
+		var map_ref: RegionMap = _map
+		var sdf_img: Image = SDF_TEXTURE.get_image() if need_sdf else null
+		var outer_img: Image = OUTER_SDF.get_image() if need_outer else null
+		var rel_tex_img: Image = Relief.TEXTURE.get_image() if need_relief else null
+		var rel_field_img: Image = Relief.FIELD.get_image() if need_relief else null
+		var rel_block_img: Image = Relief.BLOCK.get_image() if need_relief else null
+		var biomes_table: Dictionary = DataRegistry.table("biomes") if (need_relief or need_blend) else {}
+		var biomes_keys: Array = biomes_table.keys() if need_relief else []
+		var hallgrat_data: Dictionary = DataRegistry.table("hallgrat") if need_relief else {}
+		var lake_tex: Texture2D = load(BiomeBlend.LAKE_SDF_PATH) as Texture2D if (need_blend or need_mh) else null
+		var lake_img: Image = lake_tex.get_image() if lake_tex != null else null
+		var init_rel_bytes: PackedByteArray = PackedByteArray()
+		var init_rel_field: PackedByteArray = PackedByteArray()
+		var init_rel_side: int = 0
+		if need_mh and not need_relief:
+			if _relief == null:
+				_relief = Relief.new()
+			init_rel_bytes = _relief._bytes
+			init_rel_field = _relief._field
+			init_rel_side = _relief._side
+		var init_sdf: PackedByteArray = _cached_sdf if (need_mh and not need_sdf) else PackedByteArray()
+		var init_gloom: PackedFloat32Array = BiomeBlend._cells if (need_mh and not need_blend) else PackedFloat32Array()
+		var init_arid: PackedFloat32Array = BiomeBlend._arid_cells if (need_mh and not need_blend) else PackedFloat32Array()
+		var init_blend_side: int = BiomeBlend._side if (need_mh and not need_blend) else 0
+		var init_lake_bytes: PackedByteArray = BiomeBlend._lake_bytes if (need_mh and not need_blend) else PackedByteArray()
+		var init_lake_side: int = BiomeBlend._lake_side if (need_mh and not need_blend) else 0
+		var mh_tables: Dictionary = {}
+		if need_mh:
+			mh_tables = {
+				"meadow_habitats": DataRegistry.table("meadow_habitats"),
+				"hallgrat": DataRegistry.table("hallgrat"),
+				"ground": DataRegistry.table("ground"),
+				"waystones": DataRegistry.table("waystones"),
+				"vistas": DataRegistry.table("vistas"),
+				"puzzles": DataRegistry.table("puzzles"),
+			}
+		var work: Callable = func() -> Variant:
+			var res: Dictionary = {}
+			var w_sdf: PackedByteArray = init_sdf
+			var w_rel_bytes: PackedByteArray = init_rel_bytes
+			var w_rel_field: PackedByteArray = init_rel_field
+			var w_rel_side: int = init_rel_side
+			var w_gloom: PackedFloat32Array = init_gloom
+			var w_arid: PackedFloat32Array = init_arid
+			var w_blend_side: int = init_blend_side
+			var w_lake_bytes: PackedByteArray = init_lake_bytes
+			var w_lake_side: int = init_lake_side
+			if sdf_img != null:
+				var si: Image = sdf_img.duplicate() as Image
+				si.convert(Image.FORMAT_L8)
+				w_sdf = si.get_data()
+				res["sdf"] = w_sdf
+			if outer_img != null:
+				var oi: Image = outer_img.duplicate() as Image
+				oi.convert(Image.FORMAT_L8)
+				res["outer_sdf"] = oi.get_data()
+			if need_relief:
+				var built: Dictionary = Relief.build_base_data(rel_tex_img, rel_field_img, rel_block_img, active_biome, own_biomes, biomes_keys, hallgrat_data, use_town_styles)
+				res["relief"] = built
+				w_rel_bytes = built.get("bytes", PackedByteArray()) as PackedByteArray
+				w_rel_field = built.get("field", PackedByteArray()) as PackedByteArray
+				w_rel_side = int(built.get("side", 0))
+			if need_blend:
+				var bb: Dictionary = BiomeBlend.compute_bundle(map_ref, biomes_table, lake_img)
+				res["blend"] = bb
+				w_gloom = bb.get("cells", PackedFloat32Array()) as PackedFloat32Array
+				w_arid = bb.get("arid_cells", PackedFloat32Array()) as PackedFloat32Array
+				w_blend_side = int(bb.get("side", 0))
+				w_lake_bytes = bb.get("lake_bytes", PackedByteArray()) as PackedByteArray
+				w_lake_side = int(bb.get("lake_side", 0))
+			if need_mh:
+				res["habitats"] = MeadowHabitats.compute_bundle(
+					map_ref, w_rel_bytes, w_rel_field, w_rel_side, w_sdf,
+					w_lake_bytes, w_lake_side, w_gloom, w_arid, w_blend_side, mh_tables, mh_key
+				)
+			return res
+		var on_done: Callable = func(result: Variant) -> void:
+			if not is_instance_valid(self):
+				return
+			var res: Dictionary = result as Dictionary if result is Dictionary else {}
+			if res.has("sdf"):
+				_cached_sdf = res["sdf"] as PackedByteArray
+			if res.has("outer_sdf"):
+				_cached_outer_sdf = res["outer_sdf"] as PackedByteArray
+			if res.has("relief"):
+				Relief.store_cache(res["relief"] as Dictionary, Relief.WOBBLE.get_image())
+			if res.has("blend"):
+				BiomeBlend.apply_bundle(res["blend"] as Dictionary, lake_tex)
+			if res.has("habitats"):
+				MeadowHabitats.apply_bundle(res["habitats"] as Dictionary)
+			_init_worker_done = true
+			_init_job = null
+		_init_job = Jobs.run(work, on_done, Jobs.Prio.URGENT)
+	else:
+		_init_worker_done = true
+	_init_stage = 1
+
+
+func _init_step_stage2() -> void:
+	if _cached_sdf.is_empty():
+		var image: Image = SDF_TEXTURE.get_image()
+		image.convert(Image.FORMAT_L8)
+		_cached_sdf = image.get_data()
+	_sdf = _cached_sdf
+	if _cached_outer_sdf.is_empty():
+		var outer_image: Image = OUTER_SDF.get_image()
+		outer_image.convert(Image.FORMAT_L8)
+		_cached_outer_sdf = outer_image.get_data()
+	_outer_sdf = _cached_outer_sdf
+	if _relief == null:
+		_relief = Relief.new()
+	Terrain.relief = _relief
+	if multiplayer.is_server():
+		edits.read()
+	_relief.editor_apply(edits.terrain)
+	_cliffs = ReliefLayer.new()
+	_cliffs.setup(_relief.editor_texture, _relief.editor_field, _relief)
+	add_child(_cliffs)
+	var edge: VoidEdge = VoidEdge.new()
+	edge.setup(OUTER_SDF)
+	add_child(edge)
+	var biomes: Dictionary = DataRegistry.table("biomes")
+	for id: String in biomes:
+		var active: String = RegionMap.active_biome(id)
+		if not _layers.has(active):
+			var cfg: Dictionary = biomes[active] as Dictionary
+			_layers[active] = _ground if active == "meadow" or cfg.has("gloom") or cfg.has("arid") else _make_layer(active, Color(cfg.color as String))
+		_layers[id] = _layers[active]
+	_start = _map.start if _map.start.x >= 0 else _map.anchor(_map.start_region)
+	_generator = PropGenerator.new(_zone, _sdf, _relief, Rect2i(), _map.world_seed)
+	Moisture.world_seed = _map.world_seed
+	_generator.bare = _map.bare_cells()
+	BiomeBlend.install(_map)
+	MeadowHabitats.install(_map, _relief, _sdf)
+	if ResourceLoader.exists("res://assets/props/moss_carpet.png"):
+		_moss_carpet_tex = load("res://assets/props/moss_carpet.png") as Texture2D
+	if ResourceLoader.exists("res://assets/props/pasture_paving.png"):
+		_pasture_paving_tex = load("res://assets/props/pasture_paving.png") as Texture2D
+	_init_decals = DataRegistry.table("ground_baked").get("decals", []) as Array
+	_init_decal_index = _init_decals.size() - 1
+	_init_decal_sub = 0
+	_init_clear = {}
+	if not _cached_stone_cells.is_empty():
+		_stone_cells = _cached_stone_cells.duplicate()
+	_init_stage = 3
+
+
+func _init_step_stage3(deadline: int) -> void:
+	if _init_decal_sub == 0:
+		var compute_stones: bool = _cached_stone_cells.is_empty()
+		while _init_decal_index >= 0:
+			_add_single_decal(_init_decals[_init_decal_index] as Dictionary, compute_stones)
+			_init_decal_index -= 1
+			if Time.get_ticks_usec() >= deadline:
+				return
+		if compute_stones:
+			_cached_stone_cells = _stone_cells.duplicate()
+		_init_decal_sub = 1
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 1:
+		_add_structures_barriers_and_signs(DataRegistry.table("ground_baked"), _init_clear)
+		_init_decal_sub = 2
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 2:
+		_add_structures_hallgrat(DataRegistry.table("ground_baked"), _init_clear)
+		_init_decal_sub = 3
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 3:
+		_add_structures_witch_and_towers(_init_clear)
+		_init_decal_sub = 4
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 4:
+		_add_structures_statues_and_vistas(_init_clear)
+		_init_decal_sub = 5
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 5:
+		_add_structures_huts(_init_clear)
+		_init_decal_sub = 6
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 6:
+		_add_structures_sites(_init_clear)
+		_init_arenas = DataRegistry.table("ground").get("arenas", []) as Array
+		_init_arena_index = 0
+		_init_decal_sub = 7
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 7:
+		while _init_arena_index < _init_arenas.size():
+			_add_single_arena(_init_arenas[_init_arena_index] as Dictionary, _init_clear)
+			_init_arena_index += 1
+			if Time.get_ticks_usec() >= deadline:
+				return
+		_init_decal_sub = 8
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_decal_sub == 8:
+		_finish_clear_paths(DataRegistry.table("ground_baked"), _init_clear)
+		_generator.blocked_cells = _init_clear
+		_generator.extra_props = _extra_props()
+		_generator.extra_props.append_array(hallgrat.extra_props())
+		_rivers = WorldRivers.new()
+		_rivers.name = "Rivers"
+		_rivers.defer_warm_queries = true
+		add_child(_rivers)
+		_generator.water_clear = _rivers.clear_for_prop
+		_generator.water_dist = func(at: Vector2) -> float: return _rivers.field_at(at).x
+		_init_stage = 4
+		_init_stage4_sub = 0
+
+
+func _init_step_stage4(deadline: int) -> void:
+	if _init_stage4_sub == 0:
+		if not _rivers.warm_queries_step(deadline):
+			return
+		_init_stage4_sub = 1
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_stage4_sub == 1:
+		if desert_observatory == null:
+			desert_observatory = DesertObservatory.new()
+			desert_observatory.name = "DesertObservatory"
+		if not desert_observatory.setup_step(self, deadline):
+			return
+		var obs_spec: Dictionary = desert_observatory.reserved_cells()
+		_generator.blocked_cells.merge(obs_spec.get("blocked", {}) as Dictionary)
+		_stone_cells.merge(obs_spec.get("stones", {}) as Dictionary)
+		add_child(desert_observatory)
+		_init_stage4_sub = 2
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_stage4_sub == 2:
+		desert_ruins = DesertRuins.new()
+		desert_ruins.name = "DesertRuins"
+		var ruin_blocked: Dictionary = desert_ruins.setup(self, _generator.blocked_cells)
+		_generator.blocked_cells.merge(ruin_blocked)
+		_generator.extra_props.append_array(desert_ruins.extra_masonry())
+		add_child(desert_ruins)
+		_init_stage4_sub = 3
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_stage4_sub == 3:
+		desert_guardians = DesertGuardians.new()
+		desert_guardians.name = "DesertGuardians"
+		desert_guardians.setup(self, _generator.blocked_cells)
+		add_child(desert_guardians)
+		_init_stage4_sub = 4
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_stage4_sub == 4:
+		meadow_landmarks = MeadowLandmarks.new()
+		meadow_landmarks.name = "MeadowLandmarks"
+		var ml_blocked: Dictionary = meadow_landmarks.setup(self, _generator.blocked_cells)
+		_generator.blocked_cells.merge(ml_blocked)
+		add_child(meadow_landmarks)
+		_init_stage4_sub = 5
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_stage4_sub == 5:
+		meadow_pois = MeadowPois.new()
+		meadow_pois.name = "MeadowPois"
+		var mp_blocked: Dictionary = meadow_pois.setup(self)
+		_generator.blocked_cells.merge(mp_blocked)
+		add_child(meadow_pois)
+		_init_stage4_sub = 6
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_stage4_sub == 6:
+		meadow_wonders = MeadowWonders.new()
+		meadow_wonders.name = "MeadowWonders"
+		var mw_blocked: Dictionary = meadow_wonders.setup(self)
+		_generator.blocked_cells.merge(mw_blocked)
+		add_child(meadow_wonders)
+		night_wonders = NightWonders.new()
+		night_wonders.name = "NightWonders"
+		night_wonders.setup(self)
+		add_child(night_wonders)
+		_init_stage4_sub = 7
+		if Time.get_ticks_usec() >= deadline:
+			return
+	if _init_stage4_sub == 7:
+		var chests_table: Dictionary = DataRegistry.table("loot_chests")
+		var placed_chests: Array = chests_table.get("placed", []) as Array
+		for chest_entry_v: Variant in placed_chests:
+			if not (chest_entry_v is Dictionary):
+				continue
+			var chest_entry: Dictionary = chest_entry_v as Dictionary
+			var tile_v: Variant = chest_entry.get("tile", [])
+			if not (tile_v is Array):
+				continue
+			var tile_arr: Array = tile_v as Array
+			if tile_arr.size() < 2:
+				continue
+			var c_tile: Vector2i = Vector2i(int(tile_arr[0]), int(tile_arr[1]))
+			for dy: int in range(-2, 3):
+				for dx: int in range(-2, 3):
+					_generator.blocked_cells[c_tile + Vector2i(dx, dy)] = true
+		_generator.tree_free_cells = _stone_cells
+		_generator.berry_free_cells = _berry_free
+		_init_stage = 5
+
+
+func _init_step_stage5() -> void:
+	var wind: WorldWind = WorldWind.new()
+	wind.name = "WorldWind"
+	wind.setup(self)
+	add_child(wind)
+	_wildlife.setup(_map.world_seed, _rabbit_habitat, _bird_habitat, _fauna_habitat, _flower_targets)
+	var encounters: WildlifeEvents = WildlifeEvents.new()
+	encounters.name = "WildlifeEvents"
+	encounters.setup(self)
+	add_child(encounters)
+	sowing = PlantSowing.new()
+	sowing.setup(self)
+	add_child(sowing)
+	night = NightDirector.new()
+	night.setup(self)
+	add_child(night)
+	fallen_knight = FallenKnight.new()
+	fallen_knight.name = "FallenKnight"
+	var knight_tile: Array = DataRegistry.get_entry("ground", "fallen_knight").get("tile", [501, 685])
+	fallen_knight.position = Vector2(float(knight_tile[0]), float(knight_tile[1])) * 16 + Vector2(8, 8)
+	add_child(fallen_knight)
+	_spawn_guards()
+	if multiplayer.is_server() and not opening_over:
+		TimeManager.lock_at(0.0)
+	TimeManager.day_started.connect(_age_young)
+	if multiplayer.is_server():
+		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_thing_snapshot.rpc_id(id, _thing_states))
+		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_harvest_snapshot.rpc_id(id, _harvest_states))
+		TimeManager.day_started.connect(_grow_things)
+		TimeManager.day_started.connect(_on_day_started_sleep)
+		multiplayer.peer_disconnected.connect(_on_peer_disconnected_sleep)
+		multiplayer.peer_connected.connect(_on_peer_connected_sleep)
+		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_editor_snapshot.rpc_id(id, edits.data()))
+	Terrain.register_layer(_ground)
+	_collect_warm_paths()
+	Jobs.request_warm(_warm_paths)
+	_init_stage = 6
 
 
 ## The boss of an arena is not there on its own: the story calls it (`ArenaStory`: the knight at the pillar was inspected, or the hologram in the middle was
@@ -799,6 +1352,177 @@ func start_sleep(player: Player, rest: bool = false) -> void:
 	scene.name = "SleepScene"
 	player.add_child(scene)
 	scene.start(player, self, rest)
+
+
+func is_waiting_in_bed(player: Player) -> bool:
+	if player == null:
+		return false
+	return _bed_waiting_peers.has(player.get_multiplayer_authority())
+
+
+func request_bed_sleep(player: Player) -> void:
+	if player == null or not player.is_multiplayer_authority() or _sleeping_now:
+		return
+	_rpc_bed_sleep.rpc_id(1, false)
+
+
+func request_bed_leave(player: Player) -> void:
+	if player == null or not player.is_multiplayer_authority():
+		return
+	_rpc_bed_sleep.rpc_id(1, true)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _rpc_bed_sleep(leave: bool) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender <= 0:
+		sender = 1
+	if leave:
+		if _bed_ready.erase(sender):
+			_sync_bed_waiting()
+		return
+	if _sleeping_now or not opening_over or not TimeManager.can_sleep_now():
+		return
+	_bed_ready[sender] = true
+	var needed: Array[int] = _living_bed_peers()
+	if needed.is_empty():
+		return
+	var all_ready: bool = true
+	for peer_id: int in needed:
+		if not _bed_ready.has(peer_id):
+			all_ready = false
+			break
+	if all_ready:
+		_trigger_rest_sleep_all()
+		return
+	_sync_bed_waiting()
+	var town_mgr: TownManager = town()
+	if town_mgr != null:
+		var fmt: String = String(SleepRules.text_cfg().get("waiting_banner", "WARTEN IM BETT (%d/%d)"))
+		town_mgr.banner(fmt % [_bed_ready.size(), needed.size()], "")
+
+
+func _living_bed_peers() -> Array[int]:
+	var peers: Array[int] = []
+	for p: Player in Player.all:
+		if not is_instance_valid(p) or p.health.current <= 0.0 or p.fainting:
+			continue
+		var peer_id: int = p.get_multiplayer_authority()
+		if not peers.has(peer_id):
+			peers.append(peer_id)
+	return peers
+
+
+func _sync_bed_waiting() -> void:
+	_rpc_bed_waiting.rpc(_bed_ready.keys())
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_bed_waiting(ready_ids: Array) -> void:
+	_bed_waiting_peers.clear()
+	for id: Variant in ready_ids:
+		_bed_waiting_peers[int(id)] = true
+
+
+func _trigger_rest_sleep_all() -> void:
+	_sleeping_now = true
+	_bed_ready.clear()
+	_sync_bed_waiting()
+	var sleep_p: float = clampf(TimeManager.night_progress(), 0.0, 1.0)
+	var wake_t: float = SleepRules.wake_time(sleep_p)
+	var skipped_h: float = SleepRules.skipped_night_hours(TimeManager.time_of_day)
+	_rpc_begin_rest_sleep.rpc(wake_t, sleep_p, skipped_h)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_begin_rest_sleep(wake_time: float, sleep_progress: float, skipped_hours: float) -> void:
+	var local_p: Player = null
+	for p: Player in Player.all:
+		if is_instance_valid(p) and p.is_multiplayer_authority():
+			local_p = p
+			break
+	var on_blackout: Callable = Callable()
+	if multiplayer.is_server():
+		on_blackout = func() -> void:
+			_server_commit_rest_sleep(sleep_progress, wake_time, skipped_hours)
+	if local_p != null and local_p.get_node_or_null("SleepScene") == null:
+		var scene: SleepScene = SleepScene.new()
+		scene.name = "SleepScene"
+		local_p.add_child(scene)
+		scene.start(local_p, self, true, wake_time, false, on_blackout)
+	elif on_blackout.is_valid():
+		on_blackout.call()
+
+
+func _server_commit_rest_sleep(sleep_progress: float, wake_time: float, skipped_hours: float) -> void:
+	if not multiplayer.is_server():
+		return
+	TimeManager.record_sleep(sleep_progress)
+	var town_mgr: TownManager = town()
+	if town_mgr != null:
+		town_mgr.burn_lamps_for_hours(skipped_hours)
+	if night != null:
+		night.skip_night()
+	var rested: bool = SleepRules.should_grant_well_rested(sleep_progress)
+	var rested_sec: float = SleepRules.well_rested_duration()
+	for p: Player in Player.all:
+		if not is_instance_valid(p) or p.health.current <= 0.0:
+			continue
+		p.health.heal_full()
+		if p.effects != null:
+			p.effects.clear("tired")
+			if rested:
+				p.effects.apply("well_rested", rested_sec, 1.0)
+	TimeManager.set_time(wake_time)
+	TimeManager.unlock()
+	_sleeping_now = false
+
+
+func _on_day_started_sleep(_new_day: int) -> void:
+	if not multiplayer.is_server():
+		return
+	_bed_ready.clear()
+	_sync_bed_waiting()
+	if not opening_over or TimeManager.locked:
+		return
+	if TimeManager.nights_awake >= 1:
+		apply_tiredness_to_players()
+
+
+func apply_tiredness_to_players() -> void:
+	if not multiplayer.is_server() or TimeManager.nights_awake <= 0:
+		return
+	var tier: int = SleepRules.tired_tier_for_awake_nights(TimeManager.nights_awake)
+	var secs: float = SleepRules.tired_duration()
+	for p: Player in Player.all:
+		if is_instance_valid(p) and p.health.current > 0.0 and p.effects != null:
+			p.effects.apply("tired", secs, float(tier))
+
+
+func _on_peer_connected_sleep(id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	TimeManager._sync_sleep_state.rpc_id(id, TimeManager.sleep_fatigue, TimeManager.nights_awake, TimeManager.slept_night_id)
+	_rpc_bed_waiting.rpc_id(id, _bed_ready.keys())
+
+
+func _on_peer_disconnected_sleep(id: int) -> void:
+	if not multiplayer.is_server():
+		return
+	if _bed_ready.erase(id):
+		_sync_bed_waiting()
+	if not _bed_ready.is_empty() and not _sleeping_now:
+		var needed: Array[int] = _living_bed_peers()
+		if not needed.is_empty():
+			var all_ready: bool = true
+			for peer_id: int in needed:
+				if not _bed_ready.has(peer_id):
+					all_ready = false
+					break
+			if all_ready:
+				_trigger_rest_sleep_all()
 
 
 ## Valdric joins the town's daily life (data/settlers.json `takes_over`): the story's actor is put away for good and a settler is him from now on. Returns where the actor stood
@@ -1138,6 +1862,116 @@ func loading_step() -> bool:
 	return _stream_settled
 
 
+func _collect_warm_paths() -> void:
+	_warm_paths.clear()
+	for spawner_name: String in ["EnemySpawner", "ProjectileSpawner", "DropSpawner"]:
+		var spawner: MultiplayerSpawner = get_node_or_null(spawner_name) as MultiplayerSpawner
+		if spawner == null:
+			continue
+		for i: int in spawner.get_spawnable_scene_count():
+			var scene_path: String = spawner.get_spawnable_scene(i)
+			if not scene_path.is_empty() and not _warm_paths.has(scene_path):
+				_warm_paths.append(scene_path)
+	for extra_path: String in [
+		"res://assets/characters/player_emerge.png",
+		"res://assets/audio/intro/metal_scrape.wav",
+		"res://assets/audio/intro/crawl_drag.wav",
+		"res://assets/audio/intro/gasp.wav",
+		"res://assets/audio/intro/body_thud.wav",
+		"res://assets/audio/intro/cough.wav",
+		"res://assets/world/map_water.png",
+		"res://assets/world/outer_sdf.png",
+		"res://assets/world/lakes_sdf.png",
+	]:
+		if not _warm_paths.has(extra_path):
+			_warm_paths.append(extra_path)
+
+
+func loading_warmup_step() -> bool:
+	var deadline: int = Time.get_ticks_usec() + LOAD_INIT_BUDGET_USEC
+	if _warm_stage == 0:
+		if _warm_paths.is_empty():
+			_collect_warm_paths()
+		Jobs.request_warm(_warm_paths)
+		_warm_index = 0
+		_warm_stage = 1
+		return false
+	if _warm_stage == 1:
+		_warm_index = Jobs.warm_step(_warm_paths, _warm_index, deadline)
+		if _warm_index >= _warm_paths.size():
+			_warm_stage = 2
+		return false
+	if _warm_stage == 2:
+		while not _wildlife.loading_populate_step():
+			if Time.get_ticks_usec() >= deadline:
+				return false
+		_warm_stage = 3
+		return false
+	if _warm_stage == 3:
+		if _town_node != null:
+			_town_node.warm_for_gameplay()
+		_warm_stage = 4
+		return false
+	if _warm_stage == 4:
+		var interiors_node: Interiors = _init_interiors if _init_interiors != null else get_node_or_null("Interiors") as Interiors
+		for child: Node in _players.get_children():
+			var player: Player = child as Player
+			if player == null or not player.is_multiplayer_authority():
+				continue
+			if player._camera != null:
+				player._camera.reset_smoothing()
+			if interiors_node != null:
+				interiors_node.apply_view(player)
+			break
+		_warm_stage = 5
+		return false
+	if _warm_stage == 5:
+		for child: Node in _players.get_children():
+			var player: Player = child as Player
+			if player == null or not player.is_multiplayer_authority():
+				continue
+			if player._hud != null:
+				var map_win: MapWindow = player._hud.get_node_or_null("MapWindow") as MapWindow
+				if map_win != null and not map_win.warm_step(deadline):
+					return false
+			break
+		_warm_stage = 6
+		return false
+	if _warm_stage == 6:
+		var day_night: DayNight = get_node_or_null("DayNight") as DayNight
+		if day_night != null:
+			day_night._process(0.016)
+		_warm_stage = 7
+		return false
+	if _warm_stage == 7:
+		var wind: WorldWind = get_node_or_null("WorldWind") as WorldWind
+		if wind != null:
+			wind._process(0.016)
+		_warm_stage = 8
+		return true
+	return true
+
+
+func teardown_step(deadline_usec: int) -> bool:
+	if not _teardown_started:
+		_teardown_started = true
+		set_process(false)
+		set_physics_process(false)
+		if _init_job != null:
+			Jobs.cancel(_init_job)
+			Jobs.wait(_init_job)
+			_init_job = null
+		if desert_observatory != null and is_instance_valid(desert_observatory) and desert_observatory.get_parent() == null:
+			desert_observatory.free()
+			desert_observatory = null
+		_discard_chunk_build()
+	for cell_v: Variant in _chunks.keys():
+		_unload_chunk(cell_v as Vector2i)
+		if deadline_usec > 0 and Time.get_ticks_usec() >= deadline_usec:
+			break
+	return _chunks.is_empty()
+
+
 func _spawn_position(index: int) -> Vector2:
 	if _cover_at != Vector2.ZERO:
 		return _cover_at + Vector2(INTRO_SPAWN.x + 16.0 * (index % 2), INTRO_SPAWN.y + 16.0 * (index / 2))
@@ -1216,7 +2050,8 @@ func _make_layer(biome: String, tint: Color) -> TileMapLayer:
 ## Keeps the chunks around the players painted: `all` loads the whole ring now (start), otherwise
 ## nearest first. Runtime preparation is budgeted; activation is atomic.
 func _stream(all: bool) -> void:
-	var frame_deadline: int = Time.get_ticks_usec() + STREAM_BUDGET_USEC ## one budget for adding last frame's props and preparing the next chunk
+	var stream_budget: int = LOAD_STREAM_BUDGET_USEC if loading_in_steps else STREAM_BUDGET_USEC
+	var frame_deadline: int = Time.get_ticks_usec() + stream_budget ## one budget for adding last frame's props and preparing the next chunk
 	_finish_commit(frame_deadline) ## the ground committed last frame gets its props now (over several frames when it has many)
 	var centers: Array[Vector2i] = []
 	var ahead: Array[Vector2i] = [] ## look-ahead centres: loaded after the players' own rings, never built at once
@@ -1293,7 +2128,8 @@ func _stream(all: bool) -> void:
 			_building = _take_build(best)
 		if Jobs.threaded and not missing.is_empty(): ## the next few chunks are prepared by the workers while the nearest one is finished here
 			missing.sort()
-			for i: int in mini(PREFETCH, missing.size()):
+			var prefetch_count: int = LOAD_PREFETCH if loading_in_steps else PREFETCH
+			for i: int in mini(prefetch_count, missing.size()):
 				_prefetch(Vector2i(missing[i].y, missing[i].z))
 		if _building != null and _pending_commit == null:
 			var has_ground_near: bool = false
@@ -1310,13 +2146,15 @@ func _stream(all: bool) -> void:
 			if not all and time_now >= frame_deadline and not is_teleport_dest:
 				pass
 			else:
-				var deadline: int = 0 if is_teleport_dest else ((frame_deadline - STREAM_BUDGET_USEC + STREAM_OWN_CHUNK_USEC) if best_d == 0 else (frame_deadline - STREAM_BUDGET_USEC + STREAM_URGENT_USEC if best_d <= 2 else frame_deadline))
+				var deadline: int = 0 if is_teleport_dest else (frame_deadline if loading_in_steps else ((frame_deadline - STREAM_BUDGET_USEC + STREAM_OWN_CHUNK_USEC) if best_d == 0 else (frame_deadline - STREAM_BUDGET_USEC + STREAM_URGENT_USEC if best_d <= 2 else frame_deadline)))
 				if _advance_chunk(_building, deadline):
 					var finished: ChunkBuild = _building
 					_building = null
 					_commit_chunk(finished)
 					if is_teleport_dest:
 						_finish_commit()
+					elif loading_in_steps and Time.get_ticks_usec() < frame_deadline:
+						_finish_commit(frame_deadline)
 	if all or centers.is_empty():
 		return
 	for c: Vector2i in _chunks.keys():
@@ -1458,11 +2296,13 @@ func _gen_work(build: ChunkBuild) -> Variant:
 
 
 func _gen_done(_result: Variant, build: ChunkBuild) -> void:
+	build.job = null
 	build.gen_ready = true
 
 
 ## (main thread) The chunk was dropped while its job was running or waiting for delivery.
 func _gen_discard(_result: Variant, build: ChunkBuild) -> void:
+	build.job = null
 	_free_build_nodes(build)
 
 
@@ -1794,9 +2634,16 @@ func _discard_chunk_build() -> void:
 
 
 func _exit_tree() -> void:
+	if _init_job != null:
+		Jobs.cancel(_init_job)
+		Jobs.wait(_init_job)
+		_init_job = null
 	if _pending_commit != null: ## its props never entered the tree: free them here, not in `_finish_commit`
 		_free_build(_pending_commit)
 		_pending_commit = null
+	if desert_observatory != null and is_instance_valid(desert_observatory) and desert_observatory.get_parent() == null:
+		desert_observatory.free()
+		desert_observatory = null
 	_discard_chunk_build()
 
 

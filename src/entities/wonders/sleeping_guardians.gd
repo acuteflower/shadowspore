@@ -207,10 +207,10 @@ func play_awaken_fx(restored_head: bool) -> void:
 		snd.play()
 	for pl: Player in Player.all:
 		if is_instance_valid(pl) and pl.is_multiplayer_authority() and pl.global_position.distance_to(global_position) < 260.0:
-			pl.add_shake(1.3)
+			pl._shake = maxf(pl._shake, 1.3)
 	var chests: LootChests = LootChests.of(get_tree())
 	if chests != null:
-		chests.appear(wonder_id + "_chest", chest_tier, global_position + Vector2(0.0, 4.0), false, true, true)
+		chests.appear(wonder_id + "_chest", chest_tier, global_position + Vector2(0.0, 4.0), true, false, true)
 	_refresh_visuals()
 
 

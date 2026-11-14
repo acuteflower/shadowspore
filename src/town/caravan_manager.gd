@@ -100,7 +100,7 @@ func _process(delta: float) -> void:
 ## Host: set the first visit once the square stands, start the record of a visit when its window opens, drop it when it has driven off.
 func _host_step(e: float) -> void:
 	if first_day < 0 and town.founded and town.has_heart() and (town.world == null or town.world.opening_over):
-		first_day = TimeManager.day + int(cfg().get("first_delay", 1))
+		first_day = CaravanRules.first_possible_day(TimeManager.day)
 		_send_state()
 	var v: Dictionary = current(e)
 	if v.is_empty():

@@ -542,6 +542,11 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 
 
+func begin_gpu_warmup() -> void:
+	if age >= OPEN_SECONDS and not _revealing:
+		_backing.hide()
+
+
 func reveal_world() -> void:
 	_revealing = true
 	_backing.hide()

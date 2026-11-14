@@ -7,35 +7,201 @@
 			"folder": "default",
 			"tint": "#ffffff",
 			"arm_style": "default",
-			"arm_tint": "#ffffff"
+			"arm_tint": "#ffffff",
+			"starter": true,
+			"salon": false,
+			"info": "DEIN BEWÄHRTES REISEGEWAND."
 		},
 		"crimson": {
 			"name": "Blutsamt",
 			"folder": "default",
 			"tint": "#c43658",
 			"arm_style": "default",
-			"arm_tint": "#c43658"
+			"arm_tint": "#c43658",
+			"salon": false
 		},
 		"forest": {
 			"name": "Waldläufer",
 			"folder": "default",
 			"tint": "#3e7d5e",
 			"arm_style": "default",
-			"arm_tint": "#3e7d5e"
+			"arm_tint": "#3e7d5e",
+			"salon": false
 		},
 		"midnight": {
 			"name": "Nachtseide",
 			"folder": "default",
 			"tint": "#4a3b8c",
 			"arm_style": "default",
-			"arm_tint": "#4a3b8c"
+			"arm_tint": "#4a3b8c",
+			"salon": false
 		},
 		"none": {
 			"name": "Basis-Körper",
 			"folder": "",
 			"tint": "#ffffff",
 			"arm_style": "bare",
-			"arm_tint": "#ffffff"
+			"arm_tint": "#ffffff",
+			"salon": false
+		}
+	},
+	"outfit_styles": {
+		"default": {
+			"name": "Reisegewand",
+			"folder": "default",
+			"arm_style": "default",
+			"starter": true,
+			"salon": true,
+			"info": "DEIN BEWÄHRTES REISEGEWAND. WEITERE OUTFITS FINDEST DU SPÄTER IN DER WELT."
+		}
+	},
+	"outfit_colors": {
+		"default": {
+			"name": "Original",
+			"tint": "#ffffff",
+			"arm_tint": "#ffffff",
+			"swatch": ["#281d3d", "#4a3870", "#7c64a8", "#f0c878"],
+			"starter": true,
+			"salon": true,
+			"info": "DIE URSPRÜNGLICHEN STOFFFARBEN DEINES GEWANDS."
+		},
+		"crimson": {
+			"name": "Blutsamt",
+			"tint": "#c43658",
+			"arm_tint": "#c43658",
+			"swatch": ["#4a1222", "#8e223e", "#c43658", "#f288a0"],
+			"starter": true,
+			"salon": true,
+			"info": "TIEFROTER SAMT MIT WARMEM KARMIN-SCHIMMER."
+		},
+		"forest": {
+			"name": "Waldläufer",
+			"tint": "#3e7d5e",
+			"arm_tint": "#3e7d5e",
+			"swatch": ["#163828", "#285c44", "#3e7d5e", "#8ad0a8"],
+			"starter": true,
+			"salon": true,
+			"info": "GEDÄMPFTES MOOSGRÜN WIE JUNGE FARNE IM WALD."
+		},
+		"midnight": {
+			"name": "Nachtseide",
+			"tint": "#4a3b8c",
+			"arm_tint": "#4a3b8c",
+			"swatch": ["#1c163a", "#322666", "#5848a8", "#a89cf0"],
+			"starter": true,
+			"salon": true,
+			"info": "KÜHLES VIOLETTBLAU WIE SEIDE UNTER STERNEN."
+		},
+		"amber": {
+			"name": "Wüstengold",
+			"tint": "#c88638",
+			"arm_tint": "#c88638",
+			"swatch": ["#502e12", "#8f5a20", "#c88638", "#f4ce7c"],
+			"starter": true,
+			"salon": true,
+			"info": "WARMES OCKERGOLD WIE SONNENBESCHIENENER SANDSTEIN."
+		},
+		"glacier": {
+			"name": "Prismentief",
+			"tint": "#38949c",
+			"arm_tint": "#38949c",
+			"swatch": ["#143840", "#24646c", "#38949c", "#9ae8e6"],
+			"starter": true,
+			"salon": true,
+			"info": "KLARES PETROL MIT EINEM HAUCH VON KRISTALLGLANZ."
+		},
+		"rosewood": {
+			"name": "Dornenrosé",
+			"tint": "#a84c78",
+			"arm_tint": "#a84c78",
+			"swatch": ["#42182e", "#763054", "#a84c78", "#e8a4c6"],
+			"starter": true,
+			"salon": true,
+			"info": "SANFTES ALTROSA WIE BLÜTENBLÄTTER IN DER DÄMMERUNG."
+		},
+		"obsidian": {
+			"name": "Schattengarn",
+			"tint": "#342c44",
+			"arm_tint": "#342c44",
+			"swatch": ["#14101c", "#262034", "#443a5a", "#8a7ea6"],
+			"starter": true,
+			"salon": true,
+			"info": "TIEFES SCHIEFERGRAU FÜR LEISE SCHRITTE BEI NACHT."
+		}
+	},
+	"hair_styles": {
+		"default": {
+			"name": "Silberwellen",
+			"folder": "default",
+			"starter": true,
+			"salon": true,
+			"info": "DEIN OFFENES, FLIESSENDES HAAR. WEITERE FRISUREN FINDEST DU SPÄTER IN DER WELT."
+		}
+	},
+	"hair_colors": {
+		"default": {
+			"name": "Silberflieder",
+			"tint": "#ffffff",
+			"swatch": ["#3e3152", "#8e79a8", "#d6cbe6", "#f4f0ff"],
+			"starter": true,
+			"salon": true,
+			"info": "DEINE NATÜRLICHE FARBE: KÜHLES SILBER MIT EINEM HAUCH FLIEDER."
+		},
+		"obsidian": {
+			"name": "Rabenfeder",
+			"tint": "#3a3054",
+			"swatch": ["#161022", "#3a3054", "#6e6092", "#b8acd6"],
+			"starter": true,
+			"salon": true,
+			"info": "TIEFES SCHWARZVIOLETT WIE NACHTFEDERN IM MONDLICHT."
+		},
+		"blonde": {
+			"name": "Sonnenblond",
+			"tint": "#f0c878",
+			"swatch": ["#704e24", "#c89642", "#f0c878", "#fff3cb"],
+			"starter": true,
+			"salon": true,
+			"info": "WARMES GOLDBLOND WIE DÜNENSAND IN DER MITTAGSSONNE."
+		},
+		"copper": {
+			"name": "Kupferglut",
+			"tint": "#c85436",
+			"swatch": ["#581c18", "#a83c26", "#df744e", "#ffc4a2"],
+			"starter": true,
+			"salon": true,
+			"info": "LEUCHTENDES HERBSTKUPFER MIT EINEM SCHIMMER VON GLUT."
+		},
+		"rose": {
+			"name": "Rosenquarz",
+			"tint": "#e47b9a",
+			"swatch": ["#662c44", "#b84e72", "#e47b9a", "#ffd4e2"],
+			"starter": true,
+			"salon": true,
+			"info": "ZARTES ROSÉ, DAS IM SPIEGELGLANZ SANFT SCHIMMERT."
+		},
+		"prism_teal": {
+			"name": "Meerschimmer",
+			"tint": "#4db8a8",
+			"swatch": ["#194646", "#30887c", "#5ad0bc", "#c6fff5"],
+			"starter": true,
+			"salon": true,
+			"info": "TÜRKISGRÜNER SCHIMMER WIE EIN GESCHLIFFENES PRISMA."
+		},
+		"midnight": {
+			"name": "Nachtindigoblau",
+			"tint": "#4462b8",
+			"swatch": ["#18224a", "#324c94", "#6286d8", "#c2d6ff"],
+			"starter": true,
+			"salon": true,
+			"info": "TIEFER NACHTHIMMEL MIT KÜHLEM SAPHIRGLANZ."
+		},
+		"moonwhite": {
+			"name": "Mondperlmutt",
+			"tint": "#dce4f4",
+			"swatch": ["#5e6680", "#9aa6c4", "#dce4f4", "#ffffff"],
+			"starter": true,
+			"salon": true,
+			"info": "HELLES SILBERWEISS WIE FRISCHER NEBEL ÜBER DEM SEE."
 		}
 	},
 	"hairs": {

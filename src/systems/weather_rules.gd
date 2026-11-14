@@ -8,7 +8,8 @@ extends RefCounted
 ## so the clouds travel exactly as the wind blows, and time jumps just jump the sample). The world time `epoch` counts days and runs on through the
 ## night: see `epoch()`.
 
-const DAY_SEC: float = 720.0 ## TimeManager.DAY_LENGTH_SEC
+static func _day_sec() -> float:
+	return TimeManager.DAY_LENGTH_SEC
 const DAY_START: float = 0.25 ## TimeManager.DAY_START
 const WIND_BASE: float = 0.26 ## radians: the prevailing wind blows from the west, a little downwards
 
@@ -206,8 +207,9 @@ static func _locate(chain: Chain, e: float) -> int:
 static func _drift_in(chain: Chain, i: int, t_days: float) -> Vector2:
 	var v_cur: Vector2 = chain.vels[i]
 	var v_prev: Vector2 = chain.vels[i - 1] if i > 0 else v_cur
-	var blend: float = float(cfg().get("blend", 0.035)) * DAY_SEC
-	var t: float = t_days * DAY_SEC
+	var day_sec: float = _day_sec()
+	var blend: float = float(cfg().get("blend", 0.035)) * day_sec
+	var t: float = t_days * day_sec
 	var base: Vector2 = chain.drift0[i]
 	if t < blend:
 		var u: float = t / blend

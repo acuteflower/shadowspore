@@ -1,6 +1,6 @@
 # Wiesenbiom-Ausbau – Master-Konzept („Die Lebendige Wiese“)
 
-> **Status:** Konzeption & Stufenplan (abgestimmt am 2026-11-14, noch nichts implementiert).
+> **Status:** Vollständig implementiert & verifiziert (Stufen 1–6 abgeschlossen am 2026-11-14).
 > **Fokus:** Ausschließlich das gemeinsame Standard-Biom **`meadow`** (~500.736 Tiles über die fünf Überregionen *Die Lichtung*, *Nebelwald*, *Glasklippen*, *Versunkene Ruinen* und *Das Leerenblühen*). Hexenwald (`witch_forest`) und Sonnenquarz-Öde (`quartz_desert`) bleiben komplett unangetastet.
 > **Grundregel (`CLAUDE.md` / `GEMINI.md`):** Gebackene Höhen, Kollisionen, Küstenlinien (`land_sdf.png`), Flüsse und Spielstände bleiben kompatibel; alle neuen Systeme sind **streng statisch getypt**, **datengetrieben (`res://data/*.json`)**, **Multiplayer-first (Host-authoritativ)** und multithreading-sicher (`Jobs`).
 
@@ -292,3 +292,47 @@ flowchart TD
    - Mühlräder, Weltwunder, Sternschnuppen-Krater und der Weiße Kronenhirsch werden ausschließlich vom Host entschieden und per kompakten `@rpc`s / Snapshots für nachjoinende Peers synchronisiert.
 4. **Shadowspore-Tonalität (`docs/design_guide.md`):**
    - Alle neuen Sprites nutzen kühle Pflaumen-/Violettschatten, Licht von links oben, pixelgenaue `640×360`-Lesbarkeit (`Unlit` nur gezielt für Sternsplitter, Geweihspitzen, Mondblumen, Irrlichter und Glocken-Trittsteine) und wahren den respektvollen Umgang mit der Natur (Kronenhirsch unverwundbar, Bienen/Eisvögel friedlich).
+
+---
+
+## 6. Implementierungs-Übersicht (Stufen 1–6)
+
+Alle 6 Ausbaustufen für das Standard-Biom `meadow` sind vollständig integriert, multiplayer-synchronisiert und automatisiert getestet:
+
+### Implementierte Systeme & Assets
+- **Stufe 1 — Panorama-Aussichtspunkte (`Vistas` / `VistaPoint`):**
+  - Daten & Logik: `data/vistas.json` (14 handgeprüfte Klippen-Aussichten), `src/systems/vistas.gd` (`SaveGame`-Schlüssel `"vistas"`), `src/entities/props/vista_point.gd` (`zoom = 0.56`, Talblick-Pan, `WorldLevel.set_vista_focus` Chunk-Vorladen, `MapDiscovery.reveal_disc(..., 22.0)`).
+  - Art & Audio: `tools/art_vista_spot.py`, `tools/audio_vistas.py`.
+  - Test: `tools/test_vistas.tscn` (`VISTAS TEST: 96 checks, 0 failures`).
+- **Stufe 2 — Makro-Landschaften (`MeadowHabitats` & `MeadowLandmarks`):**
+  - Daten & Logik: `data/meadow_habitats.json`, `src/world/meadow_habitats.gd` (`deep_forest`, `wind_meadow`, `old_pasture`, `normal_meadow`), `src/world/meadow_landmarks.gd`, `src/entities/props/solitary_tree.gd` (Wurzelbank & im Wind pendelnde Holzschaukel), `src/entities/props/forest_shrine.gd` (`ForestShrine`), `src/fx/sunbeam_shaft.gd` (`SunbeamShaft`).
+  - Art: `tools/art_ancient_fir.py`, `tools/art_solitary_tree.py`, `tools/art_pasture_ruins.py`.
+  - Test: `tools/test_meadow_habitats.tscn` (`MEADOW HABITATS TEST: 41 checks, 0 failures`).
+- **Stufen 3 & 4 — Spuren des Roten Ordens & Alte Wasserwerke (`MeadowPois`):**
+  - Daten & Logik: `data/meadow_pois.json`, `src/world/meadow_pois.gd` (`SaveGame`-Schlüssel `"meadow_pois"`), `src/entities/props/order_monument.gd` (13 Ordens-Ruinen/Lager/Grenzsteine, Quest-Flag `found_order_trace` mit Valdric-Dialog in Glimmrast, Talisman `order_signet`), `src/entities/props/old_watermill.gd` (3 Wassermühlen mit Treibholz-Rätsel, 6-Frame-Mühlrad & Mühlenkiste), `src/entities/props/broken_stone_bridge.gd` (4 gebrochene Flussbrücken mit Schattenschritt-Lücke), `src/entities/props/fisher_pier.gd` (6 Fischerstege + `ReedRowboat`).
+  - Art: `tools/art_red_order.py`, `tools/art_water_pois.py`.
+  - Test: `tools/test_meadow_pois.tscn` (`MEADOW POIS TEST: 38 checks, 0 failures`).
+- **Stufe 5 — Die 3 Einmaligen Weltwunder (`MeadowWonders`):**
+  - Daten & Logik: `data/meadow_wonders.json`, `src/world/meadow_wonders.gd` (`SaveGame`-Schlüssel `"meadow_wonders"`), `src/entities/wonders/bell_pond.gd` (Eisvögel tagsüber, Mitternachts-Glockenschlag & leuchtender Trittstein-Pfad bei klarer Nacht, Talisman `bell_chime_talisman`), `src/entities/wonders/sleeping_guardians.gd` (7 Monolithe auf den Glasklippen, Kopfstein tragen oder Opferschalen `I..VII`, dauerhafter Heil-/Ausdauer-Lichtkreis), `src/entities/wonders/flower_amphitheater.gd` (Mondblumen-Talkessel, 42-Irrlicht-Nachttanz).
+  - Art & Audio: `tools/art_meadow_wonders.py`, `tools/audio_meadow_wonders.py`.
+  - Test: `tools/test_meadow_wonders.tscn` (`MEADOW WONDERS TEST: 32 checks, 0 failures`).
+- **Stufe 6 — Nacht-Wunder & Entdecker-Schätze (`NightWonders` & `LootChests`):**
+  - Logik & Entitäten: `src/world/night_wonders.gd`, `src/entities/props/star_crater.gd` (richtungsweisender Sternschnuppen-Schweif -> warmer `StarCrater` mit `3x star_shard` + `+18 XP` -> Abkühlen zu kaltem Gestein bei Sonnenaufgang), `src/entities/wildlife/spirit_stag.gd` (friedlicher Weißer Kronenhirsch ohne `HurtboxComponent`/`HealthComponent`, Scheu bei Lärm vs. Relikt-Freischarren bei `sneak` -> `antler_talisman` + `star_shard` + `+24 XP`).
+  - Schätze & Items: 36 handplatzierte Wiesen-Entdeckertruhen (`meadow_chest_01`..`meadow_chest_36`: 2 legendary, 10 rare, 24 common) in `data/loot_chests.json` mit automatischer 2-Tile-Umfeldfreihaltung in `WorldLevel`; neue Items/Talismane `star_shard`, `order_signet`, `bell_chime_talisman` und `antler_talisman` in `data/items.json`.
+  - Art & Audio: `tools/art_night_wonders.py`, `tools/audio_meadow_wonders.py`.
+  - Tests: `tools/test_night_wonders.tscn` (`NIGHT WONDERS TEST: 39 checks, 0 failures`) sowie `tools/test_loot_chests.tscn` (`LOOT CHESTS OK`).
+
+### Entwickler-Menü (`PauseMenu -> ENTWICKLER` in `src/ui/pause_menu.gd`)
+1. `ZUM AUSSICHTSPUNKT` (`vista_next`)
+2. `IN DEN TIEFEN URFORST` (`habitat_urforst`)
+3. `ZUR WINDWIESE (WINDEICHE)` (`habitat_wind`)
+4. `ZUM ALTEN WEIDELAND` (`habitat_pasture`)
+5. `ZU DEN ORDENS-RUINEN` (`poi_order`)
+6. `ZUR ALTEN WASSERMÜHLE` (`poi_mill`)
+7. `ZUR GEBROCHENEN BRÜCKE` (`poi_bridge`)
+8. `ZUM FISCHERSTEG` (`poi_pier`)
+9. `WUNDER: GLOCKENTEICH` (`wonder_bell`)
+10. `WUNDER: SCHLAFENDE WÄCHTER` (`wonder_guardians`)
+11. `WUNDER: BLUMEN-AMPHITHEATER` (`wonder_amphitheater`)
+12. `NACHTWUNDER: STERNSCHNUPPE` (`wonder_starfall`)
+13. `NACHTWUNDER: KRONENHIRSCH` (`wonder_stag`)

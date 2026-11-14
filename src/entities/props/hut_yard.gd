@@ -141,6 +141,11 @@ func _prop(spec: Dictionary) -> void:
 		shape.shape = box
 		shape.position = at + Vector2(float(s[2]), float(s[3])) + box.size / 2.0
 		_body.add_child(shape)
+	if String(spec.get("id", "")) == "barrel":
+		var spot: BarrelWaterSpot = BarrelWaterSpot.new()
+		spot.name = "WaterSpot"
+		spot.position = at
+		add_child(spot)
 
 
 func _layer(parent: Sprite2D, layer: Dictionary, feet: float) -> void:
@@ -238,3 +243,32 @@ func _process(delta: float) -> void:
 	for player: AudioStreamPlayer2D in _crackle:
 		if not player.playing:
 			player.play()
+
+
+class BarrelWaterSpot:
+	extends Interactable
+
+	func _enter_tree() -> void:
+		super._enter_tree()
+		add_to_group("water_barrels")
+
+	func prompt() -> String:
+		if InputManager.ui_blocking:
+			return ""
+		for player: Player in Player.all:
+			if is_instance_valid(player) and player.is_multiplayer_authority() and FarmManager.has_unfull_can(player):
+				return "KANNE FÜLLEN"
+		return ""
+
+	func reach_distance(from: Vector2) -> float:
+		return maxf(from.distance_to(global_position) - 10.0, 0.0)
+
+	func prompt_position() -> Vector2:
+		return Vector2(0.0, -24.0)
+
+	func interact(player: Player) -> void:
+		if not player.is_multiplayer_authority():
+			return
+		var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
+		if town != null and town.farm != null:
+			town.farm.request_refill()

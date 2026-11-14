@@ -10,7 +10,11 @@ const VERSION: int = 1
 
 
 static func path_for(tree: SceneTree) -> String:
-	return COOP_PATH if tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer else PATH
+	if tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer:
+		if not NetworkManager.active_save_path.is_empty():
+			return NetworkManager.active_save_path
+		return COOP_PATH
+	return PATH
 
 
 static func exists(path: String = PATH) -> bool:
@@ -44,6 +48,7 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 		"saved_at": int(Time.get_unix_time_from_system()),
 		"time": TimeManager.time_of_day,
 		"day": TimeManager.day,
+		"sleep": TimeManager.export_sleep_state(),
 		"player": {
 			"pos": [position.x, position.y],
 			"health": player.health.current,
@@ -117,6 +122,9 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 		if discovery.is_reveal_all():
 			data["map_before"] = Marshalls.raw_to_base64(discovery.export_before()) ## the fog from before the developer's whole-map reveal
 	var pending: String = target + ".tmp"
+	var target_dir: String = target.get_base_dir()
+	if not target_dir.is_empty():
+		DirAccess.make_dir_recursive_absolute(target_dir)
 	var file: FileAccess = FileAccess.open(pending, FileAccess.WRITE)
 	if file == null:
 		return false
@@ -124,7 +132,11 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	file.flush()
 	var written: bool = file.get_error() == OK
 	file.close()
-	return written and DirAccess.rename_absolute(pending, target) == OK
+	var saved_ok: bool = written and DirAccess.rename_absolute(pending, target) == OK
+	if saved_ok and tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer and not NetworkManager.active_world_id.is_empty():
+		var guest_count: int = maxi(tree.root.multiplayer.get_peers().size(), 0)
+		MultiplayerWorlds.touch_save(NetworkManager.active_world_id, TimeManager.day, TimeManager.time_of_day, guest_count)
+	return saved_ok
 
 
 static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -> bool:
@@ -146,6 +158,7 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	if not TimeManager.locked: ## the opening holds the clock at midnight
 		TimeManager.time_of_day = float(data.get("time", TimeManager.time_of_day))
 		TimeManager.day = int(data.get("day", 0))
+	TimeManager.import_sleep_state(data.get("sleep", {}) as Dictionary)
 	var pos: Array = saved.get("pos", [])
 	if pos.size() == 2:
 		player.position = Vector2(float(pos[0]), float(pos[1]))
@@ -223,6 +236,8 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 		discovery.import_before(Marshalls.base64_to_raw(String(data.get("map_before", "")))) ## empty = no whole-map reveal active
 	if resume and world != null and world.has_method("resume_story"):
 		world.call_deferred("resume_story", player) ## a save that stopped in the middle of the wake-up plays it again
+	if TimeManager.nights_awake >= 1 and world != null and world.has_method("apply_tiredness_to_players"):
+		world.call_deferred("apply_tiredness_to_players")
 	return true
 
 

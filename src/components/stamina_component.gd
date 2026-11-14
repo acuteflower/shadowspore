@@ -47,7 +47,13 @@ func regen_scale() -> float:
 	var heat: float = heat_amount()
 	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
 	var cool_bonus: float = DesertHeat.REFRESHED_REGEN_BONUS if (effects != null and effects.has("refreshed")) else 0.0
-	return clampf(1.0 - DesertHeat.STAMINA_REGEN_PENALTY * heat + cool_bonus, 0.35, 1.5)
+	var sleep_mod: float = 0.0
+	if effects != null:
+		if effects.has("well_rested"):
+			sleep_mod += SleepRules.well_rested_regen_bonus()
+		if effects.has("tired"):
+			sleep_mod -= SleepRules.tired_regen_penalty(int(effects.scale_of("tired")))
+	return clampf(1.0 - DesertHeat.STAMINA_REGEN_PENALTY * heat + cool_bonus + sleep_mod, 0.35, 1.5)
 
 
 ## 0..1 continuous desert sun-heat intensity on the owning player.
@@ -115,6 +121,21 @@ func set_max(value: float, grow: bool = false) -> void:
 
 func refill() -> void:
 	_set_current(max_stamina)
+
+
+## Host -> all peers: restores `amount` stamina right away (consumables like Bernsteinkorn).
+func restore(amount: float) -> void:
+	if amount <= 0.0:
+		return
+	if multiplayer.is_server():
+		_rpc_restore.rpc(amount)
+	else:
+		_set_current(current + amount)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_restore(amount: float) -> void:
+	_set_current(current + amount)
 
 
 func _use(amount: float) -> void:

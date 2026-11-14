@@ -66,5 +66,21 @@ static func extras(stack: Dictionary) -> Dictionary:
 	for key: String in SpellRules.SOCKET_KEYS: ## the crystals set into a staff (docs/magie_konzept.md)
 		if String(stack.get(key, "")) != "":
 			out[key] = String(stack[key])
+	if water_max(stack) > 0 and stack.has(WATER_KEY):
+		out[WATER_KEY] = clampi(int(stack[WATER_KEY]), 0, water_max(stack))
 	return out
+
+
+const WATER_KEY: String = "w"
+
+
+static func water_max(stack: Dictionary) -> int:
+	return int(definition(stack).get("water_max", 0))
+
+
+static func water(stack: Dictionary) -> int:
+	var limit: int = water_max(stack)
+	if limit <= 0:
+		return 0
+	return clampi(int(stack.get(WATER_KEY, limit)), 0, limit)
 

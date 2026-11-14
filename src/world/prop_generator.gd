@@ -228,6 +228,8 @@ class Query:
 					_index += 1
 					var plant: Dictionary = _generator._plants[String(spec.kind)]
 					var cell: Vector2i = spec.cell
+					if not _expanded.grow(8).has_point(cell): ## far from this window: it cannot stand in it or press on anything in it
+						continue
 					var pos: Vector2 = PropGenerator.position_of(cell)
 					var foot: float = _generator._foot(plant, String(spec.kind), int(spec.variant))
 					if _generator._relief.flat_around(pos, maxf(foot - 8.0, 0.0)):

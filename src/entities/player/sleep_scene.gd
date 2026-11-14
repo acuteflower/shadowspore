@@ -7,7 +7,14 @@ const SHUT: AudioStream = preload("res://assets/audio/hut/creak_b.wav")
 
 
 ## `rest`: a later night (the town quest: "rest until morning"): the same bed, nothing of the story is set again.
-func start(player: Player, world: WorldLevel, rest: bool = false) -> void:
+func start(
+	player: Player,
+	world: WorldLevel,
+	rest: bool = false,
+	wake_time: float = -1.0,
+	advance_time: bool = true,
+	on_blackout: Callable = Callable()
+) -> void:
 	player.story_lock = true
 	InputManager.ui_blocking = true
 	var layer: CanvasLayer = CanvasLayer.new()
@@ -29,6 +36,8 @@ func start(player: Player, world: WorldLevel, rest: bool = false) -> void:
 	var tween: Tween = create_tween().set_ignore_time_scale(true)
 	tween.tween_property(black, "color:a", 1.0, 2.2).set_delay(0.8)
 	await tween.finished
+	if on_blackout.is_valid():
+		on_blackout.call()
 	player.health.heal_full() ## the night mends her
 	if not rest:
 		player.quests.set_flag("slept")
@@ -41,6 +50,6 @@ func start(player: Player, world: WorldLevel, rest: bool = false) -> void:
 	var wake: WakeScene = WakeScene.new()
 	wake.name = "WakeScene"
 	player.add_child(wake)
-	wake.start(player, world, false, true, rest)
+	wake.start(player, world, false, true, rest, wake_time, advance_time)
 	await get_tree().process_frame
 	queue_free()

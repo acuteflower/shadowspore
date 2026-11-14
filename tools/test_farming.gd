@@ -53,6 +53,10 @@ func _rules() -> void:
 	for wild: String in wild_seeds:
 		_check(FarmRules.crop_for_seed(String((wild_seeds[wild] as Dictionary).seed)) != "", "wild seed of %s plants something" % wild)
 	_check(String(Items.definition({"id": "hoe_basic"}).get("tool", "")) == "hoe" and String(Items.definition({"id": "watering_can"}).get("tool", "")) == "can", "hoe and can are tools")
+	_check(int(cfg.get("can_max", 0)) == 12 and Items.water_max({"id": "watering_can", "count": 1}) == 12, "watering can capacity is 12")
+	for extra: String in ["moon_leek", "oasis_melon", "amber_grain"]:
+		_check(FarmRules.crops().has(extra) and String(FarmRules.crop(extra).get("origin", "")) == "field", "%s is a field-exclusive crop" % extra)
+	_check(bool(FarmRules.crop("moon_leek").get("glow", false)), "moon_leek glows in the dark")
 	var day: int = 5
 	var rough: Dictionary = {}
 	_check(FarmRules.tool_wanted(rough, day) == "hoe", "rough ground wants the hoe")
@@ -159,8 +163,19 @@ func _run() -> void:
 	player.quests.set_flag("rebuild_done")
 	await _frames(100)
 	_check(town.founded and town.farm != null, "the town is founded and has a farm manager")
-	player.inventory.give("wood", 40)
+	(TownRules.piece("plaza") as Dictionary)["build_seconds"] = 0.2
+	player.inventory.give("stone", 20)
+	player.inventory.give("wood", 44)
 	player.inventory.give("plant_fiber", 20)
+	var plaza_at: Vector2 = _find_site(town, "plaza", hut.position + Vector2(0, 120))
+	if plaza_at != Vector2.INF:
+		town.request_place("plaza", plaza_at, false)
+		await _frames(3)
+		var plaza_id: int = town.next_id - 1
+		for i: int in 300:
+			await get_tree().process_frame
+			if town.is_built(plaza_id):
+				break
 	_check(not town.is_unlocked("field") and town.lock_reason("field") != "", "fields are locked before the first hoe (%s)" % town.lock_reason("field"))
 	town.unlock("farming")
 	await _frames(2)
@@ -190,9 +205,31 @@ func _run() -> void:
 	await _frames(2)
 	_check(bool(farm.cell_state(field_id, 4).get("t", 0)), "the hoe tills the bed")
 	_select(player, "watering_can")
+	_check(Items.water(player.inventory.active_stack()) == 12, "fresh watering can starts full (12)")
 	farm.host_hit(field_id, 4, peer)
 	await _frames(2)
 	_check(FarmRules.is_wet(farm.cell_state(field_id, 4), TimeManager.day), "empty beds can be watered")
+	_check(Items.water(player.inventory.active_stack()) == 11, "watering uses one charge (%d)" % Items.water(player.inventory.active_stack()))
+	# empty watering can refuses to water until refilled
+	farm.host_hit(field_id, 5, peer) ## till 5? not yet hoed: hoe first
+	_select(player, "hoe_basic")
+	farm.host_hit(field_id, 5, peer)
+	await _frames(1)
+	_select(player, "watering_can")
+	player.inventory.slots[player.inventory.selected][Items.WATER_KEY] = 0
+	farm.host_hit(field_id, 5, peer)
+	await _frames(1)
+	_check(not FarmRules.is_wet(farm.cell_state(field_id, 5), TimeManager.day), "empty watering can cannot water")
+	var barrel: Node2D = get_tree().get_first_node_in_group("water_barrels") as Node2D
+	_check(barrel != null, "hut yard has a rain barrel")
+	if barrel != null:
+		player.global_position = barrel.global_position + Vector2(0.0, 12.0)
+		await _frames(2)
+		farm.request_refill()
+		await _frames(2)
+		_check(Items.water(player.inventory.active_stack()) == 12, "rain barrel refills watering can (%d)" % Items.water(player.inventory.active_stack()))
+	player.global_position = farm.cell_center(field_id, 4) + Vector2(0.0, 14.0)
+	await _frames(2)
 	var cell: FieldCell = view._cells[4]
 	_check(String(cell.spec().get("tool", "x")) == "", "a watered empty bed wants no tool")
 	_select(player, "tuber_seed")
@@ -229,6 +266,25 @@ func _run() -> void:
 	_check(String(farm.cell_state(field_id, 2).get("c", "")) == "ember_carrot" and int(farm.cell_state(field_id, 2).get("a", 0)) == 2, "state survives a save round trip")
 	var full: Dictionary = town.export_state()
 	_check(full.has("farm") and full.has("unlocks"), "the town save holds farm and unlocks")
+	# glowing ripe crop joins flora_glow for fireflies; field crops restore stamina / moon_glow
+	farm._rpc_cell(field_id, 3, {"t": 1, "c": "moon_leek", "a": FarmRules.ripe_stage("moon_leek"), "p": 0, "m": 0, "u": day}, "grow")
+	await _frames(2)
+	var glow_cell: FieldCell = view._cells[3]
+	_check(glow_cell._firefly_anchor != null and glow_cell._firefly_anchor.is_in_group("flora_glow"), "ripe moon_leek attracts fireflies via flora_glow")
+	player.inventory.give("amber_grain", 1)
+	player.stamina.spend(40.0)
+	var stam_before: float = player.stamina.current
+	_select(player, "amber_grain")
+	player.inventory._use(player.inventory.selected)
+	await _frames(2)
+	_check(player.stamina.current > stam_before + 20.0, "amber_grain restores stamina")
+	if player.effects != null:
+		player.effects.clear("food_pause")
+	player.inventory.give("moon_leek", 1)
+	_select(player, "moon_leek")
+	player.inventory._use(player.inventory.selected)
+	await _frames(2)
+	_check(player.effects != null and player.effects.has("moon_glow"), "moon_leek applies moon_glow night aura")
 	town.request_demolish(field_id)
 	await _frames(3)
 	_check(not farm.fields.has(field_id) and town.view_of(field_id) == null, "demolishing a field takes its beds along")

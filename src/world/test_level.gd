@@ -33,17 +33,48 @@ const GROUND_RECT: Rect2i = Rect2i(-52, -32, 104, 64) ## in tiles, covers arena 
 
 var _enemy_count: int = 0
 var _wave_count: int = 0
+var loading_in_steps: bool = false ## launcher drives initialization, chunk streaming, and warmup across frames
+var _stepped_init_done: bool = false
 
 
 func _ready() -> void:
 	add_to_group("world") ## the save file finds it here
+	if loading_in_steps:
+		_begin_stepped_load()
+		return
 	_fill_ground()
 	Terrain.register_layer(_ground)
+	_init_server_players()
+
+
+func _init_server_players() -> void:
 	if not multiplayer.is_server():
 		return
 	multiplayer.peer_connected.connect(_spawn_player)
 	multiplayer.peer_disconnected.connect(_despawn_player)
 	_spawn_player(multiplayer.get_unique_id())
+
+
+func _begin_stepped_load() -> void:
+	_stepped_init_done = false
+
+
+func loading_init_step() -> bool:
+	if _stepped_init_done:
+		return true
+	_stepped_init_done = true
+	_fill_ground()
+	Terrain.register_layer(_ground)
+	_init_server_players()
+	return true
+
+
+func loading_step() -> bool:
+	return true
+
+
+func loading_warmup_step() -> bool:
+	return true
 
 
 func _process(_delta: float) -> void:

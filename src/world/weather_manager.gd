@@ -241,7 +241,7 @@ func _push_wind() -> void:
 func _run_lightning(delta: float, world_seed: int) -> void:
 	var l: Dictionary = _cfg.get("lightning", {}) as Dictionary
 	var slice_len: float = float(l.get("slice", 1.0))
-	var now: float = _epoch * WeatherRules.DAY_SEC
+	var now: float = _epoch * WeatherRules._day_sec()
 	var slice: int = floori(now / slice_len)
 	var storm_drive: float = maxf(storm, desert_arcane_storm)
 	if _slice_seen < 0 or slice < _slice_seen or slice - _slice_seen > 3:

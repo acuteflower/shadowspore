@@ -3,6 +3,7 @@
  "unlock": "farming",
  "fallow_days": 3,
  "ripe_bonus": 1,
+ "can_max": 12,
  "wild_seeds": {
   "earth_tuber": {
    "seed": "tuber_seed",
@@ -104,6 +105,67 @@
     "max": 1
    },
    "origin": "wild"
+  },
+  "moon_leek": {
+   "name": "MONDLAUCH",
+   "seed": "moon_leek_seed",
+   "grow": [
+    1,
+    2,
+    2
+   ],
+   "yield": {
+    "item": "moon_leek",
+    "min": 2,
+    "max": 3
+   },
+   "seed_back": {
+    "chance": 0.4,
+    "min": 1,
+    "max": 2
+   },
+   "glow": true,
+   "origin": "field"
+  },
+  "oasis_melon": {
+   "name": "QUELLMELONE",
+   "seed": "oasis_melon_seed",
+   "grow": [
+    2,
+    2,
+    2
+   ],
+   "yield": {
+    "item": "oasis_melon",
+    "min": 2,
+    "max": 3
+   },
+   "seed_back": {
+    "chance": 0.35,
+    "min": 1,
+    "max": 1
+   },
+   "origin": "field"
+  },
+  "amber_grain": {
+   "name": "BERNSTEINKORN",
+   "seed": "amber_grain_seed",
+   "grow": [
+    1,
+    2,
+    2
+   ],
+   "yield": {
+    "item": "amber_grain",
+    "min": 3,
+    "max": 5
+   },
+   "seed_back": {
+    "chance": 0.45,
+    "min": 1,
+    "max": 2
+   },
+   "origin": "field"
   }
  }
 }

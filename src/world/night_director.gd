@@ -258,6 +258,33 @@ func _end_night() -> void:
 		town.set_fear(false)
 
 
+## Skips the remainder of the night when players sleep in a bed: clears spawned night creatures and active raids without awarding `night_survived` XP.
+func skip_night() -> void:
+	if not multiplayer.is_server():
+		return
+	_in_window = false
+	_ledger.clear()
+	lure = 0.0
+	_force_raid = false
+	_end_raid(false)
+	special = "none"
+	_hunters_left = 0
+	for list: Array[Dictionary] in [_live, _water]:
+		for entry: Dictionary in list:
+			var node: Node2D = entry.get("node") as Node2D
+			if is_instance_valid(node) and not node.is_queued_for_deletion():
+				node.queue_free()
+	_live.clear()
+	_water.clear()
+	_breather.clear()
+	_evidence.clear()
+	_noise.clear()
+	_seen.clear()
+	var town: TownManager = _world.town() as TownManager
+	if town != null and town.fear_on:
+		town.set_fear(false)
+
+
 ## The omens at dusk (the first sign that the dark will not be an ordinary one): a special night, then a new rung of the ladder, then a new moon. One banner a dusk.
 func _dusk_notice() -> void:
 	var cfg: Dictionary = NightRules.config().omens as Dictionary

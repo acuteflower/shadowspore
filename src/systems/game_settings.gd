@@ -10,6 +10,7 @@ const DEFAULTS: Dictionary = {
 	"fullscreen": false, "vsync": true, "shake": 100,
 	"numbers": true, "language": "de", "position": true, "cursor": true,
 	"weather_fx": 2, "flash_soft": false, "journal_still": false,
+	"player_name": "ELLIE",
 }
 
 static var _values: Dictionary = {}

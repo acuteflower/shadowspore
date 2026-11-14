@@ -1343,6 +1343,7 @@
   "rarity": "common",
   "enchant_slots": 0,
   "max_stack": 1,
+  "water_max": 12,
   "hotbar": true,
   "icon": "res://assets/items/watering_can.png",
   "held": "res://assets/items/watering_can_held.png",
@@ -1352,7 +1353,7 @@
    "reach": 24,
    "knockback": 0
   },
-  "description": "Ein Schwall über die Beete und die Saat trinkt. Nur gegossene Pflanzen wachsen über Nacht weiter. Regen giesst von selbst."
+  "description": "Ein Schwall über die Beete und die Saat trinkt. Fasst 12 Güsse; am Brunnenplatz, am Fluss, an der Regentonne oder im Regen wieder füllbar."
  },
  "tuber_seed": {
   "name": "Knollenkeim",
@@ -1397,6 +1398,82 @@
   "hotbar": true,
   "icon": "res://assets/items/wound_leaf_seed.png",
   "description": "Flache, zähe Samen. Das Blatt wächst nach, wenn man es pflückt. In der Schnellleiste gewählt, setzt E ihn in ein gehacktes Beet."
+ },
+ "moon_leek": {
+  "name": "Mondlauch",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/moon_leek.png",
+  "stats": {
+   "heal": 6,
+   "effect": "moon_glow",
+   "effect_seconds": 45
+  },
+  "description": "Silbrig-türkiser Lauch von bestellten Beeten. Stellt 6 Leben wieder her und hüllt dich 45 Sekunden in ruhigen Mondschimmer."
+ },
+ "moon_leek_seed": {
+  "name": "Mondlauchsamen",
+  "kind": "material",
+  "seed": true,
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/moon_leek_seed.png",
+  "description": "Kühl glimmende Lauchzwiebelchen für bestellte Stadtbeete. In der Schnellleiste gewählt, setzt E sie in ein gehacktes Beet."
+ },
+ "oasis_melon": {
+  "name": "Quellmelone",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/oasis_melon.png",
+  "stats": {
+   "heal": 10,
+   "cools": 60
+  },
+  "description": "Kühle, türkis geäderte Feldmelone aus Karawanenkernen. Stellt 10 Leben her, kühlt 60 Sekunden in der Hitze und erfrischt die Ausdauer."
+ },
+ "oasis_melon_seed": {
+  "name": "Quellmelonenkerne",
+  "kind": "material",
+  "seed": true,
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/oasis_melon_seed.png",
+  "description": "Feuchte Kerne aus fernen Oasen. Brauchen auf dem Feld Zeit und Wasser. In der Schnellleiste gewählt, setzt E sie in ein gehacktes Beet."
+ },
+ "amber_grain": {
+  "name": "Bernsteinkorn",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": true,
+  "icon": "res://assets/items/amber_grain.png",
+  "stats": {
+   "heal": 4,
+   "stamina": 35
+  },
+  "description": "Goldenes, nahrhaftes Korn von den Stadtäckern. Stellt 4 Leben und sofort 35 Ausdauer wieder her; auch von der Karawane gefragt."
+ },
+ "amber_grain_seed": {
+  "name": "Bernsteinsaat",
+  "kind": "material",
+  "seed": true,
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "icon": "res://assets/items/amber_grain_seed.png",
+  "description": "Schwere, goldene Körner für weite Beete. In der Schnellleiste gewählt, setzt E sie in ein gehacktes Beet."
  },
  "staff_hag_elm": {
   "name": "Hexenulmenstab",

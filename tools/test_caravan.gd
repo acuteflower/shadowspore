@@ -53,6 +53,7 @@ func _rules() -> void:
 	CaravanRules.set_storm_override(func(e: float) -> bool: return int(floorf(e)) == storm_day)
 	var shifted: Array[Dictionary] = CaravanRules.visits(seed_a, 10, 30.0)
 	_check(int(floorf(float(shifted[0].a))) == 11 and int(shifted[0].shift) == 1, "an arrival into a storm comes a day later")
+	_check(CaravanRules.first_possible_day(0) == 4 and CaravanRules.first_possible_day(2) == 4 and CaravanRules.first_possible_day(5) == 6, "first possible caravan day respects min_day")
 	CaravanRules.set_storm_override(func(_e: float) -> bool: return false)
 	## phases
 	var v: Dictionary = list[0]

@@ -287,6 +287,41 @@ func import_hidden(saved: Dictionary) -> void:
 		sync_hidden()
 
 
+## Host only: takes one charge of water out of the watering can in `slot_index` (defaults to `selected`). False when empty or not a can.
+func spend_water(slot_index: int = -1) -> bool:
+	var idx: int = selected if slot_index < 0 else slot_index
+	if not _valid(idx):
+		return false
+	var stack: Dictionary = slots[idx]
+	var limit: int = Items.water_max(stack)
+	var now_water: int = Items.water(stack)
+	if limit <= 0 or now_water <= 0:
+		return false
+	stack[Items.WATER_KEY] = now_water - 1
+	_commit()
+	return true
+
+
+## Host only: fills the selected watering can (or the first unfull watering can in the bag) back to capacity. False when already full or none owned.
+func refill_water(slot_index: int = -1) -> bool:
+	var targets: Array[int] = []
+	if _valid(slot_index):
+		targets.append(slot_index)
+	else:
+		targets.append(selected)
+		for i: int in SIZE:
+			if i != selected:
+				targets.append(i)
+	for idx: int in targets:
+		var stack: Dictionary = slots[idx]
+		var limit: int = Items.water_max(stack)
+		if limit > 0 and Items.water(stack) < limit:
+			stack[Items.WATER_KEY] = limit
+			_commit()
+			return true
+	return false
+
+
 ## Empties the bag, the hotbar and the worn equipment (the wake-up in the hut: the story starts again with nothing). Host only.
 func clear_all() -> void:
 	for i: int in slots.size():
@@ -400,6 +435,12 @@ func _use(index: int) -> bool:
 		var cools: float = float(stats.get("cools", 0.0))
 		if cools > 0.0:
 			player.cool_down(cools)
+		var stamina_gain: float = float(stats.get("stamina", 0.0))
+		if stamina_gain > 0.0 and player.stamina != null:
+			player.stamina.restore(stamina_gain)
+		var eff_id: String = String(stats.get("effect", ""))
+		if eff_id != "" and player.effects != null:
+			player.effects.apply(eff_id, float(stats.get("effect_seconds", 30.0)))
 	elif kind == "potion":
 		_drink(player, AlchemyRules.of(stack))
 	else:
@@ -425,6 +466,11 @@ static func usable(player: Player, def: Dictionary) -> bool:
 	if kind == "consumable":
 		var stats: Dictionary = def.get("stats", {})
 		if float(stats.get("cools", 0.0)) > 0.0 and player.is_heated():
+			return true
+		if float(stats.get("stamina", 0.0)) > 0.0 and player.stamina != null and player.stamina.current < player.stamina.max_stamina - 0.5:
+			return true
+		var eff_id: String = String(stats.get("effect", ""))
+		if eff_id != "" and player.effects != null and not player.effects.has(eff_id):
 			return true
 		return not (float(stats.get("heal", 0)) + float(stats.get("regen", 0)) > 0.0 and not player.health.can_heal())
 	var info: Dictionary = def.get("potion", {}) as Dictionary

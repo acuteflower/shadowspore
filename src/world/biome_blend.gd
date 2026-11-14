@@ -15,21 +15,46 @@ static var _arid_cells: PackedFloat32Array = PackedFloat32Array()
 static var _side: int = 0
 static var _lake_bytes: PackedByteArray = PackedByteArray()
 static var _lake_side: int = 0
+static var _installed_key: String = ""
+static var _gloom_tex: ImageTexture
+static var _arid_tex: ImageTexture
+
+
+static func cache_key_for(map: RegionMap) -> String:
+	return "%d:%s" % [map.world_seed, map.world_biome]
+
+
+static func has_cache(expected_key: String) -> bool:
+	return _installed_key == expected_key and not _cells.is_empty() and _side > 0
+
+
+static func clear_cache() -> void:
+	_cells = PackedFloat32Array()
+	_arid_cells = PackedFloat32Array()
+	_side = 0
+	_lake_bytes = PackedByteArray()
+	_lake_side = 0
+	_installed_key = ""
+	_gloom_tex = null
+	_arid_tex = null
+	RenderingServer.global_shader_parameter_set("g_gloom", null)
+	RenderingServer.global_shader_parameter_set("g_arid", null)
+	RenderingServer.global_shader_parameter_set("g_lake_sdf", null)
 
 
 ## The gloom field as numbers 0..1, one per map cell (row-major, `map.grid_size` wide).
-static func compute(map: RegionMap) -> PackedFloat32Array:
-	return _compute_field(map, "gloom", 48.0)
+static func compute(map: RegionMap, biomes_table: Dictionary = {}) -> PackedFloat32Array:
+	return _compute_field(map, "gloom", 48.0, biomes_table)
 
 
 ## The arid desert field as numbers 0..1, one per map cell (row-major, `map.grid_size` wide).
-static func compute_arid(map: RegionMap) -> PackedFloat32Array:
-	return _compute_field(map, "arid", 96.0)
+static func compute_arid(map: RegionMap, biomes_table: Dictionary = {}) -> PackedFloat32Array:
+	return _compute_field(map, "arid", 96.0, biomes_table)
 
 
-static func _compute_field(map: RegionMap, key: String, default_fade: float) -> PackedFloat32Array:
+static func _compute_field(map: RegionMap, key: String, default_fade: float, biomes_table: Dictionary = {}) -> PackedFloat32Array:
 	var side: int = map.grid_size
-	var biomes: Dictionary = DataRegistry.table("biomes")
+	var biomes: Dictionary = biomes_table if not biomes_table.is_empty() else DataRegistry.table("biomes")
 	var strength: PackedFloat32Array = PackedFloat32Array()
 	var fade: PackedFloat32Array = PackedFloat32Array()
 	strength.resize(side * side)
@@ -124,23 +149,58 @@ static func _compute_field(map: RegionMap, key: String, default_fade: float) -> 
 	return filled
 
 
-## Builds the fields for `map`, publishes them to the shaders and keeps the numbers for `amount_at` / `arid_at`.
-static func install(map: RegionMap) -> void:
-	_cells = compute(map)
-	_arid_cells = compute_arid(map)
-	_side = map.grid_size
-	RenderingServer.global_shader_parameter_set("g_gloom", _make_r8_texture(_cells, _side))
-	RenderingServer.global_shader_parameter_set("g_arid", _make_r8_texture(_arid_cells, _side))
+## Pure worker-safe computation of the BiomeBlend grids and decoded lake bytes.
+static func compute_bundle(map: RegionMap, biomes_table: Dictionary, lake_img: Image) -> Dictionary:
+	var lake_bytes: PackedByteArray = PackedByteArray()
+	var lake_side: int = 0
+	if lake_img != null:
+		var copy: Image = lake_img.duplicate() as Image
+		if copy.get_format() != Image.FORMAT_L8 and copy.get_format() != Image.FORMAT_R8:
+			copy.convert(Image.FORMAT_R8)
+		lake_bytes = copy.get_data()
+		lake_side = copy.get_width()
+	return {
+		"key": cache_key_for(map),
+		"cells": compute(map, biomes_table),
+		"arid_cells": compute_arid(map, biomes_table),
+		"side": map.grid_size,
+		"lake_bytes": lake_bytes,
+		"lake_side": lake_side,
+	}
+
+
+## Publishes a precomputed bundle (from `compute_bundle`) on the main thread.
+static func apply_bundle(bundle: Dictionary, lake_tex: Texture2D) -> void:
+	_cells = bundle.get("cells", PackedFloat32Array()) as PackedFloat32Array
+	_arid_cells = bundle.get("arid_cells", PackedFloat32Array()) as PackedFloat32Array
+	_side = int(bundle.get("side", 0))
+	_lake_bytes = bundle.get("lake_bytes", PackedByteArray()) as PackedByteArray
+	_lake_side = int(bundle.get("lake_side", 0))
+	_installed_key = String(bundle.get("key", ""))
+	_gloom_tex = _make_r8_texture(_cells, _side)
+	_arid_tex = _make_r8_texture(_arid_cells, _side)
+	_publish_shaders(lake_tex)
+	Jobs.register_cleanup(BiomeBlend.clear_cache)
+
+
+static func _publish_shaders(lake_tex: Texture2D) -> void:
+	RenderingServer.global_shader_parameter_set("g_gloom", _gloom_tex)
+	RenderingServer.global_shader_parameter_set("g_arid", _arid_tex)
 	RenderingServer.global_shader_parameter_set("g_gloom_rect", Vector4(0.0, 0.0, WORLD_PX, WORLD_PX))
-	var lake_tex: Texture2D = ResourceLoader.load(LAKE_SDF_PATH) as Texture2D
 	if lake_tex != null:
 		RenderingServer.global_shader_parameter_set("g_lake_sdf", lake_tex)
-		var lake_img: Image = lake_tex.get_image()
-		if lake_img != null:
-			if lake_img.get_format() != Image.FORMAT_L8 and lake_img.get_format() != Image.FORMAT_R8:
-				lake_img.convert(Image.FORMAT_R8)
-			_lake_bytes = lake_img.get_data()
-			_lake_side = lake_img.get_width()
+
+
+## Builds the fields for `map`, publishes them to the shaders and keeps the numbers for `amount_at` / `arid_at`.
+static func install(map: RegionMap) -> void:
+	var key: String = cache_key_for(map)
+	var lake_tex: Texture2D = ResourceLoader.load(LAKE_SDF_PATH) as Texture2D
+	if has_cache(key) and _gloom_tex != null and _arid_tex != null:
+		_publish_shaders(lake_tex)
+		return
+	var lake_img: Image = lake_tex.get_image() if lake_tex != null else null
+	var bundle: Dictionary = compute_bundle(map, DataRegistry.table("biomes"), lake_img)
+	apply_bundle(bundle, lake_tex)
 
 
 static func _make_r8_texture(values: PackedFloat32Array, side: int) -> ImageTexture:
@@ -163,20 +223,24 @@ static func arid_at(pos: Vector2) -> float:
 
 
 ## Signed distance in tiles from lake water (`< 0` in water, `0` at bank, `+d` up to ~15.875 on dry land), synced with `g_lake_sdf`.
-static func lake_tiles_at(pos: Vector2) -> float:
-	if _lake_side == 0 or _lake_bytes.is_empty():
+static func sample_lake_tiles(lake_bytes: PackedByteArray, lake_side: int, pos: Vector2) -> float:
+	if lake_side == 0 or lake_bytes.is_empty():
 		return 16.0
-	var u: Vector2 = pos / WORLD_PX * float(_lake_side) - Vector2(0.5, 0.5)
+	var u: Vector2 = pos / WORLD_PX * float(lake_side) - Vector2(0.5, 0.5)
 	var x0: int = floori(u.x)
 	var y0: int = floori(u.y)
 	var fx: float = u.x - float(x0)
 	var fy: float = u.y - float(y0)
 	var raw: float = lerpf(
-		lerpf(_lake_byte(x0, y0), _lake_byte(x0 + 1, y0), fx),
-		lerpf(_lake_byte(x0, y0 + 1), _lake_byte(x0 + 1, y0 + 1), fx),
+		lerpf(float(lake_bytes[clampi(y0, 0, lake_side - 1) * lake_side + clampi(x0, 0, lake_side - 1)]), float(lake_bytes[clampi(y0, 0, lake_side - 1) * lake_side + clampi(x0 + 1, 0, lake_side - 1)]), fx),
+		lerpf(float(lake_bytes[clampi(y0 + 1, 0, lake_side - 1) * lake_side + clampi(x0, 0, lake_side - 1)]), float(lake_bytes[clampi(y0 + 1, 0, lake_side - 1) * lake_side + clampi(x0 + 1, 0, lake_side - 1)]), fx),
 		fy
 	)
 	return (raw - 128.0) / 8.0
+
+
+static func lake_tiles_at(pos: Vector2) -> float:
+	return sample_lake_tiles(_lake_bytes, _lake_side, pos)
 
 
 static func _lake_byte(x: int, y: int) -> float:
@@ -251,19 +315,23 @@ static func puddle_at(pos: Vector2, puddle_amount: float) -> float:
 	return clampf((pn - pthr) / 0.08, 0.08, 1.0)
 
 
-static func _sample(arr: PackedFloat32Array, pos: Vector2) -> float:
-	if _side == 0 or arr.is_empty():
+static func sample_field(arr: PackedFloat32Array, side: int, pos: Vector2) -> float:
+	if side == 0 or arr.is_empty():
 		return 0.0
-	var u: Vector2 = pos / WORLD_PX * float(_side) - Vector2(0.5, 0.5)
+	var u: Vector2 = pos / WORLD_PX * float(side) - Vector2(0.5, 0.5)
 	var x0: int = floori(u.x)
 	var y0: int = floori(u.y)
 	var fx: float = u.x - float(x0)
 	var fy: float = u.y - float(y0)
 	return lerpf(
-		lerpf(_cell_at(arr, x0, y0), _cell_at(arr, x0 + 1, y0), fx),
-		lerpf(_cell_at(arr, x0, y0 + 1), _cell_at(arr, x0 + 1, y0 + 1), fx),
+		lerpf(arr[clampi(y0, 0, side - 1) * side + clampi(x0, 0, side - 1)], arr[clampi(y0, 0, side - 1) * side + clampi(x0 + 1, 0, side - 1)], fx),
+		lerpf(arr[clampi(y0 + 1, 0, side - 1) * side + clampi(x0, 0, side - 1)], arr[clampi(y0 + 1, 0, side - 1) * side + clampi(x0 + 1, 0, side - 1)], fx),
 		fy
 	)
+
+
+static func _sample(arr: PackedFloat32Array, pos: Vector2) -> float:
+	return sample_field(arr, _side, pos)
 
 
 static func _cell_at(arr: PackedFloat32Array, x: int, y: int) -> float:

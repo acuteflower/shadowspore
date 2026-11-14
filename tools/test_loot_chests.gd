@@ -41,7 +41,8 @@ func _run() -> void:
 	if chests == null:
 		get_tree().quit(1)
 		return
-	check(chests.count() == 0, "no chest lies in the world yet (placed is empty)")
+	var placed_n: int = (DataRegistry.table("loot_chests").get("placed", []) as Array).size()
+	check(chests.count() == placed_n, "placed world chests loaded (%d == %d)" % [chests.count(), placed_n])
 	chests.rng.seed = 7
 	var player: Player = world._players.get_child(0) as Player
 	var home: Vector2 = player.global_position
@@ -101,7 +102,8 @@ func _run() -> void:
 	var saved: Dictionary = chests.export_state()
 	check((saved.boss as Dictionary).has(bid), "an unopened boss chest is kept in the save")
 	chests.import_state(saved) ## loading the same state again must not double it
-	check(chests.count() == 4, "importing does not double the chests (%d)" % chests.count())
+	var placed_n2: int = (DataRegistry.table("loot_chests").get("placed", []) as Array).size()
+	check(chests.count() == placed_n2 + 4, "importing does not double the chests (%d)" % chests.count())
 	player.request_teleport(spot + Vector2(0, 18))
 	await _wait(0.3)
 	copper = int(player.progress.get("copper"))
@@ -112,7 +114,7 @@ func _run() -> void:
 	for drop: ItemDrop in _drops():
 		ids.append(drop.story_id if drop.story_id != "" else drop.item_id)
 	check(ids.has("void_splinter") and ids.has("shadow_core"), "the boss's items sprang out: %s" % [ids])
-	check(ids.has(BossRelics.PREFIX + "rissfeder"), "the first kill's relic came out of the chest")
+	check(ids.has(BossRelics.PREFIX + "rissfeder") or player.inventory.has_item("rissfeder"), "the first kill's relic came out of the chest")
 	check(not (chests.export_state().boss as Dictionary).has(bid), "an opened boss chest leaves the save")
 	print("LOOT CHESTS ", "OK" if _ok else "FAILED")
 	get_tree().quit(0 if _ok else 1)

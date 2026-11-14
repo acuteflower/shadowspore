@@ -158,32 +158,37 @@ func _run() -> void:
 		var cell: Vector2i = spent[kind]
 		_check(world._things.has(cell) and not town.cleared.has(cell) and world._thing_states.has(cell), "a used-up %s in the light stays and grows back" % kind)
 	# --- move: a finished piece is carried a cell over (across its own footprint), mirrored, for free; it takes its light along
+	var move_from: Vector2 = _find_site(town, "lamp_post", hut.position + Vector2(-50, 110))
+	var move_id: int = town.next_id
+	town._rpc_added(move_id, {"p": "lamp_post", "x": move_from.x, "y": move_from.y, "f": 0, "g": TownManager.PROGRESS_FULL}, []) ## a finished lamp post, laid by hand (the plaza rule is not what this checks)
+	await _frames(2)
 	var lamp_spec: Dictionary = TownRules.piece("lamp_post")
 	var lamp_wide: float = float((lamp_spec.get("foot", [16, 16]) as Array)[0])
-	var move_to: Vector2 = TownRules.snapped_position("lamp_post", lamp_at + Vector2(maxf(TownRules.snap_of("lamp_post"), lamp_wide * 0.5), 0.0))
+	var move_to: Vector2 = TownRules.snapped_position("lamp_post", move_from + Vector2(maxf(TownRules.snap_of("lamp_post"), lamp_wide * 0.5), 0.0))
 	for tries: int in 8:
-		if town.check_move(lamp_id, move_to, player) == "":
+		if town.check_move(move_id, move_to, player) == "":
 			break
 		move_to = TownRules.snapped_position("lamp_post", move_to + Vector2(0.0, TownRules.snap_of("lamp_post")))
-	_check(TownRules.overlaps(TownRules.foot_rect("lamp_post", move_to.x, move_to.y), town.rect_of(lamp_id)) == false or town.check_site("lamp_post", move_to) != "", "without its own id the piece would stand in its own way")
-	_check(town.check_move(lamp_id, move_to, player) == "", "a piece may be moved next to where it stands (%s)" % town.check_move(lamp_id, move_to, player))
+	_check(not TownRules.overlaps(TownRules.foot_rect("lamp_post", move_to.x, move_to.y), town.rect_of(move_id)) or town.check_site("lamp_post", move_to) != "", "without its own id the piece would stand in its own way")
+	_check(town.check_move(move_id, move_to, player) == "", "a piece may be moved next to where it stands (%s)" % town.check_move(move_id, move_to, player))
 	_check(town.check_move(0, move_to, player) != "", "the house is not moved")
 	var stock_before_move: Dictionary = town.stock.duplicate()
 	var bag_before_move: int = player.inventory.count_item("wood")
-	town.request_move(lamp_id, move_to, true)
+	town.request_move(move_id, move_to, true)
 	await _frames(3)
-	var moved: Dictionary = town.structures[lamp_id] as Dictionary
-	_check(town.position_of(lamp_id) == move_to and int(moved.f) == 1, "the piece stands at the new place, mirrored (%s)" % str(town.position_of(lamp_id)))
-	_check(town.is_built(lamp_id), "a finished piece stays finished")
-	_check(town.view_of(lamp_id) != null and town.view_of(lamp_id).position == move_to, "its picture stands at the new place")
+	_check(town.position_of(move_id) == move_to and int((town.structures[move_id] as Dictionary).f) == 1, "the piece stands at the new place, mirrored (%s)" % str(town.position_of(move_id)))
+	_check(town.is_built(move_id), "a finished piece stays finished")
+	_check(town.view_of(move_id) != null and town.view_of(move_id).position == move_to, "its picture stands at the new place")
 	_check(town.circles().any(func(c: Vector3) -> bool: return is_equal_approx(c.x, move_to.x) and is_equal_approx(c.y, move_to.y - 8.0)), "its light went along")
 	_check(town.stock == stock_before_move and player.inventory.count_item("wood") == bag_before_move, "moving costs nothing")
-	town.request_move(lamp_id, lamp_at + Vector2(0, 400), false)
+	town.request_move(move_id, move_from + Vector2(0, 400), false)
 	await _frames(2)
-	_check(town.position_of(lamp_id) == move_to, "a place in the dark is refused")
-	town.request_move(lamp_id, lamp_at, false)
+	_check(town.position_of(move_id) == move_to, "a place in the dark is refused")
+	town.request_move(move_id, move_from, false)
 	await _frames(3)
-	_check(town.position_of(lamp_id) == lamp_at and int((town.structures[lamp_id] as Dictionary).f) == 0, "it can be carried back (%s)" % str(town.position_of(lamp_id)))
+	_check(town.position_of(move_id) == move_from and int((town.structures[move_id] as Dictionary).f) == 0, "it can be carried back (%s)" % str(town.position_of(move_id)))
+	town._rpc_removed(move_id)
+	await _frames(2)
 	# --- demolish: a finished piece gives back 60 %, rounded up, into the stock
 	var stock_wood: int = int(town.stock.get("wood", 0))
 	town.request_demolish(lamp_id)
@@ -544,6 +549,36 @@ func _run() -> void:
 	_check(builder.active, "the tab starts the build mode and closes itself")
 	pause._set_open(false)
 	builder.set_active(false)
+	# --- plaza active upgrade (Lv 1 -> Lv 2)
+	var plaza_ids: Array[int] = town.built_ids("plaza")
+	var plaza_id: int = plaza_ids[0] if not plaza_ids.is_empty() else -1
+	_check(plaza_id >= 0 and town.structure_level(plaza_id) == 1, "plaza starts at level 1")
+	if plaza_id >= 0:
+		while town.level() < 2:
+			var pad_id: int = town.next_id
+			town.next_id += 1
+			town._rpc_added(pad_id, {"p": "lamp_post", "x": town.center.x + float(pad_id) * 16.0, "y": town.center.y - 60.0, "f": 0, "g": TownManager.PROGRESS_FULL, "d": TimeManager.day, "u": {"f": 1000, "l": 1}}, [])
+		await _frames(2)
+		var worth_before: float = town.worth()
+		var up_spec: Dictionary = TownRules.upgrade_spec("plaza", 2)
+		up_spec["build_seconds"] = 0.2
+		player.inventory.give("stone", 20)
+		player.inventory.give("plank", 10)
+		player.inventory.give("iron_ingot", 6)
+		player.request_teleport(town.position_of(plaza_id) + Vector2(0, 12))
+		await _frames(10)
+		_check(town.has_next_upgrade(plaza_id), "plaza offers Lv 2 upgrade when town reaches WEILER (%d)" % town.level())
+		town.request_upgrade(plaza_id)
+		await _frames(3)
+		_check(town.is_upgrading(plaza_id), "plaza enters active upgrade state")
+		for i: int in 300:
+			await get_tree().process_frame
+			if not town.is_upgrading(plaza_id):
+				break
+		var plaza_view: TownStructure = town.view_of(plaza_id)
+		_check(town.structure_level(plaza_id) == 2, "plaza reaches Lv 2 (%d)" % town.structure_level(plaza_id))
+		_check(town.worth() > worth_before + 3.0, "Lv 2 plaza adds worth (%.1f -> %.1f)" % [worth_before, town.worth()])
+		_check(plaza_view != null and String(plaza_view._spec.texture) == "plaza_2", "Lv 2 plaza view uses plaza_2 art (%s)" % (String(plaza_view._spec.texture) if plaza_view != null else "null"))
 	# --- saving and loading
 	var saved: Dictionary = town.export_state()
 	var text: String = JSON.stringify(saved)
@@ -554,6 +589,7 @@ func _run() -> void:
 	town.import_state(parsed)
 	await _frames(20)
 	_check(town.structures.size() == count and town.trust_of("gustav") == trust and JSON.stringify(town.stock, "", true) == stock_text, "the state survives the save file (%d pieces, trust %d)" % [town.structures.size(), town.trust_of("gustav")])
+	_check(plaza_id < 0 or town.structure_level(plaza_id) == 2, "plaza upgrade level survives import_state")
 	_check(town.settler_node("gustav") != null and town.view_of(shop_id) != null, "the settler and the pictures are rebuilt")
 	_check(town.cleared.has(soft_cell) or soft_cell.x < 0, "cleared props stay cleared")
 	_check(world._town_node.cleared.has(soft_cell) or soft_cell.x < 0, "and the world knows")

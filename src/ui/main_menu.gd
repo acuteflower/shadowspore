@@ -76,8 +76,21 @@ func _ready() -> void:
 	_black = ColorRect.new()
 	_black.color = Color.BLACK
 	_black.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_black.mouse_filter = Control.MOUSE_FILTER_STOP
+	_black.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	black_layer.add_child(_black)
+	var ret: Dictionary = GameLauncher.take_menu_return()
+	if not ret.is_empty():
+		_t0_usec -= 5000000
+		_ignited = true
+		_reach = 1.0
+		_black.color.a = 0.0
+		_logo_started = true
+		_logo.visible = true
+		_logo.skip_build()
+		_skipped = true
+		_ui.intro = 9.0
+		_ui.enabled = true
+		_ui.apply_return_state(ret)
 	_update_void(0.0, 0.0)
 
 
@@ -139,7 +152,11 @@ func _process(delta: float) -> void:
 			_finish_leaving()
 			return
 	var boot: float = t - BUILD_AFTER
-	if boot >= 0.0 and not _logo_started and not capture_mode:
+	if capture_mode and not _logo_started:
+		_logo_started = true
+		_logo.visible = true
+		_logo.skip_build()
+	elif boot >= 0.0 and not _logo_started and not capture_mode:
 		_logo_started = true
 		_logo.visible = true
 		_logo.play_build()
@@ -148,7 +165,7 @@ func _process(delta: float) -> void:
 	if not capture_mode:
 		_ui.intro = maxf(t - LETTERS_AFTER, 0.0) + _skip_bonus
 	_ui.enabled = _ui.intro > MainMenuUi.INTRO_DONE and _leaving.is_empty()
-	var dim: float = 0.2 if _ui.page != MainMenuUi.Page.MAIN else 1.0
+	var dim: float = 0.42 if _ui.page != MainMenuUi.Page.MAIN else 1.0
 	_logo.modulate.a = move_toward(_logo.modulate.a, dim, dt * 3.0)
 	# the camera sways slowly; the fire is followed on screen
 	var sway: Vector2 = Vector2(sin(t * TAU / 26.0) * DRIFT, sin(t * TAU / 37.0) * 2.0)

@@ -427,9 +427,12 @@ func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 				if value < score:
 					score = value
 					best = {"position":log_node.perch_point,"height":log_node.perch_height,"path":String(log_node.get_path()),"claim":key}
+	var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
 	for node: Node in get_tree().get_nodes_in_group("town_perches"): ## roofs, lamp arms, benches and fences of the town
 		var perch: RoofPerch = node as RoofPerch
 		if perch == null or perch.is_depleted():
+			continue
+		if town != null and bird.pet_key == "" and bird.species != "robin" and town.scared_at(perch.global_position) != Vector2.INF:
 			continue
 		var reach: float = perch.global_position.distance_to(bird.global_position)
 		if reach > 340.0 or (danger.is_finite() and perch.global_position.distance_to(danger) < float(bird._spec["safe_landing_range"])):

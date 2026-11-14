@@ -168,5 +168,36 @@
     "color": "4fe6d8",
     "hot": "e2fffc",
     "glyph": "drop"
+  },
+  "well_rested": {
+    "name": "AUSGERUHT",
+    "seconds": 600.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "ffd875",
+    "hot": "fff6d1",
+    "glyph": "rest"
+  },
+  "tired": {
+    "name": "ÜBERMÜDET",
+    "seconds": 1440.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "7a82ad",
+    "hot": "cbd2f2",
+    "glyph": "drowse",
+    "tiered": true
+  },
+  "moon_glow": {
+    "name": "MONDSCHIMMER",
+    "seconds": 45.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "8af6e0",
+    "hot": "e4fff8",
+    "glyph": "spark"
   }
 }

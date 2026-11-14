@@ -16,6 +16,7 @@ func _run() -> void:
 	seen.resize(MapDiscovery.GRID * MapDiscovery.GRID)
 	seen.fill(1)
 	discovery.import_data(seen.compress(FileAccess.COMPRESSION_ZSTD))
+	add_child(Waystones.new()) ## every statue sleeps: the map shows them grey
 	var layer: CanvasLayer = CanvasLayer.new()
 	add_child(layer)
 	var map: MapWindow = MapWindow.new()

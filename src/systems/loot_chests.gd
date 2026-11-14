@@ -1,7 +1,7 @@
 class_name LootChests
 extends Node2D
 ## The loot chests of the wild (docs/beutetruhen_konzept.md), host-authoritative and shared by everybody. A chest is placed with
-## `place(id, tier, pos, flip)` (from `data/loot_chests.json` `placed`, still empty: no chest lies in the world yet; later puzzles and places
+## `place(id, tier, pos, flip)` (from `data/loot_chests.json` `placed`, currently holding the 36 meadow explorer chests; puzzles and places
 ## call it too). E at a chest -> `LootChest.interact` (a hold for rare and legendary ones) -> `request_open` -> the host checks reach, life and
 ## state, tells every peer to play the opening (`_rpc_opened`) and pays in time with it: copper and XP to every living player within
 ## `share_radius`, the items (`LootRules.roll`) spring out of the chest's mouth one after the other, the best last.

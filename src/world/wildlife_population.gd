@@ -69,6 +69,16 @@ func _process(delta: float) -> void:
 		_collect_departed()
 
 
+## Populates one queued chunk during the paused loading screen once chunk colliders are synced.
+func loading_populate_step() -> bool:
+	if not multiplayer.is_server() or _pending.is_empty():
+		return true
+	var cell: Vector2i = _pending.pop_front()
+	if _active.has(cell):
+		_populate(cell)
+	return _pending.is_empty()
+
+
 func _populate(cell: Vector2i) -> void:
 	if _populations.has(cell) or _animals.get_child_count() >= int(_spec["max_loaded"]):
 		return

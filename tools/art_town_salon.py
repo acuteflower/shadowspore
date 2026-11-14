@@ -805,8 +805,8 @@ def make():
     ledge_c = [ledge_point(0.0, 1.6)[0] - CX, ledge_point(0.0, 1.6)[1] + 1 - GROUND]
     entry = {
         "name": "FREILUFTSALON", "needs": "plaza", "category": "living", "texture": "salon", "frame": [FW, FH], "feet": GROUND, "foot": [72, 18], "snap": 8,
-        "limit": 1, "salon": True, "cost": {"wood": 10, "stone": 3, "plant_fiber": 4, "glow_cap": 1}, "build_seconds": 8.0, "wave": 32, "worth": 3,
-        "info": "EIN FRISIERPLATZ UNTER FREIEM HIMMEL. HIER WIRD ELLIE BALD IHR AUSSEHEN ÄNDERN.", "glow": True, "anim": {"frames": 8, "fps": 6},
+        "limit": 1, "salon": True, "cost": {"plank": 12, "iron_ingot": 4, "willow_thread": 6, "prism_shard": 4}, "build_seconds": 18.0, "wave": 32, "worth": 8,
+        "info": "EIN FRISIERPLATZ UNTER FREIEM HIMMEL. HIER KANNST DU DEIN AUSSEHEN ÄNDERN.", "glow": True, "anim": {"frames": 8, "fps": 6},
         "light": {"color": "ffc890", "radius": 48, "energy": 0.6, "at": lamp_at, "flicker": 0.15},
         "preview": "salon_preview", "seats": [[-14, 4, 2]], "mirror": [round(glass_c[0]), round(glass_c[1])], "fireflies": True, "trample": {"strength": 0.6, "margin": 10, "front": False},
         "perches": [[-24, int(BEAM_SY), 58], [12, int(BEAM_SY), 58]],

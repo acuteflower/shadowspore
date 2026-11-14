@@ -35,51 +35,16 @@ var _ambient: AudioStreamPlayer
 var _step_clock: float = 0.0
 var _creaks: int = 0
 var _here_id: String = "" ## the room she stood in last frame
+var defer_setup: bool = false
+var _pending_ids: Array[String] = []
+var _setup_index: int = 0
+var _setup_finalized: bool = false
 
 
 func _ready() -> void:
 	add_to_group("interiors")
 	y_sort_enabled = true
 	name = "Interiors"
-	var table: Dictionary = DataRegistry.table("interiors")
-	for id: String in table:
-		var data: Dictionary = table[id] as Dictionary
-		var interior: Interior = Interior.new()
-		var next_to: Interior = null
-		if data.has("adjacent"): ## a room right next to another (the hallway under Ellie's room): no slot of its own
-			var adjacent: Dictionary = data.adjacent as Dictionary
-			next_to = _interiors.get(String(adjacent.to)) as Interior
-			var offset: Array = adjacent.offset as Array
-			interior.position = next_to.position + Vector2(float(offset[0]), float(offset[1]))
-		else:
-			interior.position = Vector2(POCKET_X0 + _order.size() * SLOT, POCKET_Y0)
-			_order.append(id)
-		add_child(interior)
-		interior.setup(id, data)
-		_interiors[id] = interior
-		if next_to != null:
-			next_to.join(interior)
-	for id: String in table: ## rooms that share the view with others they are not next to (the corridor leading up from the hallway)
-		for other_id: Variant in (table[id] as Dictionary).get("joins", []) as Array:
-			var other: Interior = _interiors.get(String(other_id)) as Interior
-			if other != null:
-				(_interiors[id] as Interior).join(other)
-	var seen: Array[Interior] = [] ## rooms that hang together (neighbours of neighbours) share one view and one dark round them
-	for start: Interior in _interiors.values():
-		if seen.has(start) or start.neighbors.is_empty():
-			continue
-		var group: Array[Interior] = [start]
-		var rect: Rect2 = Rect2(start.global_position, start.size)
-		var at: int = 0
-		while at < group.size():
-			for other: Interior in group[at].neighbors:
-				if not group.has(other):
-					group.append(other)
-					rect = rect.merge(Rect2(other.global_position, other.size))
-			at += 1
-		for member: Interior in group:
-			seen.append(member)
-			member.set_group_rect(rect)
 	Terrain.patches.append(self)
 	_wipe_layer = CanvasLayer.new()
 	_wipe_layer.layer = 80
@@ -97,6 +62,63 @@ func _ready() -> void:
 	_ambient.volume_db = -80.0
 	_ambient.finished.connect(func() -> void: _ambient.play())
 	add_child(_ambient)
+	var table: Dictionary = DataRegistry.table("interiors")
+	for id: String in table:
+		_pending_ids.append(id)
+	if not defer_setup:
+		setup_step(0)
+
+
+## Builds interior rooms incrementally up to `deadline_usec` (0 = all at once).
+func setup_step(deadline_usec: int = 0) -> bool:
+	if _setup_finalized:
+		return true
+	var table: Dictionary = DataRegistry.table("interiors")
+	var start: int = _setup_index
+	while _setup_index < _pending_ids.size():
+		var id: String = _pending_ids[_setup_index]
+		_setup_index += 1
+		var data: Dictionary = table[id] as Dictionary
+		var interior: Interior = Interior.new()
+		var next_to: Interior = null
+		if data.has("adjacent"): ## a room right next to another (the hallway under Ellie's room): no slot of its own
+			var adjacent: Dictionary = data.adjacent as Dictionary
+			next_to = _interiors.get(String(adjacent.to)) as Interior
+			var offset: Array = adjacent.offset as Array
+			interior.position = next_to.position + Vector2(float(offset[0]), float(offset[1]))
+		else:
+			interior.position = Vector2(POCKET_X0 + _order.size() * SLOT, POCKET_Y0)
+			_order.append(id)
+		add_child(interior)
+		interior.setup(id, data)
+		_interiors[id] = interior
+		if next_to != null:
+			next_to.join(interior)
+		if deadline_usec > 0 and _setup_index > start and Time.get_ticks_usec() >= deadline_usec:
+			return false
+	for id: String in table: ## rooms that share the view with others they are not next to (the corridor leading up from the hallway)
+		for other_id: Variant in (table[id] as Dictionary).get("joins", []) as Array:
+			var other: Interior = _interiors.get(String(other_id)) as Interior
+			if other != null:
+				(_interiors[id] as Interior).join(other)
+	var seen: Array[Interior] = [] ## rooms that hang together (neighbours of neighbours) share one view and one dark round them
+	for start_room: Interior in _interiors.values():
+		if seen.has(start_room) or start_room.neighbors.is_empty():
+			continue
+		var group: Array[Interior] = [start_room]
+		var group_rect: Rect2 = Rect2(start_room.global_position, start_room.size)
+		var at: int = 0
+		while at < group.size():
+			for other: Interior in group[at].neighbors:
+				if not group.has(other):
+					group.append(other)
+					group_rect = group_rect.merge(Rect2(other.global_position, other.size))
+			at += 1
+		for member: Interior in group:
+			seen.append(member)
+			member.set_group_rect(group_rect)
+	_setup_finalized = true
+	return true
 
 
 func _exit_tree() -> void:

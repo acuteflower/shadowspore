@@ -37,6 +37,11 @@ func rest_tick(_player: Player, _seated: float) -> void:
 	pass
 
 
+## Whether to show the floating "AUFSTEHEN" prompt above the sitter once seated.
+func show_stand_prompt() -> bool:
+	return true
+
+
 func occupied() -> bool:
 	for node: Node in get_tree().get_nodes_in_group("settlers"):
 		var settler: Node2D = node as Node2D

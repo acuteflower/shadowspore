@@ -57,7 +57,7 @@ func _run() -> void:
 			print("TOWN RULES NOTE: %s has no rig/sheet yet (data/%s_rig.json, assets/characters/%s.png): placeholder figure" % [id, String(spec.art), String(spec.art)])
 		for tier: Variant in spec.get("talk", []) as Array: ## (a settler with `chat` has no dialogues)
 			_check(not DataRegistry.get_entry("dialogue", String((tier as Dictionary).dialogue)).is_empty(), "%s: dialogue %s exists" % [id, String((tier as Dictionary).dialogue)])
-		for window: Variant in spec.schedule as Array:
+		for window: Variant in spec.get("schedule", []) as Array:
 			_check((window as Array).size() == 3 and (spec.spots as Dictionary).has(String((window as Array)[2])), "%s: schedule names a known spot" % id)
 	# a door has to stay free: the zone in front of it, and the settlers' work place lies in it
 	var shop_front: Rect2 = TownRules.front_rect("workshop", 100.0, 100.0)
@@ -66,7 +66,7 @@ func _run() -> void:
 	_check(TownRules.front_rect("house", 0.0, 0.0).has_area(), "the hut has a door zone too")
 	for id: String in settlers:
 		var spec: Dictionary = settlers[id] as Dictionary
-		var work: Dictionary = (spec.spots as Dictionary).get("work", {}) as Dictionary
+		var work: Dictionary = (spec.get("spots", {}) as Dictionary).get("work", {}) as Dictionary
 		if bool(spec.get("enabled", true)) and String(work.get("of", "")) == "home":
 			var at: Array = work.at as Array
 			var zone: Rect2 = TownRules.front_rect(String(spec.home), 0.0, 0.0)
@@ -97,6 +97,14 @@ func _run() -> void:
 	var refund_site: Dictionary = TownRules.refund({"wood": 3, "stone": 1}, false)
 	_check(int(refund_done.wood) == 2 and int(refund_done.stone) == 1 and int(refund_site.wood) == 3, "refunds: 60 % rounded up for a finished piece, all of it for a site")
 	_check(TownRules.cost_text({"wood": 3, "glow_cap": 2}) == "3 TANNENHOLZ  2 GLIMMKAPPE", "cost text uses item names (%s)" % TownRules.cost_text({"wood": 3, "glow_cap": 2}))
+	# upgrades
+	_check(TownRules.max_level("plaza") == 3 and not TownRules.upgrade_spec("plaza", 2).is_empty() and not TownRules.upgrade_spec("plaza", 3).is_empty(), "plaza defines stages 2 and 3")
+	_check(TownRules.piece_at_level("plaza", 2).texture == "plaza_2" and float(TownRules.piece_at_level("plaza", 3).worth) > float(TownRules.piece_at_level("plaza", 2).worth), "piece_at_level merges upgraded properties")
+	_check(ResourceLoader.exists("res://assets/town/plaza_2.png") and ResourceLoader.exists("res://assets/town/plaza_3.png"), "plaza upgrade textures exist")
+	var total_plaza_cost: Dictionary = TownRules.total_cost("plaza", 2)
+	_check(int(total_plaza_cost.get("stone", 0)) == 30 and int(total_plaza_cost.get("iron_ingot", 0)) == 4, "total_cost sums base and upgrade costs")
+	var scare: Dictionary = TownRules.piece("scarecrow")
+	_check(not scare.is_empty() and float(scare.get("scare_radius", 0.0)) > 0.0 and ResourceLoader.exists("res://assets/town/scarecrow.png"), "scarecrow piece and texture exist")
 	# the state round trip (host export -> JSON file -> import)
 	var town: TownManager = TownManager.new()
 	add_child(town)
@@ -116,6 +124,6 @@ func _run() -> void:
 	_check(town.check_site("lamp_post", Vector2(12000, 10300), false) == "AUSSERHALB DES LICHTS", "a spot in the dark is refused")
 	var again: Dictionary = town.export_state()
 	_check(JSON.stringify(again.structures) == JSON.stringify(through_json.structures) or again.structures.size() == 1, "export keeps the structures")
-	_check(int(again.stock.wood) == 12 and again.residents.gustav.trust == 30, "export keeps stock and residents")
+	_check(again.has("stock_slots") and int(town.stock.wood) == 12 and again.residents.gustav.trust == 30, "export keeps stock and residents")
 	print("TOWN RULES: ", "ok" if _ok else "FAILED")
 	get_tree().quit(0 if _ok else 1)

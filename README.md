@@ -5,7 +5,22 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.8.6 Beta – „Zinnen von Hallgrat, Sternenfall & Ruf der Tiefe“
+## 🚀 Aktuelle Version: V0.9 Beta – „Erwachen der Wächterin & Herz des Sonnenquarzes“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Nächtliche Wasserspiegelung mit Sternenhimmel und Mond im See](docs/img/wasserspiegelung_nacht.png)
+
+### Highlights von V0.9 Beta:
+- 🌌 **Die Göttin Caelia, Sternensaal & `LICHTSCHRITT`:** Die Wächterin rettet dich vor deinem ersten tödlichen Treffer in ihren kosmischen **Sternensaal**, läutert deinen Schritt zum strahlenden **`LICHTSCHRITT`** (`ALT`) und öffnet an jeder erwachten Statue das goldene **`STERNENSAAL`**-Reisesiegel.
+- ☀️ **Wüsten-Endgame-Boss „Aurelith, Herz des Sonnenquarzes“:** Im Hohen Norden der Singenden Quarzfelder warten `6` Quarzwächter, `3` monumentale Kampfphasen mit `Sand ↔ Quarz`-Bodenmagie, zurückschlagbaren Resonanz-Kernen, Sandzyklon, Armillar-Gericht & **`ZENIT-NOVA`** – samt legendärem Relikt **`Fessel des Ersten Schmelzers`**.
+- 🏘️ **Belebtes Hallgrat:** `6` ausgearbeitete Hauptfiguren (Brann, Ilvane, Odrik, Tamsa, Pim mit seiner abendlichen Lichtrunde, Hedda), bis zu `24` Stadtleute in `7` Rollen, die Kinder Moos, Fink & Lia sowie Katze **Schiefer**.
+- 💧 **Wasserspiegelungen & ☀️ Echtzeit-Sonnenschatten:** Flüsse, Seen, Regenpfützen und klare Nächte spiegeln Welt, Figuren & Sternenhimmel; dynamische Sonnen- und Mondschatten wandern über den Boden.
+- 💇 **Salon-Ausbau & Grafikstufen:** `5` neue Frisuren, das legendäre Blüten-Qipao **`Perlenblüte`**, Joruns Dialog-Portrait sowie `4` Grafik-Presets (`NIEDRIG` bis `ULTRA`) samt Performance-Schub.
+
+---
+
+## 🚀 Vorherige Version: V0.8.6 Beta – „Zinnen von Hallgrat, Sternenfall & Ruf der Tiefe“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

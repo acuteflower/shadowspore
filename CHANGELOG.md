@@ -4,6 +4,109 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9 Beta] – 2026-11-15
+### ✨ Erwachen der Wächterin & Herz des Sonnenquarzes: Der Sternensaal, Lichtschritt, Wüsten-Boss Aurelith, Belebtes Hallgrat, Wasserspiegelung & Sonnenschatten
+
+![Nächtliche Wasserspiegelung mit Sternenhimmel und Mond im See](docs/img/wasserspiegelung_nacht.png)
+
+> *Als der Abgrund nach dir greift, reißt eine türkis-goldene Lichtsäule dich empor – mitten in das schwebende Sternenmeer zu Caelia, der Wächterin. Dein Schritt wird zu reinem Licht geläutert, während draußen im Hohen Norden der Sonnenquarz-Öde sechs steinerne Ventile brechen und der ewige Titan Aurelith aus dem Sand steigt. Zurück in Hallgrat öffnen sich die Tore einer lebendigen Stadt voller Stimmen, Laternen und Geschichten – und zum ersten Mal spiegelt jedes Gewässer und jeder Regentropfen den Himmel über dir.*
+
+> [!IMPORTANT]
+> **Der große Meilenstein V0.9 Beta ist da!**
+> V0.9 vereint alle neuen Weltsysteme der letzten Updates mit den größten Inhaltssprüngen seit Langem: der persönlichen Begegnung mit der **Göttin Caelia** im offenen **Sternensaal**, der Läuterung zum **LICHTSCHRITT**, dem brutalen Wüsten-Endgame-Boss **Aurelith, Herz des Sonnenquarzes**, der vollständigen **Belebung von Hallgrat** samt Kernbesetzung, 24 Stadtleuten, Kindern und Katze, **Echtzeit-Wasserspiegelungen & Sonnenschatten**, neuen **Salon-Frisuren & dem legendären Frühlings-Qipao „Perlenblüte“** sowie **4 Grafikstufen** mit spürbar flüssigerem Welt-Streaming.
+
+<details>
+<summary><b>📋 Alle Groß-Features von V0.9 Beta auf einen Blick</b></summary>
+
+1. **🌌 Die Wächterin Caelia & Der Sternensaal:** Einmalige Rettung vor dem ersten tödlichen Treffer, offenes kosmisches Sanktuar mitten im All, Reise-Siegel **`STERNENSAAL`** an jeder erwachten Wegstein-Statue & Läuterung von `SCHATTENSCHRITT` zu **`LICHTSCHRITT`**.
+2. **☀️ Wüsten-Endgame-Boss „Aurelith, Herz des Sonnenquarzes“:** Freies Erwachens-Ritual über 6 Quarzwächter im Singenden Becken, 3 monumentale Kampfphasen mit Bodenmagie (`Sand ↔ Quarz`), zurückschlagbaren Resonanz-Kernen, Sandzyklon, Armillar-Gericht & **`ZENIT-NOVA`** – belohnt mit dem legendären Relikt **`Fessel des Ersten Schmelzers`**.
+3. **🏘️ Belebtes Hallgrat:** 6 ausgearbeitete Hauptfiguren mit Läden, Handwerk, Aushängen & Tagesplänen, bis zu `24` Stadtleute in 7 Rollen, Pims abendliche Lichtrunde, die 3 Kinder Moos, Fink & Lia sowie Katze **Schiefer**.
+4. **💧 Wasserspiegelungen & ☀️ Echtzeit-Sonnenschatten:** Flüsse, Seen und Regenpfützen spiegeln Welt, Figuren & den klaren Nachthimmel; Bäume, Häuser und Charaktere werfen wandernde Sonnen- & Mondschatten samt warmer Sonnenseiten-Beleuchtung.
+5. **💇 Salon & Portraits:** `5` brandneue Frisuren, das legendäre Outfit **`Perlenblüte`** (verweht Blüten im Wind) sowie Joruns eigenes Dialog-Portrait.
+6. **⚙️ Grafikstufen & Performance:** `4` wählbare Grafik-Presets (`NIEDRIG` / `MITTEL` / `HOCH` / `ULTRA`) mit automatischer Hardware-Erkennung sowie optimiertes Chunk-Streaming & Text-Rendering.
+
+</details>
+
+---
+
+### 🌌 Die Göttin Caelia, Der Sternensaal & LICHTSCHRITT
+
+* **🟣 NEU – Rettung vor der Leere:** Sobald mindestens eine Wegstein-Statue in der Welt erweckt wurde, fängt die Wächterin deinen ersten tödlichen Treffer ab – statt zu fallen, reißt eine türkis-goldene Lichtsäule dich empor in ihr Sanktuar.
+* **🟣 NEU – Der Sternensaal:** Eine offene, schwebende Tempelinsel aus Mond-Violettmarmor und Gold mitten im tiefen Kosmos, mit Sternennebeln, Spiegelbecken, Kristall-Kandelabern und einem gewaltigen Thron. Mit jeder draußen erwachten Wegstein-Statue entzünden sich im Saal weitere Lichtsäulen und Boden-Leylines.
+* **🟣 NEU – Das Siegel `STERNENSAAL`:** Nach dem ersten Besuch erscheint an jeder erwachten Wegstein-Statue auf der Reisekarte ein goldenes Siegel, mit dem du jederzeit in den Sternensaal reisen (und über das Rückkehr-Siegel wieder zurückkehren) kannst.
+* **🔵 REWORK – Läuterung zum `LICHTSCHRITT`:** Caelia enthüllt ihren Namen und wandelt deinen *Schattenschritt* in den strahlenden **LICHTSCHRITT** (`ALT`) – ein leuchtender Sprung, der bei der Ankunft nahe Gegner mit Lichtenergie schädigt.
+
+---
+
+### ☀️ Wüsten-Boss: „Aurelith, Herz des Sonnenquarzes“ (Endgame-Pinnacle)
+
+> [!TIP]
+> **Von Tag 1 an frei auffindbar!**
+> Im Hohen Norden der Singenden Quarzfelder liegt **Das Singende Becken** – ohne Story-Sperre zugänglich, aber ausgelegt als härteste optionale Kampfprüfung der gesamten Wüste (`2500 LP` solo vor Koop-Skalierung, stumm & erhaben, `1,0×` Gleichwertigkeit für Waffen und Zauberstäbe).
+
+* **🟣 NEU – Das Seelen-Sog-Ritual:** Sechs kleine Quarzwächter wachen um das halb im Sand versunkene Monument. Jeder besiegte Wächter lädt das versunkene Herz weiter auf; fällt der sechste, verstummt für `0,8 s` selbst der Wüstenwind, bevor Aurelith sich aus dem Boden reißt und das Becken mit einer Sinterquarz- & Sandsturm-Barriere versiegelt.
+* **🟣 NEU – Bodenmagie (`Sand ↔ Quarz`) & Resonanz-Kerne:**
+  * Aurelith verwandelt Sandflächen dynamisch in ziehende **Treibsand-Mahlströme** oder **verglasten Sinterquarz** (`1,04×` Lauftempo) samt stehenden Quarz-Pfeilern, die vor Strahlen schützen und tagsüber echten Abkühlungs-Schatten gegen die Wüstenhitze werfen.
+  * Besiegte Kampf-Golems hinterlassen für kurze Zeit **Resonanz-Kerne** – ein gezielter Waffen- oder Zaubertreffer katapultiert sie zurück in Aurelith, bricht Rüstung (`1,35×`) und kann Angriffe unterbrechen.
+* **🟣 NEU – Die 3 Kampfphasen:**
+  * **Phase 1 (*Der Erste Monolith*, `100 %–66 %`):** Losgelöster Amboss-Faustschlag mit Ketten-Rückzug, dreifache tektonische Quarz-Nähte, Treibsand-Sog, `86 px`-Kristallklinge und Geoden-Saat.
+  * **Phase 2 (*MANTELBRUCH – Das Entfesselte Prisma*, `66 %–33 %`):** Ein konzentrierter Brust-Brennstrahl, der durch lebende Golems wie durch ein Prisma in `3` Sekundärstrahlen gebrochen wird, dazu die **Tempel-Presse** (zwei zusammenfahrende Sandsteinwände), synchrone Wächter-Triade, Rückschmelze-Nova und Sand-Mirage.
+  * **Phase 3 (*SONNENSCHMELZE – Herz der Singenden Dünen*, `33 %–0 %`):** Ein lokales **Arkanes Quarzgewitter** bricht los, Aurelith schwebt auf einem tosenden Sandzyklon samt Armillarringen: **Dünentsunami** mit Wellenbrecher-Deckung, **Zwillings-Prismenklingen**, **Astrales Armillar-Gericht** und die **`12 s`-`ZENIT-NOVA`** (sprengt man `3` zurückgeschlagene Resonanz-Kerne hinein, stürzt er für `4,2 s` in einen verwundbaren **`OVERHEAT STAGGER`** mit `1,65×` Kernschaden!).
+* **🟣 NEU – Legendäre Beute & Revanche:** Nach seinem 4-aktigen Zerfall steigt ein legendäres **Glutreliquiar** herab:
+  * **Armband-Relikt `Fessel des Ersten Schmelzers`:** Erhöht Schaden (`+10 %`), Wuchtschlag (`+22 %`) & Ladetempo (`+30 %`) und verleiht den Perk **`PRISMENBRUCH`** (lässt nach einem Schritt-Blitz eine explodierende Sonnenquarz-Spitze zurück, kühlt Wüstenhitze und macht immun gegen Treibsand!).
+  * Dazu **`Ur-Prisma der Schmelze`**, `460 XP`, Münzen sowie ein dauerhafter **Quarz-Projektorsockel** (`AURELITH RUFEN`) für Revanchen und ein eigener Weltkarten-Marker.
+
+---
+
+### 🏘️ Belebtes Hallgrat – Kernbesetzung, 24 Stadtleute, Kinder & Katze
+
+* **🟣 NEU – 6 unverwechselbare Hauptfiguren mit Tagesplan:**
+  * **Brann (Torwächterin):** Hält Ellie am Osttor zur ersten Torprüfung auf (ohne Gespräch bleibt das Tor geschlossen!), patrouilliert am Brunnenhof und auf dem Wehrgang, vergibt Wach- und Boten-Aushänge.
+  * **Ilvane (Hüterin der Wächterin):** Pflegt das Forum rund um die Statue, tauscht Kerzen, Weihrauch & Wegstein-Splitter und bemerkt, welche Statuen du draußen erweckt hast.
+  * **Odrik „Meißelbart“ (Steinmetzmeister):** Meißelt am Steinmetzhof (mit Funken & Steinsplittern) und versorgt Glimmrast mit Steinbau-Rezepten.
+  * **Tamsa (Glasschleiferin):** Arbeitet am Schleifrad und betreibt einen Laden für Kristalle, Glas und Talisman-Schliff.
+  * **Pim (Lichtknecht):** Dreht zur Dämmerung seine feste **Lichtrunde** und entzündet jede einzelne Straßenlaterne in Hallgrat von Hand!
+  * **Hedda (Wirtin):** Führt das Gasthaus, verkauft Speisen & Getränke, kennt die neuesten Gerüchte und lädt abends zum belebten Gasthaus-Treff.
+* **🟣 NEU – Bis zu 24 Stadtleute in 7 Rollen:** Händler, Träger, Steinsetzer, Marktgänger, Alte, Wäscherinnen und nächtliche Tor-/Mauerwachen mit Laternen füllen Straßen, Treppen und Märkte je nach Tages- und Wetterlage.
+* **🟣 NEU – Die Kinder & Katze Schiefer:** **Moos, Fink & Lia** spielen Fangen am Brunnen, Murmeln auf den Staffeln und folgen neugierig der Karawane; die getigerte Katze **Schiefer** schläft auf warmen Essen, folgt Fisch und lässt sich schnurrend streicheln!
+
+---
+
+### 💧 Wasserspiegelungen & ☀️ Echtzeit-Sonnenschatten
+
+![Kristallklare Wasserspiegelungen am Fluss und See bei Tag](docs/img/wasserspiegelung.png)
+![Wandernde Echtzeit-Sonnenschatten in der Spielwelt](docs/img/sonnenschatten.png)
+
+* **🟣 NEU – Echtzeit-Wasserspiegelung (`WASSERSPIEGELUNG`):** Flüsse, Seen und sogar Regenpfützen spiegeln Spieler, Siedler, Bewohner, Tiere, Hütten und Hallgrats Gebäude kopfüber in Echtzeit wider. In klaren Nächten glitzern zudem **Sterne, Milchstraße und die aktuelle Mondphase** auf der Wasseroberfläche.
+* **🟣 NEU – Wandernde Sonnen- & Mondschatten (`SCHATTEN`):** Charaktere, Häuser, Props und sogar im Wind wiegende Bäume werfen je nach Sonnenstand einen dynamischen Schatten (morgens lang nach Westen, mittags kurz nach Norden, abends lang nach Osten; nachts einen zarten Mondschatten) – ergänzt um warme Sonnenseiten- und kühle Schattenseiten-Beleuchtung an Welt-Props.
+
+---
+
+### 💇 Salon-Ausbau, Outfit „Perlenblüte“ & Grafik-Einstellungen
+
+* **🟣 NEU – 5 neue Frisuren im Freiluftsalon:** Ab sofort stehen **Klingenbob**, **Sturmschweif**, **Sternenschleier** (mit leuchtenden Sternenprismen), **Dämmerflechten** und **Nachtkrone** direkt zur Auswahl.
+* **🟣 NEU – Legendäres Outfit „Perlenblüte“:** Ein Perlmutt-Seiden-Qipao mit Goldpaspeln, Pankou-Knoten und 3D-Lotusstickerei, das beim Laufen und im Wind sanft **Blütenblätter verweht**.
+* **🟣 NEU – Joruns Dialog-Portrait:** Unser fahrender Händler besitzt nun ein eigenes, animiertes Charakter-Portrait im Gesprächsfenster.
+* **🟣 NEU – 4 Grafikstufen (`NIEDRIG` / `MITTEL` / `HOCH` / `ULTRA`):** Automatische Hardware-Erkennung beim ersten Start sowie fein abgestimmte Budgets für Lichter, Partikel, Tierdichte, Spiegelungen, Schatten und Chunk-Streaming.
+* **🟡 FIX – Flüssigeres Streaming & Text-Caching:** Deutlich reduzierter Frame-Overhead beim Laden neuer Welt-Chunks und beim Zeichnen von Pixel-Texten.
+
+---
+
+### 📊 Der Weg zu V0.9 – Die wichtigsten Systeme im Überblick
+
+| System / Meilenstein | Inhalt in der V0.8 → V0.9-Reihe | Status |
+| :--- | :--- | :--- |
+| **Die Wächterin & Sternensaal** | Rettung vor erstem Tod, kosmischer Saal, `STERNENSAAL`-Siegel & `LICHTSCHRITT` | 🟣 NEU |
+| **Aurelith (Wüsten-Boss)** | Singendes Becken, 6 Wächter, 3 Phasen, `ZENIT-NOVA` & `Fessel des Ersten Schmelzers` | 🟣 NEU |
+| **Hallgrat (Stadt & Bewohner)** | Fertige Stadt mit Stadtmauer, Deko-Szenen, 6 Hauptfiguren, 24 Statisten, Kindern & Katze | 🟣 NEU |
+| **Optik & Atmosphäre** | Wasserspiegelungen (inkl. Pfützen & Nachthimmel) + Echtzeit-Sonnen-/Mondschatten | 🟣 NEU |
+| **Welt, Alltag & Koop** | Wiesenbiom Stufen 1–6, 40-Min-Schlafrhythmus, Markttage, Ackerbau 2.0 & Koop-Welten | ✅ KOMPLETT |
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Mit V0.9 Beta erreichen die Welt von Shadowspore, die Stadt Hallgrat, die Wächterin im Sternensaal und die Wüsten-Bedrohung Aurelith ihren bisher größten Meilenstein. Vielen Dank an alle, die diesen Weg bis hierher begleitet, getestet und mitgestaltet haben!*
+
+---
+
 ## [V0.8.6 Beta] – 2026-11-14
 ### 🏰 Zinnen von Hallgrat, Sternenfall & Ruf der Tiefe: Stadtmauer & Gassenleben, Nacht-Wunder, Schlafrhythmus, Markttage & Koop-Welten
 

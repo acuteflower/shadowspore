@@ -5,7 +5,20 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.9.2 Beta – „Online-Relay, Launcher-Updater & Autosave-Schutz“
+## 🚀 Aktuelle Version: V0.9.3 Beta – „Freundes-Sidebar im Pausenmenü & Nachtlichtung-Look“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Nachtsee im Sternenlicht](docs/img/lake_night.png)
+
+### Highlights von V0.9.3 Beta:
+- 🤝 **Freundes- & Profil-Sidebar im Pausenmenü:** Einklappbare Seitenleiste (`TAB` / Klick) im ruhigen *Nachtlichtung*-Design zum Verwalten von Freunden, Annehmen aktiver Lobbys und Starten von Online-Relay-Sitzungen direkt aus dem Spiel.
+- 🖼️ **Profil-Avatare & Lobby-Sync:** Deine gewählten Avatare (**Lichtung** & **Leere**) sowie dein aktiver Lobby-Status werden nun direkt ins Spiel synchronisiert.
+- ✍️ **Erweiterte Pixel-Schriftzeichen & UI-Politur:** Neue Zeichen (`#`, `(`, `)`, `<`, `=`, `·`, `„`, `“`) für die Spiel-UI sowie Styling- und Karten-Updates im Launcher und auf der Website.
+
+---
+
+## 🚀 Vorherige Version: V0.9.2 Beta – „Online-Relay, Launcher-Updater & Autosave-Schutz“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

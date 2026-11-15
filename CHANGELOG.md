@@ -4,6 +4,37 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.3 Beta] – 2026-11-15
+### 🤝 Freundes-Sidebar im Pausenmenü & Nachtlichtung-Look: Einklappbare Koop-Seitenleiste, Profil-Avatare & UI-Politur
+
+![Nachtsee im Sternenlicht](docs/img/lake_night.png)
+
+> *Mit einem Druck auf ESC oder TAB öffnet sich nun die neue einklappbare Freundes- und Profil-Sidebar – so lassen sich Freunde verwalten, Avatare zeigen und Online-Lobbys direkt aus dem laufenden Spiel heraus starten oder betreten.*
+
+> [!IMPORTANT]
+> **Direkter Koop-Komfort mitten im Spiel!**
+> V0.9.3 Beta integriert die soziale Welt nahtlos ins Pausenmenü: eine neue **einklappbare Freundes- & Profil-Sidebar** im ruhigen *Nachtlichtung*-Farbschema, eigene **Profil-Avatare** direkt im Spiel, erweiterte **Pixel-Schriftzeichen** sowie optische Verfeinerungen im Launcher und auf der Website.
+
+---
+
+### 🤝 Soziale Freundes-Sidebar im Pausenmenü
+
+* **🟣 NEU – Einklappbare Freundes- & Profil-Sidebar:** Rechts im Pausenmenü (`ESC`) erscheint ab sofort eine elegante Seitenleiste (`186 px` aufgeklappt, per Button oder `TAB` auf `28 px` einklappbar) mit ruhiger *Nachtlichtung*-Farbpalette.
+* **🟣 NEU – Direkt aus dem Spiel hosten & beitreten:** Starte direkt aus der Sidebar eine Online-Relay-Sitzung, nimm Freundes-Einladungen bzw. aktive Lobbys an oder füge neue Freunde hinzu – inklusive sauberem Eingabe-Fokus (Tippfehler durch Tab-Wechsel oder versehentliches Schließen mit `ESC` beim Tippen sind abgefangen).
+* **🟣 NEU – Profil-Avatare & Lobby-Status:** Dein Cloud-Profil synchronisiert nun deinen gewählten Avatar (**Lichtung** / **Leere**) sowie den aktuellen Lobby-Status direkt ins Spiel.
+
+---
+
+### ✨ Schrift-, Launcher- & Website-Politur
+
+* **🟣 NEU – Erweiterte Pixel-Text-Glyphen:** Unterstützung für zusätzliche Zeichen (`#`, `(`, `)`, `<`, `=`, `·` sowie deutsche Anführungszeichen `„` und `“`) in der gesamten UI.
+* **🔵 REWORK – Launcher- & Website-Feinschliff:** Überarbeitetes Styling im Desktop-Launcher sowie aktualisierte Inhalte, Weltkarte und Changelog-Darstellung auf der Website.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Einfach `ESC` drücken, Freunde in der Sidebar einladen und gemeinsam weiterziehen – viel Spaß mit V0.9.3 Beta!*
+
+---
+
 ## [V0.9.2 Beta] – 2026-11-15
 ### 🌐 Online-Relay, Launcher-Updater & Autosave-Schutz: Portfreies Koop-Relay, Auto-Updates, Sicherheits-Gate & Sternenklingen-Fixes
 

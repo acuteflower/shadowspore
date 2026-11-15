@@ -18,17 +18,34 @@ var _origin: Vector2
 var _jellies: Array[Dictionary] = []
 var _water_glows: Dictionary = {} ## water-plant sprite -> its glow sprite (same frame)
 var _water_homes: Dictionary = {} ## water-plant sprite -> where it floats
-var _bank_glow_sheet: Texture2D
-var _oasis_bank_sheet: Texture2D
-var _oasis_bank_glow_sheet: Texture2D
-var _oasis_water_sheet: Texture2D
-var _oasis_water_glow_sheet: Texture2D
-var _flora_shader: Shader ## river_flora.gdshader; the materials stay per plant (bend and current are per-plant uniforms)
+static var _shared_sheet: Texture2D
+static var _shared_bank_sheet: Texture2D
+static var _shared_bank_glow_sheet: Texture2D
+static var _shared_oasis_bank_sheet: Texture2D
+static var _shared_oasis_bank_glow_sheet: Texture2D
+static var _shared_water_sheet: Texture2D
+static var _shared_water_glow_sheet: Texture2D
+static var _shared_oasis_water_sheet: Texture2D
+static var _shared_oasis_water_glow_sheet: Texture2D
+static var _shared_jelly_tex: Texture2D
+static var _shared_jelly_mat: ShaderMaterial
+static var _shared_flora_shader: Shader ## river_flora.gdshader; materials stay per plant (bend and current are per-plant uniforms)
+var _anim_rect: Rect2 = Rect2()
+var _jellies_shown: bool = false
+var _last_bends: PackedFloat32Array = PackedFloat32Array()
+var _last_pushes: PackedVector2Array = PackedVector2Array()
 
 func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> void:
+	setup_base(rivers, cell, flow_image)
+	for step: int in 4:
+		setup_step(rivers, cell, step)
+
+
+func setup_base(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> void:
 	_rivers = rivers
 	_flow_image = flow_image
 	_origin = Vector2(cell) * 512.0
+	_anim_rect = Rect2(_origin, Vector2(512.0, 512.0)).grow(ANIMATE_RADIUS + 32.0)
 	_night = TimeManager.night_amount()
 	_spec = DataRegistry.table("river_life")
 	add_to_group("night_lights")
@@ -36,7 +53,9 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"])))
 	var spacing: int = int(_spec["spacing"])
-	var sheet: Texture2D = load("res://assets/water/river_details.png") as Texture2D
+	if _shared_sheet == null:
+		_shared_sheet = load("res://assets/water/river_details.png") as Texture2D
+	var sheet: Texture2D = _shared_sheet
 	for y: int in range(16, 512, spacing):
 		for x: int in range(16, 512, spacing):
 			if _sprites.size() >= int(_spec["max_chunk"]): break
@@ -103,10 +122,14 @@ func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> voi
 		_rows.append(5)
 		_phases.append(rng.randf() * TAU)
 		_flows.append(Vector2.ZERO)
-	_bank_props(rivers, cell)
-	_water_glow(rivers, cell)
-	_water_flora(rivers, cell)
-	_spawn_jellies(rivers, cell)
+
+
+func setup_step(rivers: WorldRivers, cell: Vector2i, step: int) -> void:
+	match step:
+		0: _bank_props(rivers, cell)
+		1: _water_glow(rivers, cell)
+		2: _water_flora(rivers, cell)
+		3: _spawn_jellies(rivers, cell)
 
 ## The sickle can cut this plant (see WaterPlantCut).
 func _make_cuttable(sprite: Sprite2D) -> void:
@@ -117,13 +140,44 @@ func _make_cuttable(sprite: Sprite2D) -> void:
 
 ## Shore dressing (rows 10-15 of `_rows` = rows 0-5 of bank_details.png): reeds, stones, driftwood,
 ## wet-grass tufts with blooms, ferns and foam-lapped stones, placed in random clumps along the bank.
+static func _bank_sheet(arid: bool) -> Texture2D:
+	if arid:
+		if _shared_oasis_bank_sheet == null:
+			_shared_oasis_bank_sheet = load("res://assets/water/oasis_bank_details.png") as Texture2D
+		return _shared_oasis_bank_sheet
+	if _shared_bank_sheet == null:
+		_shared_bank_sheet = load("res://assets/water/bank_details.png") as Texture2D
+	return _shared_bank_sheet
+
+static func _bank_glow_sheet(arid: bool) -> Texture2D:
+	if arid:
+		if _shared_oasis_bank_glow_sheet == null:
+			_shared_oasis_bank_glow_sheet = load("res://assets/water/oasis_bank_details_glow.png") as Texture2D
+		return _shared_oasis_bank_glow_sheet
+	if _shared_bank_glow_sheet == null:
+		_shared_bank_glow_sheet = load("res://assets/water/bank_details_glow.png") as Texture2D
+	return _shared_bank_glow_sheet
+
+static func _water_flora_sheets(arid: bool) -> Array[Texture2D]:
+	if arid:
+		if _shared_oasis_water_sheet == null:
+			_shared_oasis_water_sheet = load("res://assets/water/oasis_water_flora.png") as Texture2D
+		if _shared_oasis_water_glow_sheet == null:
+			_shared_oasis_water_glow_sheet = load("res://assets/water/oasis_water_flora_glow.png") as Texture2D
+		return [_shared_oasis_water_sheet, _shared_oasis_water_glow_sheet]
+	if _shared_water_sheet == null:
+		_shared_water_sheet = load("res://assets/water/water_flora.png") as Texture2D
+	if _shared_water_glow_sheet == null:
+		_shared_water_glow_sheet = load("res://assets/water/water_flora_glow.png") as Texture2D
+	return [_shared_water_sheet, _shared_water_glow_sheet]
+
 func _bank_props(rivers: WorldRivers, cell: Vector2i) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"]) + 77))
 	var clumps: FastNoiseLite = FastNoiseLite.new()
 	clumps.seed = int(_spec["seed"])
 	clumps.frequency = 0.012
-	var sheet: Texture2D = load("res://assets/water/bank_details.png") as Texture2D
+	var sheet: Texture2D = _bank_sheet(false)
 	var spacing: int = int(_spec["bank_spacing"])
 	var placed: int = 0
 	for y: int in range(0, 512, spacing):
@@ -137,11 +191,7 @@ func _bank_props(rivers: WorldRivers, cell: Vector2i) -> void:
 			if rng.randf() > density: continue
 			var arid_b: bool = BiomeBlend.arid_at(at) > 0.42
 			var kind: int = _oasis_bank_kind(gap, rng.randf()) if arid_b else _bank_kind(gap, rng.randf())
-			var active_sheet: Texture2D = sheet
-			if arid_b:
-				if _oasis_bank_sheet == null:
-					_oasis_bank_sheet = load("res://assets/water/oasis_bank_details.png") as Texture2D
-				active_sheet = _oasis_bank_sheet
+			var active_sheet: Texture2D = _bank_sheet(true) if arid_b else sheet
 			for i: int in 1 + (rng.randi() % 3 if rng.randf() < 0.5 else 0):
 				var spot: Vector2 = (at + Vector2(rng.randf_range(-11, 11), rng.randf_range(-6, 6)) * (1.0 if i > 0 else 0.0)).round()
 				var spot_gap: float = rivers.field_at(spot).x
@@ -176,13 +226,7 @@ func _add_bank_sprite(sheet: Texture2D, at: Vector2, kind: int, variant: int, rn
 	_flows.append(Vector2.ZERO)
 	if kind in [3, 6, 7, 8]:  # luminous plants: only the glowing pixels, drawn unlit and brighter at night
 		var glow: Sprite2D = Sprite2D.new()
-		if BiomeBlend.arid_at(at) > 0.42:
-			if _oasis_bank_glow_sheet == null:
-				_oasis_bank_glow_sheet = load("res://assets/water/oasis_bank_details_glow.png") as Texture2D
-			glow.texture = _oasis_bank_glow_sheet
-		else:
-			if _bank_glow_sheet == null: _bank_glow_sheet = load("res://assets/water/bank_details_glow.png") as Texture2D
-			glow.texture = _bank_glow_sheet
+		glow.texture = _bank_glow_sheet(BiomeBlend.arid_at(at) > 0.42)
 		glow.hframes = 6
 		glow.vframes = 9
 		glow.frame = sprite.frame
@@ -201,8 +245,9 @@ func _add_bank_sprite(sheet: Texture2D, at: Vector2, kind: int, variant: int, rn
 func _water_flora(rivers: WorldRivers, cell: Vector2i) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"]) + 4141))
-	var sheet: Texture2D = load("res://assets/water/water_flora.png") as Texture2D
-	var glow_sheet: Texture2D = load("res://assets/water/water_flora_glow.png") as Texture2D
+	var base_sheets: Array[Texture2D] = _water_flora_sheets(false)
+	var sheet: Texture2D = base_sheets[0]
+	var glow_sheet: Texture2D = base_sheets[1]
 	var spacing: int = int(_spec["water_flora_spacing"])
 	var placed: int = 0
 	for kind: int in [22, 20, 21]: ## the plants under the surface first, so the floating ones lie over them
@@ -225,12 +270,9 @@ func _water_flora(rivers: WorldRivers, cell: Vector2i) -> void:
 					var w_sheet: Texture2D = sheet
 					var w_glow: Texture2D = glow_sheet
 					if BiomeBlend.arid_at(at) > 0.42:
-						if _oasis_water_sheet == null:
-							_oasis_water_sheet = load("res://assets/water/oasis_water_flora.png") as Texture2D
-						if _oasis_water_glow_sheet == null:
-							_oasis_water_glow_sheet = load("res://assets/water/oasis_water_flora_glow.png") as Texture2D
-						w_sheet = _oasis_water_sheet
-						w_glow = _oasis_water_glow_sheet
+						var arid_sheets: Array[Texture2D] = _water_flora_sheets(true)
+						w_sheet = arid_sheets[0]
+						w_glow = arid_sheets[1]
 					_add_water_sprite(w_sheet, w_glow, at, kind, variant if i == 0 or rng.randf() < 0.6 else rng.randi() % 6, rng)
 					placed += 1
 
@@ -306,7 +348,7 @@ func _animate_water_plant(sprite: Sprite2D, row: int, phase: float, flow: Vector
 func _water_glow(rivers: WorldRivers, cell: Vector2i) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"]) + 303))
-	var sheet: Texture2D = load("res://assets/water/bank_details.png") as Texture2D
+	var sheet: Texture2D = _bank_sheet(false)
 	var placed: int = 0
 	for y: int in range(0, 512, 30):
 		for x: int in range(0, 512, 30):
@@ -315,11 +357,7 @@ func _water_glow(rivers: WorldRivers, cell: Vector2i) -> void:
 			var field: Vector2 = rivers.field_at(at)
 			if field.x > -3.0 or field.y < 0.08 or field.y > 0.6 or rng.randf() > 0.32: continue
 			var kind: int = 7 if field.y < 0.3 and rng.randf() < 0.6 else 8
-			var g_sheet: Texture2D = sheet
-			if BiomeBlend.arid_at(at) > 0.42:
-				if _oasis_bank_sheet == null:
-					_oasis_bank_sheet = load("res://assets/water/oasis_bank_details.png") as Texture2D
-				g_sheet = _oasis_bank_sheet
+			var g_sheet: Texture2D = _bank_sheet(true) if BiomeBlend.arid_at(at) > 0.42 else sheet
 			_add_bank_sprite(g_sheet, at, kind, rng.randi() % 6, rng)
 			_flows[_flows.size() - 1] = _flow_at(at)
 			placed += 1
@@ -335,9 +373,13 @@ func _flow_at(point: Vector2) -> Vector2:
 func _spawn_jellies(rivers: WorldRivers, cell: Vector2i) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"]) + 909))
-	var texture: Texture2D = load("res://assets/water/river_jelly.png") as Texture2D
-	var submerged: ShaderMaterial = ShaderMaterial.new()
-	submerged.shader = load("res://assets/shaders/river_jelly.gdshader") as Shader
+	if _shared_jelly_tex == null:
+		_shared_jelly_tex = load("res://assets/water/river_jelly.png") as Texture2D
+	if _shared_jelly_mat == null:
+		_shared_jelly_mat = ShaderMaterial.new()
+		_shared_jelly_mat.shader = load("res://assets/shaders/river_jelly.gdshader") as Shader
+	var texture: Texture2D = _shared_jelly_tex
+	var submerged: ShaderMaterial = _shared_jelly_mat
 	for attempt: int in 60:
 		if _jellies.size() >= int(_spec["jelly_max"]): return
 		var at: Vector2 = Vector2(cell) * 512.0 + Vector2(rng.randf() * 512.0, rng.randf() * 512.0).round()
@@ -387,10 +429,20 @@ static func _oasis_bank_kind(gap: float, roll: float) -> int:
 	return 6 # Sternen-Binsen (glow)
 
 func _drift_jellies(delta: float) -> void:
+	if _jellies.is_empty():
+		return
+	var night_on: bool = _night > 0.04
+	if not night_on:
+		if not _jellies_shown:
+			return
+		_jellies_shown = false
+		for jelly: Dictionary in _jellies:
+			(jelly["sprite"] as Sprite2D).visible = false
+		return
+	_jellies_shown = true
 	for jelly: Dictionary in _jellies:
 		var sprite: Sprite2D = jelly["sprite"]
-		sprite.visible = _night > 0.04
-		if not sprite.visible: continue
+		sprite.visible = true
 		sprite.modulate.a = clampf(_night * 1.4, 0.0, 1.0)
 		var pulse: float = fposmod(_time * 0.8 + float(jelly["phase"]), 1.0)
 		sprite.frame = int(jelly["row"]) * 8 + int(pulse * 8.0)
@@ -405,9 +457,10 @@ func _drift_jellies(delta: float) -> void:
 		sprite.position = (jelly["pos"] as Vector2).round() + Vector2(0.0, roundf(sin(_time * 0.7 + float(jelly["phase"]) * 6.0) * 2.0))
 
 func _flora_material() -> ShaderMaterial:
-	if _flora_shader == null: _flora_shader = load("res://assets/shaders/river_flora.gdshader") as Shader
+	if _shared_flora_shader == null:
+		_shared_flora_shader = load("res://assets/shaders/river_flora.gdshader") as Shader
 	var mat: ShaderMaterial = ShaderMaterial.new()
-	mat.shader = _flora_shader
+	mat.shader = _shared_flora_shader
 	return mat
 
 ## Called by DayNight through the group `night_lights`.
@@ -429,24 +482,66 @@ func _near_any(at: Vector2, players: PackedVector2Array, radius: float) -> bool:
 
 func _process(delta: float) -> void:
 	_time += delta
-	_drift_jellies(delta)
-	# Players are collected once per frame. With no player at all (workbenches) everything animates as before.
+	if not _jellies.is_empty():
+		_drift_jellies(delta)
+	var count: int = _sprites.size()
+	if count == 0:
+		return
 	var players: PackedVector2Array = PackedVector2Array()
-	for player: Player in Player.all: players.append(player.global_position)
-	for i: int in _sprites.size():
+	for player: Player in Player.all:
+		if is_instance_valid(player):
+			players.append(player.global_position)
+	if not players.is_empty():
+		var in_chunk: bool = false
+		for spot: Vector2 in players:
+			if _anim_rect.has_point(spot):
+				in_chunk = true
+				break
+		if not in_chunk:
+			return
+	if _last_bends.size() != count:
+		_last_bends.resize(count)
+		_last_bends.fill(INF)
+		_last_pushes.resize(count)
+		_last_pushes.fill(Vector2(INF, INF))
+	var bend_r: float = float(_spec["bend_radius"])
+	var plant_fps: float = float(_spec["plant_fps"])
+	var rock_fps: float = float(_spec["rock_fps"])
+	var frame_tick: int = Engine.get_process_frames()
+	for i: int in count:
 		var sprite: Sprite2D = _sprites[i]
 		var row: int = _rows[i]
-		if not players.is_empty() and not _near_any(sprite.global_position, players, ANIMATE_RADIUS): continue
+		var pos: Vector2 = sprite.global_position
+		if not players.is_empty() and not _near_any(pos, players, ANIMATE_RADIUS): continue
+		var phase: float = _phases[i]
+		var flow: Vector2 = _flows[i]
 		if row >= 20:
-			_animate_water_plant(sprite, row, _phases[i], _flows[i])
-			if row == 22:
-				(sprite.material as ShaderMaterial).set_shader_parameter("current_push", _flows[i] * (0.6 + 0.4 * sin(_time * 1.2 + _phases[i])))
+			_animate_water_plant(sprite, row, phase, flow)
+			if row == 22 and ((frame_tick + i) & 1) == 0:
+				var push22: Vector2 = flow * (0.6 + 0.4 * sin(_time * 1.2 + phase))
+				if push22.distance_squared_to(_last_pushes[i]) > 0.0002:
+					_last_pushes[i] = push22
+					(sprite.material as ShaderMaterial).set_shader_parameter("current_push", push22)
 			continue
-		if row < 10: sprite.frame = row * 8 + posmod(int(_time * float(_spec["plant_fps"] if row in [0, 1, 5] else _spec["rock_fps"]) + _phases[i]), 8)
-		if sprite.material is ShaderMaterial:
-			var bend: float = sin(_time * 1.4 + _phases[i]) * 0.7
+		if row < 10:
+			var new_frame: int = row * 8 + posmod(int(_time * (plant_fps if row in [0, 1, 5] else rock_fps) + phase), 8)
+			if sprite.frame != new_frame:
+				sprite.frame = new_frame
+		var mat: ShaderMaterial = sprite.material as ShaderMaterial
+		if mat != null:
+			var bend: float = sin(_time * 1.4 + phase) * 0.7
 			for spot: Vector2 in players:
-				var gap: Vector2 = sprite.global_position - spot
-				if gap.length() < float(_spec["bend_radius"]): bend += signf(gap.x) * 2.0 * (1.0 - gap.length() / float(_spec["bend_radius"]))
-			(sprite.material as ShaderMaterial).set_shader_parameter("bend", clampf(bend, -2.0, 2.0))
-			if row == 0 or row == 18: (sprite.material as ShaderMaterial).set_shader_parameter("current_push", _flows[i] * (0.8 + 0.4 * sin(_time * 1.5 + _phases[i])))
+				var gap: Vector2 = pos - spot
+				var dist_sq: float = gap.length_squared()
+				if dist_sq < bend_r * bend_r:
+					var dist: float = sqrt(dist_sq)
+					bend += signf(gap.x) * 2.0 * (1.0 - dist / bend_r)
+			bend = clampf(bend, -2.0, 2.0)
+			if absf(bend - _last_bends[i]) > 0.015:
+				_last_bends[i] = bend
+				mat.set_shader_parameter("bend", bend)
+			if (row == 0 or row == 18) and ((frame_tick + i) & 1) == 0:
+				var push: Vector2 = flow * (0.8 + 0.4 * sin(_time * 1.5 + phase))
+				if push.distance_squared_to(_last_pushes[i]) > 0.0002:
+					_last_pushes[i] = push
+					mat.set_shader_parameter("current_push", push)

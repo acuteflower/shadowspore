@@ -37,6 +37,8 @@ var _wisps: Array[Dictionary] = []
 
 var _time: float = 0.0
 var _dance_boost: float = 0.0 ## surges to 1.0 on interaction / awakening even at dusk or day
+var _far_wait: float = 0.0
+var _glow_t: float = 0.0
 
 
 func setup(owner_wonders: MeadowWonders, spec: Dictionary) -> void:
@@ -229,21 +231,51 @@ func _process(delta: float) -> void:
 	_dance_boost = maxf(0.0, _dance_boost - delta * 0.08)
 
 	# Stepping onto the central stone stage at night automatically awakens the amphitheater!
+	var night_amt: float = TimeManager.night_amount()
 	if multiplayer.is_server() and not awakened and TimeManager.is_night() and wonders != null:
 		for p: Player in Player.all:
 			if is_instance_valid(p) and p.health.current > 0.0 and p.global_position.distance_to(global_position) <= 44.0:
 				wonders.request_awaken_amphitheater()
 				break
 
-	var night_amt: float = TimeManager.night_amount()
-	var glow_vis: float = clampf(maxf(night_amt, _dance_boost * 0.85) + (0.22 if awakened else 0.0), 0.15, 1.0)
-	if _podium_glow != null:
-		_podium_glow.modulate.a = glow_vis * (0.84 + 0.16 * sin(_time * 2.3))
-	for i: int in _flower_glows.size():
-		var fg: Sprite2D = _flower_glows[i]
-		fg.modulate.a = glow_vis * (0.76 + 0.24 * sin(_time * 2.0 + float(i) * 0.45))
+	if _dance_boost <= 0.0:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null:
+			var max_d: float = 680.0 * 680.0
+			var near: bool = global_position.distance_squared_to(cam.get_screen_center_position()) <= max_d
+			if not near:
+				for p: Player in Player.all:
+					if is_instance_valid(p) and p.global_position.distance_squared_to(global_position) <= max_d:
+						near = true
+						break
+			if not near:
+				if _wisp_canvas != null and _wisp_canvas.visible:
+					_wisp_canvas.visible = false
+				_far_wait = 0.3
+				return
 
-	_wisp_canvas.queue_redraw()
+	_glow_t -= delta
+	if _glow_t <= 0.0:
+		_glow_t = 0.06 if (night_amt > 0.01 or _dance_boost > 0.01 or awakened) else 0.25
+		var glow_vis: float = clampf(maxf(night_amt, _dance_boost * 0.85) + (0.22 if awakened else 0.0), 0.15, 1.0)
+		if _podium_glow != null:
+			_podium_glow.modulate.a = glow_vis * (0.84 + 0.16 * sin(_time * 2.3))
+		for i: int in _flower_glows.size():
+			var fg: Sprite2D = _flower_glows[i]
+			fg.modulate.a = glow_vis * (0.76 + 0.24 * sin(_time * 2.0 + float(i) * 0.45))
+
+	var intensity: float = wisp_intensity()
+	if _wisp_canvas != null:
+		var want_vis: bool = intensity > 0.02
+		if _wisp_canvas.visible != want_vis:
+			_wisp_canvas.visible = want_vis
+		if want_vis:
+			_wisp_canvas.queue_redraw()
 
 
 func wisp_intensity() -> float:

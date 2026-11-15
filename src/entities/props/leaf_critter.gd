@@ -32,6 +32,7 @@ var _near: bool = false
 var _settled: bool = true
 var _day: int = -1
 var _redraw: float = 0.0
+var _far_wait: float = 0.0
 var _rest_point: Vector2 = Vector2.ZERO
 var _leaf_cover: int = 0
 
@@ -281,6 +282,27 @@ func _pose(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	if _flee < 0.0:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and _bush != null and _bush.global_position.distance_squared_to(cam.get_screen_center_position()) > 460.0 * 460.0:
+			if visible:
+				visible = false
+			_far_wait = 0.25
+			return
+		visible = _settled and _active()
+		if visible:
+			_pose(delta)
+		if visible:
+			_redraw -= delta
+			if _redraw <= 0.0:
+				_redraw = 0.08
+				queue_redraw()
+		return
 	if _flee >= 0.0:
 		var duration: float = float(config().departure_seconds) if _effect != "catch" else float(config().catch_seconds)
 		_flee = minf(1.0, _flee + delta / duration)

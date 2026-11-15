@@ -66,7 +66,7 @@ vec3 day_grade(vec3 c, vec2 p, float highlight) {
 global uniform vec2 g_sun_side;
 // The built-in TEXTURE cannot be passed to a function (the compiler refuses the sampler), so the edge search is a macro that
 // reads TEXTURE where it is expanded. OUT: float to fill, UV0 start uv, DIR uv step, LO/HI the frame's uv x range.
-#define SUN_EDGE(OUT, UV0, DIR, LO, HI) OUT = 44.0; for (int sun_i = 0; sun_i < 12; sun_i++) { float sun_o = float[12](1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 11.0, 14.0, 18.0, 23.0, 29.0, 36.0)[sun_i]; vec2 sun_q = (UV0) + (DIR) * sun_o; if (sun_q.x < (LO) || sun_q.x > (HI) || textureLod(TEXTURE, sun_q, 0.0).a < 0.5) { OUT = sun_o; break; } }
+#define SUN_EDGE(OUT, UV0, DIR, LO, HI) OUT = 44.0; if (g_sun_side.y * g_day_strength > 0.002) { for (int sun_i = 0; sun_i < 6; sun_i++) { float sun_o = float[6](1.0, 3.0, 6.0, 11.0, 19.0, 30.0)[sun_i]; vec2 sun_q = (UV0) + (DIR) * sun_o; if (sun_q.x < (LO) || sun_q.x > (HI) || textureLod(TEXTURE, sun_q, 0.0).a < 0.5) { OUT = sun_o; break; } } }
 // Call from fragment(): COLOR.rgb = day_sun_side(COLOR.rgb, dl, dr, p) after SUN_EDGE(dl, uv, -step, lo, hi) and
 // SUN_EDGE(dr, uv, step, lo, hi), step = vec2(TEXTURE_PIXEL_SIZE.x * flip, 0) (flip -1 when drawn mirrored: dFdx(UV.x) < 0).
 vec3 day_sun_side(vec3 c, float dl, float dr, vec2 p) {

@@ -2431,7 +2431,7 @@
   "max_stack": 30,
   "hotbar": false,
   "icon": "res://assets/items/star_shard.png",
-  "description": "Noch immer handwarmes, violett-goldenes Himmelsgestein aus einem nächtlichen Sternschnuppenkrater der Wiese. In seinem Kern singt reines Sternenlicht."
+  "description": "Noch immer handwarmes, violett-goldenes Himmelsgestein aus einem nächtlichen Sternschnuppenkrater. Caelia sammelt solche Sternensplitter im Sternensaal und tauscht sie gegen besondere Gaben."
  },
  "antler_talisman": {
   "name": "Kronenhirsch-Reif",
@@ -2548,5 +2548,156 @@
   "hotbar": false,
   "icon": "res://assets/items/ur_prisma.png",
   "description": "Ein warm pulsierender Splitter aus Aureliths Rosenschliff-Herz. In seinen acht Facetten brennt noch das gesammelte Zenitlicht der Himmelsbaumeister."
+ },
+ "stardust_elixir": {
+  "name": "Sternenstaub-Elixier",
+  "kind": "consumable",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 15,
+  "hotbar": true,
+  "icon": "res://assets/items/stardust_elixir.png",
+  "stats": {
+   "heal": 35,
+   "regen": 24,
+   "regen_seconds": 10,
+   "stamina": 100
+  },
+  "description": "Flüssiges Licht aus zerriebenem Sternerz. Stellt sofort 35 Leben sowie volle Ausdauer wieder her und lässt weitere 24 Leben über 10 Sekunden nachwachsen."
+ },
+ "astral_star_fruit": {
+  "name": "Astrale Sternfrucht",
+  "kind": "consumable",
+  "rarity": "epic",
+  "enchant_slots": 0,
+  "max_stack": 10,
+  "hotbar": true,
+  "icon": "res://assets/items/astral_star_fruit.png",
+  "stats": {
+   "heal": 45,
+   "stamina": 60,
+   "xp": 120
+  },
+  "description": "Im Mondschein gereifte Himmelsfrucht vom Altar der Wächterin. Stellt 45 Leben und 60 Ausdauer wieder her und schenkt 120 Erfahrung."
+ },
+ "morningstar_pendant": {
+  "name": "Morgenstern-Kette",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "necklace",
+  "rarity": "epic",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/morningstar_pendant.png",
+  "bonus": {
+   "damage": 0.12,
+   "blink_cooldown": -0.15,
+   "alarm": -0.2
+  },
+  "perks": [
+   "starlight"
+  ],
+  "look": {
+   "metal": "gold",
+   "stone": "78f4e6",
+   "stones": 1,
+   "glow": true,
+   "glint": true,
+   "pendant": [
+    ".l.",
+    "hSl",
+    ".T."
+   ]
+  },
+  "description": "Goldenes Sternenamulett aus Caelias Schatzkammer. Nach jedem Licht- oder Schattenschritt trifft dein nächster Hieb mit himmlischem Sternenlicht."
+ },
+ "crescent_earrings": {
+  "name": "Mondsichel-Gehänge",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "earrings",
+  "rarity": "epic",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/crescent_earrings.png",
+  "bonus": {
+   "absorb": 0.12,
+   "charge_speed": 0.22,
+   "health": 16
+  },
+  "look": {
+   "metal": "gold",
+   "stone": "78f4e6",
+   "stones": 2,
+   "glow": true,
+   "drop": [
+    "h",
+    "S",
+    "T",
+    "s"
+   ]
+  },
+  "description": "Filigrane Goldsicheln mit leuchtenden Sternenperlen. Sie dämpfen Feindesschläge spürbar und lassen schwere Hiebe schneller aufladen."
+ },
+ "caelia_sigil": {
+  "name": "Siegel der Ersten Wächterin",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "bracelet",
+  "rarity": "legendary",
+  "enchant_slots": 2,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/caelia_sigil.png",
+  "bonus": {
+   "damage": 0.15,
+   "charge_speed": 0.25,
+   "blink_cooldown": -0.2,
+   "absorb": 0.12
+  },
+  "perks": [
+   "starlight"
+  ],
+  "look": {
+   "metal": "silver",
+   "stone": "d8fff9",
+   "stones": 2,
+   "glow": true,
+   "glint": true
+  },
+  "description": "Das alte Astralband von Caelias Thron, geschmiedet für ihre treueste Sternensammlerin. Bündelt Schrittkraft, Schutz und Sternenfunken in einem einzigen Siegel."
+ },
+ "blade_starlight": {
+  "name": "Sternenfall-Klinge",
+  "kind": "weapon",
+  "slot": "main_hand",
+  "weapon_class": "sword_starlight",
+  "rarity": "legendary",
+  "enchant_slots": 2,
+  "refinable": true,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/blade_starlight.png",
+  "held": "res://assets/items/blade_starlight_held.png",
+  "stats": {
+   "damage": 28,
+   "speed": 1.18,
+   "reach": 34,
+   "knockback": 58
+  },
+  "fx": {
+   "motes": [
+    "fff8dc",
+    "78f4e6",
+    "fff0b0",
+    "3cc0c6"
+   ],
+   "trail_edge": "78f4e6",
+   "trail_core": "fff8dc",
+   "idle_glint": true
+  },
+  "description": "Von Caelia in himmlischem Sternenfeuer geschmiedet. Rechtsklick entfesselt Sternenstich (Astralsichel + 3 fallende Sterne) und Himmelsfall (5 heilende Sternenlanzen vom Himmel)."
  }
 }

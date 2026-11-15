@@ -21,14 +21,13 @@ uniform float vignette : hint_range(0.0, 1.0) = 0.0; // the picture's rim sinks 
 uniform float px_scale = 2.0;
 
 vec3 blurred(vec2 uv, float lod, vec2 texel) {
-	vec2 o = texel * exp2(lod) * 0.5;
-	vec2 d = o * 0.7071;
-	// 9-tap octagonal filter keeps halos soft and round without boxy corner artefacts
-	vec3 acc = textureLod(screen_texture, uv, lod).rgb * 0.20;
-	acc += (textureLod(screen_texture, uv + vec2(o.x, 0.0), lod).rgb + textureLod(screen_texture, uv - vec2(o.x, 0.0), lod).rgb
-		+ textureLod(screen_texture, uv + vec2(0.0, o.y), lod).rgb + textureLod(screen_texture, uv - vec2(0.0, o.y), lod).rgb) * 0.12;
-	acc += (textureLod(screen_texture, uv + vec2(d.x, d.y), lod).rgb + textureLod(screen_texture, uv + vec2(-d.x, d.y), lod).rgb
-		+ textureLod(screen_texture, uv + vec2(d.x, -d.y), lod).rgb + textureLod(screen_texture, uv + vec2(-d.x, -d.y), lod).rgb) * 0.08;
+	vec2 o = texel * exp2(lod) * 0.52;
+	vec2 p = vec2(o.x * 0.92, o.y * 0.38);
+	vec2 q = vec2(-o.x * 0.38, o.y * 0.92);
+	// 5-tap rotated quincunx filter leverages mipmap bilinear filtering for soft halos at 45% fewer taps
+	vec3 acc = textureLod(screen_texture, uv, lod).rgb * 0.24;
+	acc += (textureLod(screen_texture, uv + p, lod).rgb + textureLod(screen_texture, uv - p, lod).rgb
+		+ textureLod(screen_texture, uv + q, lod).rgb + textureLod(screen_texture, uv - q, lod).rgb) * 0.19;
 	return acc;
 }
 
@@ -44,13 +43,15 @@ vec3 glow_of(vec3 b) {
 
 void fragment() {
 	vec3 c = textureLod(screen_texture, SCREEN_UV, 0.0).rgb;
-	float base_lod = log2(max(px_scale, 1.0));
-	vec3 near = glow_of(blurred(SCREEN_UV, base_lod + 0.85, SCREEN_PIXEL_SIZE));
-	vec3 mid = glow_of(blurred(SCREEN_UV, base_lod + 2.25, SCREEN_PIXEL_SIZE));
-	vec3 far = glow_of(blurred(SCREEN_UV, base_lod + 3.85, SCREEN_PIXEL_SIZE));
-	vec3 glow = (near * 0.38 + mid * 0.44 + far * 0.52) * bloom;
-	// bloom first (it is light), as a soft screen blend so bright emissives glow cleanly without clipping
-	c = 1.0 - (1.0 - c) * (1.0 - clamp(glow * 0.56, 0.0, 0.92));
+	if (bloom > 0.001) {
+		float base_lod = log2(max(px_scale, 1.0));
+		vec3 near = glow_of(blurred(SCREEN_UV, base_lod + 0.85, SCREEN_PIXEL_SIZE));
+		vec3 mid = glow_of(blurred(SCREEN_UV, base_lod + 2.25, SCREEN_PIXEL_SIZE));
+		vec3 far = glow_of(blurred(SCREEN_UV, base_lod + 3.85, SCREEN_PIXEL_SIZE));
+		vec3 glow = (near * 0.38 + mid * 0.44 + far * 0.52) * bloom;
+		// bloom first (it is light), as a soft screen blend so bright emissives glow cleanly without clipping
+		c = 1.0 - (1.0 - c) * (1.0 - clamp(glow * 0.56, 0.0, 0.92));
+	}
 	float lum = dot(c, vec3(0.30, 0.59, 0.11));
 	// vibrance: extra punch for muted tones without oversaturating already vivid highlights
 	float sat = max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b));

@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Shadowspore Launcher</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app is-booting" data-page="home">
+      <!-- Living background: in-game scenes, slow pan and cross-fade -->
+      <div class="backdrop" aria-hidden="true">
+        <div id="slides" class="slides"></div>
+        <div class="backdrop-tint"></div>
+      </div>
+      <canvas id="atmosphere" class="atmosphere" aria-hidden="true"></canvas>
+
+      <!-- Title bar (the window has no system frame) -->
+      <header class="titlebar" data-tauri-drag-region>
+        <div class="titlebar-brand" data-tauri-drag-region>
+          <span class="brand-orb" aria-hidden="true"></span>
+          <span class="brand-word" data-px="2" data-px-color="#d9c8ff">Shadowspore</span>
+          <span class="brand-tag">Launcher</span>
+        </div>
+        <div class="titlebar-right">
+          <span id="server-pill" class="status-pill is-muted" title="Nakama-Server">
+            <span class="status-dot"></span><span class="status-text">Server wird geprüft…</span>
+          </span>
+          <button id="account-chip" type="button" class="account-chip" title="Konto">
+            <span id="chip-avatar" class="chip-avatar" aria-hidden="true">?</span>
+            <span id="chip-name" class="chip-name">Anmelden</span>
+          </button>
+          <div class="window-buttons">
+            <button type="button" class="win-btn" data-win="minimize" aria-label="Minimieren">
+              <svg viewBox="0 0 10 10" shape-rendering="crispEdges"><rect x="1" y="5" width="8" height="1" /></svg>
+            </button>
+            <button type="button" class="win-btn" data-win="maximize" aria-label="Maximieren">
+              <svg viewBox="0 0 10 10" shape-rendering="crispEdges"><path d="M1 1h8v8H1z M2 2v6h6V2z" fill-rule="evenodd" /></svg>
+            </button>
+            <button type="button" class="win-btn win-close" data-win="close" aria-label="Schließen">
+              <svg viewBox="0 0 10 10" shape-rendering="crispEdges"><path d="M1 1h1v1h1v1h1v1h2V3h1V2h1V1h1v1H8v1H7v1H6v2h1v1h1v1h1v1H8V8H7V7H6V6H4v1H3v1H2v1H1V8h1V7h1V6h1V4H3V3H2V2H1z" /></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Left rail -->
+      <nav class="rail" aria-label="Bereiche">
+        <button type="button" class="rail-btn is-active" data-nav="home" aria-label="Start">
+          <span class="pix-icon" data-icon="5"></span><span class="rail-label">Start</span>
+        </button>
+        <button type="button" class="rail-btn" data-nav="news" aria-label="Patchnotes">
+          <span class="pix-icon" data-icon="7"></span><span class="rail-label">Patchnotes</span>
+          <span id="news-dot" class="rail-dot" hidden></span>
+        </button>
+        <button type="button" class="rail-btn" data-nav="social" aria-label="Konto und Freunde">
+          <span class="pix-icon" data-icon="11"></span><span class="rail-label">Freunde</span>
+          <span id="friends-dot" class="rail-dot" hidden></span>
+        </button>
+        <button type="button" class="rail-btn" data-nav="settings" aria-label="Einstellungen">
+          <span class="pix-icon" data-icon="2"></span><span class="rail-label">Optionen</span>
+        </button>
+        <div class="rail-spacer"></div>
+        <button type="button" class="rail-btn rail-small" data-link="https://github.com/acuteflower/shadowspore" aria-label="GitHub öffnen" title="Shadowspore auf GitHub">
+          <svg class="gh-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </button>
+        <span id="rail-version" class="rail-version">—</span>
+      </nav>
+
+      <main class="pages">
+        <!-- ======================================================== START -->
+        <section class="page page-home is-active" data-page="home" aria-label="Start">
+          <div class="home-grid">
+            <div class="home-head">
+              <div id="logo" class="logo" aria-label="Shadowspore">
+                <img class="logo-layer logo-halo-void" alt="" />
+                <img class="logo-layer logo-halo-life" alt="" />
+                <img class="logo-layer logo-base" alt="" />
+                <img class="logo-layer logo-plants" alt="" />
+                <img class="logo-layer logo-glow" alt="" />
+                <span class="logo-orb logo-orb-void"></span>
+                <span class="logo-orb logo-orb-life"></span>
+                <span class="logo-shine"></span>
+              </div>
+              <p class="tagline">Licht ist Land. Die Nacht gehört der Leere.</p>
+              <button id="version-ribbon" type="button" class="version-ribbon">
+                <span class="ribbon-badge" id="ribbon-version" data-px="2" data-px-color="#2a1704" data-px-shadow="none">—</span>
+                <span class="ribbon-title" id="ribbon-title">Patchnotes werden geladen…</span>
+                <span class="ribbon-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+
+            <aside class="news-card frame" aria-label="Neuigkeiten">
+              <div class="news-banner" id="news-banner">
+                <div class="banner-track" id="banner-track"></div>
+                <div class="banner-dots" id="banner-dots"></div>
+              </div>
+              <div class="news-tabs" role="tablist">
+                <button type="button" class="news-tab is-active" data-news-tab="updates" role="tab">Updates</button>
+                <button type="button" class="news-tab" data-news-tab="links" role="tab">Links</button>
+              </div>
+              <ul class="news-list" id="news-list"></ul>
+              <ul class="news-list" id="links-list" hidden>
+                <li><button type="button" class="news-row" data-link="https://github.com/acuteflower/shadowspore/blob/main/CHANGELOG.md"><span class="news-kind">LOG</span><span class="news-title">Changelog auf GitHub</span><span class="news-date">↗</span></button></li>
+                <li><button type="button" class="news-row" data-link="https://github.com/acuteflower/shadowspore/releases"><span class="news-kind">DL</span><span class="news-title">Releases &amp; Downloads</span><span class="news-date">↗</span></button></li>
+                <li><button type="button" class="news-row" data-link="https://github.com/acuteflower/shadowspore/issues"><span class="news-kind">BUG</span><span class="news-title">Fehler melden</span><span class="news-date">↗</span></button></li>
+              </ul>
+            </aside>
+
+            <figure class="hero-art" aria-hidden="true">
+              <div class="hero-halo"></div>
+              <div class="hero-portrait" id="hero-portrait"></div>
+              <figcaption class="hero-plate">
+                <span data-px="2" data-px-color="#f2c36b">Ellie</span>
+                <span class="hero-plate-sub">Aus der Tiefe gekrochen</span>
+              </figcaption>
+            </figure>
+
+            <div class="scene-chip" id="scene-chip">
+              <span class="scene-pin"></span>
+              <span class="scene-name" id="scene-name">—</span>
+            </div>
+
+            <div class="dock">
+              <canvas id="parade" class="parade" aria-hidden="true"></canvas>
+              <div class="dock-info">
+                <div class="save-line" id="save-line">
+                  <span class="save-icon" aria-hidden="true"></span>
+                  <span id="save-text">Abgemeldet · lokaler Spielstand</span>
+                </div>
+                <div class="game-line">
+                  <span id="game-dot" class="status-dot is-warn"></span>
+                  <span id="game-label">Spiel wird gesucht…</span>
+                </div>
+              </div>
+              <div class="play-group">
+                <button id="play-btn" type="button" class="play-btn" disabled>
+                  <span class="play-sheen" aria-hidden="true"></span>
+                  <span class="play-progress" aria-hidden="true"></span>
+                  <span class="play-word" id="play-word" data-px="4" data-px-color="#fff8ea" data-px-shadow="rgba(40,10,60,.9)">Spielen</span>
+                  <span class="play-sub" id="play-sub">Als Gast starten</span>
+                </button>
+                <button id="play-options" type="button" class="play-side" aria-label="Spielpfad und Optionen" title="Spielpfad und Optionen">
+                  <span class="pix-icon" data-icon="6"></span>
+                </button>
+              </div>
+              <p id="launch-feedback" class="launch-feedback" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======================================================== PATCHNOTES -->
+        <section class="page page-news" data-page="news" aria-label="Patchnotes">
+          <div class="news-layout">
+            <aside class="version-rail frame">
+              <div class="page-kicker"><span data-px="2" data-px-color="#c9a6ff">Patchnotes</span></div>
+              <div class="version-search">
+                <input id="version-filter" type="search" placeholder="Suchen… (z. B. Hallgrat)" spellcheck="false" />
+              </div>
+              <ol class="version-list" id="version-list"></ol>
+            </aside>
+            <article class="notes frame" id="notes" tabindex="-1">
+              <div class="notes-hero" id="notes-hero">
+                <div class="notes-hero-img" id="notes-hero-img"></div>
+                <div class="notes-hero-text">
+                  <span class="notes-version" id="notes-version" data-px="3" data-px-color="#f2c36b">—</span>
+                  <h1 class="notes-heading"><span class="notes-emoji" id="notes-emoji"></span><span id="notes-title">—</span></h1>
+                  <div class="notes-meta">
+                    <span id="notes-date"></span>
+                    <button type="button" class="link-btn" id="notes-github">Auf GitHub ansehen ↗</button>
+                  </div>
+                </div>
+              </div>
+              <div class="notes-body md" id="notes-body"></div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ======================================================== SOCIAL -->
+        <section class="page page-social" data-page="social" aria-label="Konto und Freunde">
+          <div class="social-layout">
+            <!-- logged out -->
+            <section id="auth-view" class="auth-card frame">
+              <div class="page-kicker"><span data-px="2" data-px-color="#c9a6ff">Konto</span></div>
+              <h2 class="card-title">Willkommen am Lagerfeuer</h2>
+              <p class="card-desc">Melde dich an, damit Cloud-Spielstand, feste Spieler-UID und Freunde mitreisen.</p>
+              <div class="segmented" role="tablist" aria-label="Konto-Modus">
+                <button id="tab-login" type="button" role="tab" aria-selected="true" class="seg-btn is-active">Anmelden</button>
+                <button id="tab-register" type="button" role="tab" aria-selected="false" class="seg-btn">Registrieren</button>
+                <span class="seg-glider" aria-hidden="true"></span>
+              </div>
+              <form id="auth-form" class="form" novalidate>
+                <div class="field" id="username-field" hidden>
+                  <label for="auth-username">Spielername <em>(optional)</em></label>
+                  <input id="auth-username" name="username" type="text" autocomplete="nickname" spellcheck="false" autocapitalize="none" maxlength="32" placeholder="z. B. Mooswanderer" disabled />
+                </div>
+                <div class="field">
+                  <label for="auth-email">E-Mail</label>
+                  <input id="auth-email" name="email" type="email" autocomplete="username" spellcheck="false" autocapitalize="none" required placeholder="name@beispiel.de" />
+                  <span id="email-error" class="field-error">Bitte eine gültige E-Mail-Adresse eingeben.</span>
+                </div>
+                <div class="field">
+                  <label for="auth-password">Passwort</label>
+                  <div class="input-wrap">
+                    <input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="8" required placeholder="Mindestens 8 Zeichen" />
+                    <button id="toggle-password-btn" type="button" class="input-action" aria-pressed="false" aria-label="Passwort anzeigen">Zeigen</button>
+                  </div>
+                  <span id="password-error" class="field-error">Mindestens 8 Zeichen erforderlich.</span>
+                </div>
+                <p id="auth-status" class="form-status" role="status" aria-live="polite"></p>
+                <button id="auth-submit-btn" type="submit" class="btn btn-primary btn-block">Anmelden</button>
+              </form>
+              <p class="card-foot">Ohne Konto kannst du jederzeit als Gast spielen.</p>
+            </section>
+
+            <!-- logged in -->
+            <section id="social-view" class="social-view" hidden>
+              <div class="profile-card frame">
+                <div class="profile-banner" aria-hidden="true"></div>
+                <div class="profile-row">
+                  <div class="avatar" id="profile-avatar" aria-hidden="true">E</div>
+                  <div class="profile-id">
+                    <div class="profile-name-row">
+                      <strong id="profile-name" class="profile-name">Spieler</strong>
+                      <span id="profile-role-badge" class="role-badge role-player">Spieler</span>
+                    </div>
+                    <span id="profile-handle" class="profile-handle">@spieler</span>
+                  </div>
+                  <button id="logout-btn" type="button" class="btn btn-ghost btn-sm">
+                    <span class="pix-icon pix-icon-sm" data-icon="13"></span>Abmelden
+                  </button>
+                </div>
+                <div class="profile-stats">
+                  <button id="copy-uid-btn" type="button" class="stat stat-uid" title="UID kopieren">
+                    <span class="stat-label">UID</span>
+                    <code id="profile-uid" class="stat-value">------</code>
+                    <span class="stat-hint" id="uid-copy-feedback">Klicken zum Kopieren</span>
+                  </button>
+                  <div class="stat">
+                    <span class="stat-label">Cloud-Welt</span>
+                    <span class="stat-value" id="profile-save">—</span>
+                    <span class="stat-hint" id="profile-save-when"></span>
+                  </div>
+                  <div class="stat">
+                    <span class="stat-label">Beitritt</span>
+                    <span class="stat-value" id="profile-join">—</span>
+                    <span class="stat-hint">wer deiner Welt folgen darf</span>
+                  </div>
+                </div>
+
+                <section id="admin-role-card" class="admin-card" aria-label="Rollenverwaltung" hidden>
+                  <div class="admin-head"><span class="pix-icon pix-icon-sm" data-icon="8"></span>Admin · Rollenverwaltung</div>
+                  <form id="admin-role-form" class="admin-form" novalidate>
+                    <input id="admin-target-uid" name="targetUid" type="text" spellcheck="false" autocapitalize="none" required placeholder="UID oder Name" />
+                    <select id="admin-role-select" name="role" aria-label="Rolle wählen">
+                      <option value="player">Spieler</option>
+                      <option value="tester">Tester</option>
+                      <option value="moderator">Moderator</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button id="admin-role-submit" type="submit" class="btn btn-secondary btn-sm">Setzen</button>
+                  </form>
+                  <p id="admin-role-status" class="form-status" role="status" aria-live="polite"></p>
+                </section>
+              </div>
+
+              <div class="friends-card frame">
+                <div class="friends-head">
+                  <div class="page-kicker"><span data-px="2" data-px-color="#c9a6ff">Freunde</span></div>
+                  <span id="friends-count" class="count-pill">0 online</span>
+                  <button id="refresh-social-btn" type="button" class="icon-btn" title="Aktualisieren" aria-label="Aktualisieren">
+                    <span class="pix-icon pix-icon-sm" data-icon="12"></span>
+                  </button>
+                </div>
+                <form id="add-friend-form" class="add-friend" novalidate>
+                  <input id="friend-query" name="friendQuery" type="text" spellcheck="false" autocapitalize="none" required placeholder="Freund per UID hinzufügen, z. B. 100002" aria-label="UID oder Name" />
+                  <button id="add-friend-btn" type="submit" class="btn btn-primary">Hinzufügen</button>
+                </form>
+                <p id="friend-status" class="form-status" role="status" aria-live="polite"></p>
+                <div class="friends-scroll" role="region" aria-label="Freundesliste">
+                  <div id="friends-empty" class="empty-state">
+                    <span class="pix-icon pix-icon-lg" data-icon="4"></span>
+                    <p>Noch ist es still am Feuer.<br />Teile deine UID, damit Freunde dich finden.</p>
+                  </div>
+                  <div id="friends-list"></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ======================================================== SETTINGS -->
+        <section class="page page-settings" data-page="settings" aria-label="Einstellungen">
+          <form id="settings-form" class="settings frame" novalidate>
+            <div class="page-kicker"><span data-px="2" data-px-color="#c9a6ff">Optionen</span></div>
+            <h2 class="card-title">Launcher-Einstellungen</h2>
+
+            <div class="settings-group">
+              <h3 class="group-title"><span class="pix-icon pix-icon-sm" data-icon="1"></span>Server</h3>
+              <div class="field-row">
+                <div class="field">
+                  <label for="cfg-server-url">Nakama Server-URL</label>
+                  <input id="cfg-server-url" name="serverUrl" type="url" spellcheck="false" autocapitalize="none" required placeholder="http://127.0.0.1:7350" />
+                </div>
+                <div class="field">
+                  <label for="cfg-server-key">Server-Key</label>
+                  <input id="cfg-server-key" name="serverKey" type="text" spellcheck="false" autocapitalize="none" required />
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="group-title"><span class="pix-icon pix-icon-sm" data-icon="6"></span>Spiel</h3>
+              <div class="field">
+                <label for="cfg-game-exe">Shadowspore.exe <em>(für Export-Builds, leer = automatisch)</em></label>
+                <input id="cfg-game-exe" name="gameExePath" type="text" spellcheck="false" autocapitalize="none" placeholder="Automatische Erkennung" />
+              </div>
+              <div class="field">
+                <label for="cfg-godot-exe">Godot 4.7 <em>(für den Dev-Modus, leer = Downloads / PATH)</em></label>
+                <input id="cfg-godot-exe" name="godotExePath" type="text" spellcheck="false" autocapitalize="none" placeholder="Automatische Erkennung" />
+              </div>
+              <div class="field">
+                <label for="cfg-manifest-url">Update-Manifest <em>(optional, JSON mit "version")</em></label>
+                <input id="cfg-manifest-url" name="manifestUrl" type="url" spellcheck="false" autocapitalize="none" placeholder="https://example.com/shadowspore/manifest.json" />
+              </div>
+              <div class="resolved" id="resolved-path"></div>
+            </div>
+
+            <div class="settings-group">
+              <h3 class="group-title"><span class="pix-icon pix-icon-sm" data-icon="0"></span>Launcher</h3>
+              <label class="toggle">
+                <input type="checkbox" id="opt-motion" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span>Animationen reduzieren</span>
+              </label>
+              <label class="toggle">
+                <input type="checkbox" id="opt-slides" />
+                <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                <span>Hintergrund-Szenen wechseln automatisch</span>
+              </label>
+            </div>
+
+            <p id="settings-status" class="form-status" role="status" aria-live="polite"></p>
+            <div class="settings-actions">
+              <button id="cancel-settings-btn" type="button" class="btn btn-ghost">Zurücksetzen</button>
+              <button type="submit" class="btn btn-primary">Speichern &amp; prüfen</button>
+            </div>
+          </form>
+        </section>
+      </main>
+
+      <!-- Image viewer for patch-note pictures -->
+      <div id="lightbox" class="lightbox" hidden>
+        <img id="lightbox-img" alt="" />
+        <p id="lightbox-caption"></p>
+      </div>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

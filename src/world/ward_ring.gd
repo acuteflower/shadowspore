@@ -38,6 +38,9 @@ var _lights: Array[NightLight] = []
 var _band: Node2D
 var _time: float = 0.0
 var _wake: float = 1.0 ## 0..1: how far the light has come back (the band grows from stone to stone)
+var _far_wait: float = 0.0
+var _band_t: float = 0.0
+var _band_drawn_awake: bool = false
 var feed: Array[int] = [] ## indices of the weak stones the quest feeds
 var fed: Array[int] = [] ## of those, the ones that took their glimmer (host decides, every peer knows)
 var ambush: int = AMBUSH_NONE
@@ -325,28 +328,52 @@ func import_state(on: bool) -> void:
 
 
 func _near_player() -> bool:
+	var r2: float = ANIMATE_RANGE * ANIMATE_RANGE
+	var vp: Viewport = get_viewport()
+	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+	if cam != null and cam.get_screen_center_position().distance_squared_to(global_position) <= r2:
+		return true
 	for player: Player in Player.all:
-		if is_instance_valid(player) and player.global_position.distance_squared_to(global_position) <= ANIMATE_RANGE * ANIMATE_RANGE:
+		if is_instance_valid(player) and player.global_position.distance_squared_to(global_position) <= r2:
 			return true
-	return Player.all.is_empty()
+	return cam == null and Player.all.is_empty()
 
 
 func _process(delta: float) -> void:
 	_time += delta
-	if awake and _wake < 1.0:
+	var waking: bool = awake and _wake < 1.0
+	if waking:
 		var lit_before: int = _lit_count()
 		_wake = minf(1.0, _wake + delta * 0.6)
 		var lit_now: int = _lit_count()
 		if lit_now != lit_before:
 			_show_state()
 			_sound("ward_ring.wav" if lit_now == stones.size() else "ward_wake.wav", global_position if lit_now == stones.size() else to_global(stones[maxi(lit_now - 1, 0)][0] as Vector2))
-	if not _near_player():
-		return
+	if not waking:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		if not _near_player():
+			_far_wait = 0.25
+			return
 	var night: float = TimeManager.night_amount()
 	for k: int in _glows.size():
 		var beat: float = VoidGlow.beat(_time + float(k) * 0.37) if awake else 0.0
 		_glows[k].modulate.a = lerpf(0.4, 1.0, night) * (0.85 + 0.15 * beat)
-	_band.queue_redraw()
+	if awake:
+		if waking:
+			_band_t = 0.0
+			_band.queue_redraw()
+		else:
+			_band_t -= delta
+			if _band_t <= 0.0:
+				_band_t = 0.06
+				_band.queue_redraw()
+		_band_drawn_awake = true
+	elif _band_drawn_awake:
+		_band_drawn_awake = false
+		_band.queue_redraw()
 
 
 ## The band: a bowed line of teal light on the ground from stone to stone (bulging outward, so the stones stand on one oval), two pixels wide with a

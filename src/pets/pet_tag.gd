@@ -16,15 +16,17 @@ var _alpha: float = 0.0
 var _hold: float = 0.0 ## seconds the card stays after a feeding
 var _pop_age: float = 99.0
 var _pop_text: String = ""
+var _registry: PetRegistry
+var _check_wait: float = 0.0
 
 
 func _ready() -> void:
 	_bird = get_parent() as WildCorvid
 	z_index = 60
 	material = Unlit.material()
-	var registry: PetRegistry = PetRegistry.of(get_tree())
-	if registry != null:
-		registry.bond_changed.connect(_on_bond)
+	_registry = PetRegistry.of(get_tree())
+	if _registry != null:
+		_registry.bond_changed.connect(_on_bond)
 
 
 func _on_bond(key: String, peer: int, gained: float, _up: bool) -> void:
@@ -50,11 +52,25 @@ func _local() -> Player:
 
 
 func _process(delta: float) -> void:
-	var registry: PetRegistry = PetRegistry.of(get_tree())
-	if _bird == null or registry == null or not registry.has_record(_bird.pet_key):
+	var prompt_open: bool = _hold > 0.0 or _alpha > 0.0 or _pop_age < 1.4
+	if _check_wait > 0.0 and not prompt_open:
+		_check_wait -= delta
+		if _check_wait > 0.0:
+			return
+	if _registry == null:
+		_registry = PetRegistry.of(get_tree())
+		if _registry != null and not _registry.bond_changed.is_connected(_on_bond):
+			_registry.bond_changed.connect(_on_bond)
+	if _bird == null or _registry == null or not _registry.has_record(_bird.pet_key):
 		if _alpha > 0.0:
 			_alpha = 0.0
 			queue_redraw()
+		_check_wait = 0.35
+		return
+	var vp: Viewport = get_viewport()
+	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+	if not prompt_open and cam != null and _bird.global_position.distance_squared_to(cam.get_screen_center_position()) > 480.0 * 480.0:
+		_check_wait = 0.25
 		return
 	_hold = maxf(0.0, _hold - delta)
 	_pop_age += delta
@@ -69,12 +85,13 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var registry: PetRegistry = PetRegistry.of(get_tree())
-	if _alpha <= 0.01 or _bird == null or registry == null or not registry.has_record(_bird.pet_key):
+	if _registry == null:
+		_registry = PetRegistry.of(get_tree())
+	if _alpha <= 0.01 or _bird == null or _registry == null or not _registry.has_record(_bird.pet_key):
 		return
 	var key: String = _bird.pet_key
-	var label: String = registry.name_of(key)
-	var bp: float = registry.bp_of(key, multiplayer.get_unique_id())
+	var label: String = _registry.name_of(key)
+	var bp: float = _registry.bp_of(key, multiplayer.get_unique_id())
 	var stage: int = PetRules.stage_of(bp)
 	var width: int = maxi(PixelText.width(label), PIPS * 4 - 1) + 8
 	var left: int = -int(width / 2.0)

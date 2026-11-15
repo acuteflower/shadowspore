@@ -20,8 +20,9 @@ uniform float clear_px = 0.0; // extra clearing round the heroine (the Ohrringe 
 uniform vec3 hex_color : source_color = vec3(0.50, 0.62, 0.52);
 
 void fragment() {
-	// day: no fog and no dusk, the output would be fully transparent anyway ('return' is not allowed in fragment())
-	float fog_on = (fog > 0.0 || night > 0.0 || hex > 0.0) ? 1.0 : 0.0;
+	if (fog <= 0.0 && night <= 0.0 && hex <= 0.0) {
+		COLOR = vec4(0.0);
+	} else {
 	vec2 px = UV * view_px; // smooth, not snapped to art pixels
 	vec2 w = world_origin + px; // NOT floored: the camera glides finer than an art pixel, a floored origin makes the fog judder against the ground
 	float noise = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
@@ -57,5 +58,6 @@ void fragment() {
 	vec4 acc = vec4(mix(fog_color, hex_tint, share) * fog_a * (1.0 - dark_a) + vec3(0.01, 0.0, 0.03) * dark_a, 0.0);
 	acc.a = 1.0 - (1.0 - fog_a) * (1.0 - dark_a);
 	// (the town's light edge is no longer drawn here: it only shows in build mode, BuildMode._draw_territory)
-	COLOR = vec4(acc.a > 0.0 ? acc.rgb / acc.a : vec3(0.0), acc.a > 0.001 ? clamp(acc.a + noise / 255.0, 0.0, 1.0) * fog_on : 0.0); // a hair of noise against 8 bit banding
+	COLOR = vec4(acc.a > 0.0 ? acc.rgb / acc.a : vec3(0.0), acc.a > 0.001 ? clamp(acc.a + noise / 255.0, 0.0, 1.0) : 0.0); // a hair of noise against 8 bit banding
+	}
 }

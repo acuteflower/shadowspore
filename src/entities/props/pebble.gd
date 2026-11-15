@@ -15,7 +15,7 @@ const REGROW_BURST: Array[Color] = [Color("d9c8ff"), Color("78f4e6")]
 func apply_state(new_state: Dictionary, fx: String) -> void:
 	state = new_state
 	var gone: bool = bool(state.get("p", 0))
-	_sprite.texture = load(String(_spec.texture)) as Texture2D
+	_sprite.texture = _tex(String(_spec.texture))
 	_sprite.hframes = int(_spec.columns)
 	_sprite.vframes = 1
 	_sprite.frame = variant

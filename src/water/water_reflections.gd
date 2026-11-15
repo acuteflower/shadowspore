@@ -54,6 +54,7 @@ var _parts: Dictionary = {} ## instance id -> {"t": msec, "list": Array[Sprite2D
 var _wait: float = 0.0
 var _on: bool = false
 var _last_on: bool = false
+var _last_reflect_rect: Vector4 = Vector4(INF, INF, INF, INF)
 var cost_usec: int = 0 ## main-thread time of the last drawing pass (for checks)
 var drawn_items: int = 0 ## sprite copies in the last drawing pass
 
@@ -370,7 +371,10 @@ func _draw_pass() -> void:
 	var inverse: Transform2D = transform.affine_inverse()
 	var top_left: Vector2 = inverse * Vector2.ZERO
 	var span: Vector2 = Vector2(size) / transform.get_scale()
-	RenderingServer.global_shader_parameter_set("g_reflect_rect", Vector4(top_left.x, top_left.y, span.x, span.y))
+	var rect_vec: Vector4 = Vector4(top_left.x, top_left.y, span.x, span.y)
+	if not rect_vec.is_equal_approx(_last_reflect_rect):
+		_last_reflect_rect = rect_vec
+		RenderingServer.global_shader_parameter_set("g_reflect_rect", rect_vec)
 	var used: int = 0
 	var painted: int = 0
 	var z: int = -4000
@@ -384,7 +388,7 @@ func _draw_pass() -> void:
 		var thing: Node2D = _active[k]
 		var start: int = _slot_start[k]
 		var cap: int = _slot_cap[k]
-		var refresh: bool = full or _slot_moving[k] == 1 or (k + _frame) % 3 == 0
+		var refresh: bool = full or _slot_moving[k] == 1 or (k + _frame) % 10 == 0
 		if not is_instance_valid(thing) or not thing.is_inside_tree():
 			for j: int in range(cap):
 				_hide_item(start + j)

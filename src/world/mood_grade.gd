@@ -15,6 +15,14 @@ var _desert: Dictionary = {}
 var _desert_storm: Dictionary = {}
 var _strength: float = 1.0
 var _scale: float = -1.0
+var _sent_shadow: Vector3 = Vector3(INF, INF, INF)
+var _sent_light: Vector3 = Vector3(INF, INF, INF)
+var _sent_split: float = -1.0
+var _sent_vibrance: float = -1.0
+var _sent_contrast: float = -1.0
+var _sent_bloom: float = -1.0
+var _sent_threshold: float = -1.0
+var _sent_vignette: float = -1.0
 
 
 func _ready() -> void:
@@ -77,14 +85,38 @@ func follow(indoors: bool, gloom: float, arid: float = 0.0, arcane_storm: float 
 				mood = blend(mood, _desert_storm, clampf(arcane_storm * 0.90, 0.0, 0.92))
 	var shadow: Color = mood["shadow"] as Color
 	var light: Color = mood["light"] as Color
-	_material.set_shader_parameter("shadow_tint", Vector3(shadow.r, shadow.g, shadow.b))
-	_material.set_shader_parameter("light_tint", Vector3(light.r, light.g, light.b))
-	_material.set_shader_parameter("split", float(mood["split"]) * _strength)
-	_material.set_shader_parameter("vibrance", float(mood["vibrance"]) * _strength)
-	_material.set_shader_parameter("contrast", float(mood["contrast"]) * _strength)
-	_material.set_shader_parameter("bloom", float(mood["bloom"]) * _strength)
-	_material.set_shader_parameter("threshold", float(mood["threshold"]))
-	_material.set_shader_parameter("vignette", float(mood["vignette"]) * _strength)
+	var shadow_v: Vector3 = Vector3(shadow.r, shadow.g, shadow.b)
+	var light_v: Vector3 = Vector3(light.r, light.g, light.b)
+	if shadow_v.distance_squared_to(_sent_shadow) > 0.000001:
+		_sent_shadow = shadow_v
+		_material.set_shader_parameter("shadow_tint", shadow_v)
+	if light_v.distance_squared_to(_sent_light) > 0.000001:
+		_sent_light = light_v
+		_material.set_shader_parameter("light_tint", light_v)
+	var split_v: float = float(mood["split"]) * _strength
+	if absf(split_v - _sent_split) > 0.0004:
+		_sent_split = split_v
+		_material.set_shader_parameter("split", split_v)
+	var vibrance_v: float = float(mood["vibrance"]) * _strength
+	if absf(vibrance_v - _sent_vibrance) > 0.0004:
+		_sent_vibrance = vibrance_v
+		_material.set_shader_parameter("vibrance", vibrance_v)
+	var contrast_v: float = float(mood["contrast"]) * _strength
+	if absf(contrast_v - _sent_contrast) > 0.0004:
+		_sent_contrast = contrast_v
+		_material.set_shader_parameter("contrast", contrast_v)
+	var bloom_v: float = float(mood["bloom"]) * _strength
+	if absf(bloom_v - _sent_bloom) > 0.0004:
+		_sent_bloom = bloom_v
+		_material.set_shader_parameter("bloom", bloom_v)
+	var thresh_v: float = float(mood["threshold"])
+	if absf(thresh_v - _sent_threshold) > 0.0004:
+		_sent_threshold = thresh_v
+		_material.set_shader_parameter("threshold", thresh_v)
+	var vig_v: float = float(mood["vignette"]) * _strength
+	if absf(vig_v - _sent_vignette) > 0.0004:
+		_sent_vignette = vig_v
+		_material.set_shader_parameter("vignette", vig_v)
 	var px_scale: float = (get_viewport().get_final_transform() * get_viewport().get_canvas_transform()).get_scale().x ## screen pixels per art pixel
 	if absf(px_scale - _scale) > 0.001:
 		_scale = px_scale

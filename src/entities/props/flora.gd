@@ -30,6 +30,9 @@ const SOIL_BURST: Array[Color] = [Color("5a4048"), Color("7a6068"), Color("3a283
 
 const WIND_LIT: Shader = preload("res://assets/shaders/flora_wind.gdshader")
 const WIND_GLOW: Shader = preload("res://assets/shaders/flora_wind_glow.gdshader")
+static var _lit_materials: Dictionary = {}
+static var _glow_materials: Dictionary = {}
+
 ## Every small plant bends in WorldWind's wind (flora_wind.gdshader: rows above the ground slide in whole art pixels), so the
 ## idle skew of Bush is switched off here; rustling when someone walks through is still Bush's skew tween.
 func _setup_prop() -> void:
@@ -43,14 +46,19 @@ func _setup_prop() -> void:
 	_flicker = bool(_spec.get("flicker", false)) and _glow != null
 
 
-## One material per plant (cheap: the shader is shared): its own place and phase are uniforms, so the bend never depends on where the
-## camera is. Walking or running must not make the plants jitter.
+## Shared per (glow, sway) bucket; world position comes from MODEL_MATRIX in vertex() so hundreds of flora batch together.
 func _wind_material(glow: bool) -> ShaderMaterial:
+	var amt: float = float(_spec.get("sway", 0.02)) * 60.0
+	var key: int = roundi(amt * 100.0)
+	var cache: Dictionary = _glow_materials if glow else _lit_materials
+	var cached: Variant = cache.get(key)
+	if cached != null:
+		return cached as ShaderMaterial
 	var material: ShaderMaterial = ShaderMaterial.new()
 	material.shader = WIND_GLOW if glow else WIND_LIT
-	material.set_shader_parameter("amount", float(_spec.get("sway", 0.02)) * 60.0)
-	material.set_shader_parameter("origin", global_position)
-	material.set_shader_parameter("phase_seed", fposmod(global_position.x * 0.37 + global_position.y * 0.91, TAU))
+	material.set_shader_parameter("amount", amt)
+	material.set_shader_parameter("use_model_origin", true)
+	cache[key] = material
 	return material
 
 

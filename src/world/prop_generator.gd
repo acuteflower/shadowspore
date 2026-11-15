@@ -256,11 +256,11 @@ class Query:
 					_index += 1
 					var candidate: Dictionary = entry.candidate
 					var cell: Vector2i = candidate.cell
+					if not _expanded.has_point(cell): continue
 					var c_kind: String = String(candidate.kind)
 					if SHORE_KINDS.has(c_kind): ## waterside plants may stand right at the bank, just not in the water
 						if _generator.water_dist.is_valid() and float(_generator.water_dist.call(candidate.pos)) < 4.0: continue
 					elif _generator.water_clear.is_valid() and not bool(_generator.water_clear.call(candidate.pos, float(candidate.get("foot", 80.0)))): continue
-					if not _expanded.has_point(cell): continue
 					var wanted: int = 3 if int(entry.mask) == 3 and _rect.has_point(cell) else 2
 					var blocked: int = 0 if DECAL_KINDS.has(c_kind) else _dominated(candidate, wanted)
 					var result: Dictionary = {"cell": cell, "kind": candidate.kind, "variant": candidate.variant, "pos": candidate.pos}

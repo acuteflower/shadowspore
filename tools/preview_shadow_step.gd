@@ -5,6 +5,7 @@ extends Node2D
 
 var _dir: String = ""
 var _angle: float = 0.0
+var _light: bool = false
 var _player: Player
 
 
@@ -15,8 +16,11 @@ func _ready() -> void:
 			_dir = arg.trim_prefix("--dir=")
 		elif arg.begins_with("--angle="):
 			_angle = deg_to_rad(float(arg.trim_prefix("--angle=")))
+		elif arg == "--light":
+			_light = true
 	_player = load("res://src/entities/player/player.tscn").instantiate() as Player
 	_player.name = "1"
+	_player.light_step = _light
 	_player.position = Vector2(300, 190)
 	add_child(_player)
 	_player.set_physics_process(false)
@@ -38,6 +42,9 @@ func _ready() -> void:
 			if fx is ShadowStepFx:
 				fx.set_process(false)
 				(fx as ShadowStepFx)._process(1.0 / 60.0)
+			elif fx is LightStepFx:
+				fx.set_process(false)
+				(fx as LightStepFx)._process(1.0 / 60.0)
 		_player._animate(1.0 / 60.0)
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/step_%02d.png" % [_dir, index])

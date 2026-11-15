@@ -8,6 +8,19 @@ extends Interactable
 
 static var _day_shared: ShaderMaterial
 static var _day_quartz_shared: ShaderMaterial
+static var _tex_cache: Dictionary = {}
+
+
+static func _tex(path: String) -> Texture2D:
+	if path.is_empty():
+		return null
+	var cached: Variant = _tex_cache.get(path)
+	if cached != null:
+		return cached as Texture2D
+	var loaded: Texture2D = load(path) as Texture2D
+	if loaded != null:
+		_tex_cache[path] = loaded
+	return loaded
 
 static func _day_material() -> ShaderMaterial:
 	if _day_shared == null:
@@ -87,7 +100,7 @@ func _setup_glow() -> void:
 	_glow = Sprite2D.new()
 	_glow.centered = false
 	_glow.offset = _sprite.offset
-	_glow.texture = load(String(_spec.glow)) as Texture2D
+	_glow.texture = _tex(String(_spec.glow))
 	_glow.material = Unlit.material()
 	_sprite.add_child(_glow)
 	add_to_group("night_lights") ## DayNight tells every night light and prop how dark it is

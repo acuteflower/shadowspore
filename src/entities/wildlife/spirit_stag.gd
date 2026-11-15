@@ -148,6 +148,11 @@ func _process(delta: float) -> void:
 			queue_free()
 			return
 
+	if delta > 0.0:
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 560.0 * 560.0:
+			return
 	_update_frame()
 	if _glow != null:
 		var night: float = TimeManager.night_amount()

@@ -19,6 +19,7 @@ var _glow: Sprite2D
 var _light: NightLight
 var _time: float = 0.0
 var _rang: float = 0.0 ## seconds since the crystal last answered (it brightens when read)
+var _far_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -50,6 +51,10 @@ func _ready() -> void:
 	body.add_child(shape)
 	add_child(body)
 	_rang = 99.0
+	_far_wait = fposmod(absf(position.x * 0.019 + position.y * 0.031), 0.25)
+	if not lit():
+		_glow.modulate.a = 0.0
+		set_process(false)
 
 
 ## The crystal still holds some light (from 150 on).
@@ -63,6 +68,15 @@ func tone() -> int:
 
 
 func _process(delta: float) -> void:
+	if delta > 0.0 and _rang > 2.5:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 480.0 * 480.0:
+			_far_wait = 0.25
+			return
 	_time += delta
 	_rang += delta
 	var night: float = TimeManager.night_amount()

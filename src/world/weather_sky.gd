@@ -28,6 +28,8 @@ var _gust: float = 0.0
 var _manager: WeatherManager
 var _cfg: Dictionary = {}
 var _tint: Color = Color(1, 1, 1)
+var _last_xform_origin: Vector2 = Vector2(INF, INF)
+var _last_xform_view: Vector2 = Vector2(INF, INF)
 
 
 func _ready() -> void:
@@ -84,33 +86,41 @@ func update(indoors: bool, delta: float, ambient: Color) -> void:
 	var target_slant: float = clampf(wind_dir.x * (0.07 + 0.42 * w.wind + 0.10 * clampf(_gust - 0.6, 0.0, 2.0)) + wind_dir.x * 0.5 * w.storm, -1.4, 1.4)
 	slant = lerpf(slant, target_slant, 1.0 - exp(-delta / 0.5))
 	fall = 1.0 + 0.5 * w.storm + 0.15 * w.wind
-	_push_transform()
-	var reduced: float = 1.0 if quality >= 2 else 0.55
 	var shown: bool = visibility > 0.01
-	_clouds_rect.visible = shown and DRAW_CLOUDS
-	_rain_rect.visible = shown and (w.rain > 0.01 or w.fog > 0.02 or w.local_rain > 0.01)
+	var clouds_vis: bool = shown and DRAW_CLOUDS
+	var rain_vis: bool = shown and (w.rain > 0.01 or w.fog > 0.02 or w.local_rain > 0.01)
+	_clouds_rect.visible = clouds_vis
+	_rain_rect.visible = rain_vis
 	if not shown:
 		_flash_rect.visible = false
 		return
+	var soft: float = 0.35 if bool(GameSettings.get_value("flash_soft")) else 1.0
+	var f: float = w.flash * visibility * soft * (1.0 if quality >= 2 else 0.6)
+	_flash_rect.visible = f > 0.004
+	if not clouds_vis and not rain_vis and not _flash_rect.visible:
+		return
+	_push_transform()
+	var reduced: float = 1.0 if quality >= 2 else 0.55
 	var night: float = TimeManager.night_amount()
-	var height_cfg: Dictionary = _cfg.get("cloud_height", {}) as Dictionary
-	var noon: Array = height_cfg.get("noon", [54.0, 62.0]) as Array
-	var low: Array = height_cfg.get("low_sun", [104.0, 122.0]) as Array
-	var gold: float = TimeManager.golden_amount()
-	var height: Vector2 = Vector2(lerpf(float(noon[0]), float(low[0]), gold), lerpf(float(noon[1]), float(low[1]), gold))
 	var dim: float = w.ambient_dim()
 	var lit: Color = Color(ambient.r * dim, ambient.g * dim, ambient.b * dim)
-	var hex: float = BiomeBlend.amount_at(w.focus)
-	_tint = Color(1, 1, 1).lerp(Color(0.80, 1.0, 0.72), clampf(hex * 1.3, 0.0, 1.0))
-	_clouds.set_shader_parameter("height", height)
-	_clouds.set_shader_parameter("golden", gold * (1.0 - 0.6 * w.cloud))
-	_clouds.set_shader_parameter("storm", w.storm)
-	_clouds.set_shader_parameter("cover", w.cloud)
-	_clouds.set_shader_parameter("visibility", visibility * reduced * (1.0 - 0.45 * night))
-	_clouds.set_shader_parameter("clock", _clock)
-	_clouds.set_shader_parameter("ambient", Vector3(lit.r, lit.g, lit.b))
-	_clouds.set_shader_parameter("wind_dir", wind_dir)
-	if _rain_rect.visible:
+	if clouds_vis:
+		var height_cfg: Dictionary = _cfg.get("cloud_height", {}) as Dictionary
+		var noon: Array = height_cfg.get("noon", [54.0, 62.0]) as Array
+		var low: Array = height_cfg.get("low_sun", [104.0, 122.0]) as Array
+		var gold: float = TimeManager.golden_amount()
+		var height: Vector2 = Vector2(lerpf(float(noon[0]), float(low[0]), gold), lerpf(float(noon[1]), float(low[1]), gold))
+		_clouds.set_shader_parameter("height", height)
+		_clouds.set_shader_parameter("golden", gold * (1.0 - 0.6 * w.cloud))
+		_clouds.set_shader_parameter("storm", w.storm)
+		_clouds.set_shader_parameter("cover", w.cloud)
+		_clouds.set_shader_parameter("visibility", visibility * reduced * (1.0 - 0.45 * night))
+		_clouds.set_shader_parameter("clock", _clock)
+		_clouds.set_shader_parameter("ambient", Vector3(lit.r, lit.g, lit.b))
+		_clouds.set_shader_parameter("wind_dir", wind_dir)
+	if rain_vis:
+		var hex: float = BiomeBlend.amount_at(w.focus)
+		_tint = Color(1, 1, 1).lerp(Color(0.80, 1.0, 0.72), clampf(hex * 1.3, 0.0, 1.0))
 		_rain.set_shader_parameter("slant", slant)
 		_rain.set_shader_parameter("fall", fall)
 		_rain.set_shader_parameter("gust", clampf(_gust * 0.5, 0.0, 1.0))
@@ -121,9 +131,6 @@ func update(indoors: bool, delta: float, ambient: Color) -> void:
 		_rain.set_shader_parameter("ambient", Vector3(lit.r, lit.g, lit.b))
 		_rain.set_shader_parameter("wind_dir", wind_dir)
 		_rain.set_shader_parameter("tint", Vector3(_tint.r, _tint.g, _tint.b))
-	var soft: float = 0.35 if bool(GameSettings.get_value("flash_soft")) else 1.0
-	var f: float = w.flash * visibility * soft * (1.0 if quality >= 2 else 0.6)
-	_flash_rect.visible = f > 0.004
 	if _flash_rect.visible:
 		var info: Dictionary = w.flash_info
 		var color: Color = info.get("color", Color(0.8, 0.84, 1.0)) as Color
@@ -139,6 +146,8 @@ func update(indoors: bool, delta: float, ambient: Color) -> void:
 func _push_transform() -> void:
 	if not is_inside_tree() or _clouds == null:
 		return
+	if not _clouds_rect.visible and not _rain_rect.visible and not _flash_rect.visible:
+		return
 	var transform: Transform2D = get_viewport().get_canvas_transform()
 	_origin = transform.affine_inverse() * Vector2.ZERO
 	_view = get_viewport().get_visible_rect().size / transform.get_scale()
@@ -147,6 +156,16 @@ func _push_transform() -> void:
 	var exact: Vector2 = Transform2D(full.x, full.y, snapped_origin).affine_inverse() * Vector2.ZERO
 	if exact.is_finite() and exact.distance_squared_to(_origin) < 1.0:
 		_origin = exact
-	for material: ShaderMaterial in [_clouds, _rain, _flash]:
-		material.set_shader_parameter("world_origin", _origin)
-		material.set_shader_parameter("view_px", _view)
+	if _origin.distance_squared_to(_last_xform_origin) <= 0.0001 and _view.distance_squared_to(_last_xform_view) <= 0.0001:
+		return
+	_last_xform_origin = _origin
+	_last_xform_view = _view
+	if _clouds_rect.visible:
+		_clouds.set_shader_parameter("world_origin", _origin)
+		_clouds.set_shader_parameter("view_px", _view)
+	if _rain_rect.visible:
+		_rain.set_shader_parameter("world_origin", _origin)
+		_rain.set_shader_parameter("view_px", _view)
+	if _flash_rect.visible:
+		_flash.set_shader_parameter("world_origin", _origin)
+		_flash.set_shader_parameter("view_px", _view)

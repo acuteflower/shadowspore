@@ -85,6 +85,8 @@ var _mound_spot: HoardSpot
 var _glints: Array[Vector2] = []
 var _clods: Array = [] ## [pos, vel, age, life, colour]
 var _night: float = 0.0
+var _far_wait: float = 0.0
+var _idle_redraw_t: float = 0.0
 
 
 func setup(entry: Dictionary, tuning: Dictionary) -> void:
@@ -288,6 +290,25 @@ func set_night(amount: float) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_state_t += delta
+	if (state == State.PERCH or state == State.DONE) and _clods.is_empty() and not manual:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null:
+			var cam_pos: Vector2 = cam.get_screen_center_position()
+			var max_d: float = 760.0 * 760.0
+			var near: bool = _snag_pos.distance_squared_to(cam_pos) <= max_d or _mound_pos.distance_squared_to(cam_pos) <= max_d
+			if not near:
+				for p: Player in Player.all:
+					if is_instance_valid(p) and (p.global_position.distance_squared_to(_snag_pos) <= max_d or p.global_position.distance_squared_to(_mound_pos) <= max_d):
+						near = true
+						break
+			if not near:
+				_far_wait = 0.25
+				return
 	if multiplayer.is_server() and not manual:
 		_host_step(delta)
 	_animate(delta)
@@ -1000,8 +1021,16 @@ func _animate(delta: float) -> void:
 		c[0] = (c[0] as Vector2) + v * delta
 		if float(c[2]) > float(c[3]):
 			_clods.remove_at(i)
-	_crow.queue_redraw()
-	_ground.queue_redraw()
+	if (state == State.PERCH or state == State.DONE) and _clods.is_empty() and interest <= 0.15:
+		_idle_redraw_t -= delta
+		if _idle_redraw_t <= 0.0:
+			_idle_redraw_t = 0.08
+			_crow.queue_redraw()
+			_ground.queue_redraw()
+	else:
+		_idle_redraw_t = 0.0
+		_crow.queue_redraw()
+		_ground.queue_redraw()
 
 
 ## A black feather with a silver tip on the ground at station `i` (it flutters down first, then lies there and its tip glints).

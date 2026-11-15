@@ -117,6 +117,7 @@ func _contacts(delta: float) -> void:
 	for node: Node in get_tree().get_nodes_in_group("corvids"):
 		if node is Node2D and float(node.get("_height")) < 2.0:
 			actors.append(node)
+	var moved_any: bool = false
 	var details: Array[Node] = get_tree().get_nodes_in_group("meadow_details")
 	for actor: Node in actors:
 		var body: Node2D = actor as Node2D
@@ -129,6 +130,7 @@ func _contacts(delta: float) -> void:
 		var distance: float = before.distance_to(pos)
 		# Teleports / room changes do not mow the land between destinations.
 		if distance < 0.8 or distance > 96.0: continue
+		moved_any = true
 		var speed: float = distance/maxf(delta,0.01)
 		var force: float = clampf(speed/100.0,0.20,1.4)
 		if not body is Player: force *= 0.65
@@ -145,7 +147,9 @@ func _contacts(delta: float) -> void:
 			if speed > 135.0: _release_seed(pos)
 	for id: int in _previous.keys():
 		if not seen.has(id): _previous.erase(id)
-	for node: MeadowDetails in details: node.advance_contacts(delta)
+	for node: MeadowDetails in details:
+		if moved_any or not node._bends.is_empty() or node._dirty:
+			node.advance_contacts(delta)
 
 func _viewer() -> Player:
 	for player: Player in Player.all:

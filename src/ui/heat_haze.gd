@@ -51,11 +51,17 @@ func set_preview_amount(value: float) -> void:
 		_apply_shader()
 
 
+var _last_view: Vector2 = Vector2.ZERO
+var _was_active: bool = true
+
+
 func _fit() -> void:
 	var view: Vector2 = get_viewport().get_visible_rect().size
 	if size != view:
 		size = view
-	_material.set_shader_parameter("view_size", view)
+	if _last_view != view:
+		_last_view = view
+		_material.set_shader_parameter("view_size", view)
 
 
 func _target_heat() -> float:
@@ -80,18 +86,24 @@ func _target_heat() -> float:
 
 
 func _apply_shader() -> void:
-	_fit()
 	var active: bool = _amount > 0.003
+	if not active and not _was_active:
+		return
+	_was_active = active
 	visible = active
 	if _layer != null:
 		_layer.visible = active
 	if active:
+		_fit()
 		_material.set_shader_parameter("amount", _amount)
 		_material.set_shader_parameter("time", _time)
 
 
 func _process(delta: float) -> void:
 	var want: float = _target_heat()
+	if want <= 0.003 and _amount <= 0.003:
+		_apply_shader()
+		return
 	var speed: float = FADE_IN_SPEED if want > _amount else FADE_OUT_SPEED
 	_amount = move_toward(_amount, want, delta * speed)
 	if _amount > 0.003:

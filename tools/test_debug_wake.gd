@@ -18,7 +18,17 @@ func _run() -> void:
 	player.inventory.give("wood", 3)
 	var inventory_before: Array = player.inventory.slots.duplicate(true)
 	player.quests.set_flag("developer_test_keep")
+	CloudSession.logout()
 	menu.open_test_tools()
+	check(not menu._opening, "guest cannot open developer test tools")
+	CloudSession.token = "test_admin_token"
+	CloudSession.user_id = "test_admin_id"
+	CloudSession.role = "player"
+	menu.open_test_tools()
+	check(not menu._opening, "player role cannot open developer test tools")
+	CloudSession.role = "admin"
+	menu.open_test_tools()
+	check(menu._opening, "admin role can open developer test tools")
 	var found: bool = false
 	for item: Dictionary in menu._items:
 		if String(item.get("action", "")) == "return_home": found = true
@@ -72,5 +82,12 @@ func _run() -> void:
 	player.quests.import_data(completed)
 	world.resume_story(player)
 	check(player.quests.is_finished("rebuild_hut") and not player.quests.is_active("rebuild_hut"), "completed follow-up is not restarted")
+	var mod_menu: Node = player._hud.get_node("ModMenu")
+	check(bool(mod_menu.call("_can_open")), "admin can open ModMenu in free play")
+	CloudSession.role = "moderator"
+	check(not bool(mod_menu.call("_can_open")), "moderator cannot open ModMenu")
+	CloudSession.role = "player"
+	check(not bool(mod_menu.call("_can_open")), "player cannot open ModMenu")
+	CloudSession.logout()
 	print("DEBUG RETURN HOME: %d failures" % failures)
 	get_tree().quit(1 if failures else 0)

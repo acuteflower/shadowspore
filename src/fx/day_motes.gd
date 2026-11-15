@@ -26,6 +26,9 @@ class Mote:
 
 var _motes: Array[Mote] = []
 var _time: float = 0.0
+var _interiors: Interiors
+var _mines: MineManager
+var _nodes_cached: bool = false
 
 
 func _ready() -> void:
@@ -50,9 +53,13 @@ func _density() -> float:
 
 
 func _process(delta: float) -> void:
-	var interiors: Interiors = get_parent().get_node_or_null("Interiors") as Interiors
-	var mines: MineManager = get_parent().get_node_or_null("Mines") as MineManager
-	visible = (interiors == null or not interiors.local_inside()) and (mines == null or not mines.local_inside()) \
+	if not _nodes_cached:
+		var parent: Node = get_parent()
+		if parent != null:
+			_interiors = parent.get_node_or_null("Interiors") as Interiors
+			_mines = parent.get_node_or_null("Mines") as MineManager
+			_nodes_cached = true
+	visible = (_interiors == null or not _interiors.local_inside()) and (_mines == null or not _mines.local_inside()) \
 		and not DaylightField.air_blocked() and _density() > 0.02
 	if not visible:
 		return

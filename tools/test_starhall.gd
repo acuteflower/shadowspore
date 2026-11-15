@@ -173,20 +173,76 @@ func _run() -> void:
 		_check("hud blink icon bound to light_step player", blink_icon.get("_blink") != null and player.light_step)
 	await _shot("3_goddess_blessing")
 
-	# 4b. Return dialogue with Caelia once known -> full illuminated Goddess portrait
+	# 4b. Return dialogue with Caelia once known -> full illuminated Goddess portrait -> Caelia's Sternenaltar
 	if player.quests != null:
 		player.quests.set_flag("knows_goddess")
+	_check("caelia_stars quest started after blessing", player.quests != null and player.quests.is_active("caelia_stars"))
+	player.inventory.add_item("star_shard", 42)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("caelia_stars advances once player owns star_shard", player.quests != null and player.quests.has_flag("caelia_has_shard") and player.quests.active_step_id("caelia_stars") == "bring_star_shards")
 	room.goddess.interact(player)
 	await get_tree().create_timer(0.75, true).timeout
 	await _shot("2b_goddess_portrait_revealed")
 	if dlg != null and dlg.is_active():
 		dlg._end()
-	await get_tree().process_frame
-	await get_tree().process_frame
+	wait_t = 0.0
+	var altar: Node = null
+	while wait_t < 2.0 and altar == null:
+		await get_tree().process_frame
+		wait_t += get_process_delta_time()
+		altar = get_tree().get_first_node_in_group("goddess_window")
+	_check("sternenaltar opens after return dialogue", altar != null)
+	if altar != null:
+		for _i: int in 45:
+			await get_tree().process_frame
+		await _shot("8_caelia_altar_gifts")
+		var hp_before: float = player.health.max_health
+		var stam_before: float = player.stamina.max_stamina
+		var blade_offer_cost: int = 0
+		for off: Dictionary in GoddessSystem.OFFERS:
+			if String(off.get("id", "")) == "blade_starlight":
+				blade_offer_cost = int(off.get("cost", 0))
+		_check("blade_starlight costs 30 star shards", blade_offer_cost == 30)
+		goddess.request_exchange("stardust_elixir")
+		goddess.request_exchange("morningstar_pendant")
+		goddess.request_exchange("blade_starlight")
+		goddess.request_donate(7)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check("exchanged starlight items in inventory", player.inventory.has_item("stardust_elixir") and player.inventory.has_item("morningstar_pendant") and player.inventory.has_item("blade_starlight"))
+		_check("shards collected counter tracks trades + donations", goddess.shards_collected(player) == 42)
+		_check("caelia_stars quest completed after first offering", player.quests != null and player.quests.is_finished("caelia_stars"))
+		altar.call("_set_tab", 1)
+		for _i: int in 15:
+			await get_tree().process_frame
+		await _shot("9_caelia_altar_collection")
+		goddess.request_claim_milestone("m1")
+		goddess.request_claim_milestone("m2")
+		goddess.request_claim_milestone("m3")
+		goddess.request_claim_milestone("m4")
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check("milestones increase health & stamina", player.health.max_health >= hp_before + 25.0 and player.stamina.max_stamina >= stam_before + 30.0)
+		_check("milestone m2 grants starfall night bonus", GoddessSystem.any_starfall_bonus(get_tree()) >= 1)
+		_check("milestone m3 strengthens lichtschritt", GoddessSystem.star_step_rank(player) >= 1)
+		_check("milestone m4 grants caelia_sigil", player.inventory.has_item("caelia_sigil"))
+		altar.call("_close")
+		wait_t = 0.0
+		while wait_t < 1.5 and is_instance_valid(altar):
+			await get_tree().process_frame
+			wait_t += get_process_delta_time()
+		player.story_lock = false
+		player.view_shift = Vector2.ZERO
+		cam.zoom = Vector2.ONE
+		cam.reset_smoothing()
+		cam.force_update_scroll()
+		await get_tree().process_frame
 
 	# 5. Execute Lichtschritt & check FX + combat shockwave
-	player.global_position = hall.room_to_global(Vector2(280.0, 480.0))
+	player.global_position = hall.room_to_global(Vector2(256.0, 390.0))
 	player.stamina.current = player.stamina.max_stamina
+	await get_tree().process_frame
 	cam.reset_smoothing()
 	cam.force_update_scroll()
 	var dummy_hurt: _TestDummyHurtbox = _TestDummyHurtbox.new()
@@ -202,8 +258,9 @@ func _run() -> void:
 		if child is LightStepFx:
 			found_light_fx = true
 	_check("LightStepFx spawned instead of ShadowStepFx", found_light_fx)
+	await get_tree().create_timer(0.14).timeout
 	await _shot("4_lichtschritt_fx")
-	await get_tree().create_timer(0.25).timeout
+	await get_tree().create_timer(0.18).timeout
 	_check("lichtschritt arrival damages nearby enemy hurtbox", dummy_hurt.hits >= 1)
 	dummy_hurt.queue_free()
 
@@ -215,6 +272,99 @@ func _run() -> void:
 		await _shot("5_skill_tree_lichtschritt")
 		skill_win.call("_finish_close")
 		await get_tree().process_frame
+
+	# 5c. Equip blade_starlight & morningstar_pendant -> test starlight gear + swing trail + starlight perk
+	player.global_position = hall.room_to_global(Vector2(256.0, 214.0))
+	player.facing = Vector2.DOWN
+	var blade_slot: int = _find_slot(player.inventory, "blade_starlight")
+	if blade_slot >= 0:
+		player.inventory.request("equip", [blade_slot, "main_hand"])
+	if player.progress != null and player.progress.claimed < 5:
+		player.progress.claimed = 5
+	var neck_slot: int = _find_slot(player.inventory, "morningstar_pendant")
+	if neck_slot >= 0:
+		player.inventory.request("equip", [neck_slot, "talisman_1"])
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check("blade_starlight equipped in main_hand", String((player.inventory.equipment.get("main_hand", {}) as Dictionary).get("id", "")) == "blade_starlight")
+	_check("morningstar_pendant worn as talisman", player.talismans != null and player.talismans.perks.has("starlight"))
+	cam.zoom = Vector2(1.5, 1.5)
+	cam.reset_smoothing()
+	cam.force_update_scroll()
+	player.attack.attack(Vector2(0.8, 0.45).normalized())
+	await get_tree().create_timer(0.11).timeout
+	await _shot("10_ellie_starlight_gear")
+	cam.zoom = Vector2.ONE
+	await get_tree().create_timer(0.35).timeout
+	var star_dummy: _TestDummyHurtbox = _TestDummyHurtbox.new()
+	star_dummy.global_position = player.global_position + Vector2(20.0, -24.0)
+	world.add_child(star_dummy)
+	for _w: int in 40:
+		if player.attack.can_attack():
+			break
+		await get_tree().process_frame
+	await get_tree().create_timer(0.65).timeout
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	player.talismans.note_blink()
+	_check("morningstar_pendant arms starlight_left on blink", player.talismans.starlight_left > 0.0)
+	player.attack.attack(Vector2.RIGHT)
+	await get_tree().create_timer(0.35).timeout
+	_check("starlight perk deals main + wave hit on first attack after blink", star_dummy.hits >= 2 and player.talismans.starlight_left <= 0.0)
+	star_dummy.queue_free()
+
+	# 5d. blade_starlight unique right-click: Sternenstich (Astral Crescent + 3 stars) & Himmelsfall (5 stars + heal)
+	for _w2: int in 40:
+		if player.attack.can_attack():
+			break
+		await get_tree().process_frame
+	await get_tree().create_timer(0.5).timeout
+	player.global_position = hall.room_to_global(Vector2(215.0, 214.0))
+	player.stamina.current = player.stamina.max_stamina
+	cam.zoom = Vector2(1.25, 1.25)
+	cam.reset_smoothing()
+	cam.force_update_scroll()
+	var alt_dummy: _TestDummyHurtbox = _TestDummyHurtbox.new()
+	alt_dummy.global_position = player.global_position + Vector2(68.0, -24.0)
+	world.add_child(alt_dummy)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_check("blade_starlight exposes custom alt attack", player.attack.can_alt())
+	player.attack.alt_press(Vector2.RIGHT)
+	await get_tree().create_timer(0.24).timeout
+	var found_starfall_fx: bool = false
+	for child: Node in get_tree().current_scene.get_children():
+		if child is StarfallFx:
+			found_starfall_fx = true
+	_check("sternenstich spawns StarfallFx", found_starfall_fx)
+	await _shot("11_starlight_sternenstich")
+	await get_tree().create_timer(0.28).timeout
+	var hits_after_stage1: int = alt_dummy.hits
+	_check("sternenstich hits distant enemy with astral crescent + stars", hits_after_stage1 >= 2)
+	# Reset combo cleanly, then run uninterrupted Stage 1 -> Stage 2 (Himmelsfall) chain + capture
+	await get_tree().create_timer(0.85).timeout
+	for _w3: int in 40:
+		if player.attack.can_alt():
+			break
+		await get_tree().process_frame
+	player.stamina.current = player.stamina.max_stamina
+	player.attack.alt_press(Vector2.RIGHT)
+	await get_tree().create_timer(0.48).timeout
+	for _w4: int in 20:
+		if player.attack.can_alt():
+			break
+		await get_tree().process_frame
+	var hits_before_stage2: int = alt_dummy.hits
+	player.stamina.current = player.stamina.max_stamina
+	player.health.current = player.health.max_health - 20.0
+	var hp_wounded: float = player.health.current
+	player.attack.alt_press(Vector2.RIGHT)
+	await get_tree().create_timer(0.24).timeout
+	await _shot("12_starlight_himmelsfall")
+	await get_tree().create_timer(0.50).timeout
+	_check("himmelsfall hits with falling star lances & heals player", alt_dummy.hits > hits_before_stage2 and player.health.current > hp_wounded)
+	cam.zoom = Vector2.ONE
+	alt_dummy.queue_free()
 
 	# 6. Map travel destination includes STERNENSAAL even with 1 awake statue + live screenshot
 	var mw: MapWaystones = MapWaystones.new()
@@ -252,12 +402,22 @@ func _run() -> void:
 	# 8. SaveGame round-trip check
 	var exported: Dictionary = goddess.export_state()
 	goddess.debug_reset(player)
-	_check("reset clears state", not goddess.is_introduced_player(player) and not player.light_step)
+	_check("reset clears state", not goddess.is_introduced_player(player) and not player.light_step and goddess.shards_collected(player) == 0)
 	goddess.import_state(exported)
-	_check("import restores introduced and light_step", goddess.is_introduced_player(player) and player.light_step)
+	_check("import restores introduced, light_step, shards and milestones", goddess.is_introduced_player(player) and player.light_step and goddess.shards_collected(player) == 42 and goddess.has_milestone(player, "m4"))
 
 	print("STARHALL: ", "ok" if _ok else "FAILED")
 	get_tree().quit(0 if _ok else 1)
+
+
+func _find_slot(inv: InventoryComponent, item_id: String) -> int:
+	if inv == null:
+		return -1
+	for i: int in inv.slots.size():
+		var st: Dictionary = inv.slots[i]
+		if not st.is_empty() and String(st.get("id", "")) == item_id:
+			return i
+	return -1
 
 
 func _shot_deferred_noop() -> void:

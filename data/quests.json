@@ -794,5 +794,26 @@
     "talk": "lw_end"
    }
   ]
+ },
+ "caelia_stars": {
+  "name": "Gefallene Sterne",
+  "giver": "caelia",
+  "description": "Caelia bittet dich, nachts nach herabgefallenen Sternschnuppen Ausschau zu halten, warmes Sternerz aus ihren Kratern zu bergen und die Splitter zu ihrem Sternenaltar zu bringen.",
+  "steps": [
+   {
+    "id": "gather_star_shards",
+    "text": "FINDE STERNERZ IN NÄCHTLICHEN KRATERN",
+    "type": "flag",
+    "flag": "caelia_has_shard",
+    "hint": "starfall"
+   },
+   {
+    "id": "bring_star_shards",
+    "text": "BRINGE STERNERZ ZU CAELIAS STERNENALTAR",
+    "type": "flag",
+    "flag": "caelia_first_gift",
+    "actor": "caelia"
+   }
+  ]
  }
 }

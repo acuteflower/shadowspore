@@ -1,6 +1,7 @@
 class_name RiverFauna
 extends Node2D
 ## Authority-only population; bounded home chunks make unloading unambiguous.
+const RIVER_ANIMAL_SCENE: PackedScene = preload("res://src/water/river_animal.tscn")
 var rivers: WorldRivers
 var enabled_kinds: Array[String] = ["heron", "otter", "duck"]
 var _active: Dictionary = {}
@@ -11,6 +12,9 @@ var _serial: int = 0
 func _ready() -> void:
 	rivers = get_parent() as WorldRivers
 	set_process(multiplayer.is_server())
+func set_field_image(cell: Vector2i, image: Image) -> void:
+	if image != null and not _fields.has(cell):
+		_fields[cell] = image
 func chunk_loaded(cell: Vector2i) -> void:
 	if _active.has(cell): return
 	_active[cell] = true
@@ -137,9 +141,15 @@ func _populate(cell: Vector2i) -> void:
 	var settings: Dictionary = DataRegistry.table("river_animals")
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(settings["seed"])))
+	var cell_perches: Array[Node2D] = []
+	var perches_cached: bool = false
+	var max_total: int = Quality.scaled(int(settings["max_total"]), "wildlife", 1)
+	var total_now: int = animals.get_child_count()
 	for kind: String in enabled_kinds:
 		var spec: Dictionary = settings[kind]
-		if count(kind) >= int(spec["cap"]): continue
+		var sp_now: int = count(kind)
+		var sp_cap: int = int(spec["cap"])
+		if sp_now >= sp_cap: continue
 		if rng.randf() > float(spec.get("chance", 1.0)): continue
 		var found: bool = false
 		var at: Vector2
@@ -159,17 +169,24 @@ func _populate(cell: Vector2i) -> void:
 				break
 		if not found: continue
 		if kind == "dragonfly" or kind == "kingfisher":
+			if not perches_cached:
+				perches_cached = true
+				for node: Node in get_tree().get_nodes_in_group("river_perches"):
+					var p_node: Node2D = node as Node2D
+					if p_node != null and Vector2i((p_node.global_position / 512.0).floor()) == cell:
+						cell_perches.append(p_node)
 			var perch: Node2D
-			for node: Node in get_tree().get_nodes_in_group("river_perches"):
-				var candidate: Node2D = node as Node2D
-				if Vector2i((candidate.global_position / 512.0).floor()) == cell and candidate.global_position.distance_to(at) < float(spec["range"]):
+			var perch_r2: float = float(spec["range"]) * float(spec["range"])
+			for candidate: Node2D in cell_perches:
+				if candidate.global_position.distance_squared_to(at) < perch_r2:
 					perch = candidate
 					break
 			if perch == null: continue
 			at = perch.global_position
 		var near_player: bool = false
+		var fear_r2: float = (float(spec["fear"]) + 20.0) * (float(spec["fear"]) + 20.0)
 		for player: Player in Player.all:
-			if at.distance_to(player.global_position) < float(spec["fear"]) + 20.0: near_player = true
+			if at.distance_squared_to(player.global_position) < fear_r2: near_player = true
 		if near_player: continue
 		var family: bool = kind == "duck" and rng.randf() < 0.5 ## a hen with ducklings or a lone drake pair
 		var otter_pair: bool = kind == "otter" and rng.randf() < 0.65
@@ -177,10 +194,10 @@ func _populate(cell: Vector2i) -> void:
 		if kind == "otter":
 			group = 2 if otter_pair else 1
 		for member: int in group:
-			if count(kind) >= int(spec["cap"]) or animals.get_child_count() >= Quality.scaled(int(settings["max_total"]), "wildlife", 1): break
+			if sp_now >= sp_cap or total_now >= max_total: break
 			var point: Vector2 = at + Vector2(member * 3.0, member * 2.0)
 			if kind in ["shoal", "strider"] and rivers.field_at(point).x > -2.0: continue
-			var animal: RiverAnimal = load("res://src/water/river_animal.tscn").instantiate() as RiverAnimal
+			var animal: RiverAnimal = RIVER_ANIMAL_SCENE.instantiate() as RiverAnimal
 			_serial += 1
 			animal.name = "RiverAnimal%d" % _serial
 			animal.kind = kind
@@ -190,3 +207,5 @@ func _populate(cell: Vector2i) -> void:
 			animal.position = point
 			animal.facing = (-flow_at(point)).angle()
 			animals.add_child(animal)
+			sp_now += 1
+			total_now += 1

@@ -63,10 +63,21 @@ func bind(player: Node) -> void:
 	_player = player as Node2D
 
 
+var _redraw_wait: float = 0.0
+var _last_step: int = -1
+
+
 func _process(delta: float) -> void:
 	_time += delta
-	_day_pop = maxf(_day_pop - 0.5 * delta, 0.0)
-	queue_redraw()
+	var pop_active: bool = _day_pop > 0.0
+	if pop_active:
+		_day_pop = maxf(_day_pop - 0.5 * delta, 0.0)
+	_redraw_wait -= delta
+	var step: int = int(TimeManager.time_of_day * 512.0) + TimeManager.day * 1024
+	if pop_active or _redraw_wait <= 0.0 or step != _last_step:
+		_redraw_wait = 0.18
+		_last_step = step
+		queue_redraw()
 
 
 static func arc_y(x: float) -> float:

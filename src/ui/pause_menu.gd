@@ -73,6 +73,7 @@ var _pet_text: String = "" ## the new name being typed
 var _name_text: String = "" ## the player display name being typed
 var _coop_toast: String = "" ## feedback flash inside KOOP tab
 var _coop_toast_t: float = 0.0
+var _saving_cloud: bool = false
 
 
 func _ready() -> void:
@@ -125,11 +126,15 @@ func _process(delta: float) -> void:
 
 
 func open_test_tools() -> void:
+	if not CloudSession.is_admin():
+		return
 	if not _opening:
 		_set_open(true, true)
 
 
 func _set_open(open: bool, test_tools: bool = false) -> void:
+	if open and test_tools and not CloudSession.is_admin():
+		return
 	if open == _opening:
 		return
 	_opening = open
@@ -144,7 +149,7 @@ func _set_open(open: bool, test_tools: bool = false) -> void:
 		_tp_text = ""
 		_bloom_x = float(TABS[0]["x"])
 		_armed = ""
-		_save_info = SaveGame.info(SaveGame.path_for(get_tree())) if _can_save() else {}
+		_save_info = _read_save_info() if _can_save() else {}
 		if _test_tools:
 			_footer.clear()
 		else:
@@ -414,9 +419,9 @@ func _build_coop_page() -> void:
 	if not NetworkManager.is_multiplayer_session():
 		_add(0, "heading", "EINZELSPIELER")
 		_add(0, "info", "KEINE KOOP-SITZUNG AKTIV", "", {"text": ""})
-		_add(0, "info", "NEUE WELT ODER BEITRITT", "", {"text": ""})
-		_add(0, "info", "IM HAUPTMENÜ UNTER", "", {"text": ""})
-		_add(0, "info", "MEHRSPIELER STARTEN", "", {"text": ""})
+		_add(0, "info", "FREUNDE & KOOP WERDEN", "", {"text": ""})
+		_add(0, "info", "ÜBER DEN LAUNCHER", "", {"text": ""})
+		_add(0, "info", "VERWALTET", "", {"text": ""})
 		_add(0, "button", "ZUM HAUPTMENÜ", "", {"action": "coop_to_menu"})
 		_add(1, "heading", "SPIELERNAME")
 		_add(1, "field", "NAME", "player_name", {"hint": "ELLIE"})
@@ -1362,9 +1367,27 @@ func _footer_click(index: int) -> void:
 				_begin_quit(false)
 
 
+func _read_save_info() -> Dictionary:
+	if CloudSession.is_logged_in() and not NetworkManager.is_multiplayer_session():
+		var cloud_info: Dictionary = CloudSession.cloud_save_info()
+		if not cloud_info.is_empty():
+			return cloud_info
+	return SaveGame.info(SaveGame.path_for(get_tree()))
+
+
 func _do_save(then_quit: bool, to_menu: bool = false) -> void:
-	if SaveGame.save(get_tree()):
-		_save_info = SaveGame.info(SaveGame.path_for(get_tree()))
+	if _saving_cloud:
+		return
+	var local_ok: bool = SaveGame.save(get_tree())
+	if CloudSession.is_logged_in():
+		_saving_cloud = true
+		var cloud_ok: bool = await CloudSession.save_cloud_all(get_tree())
+		_saving_cloud = false
+		if not is_inside_tree():
+			return
+		local_ok = local_ok or cloud_ok
+	if local_ok:
+		_save_info = _read_save_info()
 		_saved_flash = 2.0
 		if then_quit:
 			_begin_quit(to_menu)

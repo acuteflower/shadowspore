@@ -26,6 +26,7 @@ var _light: NightLight
 var _local_sitting: bool = false
 var _cam_tween: Tween
 var _discover_sent: bool = false
+var _far_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -166,7 +167,16 @@ func interact(player: Player) -> void:
 	(player.get_node("RestComponent") as RestComponent).request_sit(self)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if delta > 0.0 and not _local_sitting:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 480.0 * 480.0:
+			_far_wait = 0.25
+			return
 	var player: Player = _local_player()
 	var sitting_now: bool = false
 	if player != null:

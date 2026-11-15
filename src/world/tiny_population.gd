@@ -1,6 +1,7 @@
 class_name TinyPopulation
 extends Node2D
 ## Sparse host-owned, chunk-bound bees and snails. No combat, emission or harvest.
+const TINY_SCENE: PackedScene = preload("res://src/entities/wildlife/tiny_wildlife.tscn")
 var _seed: int
 var _flowers: Callable
 var _habitat: Callable
@@ -9,6 +10,8 @@ var _pending: Array[Vector2i] = []
 var _settled: Dictionary = {}
 var _serial: int = 0
 var _night: bool = false
+var _crawl_shape: CircleShape2D
+var _crawl_query: PhysicsShapeQueryParameters2D
 @onready var _animals: Node2D = $Animals
 
 
@@ -52,16 +55,18 @@ func can_crawl(from: Vector2, to: Vector2, species: String = "snail") -> bool:
 	for point: Vector2 in [from, from.lerp(to, 0.5), to]:
 		if not _active.has(_cell(point)) or not bool(_habitat.call(point, species)):
 			return false
-	var shape: CircleShape2D = CircleShape2D.new()
-	shape.radius = 1.0
-	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
-	query.shape = shape
-	query.transform = Transform2D(0, from)
-	query.collision_mask = 1
-	if not get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty():
+	if _crawl_shape == null:
+		_crawl_shape = CircleShape2D.new()
+		_crawl_shape.radius = 1.0
+		_crawl_query = PhysicsShapeQueryParameters2D.new()
+		_crawl_query.shape = _crawl_shape
+		_crawl_query.collision_mask = 1
+	_crawl_query.transform = Transform2D(0, from)
+	_crawl_query.motion = Vector2.ZERO
+	if not get_world_2d().direct_space_state.intersect_shape(_crawl_query, 1).is_empty():
 		return false
-	query.motion = to - from
-	return get_world_2d().direct_space_state.cast_motion(query)[0] >= 0.999
+	_crawl_query.motion = to - from
+	return get_world_2d().direct_space_state.cast_motion(_crawl_query)[0] >= 0.999
 
 
 func _process(_delta: float) -> void:
@@ -100,6 +105,8 @@ func _populate(cell: Vector2i) -> void:
 	if mid_arid >= 0.22 and BiomeBlend.arid_at(origin) >= 0.22 and BiomeBlend.arid_at(origin + Vector2(512.0, 512.0)) >= 0.22:
 		return
 	var witch: bool = _witch(cell)
+	var cached_flowers: Array[Vector2] = []
+	var flowers_fetched: bool = false
 	for species: String in ["snail", "bee", "ladybug", "moth", "toad", "bat"]:
 		if settled.has(species) or (species == "moth" and not TimeManager.is_night() and not witch) or (species in ["toad", "bat"] and not witch):
 			continue
@@ -118,8 +125,11 @@ func _populate(cell: Vector2i) -> void:
 		if species in ["bee", "ladybug", "moth"]:
 			if not _flowers.is_valid():
 				continue
-			for point: Vector2 in _flowers.call(cell):
-				patch.append(point)
+			if not flowers_fetched:
+				flowers_fetched = true
+				for point: Vector2 in _flowers.call(cell):
+					cached_flowers.append(point)
+			patch = cached_flowers.duplicate()
 			if species == "moth":
 				var lights: Array[Vector2] = []
 				var candles: Array[Vector2] = [] ## in the Hexenwald they keep to the grave candles' flames
@@ -150,11 +160,11 @@ func _populate(cell: Vector2i) -> void:
 		var extra_bee: int = 3 if w_wind_tiny >= 0.40 else 0
 		var count: int = rng.randi_range(int(spec["group_min"]) + extra_bee, int(spec["group_max"]) + extra_bee)
 		var cap_tiny: int = Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) + (8 if w_wind_tiny >= 0.40 else 0)
+		var current: int = 0
+		for node: Node in _animals.get_children():
+			if (node as TinyWildlife).species == species and not node.is_queued_for_deletion():
+				current += 1
 		for i: int in count:
-			var current: int = 0
-			for node: Node in _animals.get_children():
-				if (node as TinyWildlife).species == species and not node.is_queued_for_deletion():
-					current += 1
 			if current >= cap_tiny:
 				break
 			var at: Vector2 = Vector2(cell) * 512 + Vector2(rng.randf_range(55, 457), rng.randf_range(55, 457))
@@ -183,7 +193,7 @@ func _populate(cell: Vector2i) -> void:
 					valid = can_crawl(at, at, species)
 				if not valid:
 					continue
-			var animal: TinyWildlife = load("res://src/entities/wildlife/tiny_wildlife.tscn").instantiate() as TinyWildlife
+			var animal: TinyWildlife = TINY_SCENE.instantiate() as TinyWildlife
 			_serial += 1
 			animal.name = "Tiny_%s_%d" % [species, _serial]
 			animal.species = species
@@ -196,6 +206,7 @@ func _populate(cell: Vector2i) -> void:
 				animal.tree_offset = Vector2((half - 1) * (-1 if i % 2 == 0 else 1), -rng.randf_range(9, 22))
 			animal.flowers = patch
 			_animals.add_child(animal)
+			current += 1
 
 
 func _populate_scarab(cell: Vector2i, settled: Dictionary) -> void:
@@ -233,7 +244,7 @@ func _populate_scarab(cell: Vector2i, settled: Dictionary) -> void:
 				break
 		if not valid:
 			continue
-		var animal: TinyWildlife = load("res://src/entities/wildlife/tiny_wildlife.tscn").instantiate() as TinyWildlife
+		var animal: TinyWildlife = TINY_SCENE.instantiate() as TinyWildlife
 		_serial += 1
 		animal.name = "Tiny_scarab_%d" % _serial
 		animal.species = "scarab"

@@ -107,11 +107,13 @@ func _can_open() -> bool:
 
 
 func _can_use() -> bool:
-	return multiplayer.is_server() and is_instance_valid(_player) and _player.health.current > 0.0 \
+	return CloudSession.is_admin() and multiplayer.is_server() and is_instance_valid(_player) and _player.health.current > 0.0 \
 		and _player.intro == null and not _player.story_lock
 
 
 func _set_open(open: bool) -> void:
+	if open and not _can_use():
+		return
 	if open:
 		_show_section(_section)
 		InputManager.ui_blocking = true

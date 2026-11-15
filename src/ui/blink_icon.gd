@@ -54,11 +54,18 @@ func _on_cooldown(_left: float, _total: float) -> void:
 	_was_ready = now_ready
 
 
+var _redraw_wait: float = 0.0
+
+
 func _process(delta: float) -> void:
 	_time += delta
+	var animating: bool = _press > 0.0 or _ring > 0.0 or (_blink != null and not _blink.is_ready())
 	_press = maxf(_press - 4.0 * delta, 0.0)
 	_ring = maxf(_ring - 1.8 * delta, 0.0)
-	queue_redraw()
+	_redraw_wait -= delta
+	if animating or _redraw_wait <= 0.0:
+		_redraw_wait = 0.10
+		queue_redraw()
 
 
 func _hotkey() -> String:

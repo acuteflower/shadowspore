@@ -41,6 +41,7 @@ var _speed_ratio: float = 0.0
 var _last_step_half: int = -1
 var _flash: float = 0.0
 var _shoulder_world: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO, Vector2.ZERO]
+var _clock: RigClock = RigClock.new()
 
 @onready var _body: Node2D = $Body
 @onready var _glow: Node2D = $Glow
@@ -76,6 +77,10 @@ func shard_launch_point(index: int) -> Vector2:
 
 
 func update_rig(delta: float, vel: Vector2, heading_rad: float, is_provoked: bool, resonance_amt: float = 0.0) -> void:
+	var spd: float = vel.length()
+	delta = _clock.step(self, delta, spd)
+	if delta < 0.0:
+		return
 	_time += delta
 	_pose_time += delta
 	_flash = maxf(0.0, _flash - delta)
@@ -84,7 +89,6 @@ func update_rig(delta: float, vel: Vector2, heading_rad: float, is_provoked: boo
 	weather_charge = clampf(resonance_amt, 0.0, 1.0)
 	_forward = Vector2.from_angle(_heading)
 	_right = Vector2(-_forward.y, _forward.x)
-	var spd: float = vel.length()
 	_speed_ratio = clampf(spd / 58.0, 0.0, 1.2)
 	if spd > 4.0 and _pose in [Pose.PEACEFUL, Pose.MOVE]:
 		_stride += delta * (3.2 + spd * 0.09)
@@ -196,31 +200,69 @@ func _draw_stone_block(canvas: Node2D, center: Vector2, half_size: Vector2, pal:
 	var c: Vector2 = center.round()
 	var hw: int = maxi(2, roundi(half_size.x))
 	var hh: int = maxi(2, roundi(half_size.y))
-	var out_c: Color = (pal["stone_out"] as Color).lerp(Color.WHITE, flash_mix * 0.5)
-	var s0: Color = (pal["stone_0"] as Color).lerp(Color.WHITE, flash_mix)
-	var s1: Color = (pal["stone_1"] as Color).lerp(Color.WHITE, flash_mix)
-	var s2: Color = (pal["stone_2"] as Color).lerp(Color.WHITE, flash_mix)
-	var s3: Color = (pal["stone_3"] as Color).lerp(Color.WHITE, flash_mix)
-	for dy: int in range(-hh - 1, hh + 2):
-		var row_trim: int = 1 if abs(dy) >= hh else 0
-		var x0: int = -hw + row_trim
-		var x1: int = hw - row_trim
-		canvas.draw_rect(Rect2(Vector2(c.x + float(x0 - 1), c.y + float(dy)), Vector2(float(x1 - x0 + 3), 1.0)), out_c)
-	for dy: int in range(-hh, hh + 1):
-		var row_trim: int = 1 if abs(dy) == hh else 0
-		var x0: int = -hw + row_trim
-		var x1: int = hw - row_trim
-		for dx: int in range(x0, x1 + 1):
-			var col: Color = s1
-			if dy <= -hh + 1 and dx <= 1:
-				col = s3
-			elif dy < 0 or (dy == 0 and dx < 0):
-				col = s2
-			elif dy >= hh - 1 or dx >= hw - 1:
-				col = s0
-			if dy == 1 and (dx + dy) % 3 != 0 and col == s1:
-				col = s0
-			canvas.draw_rect(Rect2(Vector2(c.x + float(dx), c.y + float(dy)), Vector2.ONE), col)
+	if flash_mix <= 0.01:
+		var bkey: String = "sb:%d:%d:%d" % [variant, hw, hh]
+		var cached: Array = _MASKS.get(bkey, [])
+		if cached.is_empty():
+			var w: int = (hw + 1) * 2 + 1
+			var h: int = (hh + 1) * 2 + 1
+			var ox: int = hw + 1
+			var oy: int = hh + 1
+			var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+			var out_c0: Color = pal["stone_out"] as Color
+			var s0_0: Color = pal["stone_0"] as Color
+			var s1_0: Color = pal["stone_1"] as Color
+			var s2_0: Color = pal["stone_2"] as Color
+			var s3_0: Color = pal["stone_3"] as Color
+			for dy: int in range(-hh - 1, hh + 2):
+				var row_trim: int = 1 if abs(dy) >= hh else 0
+				var x0: int = -hw + row_trim
+				var x1: int = hw - row_trim
+				img.fill_rect(Rect2i(ox + x0 - 1, oy + dy, x1 - x0 + 3, 1), out_c0)
+			for dy: int in range(-hh, hh + 1):
+				var row_trim: int = 1 if abs(dy) == hh else 0
+				var x0: int = -hw + row_trim
+				var x1: int = hw - row_trim
+				for dx: int in range(x0, x1 + 1):
+					var col: Color = s1_0
+					if dy <= -hh + 1 and dx <= 1:
+						col = s3_0
+					elif dy < 0 or (dy == 0 and dx < 0):
+						col = s2_0
+					elif dy >= hh - 1 or dx >= hw - 1:
+						col = s0_0
+					if dy == 1 and (dx + dy) % 3 != 0 and col == s1_0:
+						col = s0_0
+					img.set_pixel(ox + dx, oy + dy, col)
+			cached = [ImageTexture.create_from_image(img), Vector2i(-ox, -oy)]
+			_MASKS[bkey] = cached
+		canvas.draw_texture(cached[0] as Texture2D, c + Vector2(cached[1] as Vector2i))
+	else:
+		var out_c: Color = (pal["stone_out"] as Color).lerp(Color.WHITE, flash_mix * 0.5)
+		var s0: Color = (pal["stone_0"] as Color).lerp(Color.WHITE, flash_mix)
+		var s1: Color = (pal["stone_1"] as Color).lerp(Color.WHITE, flash_mix)
+		var s2: Color = (pal["stone_2"] as Color).lerp(Color.WHITE, flash_mix)
+		var s3: Color = (pal["stone_3"] as Color).lerp(Color.WHITE, flash_mix)
+		for dy: int in range(-hh - 1, hh + 2):
+			var row_trim: int = 1 if abs(dy) >= hh else 0
+			var x0: int = -hw + row_trim
+			var x1: int = hw - row_trim
+			canvas.draw_rect(Rect2(Vector2(c.x + float(x0 - 1), c.y + float(dy)), Vector2(float(x1 - x0 + 3), 1.0)), out_c)
+		for dy: int in range(-hh, hh + 1):
+			var row_trim: int = 1 if abs(dy) == hh else 0
+			var x0: int = -hw + row_trim
+			var x1: int = hw - row_trim
+			for dx: int in range(x0, x1 + 1):
+				var col: Color = s1
+				if dy <= -hh + 1 and dx <= 1:
+					col = s3
+				elif dy < 0 or (dy == 0 and dx < 0):
+					col = s2
+				elif dy >= hh - 1 or dx >= hw - 1:
+					col = s0
+				if dy == 1 and (dx + dy) % 3 != 0 and col == s1:
+					col = s0
+				canvas.draw_rect(Rect2(Vector2(c.x + float(dx), c.y + float(dy)), Vector2.ONE), col)
 	if rune_col.a > 0.05:
 		if rune_style == 1:
 			# Glowing chest/collar sigil (diamond + side ticks)
@@ -239,6 +281,57 @@ func _draw_quartz_crystal(canvas: Node2D, base_pt: Vector2, dir_2d: Vector2, len
 		axis = Vector2.UP
 	var perp: Vector2 = Vector2(-axis.y, axis.x)
 	var steps: int = maxi(3, roundi(length))
+	if flash_mix <= 0.01:
+		var ax_q: int = roundi(axis.x * 16.0)
+		var ay_q: int = roundi(axis.y * 16.0)
+		var hw_q: int = roundi(half_w * 4.0)
+		var vein_rgba: int = arcane_vein.to_rgba32() if arcane_vein.a > 0.05 else 0
+		var ckey: String = "qc:%d:%d:%d:%d:%d:%d" % [variant, ax_q, ay_q, hw_q, steps, vein_rgba]
+		var cached: Array = _MASKS.get(ckey, [])
+		if cached.is_empty():
+			var out_c0: Color = pal["quartz_out"] as Color
+			var q0_0: Color = pal["quartz_0"] as Color
+			var q1_0: Color = pal["quartz_1"] as Color
+			var q2_0: Color = pal["quartz_2"] as Color
+			var q3_0: Color = pal["quartz_3"] as Color
+			var pixels: Dictionary = {} ## Vector2i -> Color
+			var lo: Vector2i = Vector2i(9999, 9999)
+			var hi: Vector2i = Vector2i(-9999, -9999)
+			for s: int in range(-1, steps + 2):
+				var frac: float = clampf(float(s) / float(steps), 0.0, 1.0)
+				var w_here: int = maxi(0, roundi(half_w * (1.0 - pow(frac, 1.45))))
+				if s < 0 or s > steps:
+					w_here = 0
+				for w: int in range(-w_here - 1, w_here + 2):
+					var pt: Vector2i = Vector2i((axis * float(s) + perp * float(w)).round())
+					pixels[pt] = out_c0
+					lo = lo.min(pt)
+					hi = hi.max(pt)
+			for s: int in range(0, steps + 1):
+				var frac: float = float(s) / float(steps)
+				var w_here: int = maxi(0, roundi(half_w * (1.0 - pow(frac, 1.45))))
+				for w: int in range(-w_here, w_here + 1):
+					var pt: Vector2i = Vector2i((axis * float(s) + perp * float(w)).round())
+					var world_offset: Vector2 = perp * float(w) + axis * float(s) * 0.25
+					var col: Color = q1_0
+					if w == 0 and arcane_vein.a > 0.05 and frac > 0.14 and frac < 0.82 and (s % 2 == 0):
+						col = arcane_vein.lerp(q3_0, 0.35)
+					elif w == 0 and frac > 0.24:
+						col = q3_0
+					elif world_offset.x + world_offset.y * 0.65 <= -0.35:
+						col = q2_0 if frac < 0.72 else q3_0
+					elif world_offset.x + world_offset.y * 0.65 >= 0.75:
+						col = q0_0
+					pixels[pt] = col
+					lo = lo.min(pt)
+					hi = hi.max(pt)
+			var img: Image = Image.create(hi.x - lo.x + 1, hi.y - lo.y + 1, false, Image.FORMAT_RGBA8)
+			for pt: Vector2i in pixels:
+				img.set_pixel(pt.x - lo.x, pt.y - lo.y, pixels[pt] as Color)
+			cached = [ImageTexture.create_from_image(img), lo]
+			_MASKS[ckey] = cached
+		canvas.draw_texture(cached[0] as Texture2D, base_pt.round() + Vector2(cached[1] as Vector2i))
+		return
 	var out_c: Color = (pal["quartz_out"] as Color).lerp(Color.WHITE, flash_mix * 0.45)
 	var q0: Color = (pal["quartz_0"] as Color).lerp(Color.WHITE, flash_mix)
 	var q1: Color = (pal["quartz_1"] as Color).lerp(Color.WHITE, flash_mix)

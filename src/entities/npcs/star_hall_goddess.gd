@@ -79,6 +79,11 @@ func prompt() -> String:
 	var sys: GoddessSystem = GoddessSystem.of(get_tree())
 	if sys != null and sys.is_busy():
 		return ""
+	for p: Player in Player.all:
+		if is_instance_valid(p) and p.is_multiplayer_authority():
+			if sys != null and sys.has_light_step_player(p):
+				return "STERNENGABEN"
+			break
 	return "SPRECHEN"
 
 
@@ -94,6 +99,12 @@ func interact(player: Player) -> void:
 	var sys: GoddessSystem = GoddessSystem.of(get_tree())
 	if sys != null:
 		sys.talk_to_goddess(player, self)
+
+
+func actor_position(id: String) -> Vector2:
+	if id != "caelia":
+		return Vector2.INF
+	return GoddessSystem.starhall_world_anchor(get_tree(), global_position)
 
 
 func set_talking(on: bool) -> void:

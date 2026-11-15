@@ -68,6 +68,9 @@ var _erupt_age: float = -1.0
 var _dust_motes: Array[Dictionary] = [] ## {pos, vel, life, max_life, col, size}
 var _world: Node
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _zone_drawn: bool = false
+var _ground_fx_drawn: bool = false
+var _fx_drawn: bool = false
 
 @onready var _rig: QuartzGolemRig = $Rig
 @onready var _health: HealthComponent = $HealthComponent
@@ -248,9 +251,18 @@ func _process(delta: float) -> void:
 	]
 	_rig.variant = clampi(variant, 0, 2)
 	_rig.update_rig(delta, velocity, attack_dir.angle() if attack_pose else heading, is_provoked(), _weather_resonance())
-	_zone.queue_redraw()
-	_ground_fx.queue_redraw()
-	_fx.queue_redraw()
+	var zone_active: bool = state in [State.BLADE_WINDUP, State.BLADE_SLASH, State.SHOCK_WINDUP, State.SHOCK_SLAM] or state == State.SHARD_WINDUP or (state == State.SHARD_RELEASE and _state_time < 0.14)
+	if zone_active or _zone_drawn:
+		_zone.queue_redraw()
+		_zone_drawn = zone_active
+	var ground_active: bool = _erupt_age >= 0.0 or not _dust_motes.is_empty()
+	if ground_active or _ground_fx_drawn:
+		_ground_fx.queue_redraw()
+		_ground_fx_drawn = ground_active
+	var fx_active: bool = (_erupt_age >= 0.0 and _erupt_age < 0.46) or state == State.BLADE_SLASH or (state == State.RECOVER and _previous == State.BLADE_SLASH and _state_time < 0.20)
+	if fx_active or _fx_drawn:
+		_fx.queue_redraw()
+		_fx_drawn = fx_active
 
 
 func _physics_process(delta: float) -> void:

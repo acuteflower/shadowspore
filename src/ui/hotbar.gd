@@ -64,6 +64,12 @@ var drop: float = 0.0 ## px the branch has sunk
 var sink: float = 0.0 ## px the pendants sink inside the bar
 var shown: float = 1.0 ## alpha of the pendants (and the skill crystal)
 var _pend: Control ## overlay of the pendants (numbers, pause rings): fades with them
+var _bar_redraw_t: float = 0.0
+var _overlay_redraw_t: float = 0.0
+var _last_void_q: int = -1
+var _last_lv: int = -1
+var _last_claimable: int = -1
+var _last_hover: bool = false
 
 
 ## The vine's height at `x`: it sags in the middle and meets the sap vines at both ends.
@@ -219,6 +225,7 @@ func _on_inventory_changed() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	var prev_lv: int = _display_level
 	_update_xp(delta)
 	var pick: int = InputManager.hotbar_pick()
 	if pick >= 0:
@@ -227,25 +234,84 @@ func _process(delta: float) -> void:
 			use_requested.emit(pick)
 		else:
 			_select(pick)
+		_bar_redraw_t = 0.0
+		_overlay_redraw_t = 0.0
 	elif InputManager.hotbar_step() != 0:
 		wake()
 		_select(posmod(selected + InputManager.hotbar_step(), InventoryComponent.HOTBAR_SIZE))
+		_bar_redraw_t = 0.0
 	var ease_in: float = 1.0 - exp(-14.0 * delta)
 	_update_drag_targets()
+	var prev_shown: float = shown
+	var prev_inset: float = inset
+	var prev_drop: float = drop
+	var prev_sink: float = sink
 	_update_fold(delta)
+	var anim_active: bool = (
+		_dragging
+		or _surge > 0.0
+		or _burst > 0.0
+		or _animate
+		or _gain_age < 1.4
+		or shown != prev_shown
+		or inset != prev_inset
+		or drop != prev_drop
+		or sink != prev_sink
+		or absf(_cursor_x - _center_x(selected)) > 0.15
+	)
 	for i: int in _slots.size():
-		_lift[i] = lerpf(_lift[i], LIFT if i == selected else (2.0 if _drag_ok[i] else 0.0), ease_in)
+		var target_lift: float = LIFT if i == selected else (2.0 if _drag_ok[i] else 0.0)
+		_lift[i] = lerpf(_lift[i], target_lift, ease_in)
 		_pop[i] = maxf(_pop[i] - 3.0 * delta, 0.0)
 		if i < _deny.size():
 			_deny[i] = maxf(_deny[i] - 3.5 * delta, 0.0)
+			if _deny[i] > 0.0:
+				anim_active = true
+		if _pop[i] > 0.0 or absf(_lift[i] - target_lift) > 0.05:
+			anim_active = true
 	_cursor_x = lerpf(_cursor_x, _center_x(selected), 1.0 - exp(-20.0 * delta))
-	_place_slots()
-	queue_redraw()
-	if _overlay != null:
-		_overlay.queue_redraw()
-	if _pend != null:
-		_pend.modulate.a = shown
-		_pend.queue_redraw()
+	var void_q: int = int(VineStyle.void_amount() * 64.0)
+	if void_q != _last_void_q:
+		_last_void_q = void_q
+		_bar_redraw_t = 0.0
+		_overlay_redraw_t = 0.0
+	if anim_active:
+		_bar_redraw_t = 0.0
+		_overlay_redraw_t = 0.0
+		_place_slots()
+		queue_redraw()
+		if _overlay != null:
+			_overlay.queue_redraw()
+		if _pend != null:
+			_pend.visible = shown > 0.02
+			if _pend.visible:
+				_pend.modulate.a = shown
+				_pend.queue_redraw()
+		return
+	_bar_redraw_t -= delta
+	if _bar_redraw_t <= 0.0:
+		_bar_redraw_t = 0.06 if shown > 0.02 else 0.15
+		if shown > 0.02:
+			_place_slots()
+		queue_redraw()
+		if _pend != null:
+			_pend.visible = shown > 0.02
+			if _pend.visible:
+				_pend.modulate.a = shown
+				_pend.queue_redraw()
+	elif _pend != null and not (shown > 0.02) and _pend.visible:
+		_pend.visible = false
+	var claimable: int = _progress.claimable() if _progress != null else 0
+	if _display_level != prev_lv or _display_level != _last_lv or claimable != _last_claimable or _badge_hover != _last_hover:
+		_last_lv = _display_level
+		_last_claimable = claimable
+		_last_hover = _badge_hover
+		_overlay_redraw_t = 0.0
+	_overlay_redraw_t -= delta
+	if _overlay_redraw_t <= 0.0:
+		_overlay_redraw_t = 0.08 if (claimable > 0 or _badge_hover) else 0.5
+		if _overlay != null:
+			_overlay.queue_redraw()
 
 
 func _update_drag_targets() -> void:

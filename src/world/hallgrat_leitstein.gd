@@ -14,6 +14,7 @@ var dead: bool = false
 var _glow: Sprite2D
 var _time: float = 0.0
 var _struck: float = 99.0
+var _far_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -41,13 +42,24 @@ func _ready() -> void:
 	body.add_child(shape)
 	add_child(body)
 	_time = fposmod(position.x * 0.017 + position.y * 0.011, 9.0)
+	_far_wait = fposmod(absf(position.x * 0.023 + position.y * 0.013), 0.25)
+	set_process(_glow != null)
 
 
 func _process(delta: float) -> void:
+	if _glow == null:
+		set_process(false)
+		return
+	if delta > 0.0 and _struck > 2.5:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var cam: Camera2D = get_viewport().get_camera_2d()
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 480.0 * 480.0:
+			_far_wait = 0.25
+			return
 	_time += delta
 	_struck += delta
-	if _glow == null:
-		return
 	var night: float = TimeManager.night_amount()
 	var remember: float = 0.12 + 0.18 * maxf(0.0, sin(_time * 0.7 + tone)) * maxf(0.0, sin(_time * 1.9))  # it comes and goes, never steady
 	var flare: float = clampf(1.0 - _struck / 2.2, 0.0, 1.0)

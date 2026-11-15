@@ -2208,6 +2208,18 @@
     "speaker": "CAELIA",
     "mood": "",
     "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Und noch um eines bitte ich dich: In klaren Nächten stürzen Splitter alter Sterne als Sternschnuppen auf die Wiese herab."
+   },
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Birg dieses warme Sternerz aus den Kratern und bring es mir an meinen Altar. Jeder Splitter stärkt diesen Saal — und im Gegenzug öffne ich dir meine Schatzkammer."
+   },
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
     "text": "Wann immer du an einem meiner erwachten Wegsteine stehst, kannst du über das Siegel zu diesem Thronsaal reisen."
    }
   ]
@@ -2218,13 +2230,13 @@
     "speaker": "CAELIA",
     "mood": "",
     "title": "HÜTERIN DES ERSTEN LICHTS",
-    "text": "Der Sternensaal erinnert sich an jeden deiner Schritte, Ellie. Mit jeder erwachten Säule kehrt mehr meiner alten Wärme zurück."
+    "text": "Der Sternensaal erinnert sich an jeden deiner Schritte, Ellie. Mein Sternenaltar steht dir nun offen."
    },
    {
     "speaker": "CAELIA",
     "mood": "",
     "title": "HÜTERIN DES ERSTEN LICHTS",
-    "text": "Bald werde ich dir hier weitere Gaben der Sterne anvertrauen können. Halte das Licht unten am Leben."
+    "text": "Bringe mir das warme Sternerz gefallener Sternschnuppen. Ich segne damit unseren Himmel und tausche die Splitter gegen meine Gaben."
    }
   ]
  },

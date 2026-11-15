@@ -53,6 +53,7 @@ var _beam_level: float = 0.0
 var _ring_age: float = 99.0
 var _time: float = 0.0
 var _busy: bool = false
+var _far_wait: float = 0.0
 var _touching: bool = false
 var _discover_timer: float = 0.0
 var _tween: Tween
@@ -434,12 +435,21 @@ func _apply(progress: float, _animating: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	var live: bool = awake or _progress > 0.0
+	if delta > 0.0 and (_progress <= 0.0 or _progress >= 1.12) and _ring_age >= 3.0 and _flash <= 0.001:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 520.0 * 520.0:
+			_far_wait = 0.25
+			return
 	_time += delta
 	_check_discovery(delta)
 	if _ring_age < 99.0:
 		_ring_age += delta
 	var night: float = TimeManager.night_amount()
-	var live: bool = awake or _progress > 0.0
 	if live:
 		var breath: float = 0.5 + 0.5 * sin(_time * 1.7 + position.x * 0.1)
 		var strength: float = lerpf(0.82, 1.15, night) * (0.9 + 0.1 * breath)

@@ -11,6 +11,7 @@ uniform float open_amt = 0.0; // 0 shut .. 1 fully torn open
 uniform float close_amt = 0.0; // 0 .. 1 crumbling away
 uniform float seed = 0.0;
 uniform float lean = 0.0;     // the tear leans a little, every step another way
+uniform bool light_mode = false; // celestial starlight tear when used by LightStepFx
 const vec2 SIZE = vec2(44.0, 76.0);
 const int KNOTS = 7;
 const float BAYER[16] = float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
@@ -83,15 +84,32 @@ void fragment() {
 	float inside = 1.0 - step(0.0, wound);
 	float on_branch = 1.0 - step(0.0, branch);
 	float rim = (1.0 - smoothstep(-1.0, 1.6, wound)) * (1.0 - inside);
-	// the flesh of the void: mottled in 2x2 grains, lighter just inside the lip, a glowing seam down the middle where it gapes widest
-	vec3 dark = mix(vec3(0.024, 0.012, 0.045), vec3(0.085, 0.05, 0.15), hash(floor(pixel * 0.5) + 7.0) * 0.85);
-	if (wound > -1.6 && stipple < 0.55) { dark = vec3(0.14, 0.085, 0.27); }
-	if (spine < 0.75 && open_amt > 0.55 && hash(vec2(floor(pixel.y * 0.5), tick)) > 0.62) { dark = hash(pixel + tick) > 0.9 ? vec3(0.95, 0.3, 0.85) : vec3(0.3, 0.19, 0.55); } // the seam only glimmers here and there
-	if (h > 0.965 && sin(age * 9.0 + h * 40.0) > 0.2) { dark = vec3(0.6, 0.4, 1.0); }
-	vec3 vein = mix(vec3(0.2, 0.12, 0.4), vec3(0.66, 0.54, 0.94), pulse * pulse);
-	// the lip is not an outline: mostly a dark violet bruise, lit only on the side the light comes from (upper left) and broken by grain
+	vec3 dark;
+	vec3 vein;
+	vec3 lip;
 	float lit_side = step(0.0, -p.x - p.y * 0.3);
-	vec3 lip = mix(vec3(0.17, 0.1, 0.31), vec3(0.49, 0.34, 0.88), lit_side * step(0.45, hash(floor(pixel * 0.5) + 3.0)));
+	if (light_mode) {
+		// celestial starlight tear: deep astral teal interior framed against bright ground, glowing cyan inner lip, shimmering gold seam & glints
+		dark = mix(vec3(0.075, 0.23, 0.31), vec3(0.20, 0.62, 0.66), hash(floor(pixel * 0.5) + 7.0) * 0.85);
+		if (wound > -1.6 && stipple < 0.55) { dark = vec3(0.47, 0.96, 0.90); }
+		if (spine < 0.75 && open_amt > 0.55 && hash(vec2(floor(pixel.y * 0.5), tick)) > 0.58) {
+			dark = hash(pixel + tick) > 0.45 ? vec3(1.0, 0.94, 0.69) : vec3(0.82, 1.0, 0.97);
+		}
+		if (h > 0.955 && sin(age * 10.0 + h * 40.0) > 0.15) {
+			dark = hash(pixel + 13.0) > 0.5 ? vec3(1.0, 0.94, 0.69) : vec3(0.82, 1.0, 0.97);
+		}
+		vein = mix(vec3(0.16, 0.55, 0.58), mix(vec3(0.47, 0.96, 0.90), vec3(1.0, 0.94, 0.69), 0.38), pulse * pulse);
+		lip = mix(vec3(0.10, 0.29, 0.38), vec3(0.90, 0.77, 0.41), lit_side * step(0.45, hash(floor(pixel * 0.5) + 3.0)));
+	} else {
+		// the flesh of the void: mottled in 2x2 grains, lighter just inside the lip, a glowing seam down the middle where it gapes widest
+		dark = mix(vec3(0.024, 0.012, 0.045), vec3(0.085, 0.05, 0.15), hash(floor(pixel * 0.5) + 7.0) * 0.85);
+		if (wound > -1.6 && stipple < 0.55) { dark = vec3(0.14, 0.085, 0.27); }
+		if (spine < 0.75 && open_amt > 0.55 && hash(vec2(floor(pixel.y * 0.5), tick)) > 0.62) { dark = hash(pixel + tick) > 0.9 ? vec3(0.95, 0.3, 0.85) : vec3(0.3, 0.19, 0.55); } // the seam only glimmers here and there
+		if (h > 0.965 && sin(age * 9.0 + h * 40.0) > 0.2) { dark = vec3(0.6, 0.4, 1.0); }
+		vein = mix(vec3(0.2, 0.12, 0.4), vec3(0.66, 0.54, 0.94), pulse * pulse);
+		// the lip is not an outline: mostly a dark violet bruise, lit only on the side the light comes from (upper left) and broken by grain
+		lip = mix(vec3(0.17, 0.1, 0.31), vec3(0.49, 0.34, 0.88), lit_side * step(0.45, hash(floor(pixel * 0.5) + 3.0)));
+	}
 	vec3 col = inside > 0.5 ? dark : (on_branch > 0.5 ? vein : lip);
 	// the ground (and whatever stands behind) warps at the lips
 	float warp = (1.0 - smoothstep(1.0, 5.0, abs(wound))) * open_amt * (1.0 - close_amt);

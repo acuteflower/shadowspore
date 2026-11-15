@@ -71,12 +71,12 @@ static func heat_drive(tree: SceneTree, pos: Vector2) -> float:
 
 
 ## True when standing/wading/swimming in cooling water (oasis, river, shore).
-static func is_in_cooling_water(player: Player) -> bool:
+static func is_in_cooling_water(player: Player, known_surface: Dictionary = {}) -> bool:
 	if player == null:
 		return false
 	if player.swim > 0 or player._is_submerged():
 		return true
-	var surf: Dictionary = Terrain.surface_data(Terrain.surface_at(player.global_position))
+	var surf: Dictionary = known_surface if not known_surface.is_empty() else Terrain.surface_data(Terrain.surface_at(player.global_position))
 	return float(surf.get("submerge", 0.0)) > 0.0 or bool(surf.get("water", false))
 
 

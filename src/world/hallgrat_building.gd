@@ -16,6 +16,8 @@ var _foot: Vector2
 var _check: float = 0.0
 var _time: float = 0.0
 var _lamp: bool = false ## a street lantern: it burns only once Pim has lit it (`HallgratPeople.lamp_lit`)
+const ACTIVE_DIST_SQ: float = 680.0 * 680.0
+var _far_wait: float = 0.0
 var _at: Vector2 = Vector2.ZERO
 var _light: NightLight
 
@@ -67,6 +69,7 @@ func _ready() -> void:
 		add_child(light)
 		_light = light
 	_time = fposmod(position.x * 0.01, 7.0)
+	_far_wait = fposmod(absf(_at.x * 0.017 + _at.y * 0.031), 0.35)
 	if not bool(info.get("solid", true)): ## a flower bed, a heap of rubble: walked over
 		return
 	var body: StaticBody2D = StaticBody2D.new()
@@ -111,6 +114,7 @@ func _ready() -> void:
 		body.add_child(polygon)
 		add_child(body)
 		_time = fposmod(position.x * 0.01, 7.0)
+		_far_wait = fposmod(absf(_at.x * 0.017 + _at.y * 0.031), 0.35)
 		return
 	var shape: CollisionShape2D = CollisionShape2D.new()
 	var box: RectangleShape2D = RectangleShape2D.new()
@@ -120,15 +124,43 @@ func _ready() -> void:
 	body.add_child(shape)
 	add_child(body)
 	_time = fposmod(position.x * 0.01, 7.0)
+	_far_wait = fposmod(absf(_at.x * 0.017 + _at.y * 0.031), 0.35)
 
 
 func _process(delta: float) -> void:
+	if _glow == null and _sprite == null:
+		set_process(false)
+		return
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		if _far_wait > 0.0:
+			return
+	var vp: Viewport = get_viewport()
+	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+	if cam != null:
+		var near: bool = global_position.distance_squared_to(cam.get_screen_center_position()) <= ACTIVE_DIST_SQ
+		if not near:
+			for player: Player in Player.all:
+				if is_instance_valid(player) and player.is_multiplayer_authority() and global_position.distance_squared_to(player.global_position) <= ACTIVE_DIST_SQ:
+					near = true
+					break
+		if not near:
+			if _glow != null and _glow.modulate.a != 0.0:
+				_glow.modulate.a = 0.0
+			if _sprite != null and _sprite.modulate.a != 1.0:
+				_sprite.modulate.a = 1.0
+				if _glow != null:
+					_glow.self_modulate.a = 1.0
+			_far_wait = 0.35
+			return
 	_time += delta
 	if _glow != null:
 		var night: float = TimeManager.night_amount()
 		var lit: bool = not _lamp or HallgratPeople.lamp_lit(_at, TimeManager.time_of_day)
-		_glow.modulate.a = lerpf(0.0, 1.0, night) * (0.9 + 0.1 * sin(_time * 1.7)) * (1.0 if lit else 0.0)
-		if _light != null:
+		var glow_a: float = 0.0 if (night <= 0.005 or not lit) else night * (0.9 + 0.1 * sin(_time * 1.7))
+		if _glow.modulate.a != glow_a:
+			_glow.modulate.a = glow_a
+		if _light != null and _light.visible != lit:
 			_light.visible = lit
 	_check -= delta
 	if _check > 0.0 or _sprite == null:
@@ -142,9 +174,10 @@ func _process(delta: float) -> void:
 		if local.y < -_foot.y and _rect.grow(-4.0).has_point(local + Vector2(0, -20)):
 			hidden = true
 	var target: float = FADE_ALPHA if hidden else 1.0
-	_sprite.modulate.a = move_toward(_sprite.modulate.a, target, 0.25)
-	if _glow != null:
-		_glow.self_modulate.a = _sprite.modulate.a
+	if _sprite.modulate.a != target:
+		_sprite.modulate.a = move_toward(_sprite.modulate.a, target, 0.25)
+		if _glow != null:
+			_glow.self_modulate.a = _sprite.modulate.a
 
 
 ## The tiles the building stands on (and one round it), kept free of generated plants and stones.

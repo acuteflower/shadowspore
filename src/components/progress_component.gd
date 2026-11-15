@@ -62,12 +62,14 @@ func apply_stats(grow: bool, gear: bool = false) -> void:
 	var stats: Dictionary = LevelRewards.stats_at(claimed)
 	var talismans: TalismanComponent = owner_node.get_node_or_null("TalismanComponent") as TalismanComponent
 	var worn: Dictionary = talismans.bonus if talismans != null else {}
+	var star_hp: float = GoddessSystem.star_health_bonus(owner_node)
+	var star_stamina: float = GoddessSystem.star_stamina_bonus(owner_node)
 	var health: HealthComponent = owner_node.get_node_or_null("HealthComponent") as HealthComponent
 	if health != null:
-		health.apply_stats(float(stats["health"]) + float(worn.get("health", 0.0)), float(stats["armor"]) + float(worn.get("armor", 0.0)), float(stats["overheal"]), grow, gear)
+		health.apply_stats(float(stats["health"]) + float(worn.get("health", 0.0)) + star_hp, float(stats["armor"]) + float(worn.get("armor", 0.0)), float(stats["overheal"]), grow, gear)
 	var stamina: StaminaComponent = owner_node.get_node_or_null("StaminaComponent") as StaminaComponent
 	if stamina != null:
-		stamina.set_max(float(stats["stamina"]), grow)
+		stamina.set_max(float(stats["stamina"]) + star_stamina, grow)
 
 
 @rpc("any_peer", "call_remote", "reliable")

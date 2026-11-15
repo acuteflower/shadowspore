@@ -60,6 +60,23 @@ var _events: Dictionary = {} ## names of the opening's moments already played
 var _main: Color
 var _light_col: Color
 var _deep: Color
+var _on_screen: bool = false
+var _vis: VisibleOnScreenNotifier2D
+
+
+func _sync_process() -> void:
+	set_process(
+		_on_screen
+		or _arrive_t < ARRIVE_TIME
+		or (_open_t >= 0.0 and _open_t < 6.0)
+		or _vanish_t >= 0.0
+		or _holding
+		or _hold > 0.0
+		or _strain > 0.0
+		or not _parts.is_empty()
+		or not _rings.is_empty()
+		or not _flashes.is_empty()
+	)
 
 
 func _ready() -> void:
@@ -122,6 +139,16 @@ func _ready() -> void:
 		else:
 			_body.position.y = -96.0
 			_body.modulate.a = 0.0
+	_vis = VisibleOnScreenNotifier2D.new()
+	_vis.rect = Rect2(-40.0, -64.0, 80.0, 80.0)
+	_vis.screen_entered.connect(func() -> void:
+		_on_screen = true
+		_sync_process())
+	_vis.screen_exited.connect(func() -> void:
+		_on_screen = false
+		_sync_process())
+	add_child(_vis)
+	_sync_process()
 
 
 # ---------------------------------------------------------------- anchors
@@ -173,6 +200,7 @@ func interact(player: Player) -> void:
 		_begin(player)
 	else:
 		_holding = true
+		_sync_process()
 		_sound("hold_" + tier, -6.0)
 
 
@@ -220,6 +248,7 @@ func play_open(_mine: bool) -> void:
 	_holding = false
 	_open_t = 0.0
 	_events.clear()
+	_sync_process()
 
 
 ## A save or a late join: it stands open, no show.
@@ -232,6 +261,7 @@ func set_open_instant() -> void:
 	_arrive_t = 99.0
 	_body.position = Vector2.ZERO
 	_body.modulate.a = 1.0
+	_sync_process()
 
 
 ## Every peer: a piece of the loot just sprang out (rank 0 common .. 4 legendary).
@@ -245,12 +275,14 @@ func spring_fx(rank: int) -> void:
 	_sound("pop", -4.0, 0.9 + rank * 0.08)
 	if rank >= 3:
 		_sound("sparkle", -6.0)
+	_sync_process()
 
 
 ## Every peer: fades away (an opened boss or test chest after a while).
 func vanish() -> void:
 	if _vanish_t < 0.0:
 		_vanish_t = 0.0
+	_sync_process()
 
 
 func _rarity_color(rank: int) -> Color:
@@ -272,8 +304,11 @@ func _process(delta: float) -> void:
 	else:
 		var target: float = _hold
 		_strain = move_toward(_strain, target, delta * 4.0)
-		var amp: float = _strain * (1.5 if tier == "legendary" else 1.0)
-		_body.position.x = roundf(sin(_time * 55.0) * amp) if _strain > 0.15 else 0.0
+		if _strain > 0.15:
+			var amp: float = _strain * (1.5 if tier == "legendary" else 1.0)
+			_body.position.x = roundf(sin(_time * 55.0) * amp)
+		elif _body.position.x != 0.0:
+			_body.position.x = 0.0
 	if _vanish_t >= 0.0:
 		_vanish_t += delta
 		modulate.a = clampf(1.0 - _vanish_t / 1.4, 0.0, 1.0)
@@ -281,11 +316,17 @@ func _process(delta: float) -> void:
 			_part(Vector2(randf_range(-16, 16), randf_range(-14, 0)), Vector2(0, -randf_range(10, 26)), _main, 1.2, 0, 0.0)
 		if _vanish_t >= 1.6:
 			queue_free()
-	_ambient(delta)
-	_step_parts(delta)
-	_update_glow()
-	_fx.queue_redraw()
-	_ground.queue_redraw()
+			return
+	if _on_screen or _open_t >= 0.0:
+		_ambient(delta)
+	if not _parts.is_empty() or not _rings.is_empty() or not _flashes.is_empty():
+		_step_parts(delta)
+	if _on_screen:
+		_update_glow()
+		_fx.queue_redraw()
+		_ground.queue_redraw()
+	else:
+		_sync_process()
 
 
 func _update_glow() -> void:

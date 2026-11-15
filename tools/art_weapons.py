@@ -39,8 +39,9 @@ RAMPS = {  # dark .. light; bevel: lit rim = last, shaded rim = first, inside = 
     "stone": [hexc(c) for c in ("363046", "524b64", "746d86", "9e98ae")],  # matte chipped stone with cool-violet shadows (basic tier-1 tools)
     "timber": [hexc(c) for c in ("382538", "5c4048", "82605c", "a68378")],  # plain, humble wooden shaft for basic tools
     "cord": [hexc(c) for c in ("483844", "6e5a56", "967e6a", "baa288")],  # simple fiber/cord lashing
+    "starlight": [hexc(c) for c in ("1b4f5c", "2e8892", "6ee8dc", "dcfff8")],  # celestial starlight blade from Caelia's altar
 }
-GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8"), "sword_rift": hexc("c07bff")}
+GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8"), "sword_rift": hexc("c07bff"), "blade_starlight": hexc("fff0b0")}
 
 
 # ------------------------------------------------------------------ geometry (item frame: pointing right, y down)
@@ -133,6 +134,44 @@ def sword(blade, gem_key, steel):
         layers.append(("gem", gem, "gem:" + gem_key))
         return layers
     return build
+
+
+def starlight_sword(w, h, tf):
+    """Sternenfall-Klinge: Caelia's celestial blade — golden crescent pommel cradling a bright aqua star gem,
+    winged gold moon-crescent crossguard curving round an astral star core, and a sleek tapered starlight blade
+    with a glowing golden constellation vein along its fuller."""
+    ax = 8.0
+    start, end = 11.2, 43.0
+    n = 40
+    top, low = [], []
+    for i in range(n + 1):
+        t = i / n
+        x = start + (end - start) * t
+        half = 2.35 * (1.0 - 0.74 * (t ** 1.15)) + 0.28 * math.sin(math.pi * t)
+        notch = -0.3 if abs(t - 0.13) < 0.04 else 0.0
+        top.append((x, ax - (half + notch)))
+        low.append((x, ax + (half + notch)))
+    tip = (end + 3.2, ax)
+    layers = [
+        ("grip", stroke_mask([(3.2, ax), (9.2, ax)], 1.9, w, h, tf), "wrap"),
+        ("pommel_arc", poly_mask([
+            (0.9, ax - 2.6), (2.7, ax - 2.3), (3.4, ax - 1.1), (2.2, ax),
+            (3.4, ax + 1.1), (2.7, ax + 2.3), (0.9, ax + 2.6), (1.7, ax)
+        ], w, h, tf), "gold"),
+        ("pommel_star", poly_mask([(0.5, ax - 0.7), (1.7, ax - 0.7), (1.7, ax + 0.7), (0.5, ax + 0.7)], w, h, tf), "starcore"),
+        ("guard_up", poly_mask([
+            (8.2, ax - 0.9), (10.6, ax - 1.4), (12.8, ax - 4.2), (13.4, ax - 6.6),
+            (10.8, ax - 5.5), (9.0, ax - 3.4), (7.8, ax - 2.0)
+        ], w, h, tf), "gold"),
+        ("guard_dn", poly_mask([
+            (8.2, ax + 0.9), (10.6, ax + 1.4), (12.8, ax + 4.2), (13.4, ax + 6.6),
+            (10.8, ax + 5.5), (9.0, ax + 3.4), (7.8, ax + 2.0)
+        ], w, h, tf), "gold"),
+        ("collar", poly_mask([(8.6, ax - 1.8), (11.2, ax - 1.8), (11.2, ax + 1.8), (8.6, ax + 1.8)], w, h, tf), "gold"),
+        ("blade", poly_mask(top + [tip] + list(reversed(low)), w, h, tf), "starlight_ridge"),
+        ("guard_gem", poly_mask([(9.4, ax - 0.9), (11.2, ax - 0.9), (11.2, ax + 0.9), (9.4, ax + 0.9)], w, h, tf), "starcore"),
+    ]
+    return layers
 
 
 def rift_sword(w, h, tf):
@@ -306,6 +345,7 @@ def bone_fork(w, h, tf):
 ITEMS = {  # id: (size, pivot in the item frame, builder, steel ramp, icon fit: (rotation, scale, offset))
     "sword_basic": ((34, 12), (4.5, 6.0), sword(21, "sword_basic", "steel"), "steel", (-45.0, 0.46, (1.6, 14.4))),
     "sword_iron": ((36, 12), (4.5, 6.0), sword(23, "sword_iron", "mint"), "mint", (-45.0, 0.44, (1.6, 14.4))),
+    "blade_starlight": ((48, 16), (5.0, 8.0), starlight_sword, "starlight", (-45.0, 0.33, (2.9, 13.1))),
     "sword_void": ((42, 12), (4.5, 6.0), sword(29, "sword_void", "void"), "void", (-45.0, 0.4, (1.6, 14.4))),
     "sword_rift": ((50, 16), (4.5, 7.0), rift_sword, "raven", (-45.0, 0.4, (1.4, 14.4))),
     "axe_basic": ((34, 18), (5.0, 12.0), axe, "steel", (-45.0, 0.5, (1.0, 15.2))),
@@ -343,6 +383,45 @@ def compose(item, w, h, tf, material_map=None):
         if mat == "crack":  # flat violet light, a bright spark now and then
             for (x, y) in zip(*np.nonzero(mask)[::-1]):
                 img[(int(x), int(y))] = RAMPS["crack"][2 if (int(x) * 7 + int(y) * 3) % 5 == 0 else 1]
+            continue
+        if mat == "starcore":  # bright celestial gold-aqua core
+            ys = np.nonzero(mask)
+            cx = float(np.mean(ys[1])) if len(ys[1]) else 0.0
+            cy = float(np.mean(ys[0])) if len(ys[0]) else 0.0
+            for yy, xx in zip(*ys):
+                d = math.hypot(float(xx) - cx, float(yy) - cy)
+                img[(int(xx), int(yy))] = hexc("fffbe6") if d < 0.75 else (hexc("78f4e6") if d < 1.35 else hexc("fff0b0"))
+            continue
+        if mat == "starlight_ridge":  # celestial blade: luminous aqua top bevel, cyan astral body, dark cosmic shadow, golden constellation fuller spine
+            ys = np.nonzero(mask)
+            cols = {}
+            for yy, xx in zip(*ys):
+                lo, hi = cols.get(int(xx), (int(yy), int(yy)))
+                cols[int(xx)] = (min(lo, int(yy)), max(hi, int(yy)))
+            ramp = RAMPS["starlight"]
+            xs_sorted = sorted(cols.keys())
+            x_min = xs_sorted[0] if xs_sorted else 0
+            x_max = xs_sorted[-1] if xs_sorted else 1
+            for yy, xx in zip(*ys):
+                x, y = int(xx), int(yy)
+                lo, hi = cols[x]
+                span = hi - lo
+                if span == 0:
+                    img[(x, y)] = ramp[3]
+                    continue
+                u = (x - x_min) / max(x_max - x_min, 1)
+                mid_y = (lo + hi) // 2
+                if y == lo:
+                    c = ramp[3]
+                elif y == mid_y and u < 0.85 and span >= 2:
+                    c = hexc("fffbe8") if (x - x_min) % 4 == 0 else hexc("e6c468")
+                elif y < mid_y:
+                    c = ramp[2]
+                elif y == hi:
+                    c = ramp[0]
+                else:
+                    c = ramp[1]
+                img[(x, y)] = c
             continue
         if mat == "ridge":  # a feather blade: lit upper half, a rift of light along the spine, shaded lower half (per column, so any scale works)
             ys = np.nonzero(mask)

@@ -1,0 +1,22 @@
+name: shadowspore-dev
+logger:
+  level: "INFO"
+
+session:
+  encryption_key: "shadowspore_dev_session_key_change_in_prod"
+  token_expiry_sec: 7200
+  refresh_encryption_key: "shadowspore_dev_refresh_key_change_in_prod"
+  refresh_token_expiry_sec: 2592000 # 30 Tage (wichtig fuer Launcher)
+
+socket:
+  server_key: "shadowspore_dev_server_key"
+  port: 7350
+
+console:
+  port: 7351
+  username: "admin"
+  password: "password" # Lokal fuer Dev; auf echtem Server unbedingt aendern!
+
+runtime:
+  path: "/nakama/data/modules"
+  http_key: "shadowspore_dev_http_key"

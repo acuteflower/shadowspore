@@ -39,6 +39,13 @@ func _on_tree_trunk() -> bool:
 
 func _process(delta: float) -> void:
 	super._process(delta)
+	if delta > 0.0 and _vis_wait > 0.0:
+		if species == "desert_falcon" and multiplayer.is_server() and _height > 26.0 and state in [State.FLY, State.WATCH]:
+			_raptor_shadow_tick -= delta
+			if _raptor_shadow_tick <= 0.0:
+				_raptor_shadow_tick = 0.38
+				_cast_falcon_shadow_alarm()
+		return
 	var cols: int = maxi(1, _sprite.hframes)
 	var col: int = _sprite.frame % cols
 	if species == "owl" and _call_pose <= 0.0:

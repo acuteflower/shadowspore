@@ -50,6 +50,7 @@ var _climb_to: float = 0.0
 var _climb_height: float = 0.0
 var _perch_node: Node2D = null
 var _bluff_cool: float = 0.0
+var _far_wait: float = 0.0
 
 @onready var _sprite: Sprite2D = $Sprite2D
 
@@ -76,9 +77,18 @@ func _ready() -> void:
 		_request_snapshot.rpc_id(1)
 
 
+static var _tex_cache: Dictionary = {}
+
+
 func _load_species() -> void:
 	_spec = DataRegistry.get_entry("wildlife", species)
-	_sprite.texture = load(String(_spec["texture"])) as Texture2D
+	var tex_path: String = String(_spec["texture"])
+	var cached: Variant = _tex_cache.get(tex_path)
+	if not (cached is Texture2D):
+		cached = load(tex_path) as Texture2D
+		if cached != null:
+			_tex_cache[tex_path] = cached
+	_sprite.texture = cached as Texture2D
 	var cols: int = int(_spec.get("sheet_cols", 44))
 	var builds: int = int(_spec.get("builds", 3))
 	_sprite.hframes = cols
@@ -170,6 +180,17 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if delta > 0.0:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 520.0 * 520.0:
+			_visual_facing = facing
+			_sprite.visible = mood != Mood.HIDDEN
+			_far_wait = 0.22
+			return
 	_visual_facing += clampf(angle_difference(_visual_facing, facing), -delta * 7.0, delta * 7.0)
 	_sprite.visible = mood != Mood.HIDDEN
 	var progress: float = clampf(_elapsed / maxf(_duration, 0.1), 0.0, 1.0)

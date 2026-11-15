@@ -21,6 +21,12 @@ var _flames: PixelFlames
 var _base_material: ShaderMaterial ## the lit picture with its turquoise recoloured
 var _teal_glow: Sprite2D ## the same picture again, only its turquoise, burning (additive, unshaded)
 var _teal_material: ShaderMaterial
+var _on_screen: bool = false
+var _vis: VisibleOnScreenNotifier2D
+
+
+func _sync_process() -> void:
+	set_process(_glow != null and (_on_screen or _fury > 0.0 or _fury_goal > 0.0))
 
 
 func setup(texture_path: String, mask_path: String, top_left: Vector2, glow_path: String = "") -> void:
@@ -43,7 +49,17 @@ func setup(texture_path: String, mask_path: String, top_left: Vector2, glow_path
 		_glow.material = Unlit.material()
 		add_child(_glow)
 		add_to_group("ground_glow")
-		set_process(true)
+		var tex_size: Vector2 = _glow.texture.get_size() if _glow.texture != null else (texture.get_size() if texture != null else Vector2(256, 256))
+		_vis = VisibleOnScreenNotifier2D.new()
+		_vis.rect = Rect2(-Vector2(48, 48), tex_size + Vector2(96, 96))
+		_vis.screen_entered.connect(func() -> void:
+			_on_screen = true
+			_sync_process())
+		_vis.screen_exited.connect(func() -> void:
+			_on_screen = false
+			_sync_process())
+		add_child(_vis)
+		_sync_process()
 	tree_exiting.connect(func() -> void: Terrain.patches.erase(self))
 
 
@@ -60,6 +76,7 @@ func surface_at(world_pos: Vector2) -> String:
 
 func _process(delta: float) -> void:
 	if _glow == null:
+		set_process(false)
 		return
 	_time += delta
 	_glow.modulate.a = lerpf(0.35, 1.0, TimeManager.night_amount()) * (0.8 + 0.2 * sin(_time * 0.9))
@@ -81,6 +98,8 @@ func _process(delta: float) -> void:
 		_glow.modulate.a = maxf(_glow.modulate.a, 0.85 * _fury) ## burning, the light does not sleep by day
 		if _flames != null:
 			_flames.amount = _fury
+	elif not _on_screen and _fury <= 0.0 and _fury_goal <= 0.0:
+		_sync_process()
 
 
 ## The inlaid light turns into pink-violet fire over `seconds` (0 = at once) and parts of it burn with flames. `extinguish` puts it out again.
@@ -114,6 +133,7 @@ func ignite(seconds: float) -> void:
 	_fury_speed = 1.0 / maxf(seconds, 0.001)
 	if seconds <= 0.0:
 		_fury = 1.0
+	_sync_process()
 
 
 func extinguish(seconds: float) -> void:
@@ -121,6 +141,7 @@ func extinguish(seconds: float) -> void:
 	_fury_speed = 1.0 / maxf(seconds, 0.001)
 	if seconds <= 0.0:
 		_fury = 0.0
+	_sync_process()
 
 
 func fury() -> float:

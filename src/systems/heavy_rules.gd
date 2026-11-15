@@ -6,6 +6,7 @@ extends RefCounted
 
 const KIND_CHARGE: String = "charge_strike"
 const KIND_RIFT: String = "rift_slash" ## the Himmelsriss: no charging, two diagonal slashes that shoot feathers (docs/rissklinge.md)
+const KIND_STARFALL: String = "starfall_slash" ## the Sternenfall-Klinge: astral crescent + shooting stars from the sky
 
 
 ## The secondary block of an item's weapon class, {} when the weapon has none.
@@ -87,9 +88,10 @@ static func step(cfg: Dictionary, item_def: Dictionary, charge_time: float, chai
 	}
 
 
-## The right click of the Himmelsriss is no charge but a chain of two slashes (`secondary.kind` "rift_slash", `steps` [stage 1, stage 2]).
+## Right-click chain without charging (`rift_slash` or `starfall_slash`, `steps` [stage 1, stage 2]).
 static func is_rift_slash(cfg: Dictionary) -> bool:
-	return String(cfg.get("kind", "")) == KIND_RIFT
+	var kind: String = String(cfg.get("kind", ""))
+	return kind == KIND_RIFT or kind == KIND_STARFALL
 
 
 static func rift_steps(cfg: Dictionary) -> int:
@@ -138,6 +140,7 @@ static func rift_step(cfg: Dictionary, item_def: Dictionary, stage: int) -> Dict
 		"noise": float(cfg.get("noise", 1.0)),
 		"diag": {"pitch0": deg_to_rad(float(diag.get("pitch0", 70))), "pitch1": deg_to_rad(float(diag.get("pitch1", -10))), "yaw0": deg_to_rad(float(diag.get("yaw0", 60))), "yaw1": deg_to_rad(float(diag.get("yaw1", -60)))},
 		"volley": data.get("volley", {}) as Dictionary,
+		"starfall": data.get("starfall", {}) as Dictionary,
 	}
 
 

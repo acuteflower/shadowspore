@@ -41,6 +41,9 @@ func _process(delta: float) -> void:
 		return
 	if not _active:
 		return
+	if not CloudSession.is_admin():
+		_cancel()
+		return
 	var health: HealthComponent = _player.get("health") as HealthComponent
 	if health != null and health.current <= 0.0:
 		_cancel() ## she fell while the camera flew: back to her
@@ -73,6 +76,8 @@ func _set_zoom(value: float) -> void:
 
 
 func _can_enter() -> bool:
+	if not CloudSession.is_admin():
+		return false
 	if _player == null or not _player.is_multiplayer_authority():
 		return false
 	if InputManager.map_open or (InputManager.skills_open or InputManager.progress_open) or InputManager.build_open:

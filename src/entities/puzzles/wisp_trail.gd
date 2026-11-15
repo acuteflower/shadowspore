@@ -78,6 +78,8 @@ var _wisp_light: NightLight
 var _ground: Node2D
 var _audio: AudioStreamPlayer2D
 var _night: float = 0.0
+var _far_wait: float = 0.0
+var _rest_redraw_t: float = 0.0
 
 
 func setup(entry: Dictionary, tuning: Dictionary) -> void:
@@ -220,6 +222,28 @@ func set_night(amount: float) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_state_t += delta
+	var resting: bool = (state == State.SLEEP or state == State.GONE or state == State.SOLVED) \
+		and _tail.is_empty() and _sparks.is_empty() \
+		and (_bloom_t < 0.0 or _bloom_t >= 99.0)
+	if resting:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null:
+			var cam_pos: Vector2 = cam.get_screen_center_position()
+			var max_d: float = 720.0 * 720.0
+			var near: bool = _bowl_pos.distance_squared_to(cam_pos) <= max_d or _end_pos.distance_squared_to(cam_pos) <= max_d
+			if not near:
+				for p: Player in Player.all:
+					if is_instance_valid(p) and (p.global_position.distance_squared_to(_bowl_pos) <= max_d or p.global_position.distance_squared_to(_end_pos) <= max_d):
+						near = true
+						break
+			if not near:
+				_far_wait = 0.25
+				return
 	if multiplayer.is_server():
 		_host_step(delta)
 		_sync_t -= delta
@@ -635,8 +659,22 @@ func _animate(delta: float) -> void:
 		_bloom_t += delta
 	if _bowl_glow != null:
 		_bowl_glow.modulate.a = 0.35 + 0.65 * _night
-	_wisp.queue_redraw()
-	_ground.queue_redraw()
+	var calm: bool = (state == State.SLEEP or state == State.GONE or state == State.SOLVED) \
+		and _tail.is_empty() and _sparks.is_empty() \
+		and (_bloom_t < 0.0 or _bloom_t >= 99.0) \
+		and ((state == State.SLEEP and _fade >= 0.99) or ((state == State.GONE or state == State.SOLVED) and _fade <= 0.01))
+	if calm:
+		_rest_redraw_t -= delta
+		if _rest_redraw_t <= 0.0:
+			_rest_redraw_t = 0.08
+			if _fade > 0.01:
+				_wisp.queue_redraw()
+			if state == State.SLEEP or _fade > 0.01:
+				_ground.queue_redraw()
+	else:
+		_rest_redraw_t = 0.0
+		_wisp.queue_redraw()
+		_ground.queue_redraw()
 
 
 func _shake() -> void:

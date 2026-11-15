@@ -242,7 +242,12 @@ static func start(main: Node, request: Dictionary) -> void:
 		if NetworkManager.join_rejected.is_connected(on_rejected):
 			NetworkManager.join_rejected.disconnect(on_rejected)
 	var loaded: bool = false
-	if mode == "continue" or mode == "host":
+	if mode == "continue":
+		if CloudSession.is_logged_in():
+			loaded = await CloudSession.load_cloud_into(tree, false)
+		else:
+			loaded = SaveGame.load_into(tree, "", false)
+	elif mode == "host":
 		loaded = SaveGame.load_into(tree, "", false)
 	if level.has_method("loading_step"):
 		while not bool(level.call("loading_step")):

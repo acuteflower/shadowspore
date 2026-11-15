@@ -7,8 +7,13 @@ var _stealth: StealthComponent
 var _amount: float = 0.0
 
 
+func _ready() -> void:
+	visible = false
+
+
 func bind(stealth: StealthComponent) -> void:
 	_stealth = stealth
+	visible = false
 
 
 func _process(delta: float) -> void:

@@ -101,6 +101,7 @@ func _sync_overflow(target_energy: float, force: bool = false) -> void:
 		_overflow = Sprite2D.new()
 		_overflow.texture = texture
 		_overflow.scale = Vector2.ONE * texture_scale
+		_overflow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		_overflow.material = _overflow_material
 		_overflow.z_as_relative = false
 		_overflow.z_index = OVERFLOW_Z

@@ -41,6 +41,7 @@
 		"default": {"tilt": 20, "tilt_back": -20, "pitch": 0, "cock": 0.5, "follow": 0.3, "over": 0.22, "top_down": false},
 		"sword_1h": {"tilt": 48, "tilt_back": -42, "pitch": 0, "cock": 1.0, "follow": 0.35, "over": 0.25, "blocks": {"3": {"tilt_back": 55, "cock": 0.8}, "4": {"tilt": 8, "cock": 0.35, "follow": 0.15, "over": 0.12}}},
 		"sword_rift": {"like": "sword_1h"},
+		"sword_starlight": {"like": "sword_1h"},
 		"sickle_1h": {"tilt": -8, "tilt_back": -8, "pitch": -16, "cock": 0.2, "follow": 0.35, "over": 0.25},
 		"axe_1h": {"tilt": 55, "pitch": -14, "cock": 1.0, "follow": 0.25, "over": 0.12, "top_down": true},
 		"pickaxe_1h": {"tilt": 78, "pitch": -24, "cock": 1.35, "follow": 0.2, "over": 0.08, "top_down": true},

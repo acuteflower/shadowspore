@@ -134,8 +134,9 @@ func setup_board(for_player: Player, for_town: TownManager) -> void:
 	add_to_group("board_window")
 	player.story_lock = true
 	InputManager.ui_blocking = true
-	town.changed.connect(_on_town_changed)
-	town.notice.connect(_on_notice)
+	if town != null:
+		town.changed.connect(_on_town_changed)
+		town.notice.connect(_on_notice)
 	_setup_board()
 	_rebuild()
 	_clamp_focus()
@@ -194,10 +195,11 @@ func _close() -> void:
 		player.story_lock = false
 		_frame_view(false)
 	InputManager.ui_blocking = false
-	if town.changed.is_connected(_on_town_changed):
-		town.changed.disconnect(_on_town_changed)
-	if town.notice.is_connected(_on_notice):
-		town.notice.disconnect(_on_notice)
+	if town != null:
+		if town.changed.is_connected(_on_town_changed):
+			town.changed.disconnect(_on_town_changed)
+		if town.notice.is_connected(_on_notice):
+			town.notice.disconnect(_on_notice)
 
 
 func _exit_tree() -> void:

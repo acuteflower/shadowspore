@@ -60,6 +60,7 @@ func _build_sky_overlay() -> void:
 	add_child(_sky_layer)
 
 	_sky_canvas = Node2D.new()
+	_sky_canvas.visible = false
 	_sky_canvas.material = Unlit.material()
 	_sky_canvas.draw.connect(_draw_sky_streaks)
 	_sky_layer.add_child(_sky_canvas)
@@ -127,7 +128,8 @@ func _process(delta: float) -> void:
 		_streaks = remaining
 		if _sky_canvas != null:
 			_sky_canvas.queue_redraw()
-	elif _sky_canvas != null:
+	elif _sky_canvas != null and _sky_canvas.visible:
+		_sky_canvas.visible = false
 		_sky_canvas.queue_redraw()
 
 	if not multiplayer.is_server():
@@ -178,7 +180,7 @@ func _player_group_level() -> int:
 
 func _plan_nightly_starfalls() -> void:
 	_starfall_schedule.clear()
-	var min_count: int = starfall_min_count(_player_group_level(), TimeManager.day)
+	var min_count: int = starfall_min_count(_player_group_level(), TimeManager.day) + GoddessSystem.any_starfall_bonus(get_tree())
 	var total: int = min_count + (1 if _rng.randf() < 0.25 else 0)
 	var start_p: float = clampf(TimeManager.night_progress(), 0.0, 0.85)
 	var end_p: float = 0.92
@@ -227,6 +229,7 @@ func _rpc_starfall(cid: int, from_world: Vector2, target_pos: Vector2) -> void:
 		add_child(snd)
 		snd.play()
 	if _sky_canvas != null:
+		_sky_canvas.visible = true
 		_sky_canvas.queue_redraw()
 
 

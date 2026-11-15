@@ -39,6 +39,8 @@ var _wander_dir: Vector2 = Vector2.ZERO
 var _orbit: float = 1.0
 var _world: Node
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _zone_drawn: bool = false
+var _scream_drawn: bool = false
 
 @onready var _rig: ListenerRig = $Rig
 @onready var _health: HealthComponent = $HealthComponent
@@ -99,8 +101,14 @@ func _process(delta: float) -> void:
 	if state == State.SCREAM and not _scream_presented and _state_time >= float(_def["scream"]["hit_time"]) * 0.7:
 		_scream_presented = true
 		_present_scream()
-	_zone.queue_redraw()
-	_scream_fx.queue_redraw()
+	var zone_active: bool = state in [State.WAVE_WINDUP, State.SCREAM_WINDUP, State.SCREAM]
+	if zone_active or _zone_drawn:
+		_zone.queue_redraw()
+		_zone_drawn = zone_active
+	var scream_active: bool = age >= 0.0 and age <= 0.5
+	if scream_active or _scream_drawn:
+		_scream_fx.queue_redraw()
+		_scream_drawn = scream_active
 
 
 func _physics_process(delta: float) -> void:

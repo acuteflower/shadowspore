@@ -92,6 +92,11 @@ var _swinging: bool = false
 var _wounded: bool = false
 var _locked: bool = false ## a demolish target is under the mouse
 var _tension: float = 0.0
+var _redraw_wait: float = 0.0
+var _was_visible_cursor: bool = false
+var _last_probe_aim: Vector2 = Vector2.INF
+var _probe_wait: float = 0.0
+var _settings_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -141,10 +146,16 @@ func _process(_delta: float) -> void:
 	var now: int = Time.get_ticks_usec()
 	var dt: float = clampf(float(now - _last_usec) / 1000000.0, 0.0, 0.1) ## real time: slow motion and the pause must not slow the cursor
 	_last_usec = now
-	_enabled = bool(GameSettings.get_value("cursor"))
+	_settings_wait -= dt
+	if _settings_wait <= 0.0:
+		_settings_wait = 0.25
+		_enabled = bool(GameSettings.get_value("cursor"))
 	if Input.mouse_mode == Input.MOUSE_MODE_HIDDEN or Input.mouse_mode == Input.MOUSE_MODE_VISIBLE:
-		Input.mouse_mode = Input.MOUSE_MODE_HIDDEN if _enabled and _in_window else Input.MOUSE_MODE_VISIBLE ## outside the window the system pointer must show
-	_canvas.visible = _enabled
+		var want_mode: Input.MouseMode = Input.MOUSE_MODE_HIDDEN if _enabled and _in_window else Input.MOUSE_MODE_VISIBLE ## outside the window the system pointer must show
+		if Input.mouse_mode != want_mode:
+			Input.mouse_mode = want_mode
+	if _canvas.visible != _enabled:
+		_canvas.visible = _enabled
 	if not _enabled:
 		return
 	_time += dt
@@ -162,13 +173,15 @@ func _process(_delta: float) -> void:
 	_raw = mouse
 	_pos = mouse if SMOOTH_POSITION else mouse.round() ## sub-pixel: whole art pixels were 3-4 screen pixels, so the cursor stepped
 	var next: Look = _resolve()
-	if next != look:
+	var look_changed: bool = next != look
+	if look_changed:
 		_on_look_changed(look, next)
 		look = next
 		look_age = 0.0
 	else:
 		look_age += dt
-	if _hover_id != _hover_seen:
+	var hover_changed: bool = _hover_id != _hover_seen
+	if hover_changed:
 		_hover_seen = _hover_id
 		if _hover_id != 0 and look == Look.HARVEST and look_age > 0.0: ## slid from one plant onto the next: the bloom opens again
 			look_age = 0.0
@@ -181,36 +194,61 @@ func _process(_delta: float) -> void:
 	var goal: float = 0.0 if look == Look.HIDDEN or not inside else 1.0
 	_alpha = move_toward(_alpha, goal, dt * (7.0 if goal > _alpha else 5.0))
 	_update_particles(dt)
-	_canvas.queue_redraw()
+	var is_drawn: bool = _alpha > 0.01 and look != Look.HIDDEN
+	var hot_draw: bool = moved > 0.5 or look_changed or hover_changed or _click_age < 0.25 or not _pops.is_empty() or not _motes.is_empty() or absf(_alpha - goal) > 0.005 or _swinging or look in [Look.CHARGE, Look.DEAD, Look.FISH_DRILL, Look.FISH_BITE, Look.FISH_NIBBLE]
+	_redraw_wait -= dt
+	if not is_drawn:
+		if _was_visible_cursor:
+			_was_visible_cursor = false
+			_canvas.queue_redraw()
+	elif hot_draw or _redraw_wait <= 0.0 or not _was_visible_cursor:
+		_was_visible_cursor = true
+		_redraw_wait = 0.066
+		_canvas.queue_redraw()
 
 
 func _physics_process(delta: float) -> void:
-	_hover = HOVER_NONE
-	_hover_id = 0
 	if not _probe_wanted or _probe == null:
+		_hover = HOVER_NONE
+		_hover_id = 0
 		_pick_id = 0
 		_fauna_seen = false
+		_probe_wait = 0.0
 		return
 	var aim: Vector2 = InputManager.aim_world_position()
-	_probe.transform = Transform2D(0.0, aim)
-	var hits: Array[Dictionary] = get_viewport().world_2d.direct_space_state.intersect_shape(_probe, 8)
-	var plant: Object = null
-	for hit: Dictionary in hits:
-		var collider: Object = hit["collider"]
-		if collider == null:
-			continue
-		if collider.has_method("harvest_owner"): ## a plant's, rock's, fallen log's or clover field's hurtbox
-			if plant == null:
-				plant = collider.call("harvest_owner")
-		elif "health" in collider: ## anything with a health bar that weapons can hurt
-			var health: Object = collider.get("health")
-			if health != null and float(health.get("current")) > 0.0:
-				_hover = HOVER_ENEMY
-				return
-	if plant != null and _can_harvest(plant):
-		_hover = HOVER_HARVEST
-		_hover_id = plant.get_instance_id()
-		return
+	_probe_wait -= delta
+	if aim.distance_squared_to(_last_probe_aim) >= 1.0 or _probe_wait <= 0.0:
+		_last_probe_aim = aim
+		_probe_wait = 0.08
+		_hover = HOVER_NONE
+		_hover_id = 0
+		_probe.transform = Transform2D(0.0, aim)
+		var hits: Array[Dictionary] = get_viewport().world_2d.direct_space_state.intersect_shape(_probe, 8)
+		var plant: Object = null
+		for hit: Dictionary in hits:
+			var collider: Object = hit["collider"]
+			if collider == null:
+				continue
+			if collider.has_method("harvest_owner"): ## a plant's, rock's, fallen log's or clover field's hurtbox
+				if plant == null:
+					plant = collider.call("harvest_owner")
+			elif "health" in collider: ## anything with a health bar that weapons can hurt
+				var health: Object = collider.get("health")
+				if health != null and float(health.get("current")) > 0.0:
+					_hover = HOVER_ENEMY
+					return
+		if plant != null and _can_harvest(plant):
+			_hover = HOVER_HARVEST
+			_hover_id = plant.get_instance_id()
+			return
+	elif _hover == HOVER_ENEMY or (_hover == HOVER_HARVEST and _hover_id != 0):
+		if _hover == HOVER_HARVEST:
+			var hover_obj: Object = instance_from_id(_hover_id)
+			if hover_obj == null or not is_instance_valid(hover_obj) or not _can_harvest(hover_obj):
+				_hover = HOVER_NONE
+				_hover_id = 0
+		if _hover != HOVER_NONE:
+			return
 	_pick_wait -= delta
 	if _pick_wait <= 0.0:
 		_pick_wait = PICK_EVERY

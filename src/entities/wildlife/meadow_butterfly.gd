@@ -19,6 +19,7 @@ var _height: float = 5.0
 var _alt: float = 4.0
 var _sense_left: float = 0.0
 var _facing: float = 0.0
+var _far_wait: float = 0.0
 
 @onready var _sprite: Sprite2D = $Sprite2D
 
@@ -71,7 +72,16 @@ func _physics_process(delta: float) -> void:
 				_visit(false)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if delta > 0.0:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 520.0 * 520.0:
+			_far_wait = 0.22
+			return
 	var col: int = int(_elapsed * 22.0) % 7 if state == State.FLY else (7 if state == State.REST else [0, 1, 0, 6][int(_elapsed * 1.3) % 4])
 	var sector: int = posmod(roundi(_facing / (PI / 4.0)), 8)
 	_sprite.frame = (clampi(appearance, 0, 3) * 8 + sector) * 8 + col

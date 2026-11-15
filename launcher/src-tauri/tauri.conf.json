@@ -1,0 +1,42 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Shadowspore Launcher",
+  "version": "0.1.0",
+  "identifier": "de.shadowspore.launcher",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Shadowspore Launcher",
+        "width": 1280,
+        "height": 760,
+        "minWidth": 1040,
+        "minHeight": 640,
+        "resizable": true,
+        "center": true,
+        "label": "main",
+        "decorations": false,
+        "transparent": false,
+        "shadow": true,
+        "backgroundColor": "#07040d"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.ico"
+    ]
+  }
+}

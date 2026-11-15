@@ -480,10 +480,12 @@ func _rpc_reset_heat() -> void:
 
 
 func _update_desert_heat(delta: float) -> void:
+	if not is_multiplayer_authority():
+		return
 	if health.current <= 0.0 or intro != null:
 		heat_amount = 0.0
 		return
-	if DesertHeat.is_in_cooling_water(self):
+	if DesertHeat.is_in_cooling_water(self, _surface):
 		heat_amount = 0.0
 		return
 	if effects != null and effects.has("refreshed"):
@@ -492,7 +494,13 @@ func _update_desert_heat(delta: float) -> void:
 	if talismans != null and talismans.perks.has("prism_break"): ## Fessel des Ersten Schmelzers: desert heat never slows her
 		heat_amount = move_toward(heat_amount, 0.0, DesertHeat.COOL_REFRESHED_RATE * delta)
 		return
-	var drive: float = DesertHeat.heat_drive(get_tree(), global_position)
+	var drive_age: float = float(get_meta(&"_heat_drive_age", 999.0)) + delta
+	var drive: float = float(get_meta(&"_heat_drive_val", 0.0))
+	if drive_age >= 0.1:
+		drive_age = 0.0
+		drive = DesertHeat.heat_drive(get_tree(), global_position)
+		set_meta(&"_heat_drive_val", drive)
+	set_meta(&"_heat_drive_age", drive_age)
 	heat_amount = clampf(heat_amount + drive * delta, 0.0, 1.0)
 
 func _physics_process(delta: float) -> void:
@@ -504,10 +512,12 @@ func _physics_process(delta: float) -> void:
 			surf_id = "quartz" ## Fessel des Ersten Schmelzers freezes quicksand underfoot
 		_surface = Terrain.surface_data(surf_id)
 		var on_water_deck: bool = false
+		var rivers_patch: WorldRivers = null
 		for patch: Node in Terrain.patches:
-			if patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", global_position)):
+			if patch is WorldRivers:
+				rivers_patch = patch as WorldRivers
+			elif patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", global_position)):
 				on_water_deck = true
-				break
 		if on_water_deck:
 			set_meta("water_deck", true)
 			if swimmer != null:
@@ -515,9 +525,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			if has_meta("water_deck"):
 				remove_meta("water_deck")
-			for patch: Node in Terrain.patches:
-				if patch is WorldRivers:
-					_surface = (patch as WorldRivers).wade_data(global_position, _surface)
+			if rivers_patch != null:
+				_surface = rivers_patch.wade_data(global_position, _surface)
 		_last_surface_result = _surface
 	else:
 		_surface = _last_surface_result
@@ -681,8 +690,12 @@ func play_shadow_step(from: Vector2, to: Vector2, way: Vector2) -> void:
 func _light_step_burst(_from: Vector2, to: Vector2) -> void:
 	if not multiplayer.is_server():
 		return
-	for target: HurtboxComponent in HitScan.circle(self, to + Vector2(0.0, -12.0), 46.0, AttackComponent.HURTBOX_MASK):
-		target.take_hit(14.0, to, 130.0, name.to_int())
+	var upgraded: bool = GoddessSystem.star_step_rank(self) > 0
+	var radius: float = 62.0 if upgraded else 46.0
+	var dmg: float = 24.0 if upgraded else 14.0
+	var knock: float = 175.0 if upgraded else 130.0
+	for target: HurtboxComponent in HitScan.circle(self, to + Vector2(0.0, -12.0), radius, AttackComponent.HURTBOX_MASK):
+		target.take_hit(dmg, to, knock, name.to_int())
 
 
 ## One frame of the shadow step: her sheet frame, the dissolve / condense in the shader, a little slide along the step, the move itself.

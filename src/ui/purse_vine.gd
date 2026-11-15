@@ -80,15 +80,33 @@ func _place(snap: bool = false, delta: float = 0.0) -> void:
 		_alpha[i] = (1.0 if shown else 0.0) if snap else move_toward(_alpha[i], 1.0 if shown else 0.0, 3.0 * delta)
 
 
+var _redraw_wait: float = 0.0
+
+
 func _process(delta: float) -> void:
 	_time += delta
 	_gain_age += delta
+	var animating: bool = _gain_age < 1.7
 	if _progress != null:
+		var a0: float = _alpha[0]
+		var a1: float = _alpha[1]
+		var a2: float = _alpha[2]
+		var x0: float = _x[0]
+		var x1: float = _x[1]
+		var x2: float = _x[2]
 		_place(false, delta)
+		if absf(_alpha[0] - a0) > 0.002 or absf(_alpha[1] - a1) > 0.002 or absf(_alpha[2] - a2) > 0.002 \
+			or absf(_x[0] - x0) > 0.05 or absf(_x[1] - x1) > 0.05 or absf(_x[2] - x2) > 0.05:
+			animating = true
 		for i: int in 3:
+			if _pop[i] > 0.0 or _shown[i] != _last[i]:
+				animating = true
 			_pop[i] = maxf(_pop[i] - 1.8 * delta, 0.0)
 			_shown[i] = move_toward(_shown[i], _last[i], maxf(absf(_last[i] - _shown[i]) * 6.0, 6.0) * delta)
-	queue_redraw()
+	_redraw_wait -= delta
+	if animating or _redraw_wait <= 0.0:
+		_redraw_wait = 0.16 if VineStyle.void_amount() > 0.05 else 0.35
+		queue_redraw()
 
 
 static func branch_y(x: float) -> float:

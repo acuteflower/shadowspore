@@ -72,7 +72,7 @@ func _setup_prop() -> void:
 	add_to_group("bird_perches")
 	add_to_group("day_canopies")
 	_feet_row = float(_spec.get("feet_row", FEET_ROW))
-	var base_tex: Texture2D = load(String(_spec.texture)) as Texture2D
+	var base_tex: Texture2D = _tex(String(_spec.texture))
 	if base_tex != null:
 		_frame_w = float(base_tex.get_width()) / float(maxi(int(_spec.columns), 1))
 	var dyn_offset: Vector2 = Vector2(-_frame_w * 0.5, -_feet_row)
@@ -81,7 +81,7 @@ func _setup_prop() -> void:
 	_crown.offset = dyn_offset
 	_crown_glow.offset = dyn_offset
 	if _spec.has("ground_fruit"):
-		var gtex: Texture2D = load(String(_spec.ground_fruit)) as Texture2D
+		var gtex: Texture2D = _tex(String(_spec.ground_fruit))
 		if gtex != null:
 			_ground_fruit = Sprite2D.new()
 			_ground_fruit.texture = gtex
@@ -133,6 +133,12 @@ func _setup_prop() -> void:
 	if _spec.has("vines"):
 		_make_vines()
 	_twitches = _spec.has("twitch")
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() != null else null
+	if cam != null:
+		var reach: float = _tree_half + 440.0
+		if global_position.distance_squared_to(cam.get_screen_center_position()) > reach * reach:
+			_on_screen = false
+			set_process(false)
 	if _twitches:
 		_twitch_wait = _twitch_delay() * randf_range(0.3, 1.0)
 	if _spec.has("petals"):
@@ -150,7 +156,7 @@ func _make_vines() -> void:
 		_vine_glow_material = ShaderMaterial.new()
 		_vine_glow_material.shader = load("res://assets/shaders/vine_breathe_glow.gdshader") as Shader
 		_vine_glow_material.set_shader_parameter("mask_rows", -1.0 / 3.0)
-	var sheet: Texture2D = load(String(_spec.vines)) as Texture2D
+	var sheet: Texture2D = _tex(String(_spec.vines))
 	_vines = Sprite2D.new()
 	_vines.centered = false
 	_vines.offset = _crown.offset
@@ -316,12 +322,11 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 func _process(delta: float) -> void:
 	if _falling:
 		return
+	if not _on_screen and _wobble <= 0.002 and not _covering:
+		set_process(false) ## off screen and still: hundreds of loaded trees cost nothing per frame (woken by the notifier or a hit)
+		return
 	if _twitches:
 		_twitch(delta)
-	if not _on_screen and _wobble <= 0.002 and not _covering:
-		if not _twitches:
-			set_process(false) ## off screen and still: hundreds of loaded trees cost nothing per frame (woken by the notifier or a hit)
-		return
 	_sway_wait -= delta
 	if _wobble > 0.002 or _sway_wait <= 0.0:
 		_sway(delta)
@@ -465,7 +470,7 @@ func _show() -> void:
 	_sprite.hframes = int(_spec.columns)
 	if felled:
 		var progress: float = float(slots() - int(state.get("h", 0))) / float(slots())
-		_sprite.texture = load(String(_spec.growth)) as Texture2D
+		_sprite.texture = _tex(String(_spec.growth))
 		_sprite.vframes = 1
 		_sprite.frame = (0 if variant < 2 else 1) if progress <= 0.0 else (2 if progress < 0.5 else 3)
 		_crown.visible = false
@@ -477,7 +482,7 @@ func _show() -> void:
 		if _ground_fruit != null:
 			_ground_fruit.visible = false
 	else:
-		_sprite.texture = load(String(_spec.texture)) as Texture2D
+		_sprite.texture = _tex(String(_spec.texture))
 		_sprite.vframes = int(_spec.rows)
 		_sprite.frame = variant
 		_crown.texture = _sprite.texture
@@ -539,7 +544,7 @@ func _fell() -> void:
 		_petals.emitting = false
 	if _ground_fruit != null:
 		_ground_fruit.visible = false
-	var sheet: Texture2D = load(String(_spec.texture)) as Texture2D
+	var sheet: Texture2D = _tex(String(_spec.texture))
 	var frame_w: float = sheet.get_width() / float(_spec.columns)
 	var frame_h: float = sheet.get_height() / float(_spec.rows)
 	_fall = Node2D.new()
@@ -565,7 +570,7 @@ func _fell() -> void:
 
 ## The trunk gives way: from here the stump stands where the trunk was.
 func _cut_through() -> void:
-	_sprite.texture = load(String(_spec.growth)) as Texture2D
+	_sprite.texture = _tex(String(_spec.growth))
 	_sprite.hframes = int(_spec.columns)
 	_sprite.vframes = 1
 	_sprite.frame = 0 if variant < 2 else 1

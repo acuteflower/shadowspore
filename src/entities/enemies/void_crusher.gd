@@ -50,6 +50,8 @@ var _world: Node
 var _step_stream: AudioStream
 var _base_amounts: Dictionary = {}
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _zone_drawn: bool = false
+var _fx_drawn: bool = false
 
 @onready var _rig: CrusherRig = $Rig
 @onready var _health: HealthComponent = $HealthComponent
@@ -107,8 +109,14 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	var attack_pose: bool = state in [State.SLAM_WINDUP, State.SLAM, State.SLAM_RECOVER, State.RUSH_WINDUP, State.RUSH, State.RUSH_RECOVER, State.SWEEP_WINDUP, State.SWEEP, State.SWEEP_RECOVER]
 	_rig.update_rig(delta, velocity, heading, attack_dir.angle() if attack_pose else heading)
-	_zone.queue_redraw()
-	_fx.queue_redraw()
+	var zone_active: bool = state in [State.SLAM_WINDUP, State.RUSH_WINDUP, State.SWEEP_WINDUP, State.SLAM, State.RUSH, State.SWEEP]
+	if zone_active or _zone_drawn:
+		_zone.queue_redraw()
+		_zone_drawn = zone_active
+	var fx_active: bool = state == State.SWEEP or (state == State.SWEEP_RECOVER and _state_time < 0.25) or state == State.RUSH
+	if fx_active or _fx_drawn:
+		_fx.queue_redraw()
+		_fx_drawn = fx_active
 	if state == State.SLAM and not _presented and _state_time >= float(_def["slam"]["hit_time"]):
 		_presented = true
 		_present_slam()

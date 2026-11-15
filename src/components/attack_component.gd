@@ -152,6 +152,7 @@ var _fx_colors: Array[Color] = MOTE_COLORS.duplicate() ## what this weapon sheds
 var _trail_edge: Color = TRAIL_EDGE
 var _trail_core: Color = TRAIL_CORE
 var _sound_dir: String = ""
+var _idle_glint: bool = false
 var _stamina: StaminaComponent
 var _talismans: TalismanComponent ## damage and charge speed of the worn jewellery
 var _skills: SkillTreeComponent ## which combo steps are learned (data/skills.json upgrades)
@@ -217,7 +218,7 @@ func _is_trail_active() -> bool:
 		return true
 	if _charging:
 		return true
-	if held_refine >= RefineRules.max_level() and _has_weapon and _weapon_alpha >= 0.4 and not always_drawn:
+	if (held_refine >= RefineRules.max_level() or _idle_glint) and _has_weapon and _weapon_alpha >= 0.4 and not always_drawn:
 		return true
 	return false
 
@@ -456,7 +457,7 @@ func _server_alt(dir: Vector2, stage: int) -> void:
 	if step.is_empty():
 		return
 	_server_alt_stage = stage
-	_server_alt_until = now + int((float(step["windup"]) + float(step["active"]) + float(step["recovery"]) + HeavyRules.rift_window(HeavyRules.config(Items.definition(stack)))) * 1000.0)
+	_server_alt_until = now + int((float(step["windup"]) + float(step["active"]) + float(step["recovery"]) + HeavyRules.rift_window(HeavyRules.config(Items.definition(stack)))) * 1000.0) + 350
 	_server_combo_index = 0
 	_server_combo_until = 0
 	_server_ready_msec = now + int((float(step["windup"]) + float(step["active"]) + float(step["recovery"]) * 0.5) * 1000.0)
@@ -719,9 +720,11 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 		target.take_hit(damage, origin, knockback, get_multiplayer_authority())
 		target.armor_floor = 0.0
 	if not targets.is_empty():
+		var hit_pos: Vector2 = _hit_point(targets[0])
 		if _talismans != null:
 			_talismans.spend_dive() ## it connected: the dive is used up
-		_on_hit.rpc(_hit_point(targets[0]), dir, float(step["shake"]), float(step.get("hit_stop", 0.0)))
+			_talismans.trigger_starlight(hit_pos, damage, get_multiplayer_authority())
+		_on_hit.rpc(hit_pos, dir, float(step["shake"]), float(step.get("hit_stop", 0.0)))
 	if String(Items.definition(stack).get("tool", "")) == "can":
 		var owner_player: Player = get_parent() as Player
 		var town_node: TownManager = get_tree().get_first_node_in_group("town") as TownManager if is_inside_tree() else null
@@ -734,6 +737,10 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 ## chain (`volley`) shoots a fan of feathers from the blade's tip. `damage` is what the blow itself did to each target.
 func _rift(origin: Vector2, dir: Vector2, step: Dictionary, stack: Dictionary, damage: float, already: Array[HurtboxComponent]) -> void:
 	var unit: float = damage / maxf(float(step["damage"]), 0.01) ## the weapon's own strength, not the blow's bonus
+	var star_cfg: Dictionary = step.get("starfall", {}) as Dictionary
+	if not star_cfg.is_empty():
+		_starfall(origin, dir, step, stack, unit, star_cfg)
+		return
 	if step.has("volley"):
 		_volley(origin, dir, step, stack, unit)
 		return
@@ -799,6 +806,92 @@ func _volley_fx(at: Vector2, dir: Vector2, count: int, spread: float, speed: flo
 		return
 	FeatherVolley.shoot(get_tree().current_scene, at, dir, count, spread, speed, stops)
 	_play_sound("volley", -3.0, 1.0 if stage == 1 else 0.88)
+
+
+## Host: Sternenstich / Himmelsfall — an astral crescent wave plus shooting stars descending from the sky.
+func _starfall(origin: Vector2, dir: Vector2, step: Dictionary, stack: Dictionary, unit: float, cfg: Dictionary) -> void:
+	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
+	var tip: Vector2 = origin + aim * Items.stat(stack, "reach", 24.0) * float(step["reach"]) * 0.72
+	var mode: String = String(cfg.get("mode", "crescent_rain"))
+	var crescent_len: float = float(cfg.get("crescent_length", 0.0)) if mode == "crescent_rain" else 0.0
+	var crescent_speed: float = float(cfg.get("crescent_speed", 420.0))
+	var attacker: int = get_multiplayer_authority()
+	var targets_hit: Array[HurtboxComponent] = []
+	if crescent_len > 0.0:
+		var c_half: float = float(cfg.get("crescent_width", 16.0)) * 0.5
+		var c_dmg: float = unit * float(cfg.get("crescent_ratio", 0.65))
+		var c_knock: float = Items.stat(stack, "knockback", 0.0) * float(cfg.get("crescent_knock", 0.9))
+		for target: HurtboxComponent in HitScan.lane(self, tip, aim, crescent_len, c_half, HURTBOX_MASK):
+			target.take_hit(c_dmg, tip, c_knock, attacker)
+			targets_hit.append(target)
+	var points: PackedVector2Array = _starfall_targets(origin, aim, cfg)
+	var delays: PackedFloat32Array = PackedFloat32Array()
+	var base_delay: float = float(cfg.get("star_delay", 0.18))
+	var stagger: float = float(cfg.get("star_stagger", 0.06))
+	var star_radius: float = float(cfg.get("star_radius", 28.0))
+	var star_dmg: float = unit * float(cfg.get("star_ratio", 0.5))
+	var star_knock: float = Items.stat(stack, "knockback", 0.0) * float(cfg.get("star_knock", 1.0))
+	var heal_amount: float = float(cfg.get("heal_on_hit", 0.0))
+	for i: int in points.size():
+		delays.append(base_delay + float(i) * stagger)
+	_starfall_fx.rpc(tip, aim, crescent_len, crescent_speed, points, delays, star_radius, int(step.get("stage", 1)))
+	if not targets_hit.is_empty():
+		_on_hit.rpc(_hit_point(targets_hit[0]), aim, float(step["shake"]), 0.0)
+	var healed: Array[bool] = [false]
+	for i: int in points.size():
+		var impact_at: Vector2 = points[i]
+		get_tree().create_timer(delays[i]).timeout.connect(func() -> void:
+			if not is_inside_tree():
+				return
+			var struck: Array[HurtboxComponent] = HitScan.circle(self, impact_at, star_radius, HURTBOX_MASK)
+			for t: HurtboxComponent in struck:
+				t.take_hit(star_dmg, impact_at, star_knock, attacker)
+			if not struck.is_empty():
+				_on_hit.rpc(_hit_point(struck[0]), aim, float(step["shake"]) * 0.5, 0.0)
+				if heal_amount > 0.0 and not healed[0]:
+					healed[0] = true
+					var owner_player: Player = get_parent() as Player
+					if owner_player != null and owner_player.health != null and owner_player.health.current > 0.0:
+						owner_player.health.heal(heal_amount)
+		)
+
+
+func _starfall_targets(origin: Vector2, aim: Vector2, cfg: Dictionary) -> PackedVector2Array:
+	var out: PackedVector2Array = PackedVector2Array()
+	var count: int = maxi(int(cfg.get("stars", 3)), 1)
+	var spread: float = float(cfg.get("star_spread", 40.0))
+	if String(cfg.get("mode", "crescent_rain")) == "crescent_rain":
+		var side: Vector2 = Vector2(-aim.y, aim.x)
+		for i: int in count:
+			var dist: float = 42.0 + float(i) * 32.0
+			var offset: float = (float(i % 2) * 2.0 - 1.0) * (spread * 0.25 if i > 0 else 0.0)
+			out.append(origin + aim * dist + side * offset)
+		return out
+	var center: Vector2 = origin + aim * float(cfg.get("distance", 66.0))
+	out.append(center)
+	for i: int in count - 1:
+		var ang: float = aim.angle() + float(i) * TAU / float(maxi(count - 1, 1)) + PI * 0.25
+		out.append(center + Vector2.from_angle(ang) * spread)
+	return out
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _starfall_fx(
+	tip: Vector2,
+	dir: Vector2,
+	crescent_len: float,
+	crescent_speed: float,
+	targets: PackedVector2Array,
+	delays: PackedFloat32Array,
+	star_radius: float,
+	stage: int
+) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	StarfallFx.spawn(get_tree().current_scene, tip, dir, crescent_len, crescent_speed, targets, delays, star_radius)
+	_play_sound("volley", -2.5, 1.15 if stage == 1 else 0.94)
+	if Sfx.has("step_out"):
+		Sfx.at(self, "step_out", tip, -7.0, 1.35 if stage == 1 else 1.08)
 
 
 func _hit_point(target: HurtboxComponent) -> Vector2:
@@ -1020,6 +1113,7 @@ func _load_fx(def: Dictionary) -> void:
 	_trail_edge = Color(String(fx["trail_edge"])) if fx.has("trail_edge") else TRAIL_EDGE
 	_trail_core = Color(String(fx["trail_core"])) if fx.has("trail_core") else TRAIL_CORE
 	_sound_dir = String(fx.get("sounds", ""))
+	_idle_glint = bool(fx.get("idle_glint", false))
 
 
 ## A stack as every peer knows it from the synced item id and refinement level.
@@ -1524,15 +1618,15 @@ func _draw_charge_glint() -> void:
 
 ## A refined blade glints: from +10 now and then a twinkle somewhere along the edge, at +15 many of them and a thin gold light along the whole blade.
 func _edge_glints(delta: float) -> void:
-	if held_refine < 10 or not _has_weapon or _weapon_alpha < 0.4 or always_drawn:
+	if (held_refine < 10 and not _idle_glint) or not _has_weapon or _weapon_alpha < 0.4 or always_drawn:
 		return
 	_edge_clock += delta
-	var every: float = 0.11 if held_refine >= RefineRules.max_level() else 0.5
+	var every: float = 0.11 if held_refine >= RefineRules.max_level() else (0.16 if _idle_glint else 0.5)
 	if _edge_clock < every:
 		return
 	_edge_clock = 0.0
 	var blade: Vector2 = _blade_vector()
-	var colour: Color = RefineStyle.color(held_refine).lightened(0.25)
+	var colour: Color = _trail_edge.lerp(_trail_core, 0.5 if randf() < 0.5 else 0.0) if _idle_glint and held_refine < 10 else RefineStyle.color(held_refine).lightened(0.25)
 	if held_refine >= RefineRules.max_level() and randf() < 0.3:
 		colour = Color("ff9ae6") ## a touch of the void's magenta in the perfect blade
 	_motes.append({"pos": _grip_world() + blade * randf_range(0.35, 1.0), "vel": Vector2(randf_range(-4.0, 4.0), randf_range(-12.0, -4.0)), "age": 0.0, "life": randf_range(0.3, 0.55), "kind": 1 if randf() < 0.6 else 0, "color": colour, "size": 1.0})
@@ -1548,12 +1642,13 @@ func _grip_world() -> Vector2:
 
 
 func _draw_edge_glow() -> void:
-	if held_refine < RefineRules.max_level() or not _has_weapon or _weapon_alpha < 0.4 or always_drawn:
+	if (held_refine < RefineRules.max_level() and not _idle_glint) or not _has_weapon or _weapon_alpha < 0.4 or always_drawn:
 		return
 	var from: Vector2 = _trail.to_local(_grip_world()).round()
 	var to: Vector2 = _trail.to_local(_grip_world() + _blade_vector()).round()
 	var pulse: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
-	_trail.draw_line(from.lerp(to, 0.25), to, Color(RefineStyle.GOLD, (0.22 + 0.22 * pulse) * _weapon_alpha), 1.0)
+	var base_col: Color = _trail_edge.lerp(_trail_core, pulse) if _idle_glint and held_refine < RefineRules.max_level() else RefineStyle.GOLD
+	_trail.draw_line(from.lerp(to, 0.25), to, Color(base_col, (0.22 + 0.22 * pulse) * _weapon_alpha), 1.0)
 
 
 ## The blade sheds sparkles while it is in the air: from its outer part, flying on the way the tip really moved, rising a little and fading.

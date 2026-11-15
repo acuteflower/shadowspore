@@ -71,6 +71,14 @@ func _set_on_screen(on: bool) -> void:
 
 ## The notifier only reports changes, so a bush that was never seen is told once it has been drawn (two frames in).
 func _settle_on_screen() -> void:
+	if not Player.all.is_empty():
+		var near_player: bool = false
+		for p: Player in Player.all:
+			if is_instance_valid(p) and p.global_position.distance_squared_to(global_position) < 360000.0:
+				near_player = true
+				break
+		if not near_player:
+			return
 	for i: int in 2:
 		if not is_inside_tree():
 			return
@@ -90,12 +98,12 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 	var stripped: bool = is_depleted()
 	var columns: int = int(_spec.columns)
 	if stripped:
-		_sprite.texture = load(String(_spec.stripped)) as Texture2D
+		_sprite.texture = _tex(String(_spec.stripped))
 		_sprite.hframes = columns
 		_sprite.vframes = 1
 		_sprite.frame = variant
 	else:
-		_sprite.texture = load(String(_spec.texture)) as Texture2D
+		_sprite.texture = _tex(String(_spec.texture))
 		_sprite.hframes = columns
 		_sprite.vframes = int(_spec.rows)
 		_sprite.frame = variant + (columns if bool(state.get("p", 0)) and int(_spec.rows) > 1 else 0)

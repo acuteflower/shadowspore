@@ -438,6 +438,9 @@ func _use(index: int) -> bool:
 		var stamina_gain: float = float(stats.get("stamina", 0.0))
 		if stamina_gain > 0.0 and player.stamina != null:
 			player.stamina.restore(stamina_gain)
+		var xp_gain: int = int(stats.get("xp", 0))
+		if xp_gain > 0 and player.progress != null:
+			player.progress.award(0, xp_gain)
 		var eff_id: String = String(stats.get("effect", ""))
 		if eff_id != "" and player.effects != null:
 			player.effects.apply(eff_id, float(stats.get("effect_seconds", 30.0)))
@@ -468,6 +471,8 @@ static func usable(player: Player, def: Dictionary) -> bool:
 		if float(stats.get("cools", 0.0)) > 0.0 and player.is_heated():
 			return true
 		if float(stats.get("stamina", 0.0)) > 0.0 and player.stamina != null and player.stamina.current < player.stamina.max_stamina - 0.5:
+			return true
+		if int(stats.get("xp", 0)) > 0:
 			return true
 		var eff_id: String = String(stats.get("effect", ""))
 		if eff_id != "" and player.effects != null and not player.effects.has(eff_id):

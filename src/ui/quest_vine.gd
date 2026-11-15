@@ -121,22 +121,33 @@ func _refresh(instant: bool) -> void:
 		_wither = 1.0 if _text != "" else 0.0
 
 
+var _redraw_wait: float = 0.0
+
+
 func _process(delta: float) -> void:
 	_time += delta
+	var animating: bool = false
 	if _journal_focus_bloom and not InputManager.journal_open and not InputManager.map_open:
 		_journal_focus_bloom = false
 		if _has_quest:
 			_grow = minf(_grow, 0.75)
 			_flare = 0.85
 			_sparks = 0.55
+			animating = true
 	var want_branch: bool = _has_quest or _has_notice
+	var prev_grow: float = _grow
+	var prev_ng: float = _notice_grow
+	var prev_typed: float = _typed
 	_grow = move_toward(_grow, 1.0 if want_branch else 0.0, delta / (1.3 if want_branch else 0.9))
 	_notice_grow = move_toward(_notice_grow, 1.0 if _has_notice else 0.0, delta / (0.75 if _has_notice else 0.5))
+	if _flare > 0.0 or _sparks > 0.0 or _notice_flare > 0.0 or _notice_sparks > 0.0 or _grow != prev_grow or _notice_grow != prev_ng:
+		animating = true
 	_flare = move_toward(_flare, 0.0, delta * 1.3)
 	_sparks = move_toward(_sparks, 0.0, delta * 1.1)
 	_notice_flare = move_toward(_notice_flare, 0.0, delta * 1.3)
 	_notice_sparks = move_toward(_notice_sparks, 0.0, delta * 1.1)
 	if _pending_text != "":
+		animating = true
 		_wither = move_toward(_wither, 0.0, delta * 3.5)
 		if _wither <= 0.0:
 			_title = _pending_title
@@ -146,8 +157,18 @@ func _process(delta: float) -> void:
 			_typed = 0.0
 	elif _grow > 0.6 and _has_quest:
 		_typed = minf(_typed + TYPE_RATE * delta, float(_text.length()))
-	visible = _grow > 0.0
-	queue_redraw()
+		if _typed != prev_typed:
+			animating = true
+	var show_now: bool = _grow > 0.0
+	if visible != show_now:
+		visible = show_now
+		animating = true
+	if not show_now:
+		return
+	_redraw_wait -= delta
+	if animating or _redraw_wait <= 0.0:
+		_redraw_wait = 0.16 if VineStyle.void_amount() > 0.05 else 0.35
+		queue_redraw()
 
 
 func _draw() -> void:

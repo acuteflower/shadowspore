@@ -5,13 +5,31 @@ extends Node
 ## statue <-> Star Hall travel, and purifying Shadow Step into Light Step ("LICHTSCHRITT").
 
 signal state_changed(peer_id: int)
+signal notice(text: String, good: bool)
 
 const STARHALL_ID: String = "starhall"
 const STARHALL_DEFAULT_ORIGIN: Vector2 = Vector2(840.0, 649.0)
+const GODDESS_WINDOW_SCRIPT: GDScript = preload("res://src/ui/goddess_window.gd")
+const OFFERS: Array[Dictionary] = [
+	{"id": "stardust_elixir", "item": "stardust_elixir", "count": 1, "cost": 1},
+	{"id": "astral_star_fruit", "item": "astral_star_fruit", "count": 1, "cost": 2},
+	{"id": "morningstar_pendant", "item": "morningstar_pendant", "count": 1, "cost": 4},
+	{"id": "crescent_earrings", "item": "crescent_earrings", "count": 1, "cost": 5},
+	{"id": "blade_starlight", "item": "blade_starlight", "count": 1, "cost": 30},
+]
+const MILESTONES: Array[Dictionary] = [
+	{"id": "m1", "threshold": 3, "title": "STERNENWACHT I", "summary": "+10 LEBEN, +15 AUSDAUER & 2X ELIXIER", "reward": "stardust_elixir", "reward_count": 2, "health": 10, "stamina": 15, "starfall": 0, "step_rank": 0},
+	{"id": "m2", "threshold": 6, "title": "STERNENWACHT II", "summary": "+1 STERNSCHNUPPE PRO NACHT & STERNFRUCHT", "reward": "astral_star_fruit", "reward_count": 1, "health": 0, "stamina": 0, "starfall": 1, "step_rank": 0},
+	{"id": "m3", "threshold": 12, "title": "STERNENWACHT III", "summary": "STÄRKERER LICHTSCHRITT & 2X STERNFRUCHT", "reward": "astral_star_fruit", "reward_count": 2, "health": 0, "stamina": 0, "starfall": 0, "step_rank": 1},
+	{"id": "m4", "threshold": 20, "title": "STERNENWACHT IV", "summary": "SIEGEL DER ERSTEN WÄCHTERIN +15 HP/AUSDAUER", "reward": "caelia_sigil", "reward_count": 1, "health": 15, "stamina": 15, "starfall": 0, "step_rank": 0},
+]
 
 var _introduced: Dictionary = {} ## str(peer_id) -> bool
 var _light_step: Dictionary = {} ## str(peer_id) -> bool
 var _return_statue: Dictionary = {} ## str(peer_id) -> waystone id
+var _shards_collected: Dictionary = {} ## str(peer_id) -> int
+var _milestones_claimed: Dictionary = {} ## str(peer_id) -> Array of milestone ids
+var _altar_greeted: Dictionary = {} ## str(peer_id) -> bool
 var _busy: bool = false
 var _rescue_overlay: ColorRect
 var _rescue_layer: CanvasLayer
@@ -35,7 +53,7 @@ func _ready() -> void:
 	add_to_group("goddess")
 	if multiplayer.is_server():
 		multiplayer.peer_connected.connect(func(peer: int) -> void:
-			_rpc_snapshot.rpc_id(peer, _introduced.duplicate(), _light_step.duplicate(), _return_statue.duplicate()))
+			_rpc_snapshot.rpc_id(peer, _snapshot_dict()))
 	_setup_rescue_overlay()
 	_sync_and_hook_players()
 
@@ -66,6 +84,22 @@ func _sync_and_hook_players() -> void:
 		var want_light: bool = has_light_step_player(player)
 		if player.light_step != want_light:
 			player.light_step = want_light
+		if player.is_multiplayer_authority():
+			_sync_local_quest(player)
+
+
+func _sync_local_quest(player: Player) -> void:
+	if player == null or player.quests == null:
+		return
+	if has_light_step_player(player) and not player.quests.is_active("caelia_stars") and not player.quests.is_finished("caelia_stars"):
+		player.quests.start("caelia_stars")
+	if player.quests.is_active("caelia_stars"):
+		var collected: int = shards_collected(player)
+		var held: int = player.inventory.count_item("star_shard") if player.inventory != null else 0
+		if not player.quests.has_flag("caelia_has_shard") and (held > 0 or collected > 0):
+			player.quests.set_flag("caelia_has_shard")
+		if not player.quests.has_flag("caelia_first_gift") and collected > 0:
+			player.quests.set_flag("caelia_first_gift")
 
 
 func is_busy() -> bool:
@@ -89,6 +123,92 @@ func is_local_introduced() -> bool:
 
 func has_light_step_player(player: Player) -> bool:
 	return player != null and bool(_light_step.get(_key_for(player), false))
+
+
+func shards_collected(player: Player) -> int:
+	if player == null:
+		return 0
+	return int(_shards_collected.get(_key_for(player), 0))
+
+
+func has_milestone(player: Player, milestone_id: String) -> bool:
+	if player == null:
+		return false
+	var list: Array = _milestones_claimed.get(_key_for(player), []) as Array
+	return list.has(milestone_id)
+
+
+static func offer_spec(offer_id: String) -> Dictionary:
+	for entry: Dictionary in OFFERS:
+		if String(entry["id"]) == offer_id:
+			return entry
+	return {}
+
+
+static func milestone_spec(milestone_id: String) -> Dictionary:
+	for entry: Dictionary in MILESTONES:
+		if String(entry["id"]) == milestone_id:
+			return entry
+	return {}
+
+
+static func star_health_bonus(player_node: Node) -> float:
+	var player: Player = player_node as Player
+	if player == null or not player.is_inside_tree():
+		return 0.0
+	var sys: GoddessSystem = of(player.get_tree())
+	if sys == null:
+		return 0.0
+	var total: float = 0.0
+	for m: Dictionary in MILESTONES:
+		if sys.has_milestone(player, String(m["id"])):
+			total += float(m["health"])
+	return total
+
+
+static func star_stamina_bonus(player_node: Node) -> float:
+	var player: Player = player_node as Player
+	if player == null or not player.is_inside_tree():
+		return 0.0
+	var sys: GoddessSystem = of(player.get_tree())
+	if sys == null:
+		return 0.0
+	var total: float = 0.0
+	for m: Dictionary in MILESTONES:
+		if sys.has_milestone(player, String(m["id"])):
+			total += float(m["stamina"])
+	return total
+
+
+static func star_step_rank(player_node: Node) -> int:
+	var player: Player = player_node as Player
+	if player == null or not player.is_inside_tree():
+		return 0
+	var sys: GoddessSystem = of(player.get_tree())
+	if sys == null:
+		return 0
+	var rank: int = 0
+	for m: Dictionary in MILESTONES:
+		if sys.has_milestone(player, String(m["id"])):
+			rank += int(m["step_rank"])
+	return rank
+
+
+static func any_starfall_bonus(tree: SceneTree) -> int:
+	if tree == null:
+		return 0
+	var sys: GoddessSystem = of(tree)
+	if sys == null:
+		return 0
+	var best: int = 0
+	for list: Variant in sys._milestones_claimed.values():
+		var arr: Array = list as Array
+		var bonus: int = 0
+		for m: Dictionary in MILESTONES:
+			if arr.has(String(m["id"])):
+				bonus += int(m["starfall"])
+		best = maxi(best, bonus)
+	return best
 
 
 func can_travel_to_starhall(player: Player) -> bool:
@@ -324,27 +444,59 @@ func talk_to_goddess(player: Player, actor: StarHallGoddess) -> void:
 	if player == null or actor == null or _busy:
 		return
 	var box: DialogueBox = DialogueBox.find(player)
-	if box == null or box.is_active():
+	if box != null and box.is_active():
 		return
 	var first_blessing: bool = not has_light_step_player(player)
-	actor.set_talking(true)
-	box.start("goddess_intro" if first_blessing else "goddess_return")
-	await box.finished
-	actor.set_talking(false)
-	if not first_blessing:
+	if first_blessing:
+		if box == null:
+			return
+		actor.set_talking(true)
+		box.start("goddess_intro")
+		await box.finished
+		actor.set_talking(false)
+		_busy = true
+		player.story_lock = true
+		actor.play_bless()
+		LightStepFx.spawn_blessing(player)
+		Sfx.at(player, "step_in", player.global_position, -1.0)
+		if multiplayer.is_server():
+			_host_grant_light_step(player.name.to_int(), true)
+		else:
+			_rpc_request_bless.rpc_id(1)
+		await get_tree().create_timer(1.1, true, false, true).timeout
+		player.story_lock = false
+		_busy = false
 		return
-	_busy = true
-	player.story_lock = true
-	actor.play_bless()
-	LightStepFx.spawn_blessing(player)
-	Sfx.at(player, "step_in", player.global_position, -1.0)
+
+	var key: String = _key_for(player)
+	if not bool(_altar_greeted.get(key, false)) and box != null:
+		actor.set_talking(true)
+		box.start("goddess_return")
+		await box.finished
+		actor.set_talking(false)
+		if multiplayer.is_server():
+			_host_mark_altar_greeted(player.name.to_int())
+		else:
+			_rpc_mark_altar_greeted.rpc_id(1)
+	open_altar(player, actor)
+
+
+func open_altar(player: Player, actor: StarHallGoddess = null) -> BoardWindow:
+	if player == null or not player.is_multiplayer_authority():
+		return null
+	var town_node: TownManager = get_tree().get_first_node_in_group("town") as TownManager
+	return GODDESS_WINDOW_SCRIPT.call("open", get_tree(), player, town_node, actor) as BoardWindow
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_mark_altar_greeted() -> void:
 	if multiplayer.is_server():
-		_host_grant_light_step(player.name.to_int(), true)
-	else:
-		_rpc_request_bless.rpc_id(1)
-	await get_tree().create_timer(1.1, true, false, true).timeout
-	player.story_lock = false
-	_busy = false
+		_host_mark_altar_greeted(multiplayer.get_remote_sender_id())
+
+
+func _host_mark_altar_greeted(peer_id: int) -> void:
+	_altar_greeted[str(peer_id)] = true
+	_rpc_altar_state.rpc(_altar_state_dict(peer_id), peer_id)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -362,6 +514,8 @@ func _host_grant_light_step(peer_id: int, grant: bool) -> void:
 			p.set_light_step(grant)
 			if grant and p.health != null and p.health.current < p.health.max_health:
 				p.health.heal(p.health.max_health)
+			if grant and p.is_multiplayer_authority():
+				_sync_local_quest(p)
 	_rpc_light_step_state.rpc(peer_id, grant, true)
 
 
@@ -374,34 +528,211 @@ func _rpc_light_step_state(peer_id: int, light: bool, intro: bool) -> void:
 	for p: Player in Player.all:
 		if is_instance_valid(p) and p.name.to_int() == peer_id:
 			p.light_step = light
+			if p.is_multiplayer_authority():
+				_sync_local_quest(p)
 	state_changed.emit(peer_id)
 
 
+# ---------------------------------------------------------------- star shard altar & milestones
+
+func request_exchange(offer_id: String) -> void:
+	if multiplayer.is_server():
+		_host_exchange(1, offer_id)
+	else:
+		_rpc_exchange.rpc_id(1, offer_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_exchange(offer_id: String) -> void:
+	if multiplayer.is_server():
+		_host_exchange(multiplayer.get_remote_sender_id(), offer_id)
+
+
+func _host_exchange(peer_id: int, offer_id: String) -> void:
+	var player: Player = _player_by_peer(peer_id)
+	var offer: Dictionary = offer_spec(offer_id)
+	if player == null or player.inventory == null or offer.is_empty():
+		return
+	var cost: int = int(offer["cost"])
+	var item_id: String = String(offer["item"])
+	var count: int = int(offer["count"])
+	if player.inventory.count_item("star_shard") < cost:
+		_send_notice(peer_id, "NICHT GENUG STERNERZ.", false)
+		return
+	if not player.inventory.exchange_items("star_shard", cost, item_id, count):
+		_send_notice(peer_id, "BEUTEL IST VOLL.", false)
+		return
+	var key: String = str(peer_id)
+	_shards_collected[key] = int(_shards_collected.get(key, 0)) + cost
+	_play_altar_fx(player)
+	_rpc_altar_state.rpc(_altar_state_dict(peer_id), peer_id)
+	var def: Dictionary = DataRegistry.get_entry("items", item_id)
+	_send_notice(peer_id, "%s ERHALTEN!" % String(def.get("name", item_id)).to_upper(), true)
+
+
+func request_donate(amount: int = 1) -> void:
+	if multiplayer.is_server():
+		_host_donate(1, amount)
+	else:
+		_rpc_donate.rpc_id(1, amount)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_donate(amount: int) -> void:
+	if multiplayer.is_server():
+		_host_donate(multiplayer.get_remote_sender_id(), amount)
+
+
+func _host_donate(peer_id: int, amount: int) -> void:
+	var player: Player = _player_by_peer(peer_id)
+	var amt: int = maxi(amount, 1)
+	if player == null or player.inventory == null:
+		return
+	if not player.inventory.remove_item("star_shard", amt):
+		_send_notice(peer_id, "NICHT GENUG STERNERZ.", false)
+		return
+	var key: String = str(peer_id)
+	_shards_collected[key] = int(_shards_collected.get(key, 0)) + amt
+	if player.health != null:
+		player.health.heal(15.0 * float(amt))
+	_play_altar_fx(player)
+	_rpc_altar_state.rpc(_altar_state_dict(peer_id), peer_id)
+	_send_notice(peer_id, "%dX STERNERZ GEWEIHT!" % amt, true)
+
+
+func request_claim_milestone(milestone_id: String) -> void:
+	if multiplayer.is_server():
+		_host_claim_milestone(1, milestone_id)
+	else:
+		_rpc_claim_milestone.rpc_id(1, milestone_id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_claim_milestone(milestone_id: String) -> void:
+	if multiplayer.is_server():
+		_host_claim_milestone(multiplayer.get_remote_sender_id(), milestone_id)
+
+
+func _host_claim_milestone(peer_id: int, milestone_id: String) -> void:
+	var player: Player = _player_by_peer(peer_id)
+	var spec: Dictionary = milestone_spec(milestone_id)
+	if player == null or player.inventory == null or spec.is_empty():
+		return
+	var key: String = str(peer_id)
+	var list: Array = (_milestones_claimed.get(key, []) as Array).duplicate()
+	if list.has(milestone_id):
+		_send_notice(peer_id, "BEREITS ERHALTEN.", false)
+		return
+	if int(_shards_collected.get(key, 0)) < int(spec["threshold"]):
+		_send_notice(peer_id, "NOCH ZU WENIG STERNERZ DARGEBRACHT.", false)
+		return
+	var reward_id: String = String(spec["reward"])
+	var reward_count: int = int(spec["reward_count"])
+	if reward_id != "" and not player.inventory.exchange_items("star_shard", 0, reward_id, reward_count):
+		_send_notice(peer_id, "BEUTEL IST VOLL.", false)
+		return
+	list.append(milestone_id)
+	_milestones_claimed[key] = list
+	if player.progress != null:
+		player.progress.apply_stats(true, true)
+	_play_altar_fx(player)
+	_rpc_altar_state.rpc(_altar_state_dict(peer_id), peer_id)
+	_send_notice(peer_id, "%s EMPFANGEN!" % String(spec["title"]), true)
+
+
+func _player_by_peer(peer_id: int) -> Player:
+	for p: Player in Player.all:
+		if is_instance_valid(p) and p.name.to_int() == peer_id:
+			return p
+	return null
+
+
+func _play_altar_fx(player: Player) -> void:
+	var goddess_actor: StarHallGoddess = get_tree().get_first_node_in_group("quest_actors") as StarHallGoddess
+	if goddess_actor != null:
+		goddess_actor.play_bless()
+	if player != null and player.is_inside_tree():
+		LightStepFx.spawn_blessing(player)
+		Sfx.at(player, "step_in", player.global_position, -4.0)
+
+
+func _send_notice(peer_id: int, text: String, good: bool) -> void:
+	if peer_id == 1 or multiplayer.get_unique_id() == peer_id:
+		notice.emit(text, good)
+	else:
+		_rpc_notice.rpc_id(peer_id, text, good)
+
+
 @rpc("authority", "reliable")
-func _rpc_snapshot(intro: Dictionary, light: Dictionary, ret: Dictionary) -> void:
-	_introduced = intro.duplicate()
-	_light_step = light.duplicate()
-	_return_statue = ret.duplicate()
+func _rpc_notice(text: String, good: bool) -> void:
+	notice.emit(text, good)
+
+
+func _altar_state_dict(peer_id: int) -> Dictionary:
+	var key: String = str(peer_id)
+	return {
+		"shards": int(_shards_collected.get(key, 0)),
+		"milestones": (_milestones_claimed.get(key, []) as Array).duplicate(),
+		"greeted": bool(_altar_greeted.get(key, false)),
+	}
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_altar_state(entry: Dictionary, peer_id: int) -> void:
+	var key: String = str(peer_id)
+	_shards_collected[key] = int(entry.get("shards", 0))
+	_milestones_claimed[key] = (entry.get("milestones", []) as Array).duplicate()
+	_altar_greeted[key] = bool(entry.get("greeted", false))
+	var p: Player = _player_by_peer(peer_id)
+	if p != null:
+		if p.progress != null:
+			p.progress.apply_stats(false, true)
+		if p.is_multiplayer_authority():
+			_sync_local_quest(p)
+	state_changed.emit(peer_id)
+
+
+func _snapshot_dict() -> Dictionary:
+	return {
+		"introduced": _introduced.duplicate(),
+		"light_step": _light_step.duplicate(),
+		"return_statue": _return_statue.duplicate(),
+		"shards_collected": _shards_collected.duplicate(),
+		"milestones_claimed": _milestones_claimed.duplicate(true),
+		"altar_greeted": _altar_greeted.duplicate(),
+	}
+
+
+@rpc("authority", "reliable")
+func _rpc_snapshot(snapshot: Dictionary) -> void:
+	_introduced = (snapshot.get("introduced", {}) as Dictionary).duplicate()
+	_light_step = (snapshot.get("light_step", {}) as Dictionary).duplicate()
+	_return_statue = (snapshot.get("return_statue", {}) as Dictionary).duplicate()
+	_shards_collected = (snapshot.get("shards_collected", {}) as Dictionary).duplicate()
+	_milestones_claimed = (snapshot.get("milestones_claimed", {}) as Dictionary).duplicate(true)
+	_altar_greeted = (snapshot.get("altar_greeted", {}) as Dictionary).duplicate()
 	_sync_and_hook_players()
 
 
 # ---------------------------------------------------------------- save / load
 
 func export_state() -> Dictionary:
-	return {
-		"introduced": _introduced.duplicate(),
-		"light_step": _light_step.duplicate(),
-		"return_statue": _return_statue.duplicate(),
-	}
+	return _snapshot_dict()
 
 
 func import_state(data: Dictionary) -> void:
 	_introduced = (data.get("introduced", {}) as Dictionary).duplicate()
 	_light_step = (data.get("light_step", {}) as Dictionary).duplicate()
 	_return_statue = (data.get("return_statue", {}) as Dictionary).duplicate()
+	_shards_collected = (data.get("shards_collected", {}) as Dictionary).duplicate()
+	_milestones_claimed = (data.get("milestones_claimed", {}) as Dictionary).duplicate(true)
+	_altar_greeted = (data.get("altar_greeted", {}) as Dictionary).duplicate()
 	_sync_and_hook_players()
 	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
-		_rpc_snapshot.rpc(_introduced.duplicate(), _light_step.duplicate(), _return_statue.duplicate())
+		_rpc_snapshot.rpc(_snapshot_dict())
+	for p: Player in Player.all:
+		if is_instance_valid(p) and p.progress != null:
+			p.progress.apply_stats(false, true)
 
 
 # ---------------------------------------------------------------- dev tools
@@ -454,7 +785,7 @@ func debug_unlock_statues(player: Player) -> void:
 			waystones.request_activate(String(id))
 			break
 	if not multiplayer.get_peers().is_empty():
-		_rpc_snapshot.rpc(_introduced.duplicate(), _light_step.duplicate(), _return_statue.duplicate())
+		_rpc_snapshot.rpc(_snapshot_dict())
 	state_changed.emit(player.name.to_int())
 
 
@@ -465,6 +796,12 @@ func debug_reset(player: Player) -> void:
 	_introduced.erase(key)
 	_light_step.erase(key)
 	_return_statue.erase(key)
+	_shards_collected.erase(key)
+	_milestones_claimed.erase(key)
+	_altar_greeted.erase(key)
 	player.set_light_step(false)
-	_rpc_snapshot.rpc(_introduced.duplicate(), _light_step.duplicate(), _return_statue.duplicate())
+	if player.progress != null:
+		player.progress.apply_stats(false, true)
+	if not multiplayer.get_peers().is_empty():
+		_rpc_snapshot.rpc(_snapshot_dict())
 	state_changed.emit(player.name.to_int())

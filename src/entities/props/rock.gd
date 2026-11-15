@@ -34,7 +34,7 @@ func apply_state(new_state: Dictionary, fx: String) -> void:
 	var total: int = slots()
 	var used: int = int(state.get("h", 0))
 	var stage: int = 3 if used >= total else (0 if used * 3 < total else (1 if used * 3 < total * 2 else 2))
-	_sprite.texture = load(String(_spec.texture)) as Texture2D
+	_sprite.texture = _tex(String(_spec.texture))
 	_sprite.hframes = int(_spec.columns)
 	_sprite.vframes = int(_spec.rows)
 	_sprite.frame = variant + stage * int(_spec.columns)

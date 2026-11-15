@@ -107,13 +107,16 @@ func _run_unit_and_ui() -> void:
 	var ips: PackedStringArray = NetworkManager.local_ips()
 	_check(not ips.is_empty(), "NetworkManager.local_ips returns at least fallback IP")
 
-	# 4. MainMenuUi interaction flow (settings tabs, multi world list, create world, join return state)
+	# 4. MainMenuUi interaction flow (settings tabs + return error display + start label toggle)
 	var old_name: String = String(GameSettings.get_value("player_name"))
 	var ui: MainMenuUi = MainMenuUi.new()
 	add_child(ui)
 	ui.intro = 9.0
 	ui.enabled = true
 	await get_tree().process_frame
+
+	var main_rows: Array = ui.get("_rows") as Array
+	_check(main_rows.size() == 3, "MainMenuUi MAIN has 3 streamlined rows (start, settings, quit)")
 
 	ui.call("_open_page", MainMenuUi.Page.SETTINGS)
 	await get_tree().process_frame
@@ -123,22 +126,11 @@ func _run_unit_and_ui() -> void:
 		await get_tree().process_frame
 		_check(ui.get("_rows").size() >= 2, "settings tab %d builds rows" % tab_i)
 
-	ui.call("_open_page", MainMenuUi.Page.MULTI)
+	ui.call("_open_page", MainMenuUi.Page.MAIN)
+	ui.apply_return_state({"page": "join", "error": "FALSCHER CODE ODER WELT VOLL"})
 	await get_tree().process_frame
-	var found_created: bool = false
-	for r: Dictionary in ui.get("_rows"):
-		if String(r.id).begins_with("world:"):
-			found_created = true
-	_check(found_created, "MainMenuUi MULTI lists created persistent world")
-
-	ui.apply_return_state({"page": "join", "address": "192.168.0.22", "port": 7788, "code": "XY99AB", "error": "FALSCHER CODE ODER WELT VOLL"})
-	await get_tree().process_frame
-	_check(ui.page == MainMenuUi.Page.JOIN, "apply_return_state opens JOIN tab")
-	_check(ui.address == "192.168.0.22:7788" and ui.join_code == "XY99AB", "apply_return_state restores address+port+code")
+	_check(ui.page == MainMenuUi.Page.MAIN, "apply_return_state stays on MAIN")
 	_check(ui.status == "FALSCHER CODE ODER WELT VOLL", "apply_return_state shows join error")
-
-	ui.call("_paste_join_clipboard", "10.1.2.3:7777 K9M3PQ")
-	_check(ui.address == "10.1.2.3:7777" and ui.join_code == "K9M3PQ", "paste invite string splits address and code")
 
 	_check(MultiplayerWorlds.delete_world(wid1), "delete_world succeeds")
 	_check(MultiplayerWorlds.list().is_empty(), "deleted world gone")

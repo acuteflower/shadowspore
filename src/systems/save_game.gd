@@ -41,36 +41,33 @@ static func info(path: String = PATH) -> Dictionary:
 	return {} if data.is_empty() else {"saved_at": int(data.get("saved_at", 0)), "day": int(data.get("day", 0)), "time": float(data.get("time", 0.0))}
 
 
-static func save(tree: SceneTree, path: String = "") -> bool:
-	if tree.get_first_node_in_group("sandbox") != null: ## the trials' test world is never saved
-		return false
-	var player: Player = _local_player(tree)
-	if player == null or not tree.root.multiplayer.is_server():
-		return false
-	var target: String = path if path != "" else path_for(tree)
+static func export_player_data(player: Player) -> Dictionary:
 	player.inventory.stow_held() ## a stack on the cursor goes back into the bag first
 	var position: Vector2 = player.climb.save_position()
+	return {
+		"pos": [position.x, position.y],
+		"health": player.health.current,
+		"copper": player.progress.copper,
+		"xp": player.progress.xp,
+		"claimed": player.progress.claimed, ## the level whose rewards were collected (Fortschritt window): health, stamina, armor, talisman slots follow it
+		"skill_tree": (player.get_node("SkillTreeComponent") as SkillTreeComponent).export_data(),
+		"slots": player.inventory.slots,
+		"equipment": player.inventory.equipment,
+		"raw_rolls": player.inventory.hidden, ## what the raw stones in the bag hide (Ilva's LÄUTERN)
+		"bandaged": player.bandaged,
+		"appearance": player.appearance.export_data() if player.appearance != null else {},
+		"quests": player.quests.export_data() if player.quests != null else {},
+		"board_local": player.tracked.export_data() if player.tracked != null else {}, ## journal focus, page and read notices
+	}
+
+
+static func export_world_data(tree: SceneTree) -> Dictionary:
 	var data: Dictionary = {
 		"version": VERSION,
 		"saved_at": int(Time.get_unix_time_from_system()),
 		"time": TimeManager.time_of_day,
 		"day": TimeManager.day,
 		"sleep": TimeManager.export_sleep_state(),
-		"player": {
-			"pos": [position.x, position.y],
-			"health": player.health.current,
-			"copper": player.progress.copper,
-			"xp": player.progress.xp,
-			"claimed": player.progress.claimed, ## the level whose rewards were collected (Fortschritt window): health, stamina, armor, talisman slots follow it
-			"skill_tree": (player.get_node("SkillTreeComponent") as SkillTreeComponent).export_data(),
-			"slots": player.inventory.slots,
-			"equipment": player.inventory.equipment,
-			"raw_rolls": player.inventory.hidden, ## what the raw stones in the bag hide (Ilva's LÄUTERN)
-			"bandaged": player.bandaged,
-			"appearance": player.appearance.export_data() if player.appearance != null else {},
-			"quests": player.quests.export_data() if player.quests != null else {},
-			"board_local": player.tracked.export_data() if player.tracked != null else {}, ## journal focus, page and read notices
-		},
 	}
 	var world: Node = tree.get_first_node_in_group("world")
 	if world != null and world.get("opening_over") != null:
@@ -138,6 +135,18 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
 		if discovery.is_reveal_all():
 			data["map_before"] = Marshalls.raw_to_base64(discovery.export_before()) ## the fog from before the developer's whole-map reveal
+	return data
+
+
+static func save(tree: SceneTree, path: String = "") -> bool:
+	if tree.get_first_node_in_group("sandbox") != null: ## the trials' test world is never saved
+		return false
+	var player: Player = _local_player(tree)
+	if player == null or not tree.root.multiplayer.is_server():
+		return false
+	var target: String = path if path != "" else path_for(tree)
+	var data: Dictionary = export_world_data(tree)
+	data["player"] = export_player_data(player)
 	var pending: String = target + ".tmp"
 	var target_dir: String = target.get_base_dir()
 	if not target_dir.is_empty():
@@ -156,30 +165,31 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	return saved_ok
 
 
-static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -> bool:
-	if tree.get_first_node_in_group("sandbox") != null:
-		return false
-	var data: Dictionary = _read(path if path != "" else path_for(tree))
-	var player: Player = _local_player(tree)
-	if data.is_empty() or player == null:
-		return false
-	var saved: Dictionary = data.get("player", {})
-	## A save made after the opening (she woke up in the hut) must not start with the opening's midnight lock: WorldLevel._ready locks the
-	## clock at 00:00 until `finish_opening`, and `opening_over` is not a node state that survives a reload. Older saves have no
-	## "opening_over" key, so the flag `woke_up` in the quest block counts too.
-	var world_node: Node = tree.get_first_node_in_group("world")
-	var quest_flags: Dictionary = (saved.get("quests", {}) as Dictionary).get("flags", {}) as Dictionary
-	var opening_done: bool = bool(data.get("opening_over", false)) or bool(quest_flags.get("woke_up", false))
-	if opening_done and world_node != null and world_node.has_method("finish_opening"):
-		world_node.call("finish_opening") ## sets opening_over and unlocks the clock
-	if not TimeManager.locked: ## the opening holds the clock at midnight
-		TimeManager.time_of_day = float(data.get("time", TimeManager.time_of_day))
-		TimeManager.day = int(data.get("day", 0))
-	TimeManager.import_sleep_state(data.get("sleep", {}) as Dictionary)
-	var pos: Array = saved.get("pos", [])
-	if pos.size() == 2:
-		player.position = Vector2(float(pos[0]), float(pos[1]))
-		(player.get_node("Camera2D") as Camera2D).reset_smoothing()
+static func compress_json(data: Dictionary) -> String:
+	var raw: PackedByteArray = JSON.stringify(data).to_utf8_buffer()
+	var compressed: PackedByteArray = raw.compress(FileAccess.COMPRESSION_GZIP)
+	return Marshalls.raw_to_base64(compressed)
+
+
+static func decompress_json(encoded: String) -> Dictionary:
+	if encoded.is_empty():
+		return {}
+	var compressed: PackedByteArray = Marshalls.base64_to_raw(encoded)
+	if compressed.is_empty():
+		return {}
+	var raw: PackedByteArray = compressed.decompress_dynamic(-1, FileAccess.COMPRESSION_GZIP)
+	if raw.is_empty():
+		return {}
+	var parsed: Variant = JSON.parse_string(raw.get_string_from_utf8())
+	return parsed as Dictionary if parsed is Dictionary else {}
+
+
+static func import_player_data(player: Player, saved: Dictionary, apply_pos: bool = true) -> void:
+	if apply_pos:
+		var pos: Array = saved.get("pos", [])
+		if pos.size() == 2:
+			player.position = Vector2(float(pos[0]), float(pos[1]))
+			(player.get_node("Camera2D") as Camera2D).reset_smoothing()
 	player.progress.xp = int(saved.get("xp", 0))
 	player.progress.restore_claimed(int(saved.get("claimed", 1))) ## before the health: the maximum depends on it
 	var health: float = float(saved.get("health", player.health.max_health))
@@ -199,6 +209,22 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 		player.quests.import_data(saved.quests as Dictionary)
 	if player.tracked != null and saved.has("board_local"):
 		player.tracked.import_data(saved.board_local as Dictionary)
+
+
+static func import_world_data(tree: SceneTree, data: Dictionary, player: Player, resume: bool = true) -> bool:
+	if tree.get_first_node_in_group("sandbox") != null or data.is_empty() or player == null:
+		return false
+	var world_node: Node = tree.get_first_node_in_group("world")
+	var quest_flags: Dictionary = {}
+	if player.quests != null:
+		quest_flags = player.quests.export_data().get("flags", {}) as Dictionary
+	var opening_done: bool = bool(data.get("opening_over", false)) or bool(quest_flags.get("woke_up", false))
+	if opening_done and world_node != null and world_node.has_method("finish_opening"):
+		world_node.call("finish_opening") ## sets opening_over and unlocks the clock
+	if not TimeManager.locked: ## the opening holds the clock at midnight
+		TimeManager.time_of_day = float(data.get("time", TimeManager.time_of_day))
+		TimeManager.day = int(data.get("day", 0))
+	TimeManager.import_sleep_state(data.get("sleep", {}) as Dictionary)
 	var world: Node = tree.get_first_node_in_group("world")
 	if world != null and world.has_method("import_zone_state") and data.has("zone_world"):
 		world.call("import_zone_state", data.get("zone_world", {}))
@@ -264,6 +290,18 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	if TimeManager.nights_awake >= 1 and world != null and world.has_method("apply_tiredness_to_players"):
 		world.call_deferred("apply_tiredness_to_players")
 	return true
+
+
+static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -> bool:
+	if tree.get_first_node_in_group("sandbox") != null:
+		return false
+	var data: Dictionary = _read(path if path != "" else path_for(tree))
+	var player: Player = _local_player(tree)
+	if data.is_empty() or player == null:
+		return false
+	var saved: Dictionary = data.get("player", {}) as Dictionary
+	import_player_data(player, saved, true)
+	return import_world_data(tree, data, player, resume)
 
 
 static func _restore_stacks(inventory: InventoryComponent, saved: Dictionary) -> void:

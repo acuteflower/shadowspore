@@ -22,6 +22,7 @@ var _h: int = 24
 var _g: int = 19
 var _time: float = 0.0
 var _shown_prompt: String = ""
+var _far_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -60,12 +61,27 @@ func refresh() -> void:
 
 
 func _process(delta: float) -> void:
-	_time += delta
 	if _prompt_node != null and _prompt_node.visible: ## the verb changes under her hands (AUFHEBEN -> ABLEGEN): the shown tag follows
 		var now: String = prompt() + "|" + prompt_hint()
 		if now != _shown_prompt:
 			_shown_prompt = now
 			_prompt_node.show_text(prompt(), prompt_hint())
+	if carrier == 0 and _body.visible:
+		if on_star < 0:
+			return
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 560.0 * 560.0:
+			_far_wait = 0.25
+			return
+		_time += delta
+		_glow.modulate.a = 0.75 + 0.25 * sin(_time * 2.4 + index)
+		return
+	_time += delta
 	if carrier != 0 and mirror != null:
 		var p: Player = mirror.player_of(carrier)
 		if p != null:
@@ -73,8 +89,6 @@ func _process(delta: float) -> void:
 		queue_redraw()
 	elif not _body.visible and _time >= hidden_until:
 		refresh()
-	elif on_star >= 0:
-		_glow.modulate.a = 0.75 + 0.25 * sin(_time * 2.4 + index)
 
 
 func set_time_base(t: float) -> void:

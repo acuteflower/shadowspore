@@ -13,7 +13,9 @@ uniform float cell_w = 5.0;
 
 uniform vec2 origin = vec2(0.0); // where this plant stands in the world (set once by Flora: nothing here depends on the camera)
 uniform float phase_seed = 0.0;
+uniform bool use_model_origin = false;
 varying vec4 modulate_in;
+varying vec2 v_world_origin;
 
 // The uv to sample instead of `uv` (the texture itself cannot be passed on: it is a built-in).
 vec2 wind_uv(vec2 uv, vec2 size) {
@@ -21,9 +23,10 @@ vec2 wind_uv(vec2 uv, vec2 size) {
 	float col = floor(px.x / frame_size.x);
 	float row = mod(floor(px.y), frame_size.y);
 	float h = max(pivot_row - row, 0.0) / 16.0;
-	float pulse = 0.5 + 0.5 * sin(dot(origin, g_wind_dir) * 0.014 - g_wind_clock * 1.6);
+	vec2 w_origin = use_model_origin ? v_world_origin : origin;
+	float pulse = 0.5 + 0.5 * sin(dot(w_origin, g_wind_dir) * 0.014 - g_wind_clock * 1.6);
 	float wind = g_wind_dir.x * (0.12 + (g_wind_gust <= 1.1 ? g_wind_gust : 1.1 + 0.9 * tanh((g_wind_gust - 1.1) * 0.35)) * (0.35 + 0.65 * pulse));
-	float phase = phase_seed;
+	float phase = use_model_origin ? (fract((w_origin.x * 0.37 + w_origin.y * 0.91) * 0.15915494) * 6.2831853) : phase_seed;
 	float cell = floor(px.x / cell_w);
 	float tick = floor(g_wind_clock * 12.0) / 12.0;
 	float ripple = sin(tick * 2.4 + row * 0.11 + cell * 1.9 + phase) * flutter;

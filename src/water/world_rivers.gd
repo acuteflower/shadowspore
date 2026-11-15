@@ -14,6 +14,11 @@ var _springs: Array[Sprite2D] = []
 var _spring_glows: Array[Sprite2D] = []
 var _clock: float = 0.0
 var fauna: RiverFauna
+const RIVER_FAUNA_SCENE: PackedScene = preload("res://src/water/river_fauna.tscn")
+const RIVER_WATER_SHADER: Shader = preload("res://assets/shaders/river_water.gdshader")
+const RIVER_GLOW_SHADER: Shader = preload("res://assets/shaders/river_glow.gdshader")
+const WATER_DETAIL_TEX: Texture2D = preload("res://assets/water/water_detail.png")
+const BANK_MATERIAL_TEX: Texture2D = preload("res://assets/water/bank_material.png")
 const LAKE_SDF: Texture2D = preload("res://assets/world/lakes_sdf.png")
 static var _shared_data: Dictionary = {}
 static var _shared_queries: Dictionary = {}
@@ -23,12 +28,22 @@ static var _shared_lake_bytes: PackedByteArray = PackedByteArray()
 static func clear_cache() -> void:
 	_shared_data.clear()
 	_shared_queries.clear()
+	_shared_query_bytes.clear()
 	_shared_lake_bytes = PackedByteArray()
 
+const WATERFALL_ROCK_TEX: Texture2D = preload("res://assets/water/waterfall_rock.png")
+const WATERFALL_TEX: Texture2D = preload("res://assets/water/waterfall.png")
+const CLIFF_SPRING_TEX: Texture2D = preload("res://assets/water/cliff_spring.png")
+const CLIFF_SPRING_GLOW_TEX: Texture2D = preload("res://assets/water/cliff_spring_glow.png")
+static var _cliff_glow_unlit: CanvasItemMaterial
 var _lake_bytes: PackedByteArray
 var defer_warm_queries: bool = false
 var _warm_keys: Array[String] = []
 var _warm_index: int = 0
+var _chunk_cells: Dictionary = {}
+var _query_bytes: Dictionary = {}
+var _queries_frozen: bool = false
+static var _shared_query_bytes: Dictionary = {}
 
 
 func _ready() -> void:
@@ -48,15 +63,20 @@ func _ready() -> void:
 	_spec = DataRegistry.table("rivers")
 	_query_lock.lock()
 	_queries.merge(_shared_queries, true)
+	_query_bytes.merge(_shared_query_bytes, true)
 	for key: String in (_data["chunks"] as Dictionary):
 		var cell: Vector2i = Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+		_chunk_cells[cell] = true
 		if not _queries.has(cell):
 			_warm_keys.append(key)
 	_query_lock.unlock()
 	if not defer_warm_queries:
 		_warm_queries()
+		_queries_frozen = true
+	else:
+		_queries_frozen = _warm_index >= _warm_keys.size()
 	y_sort_enabled = true
-	fauna = load("res://src/water/river_fauna.tscn").instantiate() as RiverFauna
+	fauna = RIVER_FAUNA_SCENE.instantiate() as RiverFauna
 	add_child(fauna)
 	var mirror: WaterReflections = WaterReflections.new() ## mirror images in the water and in rain puddles
 	mirror.name = "Reflections"
@@ -87,29 +107,46 @@ func warm_queries_step(deadline_usec: int = 0) -> bool:
 		_warm_index += 1
 		var cell: Vector2i = Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
 		var img: Image = (load(String((chunks[key] as Dictionary)["query"])) as Texture2D).get_image()
+		var raw: PackedByteArray = img.get_data() if (img != null and img.get_format() == Image.FORMAT_RGBA8 and img.get_width() == 128 and img.get_height() == 128) else PackedByteArray()
 		_shared_queries[cell] = img
+		if not raw.is_empty():
+			_shared_query_bytes[cell] = raw
 		_query_lock.lock()
 		_queries[cell] = img
+		if not raw.is_empty():
+			_query_bytes[cell] = raw
 		_query_lock.unlock()
 		if deadline_usec > 0 and _warm_index > start and Time.get_ticks_usec() >= deadline_usec:
 			return false
-	return _warm_index >= _warm_keys.size()
+	_queries_frozen = _warm_index >= _warm_keys.size()
+	return _queries_frozen
 
 func _query(cell: Vector2i) -> Image:
-	var key: String = _key(cell)
-	if not (_data.get("chunks", {}) as Dictionary).has(key): return null
+	if not _chunk_cells.has(cell): return null
 	_query_lock.lock()
 	var image: Image = _queries.get(cell) as Image
 	_query_lock.unlock()
 	if image == null: ## (only a chunk added after start; loads on the main thread)
-		image = (load(String((_data["chunks"][key] as Dictionary)["query"])) as Texture2D).get_image()
+		image = (load(String((_data["chunks"][_key(cell)] as Dictionary)["query"])) as Texture2D).get_image()
+		var raw: PackedByteArray = image.get_data() if (image != null and image.get_format() == Image.FORMAT_RGBA8 and image.get_width() == 128 and image.get_height() == 128) else PackedByteArray()
 		_query_lock.lock()
 		_queries[cell] = image
+		if not raw.is_empty():
+			_query_bytes[cell] = raw
 		_query_lock.unlock()
 	return image
 
 func field_at(point: Vector2) -> Vector2:
 	var cell: Vector2i = Vector2i((point / 512.0).floor())
+	if not _chunk_cells.has(cell): return Vector2(INF, 0.0)
+	if _queries_frozen:
+		var raw: Variant = _query_bytes.get(cell)
+		if raw != null:
+			var bytes: PackedByteArray = raw
+			var lx: int = clampi(floori((point.x - float(cell.x * 512)) * 0.25), 0, 127)
+			var ly: int = clampi(floori((point.y - float(cell.y * 512)) * 0.25), 0, 127)
+			var idx: int = (ly * 128 + lx) * 4
+			return Vector2(float(bytes[idx] - 128), float(bytes[idx + 1]) / 255.0)
 	var image: Image = _query(cell)
 	if image == null: return Vector2(INF, 0.0)
 	var local: Vector2i = Vector2i(((point - Vector2(cell) * 512.0) / 4.0).floor())
@@ -122,7 +159,7 @@ func near_water(cell: Vector2i) -> bool:
 	if float(_spec["prop_margin"]) * 1.5 > 512.0: return true
 	for dy: int in range(-1, 2):
 		for dx: int in range(-1, 2):
-			if (_data["chunks"] as Dictionary).has(_key(cell + Vector2i(dx, dy))): return true
+			if _chunk_cells.has(cell + Vector2i(dx, dy)): return true
 	return false
 
 
@@ -135,7 +172,10 @@ func clear_for_prop(point: Vector2, radius: float) -> bool:
 	var nearby: bool = false
 	for y: int in range(lo.y, hi.y + 1):
 		for x: int in range(lo.x, hi.x + 1):
-			if (_data["chunks"] as Dictionary).has(_key(Vector2i(x, y))): nearby = true
+			if _chunk_cells.has(Vector2i(x, y)):
+				nearby = true
+				break
+		if nearby: break
 	if not nearby: return true
 	for dy: int in range(-1, 2):
 		for dx: int in range(-1, 2):
@@ -170,9 +210,9 @@ func wade_data(point: Vector2, base: Dictionary) -> Dictionary:
 	result["depth_amount"] = amount ## 0..1 up to the deep threshold; SwimRules starts at 0.92
 	return result
 
-func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
+func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -> RiverDetails:
 	var key: String = _key(cell)
-	if not (_data["chunks"] as Dictionary).has(key): return
+	if not (_data["chunks"] as Dictionary).has(key): return null
 	var record: Dictionary = _data["chunks"][key]
 	fauna.chunk_loaded(cell)
 	parent.tree_exiting.connect(func() -> void:
@@ -183,14 +223,16 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 	sprite.position = Vector2(cell) * 512.0
 	sprite.z_index = -7
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite.texture = load(String(record["field"])) as Texture2D
+	var field_tex: Texture2D = load(String(record["field"])) as Texture2D
+	var bank_tex: Texture2D = load(String(record["bank"])) as Texture2D
+	sprite.texture = field_tex
 	var shader_material: ShaderMaterial = ShaderMaterial.new()
-	shader_material.shader = load("res://assets/shaders/river_water.gdshader") as Shader
-	shader_material.set_shader_parameter("bank_map", load(String(record["bank"])))
+	shader_material.shader = RIVER_WATER_SHADER
+	shader_material.set_shader_parameter("bank_map", bank_tex)
 	shader_material.set_shader_parameter("bank_width", float(_spec["bank_width"]))
 	shader_material.set_shader_parameter("bank_inner", true)
-	shader_material.set_shader_parameter("water_detail", load("res://assets/water/water_detail.png"))
-	shader_material.set_shader_parameter("bank_material", load("res://assets/water/bank_material.png"))
+	shader_material.set_shader_parameter("water_detail", WATER_DETAIL_TEX)
+	shader_material.set_shader_parameter("bank_material", BANK_MATERIAL_TEX)
 	shader_material.set_shader_parameter("world_origin", sprite.position)
 	sprite.material = shader_material
 	_materials.append(shader_material)
@@ -200,11 +242,16 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 		_water_materials.erase(shader_material))
 	parent.add_child(sprite)
 	parent.y_sort_enabled = true
+	var flow_img: Image = field_tex.get_image()
+	fauna.set_field_image(cell, flow_img)
 	var details: RiverDetails = RiverDetails.new()
 	details.name = "RiverDetails"
 	details.y_sort_enabled = true
 	parent.add_child(details)
-	details.setup(self, cell, sprite.texture.get_image())
+	if defer_details:
+		details.setup_base(self, cell, flow_img)
+	else:
+		details.setup(self, cell, flow_img)
 	# Night glow pass: unlit, additive, same field; strength follows the day cycle (RiverDetails.set_night).
 	var night_glow: Sprite2D = Sprite2D.new()
 	night_glow.name = "RiverGlow"
@@ -212,10 +259,10 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 	night_glow.position = sprite.position
 	night_glow.z_index = -6
 	night_glow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	night_glow.texture = sprite.texture
+	night_glow.texture = field_tex
 	var glow_material: ShaderMaterial = ShaderMaterial.new()
-	glow_material.shader = load("res://assets/shaders/river_glow.gdshader") as Shader
-	glow_material.set_shader_parameter("bank_map", load(String(record["bank"])))
+	glow_material.shader = RIVER_GLOW_SHADER
+	glow_material.set_shader_parameter("bank_map", bank_tex)
 	glow_material.set_shader_parameter("bank_width", float(_spec["bank_width"]))
 	glow_material.set_shader_parameter("world_origin", sprite.position)
 	glow_material.set_shader_parameter("night", TimeManager.night_amount())
@@ -238,13 +285,13 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 		var height: float = float(fall_spec[2])
 		var width: float = float(fall_spec[3])
 		var ledge: Sprite2D = Sprite2D.new()
-		ledge.texture = load("res://assets/water/waterfall_rock.png") as Texture2D
+		ledge.texture = WATERFALL_ROCK_TEX
 		ledge.centered = false
 		ledge.position = Vector2(wx - 24.0, wy)
 		ledge.z_index = -5
 		parent.add_child(ledge)
 		var fall: Sprite2D = Sprite2D.new()
-		fall.texture = load("res://assets/water/waterfall.png") as Texture2D
+		fall.texture = WATERFALL_TEX
 		fall.hframes = 8
 		fall.centered = false
 		fall.position = Vector2(wx - 24.0, wy)
@@ -269,7 +316,7 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 		var sy: float = float(spring_spec[1])
 		var style: int = int(spring_spec[2])
 		var spring: Sprite2D = Sprite2D.new()
-		spring.texture = load("res://assets/water/cliff_spring.png") as Texture2D
+		spring.texture = CLIFF_SPRING_TEX
 		spring.hframes = 4
 		spring.vframes = 5
 		spring.frame_coords = Vector2i(0, clampi(style, 0, 4))
@@ -281,16 +328,17 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 		spring.tree_exiting.connect(func() -> void: _springs.erase(spring))
 		if style in [3, 4]:
 			var glow: Sprite2D = Sprite2D.new()
-			glow.texture = load("res://assets/water/cliff_spring_glow.png") as Texture2D
+			glow.texture = CLIFF_SPRING_GLOW_TEX
 			glow.hframes = 4
 			glow.vframes = 5
 			glow.frame_coords = Vector2i(0, style)
 			glow.centered = false
 			glow.position = spring.position
 			glow.z_index = -4
-			var unlit: CanvasItemMaterial = CanvasItemMaterial.new()
-			unlit.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
-			glow.material = unlit
+			if _cliff_glow_unlit == null:
+				_cliff_glow_unlit = CanvasItemMaterial.new()
+				_cliff_glow_unlit.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+			glow.material = _cliff_glow_unlit
 			parent.add_child(glow)
 			_spring_glows.append(glow)
 			glow.tree_exiting.connect(func() -> void: _spring_glows.erase(glow))
@@ -313,6 +361,7 @@ func attach_chunk(parent: Node2D, cell: Vector2i) -> void:
 		shape.shape = box
 		shape.position = Vector2(cell) * 512.0 + Vector2(float(rect[0]), float(rect[1])) + box.size * 0.5
 		body.add_child(shape)
+	return details
 
 ## Swimmers (up to 4 at once: x, y, radius, energy) make rings in the surface of every loaded water chunk. Each swimmer owns a key;
 ## energy <= 0 removes it.

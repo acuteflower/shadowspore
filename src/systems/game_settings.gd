@@ -9,7 +9,7 @@ const DEFAULTS: Dictionary = {
 	"master": 80, "music": 70, "sfx": 80,
 	"fullscreen": false, "vsync": true, "shake": 100,
 	"numbers": true, "language": "de", "position": true, "cursor": true,
-	"quality": -1, "fps_cap": 7, "adaptive": true, "pixel_res": false,
+	"quality": -1, "fps_cap": 7, "adaptive": false, "pixel_res": false,
 	"weather_fx": 2, "flash_soft": false, "reflections": true, "sun_shadows": true, "journal_still": false,
 	"player_name": "ELLIE",
 }

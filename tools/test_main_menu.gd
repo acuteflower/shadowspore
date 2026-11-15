@@ -1,5 +1,5 @@
 extends Node
-## Main menu check (headless): the menu builds, its pages open, NEUES SPIEL leaves through GameLauncher and a real new game (world + local player) starts in a
+## Main menu check (headless): the menu builds, its pages open, ABENTEUER BEGINNEN leaves through GameLauncher and a real new game (world + local player) starts in a
 ## fresh main scene. Never writes the save file. `Godot --headless --path . tools/test_main_menu.tscn`
 
 var _fails: int = 0
@@ -34,28 +34,47 @@ func _run() -> void:
 	await get_tree().process_frame
 	_check(ui.page == MainMenuUi.Page.MAIN, "starts on the main page")
 	var main_ids: Array = []
+	var main_labels: Dictionary = {}
 	for row: Dictionary in ui.get("_rows"):
 		main_ids.append(String(row.id))
-	_check(main_ids.has("new") and main_ids.has("multi") and main_ids.has("settings") and main_ids.has("quit"), "main entries: %s" % [main_ids])
-	_check(main_ids.has("continue") == SaveGame.exists(), "WEITER only with a save")
-	for page_id: String in ["multi", "join_page", "back", "settings", "back"]:
+		main_labels[String(row.id)] = String(row.label)
+	_check(main_ids == ["start", "settings", "quit"], "main entries: %s" % [main_ids])
+	var expected_start: String = "ABENTEUER FORTSETZEN" if SaveGame.exists() else "ABENTEUER BEGINNEN"
+	_check(String(main_labels.get("start", "")) == expected_start, "start label matches save state: %s" % String(main_labels.get("start", "")))
+	CloudSession.user_id = "test_u"
+	CloudSession.token = "test_t"
+	CloudSession.has_cloud_save = true
+	CloudSession.cloud_save_day = 3
+	CloudSession.save_info_changed.emit()
+	await get_tree().process_frame
+	_check(String((ui.get("_rows") as Array)[0].get("label", "")) == "ABENTEUER FORTSETZEN", "cloud save switches label to ABENTEUER FORTSETZEN")
+	CloudSession.has_cloud_save = false
+	CloudSession.save_info_changed.emit()
+	await get_tree().process_frame
+	_check(String((ui.get("_rows") as Array)[0].get("label", "")) == "ABENTEUER BEGINNEN", "no cloud save switches label to ABENTEUER BEGINNEN")
+	CloudSession.user_id = ""
+	CloudSession.token = ""
+	CloudSession.cloud_save_day = -1
+	for page_id: String in ["settings", "back"]:
 		for row: Dictionary in ui.get("_rows"):
 			if String(row.id) == page_id:
 				ui.call("_press", row, Vector2(-1.0, -1.0))
 				break
 		await get_tree().process_frame
 	_check(ui.page == MainMenuUi.Page.MAIN, "pages open and close")
-	# the typed address
-	ui.call("_open_page", MainMenuUi.Page.JOIN)
-	ui.address = ""
-	for c: int in "192.168.0.5:7777".length():
+	ui.call("_open_page", MainMenuUi.Page.SETTINGS)
+	ui.set("_settings_tab", 2)
+	ui.call("_open_page", MainMenuUi.Page.SETTINGS, false)
+	ui.set("_editing_id", "player_name")
+	ui.set("_player_name_buf", "")
+	for c: int in "ELLIE".length():
 		var key: InputEventKey = InputEventKey.new()
 		key.pressed = true
-		key.unicode = "192.168.0.5:7777".unicode_at(c)
+		key.unicode = "ELLIE".unicode_at(c)
 		_check(bool(ui.call("_type", key)), "typed char accepted")
-	_check(ui.address == "192.168.0.5:7777", "address typed: %s" % ui.address)
+	_check(String(ui.get("_player_name_buf")) == "ELLIE", "player name typed")
 	ui.call("_open_page", MainMenuUi.Page.MAIN)
-	# leave through NEUES SPIEL: needs the save absent to skip the confirm page, so ask the controller directly
+	# leave through ABENTEUER BEGINNEN / new mode: needs the save absent to skip the confirm page, so ask the controller directly
 	menu.call("_on_chosen", "new", {})
 	var waited: float = 0.0
 	var world: Node = null

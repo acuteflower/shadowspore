@@ -50,6 +50,19 @@ var _climb_walls: Array[PhysicsBody2D] = []
 var _world: Node
 var _home: Vector2 ## guard spiders (`post` in enemies.json) stay where they were put
 var _post_heading: float = 0.0
+var _zone_active: bool = false
+var _phase_slot: int = 0
+var _steer_dir: Vector2 = Vector2.ZERO
+var _steer_in: Vector2 = Vector2.ZERO
+var _steer_ttl: int = 0
+var _chase_clear: bool = false
+var _chase_nav_clear: bool = false
+var _chase_next_check: int = -1
+var _chase_last_pos: Vector2 = Vector2(INF, INF)
+
+static var _cliff_cache: Array[RID] = []
+static var _cliff_cache_msec: int = -1000
+static var _ray_query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.new()
 
 @onready var _rig: SpiderRig = $Rig
 @onready var _health: HealthComponent = $HealthComponent
@@ -74,6 +87,8 @@ func _ready() -> void:
 	_rig.strike_arc = deg_to_rad(float(_def["arc"]))
 	_rig.strike_hit_fraction = float(_def["strike_hit_time"]) / float(_def["strike"])
 	_zone.draw.connect(_draw_zone)
+	_zone.visible = false
+	_phase_slot = absi(hash(name)) % 3
 	if Interiors.slot_at(global_position) >= 0 or MineManager.in_mine(global_position):
 		_zone.z_index = -3 ## inside a room: above the floor sprite (z -6), below the furniture, so the attack warning shows
 	_rig.foot_landed.connect(func(point: Vector2) -> void: _trail.leave(point))
@@ -98,7 +113,13 @@ func _process(delta: float) -> void:
 	_rig.set_anchor(anchor)
 	_rig.attack_side = attack_side
 	_rig.update_rig(delta, velocity, heading)
-	_zone.queue_redraw()
+	var zone_needed: bool = state in [State.WINDUP, State.STRIKE, State.GRAPPLE_WINDUP, State.GRAPPLE_THROW]
+	if zone_needed != _zone_active:
+		_zone_active = zone_needed
+		_zone.visible = zone_needed
+		_zone.queue_redraw()
+	elif zone_needed:
+		_zone.queue_redraw()
 
 
 func _physics_process(delta: float) -> void:
@@ -255,9 +276,16 @@ func _chase(delta: float) -> void:
 		_target = null
 		_set_state(State.IDLE)
 		return
-	var toward: Vector2 = _target.global_position - global_position
+	var tpos: Vector2 = _target.global_position
+	var toward: Vector2 = tpos - global_position
 	var distance: float = toward.length()
-	var clear: bool = _same_floor(global_position, _target.global_position) and _clear_path(global_position, _target.global_position)
+	var frame: int = Engine.get_physics_frames()
+	if _state_time <= delta * 1.5 or frame >= _chase_next_check or tpos.distance_squared_to(_chase_last_pos) > 576.0:
+		_chase_next_check = frame + 3
+		_chase_last_pos = tpos
+		_chase_clear = _same_floor(global_position, tpos) and _clear_path(global_position, tpos)
+		_chase_nav_clear = _navigation.segment_clear(global_position, tpos)
+	var clear: bool = _chase_clear
 	heading = lerp_angle(heading, toward.angle(), float(_def["turn_speed"]) * delta)
 	_hunt_clock += delta
 	var stalk: float = float(_def["stalk_seconds"])
@@ -268,8 +296,8 @@ func _chase(delta: float) -> void:
 		_grapple_cd = float(_grapple()["cooldown"])
 		_set_state(State.GRAPPLE_WINDUP)
 		return
-	if not _navigation.segment_clear(global_position, _target.global_position):
-		var route: Vector2 = _navigation.direction_to(_target.global_position, delta)
+	if not _chase_nav_clear:
+		var route: Vector2 = _navigation.direction_to(tpos, delta)
 		if _navigation.climb_target.is_finite():
 			_prepare_climb(_navigation.climb_target)
 			return
@@ -310,16 +338,26 @@ func _skitter() -> float:
 func _steer(direction: Vector2) -> Vector2:
 	if direction == Vector2.ZERO:
 		return direction
+	if _steer_ttl > 0 and get_slide_collision_count() == 0 and direction.dot(_steer_in) > 0.94:
+		_steer_ttl -= 1
+		return _steer_dir
+	_steer_in = direction
+	_steer_ttl = 3
 	for angle: float in [0.0, 0.55 * _orbit_side, -0.55 * _orbit_side, 1.1 * _orbit_side, -1.1 * _orbit_side, 1.55 * _orbit_side]:
 		var candidate: Vector2 = direction.rotated(angle)
 		if not test_move(global_transform, candidate * 24.0):
+			_steer_dir = candidate
 			return candidate
+	_steer_dir = Vector2.ZERO
 	return Vector2.ZERO
 
 
 func _clear_path(from: Vector2, to: Vector2) -> bool:
-	var ray: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(from + Vector2(0, -4), to + Vector2(0, -4), 1)
-	return get_world_2d().direct_space_state.intersect_ray(ray).is_empty()
+	_ray_query.from = from + Vector2(0, -4)
+	_ray_query.to = to + Vector2(0, -4)
+	_ray_query.collision_mask = 1
+	_ray_query.exclude = []
+	return get_world_2d().direct_space_state.intersect_ray(_ray_query).is_empty()
 
 
 func _navigation_floor(point: Vector2) -> bool:
@@ -337,19 +375,24 @@ func _same_floor(from: Vector2, to: Vector2) -> bool:
 
 
 func _cliff_rids() -> Array[RID]:
-	var out: Array[RID] = []
-	for node: Node in get_tree().get_nodes_in_group("relief_walls"):
-		if node is PhysicsBody2D:
-			out.append((node as PhysicsBody2D).get_rid())
-	return out
+	var now: int = Time.get_ticks_msec()
+	if now - _cliff_cache_msec >= 400:
+		_cliff_cache_msec = now
+		_cliff_cache.clear()
+		for node: Node in get_tree().get_nodes_in_group("relief_walls"):
+			if node is PhysicsBody2D:
+				_cliff_cache.append((node as PhysicsBody2D).get_rid())
+	return _cliff_cache
 
 
 func _sees_over_cliff(point: Vector2) -> bool:
 	if _same_floor(global_position, point):
 		return false
-	var ray: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(global_position + Vector2(0, -4), point + Vector2(0, -4), 1)
-	ray.exclude = _cliff_rids()
-	return get_world_2d().direct_space_state.intersect_ray(ray).is_empty()
+	_ray_query.from = global_position + Vector2(0, -4)
+	_ray_query.to = point + Vector2(0, -4)
+	_ray_query.collision_mask = 1
+	_ray_query.exclude = _cliff_rids()
+	return get_world_2d().direct_space_state.intersect_ray(_ray_query).is_empty()
 
 
 ## A special A* edge, only across real relief collision. Trees, buildings and the

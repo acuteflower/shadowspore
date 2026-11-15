@@ -21,6 +21,13 @@ func _run() -> void:
 	var fc: FreeCam = player.get_node("FreeCam") as FreeCam
 	check(fc != null, "player carries a FreeCam")
 	var home: Vector2 = player.global_position
+	CloudSession.logout()
+	check(not fc._can_enter(), "guest cannot enter FreeCam")
+	CloudSession.token = "test_admin_token"
+	CloudSession.user_id = "test_admin_id"
+	CloudSession.role = "player"
+	check(not fc._can_enter(), "player role cannot enter FreeCam")
+	CloudSession.role = "admin"
 	check(fc._can_enter(), "can enter on free ground")
 	fc._enter()
 	check(InputManager.freecam_open and fc.active() and InputManager.move_vector() == Vector2.ZERO, "entering stops her and flags the input")
@@ -91,5 +98,6 @@ func _run() -> void:
 	menu._set_open(false)
 	menu._set_open(true)
 	check(not menu._test_tools and menu._scrolls[col] == 0.0, "normal pause menu opens on settings")
+	CloudSession.logout()
 	print("FREECAM: %d failures" % failures)
 	get_tree().quit(1 if failures > 0 else 0)

@@ -33,6 +33,8 @@ var _open_cells: Dictionary = {}
 var _index: int = 0
 var _retry: float = 0.0
 var _age: float = 0.0
+var _shortcut_wait: float = 0.0
+var _check_wait: float = 0.0
 var _cached_query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
 
 
@@ -52,6 +54,8 @@ func invalidate() -> void:
 	climb_target = Vector2.INF
 	_retry = 0.0
 	_age = 0.0
+	_shortcut_wait = 0.0
+	_check_wait = 0.0
 
 
 func can_occupy(point: Vector2, exclude: Array[RID] = [], mask: int = 1) -> bool:
@@ -92,6 +96,8 @@ func direction_to(goal: Vector2, delta: float) -> Vector2:
 		return Vector2.ZERO
 	_retry -= delta
 	_age += delta
+	_shortcut_wait = maxf(0.0, _shortcut_wait - delta)
+	_check_wait = maxf(0.0, _check_wait - delta)
 	if not searching and not path.is_empty() and _goal != Vector2.INF and _goal.distance_to(goal) > float(_spec["target_repath_distance"]) and _age < float(_spec["refresh_seconds"]):
 		_retarget(goal) ## the target moved: keep the route when its last leg still reaches the new goal
 	if _goal == Vector2.INF or (not searching and (_goal.distance_to(goal) > float(_spec["target_repath_distance"]) or _age >= float(_spec["refresh_seconds"]))):
@@ -109,24 +115,33 @@ func direction_to(goal: Vector2, delta: float) -> Vector2:
 		if bool(step["climb"]):
 			var takeoff: Vector2 = step["from"]
 			if at.distance_to(takeoff) > 2.5:
-				if not segment_clear(at, takeoff):
-					invalidate()
-					return Vector2.ZERO
+				if _check_wait <= 0.0:
+					_check_wait = 0.05
+					if not segment_clear(at, takeoff):
+						invalidate()
+						return Vector2.ZERO
 				return (takeoff - at).normalized()
 			climb_target = point
 			return Vector2.ZERO
 		if at.distance_to(point) < 3.0:
 			_index += 1
+			_check_wait = 0.0
+			_shortcut_wait = 0.0
 			continue
 		# Only shortcut ground edges; never skip a climb's takeoff or cross a new obstacle.
-		var next: int = _index + 1
-		while next < path.size() and not bool(path[next]["climb"]) and segment_clear(at, path[next]["point"]):
-			_index = next
-			point = path[next]["point"]
-			next += 1
-		if not segment_clear(at, point):
-			invalidate()
-			return Vector2.ZERO
+		if _shortcut_wait <= 0.0:
+			_shortcut_wait = 0.14
+			var next: int = _index + 1
+			var shortcut_cap: int = mini(path.size(), _index + 4)
+			while next < shortcut_cap and not bool(path[next]["climb"]) and segment_clear(at, path[next]["point"]):
+				_index = next
+				point = path[next]["point"]
+				next += 1
+		if _check_wait <= 0.0:
+			_check_wait = 0.05
+			if not segment_clear(at, point):
+				invalidate()
+				return Vector2.ZERO
 		return (point - at).normalized()
 	invalidate()
 	return Vector2.ZERO

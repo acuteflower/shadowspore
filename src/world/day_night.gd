@@ -9,6 +9,9 @@ const NIGHT_CALL_MS: int = 100 ## the night lights hear about a change at most t
 var _g_sun: float = -1000.0
 var _g_night: float = -1000.0
 var _g_dew: float = -1000.0
+var _sent_mat_sun: float = -1000.0
+var _sent_mat_golden: float = -1000.0
+var _sent_mat_night: float = -1000.0
 var _night_sent_ms: int = -1000
 var _glow: ShaderMaterial
 var _ground: ShaderMaterial
@@ -97,7 +100,10 @@ func _update() -> void:
 	if room.a <= 0.0 and _mines != null:
 		room = _mines.ambient_color() ## the mine has the colour of its zone
 	color = room if room.a > 0.0 else TimeManager.ambient_color() ## inside a room it has its own light
-	var indoors: bool = room.a > 0.0 or _camera_in_room() ## rooms and the mine have their own light, no sun, no weather (also while the room's own tint is not known yet)
+	var cam: Camera2D = get_viewport().get_camera_2d()
+	var cam_pos: Vector2 = cam.get_screen_center_position() if cam != null else Vector2.ZERO
+	var has_cam: bool = cam != null
+	var indoors: bool = room.a > 0.0 or (has_cam and (Interiors.slot_at(cam_pos) >= 0 or MineManager.in_mine(cam_pos))) ## rooms and the mine have their own light, no sun, no weather (also while the room's own tint is not known yet)
 	_weather.follow(indoors, get_process_delta_time())
 	var sky_sun: float = 1.0 if indoors else _weather.sunlight() ## clouds and rain take the direct sun (and its golden hour, glints, dew)
 	if not indoors:
@@ -106,18 +112,25 @@ func _update() -> void:
 		var dim: float = _weather.ambient_dim() ## the sky's own light falls under cloud: only the part above the night floor
 		var day_part: float = 1.0 - TimeManager.night_amount()
 		color = color * Color(lerpf(1.0, dim, day_part), lerpf(1.0, dim, day_part), lerpf(1.0, dim * 1.02, day_part), 1.0)
-	var gloom: float = 0.0 if indoors else _gloom_here() ## the Hexenwald: permanent dusk by day, a deeper night (docs/hexenwald_konzept.md, stage 3)
+	var gloom: float = 0.0 if (indoors or not has_cam) else BiomeBlend.amount_at(cam_pos) ## the Hexenwald: permanent dusk by day, a deeper night (docs/hexenwald_konzept.md, stage 3)
 	if gloom > 0.0:
 		color = color.lerp(TimeManager.NIGHT_COLOR, gloom) ## always night in the mood, whatever the clock says
 	var sun: float = 0.0 if indoors else TimeManager.sun_amount() * (1.0 - gloom) * sky_sun
 	var golden: float = TimeManager.golden_amount() * (1.0 - gloom) * lerpf(1.0, sky_sun, 0.7)
+	var ground_golden: float = 0.0 if indoors else golden
 	_daylight.follow(indoors, sun, golden)
-	if _ground != null:
-		_ground.set_shader_parameter("sun", sun)
-		_ground.set_shader_parameter("golden", 0.0 if indoors else golden)
-	if _sun_glow != null:
-		_sun_glow.set_shader_parameter("sun", sun)
-		_sun_glow.set_shader_parameter("golden", 0.0 if indoors else golden)
+	if absf(sun - _sent_mat_sun) > GLOBAL_EPSILON:
+		_sent_mat_sun = sun
+		if _ground != null:
+			_ground.set_shader_parameter("sun", sun)
+		if _sun_glow != null:
+			_sun_glow.set_shader_parameter("sun", sun)
+	if absf(ground_golden - _sent_mat_golden) > GLOBAL_EPSILON:
+		_sent_mat_golden = ground_golden
+		if _ground != null:
+			_ground.set_shader_parameter("golden", ground_golden)
+		if _sun_glow != null:
+			_sun_glow.set_shader_parameter("golden", ground_golden)
 	## water glints, crystal and flora sparkle, void lip: only sent when they really moved
 	var clock_night: float = TimeManager.night_amount()
 	var night: float = lerpf(clock_night, 1.0, gloom) ## its glowing plants, moon patches and mist are always at night strength
@@ -140,18 +153,21 @@ func _update() -> void:
 	_ambience.follow(sun * (1.0 - 0.8 * _weather.local_rain), night, indoors, get_process_delta_time())
 	_sky.update(indoors, get_process_delta_time(), TimeManager.ambient_color() if not indoors else Color(1, 1, 1))
 	_music.night = clock_night
+	var arid_now: float = 0.0 if (indoors or not has_cam) else BiomeBlend.arid_at(cam_pos)
 	if not indoors:
 		_music.gloom = gloom
-		_music.arid = _arid_here()
+		_music.arid = arid_now
 	_music.indoors = indoors
-	var in_starhall: bool = _interiors != null and (_interiors.in_starhall(_interiors.local_position()) or _camera_in_starhall())
+	var in_starhall: bool = _interiors != null and (_interiors.in_starhall(_interiors.local_position()) or (has_cam and _interiors.in_starhall(cam_pos)))
 	_music.in_starhall = in_starhall
 	_atmosphere.update(indoors)
 	if _shadows.is_inside_tree():
 		_shadows.follow(indoors, sun, golden, 0.0 if indoors else night, TimeManager.moon_light())
-	_mood.follow(indoors, gloom, _arid_here() if not indoors else 0.0, _weather.desert_arcane_storm if not indoors else 0.0, in_starhall)
-	if _glow != null:
-		_glow.set_shader_parameter("night", night)
+	_mood.follow(indoors, gloom, arid_now, _weather.desert_arcane_storm if not indoors else 0.0, in_starhall)
+	if absf(night - _sent_mat_night) > GLOBAL_EPSILON:
+		_sent_mat_night = night
+		if _glow != null:
+			_glow.set_shader_parameter("night", night)
 
 
 ## True while the camera looks into a pocket room or the mine: the rain, clouds and lightning of the sky never reach in there.

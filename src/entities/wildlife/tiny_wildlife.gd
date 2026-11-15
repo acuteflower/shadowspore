@@ -54,6 +54,7 @@ const TOAD_TONES: Array[Array] = [ ## dark, body, lit, wart, belly: three muted 
 
 
 var _buzz_cool: float = 0.0
+var _far_wait: float = 0.0
 
 func _ready() -> void:
 	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
@@ -206,8 +207,18 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	if delta > 0.0:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 520.0 * 520.0:
+			_far_wait = 0.22
 	_clock += delta
 	_attach()
+	if _far_wait > 0.0:
+		return
 	_visual.visible = species != "moth" or TimeManager.is_night() or _dusk
 	if tree_path.is_empty() and species in ["bee", "moth", "ladybug"]:
 		_visual.position.y = -2.0 - (sin(clampf(_elapsed / _duration, 0, 1) * PI) * float(_spec["flight_height"]) if _flying() else 0.0)

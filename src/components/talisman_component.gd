@@ -26,6 +26,7 @@ var bonus: Dictionary = {} ## what they add up to (TalismanRules.combine)
 var perks: Dictionary = {} ## the special abilities of the worn pieces (TalismanRules.perks): id -> its entry of the catalogue
 var ward_ready: bool = true ## the last wing beat can still be used (every peer; the host decides)
 var dive_left: float = 0.0 ## seconds the dive after a blink still counts (every peer counts it down)
+var starlight_left: float = 0.0 ## seconds the starlight perk after a blink remains armed
 
 var _ward_left: float = 0.0 ## host: seconds until the feather is whole again (runs on while it is not worn: taking it off is no reset)
 
@@ -56,6 +57,10 @@ func _process(delta: float) -> void:
 	if dive_left > 0.0:
 		dive_left = maxf(dive_left - delta, 0.0)
 		if dive_left <= 0.0:
+			dive_changed.emit()
+	if starlight_left > 0.0:
+		starlight_left = maxf(starlight_left - delta, 0.0)
+		if starlight_left <= 0.0:
 			dive_changed.emit()
 	if _ward_left > 0.0 and multiplayer.is_server():
 		_ward_left = maxf(_ward_left - delta, 0.0)
@@ -138,12 +143,14 @@ func corvid_calm() -> float:
 
 # ---------------------------------------------------------------- special abilities (docs/rissfeder.md)
 
-## Every peer, when a blink was played: opens the dive window (the next blow hits harder, see `dive_factor`).
+## Every peer, when a blink was played: opens the dive / starlight window (the next blow hits harder).
 func note_blink() -> void:
-	if not perks.has("dive"):
-		return
-	dive_left = float((perks["dive"] as Dictionary)["window"])
-	dive_changed.emit()
+	if perks.has("dive"):
+		dive_left = float((perks["dive"] as Dictionary)["window"])
+		dive_changed.emit()
+	if perks.has("starlight"):
+		starlight_left = float((perks["starlight"] as Dictionary)["window"])
+		dive_changed.emit()
 
 
 ## Host: the factor on the next weapon hit while the dive window is open.
@@ -165,6 +172,61 @@ func _dive_end() -> void:
 		return
 	dive_left = 0.0
 	dive_changed.emit()
+
+
+## Host: if the Starlight perk is armed after a blink, unleash a celestial wave around `at`.
+func trigger_starlight(at: Vector2, base_damage: float, attacker: int) -> void:
+	if starlight_left <= 0.0 or not perks.has("starlight") or not multiplayer.is_server():
+		return
+	var cfg: Dictionary = perks["starlight"] as Dictionary
+	var radius: float = float(cfg.get("radius", 38.0))
+	var bonus_dmg: float = base_damage * float(cfg.get("damage", 0.35))
+	var knock: float = float(cfg.get("knockback", 90.0))
+	starlight_left = 0.0
+	var player_node: Node2D = get_parent() as Node2D
+	if player_node != null:
+		for target: HurtboxComponent in HitScan.circle(player_node, at, radius, AttackComponent.HURTBOX_MASK):
+			target.take_hit(bonus_dmg, at, knock, attacker)
+	_starlight_hit.rpc(at, radius)
+
+
+@rpc("authority", "call_local", "reliable")
+func _starlight_hit(at: Vector2, radius: float) -> void:
+	starlight_left = 0.0
+	dive_changed.emit()
+	var burst: _StarlightBurst = _StarlightBurst.new(radius)
+	burst.global_position = at
+	if get_tree() != null and get_tree().current_scene != null:
+		get_tree().current_scene.add_child(burst)
+
+
+class _StarlightBurst:
+	extends Node2D
+	var _r: float = 38.0
+	var _t: float = 0.0
+
+	func _init(r: float = 38.0) -> void:
+		_r = r
+		material = Unlit.material()
+		z_index = 6
+
+	func _process(delta: float) -> void:
+		_t += delta
+		if _t >= 0.34:
+			queue_free()
+			return
+		queue_redraw()
+
+	func _draw() -> void:
+		var k: float = clampf(_t / 0.34, 0.0, 1.0)
+		var alpha: float = 1.0 - k
+		var rad: float = lerpf(8.0, _r, 1.0 - pow(1.0 - k, 2.0))
+		draw_arc(Vector2.ZERO, rad, 0.0, TAU, 24, Color("78f4e6", alpha * 0.85), 2.0)
+		draw_arc(Vector2.ZERO, rad * 0.72, 0.0, TAU, 18, Color("fff0b0", alpha * 0.9), 1.0)
+		for i: int in 8:
+			var a: float = float(i) * TAU / 8.0 + k * 0.8
+			var pt: Vector2 = Vector2.from_angle(a) * rad
+			draw_rect(Rect2(pt.round() - Vector2.ONE, Vector2(2.0, 2.0)), Color("fff0b0" if i % 2 == 0 else "d8fff9", alpha))
 
 
 ## Host, called by `HealthComponent` when a blow or tick would take her last point: the feather catches it once, then needs `cooldown` seconds.

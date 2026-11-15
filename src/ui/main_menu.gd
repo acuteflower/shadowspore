@@ -92,6 +92,12 @@ func _ready() -> void:
 		_ui.enabled = true
 		_ui.apply_return_state(ret)
 	_update_void(0.0, 0.0)
+	if not capture_mode:
+		_restore_cloud()
+
+
+func _restore_cloud() -> void:
+	await CloudSession.try_restore_session()
 
 
 func clock() -> float:

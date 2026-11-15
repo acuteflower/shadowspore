@@ -47,6 +47,15 @@
 			"damage": 28,
 			"radius": 56,
 			"knockback": 150
+		},
+		"starlight": {
+			"name": "STERNENFUNKE",
+			"text": "Nach einem Schattenschritt oder Lichtschritt entfesselt dein nächster Treffer innerhalb von {window} s eine Sternenlicht-Welle ({damage} % Zusatzschaden im Umkreis).",
+			"percent": ["damage"],
+			"window": 4.0,
+			"damage": 0.35,
+			"radius": 38,
+			"knockback": 90
 		}
 	}
 }

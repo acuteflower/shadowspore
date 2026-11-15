@@ -175,8 +175,10 @@ class ChunkBuild:
 	var clover_discs: Array[Vector3] = [] ## (x, y, rx) of the fields placed so far (read instead of the nodes, which a worker may still be painting)
 	var clover_jobs: Array[Jobs.Job] = [] ## each field paints its atlas on a worker (`CloverField.setup`); phase 9 waits for them
 	var commit_index: int = 0 ## props of `chunk.things` already added to the tree by `_finish_commit`
-	var commit_stage: int = 0 ## 0 = props, 1 = logs, 2 = clover, 3 = finalize
+	var commit_stage: int = 0 ## 0 = props, 1 = logs, 2 = clover, 3..8 = finalize & river details, 9 = live
 	var commit_sub_index: int = 0 ## index within logs or clover
+	var river_details: RiverDetails
+	var river_step: int = 0
 	var patches_seen: Array[Node] = [] ## Terrain.patches as this chunk last saw them (compared per candidate)
 	var job: Jobs.Job ## phases 0-4 (generator, ground, cliffs, prop nodes) run on a worker thread (Jobs); null = not started / sliced on the main thread
 	var beds_pending: Array[Dictionary] = [] ## forest beds that passed the worker checks; the surface patches decide on the main thread
@@ -1903,9 +1905,65 @@ func _collect_warm_paths() -> void:
 		"res://assets/world/map_water.png",
 		"res://assets/world/outer_sdf.png",
 		"res://assets/world/lakes_sdf.png",
+		"res://assets/water/river_details.png",
+		"res://assets/water/bank_details.png",
+		"res://assets/water/bank_details_glow.png",
+		"res://assets/water/water_flora.png",
+		"res://assets/water/water_flora_glow.png",
+		"res://assets/water/waterfall_rock.png",
+		"res://assets/water/waterfall.png",
+		"res://assets/water/cliff_spring.png",
+		"res://assets/water/cliff_spring_glow.png",
+		"res://src/entities/wildlife/wild_corvid.tscn",
+		"res://src/entities/wildlife/wild_meadow_bird.tscn",
+		"res://src/entities/wildlife/woodland_mammal.tscn",
+		"res://src/entities/wildlife/tiny_wildlife.tscn",
+		"res://src/entities/wildlife/wild_bear.tscn",
+		"res://src/entities/wildlife/meadow_butterfly.tscn",
+		"res://src/entities/wildlife/wildlife_shelter.tscn",
+		"res://src/water/river_animal.tscn",
+		"res://assets/wildlife/badger_den.png",
+		"res://assets/wildlife/desert_burrow.png",
+		"res://assets/wildlife/pet_marks.png",
+		"res://assets/water/oasis_bank_details.png",
+		"res://assets/water/oasis_bank_details_glow.png",
+		"res://assets/water/oasis_water_flora.png",
+		"res://assets/water/oasis_water_flora_glow.png",
+		"res://assets/water/river_jelly.png",
+		"res://assets/shaders/river_flora.gdshader",
+		"res://assets/shaders/river_jelly.gdshader",
 	]:
 		if not _warm_paths.has(extra_path):
 			_warm_paths.append(extra_path)
+	for table_name: String in ["wildlife", "river_animals"]:
+		var tbl: Dictionary = DataRegistry.table(table_name)
+		for key: String in tbl:
+			var entry: Variant = tbl[key]
+			if not (entry is Dictionary):
+				continue
+			var d: Dictionary = entry as Dictionary
+			for field_name: String in ["texture", "sheet", "scene"]:
+				var asset_path: String = String(d.get(field_name, ""))
+				if asset_path.begins_with("res://") and not _warm_paths.has(asset_path):
+					_warm_paths.append(asset_path)
+			if table_name == "wildlife" and d.has("call_count"):
+				for call_i: int in int(d.get("call_count", 0)):
+					var wav_path: String = "res://assets/audio/wildlife/%s_%d.wav" % [key, call_i]
+					if ResourceLoader.exists(wav_path) and not _warm_paths.has(wav_path):
+						_warm_paths.append(wav_path)
+			elif table_name == "river_animals" and d.has("sound"):
+				var sound_stem: String = String(d.get("sound", ""))
+				for call_i: int in 2:
+					var wav_path: String = "res://assets/audio/wildlife/%s_%d.wav" % [sound_stem, call_i]
+					if ResourceLoader.exists(wav_path) and not _warm_paths.has(wav_path):
+						_warm_paths.append(wav_path)
+	if _rivers != null and _rivers._data.has("chunks"):
+		for chunk_key: String in (_rivers._data["chunks"] as Dictionary):
+			var rec: Dictionary = (_rivers._data["chunks"] as Dictionary)[chunk_key] as Dictionary
+			for river_field: String in ["field", "bank"]:
+				var r_path: String = String(rec.get(river_field, ""))
+				if r_path.begins_with("res://") and not _warm_paths.has(r_path):
+					_warm_paths.append(r_path)
 
 
 func loading_warmup_step() -> bool:
@@ -2195,7 +2253,8 @@ func _stream(all: bool) -> void:
 		else:
 			_unload_queue.erase(c)
 	var unloads: int = 0
-	while not _unload_queue.is_empty() and unloads < MAX_UNLOADS_PER_FRAME:
+	var can_unload: bool = _pending_commit == null and (Time.get_ticks_usec() < frame_deadline or _unload_queue.size() > 6)
+	while can_unload and not _unload_queue.is_empty() and unloads < MAX_UNLOADS_PER_FRAME:
 		var c_to_unload: Vector2i = _unload_queue.pop_front()
 		if _chunks.has(c_to_unload):
 			_unload_chunk(c_to_unload)
@@ -2583,22 +2642,55 @@ func _finish_commit(deadline: int = 0) -> void:
 			_register_harvest(field)
 		build.commit_stage = 3
 
-	# Stage 3: Finalize
+	# Stage 3..9: Finalize subsystems incrementally under deadline
 	if build.commit_stage == 3:
 		if deadline > 0 and Time.get_ticks_usec() >= deadline:
 			return
-		_pending_commit = null
+		build.commit_stage = 4
 		if sowing != null:
 			sowing.populate(build.cell, chunk)
+	if build.commit_stage == 4:
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			return
+		build.commit_stage = 5
 		if desert_ruins != null:
 			desert_ruins.populate_chunk(build.cell)
+	if build.commit_stage == 5:
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			return
+		build.commit_stage = 6
 		if meadow_landmarks != null:
 			meadow_landmarks.populate_chunk(build.cell)
+	if build.commit_stage == 6:
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			return
+		build.commit_stage = 7
 		if meadow_pois != null:
 			meadow_pois.populate_chunk(build.cell)
+	if build.commit_stage == 7:
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			return
+		build.commit_stage = 8
 		if meadow_wonders != null:
 			meadow_wonders.populate_chunk(build.cell)
-		_rivers.attach_chunk(chunk.node, build.cell)
+	if build.commit_stage == 8:
+		if build.river_details == null:
+			if deadline > 0 and Time.get_ticks_usec() >= deadline:
+				return
+			build.river_details = _rivers.attach_chunk(chunk.node, build.cell, true)
+			if build.river_details == null:
+				build.commit_stage = 9
+		if build.river_details != null:
+			while build.river_step < 4:
+				if deadline > 0 and Time.get_ticks_usec() >= deadline:
+					return
+				build.river_details.setup_step(_rivers, build.cell, build.river_step)
+				build.river_step += 1
+			build.commit_stage = 9
+	if build.commit_stage == 9:
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			return
+		_pending_commit = null
 		_chunks[build.cell] = chunk
 		LeafCritter.settle_chunk(chunk.things)
 		_wildlife.chunk_loaded(build.cell)
@@ -2777,6 +2869,7 @@ func _unload_chunk(c: Vector2i) -> void:
 	_unload_queue.erase(c)
 	if not _chunks.has(c):
 		return
+	_flower_cache.erase(c)
 	_wildlife.chunk_unloaded(c)
 	var chunk: Chunk = _chunks[c]
 	for biome: String in chunk.cells:
@@ -3502,17 +3595,23 @@ func _fauna_habitat(at: Vector2, species: String) -> bool:
 	return biomes.has(_land_biome(cell)) and _relief.flat_around(at, float(spec.get("body_radius", 3.0)) + 2.0) and _rivers.clear_for_prop(at, float(spec.get("body_radius", 3.0)))
 
 
+var _flower_atlases: Dictionary = {}
+var _flower_cache: Dictionary = {}
+
+
 ## Real painted meadow blossoms, not arbitrary air positions. Called after a chunk is painted.
 func _flower_targets(chunk: Vector2i) -> Array[Vector2]:
+	if _flower_cache.has(chunk):
+		return (_flower_cache[chunk] as Array[Vector2]).duplicate()
 	var result: Array[Vector2] = []
-	var atlases: Dictionary = {} ## a set of atlas coordinates (lookups per cell, not a list scan)
-	for kind: String in DataRegistry.get_entry("wildlife", "butterfly").get("flower_kinds", []):
-		for xy: Array in _tiles.get(kind, []):
-			atlases[Vector2i(int(xy[0]), int(xy[1]))] = true
+	if _flower_atlases.is_empty():
+		for kind: String in DataRegistry.get_entry("wildlife", "butterfly").get("flower_kinds", []):
+			for xy: Array in _tiles.get(kind, []):
+				_flower_atlases[Vector2i(int(xy[0]), int(xy[1]))] = true
 	for y: int in CHUNK:
 		for x: int in CHUNK:
 			var cell: Vector2i = chunk * CHUNK + Vector2i(x, y)
-			if atlases.has(_ground.get_cell_atlas_coords(cell)):
+			if _flower_atlases.has(_ground.get_cell_atlas_coords(cell)):
 				var px: Vector2 = Vector2(cell) * 16.0 + Vector2(8, 8)
 				if BiomeBlend.arid_at(px) < 0.22 and _land_biome(cell) != "quartz_desert":
 					result.append(px)
@@ -3526,7 +3625,10 @@ func _flower_targets(chunk: Vector2i) -> Array[Vector2]:
 		for cf: CloverField in loaded_chunk.clover:
 			if cf != null and not cf.cut:
 				result.append(cf.global_position)
-	return result
+	if _flower_cache.size() >= 64:
+		_flower_cache.clear()
+	_flower_cache[chunk] = result
+	return result.duplicate()
 
 
 ## Host-owned authoring snapshot; late joiners receive this same layer.
@@ -3541,6 +3643,7 @@ func editor_apply(data: Dictionary, broadcast: bool = true) -> void:
 	if terrain_changed:
 		_relief.editor_apply(edits.terrain)
 		_generator._cache.clear()
+	_flower_cache.clear()
 	var loaded: Array = _chunks.keys()
 	for c: Vector2i in _chunks.keys():
 		_unload_chunk(c)

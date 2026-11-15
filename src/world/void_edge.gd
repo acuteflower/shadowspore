@@ -13,6 +13,8 @@ var _clock: float = 0.0 ## animation time; runs slow by day and faster at night,
 var _sdf_data: PackedByteArray = PackedByteArray()
 var _sdf_w: int = 0
 var _sdf_h: int = 0
+var _last_near_box: Rect2 = Rect2()
+var _last_near_result: bool = false
 
 
 func setup(sdf: Texture2D) -> void:
@@ -67,6 +69,16 @@ func _is_void_near(top_left: Vector2, bottom_right: Vector2) -> bool:
 	return false
 
 
+func _is_void_near_cached(top_left: Vector2, bottom_right: Vector2) -> bool:
+	var view_rect: Rect2 = Rect2(top_left, bottom_right - top_left)
+	if not _last_near_result and _last_near_box.size.x > 0.0 and _last_near_box.encloses(view_rect):
+		return false
+	var test_box: Rect2 = view_rect.grow(64.0)
+	_last_near_result = _is_void_near(test_box.position, test_box.end)
+	_last_near_box = test_box
+	return _last_near_result
+
+
 func _process(delta: float) -> void:
 	var night: float = TimeManager.night_amount()
 	_clock = fmod(_clock + delta * lerpf(0.6, 1.25, night), 20000.0)
@@ -75,7 +87,7 @@ func _process(delta: float) -> void:
 	var bottom_right: Vector2 = (inverse * get_viewport_rect().size).ceil() + Vector2.ONE * 2.0
 
 	var center: Vector2 = (top_left + bottom_right) * 0.5
-	if Interiors.slot_at(center) >= 0 or not _is_void_near(top_left, bottom_right):
+	if Interiors.slot_at(center) >= 0 or not _is_void_near_cached(top_left, bottom_right):
 		visible = false
 		return
 

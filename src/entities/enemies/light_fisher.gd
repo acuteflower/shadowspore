@@ -67,6 +67,8 @@ var _wet_left: float = 0.0
 var _retired: bool = false
 var _world: Node
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _zone_drawn: bool = false
+var _fx_drawn: bool = false
 
 @onready var _rig: FisherRig = $Rig
 @onready var _health: HealthComponent = $HealthComponent
@@ -126,8 +128,14 @@ func _process(delta: float) -> void:
 	_follow_rig()
 	if state == State.ORB_CAST:
 		_orb_sounds()
-	_zone.queue_redraw()
-	_fx.queue_redraw()
+	var zone_active: bool = state in [State.SNAP_WINDUP, State.SNAP, State.FLASH_WINDUP, State.ORB_CAST]
+	if zone_active or _zone_drawn:
+		_zone.queue_redraw()
+		_zone_drawn = zone_active
+	var fx_active: bool = state in [State.FLASH, State.SNAP, State.ORB_CAST] or (state == State.RECOVER and _previous == State.FLASH and _state_time <= 0.9)
+	if fx_active or _fx_drawn:
+		_fx.queue_redraw()
+		_fx_drawn = fx_active
 
 
 ## The hurtboxes and the lantern's light follow the picture: the lantern hangs where the stalk ends, the maw is where the head is.

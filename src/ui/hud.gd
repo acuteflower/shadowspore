@@ -41,6 +41,14 @@ var _boss_alpha: float = 1.0 ## 0 while a boss fight is active, hiding non-comba
 var _cover_alpha: Dictionary = {} ## part name -> fade of the full-screen menus (QuestVine, HintCard)
 var _last_pos: Vector2 = Vector2.INF
 var _fold_base: Dictionary = {} ## part -> its offsets from hud.tscn, before the hotbar fold moved it
+var _part_cache: Dictionary = {} ## cached child node refs by name (updated via child_entered_tree / child_exiting_tree)
+var _last_fold: Vector4 = Vector4(INF, INF, INF, INF)
+var _last_fade_alphas: Dictionary = {}
+var _hotbar_node: Hotbar
+var _blink_icon_node: CanvasItem
+var _inventory_window: CanvasItem
+var _map_window: CanvasItem
+var _quest_journal: CanvasItem
 
 
 ## Any real input or cursor movement counts as activity.
@@ -69,7 +77,7 @@ func _holds_hud(covered: bool) -> bool:
 
 
 func _is_boss_fight_active() -> bool:
-	var boss: BossBar = get_node_or_null("BossBar") as BossBar
+	var boss: BossBar = _cached_node("BossBar") as BossBar
 	if boss != null and boss.is_fighting():
 		return true
 	return get_tree() != null and get_tree().root.get_node_or_null("BossIntroLayer") != null
@@ -77,6 +85,16 @@ func _is_boss_fight_active() -> bool:
 
 func _on_player_damaged(_amount: float, _from: Vector2, _knockback: float) -> void:
 	_idle_time = 0.0
+
+
+func _cached_node(part: String) -> Node:
+	if _part_cache.has(part):
+		var n: Node = _part_cache[part] as Node
+		if n == null or is_instance_valid(n):
+			return n
+	var found: Node = get_node_or_null(part)
+	_part_cache[part] = found
+	return found
 
 
 func _apply_idle_fade(delta: float, covered: bool) -> void:
@@ -91,20 +109,24 @@ func _apply_idle_fade(delta: float, covered: bool) -> void:
 	_vista_alpha = move_toward(_vista_alpha, 0.0 if vista_active else 1.0, delta / (0.85 if vista_active else 0.35))
 	var boss_active: bool = _is_boss_fight_active()
 	_boss_alpha = move_toward(_boss_alpha, 0.0 if boss_active else 1.0, delta / (BOSS_FADE_OUT if boss_active else BOSS_FADE_IN))
+	var base_alpha: float = _idle_alpha * _vista_alpha
 	for part: String in IDLE_PARTS:
-		var node: CanvasItem = get_node_or_null(part) as CanvasItem
+		var node: CanvasItem = _cached_node(part) as CanvasItem
 		if node != null:
 			var boss_mult: float = _boss_alpha if BOSS_HIDE_PARTS.has(part) else 1.0
-			node.modulate.a = _idle_alpha * _vista_alpha * float(_cover_alpha.get(part, 1.0)) * boss_mult
+			var target_alpha: float = base_alpha * float(_cover_alpha.get(part, 1.0)) * boss_mult
+			if absf(float(_last_fade_alphas.get(part, -1.0)) - target_alpha) > 0.0005:
+				_last_fade_alphas[part] = target_alpha
+				node.modulate.a = target_alpha
 
 
 ## Full-screen menus cover the quest branch and tutorial card.
 func _process(delta: float) -> void:
-	var skills: SkillTreeWindow = get_node_or_null("SkillTreeWindow") as SkillTreeWindow
-	var progress: ProgressWindow = get_node_or_null("ProgressWindow") as ProgressWindow
-	var pause: CanvasItem = get_node_or_null("PauseMenu") as CanvasItem
-	var covered: bool = $InventoryWindow.visible or $MapWindow.visible or $QuestJournal.visible or (skills != null and skills.visible) or (progress != null and progress.visible) or (pause != null and pause.visible) ## the Escape menu too
-	var boss: BossBar = get_node_or_null("BossBar") as BossBar
+	var skills: SkillTreeWindow = _cached_node("SkillTreeWindow") as SkillTreeWindow
+	var progress: ProgressWindow = _cached_node("ProgressWindow") as ProgressWindow
+	var pause: CanvasItem = _cached_node("PauseMenu") as CanvasItem
+	var covered: bool = (_inventory_window != null and _inventory_window.visible) or (_map_window != null and _map_window.visible) or (_quest_journal != null and _quest_journal.visible) or (skills != null and skills.visible) or (progress != null and progress.visible) or (pause != null and pause.visible) ## the Escape menu too
+	var boss: BossBar = _cached_node("BossBar") as BossBar
 	if boss != null:
 		boss.set_covered(covered)
 	for part: String in ["QuestVine", "HintCard", "MultiplayerHud"]:
@@ -115,19 +137,24 @@ func _process(delta: float) -> void:
 
 ## The folded hotbar sinks and draws in: the sap vines stay on its ends, the skill crystal sinks and fades with the pendants.
 func _follow_hotbar_fold() -> void:
-	var bar: Hotbar = $Hotbar as Hotbar
+	var bar: Hotbar = _hotbar_node
 	if bar == null:
 		return
+	var state: Vector4 = Vector4(bar.drop, bar.inset, bar.sink, bar.shown)
+	if state == _last_fold:
+		return
+	_last_fold = state
 	_shift_part("Hotbar", Vector2(0.0, bar.drop))
 	_shift_part("HealthBar", Vector2(bar.inset, bar.drop))
 	_shift_part("StaminaBar", Vector2(-bar.inset, bar.drop))
 	_shift_part("BlinkIcon", Vector2(-bar.inset, bar.drop + bar.sink))
 	_shift_part("StatusTags", Vector2(0.0, bar.drop)) ## burning and the like stay above the health vine
-	($BlinkIcon as CanvasItem).self_modulate.a = bar.shown
+	if _blink_icon_node != null:
+		_blink_icon_node.self_modulate.a = bar.shown
 
 
 func _shift_part(part: String, by: Vector2) -> void:
-	var node: Control = get_node_or_null(part) as Control
+	var node: Control = _cached_node(part) as Control
 	if node == null:
 		return
 	if not _fold_base.has(part):
@@ -140,7 +167,17 @@ func _shift_part(part: String, by: Vector2) -> void:
 
 
 func _ready() -> void:
-	$Hotbar.visibility_changed.connect(func() -> void: _sync_hotbar_bars.call_deferred())
+	_hotbar_node = get_node_or_null("Hotbar") as Hotbar
+	_blink_icon_node = get_node_or_null("BlinkIcon") as CanvasItem
+	_inventory_window = get_node_or_null("InventoryWindow") as CanvasItem
+	_map_window = get_node_or_null("MapWindow") as CanvasItem
+	_quest_journal = get_node_or_null("QuestJournal") as CanvasItem
+	for child: Node in get_children():
+		_part_cache[child.name] = child
+	child_entered_tree.connect(func(c: Node) -> void: _part_cache[c.name] = c)
+	child_exiting_tree.connect(func(c: Node) -> void: _part_cache.erase(c.name); _last_fade_alphas.erase(c.name))
+	if _hotbar_node != null:
+		_hotbar_node.visibility_changed.connect(func() -> void: _sync_hotbar_bars.call_deferred())
 	process_mode = Node.PROCESS_MODE_ALWAYS ## the HUD keeps moving while the Escape menu pauses the game
 
 

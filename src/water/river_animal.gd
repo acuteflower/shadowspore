@@ -31,6 +31,12 @@ var _wake_wait: float = 0.0
 var _voice: AudioStreamPlayer2D
 @onready var _sprite: Sprite2D = $Sprite
 @onready var _ripples: WaterRipples = $Ripples
+static var _tex_cache: Dictionary = {}
+static var _sfx_cache: Dictionary = {}
+
+static func clear_cache() -> void:
+	_tex_cache.clear()
+	_sfx_cache.clear()
 
 func _ready() -> void:
 	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
@@ -43,7 +49,12 @@ func _ready() -> void:
 	add_to_group("river_animals")
 	_sound_wait = _rng.randf_range(2.0, SOUND_COOLDOWN)
 	if _spec.has("sheet"):
-		_sprite.texture = load(String(_spec.sheet)) as Texture2D
+		var sheet_path: String = String(_spec.sheet)
+		var tex: Texture2D = _tex_cache.get(sheet_path) as Texture2D
+		if tex == null:
+			tex = load(sheet_path) as Texture2D
+			_tex_cache[sheet_path] = tex
+		_sprite.texture = tex
 		_sprite.hframes = int(_spec.cols)
 		_sprite.vframes = int(_spec.builds) * 8
 		_sprite.offset = -Vector2(float(_spec.feet[0]), float(_spec.feet[1]))
@@ -222,7 +233,12 @@ func _call() -> void:
 	var stream_idx: int = _rng.randi() % 2
 	if kind == "duck":
 		stream_idx = 1 if _build() == 0 else 0
-	_voice.stream = load("res://assets/audio/wildlife/%s_%d.wav" % [String(_spec.sound), stream_idx]) as AudioStream
+	var sfx_path: String = "res://assets/audio/wildlife/%s_%d.wav" % [String(_spec.sound), stream_idx]
+	var stream: AudioStream = _sfx_cache.get(sfx_path) as AudioStream
+	if stream == null:
+		stream = load(sfx_path) as AudioStream
+		_sfx_cache[sfx_path] = stream
+	_voice.stream = stream
 	_voice.pitch_scale = _rng.randf_range(0.92, 1.1) * (1.42 if kind == "duck" and member > 0 and school.begins_with("duckfamily") else 1.0)
 	_voice.play()
 

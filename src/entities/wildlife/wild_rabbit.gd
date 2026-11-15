@@ -45,6 +45,7 @@ var _look_turned: bool = false
 
 
 var _thump_cool: float = 0.0
+var _far_wait: float = 0.0
 
 func _ready() -> void:
 	add_to_group("wild_animals") ## the cursor shrinks to a dot over animals (GameCursor)
@@ -80,8 +81,17 @@ func _physics_process(delta: float) -> void:
 		_advance_hop(delta)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if captured: return
+	if delta > 0.0:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 520.0 * 520.0:
+			_far_wait = 0.22
+			return
 	var col: int = 0
 	if _hopping:
 		var t: float = clampf(_hop_time / _hop_duration, 0.0, 1.0)

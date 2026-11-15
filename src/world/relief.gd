@@ -218,19 +218,29 @@ func style(x: int, y: int) -> int:
 
 ## True if any land tile in `rect` (tile coordinates) has crystal (3), void (4) or quartz-sandstone (6) style.
 func has_glow_style(rect: Rect2i) -> bool:
+	return (check_view_features(rect) & 1) != 0
+
+
+## Bitmask for `rect` (tile coordinates): bit 0 = has glow style (3, 4, or 6), bit 1 = has elevated terrain (level > 0).
+func check_view_features(rect: Rect2i) -> int:
 	var x0: int = maxi(0, rect.position.x)
 	var y0: int = maxi(0, rect.position.y)
 	var x1: int = mini(_side, rect.end.x)
 	var y1: int = mini(_side, rect.end.y)
+	var mask: int = 0
 	for y: int in range(y0, y1):
 		var row: int = y * _side * 4
 		for x: int in range(x0, x1):
 			var idx: int = row + x * 4
+			if _bytes[idx] > 0:
+				mask |= 2
 			if _bytes[idx + 3] != 0: ## land
 				var st: int = _bytes[idx + 1] >> 4
 				if st == 3 or st == 4 or st == 6:
-					return true
-	return false
+					mask |= 1
+			if mask == 3:
+				return 3
+	return mask
 
 
 ## Where a prop or a player can stand: land that is no wall face.
@@ -244,25 +254,37 @@ func level_at(pos: Vector2) -> float:
 
 
 static func sample_level_at(bytes: PackedByteArray, field: PackedByteArray, side: int, pos: Vector2) -> float:
-	var u: Vector2 = pos / TILE - Vector2(0.5, 0.5)
-	var x0: int = floori(u.x)
-	var y0: int = floori(u.y)
+	var inv_tile: float = 1.0 / TILE
+	var ux: float = pos.x * inv_tile - 0.5
+	var uy: float = pos.y * inv_tile - 0.5
+	var x0: int = floori(ux)
+	var y0: int = floori(uy)
+	var wx: float = ux - x0
+	var wy: float = uy - y0
+	var max_s: int = side - 1
+	var cx0: int = 0 if x0 < 0 else (max_s if x0 > max_s else x0)
+	var cx1: int = 0 if x0 + 1 < 0 else (max_s if x0 + 1 > max_s else x0 + 1)
+	var cy0: int = 0 if y0 < 0 else (max_s if y0 > max_s else y0)
+	var cy1: int = 0 if y0 + 1 < 0 else (max_s if y0 + 1 > max_s else y0 + 1)
+	var row0: int = cy0 * side
+	var row1: int = cy1 * side
+	var i00: int = (row0 + cx0) * 3
+	var i10: int = (row0 + cx1) * 3
+	var i01: int = (row1 + cx0) * 3
+	var i11: int = (row1 + cx1) * 3
 	var height: float = 0.0
 	for channel: int in 3:
-		var amount: float = lerpf(
-			lerpf(_sample_field_at(field, side, x0, y0, channel), _sample_field_at(field, side, x0 + 1, y0, channel), u.x - x0),
-			lerpf(_sample_field_at(field, side, x0, y0 + 1, channel), _sample_field_at(field, side, x0 + 1, y0 + 1, channel), u.x - x0),
-			u.y - y0
-		)
-		if amount > 0.5:
+		var a: float = field[i00 + channel] + (field[i10 + channel] - field[i00 + channel]) * wx
+		var b: float = field[i01 + channel] + (field[i11 + channel] - field[i01 + channel]) * wx
+		if a + (b - a) * wy > 127.5:
 			height += 1.0
-	var x: int = floori(pos.x / TILE)
-	var y: int = floori(pos.y / TILE)
+	var x: int = floori(pos.x * inv_tile)
+	var y: int = floori(pos.y * inv_tile)
 	var k: int = 0 if (x < 0 or y < 0 or x >= side or y >= side) else (bytes[(y * side + x) * 4 + 1] & 15)
 	if k >= RAMP:
 		var geom: int = bytes[(y * side + x) * 4 + 2]
 		var depth: int = ((geom >> 2) & 3) + 1
-		height += (depth - (geom & 3) - fposmod(pos.y, TILE) / TILE) / depth
+		height += (depth - (geom & 3) - fposmod(pos.y, TILE) * inv_tile) / depth
 	return height
 
 

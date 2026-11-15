@@ -36,6 +36,11 @@ func _set_wounded(on: bool, silent: bool = false) -> void:
 	if on and not _on and not silent:
 		_flash = 1.0
 	_on = on
+	if _on or _grow > 0.0 or _flash > 0.0:
+		set_process(true)
+	else:
+		visible = false
+		set_process(false)
 
 
 func _process(delta: float) -> void:
@@ -43,6 +48,7 @@ func _process(delta: float) -> void:
 	_flash = move_toward(_flash, 0.0, delta * 1.6)
 	if _grow <= 0.0 and _flash <= 0.0:
 		visible = false
+		set_process(false)
 		return
 	visible = true
 	_time += delta

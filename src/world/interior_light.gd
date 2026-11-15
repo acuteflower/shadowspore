@@ -11,6 +11,8 @@ extends PointLight2D
 @export var day_only: bool = false
 
 var _phase: float = 0.0
+var _step_wait: float = 0.0
+var _far_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -18,9 +20,32 @@ func _ready() -> void:
 	LightTexture.apply(self, radius * 2, squash, variant)
 	color = glow_color
 	_phase = fposmod(position.x * 0.37 + position.y * 0.71, TAU)
+	_far_wait = fposmod(absf(position.x * 0.013 + position.y * 0.029), 0.35)
+	set_process(is_visible_in_tree())
 
 
-func _process(_delta: float) -> void:
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and is_node_ready():
+		_far_wait = 0.0
+		set_process(is_visible_in_tree())
+
+
+func _process(delta: float) -> void:
+	if not is_visible_in_tree():
+		set_process(false)
+		return
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if delta > 0.0:
+		var cam: Camera2D = get_viewport().get_camera_2d()
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 680.0 * 680.0:
+			_far_wait = 0.35
+			return
+	_step_wait -= delta
+	if _step_wait > 0.0:
+		return
+	_step_wait = 1.0 / 30.0
 	var t: float = Time.get_ticks_msec() * 0.001
 	var dance: float = 1.0 + flicker * (0.5 * sin(t * 11.0 + _phase) + 0.3 * sin(t * 17.3 + _phase * 2.0) + 0.2 * sin(t * 4.1))
 	var breath: float = 1.0 + 0.05 * sin(t * 1.3 + _phase)

@@ -4,6 +4,7 @@ varying vec2 daylight_position;
 #include "res://assets/shaders/flora_wind.gdshaderinc"
 void vertex() {
 	daylight_position = (MODEL_MATRIX * vec4(VERTEX, 0.0, 1.0)).xy;
+	v_world_origin = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xy;
 	modulate_in = COLOR;
 }
 void fragment() {

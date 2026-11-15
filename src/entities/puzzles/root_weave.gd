@@ -18,6 +18,7 @@ const SAP_FLOW: Color = Color("aaf8ee")
 const SAP_GOLD: Color = Color("ffb347")
 const THORN: Color = Color("0c0814")
 const THORN_TIP: Color = Color("6a4ab0")
+const ACTIVE_DIST_SQ: float = 720.0 * 720.0
 
 var rules: WeaveRules
 var cfg: Dictionary = {}
@@ -46,6 +47,8 @@ var _sap_node: Node2D
 var _fx_node: Node2D
 var _runes: Dictionary = {}
 var _rune_order: Array = []
+var _far_wait: float = 0.0
+var _idle_redraw_t: float = 0.0
 
 
 func setup(entry: Dictionary, tuning: Dictionary) -> void:
@@ -254,7 +257,31 @@ func _rpc_state(on: bool, l: int, p: int, solved_: bool) -> void:
 	_apply_state(on, l, p, solved_)
 
 
+func _has_rise_pending() -> bool:
+	for rt: float in _rise_t:
+		if rt < INF:
+			return true
+	return false
+
+
 func _process(delta: float) -> void:
+	if (not active or done) and _events.is_empty() and _sparks.is_empty() and _clods.is_empty() and _sinking < 0.0 and _time >= _gold_t + 3.0 and _focus_bit < 0 and not _has_rise_pending():
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null:
+			var near: bool = _heart_pos.distance_squared_to(cam.get_screen_center_position()) <= ACTIVE_DIST_SQ
+			if not near:
+				for p: Player in Player.all:
+					if is_instance_valid(p) and p.global_position.distance_squared_to(_heart_pos) <= ACTIVE_DIST_SQ:
+						near = true
+						break
+			if not near:
+				_far_wait = 0.3
+				return
 	_time += delta
 	while not _events.is_empty() and float((_events[0] as Array)[0]) <= _time:
 		var ev: Array = _events.pop_front() as Array
@@ -292,8 +319,16 @@ func _process(delta: float) -> void:
 		c[0] = (c[0] as Vector2) + (c[1] as Vector2) * delta
 		c[1] = (c[1] as Vector2) + Vector2(0, 260.0) * delta
 	_clods = _clods.filter(func(c: Array) -> bool: return float(c[2]) < float(c[3]))
-	_root_node.queue_redraw()
-	_sap_node.queue_redraw()
+	if moving or _focus_bit >= 0 or _has_rise_pending():
+		_idle_redraw_t = 0.0
+		_root_node.queue_redraw()
+		_sap_node.queue_redraw()
+	else:
+		_idle_redraw_t -= delta
+		if _idle_redraw_t <= 0.0:
+			_idle_redraw_t = 0.06 if active else 0.14
+			_root_node.queue_redraw()
+			_sap_node.queue_redraw()
 	if moving or not _clods.is_empty():
 		_fx_node.queue_redraw()
 	if multiplayer.is_server():

@@ -75,7 +75,7 @@ const GOVERN_COOLDOWN: float = 6.0 ## s nach jeder Änderung nichts tun (Streami
 
 var level: int = Level.HIGH ## die gewählte Stufe
 var effective: int = Level.HIGH ## die wirksame Stufe (<= level, vom Governor gesenkt)
-var adaptive: bool = true
+var adaptive: bool = false
 
 var _frame_sum: float = 0.0
 var _frame_count: int = 0
@@ -90,7 +90,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_priority = -90
 	reload()
-	get_tree().node_added.connect(_on_node_added)
+	_sync_node_added_hook()
 
 
 ## Liest die Einstellungen neu und wendet alles an (vom Einstellungsmenü nach jeder Änderung gerufen).
@@ -185,14 +185,14 @@ func _on_node_added(node: Node) -> void:
 		node.set(&"amount", maxi(1, int(round(base * factor))))
 
 
-## Ziel-Framezeit in ms: Bildratenlimit, sonst die Bildschirmfrequenz (mindestens 60 Hz).
+## Ziel-Framezeit in ms: Bildratenlimit (höchstens 60 Hz als Governor-Ziel), sonst 60 Hz.
 func target_ms() -> float:
 	if Engine.max_fps > 0:
-		return 1000.0 / Engine.max_fps
+		return 1000.0 / minf(float(Engine.max_fps), 60.0)
 	var hz: float = DisplayServer.screen_get_refresh_rate()
 	if hz <= 1.0:
 		hz = 60.0
-	return 1000.0 / clampf(hz, 60.0, 144.0)
+	return 1000.0 / clampf(hz, 30.0, 60.0)
 
 
 func average_ms() -> float:
@@ -253,16 +253,30 @@ func _set_effective(value: int, quiet: bool = false) -> void:
 	value = clampi(value, Level.LOW, level)
 	if value == effective and quiet:
 		apply_static()
+		_sync_node_added_hook()
 		return
 	var moved: bool = value != effective
 	effective = value
 	_cooldown = GOVERN_COOLDOWN
 	apply_static()
+	_sync_node_added_hook()
 	if moved:
 		apply_engine()
 		if not quiet and OS.is_debug_build():
 			print("[Quality] wirksame Stufe: %s (Mittel %.1f ms, Ziel %.1f ms)" % [NAMES[effective], _avg_ms, target_ms()])
 	changed.emit()
+
+
+func _sync_node_added_hook() -> void:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	var need_hook: bool = not is_equal_approx(scale("particles"), 1.0)
+	var connected: bool = tree.node_added.is_connected(_on_node_added)
+	if need_hook and not connected:
+		tree.node_added.connect(_on_node_added)
+	elif not need_hook and connected:
+		tree.node_added.disconnect(_on_node_added)
 
 
 ## Budgets, die als statische Werte gelesen werden (heiße Pfade sollen kein Dictionary nachschlagen).
@@ -305,6 +319,7 @@ func cycle(key: String, dir: int) -> void:
 	match key:
 		"quality":
 			GameSettings.set_value("quality", posmod(level + dir, NAMES.size()))
+			GameSettings.set_value("adaptive", false)
 		"fps_cap":
 			GameSettings.set_value("fps_cap", posmod(int(GameSettings.get_value("fps_cap")) + dir, FPS_CAPS.size()))
 		"weather_fx":

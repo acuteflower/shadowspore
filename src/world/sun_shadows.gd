@@ -61,6 +61,10 @@ var _wait: float = 0.0
 var _frame: int = 0
 var _on: bool = false
 var _last_on: bool = false
+var _sent_sun_side: Vector2 = Vector2(INF, INF)
+var _sent_tone: Vector3 = Vector3(INF, INF, INF)
+var _sent_strength: float = -1.0
+var _last_shadow_rect: Vector4 = Vector4(INF, INF, INF, INF)
 
 
 func _ready() -> void:
@@ -148,9 +152,17 @@ func follow(indoors: bool, sun: float, golden: float, night: float, moon: float)
 	var side_k: float = 0.0
 	if enabled and sun_k >= moon_k:
 		side_k = clampf(sun_k / 0.86, 0.0, 1.0) * SUN_SIDE
-	RenderingServer.global_shader_parameter_set("g_sun_side", Vector2(across, side_k))
-	_overlay_material.set_shader_parameter("tone", Vector3(tone.r, tone.g, tone.b))
-	_overlay_material.set_shader_parameter("strength", strength)
+	var sun_side: Vector2 = Vector2(across, side_k)
+	if not sun_side.is_equal_approx(_sent_sun_side):
+		_sent_sun_side = sun_side
+		RenderingServer.global_shader_parameter_set("g_sun_side", sun_side)
+	var tone_v: Vector3 = Vector3(tone.r, tone.g, tone.b)
+	if tone_v.distance_squared_to(_sent_tone) > 0.000001:
+		_sent_tone = tone_v
+		_overlay_material.set_shader_parameter("tone", tone_v)
+	if absf(strength - _sent_strength) > 0.0004:
+		_sent_strength = strength
+		_overlay_material.set_shader_parameter("strength", strength)
 
 
 func _process(delta: float) -> void:
@@ -370,9 +382,12 @@ func _draw_pass() -> void:
 	_viewport.canvas_transform = transform
 	var top_left: Vector2 = transform.affine_inverse() * Vector2.ZERO
 	var span: Vector2 = Vector2(size) / transform.get_scale()
-	_overlay_material.set_shader_parameter("shadow_rect", Vector4(top_left.x, top_left.y, span.x, span.y))
-	var area: Rect2 = Rect2(top_left, span).grow(48.0)
-	_overlay.polygon = PackedVector2Array([area.position, Vector2(area.end.x, area.position.y), area.end, Vector2(area.position.x, area.end.y)])
+	var srect: Vector4 = Vector4(top_left.x, top_left.y, span.x, span.y)
+	if srect != _last_shadow_rect:
+		_last_shadow_rect = srect
+		_overlay_material.set_shader_parameter("shadow_rect", srect)
+		var area: Rect2 = Rect2(top_left, span).grow(48.0)
+		_overlay.polygon = PackedVector2Array([area.position, Vector2(area.end.x, area.position.y), area.end, Vector2(area.position.x, area.end.y)])
 	_frame += 1
 	swayed_items = 0
 	var parent: RID = _root.get_canvas_item()

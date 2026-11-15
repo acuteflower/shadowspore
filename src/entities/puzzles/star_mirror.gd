@@ -51,6 +51,9 @@ var _ground: Node2D
 var _fx: Node2D
 var _time: float = 0.0
 var _solved_t: float = INF
+var _far_wait: float = 0.0
+var _drop_check: float = 0.0
+var _redraw_t: float = 0.0
 
 
 func setup(entry: Dictionary, tuning: Dictionary) -> void:
@@ -401,25 +404,55 @@ func _apply(pos: PackedVector2Array, carriers: PackedInt32Array, solved_: bool) 
 
 func _process(delta: float) -> void:
 	_time += delta
-	_reflect.queue_redraw()
-	_ground.queue_redraw()
-	if _time - _solved_t < 4.0:
+	if multiplayer.is_server():
+		_drop_check -= delta
+		if _drop_check <= 0.0:
+			_drop_check = 0.12
+			for s: StarStone in _stones: ## a carrier who fell or left drops the stone where she was
+				if s.carrier == 0:
+					continue
+				var p: Player = player_of(s.carrier)
+				if p == null or p.health == null or p.health.current <= 0.0:
+					var at: Vector2 = s.global_position
+					if in_water(at):
+						at = _pond + Vector2(0, _wry + 14.0)
+					_send_drop(s.index, at.round(), -1)
+	var solving_fx: bool = _solved_t <= _time and _time - _solved_t < 4.0
+	if not solving_fx:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null:
+			var cam_pos: Vector2 = cam.get_screen_center_position()
+			var max_d: float = 720.0 * 720.0
+			var near: bool = _pond.distance_squared_to(cam_pos) <= max_d or _field.distance_squared_to(cam_pos) <= max_d
+			if not near:
+				for pl: Player in Player.all:
+					if is_instance_valid(pl) and (pl.global_position.distance_squared_to(_pond) <= max_d or pl.global_position.distance_squared_to(_field) <= max_d):
+						near = true
+						break
+			if not near:
+				_far_wait = 0.3
+				return
+	if solving_fx:
+		_redraw_t = 0.0
+		_reflect.queue_redraw()
+		_ground.queue_redraw()
 		_fx.queue_redraw()
+	else:
+		_redraw_t -= delta
+		if _redraw_t <= 0.0:
+			_redraw_t = 0.08 if (_night() > 0.02 or done) else 0.25
+			_reflect.queue_redraw()
+			_ground.queue_redraw()
 	var lit_k: int = 1 if _night() > 0.5 or done else 0
 	for c: Sprite2D in _corners:
 		if c.frame != lit_k:
 			c.frame = lit_k
 			(c.get_child(0) as Sprite2D).frame = lit_k
-	if multiplayer.is_server():
-		for s: StarStone in _stones: ## a carrier who fell or left drops the stone where she was
-			if s.carrier == 0:
-				continue
-			var p: Player = player_of(s.carrier)
-			if p == null or p.health == null or p.health.current <= 0.0:
-				var at: Vector2 = s.global_position
-				if in_water(at):
-					at = _pond + Vector2(0, _wry + 14.0)
-				_send_drop(s.index, at.round(), -1)
 
 
 func _night() -> float:

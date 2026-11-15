@@ -26,6 +26,7 @@ InputManager="*res://src/autoload/input_manager.gd"
 Terrain="*res://src/autoload/terrain.gd"
 GameCursor="*res://src/autoload/game_cursor.gd"
 Quality="*res://src/autoload/quality.gd"
+CloudSession="*res://src/autoload/cloud_session.gd"
 
 [debug]
 

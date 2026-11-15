@@ -30,6 +30,8 @@ const VIOLET: Color = Color("7048d0")
 const DEW: Color = Color("c8fff4")
 const ACTOR_SLOTS: int = 4
 
+static var _shared_quad: QuadMesh
+
 var radius: Vector2 = Vector2(40, 28) ## px, the plan's ellipse (the world level checks the ground under it)
 var atlas_image: Image
 var _materials: Array[ShaderMaterial] = []
@@ -148,13 +150,15 @@ func _add_band(key: int, clumps: Array, textures: Array[ImageTexture]) -> void:
 		instance.texture = textures[layer]
 		instance.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		instance.material = _materials[layer]
-		var quad: QuadMesh = QuadMesh.new()
-		quad.size = Vector2(CELL)
+		if _shared_quad == null:
+			var quad: QuadMesh = QuadMesh.new()
+			quad.size = Vector2(CELL)
+			_shared_quad = quad
 		instance.multimesh = MultiMesh.new()
 		instance.multimesh.transform_format = MultiMesh.TRANSFORM_2D
 		instance.multimesh.use_colors = true
 		instance.multimesh.use_custom_data = true
-		instance.multimesh.mesh = quad
+		instance.multimesh.mesh = _shared_quad
 		instance.multimesh.instance_count = clumps.size()
 		var first_layer: int = _pieces.size() if layer == 0 else _pieces.size() - clumps.size()
 		for i: int in clumps.size():

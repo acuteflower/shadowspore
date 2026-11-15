@@ -61,9 +61,9 @@ func map_pan_vector() -> Vector2:
 	return Input.get_vector("move_left", "move_right", "move_up", "move_down")
 
 
-## L: fly the free camera / land where it is. Works with menus shut only.
+## L: fly the free camera / land where it is. Works with menus shut only (admin only).
 func freecam_pressed() -> bool:
-	return not ui_blocking and not menu_open and Input.is_action_just_pressed("freecam")
+	return CloudSession.is_admin() and not ui_blocking and not menu_open and Input.is_action_just_pressed("freecam")
 
 
 func map_pressed() -> bool:
@@ -107,26 +107,26 @@ func secondary_down() -> bool:
 
 ## Dev key: spawn an enemy at the cursor.
 func debug_spawn_pressed() -> bool:
-	return not ui_blocking and Input.is_action_just_pressed("debug_spawn")
+	return CloudSession.is_admin() and not ui_blocking and Input.is_action_just_pressed("debug_spawn")
 
 
 func debug_listener_pressed() -> bool:
-	return not ui_blocking and Input.is_action_just_pressed("debug_spawn_listener")
+	return CloudSession.is_admin() and not ui_blocking and Input.is_action_just_pressed("debug_spawn_listener")
 
 
 ## Dev key F3: spawn a void crusher at the cursor.
 func debug_crusher_pressed() -> bool:
-	return not ui_blocking and Input.is_action_just_pressed("debug_spawn_crusher")
+	return CloudSession.is_admin() and not ui_blocking and Input.is_action_just_pressed("debug_spawn_crusher")
 
 
 ## F5: a Lichtfischer, only in water.
 func debug_fisher_pressed() -> bool:
-	return not ui_blocking and Input.is_action_just_pressed("debug_spawn_fisher")
+	return CloudSession.is_admin() and not ui_blocking and Input.is_action_just_pressed("debug_spawn_fisher")
 
 
 ## Dev key F4 (host): the clock jumps one hour.
 func debug_time_pressed() -> bool:
-	return Input.is_action_just_pressed("debug_time")
+	return CloudSession.is_admin() and Input.is_action_just_pressed("debug_time")
 
 
 ## The map's travel mode: E held (the hold on a waystone's marker) and A / D or the arrow keys to step through the destinations.

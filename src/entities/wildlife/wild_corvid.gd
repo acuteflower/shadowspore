@@ -51,6 +51,11 @@ var witch: bool = false ## host: it lives in the Hexenwald (set by CorvidPopulat
 var _observe_peer: int = 0 ## host: the player this bird is shadowing (0 = none), see `_observe`
 var _observe_hops: int = 0
 var _observe_cool: float = 0.0
+var _weather_node: Node
+var _weather_checked: bool = false
+var _registry: PetRegistry
+var _registry_checked: bool = false
+var _vis_wait: float = 0.0
 const CALL_SFX: Dictionary = {
 	"crow": ["crow_caw_a", "crow_caw_b"],
 	"raven": ["raven_croak", "raven_call"],
@@ -103,11 +108,35 @@ func _ready() -> void:
 		_request_snapshot.rpc_id(1)
 
 
+static var _tex_cache: Dictionary = {}
+static var _sfx_cache: Dictionary = {}
+
+
+static func _cached_tex(path: String) -> Texture2D:
+	var cached: Variant = _tex_cache.get(path)
+	if cached is Texture2D:
+		return cached as Texture2D
+	var tex: Texture2D = load(path) as Texture2D
+	if tex != null:
+		_tex_cache[path] = tex
+	return tex
+
+
+static func _cached_sfx(path: String) -> AudioStream:
+	var cached: Variant = _sfx_cache.get(path)
+	if cached is AudioStream:
+		return cached as AudioStream
+	var stream: AudioStream = load(path) as AudioStream
+	if stream != null:
+		_sfx_cache[path] = stream
+	return stream
+
+
 func _load_species() -> void:
 	_spec = DataRegistry.get_entry("wildlife", species)
 	if _sprite != null and _spec.has("texture"):
 		var tex_path: String = String(_spec["texture"])
-		_sprite.texture = load(tex_path) as Texture2D
+		_sprite.texture = _cached_tex(tex_path)
 		var default_cols: int = 50 if tex_path.ends_with("meadow_birds.png") else 62
 		_sprite.hframes = int(_spec.get("sheet_cols", default_cols))
 		_sprite.vframes = int(_spec.get("builds", 6)) * 8
@@ -123,7 +152,7 @@ func _load_species() -> void:
 		if id != "" and Sfx.has(id):
 			_calls.append(Sfx.stream(id))
 		else:
-			_calls.append(load("res://assets/audio/wildlife/%s_%d.wav" % [species, i]) as AudioStream)
+			_calls.append(_cached_sfx("res://assets/audio/wildlife/%s_%d.wav" % [species, i]))
 
 
 func _exit_tree() -> void:
@@ -231,7 +260,17 @@ func fly_to(goal: Vector2) -> bool:
 	return true
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if rider == 0 and delta > 0.0:
+		if _vis_wait > 0.0:
+			_vis_wait -= delta
+			if _vis_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		if cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) > 560.0 * 560.0:
+			_vis_wait = 0.2
+			return
 	var cols: int = _sprite.hframes
 	var col: int = 0
 	var hop_arc: float = 0.0
@@ -251,8 +290,10 @@ func _process(_delta: float) -> void:
 		State.WATCH:
 			col = 22 + int(_elapsed * 2.2) % 4
 		State.ROOST:
-			var weather_node: Node = get_tree().get_first_node_in_group("weather")
-			var sleepy_roost: bool = rider == 0 and (_rest_time() or (weather_node != null and float(weather_node.get("rain")) > 0.42))
+			if not _weather_checked:
+				_weather_node = get_tree().get_first_node_in_group("weather")
+				_weather_checked = true
+			var sleepy_roost: bool = rider == 0 and (_rest_time() or (_weather_node != null and float(_weather_node.get("rain")) > 0.42))
 			if cols >= 62 and sleepy_roost:
 				col = 58 + int(_elapsed * 1.5) % 4
 			elif cols >= 62:
@@ -283,11 +324,13 @@ func _process(_delta: float) -> void:
 	if rider != 0:
 		_sprite.z_index = 1 ## in front of the player it sits on
 	if _ring != null:
-		var registry: PetRegistry = PetRegistry.of(get_tree())
-		_ring.visible = registry != null and registry.has_record(pet_key) and state != State.FLY
+		if not _registry_checked:
+			_registry = PetRegistry.of(get_tree())
+			_registry_checked = true
+		_ring.visible = _registry != null and _registry.has_record(pet_key) and state != State.FLY
 		if _ring.visible:
 			var rings: Array = (PetRules.table()["register"] as Dictionary)["ring_colors"] as Array
-			_ring.modulate = Color(String(rings[int(registry.record(pet_key)["ring"]) % rings.size()]))
+			_ring.modulate = Color(String(rings[int(_registry.record(pet_key)["ring"]) % rings.size()]))
 			_ring.frame = _sprite.frame
 			_ring.position.y = _sprite.position.y
 			_ring.z_index = _sprite.z_index

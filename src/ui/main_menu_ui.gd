@@ -2,19 +2,19 @@ class_name MainMenuUi
 extends Control
 ## The pages of the main menu (docs/hauptmenue_konzept.md):
 ## - MAIN: ember words rising from Valdric's campfire clearing into the left shadow.
-## - Left-Sanctuary Hub (`CONFIRM_NEW`, `MULTI`, `JOIN`, `SETTINGS`): living vine branch & hanging tabs,
+## - Left-Sanctuary Hub (`CONFIRM_NEW`, `SETTINGS`): living vine branch & hanging tabs,
 ##   keeping both the TitleLogo above and the campfire clearing on the bottom-right unobstructed.
 ## Mouse (click, hover, drag, wheel), keyboard (arrows, Tab/Q/E, Enter, Backspace, Esc, Ctrl+V)
 ## and gamepad (ui_* / L1/R1) all work.
 
 signal chosen(id: String, data: Dictionary)
 
-enum Page { MAIN, CONFIRM_NEW, MULTI, JOIN, SETTINGS }
+enum Page { MAIN, CONFIRM_NEW, SETTINGS }
 
 const VIEW: Vector2 = Vector2(640.0, 360.0)
 const MENU_X: float = 50.0
-const MENU_Y: float = 186.0
-const ROW_GAP: float = 23.0
+const MENU_Y: float = 198.0
+const ROW_GAP: float = 24.0
 const TEXT_SCALE: float = 2.0
 const ROW_DELAY: float = 0.16
 const CHAR_DELAY: float = 0.032
@@ -29,16 +29,13 @@ const PANEL_RECT: Rect2 = Rect2(20.0, 144.0, 344.0, 200.0)
 const BRANCH_Y: float = 118.0
 const CONTENT_TOP: float = 174.0
 const CONTENT_BOTTOM: float = 314.0
-const FOOTER_Y: float = 320.0
 const SLIDER_W: float = 96.0
 const ICONS_PATH: String = "res://assets/ui/menu_icons.png"
 const ICONS_GLOW_PATH: String = "res://assets/ui/menu_icons_glow.png"
 
-const ADDRESS_CHARS: String = "0123456789.:-abcdefghijklmnopqrstuvwxyz"
 const HINTS: Dictionary = {
-	"continue": "DORT WEITER, WO DU AUFGEHÖRT HAST",
-	"new": "EINE NEUE GESCHICHTE BEGINNT IM DUNKELN",
-	"multi": "EIGENE KOOP-WELTEN, CODE & LAN-BEITRITT",
+	"start_new": "EINE NEUE GESCHICHTE BEGINNT IM DUNKELN",
+	"start_continue": "DORT WEITER, WO DU AUFGEHÖRT HAST",
 	"settings": "TON, BILD, SPIEL UND STEUERUNG",
 	"quit": "DIE LEERE WARTET SCHON",
 }
@@ -47,10 +44,6 @@ const SETTINGS_TABS: Array[Dictionary] = [
 	{"id": 1, "name": "BILD", "x": 132.0, "icon": 1},
 	{"id": 2, "name": "SPIEL", "x": 204.0, "icon": 2},
 	{"id": 3, "name": "TASTEN", "x": 286.0, "icon": 3},
-]
-const MULTI_TABS: Array[Dictionary] = [
-	{"id": "multi", "name": "WELTEN", "x": 86.0, "icon": 5},
-	{"id": "join_page", "name": "BEITRETEN", "x": 182.0, "icon": 13},
 ]
 const CONTROLS_LIST: Array[Array] = [
 	["BEWEGEN", "", "WASD"],
@@ -70,8 +63,6 @@ const CONTROLS_LIST: Array[Array] = [
 var page: Page = Page.MAIN
 var intro: float = 0.0
 var enabled: bool = false
-var address: String = "127.0.0.1"
-var join_code: String = ""
 var status: String = ""
 var fire_point: Vector2 = Vector2(468.0, 282.0)
 
@@ -92,15 +83,6 @@ var _scroll: float = 0.0
 var _content_h: float = 0.0
 var _drag_slider: String = ""
 var _settings_tab: int = 0
-var _creating_world: bool = false
-var _new_world_name: String = "WALDLICHTUNG"
-var _new_world_code: String = ""
-var _new_world_max: int = 4
-var _new_world_port: String = "7777"
-var _worlds_cache: Array[Dictionary] = []
-var _recent_cache: Array[Dictionary] = []
-var _armed_delete_id: String = ""
-var _armed_left: float = 0.0
 var _editing_id: String = ""
 var _status_timer: float = 0.0
 var _status_is_error: bool = false
@@ -113,11 +95,32 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_save_day = int(SaveGame.info().get("day", -1)) if SaveGame.exists() else -1
+	_save_day = _current_save_day()
 	_player_name_buf = MultiplayerWorlds.sanitize_name(String(GameSettings.get_value("player_name")), "ELLIE")
-	_new_world_code = MultiplayerWorlds.generate_code()
+	CloudSession.auth_changed.connect(_on_cloud_state_changed)
+	CloudSession.save_info_changed.connect(_on_cloud_state_changed)
 	_reload_icons()
 	_open_page(Page.MAIN)
+
+
+func _on_cloud_state_changed(_logged_in: bool = false) -> void:
+	_save_day = _current_save_day()
+	if page == Page.MAIN:
+		_rebuild_rows()
+		_slide.resize(_rows.size())
+		_sel = clampi(_sel, 0, maxi(_rows.size() - 1, 0))
+
+
+func _has_any_save() -> bool:
+	if CloudSession.is_logged_in():
+		return CloudSession.has_cloud_save
+	return SaveGame.exists()
+
+
+func _current_save_day() -> int:
+	if CloudSession.is_logged_in():
+		return CloudSession.cloud_save_day
+	return int(SaveGame.info().get("day", -1)) if SaveGame.exists() else -1
 
 
 func _reload_icons() -> void:
@@ -130,17 +133,9 @@ func _reload_icons() -> void:
 func apply_return_state(ret: Dictionary) -> void:
 	if ret.is_empty():
 		return
-	var target: String = String(ret.get("page", ""))
-	if target == "join":
-		var ret_addr: String = String(ret.get("address", "127.0.0.1"))
-		var ret_port: int = int(ret.get("port", NetworkManager.DEFAULT_PORT))
-		address = ret_addr if ret_port == NetworkManager.DEFAULT_PORT else ("%s:%d" % [ret_addr, ret_port])
-		join_code = MultiplayerWorlds.normalize_code(String(ret.get("code", "")))
-		_open_page(Page.JOIN)
-		_set_status(String(ret.get("error", "VERBINDUNG FEHLGESCHLAGEN")), true, 6.0)
-	elif target == "multi":
-		_open_page(Page.MULTI)
-		_set_status(String(ret.get("error", "HOST FEHLGESCHLAGEN")), true, 6.0)
+	var err_msg: String = String(ret.get("error", ""))
+	if not err_msg.is_empty():
+		_set_status(err_msg, true, 6.0)
 
 
 func _exit_tree() -> void:
@@ -166,10 +161,8 @@ func _open_page(next: Page, reset_sub: bool = true) -> void:
 	_page_age = 0.0
 	_scroll = 0.0
 	_drag_slider = ""
-	_armed_delete_id = ""
 	_editing_id = ""
 	if reset_sub:
-		_creating_world = false
 		status = ""
 		_status_timer = 0.0
 	_player_name_buf = MultiplayerWorlds.sanitize_name(String(GameSettings.get_value("player_name")), "ELLIE")
@@ -179,10 +172,6 @@ func _open_page(next: Page, reset_sub: bool = true) -> void:
 		if _row_selectable(_rows[i]):
 			_sel = i
 			break
-	if page == Page.JOIN:
-		_editing_id = "addr"
-	elif page == Page.MULTI and _creating_world:
-		_editing_id = "new_world_name"
 	_hover = -1
 	_hover_sub = ""
 	_rects.clear()
@@ -196,11 +185,9 @@ func _rebuild_rows() -> void:
 	_rows.clear()
 	match page:
 		Page.MAIN:
-			if SaveGame.exists():
-				_rows.append({"id": "continue", "label": "WEITER"})
+			var start_label: String = "ABENTEUER FORTSETZEN" if _has_any_save() else "ABENTEUER BEGINNEN"
 			_rows.append_array([
-				{"id": "new", "label": "NEUES SPIEL"},
-				{"id": "multi", "label": "MEHRSPIELER"},
+				{"id": "start", "label": start_label},
 				{"id": "settings", "label": "EINSTELLUNGEN"},
 				{"id": "quit", "label": "BEENDEN"},
 			])
@@ -209,33 +196,6 @@ func _rebuild_rows() -> void:
 				{"id": "new_yes", "label": "JA, NEU BEGINNEN"},
 				{"id": "back", "label": "ABBRECHEN"},
 			])
-		Page.MULTI:
-			_worlds_cache = MultiplayerWorlds.list()
-			if _creating_world:
-				_rows.append_array([
-					{"id": "new_world_name", "label": "WELTNAME", "kind": "field"},
-					{"id": "new_world_code", "label": "JOIN-CODE", "kind": "field"},
-					{"id": "new_world_max", "label": "MAX. SPIELER", "kind": "stepper"},
-					{"id": "new_world_port", "label": "PORT", "kind": "field"},
-					{"id": "create_confirm", "label": "ERSTELLEN & STARTEN", "kind": "action"},
-					{"id": "create_cancel", "label": "ABBRECHEN", "kind": "action"},
-				])
-			else:
-				_rows.append({"id": "create_mode", "label": "NEUE KOOP-WELT ERSTELLEN", "kind": "create_btn"})
-				for i: int in _worlds_cache.size():
-					_rows.append({"id": "world:%d" % i, "label": String(_worlds_cache[i].get("name", "KOOP-WELT")), "kind": "world_card", "index": i})
-				_rows.append({"id": "join_page", "label": "BEITRETEN", "kind": "footer"})
-				_rows.append({"id": "back", "label": "ZURÜCK", "kind": "footer"})
-		Page.JOIN:
-			_recent_cache = MultiplayerWorlds.recent_hosts()
-			_rows.append_array([
-				{"id": "addr", "label": "IP-ADRESSE", "kind": "field"},
-				{"id": "join_code", "label": "JOIN-CODE", "kind": "field"},
-				{"id": "join", "label": "VERBINDEN", "kind": "action"},
-			])
-			for i: int in mini(_recent_cache.size(), 3):
-				_rows.append({"id": "recent:%d" % i, "label": String(_recent_cache[i].get("label", "")), "kind": "recent", "index": i})
-			_rows.append({"id": "back", "label": "ZURÜCK", "kind": "footer"})
 		Page.SETTINGS:
 			match _settings_tab:
 				0:
@@ -266,6 +226,8 @@ func _rebuild_rows() -> void:
 						{"id": "position", "label": "POSITION", "kind": "toggle"},
 						{"id": "journal_still", "label": "TAGEBUCH OHNE BEWEGUNG", "kind": "toggle"},
 					])
+					if _has_any_save():
+						_rows.append({"id": "new_adventure", "label": "NEUES ABENTEUER (RESET)", "kind": "action"})
 				3:
 					for row: Array in CONTROLS_LIST:
 						_rows.append({"id": "ctrl:" + String(row[0]), "label": String(row[0]), "action": String(row[1]), "fallback": String(row[2]), "kind": "control"})
@@ -284,10 +246,6 @@ func _process(delta: float) -> void:
 		_status_timer -= delta
 		if _status_timer <= 0.0:
 			status = ""
-	if not _armed_delete_id.is_empty():
-		_armed_left -= delta
-		if _armed_left <= 0.0:
-			_armed_delete_id = ""
 	if _sel != _last_sel:
 		if _last_sel >= 0 and enabled:
 			Sfx.ui(self, "ui_click", -12.0, 0.08)
@@ -363,21 +321,11 @@ func _input(event: InputEvent) -> void:
 			_open_page(Page.SETTINGS, false)
 			get_viewport().set_input_as_handled()
 			return
-		if (page == Page.MULTI or page == Page.JOIN) and not _creating_world and _editing_id.is_empty() and not key.echo and key.physical_keycode in [KEY_Q, KEY_E]:
-			var next_page: Page = Page.JOIN if page == Page.MULTI else Page.MULTI
-			Sfx.ui(self, "ui_click", -3.0)
-			_open_page(next_page)
-			get_viewport().set_input_as_handled()
-			return
 	if event.is_action_pressed("ui_cancel"):
 		if page != Page.MAIN:
 			Sfx.ui(self, "ui_back", -4.0)
-			if _creating_world:
-				_creating_world = false
-				_open_page(Page.MULTI)
-			else:
-				GameSettings.save()
-				_open_page(Page.MAIN)
+			GameSettings.save()
+			_open_page(Page.SETTINGS if page == Page.CONFIRM_NEW else Page.MAIN)
 			get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed(&"ui_up"):
@@ -397,8 +345,6 @@ func _input(event: InputEvent) -> void:
 				_flip(String(row.id))
 			elif kind == "weather":
 				Quality.cycle(String(row.id), dir)
-			elif kind == "stepper":
-				_new_world_max = clampi(_new_world_max + dir, 2, 4)
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed(&"ui_accept") or (event.is_action_pressed(&"interact") and key != null and _active_field_id().is_empty()):
 		if _sel >= 0 and _sel < _rows.size():
@@ -440,97 +386,18 @@ func _active_field_id() -> String:
 	return ""
 
 
-## Typing into whichever text field is focused (`addr`, `join_code`, `new_world_name`, `new_world_code`, `new_world_port`, `player_name`).
 func _type(key: InputEventKey) -> bool:
-	var field_id: String = _active_field_id()
-	if field_id.is_empty():
+	if _active_field_id() != "player_name":
 		return false
 	if key.keycode == KEY_ENTER or key.keycode == KEY_KP_ENTER:
-		if _editing_id == "player_name":
-			_editing_id = ""
-			return true
-		return false
+		_editing_id = ""
+		return true
 	if key.keycode == KEY_ESCAPE or key.keycode == KEY_UP or key.keycode == KEY_DOWN:
 		return false
 	if key.keycode == KEY_TAB:
 		_step_sel(1)
 		return true
-	match field_id:
-		"addr":
-			return _type_addr(key)
-		"join_code":
-			return _type_code(key, true)
-		"new_world_code":
-			return _type_code(key, false)
-		"new_world_name":
-			return _type_name(key, false)
-		"player_name":
-			return _type_name(key, true)
-		"new_world_port":
-			return _type_port(key)
-	return false
-
-
-func _type_addr(key: InputEventKey) -> bool:
-	if key.keycode == KEY_BACKSPACE:
-		address = address.substr(0, maxi(address.length() - 1, 0))
-		return true
-	if key.keycode == KEY_V and key.ctrl_pressed:
-		_paste_join_clipboard(DisplayServer.clipboard_get())
-		return true
-	if key.unicode > 31 and not key.ctrl_pressed:
-		var c: String = char(key.unicode).to_lower()
-		if ADDRESS_CHARS.contains(c) and address.length() < 40:
-			address += c
-		return true
-	return false
-
-
-func _paste_join_clipboard(raw: String) -> void:
-	var trimmed: String = raw.strip_edges()
-	if " " in trimmed or "|" in trimmed:
-		var norm: String = trimmed.replace("|", " ")
-		var parts: PackedStringArray = norm.split(" ", false)
-		if parts.size() >= 2:
-			address = _filter_addr(parts[0])
-			join_code = MultiplayerWorlds.normalize_code(parts[1])
-			return
-	address = _filter_addr(trimmed)
-
-
-func _filter_addr(raw: String) -> String:
-	var out: String = ""
-	for c: String in raw.to_lower():
-		if ADDRESS_CHARS.contains(c) and out.length() < 40:
-			out += c
-	return out
-
-
-func _type_code(key: InputEventKey, for_join: bool) -> bool:
-	var buf: String = join_code if for_join else _new_world_code
-	if key.keycode == KEY_BACKSPACE:
-		buf = buf.substr(0, maxi(buf.length() - 1, 0))
-	elif key.keycode == KEY_V and key.ctrl_pressed:
-		var clip: String = DisplayServer.clipboard_get().strip_edges()
-		if for_join and (" " in clip or "|" in clip):
-			_paste_join_clipboard(clip)
-			return true
-		buf = MultiplayerWorlds.normalize_code(clip)
-	elif key.unicode > 31 and not key.ctrl_pressed:
-		var c: String = char(key.unicode).to_upper()
-		if buf.length() < 6:
-			buf = MultiplayerWorlds.normalize_code(buf + c)
-	else:
-		return false
-	if for_join:
-		join_code = buf
-	else:
-		_new_world_code = buf
-	return true
-
-
-func _type_name(key: InputEventKey, is_player_name: bool) -> bool:
-	var buf: String = _player_name_buf if is_player_name else _new_world_name
+	var buf: String = _player_name_buf
 	if key.keycode == KEY_BACKSPACE:
 		buf = buf.substr(0, maxi(buf.length() - 1, 0))
 	elif key.keycode == KEY_V and key.ctrl_pressed:
@@ -542,26 +409,11 @@ func _type_name(key: InputEventKey, is_player_name: bool) -> bool:
 			buf += c
 	else:
 		return false
-	if is_player_name:
-		_player_name_buf = buf
-		if not buf.strip_edges().is_empty():
-			GameSettings.set_value("player_name", MultiplayerWorlds.sanitize_name(buf, "ELLIE"))
-			GameSettings.save()
-	else:
-		_new_world_name = buf
+	_player_name_buf = buf
+	if not buf.strip_edges().is_empty():
+		GameSettings.set_value("player_name", MultiplayerWorlds.sanitize_name(buf, "ELLIE"))
+		GameSettings.save()
 	return true
-
-
-func _type_port(key: InputEventKey) -> bool:
-	if key.keycode == KEY_BACKSPACE:
-		_new_world_port = _new_world_port.substr(0, maxi(_new_world_port.length() - 1, 0))
-		return true
-	if key.unicode > 31 and not key.ctrl_pressed:
-		var c: String = char(key.unicode)
-		if c >= "0" and c <= "9" and _new_world_port.length() < 5:
-			_new_world_port += c
-		return true
-	return false
 
 
 func _step_slider(id: String, step: int) -> void:
@@ -571,12 +423,6 @@ func _step_slider(id: String, step: int) -> void:
 
 func _flip(id: String) -> void:
 	GameSettings.set_value(id, not bool(GameSettings.get_value(id)))
-	GameSettings.save()
-
-
-func _cycle_weather(dir: int) -> void:
-	var cur: int = clampi(int(GameSettings.get_value("weather_fx")), 0, 2)
-	GameSettings.set_value("weather_fx", posmod(cur + dir, 3))
 	GameSettings.save()
 
 
@@ -597,68 +443,9 @@ func _handle_sub_action(action: String, payload: Variant) -> void:
 		_settings_tab = int(payload)
 		_open_page(Page.SETTINGS, false)
 		return
-	if action == "multi_tab":
-		_creating_world = false
-		_open_page(Page.MULTI if String(payload) == "multi" else Page.JOIN)
-		return
-	if action == "edit_player_name":
-		_editing_id = "player_name"
-		return
-	if action == "copy_host_ip":
-		var ip_str: String = "%s:%d" % [NetworkManager.primary_ip(), NetworkManager.DEFAULT_PORT]
-		DisplayServer.clipboard_set(ip_str)
-		_set_status("IP KOPIERT: %s" % ip_str, false, 2.5)
-		return
-	if action == "reroll_code":
-		_new_world_code = MultiplayerWorlds.generate_code()
-		_set_status("NEUER CODE: %s" % _new_world_code, false, 2.0)
-		return
-	if action.begins_with("world_host:"):
-		var idx: int = int(action.trim_prefix("world_host:"))
-		if idx >= 0 and idx < _worlds_cache.size():
-			_launch_world(_worlds_cache[idx])
-		return
-	if action.begins_with("world_copy:"):
-		var idx: int = int(action.trim_prefix("world_copy:"))
-		if idx >= 0 and idx < _worlds_cache.size():
-			var w: Dictionary = _worlds_cache[idx]
-			var inv: String = "%s:%d %s" % [NetworkManager.primary_ip(), int(w.get("port", 7777)), String(w.get("code", ""))]
-			DisplayServer.clipboard_set(inv)
-			_set_status("EINLADUNG KOPIERT", false, 2.5)
-		return
-	if action.begins_with("world_del:"):
-		var wid: String = action.trim_prefix("world_del:")
-		if _armed_delete_id != wid:
-			_armed_delete_id = wid
-			_armed_left = 2.6
-			_set_status("NOCHMAL KLICKEN ZUM LÖSCHEN", true, 2.6)
-		else:
-			_armed_delete_id = ""
-			MultiplayerWorlds.delete_world(wid)
-			_set_status("WELT GELÖSCHT", false, 2.2)
-			_open_page(Page.MULTI, false)
-		return
-	if action.begins_with("recent_fill:"):
-		var idx: int = int(action.trim_prefix("recent_fill:"))
-		if idx >= 0 and idx < _recent_cache.size():
-			var rh: Dictionary = _recent_cache[idx]
-			var rport: int = int(rh.get("port", NetworkManager.DEFAULT_PORT))
-			var raddr: String = String(rh.get("address", "127.0.0.1"))
-			address = raddr if rport == NetworkManager.DEFAULT_PORT else ("%s:%d" % [raddr, rport])
-			join_code = String(rh.get("code", ""))
-			_set_status("DATEN ÜBERNOMMEN", false, 2.0)
-		return
-
-
-func _launch_world(w: Dictionary) -> void:
-	chosen.emit("host", {
-		"world_id": String(w.get("id", "")),
-		"world_name": String(w.get("name", "KOOP-WELT")),
-		"code": String(w.get("code", "")),
-		"port": int(w.get("port", NetworkManager.DEFAULT_PORT)),
-		"max_players": int(w.get("max_players", NetworkManager.MAX_PLAYERS)),
-		"save_path": String(w.get("save_path", "")),
-	})
+	if action == "copy_uid" and not CloudSession.uid.is_empty():
+		DisplayServer.clipboard_set(CloudSession.uid)
+		_set_status("UID KOPIERT: %s" % CloudSession.uid, false, 2.5)
 
 
 func _press(row: Dictionary, at: Vector2) -> void:
@@ -683,74 +470,25 @@ func _press(row: Dictionary, at: Vector2) -> void:
 	if kind == "weather":
 		Quality.cycle(id, 1)
 		return
-	if kind == "stepper":
-		_new_world_max = 2 if _new_world_max >= 4 else _new_world_max + 1
-		return
 	if kind == "field":
 		_editing_id = id
 		return
-	if kind == "world_card":
-		var idx: int = int(row.get("index", -1))
-		if idx >= 0 and idx < _worlds_cache.size():
-			_launch_world(_worlds_cache[idx])
-		return
-	if kind == "recent":
-		_handle_sub_action("recent_fill:%d" % int(row.get("index", 0)), null)
-		return
 	match id:
+		"start":
+			chosen.emit("continue" if _has_any_save() else "new", {})
 		"continue":
 			chosen.emit("continue", {})
-		"new":
-			if SaveGame.exists():
-				_open_page(Page.CONFIRM_NEW)
-			else:
-				chosen.emit("new", {})
-		"new_yes":
+		"new", "new_yes":
 			chosen.emit("new", {})
-		"multi":
-			_open_page(Page.MULTI)
-		"create_mode":
-			_creating_world = true
-			_new_world_name = "WALDLICHTUNG"
-			_new_world_code = MultiplayerWorlds.generate_code()
-			_new_world_port = str(NetworkManager.DEFAULT_PORT)
-			_open_page(Page.MULTI, false)
-		"create_cancel":
-			_creating_world = false
-			_open_page(Page.MULTI)
-		"create_confirm":
-			var port_num: int = clampi(_new_world_port.to_int() if _new_world_port.is_valid_int() else NetworkManager.DEFAULT_PORT, 1024, 65535)
-			var created: Dictionary = MultiplayerWorlds.create_world(_new_world_name, _new_world_max, port_num, _new_world_code)
-			_creating_world = false
-			_launch_world(created)
-		"host":
-			var worlds: Array[Dictionary] = MultiplayerWorlds.list()
-			if worlds.is_empty():
-				var created: Dictionary = MultiplayerWorlds.create_world("KOOP-WELT", 4, NetworkManager.DEFAULT_PORT)
-				_launch_world(created)
-			else:
-				_launch_world(worlds[0])
-		"join_page":
-			_open_page(Page.JOIN)
-		"join":
-			var parsed: Dictionary = MultiplayerWorlds.parse_address_port(address, NetworkManager.DEFAULT_PORT)
-			var host: String = String(parsed.get("address", ""))
-			if host.is_empty():
-				_set_status("KEINE IP-ADRESSE ANGEGEBEN", true, 3.0)
-				return
-			var clean_code: String = MultiplayerWorlds.normalize_code(join_code)
-			chosen.emit("join", {"address": host, "port": int(parsed.get("port", NetworkManager.DEFAULT_PORT)), "code": clean_code})
+		"new_adventure":
+			_open_page(Page.CONFIRM_NEW)
 		"settings":
 			_open_page(Page.SETTINGS)
 		"quit":
 			chosen.emit("quit", {})
 		"back":
 			GameSettings.save()
-			if _creating_world:
-				_creating_world = false
-				_open_page(Page.MULTI)
-			else:
-				_open_page(Page.MAIN)
+			_open_page(Page.SETTINGS if page == Page.CONFIRM_NEW else Page.MAIN)
 
 
 # ---------------------------------------------------------------------------------------------- drawing
@@ -854,15 +592,32 @@ func _draw_main(_void_level: float) -> void:
 			_glyph(ch, target, Color(ink, a), Color(VineStyle.OUTLINE, a))
 		_rects.append(Rect2(MENU_X - 20.0, y - 2.0, w + 40.0, ROW_GAP - 2.0) if row_done else Rect2())
 	if enabled and _sel < _rows.size():
-		var text: String = String(HINTS.get(String(_rows[_sel].id), ""))
-		if String(_rows[_sel].id) == "continue" and _save_day >= 0:
-			text = "TAG %d - %s" % [_save_day + 1, text]
+		var row_id: String = String(_rows[_sel].id)
+		var text: String = ""
+		if row_id == "start":
+			text = String(HINTS["start_continue" if _has_any_save() else "start_new"])
+			if _has_any_save() and _save_day >= 0:
+				text = "TAG %d - %s" % [_save_day + 1, text]
+		else:
+			text = String(HINTS.get(row_id, ""))
 		var shown: String = text.substr(0, int(_sel_age * 70.0))
-		var hint_y: float = _row_y(_rows.size()) + 6.0
+		var hint_y: float = _row_y(_rows.size()) + 8.0
 		draw_rect(Rect2(MENU_X, hint_y - 5.0, 18.0, 1.0), Color(IDLE_INK, 0.5))
 		PixelText.draw(self, shown, Vector2i(int(MENU_X), int(hint_y)), Color(IDLE_INK, 0.9), Color(VineStyle.OUTLINE, 0.9))
 		if not status.is_empty():
 			PixelText.draw(self, status, Vector2i(int(MENU_X), int(hint_y + 11.0)), Color(DANGER if _status_is_error else Color("7fe3da")), Color(VineStyle.OUTLINE))
+	if intro > 0.6 and CloudSession.is_logged_in():
+		var ba: float = smoothstep(0.6, 1.5, intro)
+		var uname: String = CloudSession.username.to_upper()
+		var btxt: String = "UID %s" % CloudSession.uid if uname.is_empty() else "UID %s - %s" % [CloudSession.uid, uname]
+		var bw: float = float(PixelText.width(btxt)) + 24.0
+		var br: Rect2 = Rect2(14.0, 10.0, bw, 14.0)
+		var hot: bool = _hover_sub == "copy_uid"
+		draw_rect(br, Color("7fe3da", 0.85 * ba))
+		draw_rect(br.grow(-1.0), Color("241e42" if hot else "161226", 0.85 * ba))
+		_draw_icon(5, Vector2(br.position.x + 2.0, br.position.y + 1.0), ba)
+		PixelText.draw(self, btxt, Vector2i(int(br.position.x + 16.0), int(br.position.y + 4.0)), Color("b9f3ee", ba), Color(VineStyle.OUTLINE, ba))
+		_hitboxes.append({"rect": br, "action": "copy_uid"})
 
 
 func _draw_sanctuary(void_level: float) -> void:
@@ -874,42 +629,21 @@ func _draw_sanctuary(void_level: float) -> void:
 	if page == Page.CONFIRM_NEW:
 		rect = Rect2(Vector2(PANEL_RECT.position.x, 174.0 + dy), Vector2(PANEL_RECT.size.x, 126.0))
 
-	# Hanging vine branch across the left-sanctuary header (Settings & Multiplayer tabs)
-	var has_tabs: bool = page == Page.SETTINGS or ((page == Page.MULTI or page == Page.JOIN) and not _creating_world)
-	if has_tabs:
+	if page == Page.SETTINGS:
 		var branch_fn: Callable = func(x: float) -> float:
 			return BRANCH_Y + dy + sin(x * 0.03) * 1.4
 		VineStyle.branch(self, 0.0, rect.end.x + 18.0, branch_fn, 5, void_level * 0.4, 18.0, _time, fade)
 		VineStyle.foliage(self, 0.0, rect.end.x + 14.0, branch_fn, 9, 211, void_level * 0.4, 14.0, _time, fade)
 		_draw_header_tabs(fade, dy, void_level)
 
-	# Panel body with soft aura
-	VineStyle.glow(self, rect.get_center(), 150.0, Color("7fe3da") if page in [Page.MULTI, Page.JOIN] else VineStyle.ACCENT_WARM, 0.07 * fade)
+	VineStyle.glow(self, rect.get_center(), 150.0, VineStyle.ACCENT_WARM, 0.07 * fade)
 	VineStyle.paper(self, rect, fade, void_level * 0.45, 7)
-	draw_rect(Rect2(rect.position.x + 4.0, rect.position.y + 3.0, rect.size.x - 8.0, 1.0), Color("7fe3da" if page in [Page.MULTI, Page.JOIN] else "ffd98a", 0.25 * fade))
+	draw_rect(Rect2(rect.position.x + 4.0, rect.position.y + 3.0, rect.size.x - 8.0, 1.0), Color("ffd98a", 0.25 * fade))
 
-	# Panel header line
 	var title: String = _page_title()
-	var icon_idx: int = 5 if page == Page.MULTI else (13 if page == Page.JOIN else (int(SETTINGS_TABS[_settings_tab]["icon"]) if page == Page.SETTINGS else 10))
+	var icon_idx: int = int(SETTINGS_TABS[_settings_tab]["icon"]) if page == Page.SETTINGS else 10
 	_draw_icon(icon_idx, Vector2(rect.position.x + 12.0, rect.position.y + 8.0), fade)
 	PixelText.draw(self, title, Vector2i(int(rect.position.x + 28.0), int(rect.position.y + 11.0)), Color(VineStyle.ACCENT_WARM, fade), Color(VineStyle.OUTLINE, fade))
-
-	# Player name badge on MP header
-	if page in [Page.MULTI, Page.JOIN] and not _creating_world:
-		var name_disp: String = _player_name_buf if not _player_name_buf.is_empty() else "ELLIE"
-		var pill_txt: String = "NAME: " + name_disp
-		var editing_name: bool = _editing_id == "player_name"
-		var pw: float = float(PixelText.width(pill_txt)) + (18.0 if editing_name else 12.0)
-		var pr: Rect2 = Rect2(rect.end.x - pw - 10.0, rect.position.y + 8.0, pw, 13.0)
-		var nhot: bool = _hover_sub == "edit_player_name" or editing_name
-		draw_rect(pr, Color("7fe3da" if editing_name else VineStyle.OUTLINE, fade))
-		draw_rect(pr.grow(-1.0), Color("241e42" if nhot else "1a1630", fade))
-		PixelText.draw(self, pill_txt, Vector2i(int(pr.position.x + 6.0), int(pr.position.y + 3.0)), Color("b9f3ee" if nhot else "c8c3df", fade), Color(VineStyle.OUTLINE, fade))
-		if editing_name and int(_time * 2.4) % 2 == 0:
-			var cx: float = pr.position.x + 6.0 + float(PixelText.width(pill_txt)) + 1.0
-			draw_rect(Rect2(cx, pr.position.y + 2.0, 1.0, 8.0), Color("7fe3da", fade))
-		_hitboxes.append({"rect": pr, "action": "edit_player_name"})
-
 	draw_rect(Rect2(rect.position.x + 12.0, rect.position.y + 26.0, rect.size.x - 24.0, 1.0), Color("4a4180", 0.5 * fade))
 
 	_rects.clear()
@@ -933,60 +667,36 @@ func _draw_sanctuary(void_level: float) -> void:
 		var kind: String = String(row.get("kind", ""))
 		if kind == "footer":
 			continue
-		var row_h: float = _row_height(kind)
+		var row_h: float = 19.0 if kind == "action" else 17.0
 		var row_rect: Rect2 = Rect2(rect.position.x + 12.0, y, rect.size.x - 24.0, row_h)
-		var visible_in_view: bool = row_rect.position.y >= top_y - 2.0 and row_rect.end.y <= bot_y + 2.0
-		if visible_in_view:
+		if row_rect.position.y >= top_y - 2.0 and row_rect.end.y <= bot_y + 2.0:
 			_rects[i] = row_rect
 			_draw_row_widget(i, row, row_rect, fade, void_level)
 		y += row_h + 4.0
 	_content_h = y - start_y
 
-	# Scrollbar indicator if overflow
 	var max_scroll: float = maxf(_content_h - (bot_y - top_y), 0.0)
 	if max_scroll > 2.0:
 		var track_h: float = bot_y - top_y - 4.0
 		var thumb_h: float = maxf(track_h * clampf((bot_y - top_y) / _content_h, 0.2, 1.0), 14.0)
 		var thumb_y: float = top_y + (_scroll / max_scroll) * (track_h - thumb_h)
 		draw_rect(Rect2(rect.end.x - 7.0, top_y, 2.0, track_h), Color("171329", 0.7 * fade))
-		draw_rect(Rect2(rect.end.x - 7.0, thumb_y, 2.0, thumb_h), Color("7fe3da", 0.75 * fade))
+		draw_rect(Rect2(rect.end.x - 7.0, thumb_y, 2.0, thumb_h), Color(VineStyle.ACCENT_WARM, 0.75 * fade))
 
 	_draw_footer_bar(rect, fade)
 
 
 func _draw_header_tabs(fade: float, dy: float, void_level: float) -> void:
-	if page == Page.SETTINGS:
-		for i: int in SETTINGS_TABS.size():
-			var t: Dictionary = SETTINGS_TABS[i]
-			var ax: float = float(t["x"])
-			var active: bool = i == _settings_tab
-			var tab_act: String = "settings_tab_%d" % i
-			var hover: bool = _hover_sub == tab_act
-			var tab_rect: Rect2 = VineStyle.tab(self, String(t["name"]), Vector2(ax, BRANCH_Y + dy), fade, 3.0 if active else (1.5 if hover else 0.0), void_level * 0.4, _time, i, active, hover, VineStyle.ACCENT_WARM)
-			_hitboxes.append({"rect": tab_rect, "action": "settings_tab", "payload": i})
-			if active:
-				VineStyle.bloom(self, Vector2(ax, BRANCH_Y + dy), fade, _time, void_level * 0.4, VineStyle.ACCENT_WARM)
-	else:
-		for i: int in MULTI_TABS.size():
-			var t: Dictionary = MULTI_TABS[i]
-			var ax: float = float(t["x"])
-			var tid: String = String(t["id"])
-			var active: bool = (tid == "multi" and page == Page.MULTI) or (tid == "join_page" and page == Page.JOIN)
-			var tab_act: String = "multi_tab_%s" % tid
-			var hover: bool = _hover_sub == tab_act
-			var tab_rect: Rect2 = VineStyle.tab(self, String(t["name"]), Vector2(ax, BRANCH_Y + dy), fade, 3.0 if active else (1.5 if hover else 0.0), void_level * 0.4, _time, i, active, hover, Color("7fe3da"))
-			_hitboxes.append({"rect": tab_rect, "action": "multi_tab", "payload": tid})
-			if active:
-				VineStyle.bloom(self, Vector2(ax, BRANCH_Y + dy), fade, _time, void_level * 0.4, Color("7fe3da"))
-
-
-func _row_height(kind: String) -> float:
-	match kind:
-		"world_card": return 34.0
-		"create_btn": return 20.0
-		"action": return 19.0
-		"recent": return 15.0
-	return 17.0
+	for i: int in SETTINGS_TABS.size():
+		var t: Dictionary = SETTINGS_TABS[i]
+		var ax: float = float(t["x"])
+		var active: bool = i == _settings_tab
+		var tab_act: String = "settings_tab_%d" % i
+		var hover: bool = _hover_sub == tab_act
+		var tab_rect: Rect2 = VineStyle.tab(self, String(t["name"]), Vector2(ax, BRANCH_Y + dy), fade, 3.0 if active else (1.5 if hover else 0.0), void_level * 0.4, _time, i, active, hover, VineStyle.ACCENT_WARM)
+		_hitboxes.append({"rect": tab_rect, "action": "settings_tab", "payload": i})
+		if active:
+			VineStyle.bloom(self, Vector2(ax, BRANCH_Y + dy), fade, _time, void_level * 0.4, VineStyle.ACCENT_WARM)
 
 
 func _draw_row_widget(idx: int, row: Dictionary, rect: Rect2, fade: float, void_level: float) -> void:
@@ -995,94 +705,17 @@ func _draw_row_widget(idx: int, row: Dictionary, rect: Rect2, fade: float, void_
 	var label: String = String(row.label)
 	var active: bool = idx == _sel
 	var editing: bool = _editing_id == id
-	var tone: Color = Color("7fe3da") if (page in [Page.MULTI, Page.JOIN]) else VineStyle.ACCENT_WARM
+	var tone: Color = VineStyle.ACCENT_WARM
 	var outline: Color = Color(VineStyle.OUTLINE, fade)
 	var ink: Color = Color(VineStyle.PETAL if (active or editing) else UiStyle.TEXT, fade)
 
-	if kind == "world_card":
-		var w: Dictionary = _worlds_cache[int(row.get("index", 0))]
-		var wid: String = String(w.get("id", ""))
-		draw_rect(rect, Color(VineStyle.OUTLINE, fade))
-		draw_rect(rect.grow(-1.0), Color("292347" if active else "1c1733", fade))
-		if active:
-			draw_rect(Rect2(rect.position.x + 1.0, rect.position.y + 1.0, 2.0, rect.size.y - 2.0), Color("7fe3da", fade))
-		_draw_icon(5, Vector2(rect.position.x + 6.0, rect.position.y + 5.0), fade)
-		PixelText.draw(self, label, Vector2i(int(rect.position.x + 22.0), int(rect.position.y + 5.0)), Color(VineStyle.PETAL if active else Color("e8e4f4"), fade), outline)
-		var day_str: String = "NEUE WELT"
-		if bool(w.get("has_save", false)):
-			var mins: int = int(float(w.get("time", 0.3)) * 1440.0)
-			day_str = "TAG %d · %02d:%02d" % [int(w.get("day", 0)) + 1, mins / 60, mins % 60]
-		var info_line: String = "%s · MAX %d" % [day_str, int(w.get("max_players", 4))]
-		PixelText.draw(self, info_line, Vector2i(int(rect.position.x + 22.0), int(rect.position.y + 18.0)), Color("8a84ad", fade), outline)
-
-		# Code chip
-		var code_str: String = String(w.get("code", "------"))
-		var code_w: float = float(PixelText.width(code_str)) + 20.0
-		var code_rect: Rect2 = Rect2(rect.end.x - 102.0 - code_w, rect.position.y + 4.0, code_w, 13.0)
-		draw_rect(code_rect, Color(VineStyle.OUTLINE, fade))
-		draw_rect(code_rect.grow(-1.0), Color("161226", fade))
-		_draw_icon(6, Vector2(code_rect.position.x + 2.0, code_rect.position.y), fade)
-		PixelText.draw(self, code_str, Vector2i(int(code_rect.position.x + 16.0), int(code_rect.position.y + 3.0)), Color("ffd98a", fade), outline)
-
-		# Action pills inside world card: ÖFFNEN, COPY, DELETE
-		var open_r: Rect2 = Rect2(rect.end.x - 96.0, rect.position.y + 4.0, 52.0, 14.0)
-		var copy_r: Rect2 = Rect2(rect.end.x - 40.0, rect.position.y + 4.0, 18.0, 14.0)
-		var del_r: Rect2 = Rect2(rect.end.x - 20.0, rect.position.y + 4.0, 16.0, 14.0)
-		var open_act: String = "world_host:%d" % int(row.get("index", 0))
-		var copy_act: String = "world_copy:%d" % int(row.get("index", 0))
-		var del_act: String = "world_del:%s" % wid
-		VineStyle.plate(self, open_r, "ÖFFNEN", Color("7fe3da") if (_hover_sub == open_act or active) else Color("4a4180"), Color("171329") if _hover_sub == open_act else VineStyle.PETAL, fade, void_level * 0.4)
-		draw_rect(copy_r, Color(VineStyle.OUTLINE, fade))
-		draw_rect(copy_r.grow(-1.0), Color("2f2854" if _hover_sub == copy_act else "1e1a36", fade))
-		_draw_icon(7, Vector2(copy_r.position.x + 3.0, copy_r.position.y + 1.0), fade)
-		var armed: bool = _armed_delete_id == wid
-		draw_rect(del_r, Color(VineStyle.OUTLINE, fade))
-		draw_rect(del_r.grow(-1.0), Color(DANGER if (armed or _hover_sub == del_act) else Color("2b1929"), fade))
-		_draw_icon(10, Vector2(del_r.position.x + 2.0, del_r.position.y + 1.0), fade)
-		_hitboxes.append({"rect": open_r, "action": open_act})
-		_hitboxes.append({"rect": copy_r, "action": copy_act})
-		_hitboxes.append({"rect": del_r, "action": del_act})
-		return
-
-	if kind == "create_btn":
-		if active:
-			VineStyle.glow(self, rect.get_center(), 38.0, Color("a6e68f"), 0.28 * fade)
-		draw_rect(rect, Color(VineStyle.OUTLINE, fade))
-		draw_rect(rect.grow(-1.0), Color("3c6244" if active else "2a4534", fade))
-		draw_rect(Rect2(rect.position + Vector2(1.0, 1.0), Vector2(rect.size.x - 2.0, 1.0)), Color("a6e68f" if active else "5d9364", fade))
-		var tw: float = float(PixelText.width(label))
-		PixelText.draw(self, label, Vector2i(int(rect.position.x + (rect.size.x - tw) * 0.5 + 6.0), int(rect.position.y + 6.0)), Color(VineStyle.PETAL if active else Color("d8f8cc"), fade), outline)
-		_draw_icon(11, Vector2(rect.position.x + 8.0, rect.position.y + 4.0), fade)
-		return
-
 	if kind == "action":
-		var ac_tone: Color = Color("7fe3da") if id in ["join", "create_confirm"] else tone * 0.6
+		var ac_tone: Color = DANGER if id == "new_adventure" else tone * 0.6
 		if active:
 			VineStyle.glow(self, rect.get_center(), 36.0, ac_tone, 0.3 * fade)
 		VineStyle.plate(self, rect, label, ac_tone if active else ac_tone * 0.5, VineStyle.PETAL if active else UiStyle.TEXT, fade, void_level * 0.4)
-		if id == "join":
-			_draw_icon(13, Vector2(rect.position.x + 8.0, rect.position.y + 3.0), fade)
-		elif id == "create_confirm":
-			_draw_icon(4, Vector2(rect.position.x + 8.0, rect.position.y + 3.0), fade)
 		return
 
-	if kind == "recent":
-		var rh: Dictionary = _recent_cache[int(row.get("index", 0))]
-		draw_rect(rect, Color(VineStyle.OUTLINE, 0.85 * fade))
-		draw_rect(rect.grow(-1.0), Color("262040" if active else "19152b", 0.9 * fade))
-		var rname: String = String(rh.get("label", ""))
-		var raddr: String = String(rh.get("address", ""))
-		var rcode: String = String(rh.get("code", ""))
-		var rx: float = rect.position.x + 8.0
-		PixelText.draw(self, rname, Vector2i(int(rx), int(rect.position.y + 4.0)), Color("e8e4f4" if active else "b4aed0", fade), outline)
-		rx += float(PixelText.width(rname)) + 10.0
-		PixelText.draw(self, raddr, Vector2i(int(rx), int(rect.position.y + 4.0)), Color("7fe3da", fade), outline)
-		if not rcode.is_empty():
-			var cw: float = float(PixelText.width(rcode))
-			PixelText.draw(self, rcode, Vector2i(int(rect.end.x - cw - 8.0), int(rect.position.y + 4.0)), Color("ffd98a", fade), outline)
-		return
-
-	# Standard row (slider, toggle, weather, stepper, field)
 	if active or editing:
 		draw_rect(rect, Color("241f3f", 0.55 * fade))
 	PixelText.draw(self, label, Vector2i(int(rect.position.x + 6.0), int(rect.position.y + 5.0)), ink, outline)
@@ -1098,43 +731,20 @@ func _draw_row_widget(idx: int, row: Dictionary, rect: Rect2, fade: float, void_
 			var word: String = "AN" if on else "AUS"
 			PixelText.draw(self, word, Vector2i(int(rect.end.x - 28.0), int(rect.position.y + 5.0)), Color(Color("a6e68f") if on else Color("8a84ad"), fade), outline)
 		"weather":
-			var wtxt: String = Quality.label(id) ## weather, graphics level, frame cap (choices)
+			var wtxt: String = Quality.label(id)
 			var box: Rect2 = Rect2(rect.end.x - 76.0, rect.position.y + 2.0, 72.0, 13.0)
 			VineStyle.plate(self, box, wtxt, tone if active else tone * 0.35, VineStyle.PETAL if active else UiStyle.TEXT, fade, void_level * 0.3)
-		"stepper":
-			var stxt: String = "%d SPIELER" % _new_world_max
-			var box: Rect2 = Rect2(rect.end.x - 76.0, rect.position.y + 2.0, 72.0, 13.0)
-			VineStyle.plate(self, box, stxt, tone if active else tone * 0.35, VineStyle.PETAL if active else UiStyle.TEXT, fade, void_level * 0.3)
 		"field":
-			var box_w: float = 166.0 if id != "new_world_code" else 144.0
-			var box: Rect2 = Rect2(rect.end.x - box_w - (22.0 if id == "new_world_code" else 4.0), rect.position.y + 2.0, box_w, 13.0)
+			var box: Rect2 = Rect2(rect.end.x - 170.0, rect.position.y + 2.0, 166.0, 13.0)
 			draw_rect(box, outline)
 			draw_rect(box.grow(-1.0), Color("161228", fade))
 			if editing or active:
 				draw_rect(Rect2(box.position.x + 1.0, box.end.y - 2.0, box.size.x - 2.0, 1.0), Color(tone, fade))
-			var val: String = _field_value(id)
-			var disp: String = val.to_upper()
+			var disp: String = _player_name_buf.to_upper()
 			PixelText.draw(self, disp, Vector2i(int(box.position.x + 5.0), int(box.position.y + 3.0)), Color(HOT_INK if (editing or active) else Color("ffd98a"), fade), outline)
 			if (editing or active) and int(_time * 2.4) % 2 == 0:
 				var cx: float = box.position.x + 5.0 + float(PixelText.width(disp)) + 1.0
 				draw_rect(Rect2(cx, box.position.y + 2.0, 1.0, 8.0), Color(tone, fade))
-			if id == "new_world_code":
-				var rr: Rect2 = Rect2(rect.end.x - 20.0, rect.position.y + 2.0, 16.0, 13.0)
-				draw_rect(rr, outline)
-				draw_rect(rr.grow(-1.0), Color("24304c" if _hover_sub == "reroll_code" else "1a1732", fade))
-				_draw_icon(12, Vector2(rr.position.x + 2.0, rr.position.y + 1.0), fade)
-				_hitboxes.append({"rect": rr, "action": "reroll_code"})
-
-
-func _field_value(id: String) -> String:
-	match id:
-		"addr": return address
-		"join_code": return join_code
-		"new_world_name": return _new_world_name
-		"new_world_code": return _new_world_code
-		"new_world_port": return _new_world_port
-		"player_name": return _player_name_buf
-	return ""
 
 
 func _draw_vine_slider(id: String, at: Vector2, fade: float, tone: Color, focused: bool) -> void:
@@ -1192,7 +802,8 @@ func _draw_controls_grid(rect: Rect2, fade: float, void_level: float) -> void:
 
 func _draw_confirm_body(rect: Rect2, fade: float) -> void:
 	var outline: Color = Color(VineStyle.OUTLINE, fade)
-	var lines: PackedStringArray = ["DEIN AKTUELLER SPIELSTAND WIRD BEIM", "NÄCHSTEN SPEICHERN ÜBERSCHRIEBEN."]
+	var save_kind: String = "CLOUD-SPIELSTAND" if CloudSession.is_logged_in() else "SPIELSTAND"
+	var lines: PackedStringArray = ["DEIN AKTUELLER " + save_kind + " WIRD", "BEIM NÄCHSTEN SPEICHERN ÜBERSCHRIEBEN."]
 	var y: float = rect.position.y + 38.0
 	for line: String in lines:
 		PixelText.draw(self, line, Vector2i(int(rect.position.x + (rect.size.x - float(PixelText.width(line))) * 0.5), int(y)), Color(UiStyle.TEXT, 0.9 * fade), outline)
@@ -1212,25 +823,12 @@ func _draw_footer_bar(rect: Rect2, fade: float) -> void:
 	var outline: Color = Color(VineStyle.OUTLINE, fade)
 	var bar_y: float = rect.end.y - 24.0
 	draw_rect(Rect2(rect.position.x + 12.0, bar_y - 3.0, rect.size.x - 24.0, 1.0), Color("4a4180", 0.45 * fade))
-
-	# Show LAN IP badge on bottom-left of Multiplayer Worlds / Create
-	if page == Page.MULTI:
-		var ip_str: String = "DEINE IP: %s:%d" % [NetworkManager.primary_ip(), NetworkManager.DEFAULT_PORT]
-		var ip_r: Rect2 = Rect2(rect.position.x + 12.0, bar_y + 2.0, float(PixelText.width(ip_str)) + 20.0, 14.0)
-		draw_rect(ip_r, Color("1a1630", fade))
-		_draw_icon(4, Vector2(ip_r.position.x + 2.0, ip_r.position.y + 1.0), fade)
-		PixelText.draw(self, ip_str, Vector2i(int(ip_r.position.x + 16.0), int(ip_r.position.y + 4.0)), Color("b9f3ee" if _hover_sub == "copy_host_ip" else "8a84ad", fade), outline)
-		_hitboxes.append({"rect": ip_r, "action": "copy_host_ip"})
-
-	# Status feedback toast if any
 	if not status.is_empty():
 		var scol: Color = DANGER if _status_is_error else Color("7fe3da")
-		var sx: int = int(rect.position.x + 14.0) if page != Page.MULTI else int(rect.position.x + 14.0)
+		var sx: int = int(rect.position.x + 14.0)
 		var sy: int = int(bar_y - 13.0)
 		draw_rect(Rect2(float(sx - 3), float(sy - 2), float(PixelText.width(status) + 6), 11.0), Color("161226", 0.92 * fade))
 		PixelText.draw(self, status, Vector2i(sx, sy), Color(scol, fade), outline)
-
-	# Draw footer buttons right-aligned inside footer bar
 	var right_x: float = rect.end.x - 12.0
 	for i: int in range(_rows.size() - 1, -1, -1):
 		var row: Dictionary = _rows[i]
@@ -1240,7 +838,7 @@ func _draw_footer_bar(rect: Rect2, fade: float) -> void:
 		var br: Rect2 = Rect2(right_x - bw, bar_y + 1.0, bw, 16.0)
 		_rects[i] = br
 		var active: bool = i == _sel
-		var tone: Color = Color("7fe3da") if String(row.id) == "join_page" else VineStyle.ACCENT_WARM
+		var tone: Color = VineStyle.ACCENT_WARM
 		if active:
 			VineStyle.glow(self, br.get_center(), 24.0, tone, 0.3 * fade)
 		VineStyle.plate(self, br, String(row.label), tone if active else tone * 0.35, VineStyle.PETAL if active else UiStyle.TEXT, fade, 0.25)
@@ -1249,9 +847,7 @@ func _draw_footer_bar(rect: Rect2, fade: float) -> void:
 
 func _page_title() -> String:
 	match page:
-		Page.CONFIRM_NEW: return "NEUES SPIEL"
-		Page.MULTI: return "NEUE KOOP-WELT" if _creating_world else "MEHRSPIELER-WELTEN"
-		Page.JOIN: return "WELT BEITRETEN"
+		Page.CONFIRM_NEW: return "NEUES ABENTEUER"
 		Page.SETTINGS: return "EINSTELLUNGEN"
 	return ""
 

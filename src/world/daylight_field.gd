@@ -19,6 +19,11 @@ var _story_blocked: bool = false
 var _story_wait: float = 0.0
 var _shafts: ShaderMaterial
 var _quad: Polygon2D
+var _sent_strength: float = -1.0
+var _sent_gold: float = -1.0
+var _sent_air: float = -1.0
+var _buf: PackedByteArray
+
 
 func _ready() -> void:
 	_config = DataRegistry.table("daylight")
@@ -26,6 +31,8 @@ func _ready() -> void:
 	z_index = -7
 	coverage = Image.create(SIZE.x, SIZE.y, false, Image.FORMAT_R8)
 	coverage.fill(Color.BLACK)
+	_buf.resize(SIZE.x * SIZE.y)
+	_buf.fill(0)
 	_texture = ImageTexture.create_from_image(coverage)
 	RenderingServer.global_shader_parameter_set("g_day_cover", _texture)
 	_quad = Polygon2D.new()
@@ -45,23 +52,32 @@ func _exit_tree() -> void:
 func follow(indoors: bool, sun: float, gold: float) -> void:
 	strength = 0.0 if indoors else maxf(sun, gold * float(DataRegistry.table("daylight").get("golden_strength", 0.85)))
 	golden = 0.0 if indoors else gold
-	RenderingServer.global_shader_parameter_set("g_day_strength", strength)
-	RenderingServer.global_shader_parameter_set("g_day_gold", golden)
+	if absf(strength - _sent_strength) > 0.0004:
+		_sent_strength = strength
+		RenderingServer.global_shader_parameter_set("g_day_strength", strength)
+	if absf(golden - _sent_gold) > 0.0004:
+		_sent_gold = golden
+		RenderingServer.global_shader_parameter_set("g_day_gold", golden)
 	visible = strength > 0.001
 
 func _process(delta: float) -> void:
+	if strength <= 0.001:
+		return
 	_story_wait -= delta
 	if _story_wait <= 0.0:
 		_story_wait = 0.15
 		_story_blocked = false
-		for actor: Node in get_tree().get_nodes_in_group("players"):
-			if actor.is_multiplayer_authority(): _story_blocked = bool(actor.get("story_lock"))
+		for actor: Player in Player.all:
+			if is_instance_valid(actor) and actor.is_multiplayer_authority():
+				_story_blocked = bool(actor.get("story_lock"))
 	clock += delta
 	sway = WorldWind.sample(Vector2.ZERO) * 3.0
 	RenderingServer.global_shader_parameter_set("g_day_sway", sway)
 	RenderingServer.global_shader_parameter_set("g_day_clock", clock)
-	_shafts.set_shader_parameter("air", 0.0 if air_blocked() else 1.0)
-	if strength <= 0.001: return
+	var air: float = 0.0 if air_blocked() else 1.0
+	if air != _sent_air:
+		_sent_air = air
+		_shafts.set_shader_parameter("air", air)
 	var view: Rect2 = view_rect()
 	_wait -= delta
 	if _wait <= 0.0 or not region.encloses(view.grow(32.0)):
@@ -79,28 +95,40 @@ func rebuild(view: Rect2) -> void:
 	var area: Rect2 = view.grow(PAD)
 	var step: Vector2 = Vector2(ceilf(area.size.x / SIZE.x / 4.0) * 4.0, ceilf(area.size.y / SIZE.y / 4.0) * 4.0)
 	region = Rect2((area.position / step).floor() * step, step * Vector2(SIZE))
-	coverage.fill(Color.BLACK)
+	_buf.fill(0)
 	var rays: PackedVector4Array = PackedVector4Array()
 	var candidates: Array[Node] = get_tree().get_nodes_in_group("day_canopies")
+	var pad_region: Rect2 = region.grow(240.0)
+	var shaft_limit: int = clampi(int(_config.get("shaft_limit", 4)), 0, 4)
+	var rays_view: Rect2 = view.grow(80.0)
 	for node: Node in candidates:
 		var tree: Node2D = node as Node2D
-		if tree == null or not region.grow(240.0).has_point(tree.global_position): continue
+		if tree == null or not pad_region.has_point(tree.global_position): continue
 		var shape: Vector4 = tree.call("day_canopy")
 		if shape.z <= 0.0: continue
 		var center: Vector2 = Vector2(shape.x, shape.y)
 		var radius: Vector2 = Vector2(shape.z, shape.w)
 		var bounds: Rect2i = Rect2i(((center - radius - region.position) / step).floor(), (radius * 2.0 / step).ceil() + Vector2(2, 2))
 		bounds = bounds.intersection(Rect2i(Vector2i.ZERO, SIZE))
+		var inv_rx: float = 1.0 / radius.x
+		var inv_ry: float = 1.0 / radius.y
 		for y: int in range(bounds.position.y, bounds.end.y):
+			var py: float = (region.position.y + (float(y) + 0.5) * step.y - center.y) * inv_ry
+			var row_off: int = y * SIZE.x
 			for x: int in range(bounds.position.x, bounds.end.x):
-				var p: Vector2 = region.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * step
-				var d: float = ((p - center) / radius).length()
-				var cover: float = (1.0 - smoothstep(0.55, 1.0, d)) * 0.88
-				coverage.set_pixel(x, y, Color(maxf(coverage.get_pixel(x, y).r, cover), 0, 0))
+				var px: float = (region.position.x + (float(x) + 0.5) * step.x - center.x) * inv_rx
+				var d2: float = px * px + py * py
+				if d2 >= 1.0:
+					continue
+				var cover: int = int(roundf((1.0 - smoothstep(0.55, 1.0, sqrt(d2))) * 224.4))
+				var idx: int = row_off + x
+				if cover > _buf[idx]:
+					_buf[idx] = cover
 		# Stable selection from world position; no random changes as the camera moves.
 		var eligible: bool = posmod(int(tree.global_position.x) * 7 + int(tree.global_position.y) * 13, 5) == 0
-		if rays.size() < clampi(int(_config.get("shaft_limit", 4)), 0, 4) and eligible and view.grow(80.0).has_point(center):
+		if rays.size() < shaft_limit and eligible and rays_view.has_point(center):
 			rays.append(Vector4(center.x - radius.x * 0.3, center.y - radius.y * 0.6, minf(110.0, radius.x * 2.4), maxf(5.0, radius.x * 0.16)))
+	coverage.set_data(SIZE.x, SIZE.y, false, Image.FORMAT_R8, _buf)
 	var count: int = rays.size()
 	while rays.size() < 4: rays.append(Vector4.ZERO)
 	_texture.update(coverage)

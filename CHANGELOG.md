@@ -4,6 +4,113 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.8.6 Beta] – 2026-11-14
+### 🏰 Zinnen von Hallgrat, Sternenfall & Ruf der Tiefe: Stadtmauer & Gassenleben, Nacht-Wunder, Schlafrhythmus, Markttage & Koop-Welten
+
+![Hallgrat im Nachtlicht mit Stadtmauer und Laternen](docs/img/hallgrat_deko_night.png)
+
+> *Wenn die Nacht über Hallgrats Zinnen hereinbricht, entzünden sich Laternen und Wegschreine entlang der neuen Pflastergassen. Draußen in den Wiesen zieht eine Sternschnuppe ihre leuchtende Spur, ein weißer Kronenhirsch tritt lautlos aus dem Nebel, in Glimmrast ruft Jorun zum Großen Markttag – und tief unter den Dünen der Sonnenquarz-Öde regt sich erstmals der ewige Titan Aurelith.*
+
+> [!IMPORTANT]
+> **Ein gewaltiges Fundament auf dem Weg zu V0.9!**
+> V0.8.6 vollendet die Stadtmauern und das Straßenleben von **Hallgrat**, schließt den **Wiesenbiom-Ausbau (Stufe 6)** mit nächtlichen Wundern und 36 Schatztruhen ab, führt den **echten Tag-Nacht- & Schlafrhythmus** ein, erweitert **Glimmrast** um Markttage, Vorbestellungen, 3 neue Feldfrüchte und den interaktiven **Freiluftsalon** – und legt mit **Koop-Welten** sowie dem ersten Modell-Fundament von **Wüsten-Boss Aurelith** die Basis für die nächsten großen Kämpfe.
+
+<details>
+<summary><b>📋 Alle Highlights von V0.8.6 auf einen Blick</b></summary>
+
+1. **🏰 Hallgrat Stufen 3d & 3e:** Ringförmige Stadtmauer mit Rundtürmen & Zinnen, durchgehende Garten-/Feld-/Ruinenmauern mit Kollision, geordnete Häuserreihen, Laternen & über 60 neue Straßenszenen samt Kartenansicht.
+2. **🌠 Wiesenbiom Stufe 6:** Nächtliche Sternschnuppen-Krater, der friedliche Weiße Kronenhirsch & 36 platzierte Entdecker-Truhen.
+3. **🌙 Dynamischer Tag-Nacht- & Schlafrhythmus:** 40-Minuten-Zyklus, individuelle Schlafschwelle (`10 %–70 %`), `AUSGERUHT`-Bonus & `ÜBERMÜDET`-Malus sowie Koop-Bettwarte-Banner.
+4. **🎪 Glimmrast-Erweiterung:** Markttage & Vorbestellungen bei Jorun, Brunnenplatz Stufe 2 & 3, 3 neue Feldfrüchte, Gießkannen-Limit (`12` Güsse), Vogelscheuche & voller Freiluftsalon.
+5. **🤝 Koop-Welten & Boss-Fokus-HUD:** Eigene Koop-Welt-Speicherstände mit 6-stelligem Beitrittscode, Live-Spielerliste im HUD & automatisches Ausblenden von Neben-HUDs im Bosskampf.
+6. **🏜️ Ausblick – Aurelith (Paket 1):** Komplettes Boss-Dossier & 3-stufiges Titan-Modell von *Aurelith, Herz des Sonnenquarzes* fertiggestellt (der eigentliche Bosskampf folgt in den nächsten Paketen).
+
+</details>
+
+---
+
+### 🏰 Hallgrat (Stufen 3d & 3e) – Stadtmauer, Gassenleben & Kartendarstellung
+
+* **🟣 NEU – Die Stadtmauer von Hallgrat:** Rund um das Hochplateau erhebt sich eine wuchtige Werkstein-Stadtmauer mit Wehrgang, Zinnen, Kreuzscharten, Strebepfeilern, Fackeln, Toren an allen Straßenausgängen und mächtigen Rundtürmen (mit Zinnenkranz oder Schieferkegeldach samt Wimpel). Auch auf der Weltkarte ist die neue Stadtmauer nun eingezeichnet.
+* **🟣 NEU – Durchgehende Mauern & echte Hitboxen:** Über 80 Mauerläufe (in den Stilen *Garten*, *Feld* und *Ruine*) schlängeln sich nahtlos entlang der Pflasterkanten, enden an Torpfosten vor Türwegen und blockieren nun zuverlässig in der Spielwelt.
+* **🔵 REWORK – Geordnete Häuserreihen & Gassen:** Füllhäuser stehen jetzt in stimmigen Reihen mit gemeinsamen, geschwungenen Gassen vor den Haustüren statt verstreuter Einzelpfade.
+* **🟣 NEU – Lebendige Straßen, Plätze & Grün:** Dutzende neue Szenen füllen die Stadt mit Leben: nachts leuchtende Straßenlaternen, Wegschreine mit Kerzen, Bänke, Tröge, Wäscheleinen, Ladenschilder am Eisenarm, Hackklötze, Körbe, Steinmetzquader, Holzzäune, begehbare Gemüsebeete sowie Haine, Büsche und Blumen am Mauerfuß.
+
+![Stadtmauer von Hallgrat mit Rundtürmen und Zinnen](docs/img/hallgrat_stadtmauer.png)
+![Marktplatz und Straßendekoration in Hallgrat](docs/img/hallgrat_markt.png)
+![Belebte Gassen und Mauern in Hallgrat](docs/img/hallgrat_deko.png)
+
+---
+
+### 🌠 Wiesenbiom-Ausbau (Stufe 6) – Nacht-Wunder & 36 Entdecker-Truhen
+
+* **🟣 NEU – Sternschnuppen-Krater:** In klaren Nächten schießt ein leuchtender Schweif über das Wiesenbiom und schlägt als warmer **Sternschnuppen-Krater** ein (`3× Sternensplitter` + `+18 XP`). Wer bis zum Sonnenaufgang wartet, findet nur noch erkaltetes Gestein.
+* **🟣 NEU – Der Weiße Kronenhirsch:** Ein scheues, unverwundbares Nachtwesen streift durch die Wiesen. Lautes Heranstürmen verscheucht ihn – wer sich jedoch geduldig **anschleicht**, erlebt ein stilles Wunder: Der Hirsch scharrt `Geweih-Talisman`, `Sternensplitter` und `+24 XP` aus dem Boden.
+* **🟣 NEU – 36 platzierte Entdecker-Truhen:** In der gesamten Wiese warten nun 36 sorgfältig platzierte Schatztruhen (`2 legendär`, `10 selten`, `24 gewöhnlich`) mit freigehaltenem Umfeld, neuen Talismanen und seltenen Samen.
+
+---
+
+### 🌙 Dynamischer Tag-Nacht-Zyklus & Echter Schlafrhythmus
+
+* **🔵 REWORK – 40-Minuten-Tag-Nacht-Zyklus:** Ein voller Tag-Nacht-Durchlauf dauert nun `40 Minuten` (`2400 s`). Die Nacht beginnt um `21:00` und endet um `04:12` (`30 %` bzw. `12 Minuten` Echtzeit); der Morgen- und Abend-Farbmix wurde für sattere Lichtstimmung feinjustiert und das nächtliche Monster-Pacing leicht entspannt.
+* **🟣 NEU – Schlafschwelle & Müdigkeitsschuld:** Schlaf ist kein reiner Zeitsprung mehr. Je nach aktueller Erholung darf man erst ab `10 %` (völlig erschöpft) bis `70 %` (komplett ausgeruht) der Nacht ins Bett (Standard: `40 %`). Wer zu früh schlafen will, erhält einen Hinweis (*„Ich bin noch nicht müde.“*); durchgemachte Nächte bauen hingegen Müdigkeit auf.
+* **🟣 NEU – Dynamisches Aufwachen & Schlaf-Effekte:**
+  * **Früher, erholsamer Schlaf:** Weckt kurz nach `06:00`, bewahrt den Morgentau und verleiht **AUSGERUHT** (`+12 %` Ausdauer-Regeneration für `10 Minuten`).
+  * **Später Schlaf / Schlafmangel:** Weckt erst um `09:00` und belegt dich mit **ÜBERMÜDET** (Stufe I & II mit `-10 %` bis `-20 %` Ausdauer-Regeneration).
+  * **Koop-Abstimmung:** Im Mehrspieler erscheint beim Warten im Bett das Banner **`WARTEN IM BETT`**.
+
+---
+
+### 🎪 Glimmrast-Ausbau – Markttage, Ackerbau 2.0 & Freiluftsalon
+
+* **🟣 NEU – Karawanen-Markttage & Vorbestellungen:**
+  * Ab Tag 4 besucht Jorun die Stadt und hält seinen Stand bis abends länger geöffnet.
+  * Je nach Stadtstufe feiert Glimmrast nun **MARKTTAG** oder **GROSSER MARKTTAG** – mit deutlich mehr Waren (`1,35×` bzw. `1,65×` Bestand), mehr **GESUCHT**-Ankäufen und passenden Reaktionen der Siedler.
+  * Im neuen Reiter **BESTELLEN** lassen sich bis zu `3` gezielte Lieferungen (Wüstenfrüchte, seltene Samen, Sonnenquarz, Mondstein, Tränke oder Edelsteine) für Joruns nächsten Halt vorbestellen. Dazu gibt es neue Jorun-Aushänge am Dorfbrett.
+* **🟣 NEU – Brunnenplatz Stufe 2 & 3:** Das Herz der Stadt lässt sich nun in zwei weiteren Ausbaustufen zu einem prächtigeren Brunnenplatz mit größerem Stadtwert und stärkerer Lichtaura erweitern.
+* **🟣 NEU – Ackerbau 2.0 (3 neue Feldfrüchte, Gießkannen-Limit & Vogelscheuche):**
+  * **Mondlauch:** Heilt `6` LP und hüllt dich `45 s` in ruhigen **MONDSCHIMMER**.
+  * **Quellmelone:** Heilt `10` LP, kühlt `60 s` in der Wüstenhitze und erfrischt die Ausdauer.
+  * **Bernsteinkorn:** Heilt `4` LP, stellt `35` Ausdauer wieder her und ist sowohl in der Alchemie als auch bei der Karawane gefragt.
+  * **Gießkanne (`12` Güsse):** Die Kanne fasst nun `12` Güsse und lässt sich am Brunnenplatz, am Fluss, an der Regentonne oder direkt im Regen wieder auffüllen.
+  * **Vogelscheuche:** Schützt Beete im Umkreis von `112 px` vor hungrigen Krähen und Raben.
+* **🟣 NEU – Vollwertiger Freiluftsalon:** Am Spiegelplatz öffnet nun das komplette **FREILUFTSALON**-Fenster mit den Reitern **FRISUR**, **OUTFIT** und **FÄRBEN** samt Live-Vorschau im Spiegel und `8` Outfit-Farben (*Original*, *Blutsamt*, *Waldläufer*, *Nachtseide*, *Wüstengold*, *Prismentief*, *Dornenrosé*, *Schattengarn*).
+
+---
+
+### 🤝 Koop-Welten, Boss-HUD-Fokus & Weltstart-Optimierung
+
+* **🟣 NEU – Persistente Koop-Welten:** Im Mehrspieler-Tab lassen sich nun eigene Koop-Welten verwalten und starten – inklusive **6-stelligem Beitrittscode**, Liste kürzlich besuchter Hosts und speicherbarer Weltstände.
+* **🟣 NEU – Kompaktes Multiplayer-HUD:** Unten links zeigt eine neue einklappbare Karte den aktuellen Raumcode, die LAN-IP zum schnellen Kopieren sowie alle verbundenen Mitspieler mit ihren Sporen-Farben.
+* **🔵 REWORK – Bosskampf-HUD-Fokus:** Während eines aktiven Bosskampfs blenden unbeteiligte Info-Anzeigen (Uhr, Geldbörse, Quest-Leiste, Tipps, Angel- & Multiplayer-HUD) automatisch aus, damit volle Sicht auf das Kampfgeschehen bleibt.
+* **🟡 FIX – Flüssigerer Weltstart:** Grafikeffekte werden nun hinter dem Ladebildschirm vorab aufgewärmt, sodass beim Betreten der Welt weniger Mikroruckler auftreten.
+
+---
+
+### 🏜️ Ausblick – Wüsten-Boss „Aurelith, Herz des Sonnenquarzes“ (Fundament / Paket 1)
+
+> [!TIP]
+> **Erster Blick auf den kommenden Endgame-Titanen der Sonnenquarz-Öde!**
+> In V0.8.6 wurde **Paket 1** fertiggestellt: das komplette Kampf-Dossier sowie das hochdetaillierte, 3-stufige Pixel-Art-Modell von **Aurelith** (vom halb im Sand versunkenen Monument über *Der Erste Monolith* und *Das Entfesselte Prisma* bis zum *Herz der Singenden Dünen* mit Sandzyklon und Armillarringen). Der eigentliche Bosskampf im Hohen Norden der Singenden Quarzfelder folgt in den nächsten Paketen!
+
+---
+
+### 📊 Balancing & Systemwerte im Überblick
+
+| System / Wert | Vorher | Nachher | Einordnung |
+| :--- | :--- | :--- | :--- |
+| **Nachtfenster (Start / Ende)** | `0.80` – `0.20` | `0.86` – `0.185` (Schlaf-Nacht `21:00–04:12`) | 🔵 REWORK |
+| **Gießkanne Kapazität** | Unbegrenzt | `12` Güsse (Brunnen/Fluss/Tonne/Regen) | 🔵 REWORK |
+| **Freiluftsalon Baukosten** | `10 Holz, 3 Stein, 4 Fasern, 1 Glimmkappe` | `12 Planken, 4 Eisenbarren, 6 Weidengarn, 4 Prismensplitter` | 🔴 NERF |
+| **Karawane Öffnungszeit & Min-Tag** | Bis `0.78`, ab Tag 1 | Bis `0.83`, ab Tag `4` + Markttage | 🟢 BUFF |
+| **Brunnenplatz Ausbaustufen** | Nur Stufe 1 | Stufen `1`, `2` & `3` | 🟢 BUFF |
+| **Nacht-Alarm / Lockruf Cooldowns** | `70 s` / `80 s` | `95 s` / `110 s` | 🟢 BUFF |
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Mit Hallgrats stolzen Zinnen, Sternschnuppen über der Wiese und den ersten Markttagen am Brunnenplatz steht das Fundament für V0.9. Danke fürs Spielen und Testen!*
+
+---
+
 ## [V0.8.5 Beta] – 2026-11-14
 ### ✨ Steine von Hallgrat & Wunder der Wiese: Weltwunder, Nacht-Geheimnisse, fertiges Hallgrat & Freiluftsalon
 

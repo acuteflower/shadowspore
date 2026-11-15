@@ -4,6 +4,52 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.1 Beta] – 2026-11-15
+### 🌟 Sternengaben, Himmelsfall & Shadowspore Launcher: Caelias Sternenaltar, Sternenklinge, Cloud-Profil & Desktop-Launcher
+
+![Nachtsee im Sternenlicht](docs/img/lake_night.png)
+
+> *Unter dem Nachthimmel sammeln sich warme Sternensplitter zu Caelias Sternengaben und der legendären Sternenklinge – während der neue Shadowspore-Launcher mit Cloud-Profil das Tor zur Welt öffnet.*
+
+> [!IMPORTANT]
+> **Ein starkes Content- & Plattform-Update auf V0.9!**
+> V0.9.1 Beta bringt **Caelias Sternenaltar** samt der neuen Quest *„Gefallene Sterne“*, exklusiven **Sternengaben**, einer **Sammlungs-Meilensteinleiste** und der legendären **Sternenklinge**, legt das Fundament für **Cloud-Profile & getrennte Cloud-Spielstände** mit dem brandneuen **Shadowspore Desktop-Launcher** und poliert Licht-, Nebel-, Wind-, Spiegelungs- und Gegner-Systeme weiter auf.
+
+---
+
+### 🌌 Caelias Sternenaltar – Quest „Gefallene Sterne“, Sternengaben & Sternenklinge
+
+* **🟣 NEU – Quest „Gefallene Sterne“:** Caelia bittet dich im Sternensaal, nachts nach herabgefallenen Sternschnuppen Ausschau zu halten, warmes **Sternerz** aus ihren Kratern zu bergen und es zu ihrem **Sternenaltar** zu bringen.
+* **🟣 NEU – Sternenaltar (`STERNENGABEN` & `SAMMLUNG`):**
+  * **Tauschen (`STERNENGABEN`):** Tausche gesammeltes Sternerz direkt bei Caelia gegen himmlische Verbrauchsgegenstände, Talismane und Waffen ein.
+  * **Darbringen (`SAMMLUNG`):** Opfere Sternerz, um den Sternensaal zu stärken und dauerhafte Meilenstein-Belohnungen freizuschalten.
+* **🟣 NEU – 6 exklusive Himmelsgaben & der Perk `STERNENFUNKE`:**
+  * **Sternenstaub-Elixier:** Stellt sofort `35` Leben sowie volle Ausdauer wieder her und regeneriert weitere `24` Leben über `10 s`.
+  * **Astrale Sternfrucht:** Stellt `45` Leben und `60` Ausdauer wieder her und schenkt `120` Erfahrung.
+  * **Morgenstern-Kette:** `+12 %` Schaden, `-15 %` Schritt-Abklingzeit, `-20 %` Alarm und der neue Perk **`STERNENFUNKE`** (nach einem Schatten- oder Lichtschritt entfesselt dein nächster Treffer innerhalb von `4,0 s` eine Sternenlicht-Welle mit `+35 %` Zusatzschaden im Umkreis).
+  * **Mondsichel-Gehänge:** `12 %` Schadensabsorption, `+22 %` Ladetempo und `+16` maximales Leben.
+  * **Siegel der Ersten Wächterin (Legendär):** `+15 %` Schaden, `+25 %` Ladetempo, `-20 %` Schritt-Abklingzeit, `12 %` Absorption und Perk **`STERNENFUNKE`**.
+  * **Sternenklinge (Legendäres Einhandschwert):** Mit neuer Rechtsklick-Doppeltechnik: **STERNENSTICH** (durchdringende Astralsichel + `3` herabfallende Sternschnuppen) und **HIMMELSFALL** (`5` himmlische Lichtlanzen vom Himmel, die bei Treffer `+8` Leben heilen!).
+
+---
+
+### 🚀 Shadowspore Desktop-Launcher & Cloud-Konto
+
+* **🟣 NEU – Shadowspore Desktop-Launcher:** Ein eigener Desktop-Launcher mit Startseite, Szenen-Galerie, News- & Changelog-Leser, Konto-Anmeldung, Freundesliste, Beitritts-Einstellungen und direktem Spielstart.
+* **🟣 NEU – Cloud-Session & getrennte Cloud-Saves:** Unterstützung für Cloud-Anmeldung, Spieler-UID, Rollen, Freundeslisten sowie getrennt gespeicherte **Charakterprofile** und **Weltstände** über einen eigenen Server-Dienst.
+
+---
+
+### ✨ Feinschliff an Welt, Shaders, Gegnern & Kamera
+
+* **🔵 REWORK – Licht-, Nebel- & Wind-Feinschliff:** Überarbeitete Tageslicht-, Stimmungs-, Nachtnebel-, Leerenriss- und Blattwind-Shader sowie fein abgestimmte Helligkeit und Farbwerte.
+* **🟡 FIX – Gegner-, Tier- & Kamera-Politur:** Verbesserungen an Gegner-Navigation und Rigs (u. a. Quarzwächter, Lichtfischer, Schattenspinne, Leerenbrecher, Horcher), Wildtieren, Wasserspiegelungen, Sonnenschatten, Grafik-Qualitätsstufen und der freien Kamera.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Ob mit der Sternenklinge unterm Nachthimmel oder direkt über den neuen Shadowspore-Launcher: Viel Freude beim Entdecken von V0.9.1 Beta!*
+
+---
+
 ## [V0.9 Beta] – 2026-11-15
 ### ✨ Erwachen der Wächterin & Herz des Sonnenquarzes: Der Sternensaal, Lichtschritt, Wüsten-Boss Aurelith, Belebtes Hallgrat, Wasserspiegelung & Sonnenschatten
 

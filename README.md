@@ -5,7 +5,21 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.9 Beta – „Erwachen der Wächterin & Herz des Sonnenquarzes“
+## 🚀 Aktuelle Version: V0.9.1 Beta – „Sternengaben, Himmelsfall & Shadowspore Launcher“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Nachtsee im Sternenlicht](docs/img/lake_night.png)
+
+### Highlights von V0.9.1 Beta:
+- 🌟 **Caelias Sternenaltar & Quest „Gefallene Sterne“:** Sammle nachts **Sternerz** aus Kratern, bringe es in den Sternensaal und schalte im Reiter **`SAMMLUNG`** Meilensteine frei oder tausche es im Reiter **`STERNENGABEN`** ein.
+- ⚔️ **Legendäre Sternenklinge & Himmelsgaben:** Entfessle mit der **Sternenklinge** die Doppeltechnik **STERNENSTICH** (Astralsichel + 3 Sternschnuppen) & **HIMMELSFALL** (5 heilende Lichtlanzen) und rüste **Sternenstaub-Elixier**, **Astrale Sternfrucht**, **Morgenstern-Kette**, **Mondsichel-Gehänge** sowie das **Siegel der Ersten Wächterin** (Perk **`STERNENFUNKE`**) aus.
+- 🚀 **Shadowspore Desktop-Launcher & Cloud-Konto:** Neuer Desktop-Launcher mit Szenen-Galerie, Changelog-Leser, Freundesliste und Spielstart samt Cloud-Profil- & Cloud-Save-Integration.
+- ✨ **Welt- & Shader-Politur:** Verfeinerte Licht-, Nebel-, Wind- & Spiegelungs-Shader sowie Feinschliff an Gegner-Navigation, Wildtieren, Sonnenschatten und freier Kamera.
+
+---
+
+## 🚀 Vorherige Version: V0.9 Beta – „Erwachen der Wächterin & Herz des Sonnenquarzes“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

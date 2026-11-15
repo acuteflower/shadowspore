@@ -54,7 +54,10 @@ var _vignette: GradientTexture2D
 var _fog_image: Image
 var _fog_texture: ImageTexture
 var _fading: Dictionary = {} ## cell index -> 0..1 while it clears
+const ZONE_MAP_VIEW_SCRIPT: GDScript = preload("res://src/ui/zone_map_view.gd")
+
 var _loaded: bool = false
+var _zone_view: RefCounted
 var _warm_sub: int = 0
 var _warm_decals: Array = []
 var _warm_decal_idx: int = 0
@@ -161,6 +164,19 @@ func warm() -> void:
 		_load_data()
 
 
+func _is_zones_world() -> bool:
+	return get_tree().get_first_node_in_group("zone_world") != null
+
+
+func set_zone_map_mode(mode_name: String, zone_id: String = "") -> void:
+	if not _loaded:
+		_load_data()
+	if _zone_view != null:
+		_zone_view.set_mode(mode_name, zone_id)
+		if _overlay != null:
+			_overlay.queue_redraw()
+
+
 func _load_data() -> void:
 	while not warm_step(0):
 		pass
@@ -169,6 +185,12 @@ func _load_data() -> void:
 ## Incrementally builds map textures & lookup tables within `deadline_usec` (0 = synchronous).
 func warm_step(deadline_usec: int) -> bool:
 	if _loaded:
+		return true
+	if _is_zones_world():
+		_zone_view = ZONE_MAP_VIEW_SCRIPT.new() as RefCounted
+		if _canvas != null:
+			_canvas.visible = false
+		_loaded = true
 		return true
 	if _warm_sub == 0:
 		_discovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
@@ -446,6 +468,10 @@ func _process(delta: float) -> void:
 	_hover_t = move_toward(_hover_t, 0.0 if _hover_id.is_empty() else 1.0, delta / (0.12 if _hover_id.is_empty() else 0.18))
 	if _hover_t <= 0.0 and _hover_id.is_empty():
 		_hover_marker.clear()
+	if _zone_view != null:
+		queue_redraw()
+		_overlay.queue_redraw()
+		return
 	_pet_marks.update(get_tree(), _cursor, _to_screen)
 	_vista_marks.update(get_tree(), _cursor, _to_screen)
 	var pick: String = _ways.update(delta, get_tree(), _cursor, _to_screen, _ws_mouse, InputManager.interact_held() and _opening, InputManager.map_select_step() if _opening else 0)
@@ -473,20 +499,26 @@ func open_travel(from_id: String) -> bool:
 	if not _opening:
 		_ways.travel_from = ""
 		return false
+	if _zone_view != null:
+		_zone_view.set_mode("continent")
+		_open_t = 1.0
+		visible = true
+		return true
 	var tiles: Array[Vector2] = []
 	var manager: Waystones = Waystones.of(get_tree())
 	for entry: Dictionary in manager.entries():
 		if bool(entry.awake):
 			var tile: Array = entry.tile as Array
 			tiles.append(Vector2(float(tile[0]), float(tile[1])))
-	var lo: Vector2 = tiles[0]
-	var hi: Vector2 = tiles[0]
-	for t: Vector2 in tiles:
-		lo = Vector2(minf(lo.x, t.x), minf(lo.y, t.y))
-		hi = Vector2(maxf(hi.x, t.x), maxf(hi.y, t.y))
-	_center = (lo + hi) / 2.0
-	_scale = 0.4
-	_scale_target = clampf(minf(size.x * 0.55 / maxf(hi.x - lo.x, 40.0), size.y * 0.5 / maxf(hi.y - lo.y, 40.0)), SCALE_MIN, 1.4)
+	if not tiles.is_empty():
+		var lo: Vector2 = tiles[0]
+		var hi: Vector2 = tiles[0]
+		for t: Vector2 in tiles:
+			lo = Vector2(minf(lo.x, t.x), minf(lo.y, t.y))
+			hi = Vector2(maxf(hi.x, t.x), maxf(hi.y, t.y))
+		_center = (lo + hi) / 2.0
+		_scale = 0.4
+		_scale_target = clampf(minf(size.x * 0.55 / maxf(hi.x - lo.x, 40.0), size.y * 0.5 / maxf(hi.y - lo.y, 40.0)), SCALE_MIN, 1.4)
 	return true
 
 
@@ -555,6 +587,8 @@ func _set_open(open: bool, return_to_journal: bool = true) -> void:
 	var health: HealthComponent = _player.get("health") as HealthComponent if is_instance_valid(_player) else null
 	InputManager.ui_blocking = open or InputManager.menu_open or (health != null and health.current <= 0.0)
 	if open:
+		if _zone_view != null:
+			_zone_view.on_open(get_tree().get_first_node_in_group("zone_world"), _player)
 		_center = _player_tile()
 		_scale = _scale_target * 0.8
 		_anchor = size / 2.0
@@ -647,6 +681,11 @@ func _tile_at(screen: Vector2) -> Vector2:
 # ---------- input ----------
 
 func _gui_input(event: InputEvent) -> void:
+	if _zone_view != null and _opening:
+		if _zone_view.handle_input(event, size, get_tree().get_first_node_in_group("zone_world"), _player):
+			_overlay.queue_redraw()
+			get_viewport().set_input_as_handled()
+		return
 	var button: InputEventMouseButton = event as InputEventMouseButton
 	var motion: InputEventMouseMotion = event as InputEventMouseMotion
 	if motion != null:
@@ -728,11 +767,16 @@ func _draw() -> void:
 
 
 func _fade() -> float:
+	if _zone_view != null:
+		return clampf(_open_t * 2.5, 0.0, 1.0)
 	return clampf((_open_t - 0.4) / 0.5, 0.0, 1.0)
 
 
 func _draw_overlay() -> void:
 	var fade: float = _fade()
+	if _zone_view != null:
+		_zone_view.draw(_overlay, size, fade, _time, get_tree().get_first_node_in_group("zone_world"), _player)
+		return
 	var void_level: float = VineStyle.void_amount()
 	_draw_trail(fade)
 	_draw_labels(fade)
@@ -829,13 +873,13 @@ func _draw_town(fade: float) -> void:
 		return
 	var lit: Array[Vector3] = town.lit_circles()
 	for pass_index: int in 2:
+		var screen_circles: Array[Vector3] = []
 		for c: Vector3 in town.circles() if pass_index == 0 else lit:
 			var around: Vector2 = _to_screen(Vector2(c.x, c.y) / 16.0)
 			var radius: float = c.z / 16.0 * _scale
-			if radius < 3.0 or around.x + radius < 0.0 or around.y + radius < 0.0 or around.x - radius > size.x or around.y - radius > size.y:
-				continue
-			var tone: Color = Color(TOWN_TEAL, (0.16 if pass_index == 0 else 0.55) * fade)
-			VineStyle.ring(_overlay, around, int(radius), tone, 0.6 if pass_index == 1 else 0.3)
+			screen_circles.append(Vector3(around.x, around.y, radius))
+		var tone: Color = Color(TOWN_TEAL, (0.16 if pass_index == 0 else 0.55) * fade)
+		VineStyle.ring_union(_overlay, screen_circles, size, tone, 0.6 if pass_index == 1 else 0.3)
 	var at: Vector2 = _to_screen(town.heart() / 16.0)
 	if _on_screen(at):
 		_glyph(TOWN_FLAG, at + Vector2(0, -3), TOWN_TEAL, fade)
@@ -1156,6 +1200,8 @@ func _draw_presence(fade: float) -> void:
 			nearest = distance
 			hovered = marker.duplicate()
 			hovered["screen"] = at
+	if _ways.travel_from != "":
+		hovered = {}
 	_set_presence_hover(hovered)
 	if not _hover_marker.is_empty() and _hover_t > 0.0:
 		_draw_presence_tooltip(_hover_marker, fade)

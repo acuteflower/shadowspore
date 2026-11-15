@@ -902,6 +902,38 @@ func _journal_rules(player: Player, board: BoardManager, spot: Vector2, story_id
 	for entry: Dictionary in tracked.entries():
 		if String(entry.id) == "story:gustav_rescue":
 			_check(String(entry.get("sketch", "")) == "wheel" and (entry.memories as Array).size() == 2 and not "bis ins Licht" in String((entry.memories as Array)[1]), "the journal shows the two latest memories and the sketch for the opened wagon")
+	# --- Etappe 3: wild/kill hints, kill map marker & Bauwunsch recipe unlock
+	_check((BoardRules.hint_of("dusk_berry").get("area", []) as Array).size() == 3 and (BoardRules.hint_of("iron_ore").get("area", []) as Array).size() == 3, "new wild plant and ore hints resolve")
+	_check((BoardRules.hint_of("shadow_spider").get("area", []) as Array).size() == 3, "kill target hint resolves")
+	var bw_id: int = board.debug_post("bauwunsch_bretter", "gustav")
+	_check(bw_id >= 0 and String(board.offer_of(bw_id).get("ul", "")) == "recipe_plank_bulk", "bauwunsch notice carries unlock key")
+	_check("BAUWUNSCH" in board.town.recipe_block("plank_bulk", player), "bauwunsch recipe is locked before completion")
+	player.global_position = spot
+	board.request_accept(bw_id)
+	var bw_offer: Dictionary = board.offer_of(bw_id)
+	player.inventory.give(String(bw_offer.t), int(bw_offer.n))
+	var gustav_npc: Node2D = board.town.person_node("gustav")
+	if gustav_npc != null:
+		player.global_position = gustav_npc.global_position
+	board._host_finish(peer, bw_id, 1)
+	_check(board.town.unlocks.has("recipe_plank_bulk") and board.town.recipe_block("plank_bulk", player) != "BAUWUNSCH AN DER TAFEL NÖTIG", "finishing bauwunsch unlocks recipe_plank_bulk")
+	var bw_rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	bw_rng.seed = 99
+	var rerolled_bw: bool = false
+	for i: int in 40:
+		var rolled: Dictionary = BoardRules.roll(bw_rng, {"gustav": {"trust": 20}}, [], 1, i + 1, board.town.unlocks)
+		if String(rolled.get("tx", "")) == "bauwunsch_bretter":
+			rerolled_bw = true
+	_check(not rerolled_bw, "unlocked bauwunsch does not roll again")
+	player.global_position = spot
+	var mark_hunt: int = board.debug_post("valdric_spider", "valdric")
+	board.request_accept(mark_hunt)
+	var found_hunt_mark: bool = false
+	for e: Dictionary in player.tracked.board_entries():
+		var hunt_area: Vector3 = e.area as Vector3
+		if String(e.id) == "board:%d" % mark_hunt and is_finite(hunt_area.z) and hunt_area.z > 0.0:
+			found_hunt_mark = true
+	_check(found_hunt_mark, "accepted kill notice exposes map hunt marker")
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--journal-capture="):
 			await _capture_journal(arg.trim_prefix("--journal-capture="), player, board, spot, journal)

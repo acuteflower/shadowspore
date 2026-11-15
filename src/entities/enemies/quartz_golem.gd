@@ -31,6 +31,8 @@ var damage_scale: float = 1.0
 var emerge_on_spawn: bool = false
 var variant: int = 0 ## 0 = Sun-Quartz/Ochre, 1 = Mesa-Terracotta/Amber, 2 = Prisma/Ruin-Stone
 var start_dormant: bool = false
+var pickaxe_override: float = -1.0 ## >= 0 overrides `pickaxe_multiplier` (1.0 inside Aurelith's basin/fight)
+var basin_aggro_speed: float = 1.0 ## > 1 when sibling basin guardians fall around Aurelith's monument
 var home_pos: Vector2 = Vector2.INF
 var night: NightBehavior = null ## always null in natural desert spawns (day & night independent)
 var heading: float = PI * 0.5
@@ -121,7 +123,17 @@ func is_provoked() -> bool:
 
 
 func pickaxe_multiplier() -> float:
+	if pickaxe_override >= 0.0:
+		return pickaxe_override
 	return float(_def.get("pickaxe_multiplier", 1.35))
+
+
+func boost_basin_aggression(intensity: float, target: Player = null) -> void:
+	var k: float = clampf(intensity, 0.0, 1.0)
+	_arcane_boost = maxf(_arcane_boost, 12.0 * k)
+	basin_aggro_speed = 1.0 + 0.24 * k
+	if multiplayer.is_server() and target != null and is_instance_valid(target) and target.health.current > 0.0:
+		provoke_ally(target)
 
 
 func note_pickaxe_hit(from: Vector2) -> void:
@@ -402,7 +414,7 @@ func _combat(delta: float) -> void:
 			speed = float(_def["strafe_speed"])
 		else:
 			move_dir = _safe_direction(dir)
-	velocity = velocity.move_toward(move_dir * speed, delta * 280.0)
+	velocity = velocity.move_toward(move_dir * speed * basin_aggro_speed, delta * 280.0)
 
 
 func _shard_dirs(center_dir: Vector2) -> Array[Vector2]:

@@ -88,6 +88,15 @@
   "takes_over": "story_gustav",
   "role": "craft",
   "home": "workshop",
+  "likes": [
+   {"item": "resin", "trust": 8},
+   {"item": "reed", "trust": 6},
+   {"item": "birch_bark", "trust": 7}
+  ],
+  "gift_thanks": [
+   "Feines Material — genau so etwas spart mir Stunden.",
+   "Danke dir! Das lege ich gleich gut beiseite."
+  ],
   "arrive": {
    "needs": "workshop",
    "delay": 6.0,
@@ -305,6 +314,15 @@
   "art": "adventurer",
   "role": "guard",
   "home": "house",
+  "likes": [
+   {"item": "potion_heal_1", "trust": 10},
+   {"item": "dusk_berry", "trust": 6},
+   {"item": "ember_berry", "trust": 7}
+  ],
+  "gift_thanks": [
+   "Für die nächste Wache am Rand des Lichts. Hab Dank.",
+   "Ein gutes Zeichen. Die Nacht wird es uns nicht leicht machen."
+  ],
   "founder": true,
   "takes_over": "knight",
   "actor": "knight",
@@ -541,6 +559,15 @@
   "takes_over": "story_torben",
   "role": "smith",
   "home": "smithy",
+  "likes": [
+   {"item": "void_splinter", "trust": 10},
+   {"item": "glow_cap", "trust": 6},
+   {"item": "iron_ore", "trust": 8}
+  ],
+  "gift_thanks": [
+   "Ordentliches Material. Bleibt unter uns.",
+   "Hmm. Brauchbar für die Esse. Danke."
+  ],
   "arrive": {
    "needs": "smithy",
    "delay": 0.0,
@@ -1123,6 +1150,219 @@
     "Die Wimpel hängen draußen — heute lege ich das Beste nach vorn!",
     "Markttag auf dem Brunnenplatz! Schau dir meine Sonderauslage an.",
     "So viel Betrieb am Platz — genau dafür fahre ich diesen Weg."
+   ]
+  }
+ },
+ "brann": {
+  "name": "BRANN",
+  "title": "TORWÄCHTERIN",
+  "art": "hallgrat_brann",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "guard",
+  "likes": [
+   "fish_trout",
+   "fish_pike",
+   "fish_carp"
+  ],
+  "chat": {
+   "spot": {
+    "gate": [
+     "Wer durchs Osttor will, sagt mir seinen Namen. Du hast es schon.",
+     "Der Westweg ist ruhig heute. Das gefällt mir nicht."
+    ],
+    "gate_night": [
+     "Nach der Glocke bleibt das Tor zu. Fast immer."
+    ],
+    "well": [
+     "Das Wasser hier ist das kälteste der Stadt. Trink."
+    ]
+   },
+   "night": [
+    "Die Mauer hält. Die Mauer hat immer gehalten."
+   ],
+   "any": [
+    "Steh nicht so herum. Hallgrat mag keine Müßiggänger.",
+    "Ich hab drei Kommandanten überlebt. Den vierten auch."
+   ]
+  }
+ },
+ "ilvane": {
+  "name": "ILVANE",
+  "title": "HÜTERIN DER WÄCHTERIN",
+  "art": "hallgrat_ilvane",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "keeper",
+  "likes": [
+   "grave_candle",
+   "moonbell",
+   "mist_lily"
+  ],
+  "shop": "ilvane_hall",
+  "chat": {
+   "spot": {
+    "sweep": [
+     "Jeden Morgen kehrt der Wind Staub auf ihre Füße. Jeden Morgen kehre ich ihn weg."
+    ],
+    "kneel": [
+     "Sie hört zu. Nur antwortet sie nicht mehr."
+    ],
+    "hall": [
+     "Die Halle ist offen für jeden, der leise ist."
+    ]
+   },
+   "night": [
+    "Die Kerzen brennen für die, die nicht heimkamen."
+   ],
+   "any": [
+    "Du trägst Wiesenstaub an den Stiefeln. Woher kommst du?",
+    "Die Wächterin hat diese Stadt einmal gerettet. Man vergisst das zu leicht."
+   ]
+  }
+ },
+ "odrik": {
+  "name": "ODRIK",
+  "title": "STEINMETZ",
+  "art": "hallgrat_odrik",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "mason",
+  "likes": [
+   "curse_silver",
+   "lake_moonstone",
+   "iron_ore"
+  ],
+  "chat": {
+   "spot": {
+    "yard": [
+     "Nicht stehen bleiben, wo Splitter fliegen.",
+     "Der Stein sagt dir, wo er brechen will. Man muss nur zuhören."
+    ],
+    "inn": [
+     "Feierabend. Frag mich morgen nach Stein."
+    ]
+   },
+   "night": [
+    "Hedda schenkt nach der Glocke nur noch Dünnbier aus. Eine Schande."
+   ],
+   "any": [
+    "Meißelbart nennen sie mich. Weiß der Himmel, warum.",
+    "Jede Treppe in dieser Stadt hab ich mindestens einmal geflickt."
+   ]
+  }
+ },
+ "tamsa": {
+  "name": "TAMSA",
+  "title": "GLASSCHLEIFERIN",
+  "art": "hallgrat_tamsa",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "glass",
+  "likes": [
+   "lake_glimmer",
+   "lake_moonstone",
+   "void_bloom"
+  ],
+  "shop": "tamsa_glass",
+  "chat": {
+   "spot": {
+    "grind": [
+     "Nicht anfassen, der ist noch warm!",
+     "Siehst du, wie das Licht da drin bricht? Noch zwei Schliffe."
+    ],
+    "market": [
+     "Heute verkauf ich, morgen schleif ich. Oder umgekehrt."
+    ],
+    "shop": [
+     "Komm rein, aber stoß nichts um. Alles hier klirrt."
+    ]
+   },
+   "night": [
+    "Nachts sieht man die Fehler im Glas am besten."
+   ],
+   "any": [
+    "Du hast einen Stab? Zeig her! Nein, warte, später.",
+    "Die Glasklippen singen, wenn der Wind dreht. Hast du es gehört?"
+   ]
+  }
+ },
+ "pim": {
+  "name": "PIM",
+  "title": "LAMPENJUNGE",
+  "art": "hallgrat_pim",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "lamps",
+  "likes": [
+   "resin",
+   "glow_cap",
+   "dusk_berry"
+  ],
+  "chat": {
+   "spot": {
+    "store": [
+     "Jedes Glas muss blitzen, sonst schimpft Brann.",
+     "Dreiundvierzig Laternen. Ich hab sie alle gezählt."
+    ],
+    "forum": [
+     "Die Laterne an der Wächterin zünde ich immer zuerst."
+    ],
+    "market": [
+     "Hast du was Süßes? Nur fragen."
+    ],
+    "tower": [
+     "Gleich läutet die Glocke. Dann muss ich los!"
+    ]
+   },
+   "night": [
+    "Wenn alle Lampen brennen, trauen sie sich nicht her. Sagt Brann."
+   ],
+   "any": [
+    "Ich bin Pim! Ich mach das Licht.",
+    "Später werde ich Wächter. Oder Glasschleifer. Oder beides."
+   ]
+  }
+ },
+ "hedda": {
+  "name": "HEDDA",
+  "title": "WIRTIN",
+  "art": "hallgrat_hedda",
+  "enabled": false,
+  "away": true,
+  "counts": false,
+  "role": "inn",
+  "likes": [
+   "dusk_berry",
+   "glow_cap",
+   "earth_tuber"
+  ],
+  "shop": "hedda_inn",
+  "chat": {
+   "spot": {
+    "sweep": [
+     "Wer Dreck reinträgt, kehrt selbst.",
+     "Morgens ist es hier noch still. Genieß es."
+    ],
+    "market": [
+     "Die Rüben sind wieder teurer geworden. Wie immer."
+    ],
+    "front": [
+     "Setz dich, iss was. Du siehst aus, als wärst du gelaufen.",
+     "Zwei Krüge, einer für dich?"
+    ]
+   },
+   "night": [
+    "Nach der Glocke nur noch für die Wache und die Durstigen."
+   ],
+   "any": [
+    "In der Grauen Stufe kriegt jeder einen Teller. Wer zahlt, kriegt zwei.",
+    "Odrik schuldet mir drei Abende. Erzähl's ihm nicht."
    ]
   }
  }

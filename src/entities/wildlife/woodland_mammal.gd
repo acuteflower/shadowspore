@@ -1390,3 +1390,10 @@ func _settle(at: Vector2, previous: int, settled_climb: float = 0.0) -> void:
 func _request_snapshot() -> void:
 	if multiplayer.is_server():
 		_command.rpc_id(multiplayer.get_remote_sender_id(), mood, _duration, facing, _start, _end, _elapsed, _gait_start, _rolling, _climb_from, _climb_to)
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, true)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

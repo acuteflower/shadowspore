@@ -133,6 +133,8 @@ func _clear_basin_clutter(world: WorldLevel) -> void:
 
 
 func _pause_spawners(world: WorldLevel) -> void:
+	if world.aurelith_arena != null:
+		world.aurelith_arena.set_preview_hidden(true)
 	if world.desert_guardians != null:
 		world.desert_guardians.set_process(false)
 		world.desert_guardians.set_physics_process(false)

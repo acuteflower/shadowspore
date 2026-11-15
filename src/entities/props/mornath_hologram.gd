@@ -114,7 +114,7 @@ func _additive() -> CanvasItemMaterial:
 
 ## The map (M) shows his own marker while the hologram stands (`MapWindow._live_markers`, style `mornath` in data/map_markers.json): no `actor_position`, only a mark.
 func map_marker() -> Dictionary:
-	if not active or _appear < 0.5:
+	if not active:
 		return {}
 	return {"id": "mornath", "position": global_position}
 

@@ -1,0 +1,163 @@
+{
+ "frame": [
+  76,
+  96
+ ],
+ "feet": [
+  38,
+  80
+ ],
+ "frames": 36,
+ "rows": 8,
+ "height": 56,
+ "clips": {
+  "idle": {
+   "start": 0,
+   "count": 4,
+   "fps": 3
+  },
+  "walk": {
+   "start": 4,
+   "count": 6,
+   "fps": 8
+  },
+  "talk": {
+   "start": 10,
+   "count": 4,
+   "fps": 5
+  },
+  "wave": {
+   "start": 14,
+   "count": 6,
+   "fps": 7
+  },
+  "carry": {
+   "start": 20,
+   "count": 6,
+   "fps": 7
+  },
+  "sit": {
+   "start": 26,
+   "count": 4,
+   "fps": 2
+  },
+  "work": {
+   "start": 30,
+   "count": 6,
+   "fps": 5
+  }
+ },
+ "kinds": [
+  {
+   "build": "schmal",
+   "cut": "kittel",
+   "head": "kurz",
+   "load": "korb",
+   "height": 56
+  },
+  {
+   "build": "schmal",
+   "cut": "rock",
+   "head": "zopf",
+   "load": "krug",
+   "height": 56
+  },
+  {
+   "build": "kraeftig",
+   "cut": "kittel",
+   "head": "glatze",
+   "load": "sack",
+   "height": 59
+  },
+  {
+   "build": "kraeftig",
+   "cut": "mantel",
+   "head": "hut",
+   "load": "",
+   "height": 59
+  },
+  {
+   "build": "alt",
+   "cut": "mantel",
+   "head": "kapuze",
+   "load": "",
+   "height": 53
+  },
+  {
+   "build": "alt",
+   "cut": "rock",
+   "head": "kurz",
+   "load": "korb",
+   "height": 53
+  },
+  {
+   "build": "schmal",
+   "cut": "mantel",
+   "head": "kapuze",
+   "load": "",
+   "height": 56
+  },
+  {
+   "build": "kraeftig",
+   "cut": "kittel",
+   "head": "hut",
+   "load": "brett",
+   "height": 59
+  },
+  {
+   "build": "schmal",
+   "cut": "kittel",
+   "head": "zopf",
+   "load": "werkzeug",
+   "height": 56
+  },
+  {
+   "build": "alt",
+   "cut": "kittel",
+   "head": "glatze",
+   "load": "",
+   "height": 53
+  },
+  {
+   "build": "kraeftig",
+   "cut": "rock",
+   "head": "kurz",
+   "load": "sack",
+   "height": 59
+  },
+  {
+   "build": "schmal",
+   "cut": "mantel",
+   "head": "kurz",
+   "load": "korb",
+   "height": 56
+  },
+  {
+   "build": "kraeftig",
+   "cut": "mantel",
+   "head": "helm",
+   "load": "wache",
+   "height": 59
+  }
+ ],
+ "keys": {
+  "a": [
+   "31405e",
+   "475c80",
+   "6680a6",
+   "93aacb"
+  ],
+  "b": [
+   "5d4b33",
+   "82694a",
+   "a88c65",
+   "cfb68d"
+  ],
+  "h": [
+   "2d1d13",
+   "4b321f",
+   "6d4b2f",
+   "936b45"
+  ]
+ }
+}

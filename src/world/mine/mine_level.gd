@@ -186,7 +186,7 @@ func _dress(chunk: MineChunk) -> void:
 	for node: Node2D in nodes:
 		yard.add_child(node)
 	chunk.decor = yard
-	var world: WorldLevel = mines.get_parent() as WorldLevel if mines != null else null
+	var world: Variant = mines.get_parent() if mines != null else null
 	if world != null:
 		for r: Dictionary in layout.chunk_rocks.get(chunk.cell, []) as Array:
 			var global: Vector2 = position + Vector2(float(r.x), float(r.y))

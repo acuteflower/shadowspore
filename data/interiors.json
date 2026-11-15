@@ -5418,5 +5418,33 @@
   ],
   "rays": [],
   "resident": "lake_witch"
+ },
+ "starhall": {
+  "title": "Der Sternensaal",
+  "dir": "res://assets/interior/starhall/",
+  "size": [
+   560,
+   820
+  ],
+  "floor": [
+   138,
+   80,
+   284,
+   690
+  ],
+  "ambient": {
+   "day": "#4c4668",
+   "night": "#4c4668"
+  },
+  "entry": [
+   280,
+   715
+  ],
+  "surface": "stone",
+  "no_creak": true,
+  "no_ambient": true,
+  "no_edge": true,
+  "backdrop": false,
+  "custom_starhall": true
  }
 }

@@ -36,7 +36,7 @@ var _flora_timer: float = 0.0
 func _ready() -> void:
 	material = Unlit.material()
 	z_index = 3
-	for i: int in COUNT:
+	for i: int in int(COUNT * 1.25): ## ULTRA lets 25 % more fly; `_active()` takes the graphics level's share
 		var fly: Fly = Fly.new()
 		fly.radius = randf_range(10.0, 30.0)
 		fly.speed_x = randf_range(0.25, 0.7)
@@ -65,10 +65,17 @@ func _process(delta: float) -> void:
 	if _flora_timer <= 0.0:
 		_flora_timer = 0.5
 		_refresh_flora(rect)
-	for fly: Fly in _flies:
+	var active: int = _active()
+	for i: int in active:
+		var fly: Fly = _flies[i]
 		if not rect.grow(MARGIN).has_point(fly.home):
 			_respawn(fly, rect)
 	queue_redraw()
+
+
+## How many flies the graphics level lets fly (Quality "fireflies").
+func _active() -> int:
+	return mini(Quality.scaled(COUNT, "fireflies", 8), _flies.size())
 
 
 func _night_here() -> float:
@@ -114,7 +121,7 @@ func _respawn(fly: Fly, rect: Rect2) -> void:
 
 func _draw() -> void:
 	var night: float = _night_here()
-	for i: int in _flies.size():
+	for i: int in mini(_active(), _flies.size()):
 		var fly: Fly = _flies[i]
 		if fly.home.x == INF:
 			continue

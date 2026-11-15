@@ -12,6 +12,9 @@ const ACTION: String = "shadow_step"
 const DIM: Color = Color("3a1f66")
 const BRIGHT: Color = Color("9b5cff")
 const CORE: Color = Color("e7c8ff")
+const LIGHT_DIM: Color = Color("164b56")
+const LIGHT_BRIGHT: Color = Color("78f4e6")
+const LIGHT_CORE: Color = Color("fff0b0")
 const GLYPH: PackedStringArray = [
 	"...X...",
 	"..XXX..",
@@ -65,6 +68,11 @@ func _hotkey() -> String:
 func _draw() -> void:
 	if _blink == null:
 		return
+	var owner_node: Node = _blink.get_parent()
+	var is_light: bool = owner_node != null and bool(owner_node.get("light_step"))
+	var c_dim: Color = LIGHT_DIM if is_light else DIM
+	var c_bright: Color = LIGHT_BRIGHT if is_light else BRIGHT
+	var c_core: Color = LIGHT_CORE if is_light else CORE
 	var ready_now: bool = _blink.is_ready()
 	var charged: float = 1.0 - _blink.cooldown_left / maxf(_blink.total, 0.01)
 	var pulse: float = 0.5 + 0.5 * sin(_time * 3.5)
@@ -77,7 +85,7 @@ func _draw() -> void:
 	for y: int in range(int(anchor.y) + 1, int(top)): ## thread
 		draw_rect(Rect2(ANCHOR_X, y, 1, 1), VineStyle.BARK_LIGHT.lerp(VineStyle.BARK_VOID_LIGHT, taken) if y % 2 == 0 else VineStyle.BARK.lerp(VineStyle.BARK_VOID, taken))
 
-	VineStyle.glow(self, center, 13.0 if ready_now else 8.0, BRIGHT, (0.55 + 0.35 * pulse if ready_now else 0.2 + 0.3 * charged) + _press * 0.5)
+	VineStyle.glow(self, center, 13.0 if ready_now else 8.0, c_bright, (0.55 + 0.35 * pulse if ready_now else 0.2 + 0.3 * charged) + _press * 0.5)
 
 	var origin: Vector2 = Vector2(ANCHOR_X - GLYPH[0].length() / 2.0, top).floor()
 	for y: int in GLYPH.size():
@@ -86,9 +94,9 @@ func _draw() -> void:
 			var cell: String = GLYPH[y][x]
 			if cell == ".":
 				continue
-			var color: Color = VineStyle.BARK_VOID.lerp(DIM, 0.8)
+			var color: Color = VineStyle.BARK_VOID.lerp(c_dim, 0.8)
 			if lit:
-				color = CORE if cell == "L" else BRIGHT
+				color = c_core if cell == "L" else c_bright
 				if ready_now and cell == "L":
 					color = color.lerp(Color.WHITE, pulse)
 				if _press > 0.0:
@@ -100,7 +108,7 @@ func _draw() -> void:
 	if not ready_now:
 		for k: int in 2: ## shards orbit the recharging crystal
 			var angle: float = _time * 2.4 + k * PI
-			draw_rect(Rect2(roundf(center.x + cos(angle) * 8.0), roundf(center.y + sin(angle) * 5.0), 1, 1), Color(CORE, 0.4 + 0.6 * charged))
+			draw_rect(Rect2(roundf(center.x + cos(angle) * 8.0), roundf(center.y + sin(angle) * 5.0), 1, 1), Color(c_core, 0.4 + 0.6 * charged))
 		var seconds: String = str(ceili(_blink.cooldown_left))
 		PixelText.draw(self, seconds, Vector2i(roundi(center.x) - PixelText.width(seconds) / 2, roundi(center.y) - 4), UiStyle.TEXT, VineStyle.OUTLINE)
 
@@ -108,7 +116,7 @@ func _draw() -> void:
 		var radius: float = (1.0 - _ring) * 14.0 + 4.0
 		for k: int in 12:
 			var angle: float = k * TAU / 12.0 + 0.3
-			draw_rect(Rect2(roundf(center.x + cos(angle) * radius), roundf(center.y + sin(angle) * radius * 0.8), 1, 1), Color(CORE, _ring))
+			draw_rect(Rect2(roundf(center.x + cos(angle) * radius), roundf(center.y + sin(angle) * radius * 0.8), 1, 1), Color(c_core, _ring))
 
 	var key_color: Color = UiStyle.TEXT.lerp(Color.WHITE, _press) if ready_now else UiStyle.TEXT_DIM ## plain label like the hotbar numbers, no cap
 	PixelText.draw(self, _key, Vector2i(roundi(ANCHOR_X - PixelText.width(_key) / 2.0), int(top) + GLYPH.size() + 5), key_color, VineStyle.OUTLINE)

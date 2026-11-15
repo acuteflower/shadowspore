@@ -20,7 +20,7 @@ const PROGRESS_FULL: int = 1000
 const STATE_VERSION: int = 1
 const STOCK_SLOTS: int = 48 ## the stockpile: 8 x 6 slots
 
-var world: WorldLevel
+var world: Variant
 var founded: bool = false
 var name_index: int = 0
 var center: Vector2 = Vector2.ZERO ## the hut's feet: the heart of the town
@@ -266,7 +266,7 @@ func _on_day_started(_day: int) -> void:
 		player.quests.set_flag("town_morning")
 
 
-func setup(level: WorldLevel) -> void:
+func setup(level: Variant) -> void:
 	world = level
 
 
@@ -548,8 +548,28 @@ func set_alert(on: bool, angle: float) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_alert(on: bool, angle: float) -> void:
+	var rising: bool = on and not alert_on
 	alert_on = on
 	alert_angle = angle
+	if rising:
+		_ring_bell()
+		event.emit("alert", {"angle": angle})
+
+
+func _ring_bell(db: float = -4.0) -> void:
+	var player: Player = local_player()
+	if player == null or player.global_position.distance_to(heart()) > 560.0:
+		return
+	var path: String = "res://assets/audio/board/bell.wav"
+	if not ResourceLoader.exists(path):
+		return
+	var audio: AudioStreamPlayer = AudioStreamPlayer.new()
+	audio.stream = load(path) as AudioStream
+	audio.volume_db = db
+	audio.bus = &"SFX" if AudioServer.get_bus_index(&"SFX") >= 0 else &"Master"
+	add_child(audio)
+	audio.finished.connect(audio.queue_free)
+	audio.play()
 
 
 ## Host: the people of the town are afraid (creatures at the edge of the light, a call, a raid) or calm again. Every peer's settlers follow.
@@ -1949,11 +1969,78 @@ func add_story_resident(sid: String, fresh: bool = false) -> void:
 
 @rpc("authority", "call_local", "reliable")
 func _rpc_resident(sid: String, data: Dictionary, fresh: bool) -> void:
-	residents[sid] = {"trust": int(data.get("trust", 0)), "talked": int(data.get("talked", -1))}
+	residents[sid] = {
+		"trust": int(data.get("trust", 0)),
+		"talked": int(data.get("talked", -1)),
+		"gifted": int(data.get("gifted", -1)),
+	}
 	_ensure_settler(sid, fresh)
 	if fresh:
 		resident_joined.emit(sid)
 	changed.emit()
+
+
+## Returns the liked item spec `{item, trust}` held in `player`'s active hotbar slot if they have not gifted `sid` today; `{}` otherwise.
+func gift_candidate(sid: String, player: Player) -> Dictionary:
+	if player == null or player.inventory == null or not residents.has(sid):
+		return {}
+	var res: Dictionary = residents[sid] as Dictionary
+	if int(res.get("gifted", -1)) == TimeManager.day:
+		return {}
+	var sel: int = player.inventory.selected
+	if sel < 0 or sel >= player.inventory.slots.size():
+		return {}
+	var stack: Variant = player.inventory.slots[sel]
+	if not (stack is Dictionary) or (stack as Dictionary).is_empty():
+		return {}
+	var item_id: String = String((stack as Dictionary).get("id", ""))
+	if item_id == "":
+		return {}
+	for raw: Variant in settler_spec(sid).get("likes", []) as Array:
+		var like: Dictionary = raw as Dictionary
+		if String(like.get("item", "")) == item_id:
+			return like.duplicate()
+	return {}
+
+
+func request_gift(sid: String, item: String) -> void:
+	if multiplayer.is_server():
+		_host_gift(sid, item, multiplayer.get_unique_id())
+	else:
+		_rpc_gift.rpc_id(1, sid, item)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_gift(sid: String, item: String) -> void:
+	if multiplayer.is_server():
+		_host_gift(sid, item, multiplayer.get_remote_sender_id())
+
+
+func _host_gift(sid: String, item: String, peer: int) -> void:
+	var player: Player = player_of(peer)
+	if player == null or player.inventory == null or not residents.has(sid):
+		return
+	var data: Dictionary = (residents[sid] as Dictionary).duplicate()
+	if int(data.get("gifted", -1)) == TimeManager.day:
+		_tell(peer, "HEUTE SCHON BESCHENKT", false)
+		return
+	var gain: int = 0
+	for raw: Variant in settler_spec(sid).get("likes", []) as Array:
+		var like: Dictionary = raw as Dictionary
+		if String(like.get("item", "")) == item:
+			gain = maxi(int(like.get("trust", 5)), 1)
+			break
+	if gain <= 0:
+		return
+	var node: Settler = _settlers.get(sid) as Settler
+	if node != null and is_instance_valid(node) and node.visible and player.global_position.distance_to(node.global_position) > 160.0:
+		return
+	if not player.inventory.remove_item(item, 1):
+		return
+	data["gifted"] = TimeManager.day
+	data["trust"] = mini(int(data.get("trust", 0)) + gain, 100)
+	_rpc_resident.rpc(sid, data, false)
+	_tell(peer, "%s FREUT SICH (+%d VERTRAUEN)" % [String(settler_spec(sid).get("name", sid)), gain], true)
 
 
 func _ensure_settler(sid: String, fresh: bool) -> void:
@@ -1983,7 +2070,7 @@ func _rpc_talk(sid: String) -> void:
 func _host_talk(sid: String) -> void:
 	if not residents.has(sid) and not bool(settler_spec(sid).get("away", false)): ## somebody who lives elsewhere is known from the first talk on
 		return
-	var data: Dictionary = (residents.get(sid, {"trust": 0, "talked": -1}) as Dictionary).duplicate()
+	var data: Dictionary = (residents.get(sid, {"trust": 0, "talked": -1, "gifted": -1}) as Dictionary).duplicate()
 	if int(data.talked) != TimeManager.day:
 		data.talked = TimeManager.day
 		data.trust = mini(int(data.trust) + 10, 100)
@@ -1993,6 +2080,7 @@ func _host_talk(sid: String) -> void:
 ## Host, every game hour: residents with a trade work for the town while they are at their place.
 func _hour_tick() -> void:
 	_burn_lamps()
+	_valdric_tend_lamps()
 	for sid: String in residents:
 		var spec: Dictionary = settler_spec(sid)
 		var made: Dictionary = spec.get("produces", {}) as Dictionary
@@ -2014,6 +2102,42 @@ func _hour_tick() -> void:
 		_sync_stock()
 
 
+## Host: in the evening and at night Valdric refills one cold, empty, or low lamp from town stock.
+func _valdric_tend_lamps() -> void:
+	if not residents.has("valdric") or (not TimeManager.is_night() and TimeManager.time_of_day < 0.75):
+		return
+	var best_id: int = -1
+	var best_fuel: int = 251
+	for id: int in structures.keys():
+		var spec: Dictionary = lamp_spec(id)
+		if spec.is_empty() or not is_built(id):
+			continue
+		var item: String = String(spec.get("item", ""))
+		if item == "" or int(stock.get(item, 0)) < 1:
+			continue
+		var u: Dictionary = lamp_u(id)
+		var fuel: int = 0 if int(u.l) == 0 else int(u.f)
+		if fuel < best_fuel:
+			best_fuel = fuel
+			best_id = id
+	if best_id < 0:
+		return
+	var best_spec: Dictionary = lamp_spec(best_id)
+	var fuel_item: String = String(best_spec.get("item", ""))
+	_add_stock(fuel_item, -1)
+	_sync_stock()
+	var next_fuel: int = mini(1000, int(lamp_u(best_id).f) + int(best_spec.get("per_item", 500)))
+	_rpc_lamp.rpc(best_id, next_fuel, 1, true)
+	_rpc_valdric_lamp_say.rpc()
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_valdric_lamp_say() -> void:
+	var valdric: Settler = _settlers.get("valdric") as Settler
+	if valdric != null and is_instance_valid(valdric) and valdric.visible and not valdric._talking:
+		valdric.say("Ich füll die Laternen nach.", 2.4)
+
+
 # ---------- crafting ----------
 
 func recipes() -> Dictionary:
@@ -2025,6 +2149,9 @@ func recipe_block(recipe_id: String, player: Player) -> String:
 	var recipe: Dictionary = recipes().get(recipe_id, {}) as Dictionary
 	if recipe.is_empty():
 		return "UNBEKANNT"
+	var unlock_req: String = String(recipe.get("needs_unlock", ""))
+	if unlock_req != "" and not unlocks.has(unlock_req):
+		return "BAUWUNSCH AN DER TAFEL NÖTIG"
 	var maker: String = String(recipe.get("npc", "gustav"))
 	if trust_of(maker) < int(recipe.get("trust", 0)):
 		return "%s TRAUT DIR NOCH NICHT" % String(settler_spec(maker).get("name", maker))
@@ -2675,20 +2802,22 @@ func _host_craft(recipe_id: String, peer: int) -> void:
 
 
 ## Host: the town learns something (`unlocks`), everybody hears it once. "farming" makes the fields buildable (docs/farming.md).
-func unlock(what: String) -> void:
+func unlock(what: String, label: String = "") -> void:
 	if not multiplayer.is_server() or unlocks.has(what):
 		return
-	_rpc_unlock.rpc(what, true)
+	_rpc_unlock.rpc(what, true, label)
 
 
 @rpc("authority", "call_local", "reliable")
-func _rpc_unlock(what: String, announce: bool) -> void:
+func _rpc_unlock(what: String, announce: bool, label: String = "") -> void:
 	if unlocks.has(what):
 		return
 	unlocks[what] = true
 	changed.emit()
 	if announce and what == String(FarmRules.config().get("unlock", "farming")):
 		_announce("FELDER FREIGESCHALTET", "BAUMENÜ · ACKER")
+	elif announce and label != "":
+		_announce("BAUWUNSCH ERFÜLLT", label)
 
 
 # ---------- the name ----------
@@ -2730,6 +2859,10 @@ func _rpc_look(color_index: int, emblem_index: int) -> void:
 func _rpc_look_state(color_index: int, emblem_index: int) -> void:
 	look_color = posmod(color_index, TownEmblems.COLORS.size())
 	look_emblem = posmod(emblem_index, TownEmblems.GLYPHS.size())
+	for view: Variant in _views.values():
+		var st: TownStructure = view as TownStructure
+		if st != null and is_instance_valid(st):
+			st.refresh_look()
 	changed.emit()
 
 
@@ -3087,7 +3220,7 @@ func import_state(data: Dictionary) -> void:
 	var people: Dictionary = data.get("residents", {}) as Dictionary
 	for sid: String in people:
 		var entry: Dictionary = people[sid] as Dictionary
-		residents[sid] = {"trust": int(entry.get("trust", 0)), "talked": int(entry.get("talked", -1))}
+		residents[sid] = {"trust": int(entry.get("trust", 0)), "talked": int(entry.get("talked", -1)), "gifted": int(entry.get("gifted", -1))}
 	for what: Variant in data.get("unlocks", []) as Array:
 		unlocks[String(what)] = true
 	if farm != null:

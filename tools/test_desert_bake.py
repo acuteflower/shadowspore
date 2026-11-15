@@ -30,13 +30,13 @@ land = sdf >= 128
 biomes = json.load(open(os.path.join(ROOT, "data/biomes.json")))
 
 check([int(r["id"]) for r in d["regions"]] == list(range(35)), "regions 0-34 in order")
-sup = d["supers"][6]
+sup = d["supers"][2]
 check(
-    int(sup["id"]) == 6
+    int(sup["id"]) == 2
     and sup["biome"] == "quartz_desert"
     and sup["name"] == "Sonnenquarz-Öde"
     and [int(r) for r in sup["regions"]] == [5, 6, 32, 33, 34],
-    "super region 6 is Sonnenquarz-Öde with regions [5, 6, 32, 33, 34]",
+    "super region 2 is Sonnenquarz-Öde with regions [5, 6, 32, 33, 34]",
 )
 check(
     d["biome"] == "meadow" and d["own_biomes"] == ["witch_forest", "quartz_desert"],
@@ -47,7 +47,7 @@ check(biomes["quartz_desert"].get("bare") is True and biomes["quartz_desert"].ge
 
 for rid in (5, 6, 32, 33, 34):
     reg = d["regions"][rid]
-    check(int(reg["super"]) == 6, f"region {rid} belongs to super 6")
+    check(int(reg["super"]) == 2, f"region {rid} belongs to super 2")
     for n in reg["neighbors"]:
         check(rid in [int(x) for x in d["regions"][int(n)]["neighbors"]], f"mutual neighbor {rid} <-> {int(n)}")
 

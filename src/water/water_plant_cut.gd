@@ -7,7 +7,7 @@ const HARVEST_LAYER: int = 1 << 4
 const RADIUS: float = 9.0
 
 var key: String = ""
-var level: WorldLevel
+var level: Variant
 var cut: bool = false
 var plant: Sprite2D
 var _harvest: HarvestHurtbox
@@ -34,7 +34,7 @@ func setup(sprite: Sprite2D) -> void:
 
 
 func _enter_tree() -> void:
-	level = get_tree().get_first_node_in_group("world") as WorldLevel
+	level = get_tree().get_first_node_in_group("world")
 	if level != null and key != "":
 		level.call("_register_harvest", self)
 

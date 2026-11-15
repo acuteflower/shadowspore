@@ -34,7 +34,7 @@ const DIALOGUE_AT: float = 8.4
 enum State { OPENING, SPEAKING, WAITING, GETUP, DONE }
 
 var _player: Player
-var _world: WorldLevel
+var _world: Variant
 var _interiors: Interiors
 var _interior: Interior
 var _black: ColorRect
@@ -62,7 +62,7 @@ var _blanket: Sprite2D ## the blanket over her, fixed to the bed (its own sheet:
 
 func start(
 	player: Player,
-	world: WorldLevel,
+	world: Variant,
 	ready_to_get_up: bool = false,
 	second_morning: bool = false,
 	rest: bool = false,

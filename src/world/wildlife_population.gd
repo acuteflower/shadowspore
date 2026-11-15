@@ -80,7 +80,7 @@ func loading_populate_step() -> bool:
 
 
 func _populate(cell: Vector2i) -> void:
-	if _populations.has(cell) or _animals.get_child_count() >= int(_spec["max_loaded"]):
+	if _populations.has(cell) or _animals.get_child_count() >= Quality.scaled(int(_spec["max_loaded"]), "wildlife", 1):
 		return
 	var rabbits: Array[WildRabbit] = []
 	_populations[cell] = rabbits
@@ -101,7 +101,7 @@ func _populate(cell: Vector2i) -> void:
 		return
 	var count: int = rng.randi_range(int(_spec["group_min"]), int(_spec["group_max"]))
 	for i: int in count:
-		if _animals.get_child_count() >= int(_spec["max_loaded"]):
+		if _animals.get_child_count() >= Quality.scaled(int(_spec["max_loaded"]), "wildlife", 1):
 			break
 		var position: Vector2 = center
 		if i > 0:

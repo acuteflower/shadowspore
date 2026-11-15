@@ -272,12 +272,12 @@ func _entry_of(offer: Dictionary, peer: int) -> Dictionary:
 		if at.size() == 3:
 			area = Vector3(float(at[0]), float(at[1]), float(at[2]))
 			area_name = "ZULETZT GESEHEN" if BoardRules.is_bounty(offer) else "EINSATZGEBIET"
-		elif kind == BoardRules.FETCH:
+		elif kind == BoardRules.FETCH or kind == BoardRules.KILL:
 			var hint: Dictionary = BoardRules.hint_of(String(offer.t))
 			var zone: Array = hint.get("area", []) as Array
 			if zone.size() == 3:
 				area = Vector3(float(zone[0]), float(zone[1]), float(zone[2])) * 16.0
-				area_name = String(hint.get("name", "FUNDGEBIET"))
+				area_name = String(hint.get("name", "EINSATZGEBIET" if kind == BoardRules.KILL else "FUNDGEBIET"))
 	var bonus: Dictionary = offer.get("b", {})
 	return {
 		"area": area, "area_name": area_name, "urgent": BoardRules.is_urgent(offer), "urgent_left": BoardRules.urgent_left(offer, TimeManager.time_of_day),

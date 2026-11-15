@@ -74,7 +74,7 @@ func update(indoors: bool, delta: float, ambient: Color) -> void:
 	var w: WeatherManager = _manager if _manager != null else WeatherManager.current
 	if w == null:
 		return
-	quality = int(GameSettings.get_value("weather_fx"))
+	quality = mini(int(GameSettings.get_value("weather_fx")), int(Quality.get_value("weather_fx"))) ## the graphics level may reduce it
 	_clock += delta
 	visibility = move_toward(visibility, 0.0 if (indoors or quality <= 0) else 1.0, delta / 0.6)
 	var wind: WorldWind = WorldWind.current

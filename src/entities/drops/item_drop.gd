@@ -125,8 +125,8 @@ func _collect(player: Player) -> void:
 	if left < count:
 		if story_id == "knight_sword":
 			var world: Node = get_tree().get_first_node_in_group("world")
-			if world is WorldLevel and (world as WorldLevel).fallen_knight != null:
-				(world as WorldLevel).fallen_knight.sword_taken(player.name.to_int())
+			if world != null and world.is_in_group("story_world") and world.get("fallen_knight") != null:
+				(world.get("fallen_knight") as FallenKnight).sword_taken(player.name.to_int())
 			elif story_id.begins_with(BossRelics.PREFIX):
 				var ledger: BossRelics = BossRelics.of(get_tree())
 				if ledger != null:

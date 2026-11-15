@@ -199,7 +199,7 @@ func _on_day_started(day: int) -> void:
 	while fresh < BoardRules.limit("new_per_day") and _simple_count() < _simple_cap():
 		if _rng.randf() > float(post.get("chance", 1.0)):
 			break
-		var offer: Dictionary = BoardRules.roll(_rng, _board_givers(), _plain_hanging(), day, next_id)
+		var offer: Dictionary = BoardRules.roll(_rng, _board_givers(), _plain_hanging(), day, next_id, town.unlocks if town != null else {})
 		if offer.is_empty():
 			break
 		_maybe_rush(offer)
@@ -600,6 +600,8 @@ func _host_finish(peer: int, id: int, attempt: int) -> void:
 	_archive_entry(offer, entry, owner, "finished", TimeManager.day)
 	player.progress.award(int(offer.c), int(offer.x))
 	_add_trust(String(offer.g), int(offer.tr))
+	if String(offer.get("ul", "")) != "" and town != null:
+		town.unlock(String(offer.ul), String(offer.get("ull", "")))
 	_reply(peer, "ERLEDIGT", true)
 	_honor_count(peer, offer)
 	_broadcast()

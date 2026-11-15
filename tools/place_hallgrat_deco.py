@@ -143,6 +143,7 @@ def main():
 
     paved = np.zeros((H, W), bool)      # streets, squares (4 px)
     path_ = np.zeros((H, W), bool)      # the door paths
+    yard = np.zeros((H, W), bool)       # trodden earth (the stable yard and the paddock): things may stand on it, nothing grows on it
     for d in baked["decals"]:
         if not d["id"].startswith("hallgrat_") or d["id"] == "hallgrat_clear":
             continue
@@ -155,7 +156,7 @@ def main():
         if a1 <= a0 or b1 <= b0:
             continue
         piece = sub[a0 - r0:a1 - r0, b0 - c0:b1 - c0]
-        (path_ if d["id"].startswith("hallgrat_zugang") else paved)[a0:a1, b0:b1] |= piece
+        (yard if d["id"] == "hallgrat_stallhof" else path_ if d["id"].startswith("hallgrat_zugang") else paved)[a0:a1, b0:b1] |= piece
     taken = np.zeros((H, W), bool)      # footprints and what must stay free
     hidden = np.zeros((H, W), bool)     # behind a house's picture
     house = np.zeros((H, W), bool)      # the houses' own footprints (a wall may run up to them)
@@ -236,10 +237,50 @@ def main():
         for dx in (-1, 0, 1):
             pathy |= np.roll(np.roll(path_, dy, 0), dx, 1)
 
+    # the walkways stay free: the middle of every street (its width less 7 px a side), every door path and 4 px round it, and on a square
+    # everything but a band along its rim (24 px): things on the paving stand at its edge, never in the way
+    import bake_hallgrat_ground as bhg
+    lane = pathy.copy()
+    YY, XX = np.mgrid[0:H, 0:W]
+    XX = bx0 + XX * C + C / 2.0
+    YY = by0 + YY * C + C / 2.0
+    for spec in town.get("paving", []):
+        if "way" not in spec:
+            continue
+        line = next(w_["line"] for w_ in town["ways"] if w_["id"] == spec["way"])
+        sl_pts = bhg.smooth_line([(x * 16 + 8.0, y * 16 + 8.0) for x, y in line])
+        half = spec.get("width", 36) / 2.0 - 7.0
+        for (ax, ay), (bx_, by_) in zip(sl_pts, sl_pts[1:]):
+            r0, c0 = cell(min(ax, bx_) - half - 4, min(ay, by_) - half - 4)
+            r1, c1 = cell(max(ax, bx_) + half + 4, max(ay, by_) + half + 4)
+            r0, c0, r1, c1 = max(0, r0), max(0, c0), min(H, r1 + 1), min(W, c1 + 1)
+            if r1 <= r0 or c1 <= c0:
+                continue
+            X_, Y_ = XX[r0:r1, c0:c1], YY[r0:r1, c0:c1]
+            vx, vy = bx_ - ax, by_ - ay
+            L2 = max(vx * vx + vy * vy, 1e-6)
+            tt = np.clip(((X_ - ax) * vx + (Y_ - ay) * vy) / L2, 0, 1)
+            lane[r0:r1, c0:c1] |= np.hypot(X_ - ax - tt * vx, Y_ - ay - tt * vy) < half
+    lane &= paved | path_ | pathy
+    open_ = ~paved & ~yard
+    rim = np.zeros((H, W), bool)
+    for dy in range(-6, 7):
+        for dx in range(-6, 7):
+            if dx * dx + dy * dy <= 36:
+                rim |= np.roll(np.roll(open_, dy, 0), dx, 1)
+    rim &= paved
+    off_way = ~lane & (~paved | rim)    # where a thing may stand when it is allowed onto the paving
+
     def box_free(x0, y0, x1, y1, allow_hidden=False, street=False):
         r0, c0 = cell(x0, y0)
         r1, c1 = cell(x1, y1)
         if r0 < 0 or c0 < 0 or r1 >= H or c1 >= W:
+            return False
+        if street == "square" and lane[r0:r1 + 1, c0:c1 + 1].any():  # a market stall: anywhere on a square but in the walkways
+            WHY["lane"] = WHY.get("lane", 0) + 1
+            return False
+        if street is True and not off_way[r0:r1 + 1, c0:c1 + 1].all():
+            WHY["lane"] = WHY.get("lane", 0) + 1
             return False
         for nm, arr_ in (("taken", taken), ("grown", pathy if street else grown)) + (() if allow_hidden else (("hidden", hidden),)):
             if arr_[r0:r1 + 1, c0:c1 + 1].any():
@@ -394,6 +435,12 @@ def main():
             if dx * dx + dy * dy <= reach * reach:
                 near_paved |= np.roll(np.roll(paved, dy, 0), dx, 1)
     lines = contours(near_paved)
+    # small squares (a well court) stay open all round: a ring of wall there would shut the court off (docs/hallgrat_bewohner_konzept.md)
+    open_rects = []
+    for pl in town.get("places", []):
+        x0, y0, w, h_ = pl["rect"]
+        if pl.get("kind") == "square" and w < 10 and h_ < 10:
+            open_rects.append(((x0 - 3) * 16, (y0 - 3) * 16, (x0 + w + 3) * 16, (y0 + h_ + 3) * 16))
     wallm = np.zeros((H, W), bool)       # under a wall
     for line in lines:
         pts = resample(chaikin(chaikin([(bx0 + c_ * C + C / 2, by0 + r * C + C / 2) for r, c_ in line])), 3.0)
@@ -419,6 +466,8 @@ def main():
                 ox_, oy_ = int((x - nx * 6) // 16), int((y - ny * 6) // 16)
                 if dist is None or dist == "glasbruch":
                     why = "out"
+                elif any(a <= x <= c and b <= y <= d for a, b, c, d in open_rects):
+                    why = "open"
                 elif not (floor[ty, tx] and floor[oy_, ox_] and level[ty, tx] == level[sy_, sx_] == level[oy_, ox_]):
                     why = "level"
                 else:
@@ -474,9 +523,54 @@ def main():
                         mark(taken, p[0] - 5, p[1] - 5, p[0] + 5, p[1] + 5)
                         mark(wallm, p[0] - 4, p[1] - 4, p[0] + 4, p[1] + 4)
                 i += len(part)
-                if rng.random() < (0.45 if dist in ("fuss", "verloren") else 0.2):
-                    i += int(rng.uniform(5, 12))  # a gap: a fallen stretch, a way through
+                # always a gap between two pieces (24-36 px, wide enough to walk through): a low wall never closes a square or garden
+                # off for good (the people's walking net, HallgratWays, and Ellie need a way in)
+                i += int(rng.uniform(8, 12))
     n_wall = len(wall_runs) - n_ramp
+    # 0b. the paddock of the stables: a wooden fence (style `koppel`) round the poly of hallgrat.json `stallungen.koppel`, open between its
+    # last and first point (the gate, two strong posts), broken where a house or a way is in the way
+    koppel_in = np.zeros((H, W), bool)
+    for pl in town.get("places", []):
+        if "koppel" not in pl:
+            continue
+        poly = [tuple(q) for q in pl["koppel"]]
+        poly_mark(koppel_in, poly)
+        mx, my = sum(q[0] for q in poly) / len(poly), sum(q[1] for q in poly) / len(poly)
+        pts = resample(chaikin(chaikin(poly)), 3.0)
+        info_pts = []
+        for x, y in pts:
+            r, c_ = cell(x, y)
+            nx, ny = mx - x, my - y
+            ln = math.hypot(nx, ny) or 1.0
+            box = (slice(max(0, r - 1), r + 2), slice(max(0, c_ - 1), c_ + 2))
+            tx, ty = int(x // 16), int(y // 16)
+            why = ""
+            if not floor[ty, tx]:
+                why = "level"
+            elif house[box].any() or taken[box].any():
+                why = "house"
+            elif paved[box].any() or path_[box].any():
+                why = "path"
+            info_pts.append((x, y, nx / ln, ny / ln, why))
+        k = 0
+        while k < len(info_pts):
+            if info_pts[k][4]:
+                k += 1
+                continue
+            j = k
+            while j < len(info_pts) and not info_pts[j][4]:
+                j += 1
+            seg = info_pts[k:j]
+            if len(seg) >= 5:
+                run = {"id": len(wall_runs), "style": "koppel", "seed": rng.randint(0, 99999),
+                       "pts": [[round(q[0], 1), round(q[1], 1)] for q in seg], "n": [[round(q[2], 2), round(q[3], 2)] for q in seg],
+                       "posts": [k == 0, j == len(info_pts)], "abut": [False, False]}
+                wall_runs.append(run)
+                for q in seg:
+                    mark(taken, q[0] - 5, q[1] - 5, q[0] + 5, q[1] + 5)
+                    mark(hidden, q[0] - 4, q[1] - 22, q[0] + 4, q[1] - 6)
+            k = j
+    n_koppel = len(wall_runs) - n_ramp - n_wall
     # 1. at the houses: little scenes, not single things (planters either side of a door, a shop's crates stacked with a barrel and
     # sacks before them, a woodpile against the side wall, a bench under the window, an abandoned house's rubble)
     n_house = 0
@@ -498,10 +592,16 @@ def main():
         front = b["view"] in ("s",)
         dw = lambda k: art["deko_" + k]["foot"][0]  # noqa: E731
         dd = lambda k: art["deko_" + k]["foot"][1]  # noqa: E731
-        if front and not t.startswith(("laden", "verlassen", "stall", "torhaus")) and rng.random() < 0.8:  # a pair either side of the door
-            k_ = rng.choice(("kuebel", "kuebel", "urne")) if not t.startswith("halle") else "urne"
+        if front and not t.startswith(("laden", "verlassen", "stall", "torhaus")) and rng.random() < 0.85:  # a pair either side of the door
+            k_ = rng.choice(("kuebel", "kuebel", "urne", "toepfe")) if not t.startswith("halle") else "urne"
             off = 21 + dw(k_) / 2
-            n_house += group([(k_, door_x - off, fy + dd(k_) + 4), (k_, door_x + off, fy + dd(k_) + 4)])
+            if k_ == "toepfe":  # the pots crowd one side of the step, a bucket and broom the other
+                n_house += group([("toepfe", door_x - off, fy + dd("toepfe") + 4), ("eimer", door_x + 21 + dw("eimer") / 2, fy + dd("eimer") + 4)])
+            else:
+                n_house += group([(k_, door_x - off, fy + dd(k_) + 4), (k_, door_x + off, fy + dd(k_) + 4)])
+        if not t.startswith(("stall", "torhaus", "halle")) and rng.random() < 0.45:  # a rain barrel at a side wall
+            sd_ = rng.choice((-1, 1))
+            n_house += group([("regentonne", (left - dw("regentonne") / 2 - 3) if sd_ < 0 else (right + dw("regentonne") / 2 + 3), fy - 4)])
         first = left + 12 if door_x - left > right - door_x else right - 12   # the corner away from the door first, then the other
         scene_roll = rng.random()
         for far in (first, left + right - first):
@@ -509,7 +609,12 @@ def main():
                 continue
             side = -1 if far < fx else 1
             got = 0
-            if t.startswith("laden"):
+            if t.startswith("laden") and scene_roll < 0.45:  # a workshop: the anvil or the grindstone out in front
+                tool_ = "amboss" if scene_roll < 0.22 else "schleifstein"
+                got = group([(tool_, far, fy + dd(tool_) + 5), ("fass", far - side * 26, fy + dd("fass") + 4)])
+                if got and front:
+                    group([("schild", door_x - side * 24, fy + dd("schild") + 3)])
+            elif t.startswith("laden"):
                 x = far - side * 2
                 got = group([("kisten", x, fy + dd("kisten") + 4), ("fass", x - side * (dw("kisten") / 2 + dw("fass") / 2 + 1), fy + dd("fass") + 4),
                              ("saecke", x + side * 2, fy + dd("kisten") + dd("saecke") + 9)])
@@ -539,8 +644,41 @@ def main():
             elif scene_roll < 0.9:
                 got = group([("fass", far, fy + dd("fass") + 4), ("saecke", far - side * 22, fy + dd("saecke") + 5)])
             n_house += got
-            if got:
-                break
+            scene_roll = rng.random()  # the other corner gets a scene of its own
+    # 1a. the stables: the yard before it (the cart, spare wheels, the mounting block, the trough with its pump, the saddle rack at the
+    # end of the lean-to), the muck heap at the east end, hay racks, a trough, hay and buckets in the paddock
+    def place_near(t, x, y, flip=False, tries=14, street=False):
+        for k in range(tries):
+            dx_, dy_ = (0.0, 0.0) if k == 0 else (rng.uniform(-16, 16), rng.uniform(-8, 8))
+            if place(t, x + dx_, y + dy_, flip=flip, pad=0, street=street):
+                return True
+        return False
+    for b, info, left, right in houses:
+        if b["type"] != "stall":
+            continue
+        fx, fy = b["px"]
+        for t, dx_, dy_, fl in (("wagen", -112, 46, False), ("raeder", -150, 22, False), ("aufsitz", -6, 20, False), ("eimer", 18, 18, True),
+                                ("pferdetrog", 62, 30, False), ("sattel", 126, 20, False), ("heu", 98, 26, False), ("mist", 200, 16, True),
+                                ("heuraufe", 240, 136, False), ("pferdetrog", 290, 200, True), ("heu", 170, 190, False), ("heu", 186, 200, True),
+                                ("eimer", 320, 106, False), ("heuraufe", 160, 110, True)):
+            if place_near(t, fx + dx_, fy + dy_, fl):
+                n_house += 1
+    taken |= koppel_in  # nothing else in the paddock
+    # 1a'. the Steinmarkt gets real market stalls along its south rim (counters to the square) and along its north rim where it is free
+    for pl in town.get("places", []):
+        if pl["id"] != "steinmarkt":
+            continue
+        x0, y0, w, h_ = pl["rect"]
+        k_ = 0
+        stalls_at = []
+        for yy in range((y0 + h_) * 16 - 20, y0 * 16 + 60, -6):  # either side of the Steige, never in it, room to walk between them
+            for xx in range(x0 * 16 + 40, (x0 + w) * 16 - 36, 6):
+                if k_ >= 5 or any(abs(xx - a) < 84 and abs(yy - b_) < 52 for a, b_ in stalls_at):
+                    continue
+                if place("markt_s%d" % (k_ % 3), xx, yy, pad=3, street="square"):
+                    stalls_at.append((xx, yy))
+                    k_ += 1
+        print("market stalls on the Steinmarkt:", k_)
     print("houses refused:", dict(WHY))
     WHY.clear()
     # 1b. the named places of the plan get what belongs there: wells, banners and benches on the squares, carts and hay in the yards, the
@@ -559,22 +697,46 @@ def main():
                     break
         return got
     PLACE_THINGS = {
-        "forum": ["fahne", "fahne", "fahne", "fahne", "bank_ew", "bank_ew", "schrein"],
-        "brunnenhof": ["fahne", "bank_ew", "kuebel", "kuebel", "urne", "bank_ns"],
-        "steinmarkt": ["fahne", "fahne", "koerbe", "koerbe", "kisten", "fass", "saecke", "kruege", "bank_ew", "karren", "trog", "schild"],
-        "karrenhof": ["karren", "karren", "heu", "heu", "heu", "trog", "fass", "kisten", "hackklotz", "saecke"],
-        "steinmetzhof": ["quader", "quader", "quader", "steine", "saeule", "karren", "steine", "quader"],
-        "brunnenmulde": ["beet", "beet", "beet", "kuebel", "bank_ew", "schrein", "urne", "beet", "kuebel"],
-        "gedenkgarten": ["schrein", "urne", "urne", "bank_ew", "beet", "beet", "saeule", "kuebel"],
-        "glasschleiferei": ["kisten", "quader", "fass"],
-        "lampenmacherei": ["laterne", "kisten", "fass"],
-        "stallungen": ["heu", "heu", "trog", "karren", "zaun_ew", "zaun_ew"],
+        "forum": ["fahne", "fahne", "fahne", "fahne", "bank_ew", "bank_ew", "schrein", "anschlag", "toepfe"],
+        "brunnenhof": ["fahne", "bank_ew", "kuebel", "kuebel", "urne", "bank_ns", "eimer", "toepfe"],
+        "steinmarkt": ["fahne", "fahne", "anschlag", "koerbe", "koerbe", "kisten", "fass", "saecke", "kruege", "bank_ew", "trog", "schild", "eimer"],
+        "karrenhof": ["wagen", "karren", "raeder", "heu", "heu", "trog", "fass", "kisten", "hackklotz", "saecke", "fass_lieg"],
+        "steinmetzhof": ["quader", "quader", "quader", "schleifstein", "steine", "saeule", "karren", "steine", "quader"],
+        "brunnenmulde": ["beet", "beet", "beet", "kuebel", "bank_ew", "schrein", "urne", "beet", "kuebel", "bienen", "kraeuter", "toepfe"],
+        "gedenkgarten": ["schrein", "urne", "urne", "bank_ew", "beet", "beet", "saeule", "kuebel", "kraeuter"],
+        "glasschleiferei": ["schleifstein", "kisten", "quader", "fass"],
+        "lampenmacherei": ["amboss", "laterne", "kisten", "fass"],
+        "felder": ["vogelscheuche", "vogelscheuche", "kraeuter", "eimer", "koerbe"],
+        "windmuehle": ["saecke", "saecke", "karren", "taubenschlag"],
+        "gasthaus": ["fass", "fass_lieg", "bank_ew", "kruege", "anschlag"],
+        "vogtshaus": ["anschlag", "toepfe", "fahne"],
+        "rothalle": ["fahne", "fahne", "steine"],
+        "archiv": ["urne", "toepfe"],
     }
+    # 1c. the windmill stands in the open by the fields, as near to the plan's `windmuehle` as it finds free ground
+    for pl in town.get("places", []):
+        if pl["id"] != "windmuehle":
+            continue
+        x0, y0, w, h_ = pl["rect"]
+        cx, cy = (x0 + w / 2) * 16, (y0 + h_) * 16
+        tries = sorted(((dx, dy) for dx in range(-320, 321, 8) for dy in range(-240, 241, 8)), key=lambda q: math.hypot(q[0], q[1] * 1.3))
+        homes = [b["px"] for b in town.get("placed", []) if "px" in b]
+        for dx, dy in tries:
+            mx, my = cx + dx, cy + dy
+            # its sails reach about 45 px to each side and 110 px up: keep them off every roof
+            if any(abs(mx - hx) < 180 and -170 < my - hy < 150 for hx, hy in homes):
+                continue
+            if place("muehle", mx, my, pad=3):
+                mill_at = (cx + dx, cy + dy)
+                mark(hidden, mill_at[0] - 48, mill_at[1] - 120, mill_at[0] + 48, mill_at[1] - 4)
+                n_place += 1
+                print("the windmill stands at", mill_at)
+                break
     for pl in town.get("places", []):
         x0, y0, w, h_ = pl["rect"]
-        if pl["id"] == "brunnenhof" and place("brunnen", (x0 + w / 2) * 16, (y0 + h_ / 2) * 16 + 10, pad=2, street=True):
+        if pl["id"] == "brunnenhof" and place("brunnen", (x0 + w / 2) * 16, (y0 + h_ / 2) * 16 + 10, pad=2, street="square"):
             n_place += 1
-        if pl["id"] == "steinmarkt" and place("brunnen", (x0 + w * 0.3) * 16, (y0 + h_ * 0.6) * 16, pad=2, street=True):
+        if pl["id"] == "steinmarkt" and place("brunnen", (x0 + w * 0.3) * 16, (y0 + h_ * 0.6) * 16, pad=2, street="square"):
             n_place += 1
         if pl["kind"] == "fields":  # rows of a kitchen field, a fence along the front
             for yy in range(y0 * 16 + 36, (y0 + h_) * 16 - 16, 20):
@@ -596,7 +758,7 @@ def main():
         nx, ny = ns[mid]
         dx_, dy_ = pts[-1][0] - pts[0][0], pts[-1][1] - pts[0][1]
         straight = math.hypot(dx_, dy_) > 0.9 * 3.0 * (len(pts) - 1)
-        if run["style"] not in ("ruine", "stadt") and straight and len(pts) > 18 and rng.random() < 0.35:
+        if run["style"] not in ("ruine", "stadt", "koppel") and straight and len(pts) > 18 and rng.random() < 0.35:
             t = "bank_ew" if abs(dx_) > 2.2 * abs(dy_) else ("bank_ns" if abs(dy_) > 2.2 * abs(dx_) else "")
             if t == "bank_ew" and rng.random() < 0.3:
                 t = "trog"
@@ -608,7 +770,7 @@ def main():
                     ox, oy = x, (y + fd + 6) if ny > 0 else (y - 6)
                 if place(t, ox, oy, pad=0, allow_hidden=False, street=True):
                     n_way += 1
-        if run["style"] != "stadt" and rng.random() < 0.4:  # a planter, a bollard, now and then a shrine by the way
+        if run["style"] not in ("stadt", "koppel") and rng.random() < 0.4:  # a planter, a bollard, now and then a shrine by the way
             dist = district_of(x, y)
             pool = WAYSIDE.get(dist, (None, ("prellstein",)))[1] + (("schrein",) if dist in ("staffeln", "stille", "rand") and rng.random() < 0.25 else ())
             j = rng.randrange(len(pts))
@@ -640,9 +802,46 @@ def main():
         if place("laterne", ox, oy, flip=nx > 0.3, pad=1, lv=int(level[int(y) // 16, int(x) // 16]), street=True):
             lanterns.append((ox, oy))
             n_way += 1
+    # 2b. little scenes of life on the free grass near the houses: a bee garden, a dovecote with a bench, a kitchen plot with its scarecrow,
+    # a rain barrel and pots, a washing line, a woodcutter's corner (offset px from the first thing)
+    VIGNETTES = {
+        "garten": (("bienen", 0, 0), ("kraeuter", 36, 6), ("beet", 6, 26)),
+        "tauben": (("taubenschlag", 0, 0), ("bank_ew", 28, 8), ("toepfe", -24, 6)),
+        "acker": (("acker", 0, 0), ("acker", 0, 20), ("vogelscheuche", 34, 12), ("zaun_ew", -2, 40)),
+        "wasser": (("regentonne", 0, 0), ("toepfe", 22, 4), ("eimer", -20, 6)),
+        "waesche": (("waesche", 0, 0), ("koerbe", 30, 8), ("eimer", -28, 6)),
+        "werk": (("hackklotz", 0, 0), ("holz", 32, -2), ("raeder", -32, 8)),
+    }
+    POOL = {"fuss": ("werk", "acker", "waesche", "tauben", "wasser"), "staffeln": ("garten", "tauben", "wasser", "waesche", "garten"),
+            "stille": ("garten", "tauben", "garten"), "rand": ("acker", "garten", "werk", "waesche")}
+    near_house = house.copy()
+    for _ in range(4):
+        g2 = near_house.copy()
+        for dy, dx in ((6, 0), (-6, 0), (0, 6), (0, -6), (4, 4), (-4, 4), (4, -4), (-4, -4)):
+            g2 |= np.roll(np.roll(near_house, dy, 0), dx, 1)
+        near_house = g2
+    cand = list(zip(*np.nonzero(near_house & ~house & ~grown & ~taken & ~hidden & ~yard)))
+    rng.shuffle(cand)
+    spots = []
+    n_vig = 0
+    for r, c_ in cand:
+        if n_vig >= 34:
+            break
+        x, y = bx0 + c_ * C + C / 2, by0 + r * C + C / 2
+        dist = district_of(x, y)
+        if dist not in POOL or any(math.hypot(x - a, (y - b_) * 1.3) < 120 for a, b_ in spots):
+            continue
+        scene = VIGNETTES[rng.choice(POOL[dist])]
+        if not place(scene[0][0], x, y, pad=1):
+            continue
+        for t, ox, oy in scene[1:]:
+            place(t, x + ox, y + oy, pad=0)
+        spots.append((x, y))
+        n_vig += 1
+    print("scenes of life on the grass:", n_vig)
     # 3. greenery on the free grass (tiles: the world places plants at a jittered spot inside their tile)
     green = []
-    gtaken = np.zeros((H, W), bool)
+    gtaken = yard | koppel_in
     tiles = []
     for ty in range(by0 // 16, by1 // 16):
         for tx in range(bx0 // 16, bx1 // 16):
@@ -733,7 +932,7 @@ def main():
            "feld": (("grass", 0, 6), ("grass", 0, 6), ("bush", 0, 7), ("puffseed", 0, 3), ("wound_leaf", 0, 3)),
            "ruine": (("grass", 0, 6), ("bush", 0, 7), ("bush", 0, 7), ("glowfern", 0, 3), ("wound_leaf", 0, 3))}
     for run in wall_runs:
-        if run["style"] == "stadt":
+        if run["style"] in ("stadt", "koppel"):
             continue
         for j in range(1, len(run["pts"]) - 1, 3):
             if rng.random() < 0.6:
@@ -773,6 +972,7 @@ def main():
     town["greenery"] = green
     json.dump(town, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent="\t")
     open(path, "a", encoding="utf-8").write("\n")
+    print("paddock fence: %d runs" % n_koppel)
     print("deco: %d at houses, %d wall runs, %d by the ways; greenery: %d trees, %d against walls and houses, %d bushes/grass, %d flowers"
           % (n_house, n_wall, n_way, n_trees, n_hug, n_small, len(green) - n_trees - n_small - n_hug))
     print("refused:", WHY)

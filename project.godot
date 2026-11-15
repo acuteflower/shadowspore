@@ -25,6 +25,7 @@ TimeManager="*res://src/autoload/time_manager.gd"
 InputManager="*res://src/autoload/input_manager.gd"
 Terrain="*res://src/autoload/terrain.gd"
 GameCursor="*res://src/autoload/game_cursor.gd"
+Quality="*res://src/autoload/quality.gd"
 
 [debug]
 
@@ -341,6 +342,26 @@ renderer/rendering_method="mobile"
 
 [shader_globals]
 
+g_reflect={
+"type": "sampler2D",
+"value": "res://assets/world/town_wear_empty.png"
+}
+g_reflect_rect={
+"type": "vec4",
+"value": Vector4(0, 0, 1, 1)
+}
+g_reflect_on={
+"type": "float",
+"value": 0.0
+}
+g_sky_view={
+"type": "vec4",
+"value": Vector4(0, 0, 640, 360)
+}
+g_sky={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
 g_sun={
 "type": "float",
 "value": 0.0
@@ -454,6 +475,10 @@ g_day_gold={
 "value": 0.0
 }
 g_day_sway={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+g_sun_side={
 "type": "vec2",
 "value": Vector2(0, 0)
 }

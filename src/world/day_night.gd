@@ -17,6 +17,7 @@ var _daylight: DaylightField
 var _ambience: DayAmbience
 var _music: MusicDirector
 var _atmosphere: NightAtmosphere
+var _shadows: SunShadows
 var _mood: MoodGrade
 var _interiors: Interiors
 var _mines: MineManager
@@ -34,6 +35,8 @@ func _ready() -> void:
 		_ground = (ground as CanvasItem).material as ShaderMaterial
 	_daylight = DaylightField.new()
 	get_parent().add_child.call_deferred(_daylight)
+	_shadows = SunShadows.new() ## cast shadows of sun and moon (docs/sonnenschatten.md)
+	get_parent().add_child.call_deferred(_shadows)
 	_add_sun_glow()
 	_ambience = DayAmbience.new()
 	add_child(_ambience)
@@ -141,8 +144,12 @@ func _update() -> void:
 		_music.gloom = gloom
 		_music.arid = _arid_here()
 	_music.indoors = indoors
+	var in_starhall: bool = _interiors != null and (_interiors.in_starhall(_interiors.local_position()) or _camera_in_starhall())
+	_music.in_starhall = in_starhall
 	_atmosphere.update(indoors)
-	_mood.follow(indoors, gloom, _arid_here() if not indoors else 0.0, _weather.desert_arcane_storm if not indoors else 0.0)
+	if _shadows.is_inside_tree():
+		_shadows.follow(indoors, sun, golden, 0.0 if indoors else night, TimeManager.moon_light())
+	_mood.follow(indoors, gloom, _arid_here() if not indoors else 0.0, _weather.desert_arcane_storm if not indoors else 0.0, in_starhall)
 	if _glow != null:
 		_glow.set_shader_parameter("night", night)
 
@@ -154,6 +161,13 @@ func _camera_in_room() -> bool:
 		return false
 	var at: Vector2 = camera.get_screen_center_position()
 	return Interiors.slot_at(at) >= 0 or MineManager.in_mine(at)
+
+
+func _camera_in_starhall() -> bool:
+	var camera: Camera2D = get_viewport().get_camera_2d()
+	if camera == null or _interiors == null:
+		return false
+	return _interiors.in_starhall(camera.get_screen_center_position())
 
 
 ## 0 on the meadow .. 1 deep in the Hexenwald, at the middle of what the camera sees (BiomeBlend).

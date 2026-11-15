@@ -14,7 +14,9 @@ import math
 import os
 import pathlib
 import random
+import re
 import sys
+import zlib
 
 import numpy as np
 
@@ -599,57 +601,54 @@ def bake_quartz_caravan_path(spec, seed, centre):
     return img, mask, (x0, y0), glow
 
 
-def bake_path(spec, seed, centre):
-    """Bakes a rich, organic Shadowspore path decal:
-    - Cluster-shaded earth cushions (orphan-cleaned, zero 4x4 Bayer static)
-    - Alternating double-rut stretches, warm single-track sections, and natural grassy spur-islands
-    - Whole-cell Voronoi twilight-slate flagstones & crooked curbstones in weathered stretches
-    - Damp violet-umber hollows with sky-reflecting puddles, shaded pebbles, bark chips & bank roots
-    - Scalloped overhanging NW turf & curved SE grass blades melting seamlessly into grass.png."""
+def _smoothstep(e0, e1, x):
+    denom = e1 - e0
+    if isinstance(denom, np.ndarray):
+        safe_d = np.where(np.abs(denom) < 1e-6, 1.0, denom)
+        t = np.where(np.abs(denom) < 1e-6, 0.0, np.clip((x - e0) / safe_d, 0.0, 1.0))
+    else:
+        if abs(denom) < 1e-6:
+            return np.zeros_like(x, dtype=np.float32) if isinstance(x, np.ndarray) else 0.0
+        t = np.clip((x - e0) / denom, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _smin(a, b, k):
+    if isinstance(k, (int, float)) and k <= 1e-6:
+        return np.minimum(a, b)
+    kk = np.maximum(k, 1e-6)
+    h = np.maximum(kk - np.abs(a - b), 0.0) / kk
+    return np.minimum(a, b) - 0.25 * kk * h * h
+
+
+def _logical_id(spec):
+    sid = spec["id"]
+    if spec.get("arc") is not None and re.search(r"_\d+$", sid):
+        return sid.rsplit("_", 1)[0]
+    return sid
+
+
+def _build_road_profile(spec, road_seed, suppress_taper_in=False, suppress_taper_out=False):
     width = float(spec.get("width", 26))
     is_gloom = bool(spec.get("gloom", False))
-    seed = int(spec.get("seed", seed))  # the pieces of one road share a seed, so their widths, ruts and paving run on without a seam
+    is_ruts = bool(spec.get("ruts", False))
     curve = catmull(spec["points"], step=1.6)
     seg = np.linalg.norm(np.diff(curve, axis=0), axis=1)
     arc = np.concatenate([[0.0], np.cumsum(seg)])
     total = float(arc[-1])
-    # A piece of a long road (`arc` [from, to] in px along the curve): everything is computed over the piece plus a margin of the
-    # neighbours, but only the pixels nearest to its own stretch are kept (`own_lo` .. `own_hi`), so the pictures meet on a clean cut.
-    piece = spec.get("arc")
-    own_lo, own_hi = 0, len(curve)
-    if piece:
-        own_lo = int(np.searchsorted(arc, float(piece[0])))
-        own_hi = len(curve) if float(piece[1]) >= total - 1.0 else int(np.searchsorted(arc, float(piece[1])))
-    pad = int((width + 40) / 1.6) if piece else 0
-    r_lo, r_hi = max(0, own_lo - pad), min(len(curve), own_hi + pad)
-    span = total if not piece else float(arc[own_hi - 1] - arc[own_lo])
-    margin = int(width) + 18
-    x0, y0 = int(curve[r_lo:r_hi, 0].min()) - margin, int(curve[r_lo:r_hi, 1].min()) - margin
-    x1, y1 = int(curve[r_lo:r_hi, 0].max()) + margin, int(curve[r_lo:r_hi, 1].max()) + margin
-    w, h = x1 - x0, y1 - y0
-    if piece:
-        vnoise_l = lambda w_, h_, sc, sd: vnoise_at(x0 + centre[0], y0 + centre[1], w_, h_, sc, sd)  # noqa: E731
-    else:
-        vnoise_l = vnoise
-
-    def own(ci):  # a feature centred on this curve index belongs to this picture (with room to spare at a cut)
-        if not piece:
-            return True
-        return own_lo <= ci < own_hi and arc[ci] - arc[own_lo] >= (16.0 if own_lo > 0 else -1.0) and arc[own_hi - 1] - arc[ci] >= (16.0 if own_hi < len(curve) else -1.0)
-
-    rng = np.random.default_rng(seed)
-    prng = random.Random(seed)
+    rng = np.random.default_rng(road_seed)
     phase = rng.random(12) * math.tau
 
-    # Breathing width, ruts, dampness, stone paving, and occasional spur-islands along arc `s`
     half = width * 0.5 * (
         0.88
         + 0.20 * np.sin(arc / 53.0 + phase[0])
         + 0.11 * np.sin(arc / 21.0 + phase[1])
         + 0.08 * np.maximum(0.0, np.sin(arc / 115.0 + phase[2]) - 0.35)
     )
-    taper_in = np.clip(arc / float(spec.get("taper_in", 0.0) or 1.0), 0.0, 1.0) if spec.get("taper_in", 0) else np.ones_like(arc)
-    taper_out = np.clip((total - arc) / float(spec.get("taper_out", 70.0)), 0.0, 1.0)
+    t_in = 0.0 if suppress_taper_in else float(spec.get("taper_in", 0.0) or 0.0)
+    t_out = 0.0 if suppress_taper_out else float(spec.get("taper_out", 70.0))
+    taper_in = np.clip(arc / max(t_in, 1.0), 0.0, 1.0) if t_in > 0.0 else np.ones_like(arc)
+    taper_out = np.clip((total - arc) / max(t_out, 1.0), 0.0, 1.0) if t_out > 0.0 else np.ones_like(arc)
     end_env = np.minimum(taper_in, 0.25 + 0.75 * taper_out)
     half = half * end_env
 
@@ -657,14 +656,12 @@ def bake_path(spec, seed, centre):
     damp_amt = np.clip(0.38 + 0.58 * np.sin(arc / 130.0 + phase[4]) * np.cos(arc / 67.0 + phase[5]), 0.0, 1.0)
     if is_gloom:
         damp_amt = np.clip(damp_amt * 0.7 + 0.35, 0.0, 1.0)
-    # Stone flagstone patches: stronger near start_ruins on footpath_start, plus organic old remnants along the way
     ruin_boost = np.exp(-arc / 160.0) * (0.42 if spec.get("id") == "footpath_start" else 0.0)
     pave_amt = np.clip(0.45 * np.sin(arc / 95.0 + phase[6]) * np.sin(arc / 43.0 + phase[7]) + ruin_boost, 0.0, 1.0)
     island_amt = np.where((half >= 12.2) & (arc > 75.0) & (arc < total - 95.0), np.sin(arc / 145.0 + phase[8]), -1.0)
-    is_ruts = bool(spec.get("ruts", False))  # a cart road (the caravan's, docs/haendler_konzept.md 4.1): two worn wheel ruts, grass down the middle, no paving
     mid_amt = np.zeros_like(arc)
     city = np.zeros_like(arc)
-    if spec.get("old_road"):  # the Westweg (docs/stadt_westen_konzept.md 2.4): remnants of an old paved road that grows whole towards the city
+    if spec.get("old_road"):
         u = np.clip((arc / max(total, 1.0) - 0.55) / 0.40, 0.0, 1.0)
         city = u * u * (3.0 - 2.0 * u)
         pave_amt = np.clip(pave_amt * (1.0 - city) + 0.10 + 0.22 * np.maximum(0.0, np.sin(arc / 211.0 + phase[10])) + city * 0.98, 0.0, 1.0)
@@ -674,17 +671,488 @@ def bake_path(spec, seed, centre):
         rut_amt = np.clip(0.86 + 0.14 * np.sin(arc / 60.0 + phase[3]), 0.0, 1.0)
         pave_amt = np.zeros_like(arc)
         island_amt = np.full_like(arc, -1.0)
-        mid_amt = np.clip(0.75 + 0.45 * np.sin(arc / 70.0 + phase[9]), 0.0, 1.0) * np.clip(arc / 40.0, 0.0, 1.0)
+        end_fade_in = np.ones_like(arc) if (suppress_taper_in or t_in <= 0.0) else np.clip(arc / 40.0, 0.0, 1.0)
+        end_fade_out = np.ones_like(arc) if (suppress_taper_out or t_out <= 16.0) else np.clip((total - arc) / 48.0, 0.0, 1.0)
+        # Keep the center meadow strip alive along the entire cart road, breathing gently instead of dropping out
+        mid_amt = (0.72 + 0.28 * np.sin(arc / 70.0 + phase[9])) * np.minimum(end_fade_in, end_fade_out)
 
     tangents = np.gradient(curve, axis=0)
     tangents /= np.linalg.norm(tangents, axis=1)[:, None] + 1e-9
+    return {
+        "lid": _logical_id(spec),
+        "spec": spec,
+        "seed": road_seed,
+        "width": width,
+        "is_gloom": is_gloom,
+        "is_ruts": is_ruts,
+        "old_road": bool(spec.get("old_road", False)),
+        "curve": curve,
+        "arc": arc,
+        "total": total,
+        "half": half,
+        "rut_amt": rut_amt,
+        "damp_amt": damp_amt,
+        "pave_amt": pave_amt,
+        "island_amt": island_amt,
+        "mid_amt": mid_amt,
+        "city": city,
+        "tangents": tangents,
+        "clip_start": 0,
+        "clip_end": len(curve),
+    }
 
-    # Fast band-restricted distance & nearest-index rasterization around the curve!
+
+def _quad_bezier_samples(p0, ctrl, p2, hw0, hw2, steps=36):
+    t = np.linspace(0.0, 1.0, steps, dtype=np.float32)[:, None]
+    omt = 1.0 - t
+    pts = omt * omt * p0[None, :] + 2.0 * omt * t * ctrl[None, :] + t * t * p2[None, :]
+    hw = omt[:, 0] * hw0 + t[:, 0] * hw2
+    return pts, t[:, 0], hw
+
+
+def build_road_graph(data, global_seed):
+    """Detects every junction/fork/crossing between logical paths and computes corner fillets, arm clipping and turning wheel ruts."""
+    roads = []
+    roads_by_lid = {}
+    for i, spec in enumerate(data.get("paths", [])):
+        if spec.get("quartz_caravan"):
+            continue
+        lid = _logical_id(spec)
+        if lid in roads_by_lid:
+            continue
+        road_seed = int(spec.get("seed", global_seed + i * 101 + 7))
+        prof = _build_road_profile(spec, road_seed)
+        roads_by_lid[lid] = prof
+        roads.append(prof)
+
+    # Detect close encounters between distinct logical paths
+    raw_contacts = []
+    for ia in range(len(roads)):
+        rA = roads[ia]
+        cA = rA["curve"]
+        ax0, ay0 = cA.min(axis=0)
+        ax1, ay1 = cA.max(axis=0)
+        for ib in range(ia + 1, len(roads)):
+            rB = roads[ib]
+            cB = rB["curve"]
+            bx0, by0 = cB.min(axis=0)
+            bx1, by1 = cB.max(axis=0)
+            thresh = (rA["width"] + rB["width"]) * 0.5 + 14.0
+            pad = thresh + 8.0
+            ox0, ox1 = max(ax0, bx0) - pad, min(ax1, bx1) + pad
+            oy0, oy1 = max(ay0, by0) - pad, min(ay1, by1) + pad
+            if ox1 < ox0 or oy1 < oy0:
+                continue
+            ia_mask = np.nonzero((cA[:, 0] >= ox0) & (cA[:, 0] <= ox1) & (cA[:, 1] >= oy0) & (cA[:, 1] <= oy1))[0][::2]
+            ib_mask = np.nonzero((cB[:, 0] >= ox0) & (cB[:, 0] <= ox1) & (cB[:, 1] >= oy0) & (cB[:, 1] <= oy1))[0][::2]
+            if len(ia_mask) == 0 or len(ib_mask) == 0:
+                continue
+            pA = cA[ia_mask]
+            pB = cB[ib_mask]
+            d2 = ((pA[:, None, :] - pB[None, :, :]) ** 2).sum(axis=-1)
+            hits_a, hits_b = np.nonzero(d2 <= thresh * thresh)
+            if len(hits_a) == 0:
+                continue
+            # Local minimum per contact region
+            best = int(np.argmin(d2[hits_a, hits_b]))
+            ci_a = int(ia_mask[hits_a[best]])
+            ci_b = int(ib_mask[hits_b[best]])
+            mid = 0.5 * (cA[ci_a] + cB[ci_b])
+            raw_contacts.append((rA["lid"], rB["lid"], mid))
+
+    # Cluster nearby contacts (<= 80 px) so 3+ way meetings form one unified junction
+    clusters = []
+    for lid_a, lid_b, mid in raw_contacts:
+        placed = False
+        for cl in clusters:
+            if any(np.linalg.norm(mid - m) <= 80.0 for m in cl["pts"]):
+                cl["lids"].update((lid_a, lid_b))
+                cl["pts"].append(mid)
+                placed = True
+                break
+        if not placed:
+            clusters.append({"lids": {lid_a, lid_b}, "pts": [mid]})
+
+    overrides = data.get("junctions", [])
+    taper_flags = {lid: [False, False] for lid in roads_by_lid}
+    junc_specs = []
+    for cl in clusters:
+        lids = sorted(cl["lids"])
+        c0 = np.mean(cl["pts"], axis=0)
+        modes = {}
+        closest_idx = {}
+        for lid in lids:
+            r = roads_by_lid[lid]
+            ci = int(np.argmin(((r["curve"] - c0) ** 2).sum(axis=1)))
+            closest_idx[lid] = ci
+            a_c = float(r["arc"][ci])
+            if a_c <= 75.0:
+                modes[lid] = "start"
+                taper_flags[lid][0] = True
+            elif r["total"] - a_c <= 75.0:
+                modes[lid] = "end"
+                taper_flags[lid][1] = True
+            else:
+                modes[lid] = "through"
+
+        through_lids = [lid for lid in lids if modes[lid] == "through"]
+        term_lids = [lid for lid in lids if modes[lid] != "through"]
+        if len(through_lids) >= 2:
+            r0, r1 = roads_by_lid[through_lids[0]], roads_by_lid[through_lids[1]]
+            i0 = closest_idx[through_lids[0]]
+            i1 = closest_idx[through_lids[1]]
+            sl0 = r0["curve"][max(0, i0 - 40):i0 + 41]
+            sl1 = r1["curve"][max(0, i1 - 40):i1 + 41]
+            dd = ((sl0[:, None, :] - sl1[None, :, :]) ** 2).sum(axis=-1)
+            k0, k1 = np.unravel_index(np.argmin(dd), dd.shape)
+            center = 0.5 * (sl0[k0] + sl1[k1])
+        elif len(through_lids) == 1 and term_lids:
+            r_thr = roads_by_lid[through_lids[0]]
+            ends = [
+                roads_by_lid[lid]["curve"][0 if modes[lid] == "start" else -1]
+                for lid in term_lids
+            ]
+            avg_end = np.mean(ends, axis=0)
+            i_t = closest_idx[through_lids[0]]
+            s0 = max(0, i_t - 45)
+            sl = r_thr["curve"][s0:i_t + 46]
+            best_t = s0 + int(np.argmin(((sl - avg_end) ** 2).sum(axis=1)))
+            center = r_thr["curve"][best_t].copy()
+        else:
+            ends = [
+                roads_by_lid[lid]["curve"][0 if modes[lid] == "start" else -1]
+                for lid in lids
+            ]
+            center = np.mean(ends, axis=0)
+
+        fillet_override = None
+        for ov in overrides:
+            if math.hypot(center[0] - float(ov["x"]), center[1] - float(ov["y"])) < 96.0:
+                center = np.array([float(ov["x"]), float(ov["y"])], dtype=np.float64)
+                if "fillet" in ov:
+                    fillet_override = float(ov["fillet"])
+                break
+
+        j_key = "|".join(lids) + "_%d_%d" % (int(round(center[0] / 32.0)), int(round(center[1] / 32.0)))
+        j_seed = global_seed + 9001 + (zlib.crc32(j_key.encode("utf-8")) % 100000)
+        junc_specs.append((lids, modes, center, j_seed, fillet_override))
+
+    # Rebuild affected profiles without branch-pinching end tapers, and record endpoint clips
+    for lid, (sup_in, sup_out) in taper_flags.items():
+        if sup_in or sup_out:
+            old_p = roads_by_lid[lid]
+            roads_by_lid[lid] = _build_road_profile(old_p["spec"], old_p["seed"], suppress_taper_in=sup_in, suppress_taper_out=sup_out)
+
+    junctions = []
+    by_lid_junctions = {lid: [] for lid in roads_by_lid}
+    for lids, modes, center, j_seed, fillet_override in junc_specs:
+        through_lids = [lid for lid in lids if modes[lid] == "through"]
+        max_hw = max(float(roads_by_lid[lid]["width"]) * 0.5 for lid in lids)
+        r_junc = max(max_hw * 2.5, 40.0)
+        r_blend = r_junc + 30.0
+        eval_pad = int((r_blend + 24.0) / 1.6)
+        fillet = fillet_override if fillet_override is not None else min(max_hw * 0.92, 13.5)
+
+        arms_sdf = []
+        dirs = []
+        contact_idx_by_lid = {}
+        for rank, lid in enumerate(lids):
+            prof = roads_by_lid[lid]
+            curve = prof["curve"]
+            i_j = int(np.argmin(((curve - center) ** 2).sum(axis=1)))
+            contact_idx_by_lid[lid] = i_j
+            mode = modes[lid]
+            clip_origin, clip_normal = None, None
+
+            def norm_vec(v):
+                ln = float(np.linalg.norm(v))
+                return v / ln if ln > 1e-6 else np.array([1.0, 0.0], dtype=np.float64)
+
+            if mode == "through":
+                s_lo = max(0, i_j - eval_pad)
+                s_hi = min(len(curve), i_j + eval_pad + 1)
+                kb = max(0, i_j - 14)
+                kf = min(len(curve) - 1, i_j + 14)
+                d_bwd = norm_vec(curve[kb] - curve[i_j]) if kb < i_j else -prof["tangents"][i_j]
+                d_fwd = norm_vec(curve[kf] - curve[i_j]) if kf > i_j else prof["tangents"][i_j]
+                dirs.append((lid, prof["is_ruts"], float(prof["half"][i_j]), d_bwd, "bwd"))
+                dirs.append((lid, prof["is_ruts"], float(prof["half"][i_j]), d_fwd, "fwd"))
+            elif mode == "start":
+                prof["clip_start"] = max(prof["clip_start"], i_j)
+                s_lo = i_j
+                s_hi = min(len(curve), i_j + eval_pad + 1)
+                kf = min(len(curve) - 1, i_j + 14)
+                d_out = norm_vec(curve[kf] - curve[i_j]) if kf > i_j else prof["tangents"][i_j]
+                if through_lids:
+                    r_thr = roads_by_lid[through_lids[0]]
+                    i_t = int(np.argmin(((r_thr["curve"] - center) ** 2).sum(axis=1)))
+                    t_thr = r_thr["tangents"][i_t]
+                    n_side = np.array([-t_thr[1], t_thr[0]], dtype=np.float64)
+                    if float(np.dot(n_side, d_out)) < 0.0:
+                        n_side = -n_side
+                    clip_origin, clip_normal = center.copy(), n_side
+                dirs.append((lid, prof["is_ruts"], float(prof["half"][i_j]), d_out, "start"))
+            else:  # "end"
+                prof["clip_end"] = min(prof["clip_end"], i_j + 1)
+                s_lo = max(0, i_j - eval_pad)
+                s_hi = i_j + 1
+                kb = max(0, i_j - 14)
+                d_out = norm_vec(curve[kb] - curve[i_j]) if kb < i_j else -prof["tangents"][i_j]
+                if through_lids:
+                    r_thr = roads_by_lid[through_lids[0]]
+                    i_t = int(np.argmin(((r_thr["curve"] - center) ** 2).sum(axis=1)))
+                    t_thr = r_thr["tangents"][i_t]
+                    n_side = np.array([-t_thr[1], t_thr[0]], dtype=np.float64)
+                    if float(np.dot(n_side, d_out)) < 0.0:
+                        n_side = -n_side
+                    clip_origin, clip_normal = center.copy(), n_side
+                dirs.append((lid, prof["is_ruts"], float(prof["half"][i_j]), d_out, "end"))
+
+            arms_sdf.append({
+                "lid": lid,
+                "rank": rank,
+                "prof": prof,
+                "s_lo": s_lo,
+                "s_hi": s_hi,
+                "clip_origin": clip_origin,
+                "clip_normal": clip_normal,
+            })
+
+        turns = []
+        for ia in range(len(dirs)):
+            lid_a, ruts_a, hw_a, dir_a, _ = dirs[ia]
+            for ib in range(ia + 1, len(dirs)):
+                lid_b, ruts_b, hw_b, dir_b, _ = dirs[ib]
+                if lid_a == lid_b:
+                    continue  # skip opposite ends of the same through-road
+                cos_ang = float(np.dot(dir_a, dir_b))
+                if cos_ang > 0.28:
+                    continue  # preserve acute grass wedges between diverging Y-arms
+                leg = max(hw_a, hw_b) * 2.25
+                pts, t_arr, hw_arr = _quad_bezier_samples(center + dir_a * leg, center, center + dir_b * leg, hw_a, hw_b)
+                turns.append({"pts": pts, "t": t_arr, "hw": hw_arr, "has_ruts": bool(ruts_a or ruts_b)})
+
+        junc = {
+            "lids": lids,
+            "center": center,
+            "seed": j_seed,
+            "max_hw": max_hw,
+            "r_junc": r_junc,
+            "r_blend": r_blend,
+            "fillet": fillet,
+            "arms_sdf": arms_sdf,
+            "turns": turns,
+            "contact_idx_by_lid": contact_idx_by_lid,
+        }
+        junctions.append(junc)
+        for lid in lids:
+            by_lid_junctions[lid].append(junc)
+
+    return {"roads_by_lid": roads_by_lid, "junctions": junctions, "by_lid_junctions": by_lid_junctions}
+
+
+def _eval_junction_fields(junc, jx0, jy0, jw, jh, centre, my_lid):
+    """Evaluates unified corner-filleted SDF, gradient normals, median clearing, turning wheel ruts, and deterministic Voronoi ownership."""
+    px = (np.arange(jx0, jx0 + jw, dtype=np.float32) + 0.5)[None, :]
+    py = (np.arange(jy0, jy0 + jh, dtype=np.float32) + 0.5)[:, None]
+    cx_j, cy_j = float(junc["center"][0]), float(junc["center"][1])
+    r_j = np.hypot(px - cx_j, py - cy_j)
+    w_j = _smoothstep(junc["r_blend"], junc["r_junc"], r_j)
+
+    score_list, sd_list, hw_list = [], [], []
+    damp_list, rut_base_list, pave_list = [], [], []
+    arm_lids = []
+    lat_frac_list, mid_amt_list, is_ruts_list, arm_rut_list = [], [], [], []
+
+    for arm in junc["arms_sdf"]:
+        prof = arm["prof"]
+        curve = prof["curve"]
+        s_lo, s_hi = arm["s_lo"], arm["s_hi"]
+        sub_c = curve[s_lo:s_hi].astype(np.float32)
+        dx = px[..., None] - sub_c[None, None, :, 0]
+        dy = py[..., None] - sub_c[None, None, :, 1]
+        d2 = dx * dx + dy * dy
+        rel_idx = np.argmin(d2, axis=-1)
+        idx = rel_idx + s_lo
+        d = np.sqrt(np.take_along_axis(d2, rel_idx[..., None], axis=-1)[..., 0])
+        hw = np.maximum(prof["half"][idx].astype(np.float32), 0.5)
+        sd = d - hw
+
+        tan = prof["tangents"][idx].astype(np.float32)
+        vx = px - curve[idx, 0].astype(np.float32)
+        vy = py - curve[idx, 1].astype(np.float32)
+        lat = np.abs(vx * (-tan[..., 1]) + vy * tan[..., 0])
+        lat_frac = lat / hw
+
+        proj_fade = np.ones((jh, jw), dtype=np.float32)
+        if arm["clip_origin"] is not None:
+            co, cn = arm["clip_origin"], arm["clip_normal"]
+            proj = (px - float(co[0])) * float(cn[0]) + (py - float(co[1])) * float(cn[1])
+            sd = np.maximum(sd, -proj)
+            proj_fade = _smoothstep(-4.0, 6.0, proj)
+
+        sc = sd / np.maximum(hw, 1.0) + arm["rank"] * 1e-4
+        score_list.append(sc)
+        sd_list.append(sd)
+        hw_list.append(hw)
+        damp_list.append(prof["damp_amt"][idx].astype(np.float32))
+        rut_base_list.append(prof["rut_amt"][idx].astype(np.float32))
+        pave_list.append(prof["pave_amt"][idx].astype(np.float32))
+        lat_frac_list.append(lat_frac)
+        mid_amt_list.append(prof["mid_amt"][idx].astype(np.float32))
+        is_ruts_list.append(bool(prof["is_ruts"]))
+        arm_lids.append(arm["lid"])
+
+        if prof["is_ruts"]:
+            r_arm = np.exp(-((lat_frac - 0.44) / 0.18) ** 2) * prof["rut_amt"][idx].astype(np.float32)
+            r_arm *= _smoothstep(4.0, -2.0, sd) * proj_fade
+            arm_rut_list.append(r_arm)
+        else:
+            arm_rut_list.append(np.zeros((jh, jw), dtype=np.float32))
+
+    # Voronoi owner partition with zero gaps & zero overlap
+    score_stack = np.stack(score_list, axis=0)
+    best_arm = np.argmin(score_stack, axis=0)
+    my_arm_indices = [i for i, lid in enumerate(arm_lids) if lid == my_lid]
+    if my_arm_indices:
+        owner_mine = np.isin(best_arm, my_arm_indices)
+    else:
+        owner_mine = np.zeros((jh, jw), dtype=bool)
+
+    # Smooth union SDF with filleted corners
+    sd_comb = sd_list[0].copy()
+    fillet_field = np.float32(junc["fillet"]) * w_j
+    for sd_k in sd_list[1:]:
+        sd_comb = _smin(sd_comb, sd_k, fillet_field)
+
+    wts = [np.exp(-np.clip(sc, -1.5, 4.0) * 3.0) for sc in score_list]
+    w_sum = sum(wts) + np.float32(1e-6)
+    hw_eff = sum(w * hw for w, hw in zip(wts, hw_list)) / w_sum
+    damp_j = sum(w * dp for w, dp in zip(wts, damp_list)) / w_sum
+    rut_base_j = sum(w * rb for w, rb in zip(wts, rut_base_list)) / w_sum
+    pave_j = sum(w * pv for w, pv in zip(wts, pave_list)) / w_sum
+
+    eff_t_j = np.float32(1.0) + sd_comb / np.maximum(hw_eff, 0.5)
+    gy_sd, gx_sd = np.gradient(sd_comb)
+    gn = np.hypot(gx_sd, gy_sd) + np.float32(1e-6)
+    nw_j = (gx_sd / gn) * np.float32(-0.7071) + (gy_sd / gn) * np.float32(-0.7071)
+
+    j_seed = junc["seed"]
+    wob_j = (vnoise_at(jx0 + centre[0], jy0 + centre[1], jw, jh, 8, j_seed + 11) - 0.5) * 0.28 + (vnoise_at(jx0 + centre[0], jy0 + centre[1], jw, jh, 3, j_seed + 12) - 0.5) * 0.10
+    cush_j = (vnoise_at(jx0 + centre[0], jy0 + centre[1], jw, jh, 9, j_seed + 13) - 0.5) * 1.55 + (vnoise_at(jx0 + centre[0], jy0 + centre[1], jw, jh, 4, j_seed + 14) - 0.5) * 0.55
+
+    # Turning apron clearing + smooth quadratic Bezier turning wheel tracks
+    apron_clear = _smoothstep(junc["max_hw"] * 1.65, junc["max_hw"] * 0.90, r_j)
+    rut_turn = np.zeros((jh, jw), dtype=np.float32)
+    px_g, py_g = np.broadcast_arrays(px, py)
+    px_flat = px_g.reshape(-1, 1)
+    py_flat = py_g.reshape(-1, 1)
+    for turn in junc["turns"]:
+        tpts = turn["pts"]
+        dx_t = px_flat - tpts[:, 0][None, :]
+        dy_t = py_flat - tpts[:, 1][None, :]
+        d2_t = dx_t * dx_t + dy_t * dy_t
+        k_t = np.argmin(d2_t, axis=1)
+        d_t = np.sqrt(d2_t[np.arange(len(k_t)), k_t]).reshape(jh, jw)
+        t_param = turn["t"][k_t].reshape(jh, jw)
+        hw_t = turn["hw"][k_t].reshape(jh, jw)
+        win = np.power(np.maximum(np.sin(np.pi * np.clip(t_param, 0.0, 1.0)), 0.0), 0.70)
+        apron_clear = np.maximum(apron_clear, _smoothstep(0.72 * hw_t, 0.28 * hw_t, d_t) * win)
+        if turn["has_ruts"]:
+            wheel_d = np.abs(d_t - 0.44 * hw_t)
+            fade = _smoothstep(0.0, 0.18, t_param) * _smoothstep(1.0, 0.82, t_param)
+            rut_arc = np.exp(-((wheel_d / (0.17 * hw_t)) ** 2)) * fade * rut_base_j
+            rut_turn = np.maximum(rut_turn, rut_arc)
+
+    rut_j = rut_turn.copy()
+    for ar in arm_rut_list:
+        rut_j = np.maximum(rut_j, ar)
+
+    return {
+        "r_j": r_j,
+        "w_j": w_j,
+        "wob_j": wob_j.astype(np.float32),
+        "cush_j": cush_j.astype(np.float32),
+        "eff_t_j": eff_t_j.astype(np.float32),
+        "hw_eff_j": hw_eff.astype(np.float32),
+        "nw_j": nw_j.astype(np.float32),
+        "rut_j": rut_j.astype(np.float32),
+        "damp_j": damp_j.astype(np.float32),
+        "pave_j": (pave_j * (1.0 - w_j)).astype(np.float32),
+        "rut_base_j": rut_base_j.astype(np.float32),
+        "apron_clear": apron_clear.astype(np.float32),
+        "sd_list": sd_list,
+        "hw_list": hw_list,
+        "lat_frac_list": lat_frac_list,
+        "mid_amt_list": mid_amt_list,
+        "is_ruts_list": is_ruts_list,
+        "arm_lids": arm_lids,
+        "best_arm": best_arm,
+        "owner_mine": owner_mine,
+    }
+
+
+def bake_path(spec, seed, centre, road_graph=None):
+    """Bakes a rich, organic Shadowspore path decal:
+    - Cluster-shaded earth cushions (orphan-cleaned, world-anchored noise, zero 4x4 Bayer static)
+    - Continuous double-rut cart roads, warm footpaths, and natural spur-islands
+    - Unified multi-arm junctions (smooth corner fillets, cleared turning aprons, Bezier turning ruts, zero decal seams)
+    - Scalloped overhanging NW turf & curved SE grass blades melting seamlessly into grass.png."""
+    lid = _logical_id(spec)
+    prof = road_graph["roads_by_lid"][lid] if (road_graph and lid in road_graph["roads_by_lid"]) else _build_road_profile(spec, int(spec.get("seed", seed)))
+    width = prof["width"]
+    is_gloom = prof["is_gloom"]
+    is_ruts = prof["is_ruts"]
+    seed = prof["seed"]
+    curve, arc, total = prof["curve"], prof["arc"], prof["total"]
+    half, rut_amt, damp_amt, pave_amt = prof["half"], prof["rut_amt"], prof["damp_amt"], prof["pave_amt"]
+    island_amt, mid_amt, city, tangents = prof["island_amt"], prof["mid_amt"], prof["city"], prof["tangents"]
+    clip_lo, clip_hi = prof["clip_start"], prof["clip_end"]
+
+    piece = spec.get("arc")
+    own_lo, own_hi = 0, len(curve)
+    if piece:
+        own_lo = int(np.searchsorted(arc, float(piece[0])))
+        own_hi = len(curve) if float(piece[1]) >= total - 1.0 else int(np.searchsorted(arc, float(piece[1])))
+    pad = int((width + 40) / 1.6) if piece else 0
+    r_lo, r_hi = max(0, own_lo - pad), min(len(curve), own_hi + pad)
+    a_lo, a_hi = max(clip_lo, r_lo), min(clip_hi, r_hi)
+    span = total if not piece else float(arc[max(own_lo, own_hi - 1)] - arc[own_lo])
+
+    # Identify junctions touching this decal piece
+    piece_junctions = []
+    if road_graph:
+        for junc in road_graph["by_lid_junctions"].get(lid, []):
+            ci_j = junc["contact_idx_by_lid"].get(lid, -1)
+            if max(0, r_lo - 12) <= ci_j <= min(len(curve), r_hi + 12):
+                piece_junctions.append(junc)
+
+    margin = int(width) + 18
+    x0 = int(curve[r_lo:r_hi, 0].min()) - margin
+    y0 = int(curve[r_lo:r_hi, 1].min()) - margin
+    x1 = int(curve[r_lo:r_hi, 0].max()) + margin
+    y1 = int(curve[r_lo:r_hi, 1].max()) + margin
+    for junc in piece_junctions:
+        jpad = int(math.ceil(junc["r_blend"])) + 12
+        x0 = min(x0, int(math.floor(junc["center"][0])) - jpad)
+        y0 = min(y0, int(math.floor(junc["center"][1])) - jpad)
+        x1 = max(x1, int(math.ceil(junc["center"][0])) + jpad)
+        y1 = max(y1, int(math.ceil(junc["center"][1])) + jpad)
+    w, h = x1 - x0, y1 - y0
+
+    def own(ci):
+        if not piece:
+            return True
+        return own_lo <= ci < own_hi and arc[ci] - arc[own_lo] >= (16.0 if own_lo > 0 else -1.0) and arc[own_hi - 1] - arc[ci] >= (16.0 if own_hi < len(curve) else -1.0)
+
+    prng = random.Random(seed)
+
+    # Fast band-restricted distance & nearest-index rasterization around the active curve
     d2_map = np.full((h, w), 1e9, dtype=np.float32)
     idx_map = np.zeros((h, w), dtype=np.int32)
     cx_local = curve[:, 0] - x0
     cy_local = curve[:, 1] - y0
-    for i in range(r_lo, r_hi):
+    for i in range(a_lo, a_hi):
         hw_i = float(half[i])
         if hw_i < 0.8:
             continue
@@ -702,55 +1170,145 @@ def bake_path(spec, seed, centre):
         idx_map[ly0:ly1 + 1, lx0:lx1 + 1][better] = i
 
     near_band = d2_map < 1e8
-    ys_b, xs_b = np.nonzero(near_band)
     img = np.zeros((h, w, 4), dtype=np.uint8)
     mask = np.zeros((h, w, 4), dtype=np.uint8)
-    if len(ys_b) == 0:
+    if not np.any(near_band) and not piece_junctions:
         return img, mask, (x0, y0)
 
-    edge_wob = (vnoise_l(w, h, 8, seed + 11) - 0.5) * 0.28 + (vnoise_l(w, h, 3, seed + 12) - 0.5) * 0.10
-    cush = (vnoise_l(w, h, 9, seed + 13) - 0.5) * 1.55 + (vnoise_l(w, h, 4, seed + 14) - 0.5) * 0.55
-
-    c_idx = idx_map[ys_b, xs_b]
-    d_val = np.sqrt(d2_map[ys_b, xs_b])
-    hw_val = np.maximum(half[c_idx], 0.5)
-    vx = (xs_b + 0.5 - cx_local[c_idx]) / np.maximum(d_val, 1e-6)
-    vy = (ys_b + 0.5 - cy_local[c_idx]) / np.maximum(d_val, 1e-6)
-    nw_val = vx * (-0.7071) + vy * (-0.7071)
-    lat_val = vx * (-tangents[c_idx, 1]) + vy * tangents[c_idx, 0]
-
-    # Spur-Insel: where island_amt > 0.78, push the two tracks gently apart around a tiny meadow island
-    isl = np.clip((island_amt[c_idx] - 0.76) / 0.24, 0.0, 1.0)
-    eff_t = np.where(
-        isl > 0.0,
-        np.abs(d_val - isl * hw_val * 0.48) / (hw_val * (1.0 - 0.26 * isl)),
-        d_val / hw_val,
-    )
-    te_val = eff_t + edge_wob[ys_b, xs_b]
-
-    keep_sub = (te_val < 1.0) & (hw_val >= 1.0)
-    if is_ruts:  # the grass strip between the wheels: the meadow shows through, ragged at its edges
-        lat_frac = np.abs(lat_val * eff_t)
-        strip = 0.17 + (edge_wob[ys_b, xs_b] * 0.35)
-        keep_sub &= ~((lat_frac < strip) & (mid_amt[c_idx] > 0.35))
-    ky, kx = ys_b[keep_sub], xs_b[keep_sub]
-    k_cidx = c_idx[keep_sub]
-    k_te = te_val[keep_sub]
-    k_t = eff_t[keep_sub]
-    k_nw = nw_val[keep_sub]
-    k_lat = lat_val[keep_sub]
-    k_isl = isl[keep_sub]
+    # World-anchored noise everywhere so piece cuts & junction seams match down to every pixel
+    edge_wob = (vnoise_at(x0 + centre[0], y0 + centre[1], w, h, 8, seed + 11) - 0.5) * 0.28 + (vnoise_at(x0 + centre[0], y0 + centre[1], w, h, 3, seed + 12) - 0.5) * 0.10
+    cush = (vnoise_at(x0 + centre[0], y0 + centre[1], w, h, 9, seed + 13) - 0.5) * 1.55 + (vnoise_at(x0 + centre[0], y0 + centre[1], w, h, 4, seed + 14) - 0.5) * 0.55
+    edge_wob = edge_wob.astype(np.float32)
+    cush = cush.astype(np.float32)
 
     keep = np.zeros((h, w), dtype=bool)
-    keep[ky, kx] = True
+    te_grid = np.full((h, w), 2.0, dtype=np.float32)
+    t_grid = np.full((h, w), 2.0, dtype=np.float32)
     nw_grid = np.zeros((h, w), dtype=np.float32)
-    nw_grid[ky, kx] = k_nw
-    te_grid = np.ones((h, w), dtype=np.float32) * 2.0
-    te_grid[ky, kx] = k_te
+    rut_grid = np.zeros((h, w), dtype=np.float32)
+    cwarm_grid = np.zeros((h, w), dtype=np.float32)
+    damp_grid = np.zeros((h, w), dtype=np.float32)
+    pave_grid = np.zeros((h, w), dtype=np.float32)
+    half_grid = np.zeros((h, w), dtype=np.float32)
+    j_seed_grid = np.full((h, w), seed, dtype=np.int64)
+    no_feat_grid = np.zeros((h, w), dtype=bool)
+
+    ys_b, xs_b = np.nonzero(near_band)
+    if len(ys_b):
+        c_idx = idx_map[ys_b, xs_b]
+        d_val = np.sqrt(d2_map[ys_b, xs_b])
+        hw_val = np.maximum(half[c_idx].astype(np.float32), 0.5)
+        vx = (xs_b + 0.5 - cx_local[c_idx]) / np.maximum(d_val, 1e-6)
+        vy = (ys_b + 0.5 - cy_local[c_idx]) / np.maximum(d_val, 1e-6)
+        nw_val = vx * (-0.7071) + vy * (-0.7071)
+        lat_val = vx * (-tangents[c_idx, 1]) + vy * tangents[c_idx, 0]
+
+        isl_arr = island_amt[c_idx].copy()
+        for junc in piece_junctions:
+            dist_c = np.hypot(xs_b + x0 + 0.5 - float(junc["center"][0]), ys_b + y0 + 0.5 - float(junc["center"][1]))
+            isl_arr = np.where(dist_c < junc["r_blend"] + 24.0, -1.0, isl_arr)
+
+        isl = np.clip((isl_arr - 0.76) / 0.24, 0.0, 1.0).astype(np.float32)
+        eff_t = np.where(
+            isl > 0.0,
+            np.abs(d_val - isl * hw_val * 0.48) / (hw_val * (1.0 - 0.26 * isl)),
+            d_val / hw_val,
+        ).astype(np.float32)
+        te_val = eff_t + edge_wob[ys_b, xs_b]
+        keep_sub = (te_val < 1.0) & (hw_val >= 1.0)
+        if is_ruts:
+            lat_frac = np.abs(lat_val * eff_t)
+            m_sub = mid_amt[c_idx].astype(np.float32)
+            strip = (0.16 + 0.03 * m_sub + edge_wob[ys_b, xs_b] * 0.30) * np.clip((m_sub - 0.25) / 0.75, 0.0, 1.0)
+            keep_sub &= ~((lat_frac < strip) & (m_sub > 0.25) & (strip > 0.03))
+
+        rut_b = np.exp(-((np.abs(lat_val * eff_t) - 0.44) / 0.18) ** 2) * rut_amt[c_idx].astype(np.float32) * (1.0 - isl)
+        cwarm_b = (1.0 - rut_amt[c_idx].astype(np.float32)) * 0.75 * np.maximum(0.0, 1.0 - (eff_t / 0.62) ** 2)
+
+        te_grid[ys_b, xs_b] = te_val
+        t_grid[ys_b, xs_b] = eff_t
+        nw_grid[ys_b, xs_b] = nw_val
+        rut_grid[ys_b, xs_b] = rut_b
+        cwarm_grid[ys_b, xs_b] = cwarm_b
+        damp_grid[ys_b, xs_b] = damp_amt[c_idx].astype(np.float32)
+        pave_grid[ys_b, xs_b] = pave_amt[c_idx].astype(np.float32)
+        half_grid[ys_b, xs_b] = hw_val
+        keep[ys_b[keep_sub], xs_b[keep_sub]] = True
+
+    # Apply unified multi-arm junction geometry, corner fillets & turning ruts
+    junction_patches = []
+    for junc in piece_junctions:
+        jpad = int(math.ceil(junc["r_blend"])) + 8
+        jx0 = int(math.floor(junc["center"][0])) - jpad
+        jy0 = int(math.floor(junc["center"][1])) - jpad
+        jx1 = int(math.ceil(junc["center"][0])) + jpad
+        jy1 = int(math.ceil(junc["center"][1])) + jpad
+        bx0, by0 = jx0 - x0, jy0 - y0
+        bx1, by1 = jx1 - x0, jy1 - y0
+        jf = _eval_junction_fields(junc, jx0, jy0, bx1 - bx0, by1 - by0, centre, lid)
+
+        r_j = jf["r_j"]
+        w_j = jf["w_j"]
+        nb_sub = near_band[by0:by1, bx0:bx1]
+        in_j = r_j < (junc["r_blend"] - 2.0)
+        eff_w = np.where(nb_sub, w_j, 1.0).astype(np.float32)
+
+        wob_mix = edge_wob[by0:by1, bx0:bx1] * (1.0 - eff_w) + jf["wob_j"] * eff_w
+        cush_mix = cush[by0:by1, bx0:bx1] * (1.0 - eff_w) + jf["cush_j"] * eff_w
+        edge_wob[by0:by1, bx0:bx1][in_j] = wob_mix[in_j]
+        cush[by0:by1, bx0:bx1][in_j] = cush_mix[in_j]
+
+        eff_t_mix = np.where(nb_sub, t_grid[by0:by1, bx0:bx1] * (1.0 - w_j) + jf["eff_t_j"] * w_j, jf["eff_t_j"])
+        te_j = eff_t_mix + wob_mix
+        nw_mix = np.where(nb_sub, nw_grid[by0:by1, bx0:bx1] * (1.0 - w_j) + jf["nw_j"] * w_j, jf["nw_j"])
+        rut_mix = np.where(nb_sub, rut_grid[by0:by1, bx0:bx1] * (1.0 - w_j) + jf["rut_j"] * w_j, jf["rut_j"])
+        damp_mix = np.where(nb_sub, damp_grid[by0:by1, bx0:bx1] * (1.0 - w_j) + jf["damp_j"] * w_j, jf["damp_j"])
+        pave_mix = np.where(nb_sub, pave_grid[by0:by1, bx0:bx1] * (1.0 - w_j) + jf["pave_j"] * w_j, jf["pave_j"])
+        hw_mix = np.where(nb_sub, half_grid[by0:by1, bx0:bx1] * (1.0 - w_j) + jf["hw_eff_j"] * w_j, jf["hw_eff_j"])
+        t_clamped = np.clip(eff_t_mix, 0.0, 1.0)
+        cwarm_j = (1.0 - jf["rut_base_j"]) * 0.75 * np.maximum(0.0, 1.0 - (t_clamped / 0.62) ** 2)
+        cwarm_mix = np.where(nb_sub, cwarm_grid[by0:by1, bx0:bx1] * (1.0 - w_j) + cwarm_j * w_j, cwarm_j)
+
+        # Preserve lush green median strip on cart-road arms away from the swept turning apron,
+        # never letting one arm's median grass block a crossing road's tread.
+        best_a = jf["best_arm"]
+        in_median_j = np.zeros_like(in_j)
+        apron_c = jf["apron_clear"]
+        for ai in range(len(jf["sd_list"])):
+            if not jf["is_ruts_list"][ai]:
+                continue
+            m_ai = jf["mid_amt_list"][ai]
+            strip_ai = (0.16 + 0.03 * m_ai + wob_mix * 0.30) * np.clip((m_ai - 0.25) / 0.75, 0.0, 1.0) * (1.0 - apron_c)
+            blocked_by_other = np.zeros_like(in_j)
+            for ak in range(len(jf["sd_list"])):
+                if ak != ai:
+                    blocked_by_other |= jf["sd_list"][ak] < (-0.25 * jf["hw_list"][ak])
+            cand_m = (best_a == ai) & (jf["lat_frac_list"][ai] < strip_ai) & (m_ai > 0.25) & (strip_ai > 0.03) & (~blocked_by_other)
+            in_median_j |= cand_m
+
+        keep_j = (te_j < 1.0) & (hw_mix >= 1.0) & (~in_median_j)
+        keep[by0:by1, bx0:bx1][in_j] = keep_j[in_j]
+        te_grid[by0:by1, bx0:bx1][in_j] = te_j[in_j]
+        t_grid[by0:by1, bx0:bx1][in_j] = eff_t_mix[in_j]
+        nw_grid[by0:by1, bx0:bx1][in_j] = nw_mix[in_j]
+        rut_grid[by0:by1, bx0:bx1][in_j] = rut_mix[in_j]
+        cwarm_grid[by0:by1, bx0:bx1][in_j] = cwarm_mix[in_j]
+        damp_grid[by0:by1, bx0:bx1][in_j] = damp_mix[in_j]
+        pave_grid[by0:by1, bx0:bx1][in_j] = pave_mix[in_j]
+        half_grid[by0:by1, bx0:bx1][in_j] = hw_mix[in_j]
+
+        in_core = r_j <= (junc["r_junc"] + 16.0)
+        j_seed_grid[by0:by1, bx0:bx1][in_core] = junc["seed"]
+        no_feat_grid[by0:by1, bx0:bx1][in_core] = True
+        junction_patches.append((by0, by1, bx0, bx1, in_j, jf["owner_mine"]))
+
+    ky, kx = np.nonzero(keep)
+    if len(ky) == 0:
+        return img, mask, (x0, y0)
+    k_te = te_grid[ky, kx]
+    k_nw = nw_grid[ky, kx]
 
     # Compute cluster-shaded soil index (0..6)
-    rut_profile = np.exp(-((np.abs(k_lat * k_t) - 0.44) / 0.18) ** 2) * rut_amt[k_cidx] * (1.0 - k_isl)
-    center_warm = (1.0 - rut_amt[k_cidx]) * 0.75 * np.maximum(0.0, 1.0 - (k_t / 0.62) ** 2)
     bank_shade = np.where(
         k_te > 0.74,
         np.where(k_nw > 0.16, -0.75, np.where(k_nw < -0.16, 0.55, 0.0)),
@@ -759,8 +1317,8 @@ def bake_path(spec, seed, centre):
     raw_tone = (
         3.65
         + cush[ky, kx]
-        + center_warm
-        - 1.30 * rut_profile
+        + cwarm_grid[ky, kx]
+        - 1.30 * rut_grid[ky, kx]
         - 0.75 * np.maximum(0.0, k_te - 0.62) / 0.38
         + bank_shade
     )
@@ -782,7 +1340,7 @@ def bake_path(spec, seed, centre):
     earth_arr = np.array(PATH_RAMP, dtype=np.float32)
     damp_arr = np.array(DAMP_RAMP, dtype=np.float32)
     t_idx = tone_grid[ky, kx]
-    d_mix = damp_amt[k_cidx][:, None]
+    d_mix = damp_grid[ky, kx][:, None]
     cols = np.clip(earth_arr[t_idx] * (1.0 - d_mix) + damp_arr[t_idx] * d_mix, 0, 255).astype(np.uint8)
     cols[:, 3] = 255
     img[ky, kx] = cols
@@ -790,47 +1348,55 @@ def bake_path(spec, seed, centre):
     solid_mask = keep & (te_grid < 0.88)
     mask[solid_mask] = (PATH_CODE, 0, 0, 255)
 
-    # Subtle 2-3 px horizontal soil ripples inside wide beds
-    for _ in range(int(span * 0.45)):
-        ci = prng.randrange(own_lo, own_hi)
-        if half[ci] < 5.0:
-            continue
-        off = prng.uniform(-0.65, 0.65) * half[ci]
-        sx_i = int(cx_local[ci] - tangents[ci, 1] * off)
-        sy_i = int(cy_local[ci] + tangents[ci, 0] * off)
-        if 2 <= sx_i < w - 4 and 2 <= sy_i < h - 2 and keep[sy_i, sx_i]:
-            nt = clampi(tone_grid[sy_i, sx_i] + prng.choice((-1, 1)), 0, 6)
-            dm = float(damp_amt[ci])
-            rc = tuple(int(earth_arr[nt, ch] * (1.0 - dm) + damp_arr[nt, ch] * dm) for ch in range(3)) + (255,)
-            for dx in range(prng.randint(2, 3)):
-                if keep[sy_i, sx_i + dx]:
-                    img[sy_i, sx_i + dx] = rc
+    # World-anchored 2-3 px horizontal soil ripples inside wide beds (identical across seams)
+    wx0, wy0 = x0 + centre[0], y0 + centre[1]
+    wc_x0, wc_x1 = wx0 // 8, (wx0 + w - 1) // 8
+    wc_y0, wc_y1 = wy0 // 8, (wy0 + h - 1) // 8
+    for wcy in range(wc_y0, wc_y1 + 1):
+        ly_c = clampi(wcy * 8 + 4 - wy0, 0, h - 1)
+        for wcx in range(wc_x0, wc_x1 + 1):
+            lx_c = clampi(wcx * 8 + 4 - wx0, 0, w - 1)
+            cs = int(j_seed_grid[ly_c, lx_c])
+            if noise(wcx, wcy, cs + 201) >= 165:
+                continue
+            sx_i = wcx * 8 + (noise(wcx, wcy, cs + 203) % 8) - wx0
+            sy_i = wcy * 8 + (noise(wcx, wcy, cs + 205) % 8) - wy0
+            if 2 <= sx_i < w - 4 and 2 <= sy_i < h - 2 and keep[sy_i, sx_i] and half_grid[sy_i, sx_i] >= 5.0:
+                delta = -1 if (noise(wcx, wcy, cs + 207) & 1) else 1
+                nt = clampi(int(tone_grid[sy_i, sx_i]) + delta, 0, 6)
+                dm = float(damp_grid[sy_i, sx_i])
+                rc = tuple(int(earth_arr[nt, ch] * (1.0 - dm) + damp_arr[nt, ch] * dm) for ch in range(3)) + (255,)
+                rlen = 2 + (noise(wcx, wcy, cs + 209) & 1)
+                for dx in range(rlen):
+                    if keep[sy_i, sx_i + dx]:
+                        img[sy_i, sx_i + dx] = rc
 
     # Whole-cell Voronoi twilight-slate flagstones in weathered paved stretches (never sliced mid-stone!)
     stone_drawn = np.zeros((h, w), dtype=bool)
     pave_indices = np.nonzero(pave_amt > 0.16)[0]
-    whole_stones = bool(spec.get("old_road"))  # the old road: a stone is there or not as a whole (decided at its own centre), never cut by a box
     visited_boxes = set()
     for ci in pave_indices[::6]:
-        bx_c, by_c = (int(cx_local[ci]) // 16, int(cy_local[ci]) // 16) if not piece else (int(curve[ci, 0]) // 16, int(curve[ci, 1]) // 16)  # pieces: world boxes, so both sides of a cut lay the same stones
+        if ci < a_lo or ci >= a_hi:
+            continue
+        bx_c, by_c = int(curve[ci, 0] + centre[0]) // 16, int(curve[ci, 1] + centre[1]) // 16
         if (bx_c, by_c) in visited_boxes:
             continue
         visited_boxes.add((bx_c, by_c))
-        reach = int(half[ci]) + (14 if whole_stones else 4)
+        reach = int(half[ci]) + 14
         ya, yb = max(0, int(cy_local[ci]) - reach), min(h - 1, int(cy_local[ci]) + reach)
         xa, xb = max(0, int(cx_local[ci]) - reach), min(w - 1, int(cx_local[ci]) + reach)
-        loc_thresh = 1.0 - pave_amt[ci] * 1.15
         for py_i in range(ya, yb + 1):
             for px_i in range(xa, xb + 1):
                 if not keep[py_i, px_i] or stone_drawn[py_i, px_i]:
                     continue
-                gx, gy = px_i + x0 + seed * 5, py_i + y0 + seed * 3
+                gx, gy = px_i + wx0 + seed * 5, py_i + wy0 + seed * 3
                 cid, d1, d2, (ccx, ccy) = cell_of(gx, gy)
-                icx = clampi(int(round(ccx - seed * 5 - x0)), 0, w - 1)
-                icy = clampi(int(round(ccy - seed * 3 - y0)), 0, h - 1)
-                if te_grid[icy, icx] >= 0.72:
+                icx = clampi(int(round(ccx - seed * 5 - wx0)), 0, w - 1)
+                icy = clampi(int(round(ccy - seed * 3 - wy0)), 0, h - 1)
+                if te_grid[icy, icx] >= 0.72 or no_feat_grid[icy, icx]:
                     continue
-                if (noise(cid, 3, seed + 91) / 255.0) < ((1.0 - pave_amt[idx_map[icy, icx]] * 1.15) if whole_stones else loc_thresh):
+                pv_check = float(pave_grid[icy, icx])
+                if (noise(cid, 3, seed + 91) / 255.0) < (1.0 - pv_check * 1.15):
                     continue
                 stone_drawn[py_i, px_i] = True
                 mask[py_i, px_i] = (STONE_CODE, 0, 0, 255)
@@ -845,24 +1411,25 @@ def bake_path(spec, seed, centre):
                         c_cush = (noise(gx // 3, gy // 3, 48) / 255.0 - 0.5) * 0.65
                         img[py_i, px_i] = STONE[clampi(int(round(tone + 0.6 + lit + c_cush)), 1, 4)]
 
-    # Crooked sunken stepping slabs, mossy island boulders, occasional puddles, and bank roots
+    # Crooked sunken stepping slabs, mossy island boulders, occasional puddles, and bank roots (kept clear of junction cores)
     last_feature_a = -40.0
     for ci in range(max(12, own_lo), min(len(curve) - 12, own_hi), 8):
-        if not own(ci):
+        if ci < a_lo or ci >= a_hi or not own(ci):
+            continue
+        ix_c, iy_c = clampi(int(cx_local[ci]), 0, w - 1), clampi(int(cy_local[ci]), 0, h - 1)
+        if no_feat_grid[iy_c, ix_c]:
             continue
         a_cur = float(arc[ci])
         if a_cur - last_feature_a < 26.0 or half[ci] < 7.5:
             continue
         nx_v, ny_v = -tangents[ci, 1], tangents[ci, 0]
         ang = math.degrees(math.atan2(ny_v, nx_v)) + 90.0
-        # Mossy boulder on Spur-Insel centers!
         if island_amt[ci] > 0.88:
-            _draw_path_slab(img, mask, cx_local[ci], cy_local[ci], 5.6, 4.0, ang + prng.uniform(-15, 15), seed + ci, mossy=0.45)
+            _draw_path_slab(img, mask, cx_local[ci], cy_local[ci], 5.6, 4.0, ang + prng.uniform(-15, 15), seed + ci, mossy=0.45, at=(wx0, wy0))
             last_feature_a = a_cur + 22.0
             continue
         r_roll = prng.random()
         if damp_amt[ci] > 0.78 and half[ci] >= 11.0 and r_roll < 0.22:
-            # Small organic rainwater puddle reflecting the sky
             pcx = cx_local[ci] + nx_v * prng.uniform(-2.5, 2.5)
             pcy = cy_local[ci] + ny_v * prng.uniform(-2.5, 2.5)
             prx, pry = prng.uniform(4.2, 6.4), prng.uniform(2.6, 3.8)
@@ -882,18 +1449,22 @@ def bake_path(spec, seed, centre):
                         img[yy, xx] = PUDDLE[pt]
             last_feature_a = a_cur + 28.0
         elif r_roll < (0.28 if is_gloom else 0.18):
-            # Crooked sunken curbstone or stepping slab
             side_sgn = prng.choice((-1, 1))
-            off = side_sgn * half[ci] * (prng.uniform(0.55, 0.78) if not is_gloom else prng.uniform(0.1, 0.65))
+            off_range = (0.68, 0.86) if is_ruts else ((0.55, 0.78) if not is_gloom else (0.1, 0.65))
+            off = side_sgn * half[ci] * prng.uniform(*off_range)
+            slab_scale = 0.75 if is_ruts else 1.0
+            sx_s = cx_local[ci] + nx_v * off
+            sy_s = cy_local[ci] + ny_v * off
+            isx, isy = clampi(int(sx_s), 0, w - 1), clampi(int(sy_s), 0, h - 1)
+            if is_ruts and not keep[isy, isx]:
+                continue
             _draw_path_slab(
-                img, mask,
-                cx_local[ci] + nx_v * off, cy_local[ci] + ny_v * off,
-                prng.uniform(3.8, 5.2), prng.uniform(2.6, 3.6),
-                ang + prng.uniform(-14, 14), seed + ci * 3, mossy=0.32
+                img, mask, sx_s, sy_s,
+                prng.uniform(3.8, 5.2) * slab_scale, prng.uniform(2.6, 3.6) * slab_scale,
+                ang + prng.uniform(-14, 14), seed + ci * 3, mossy=0.32, at=(wx0, wy0)
             )
             last_feature_a = a_cur
-        elif r_roll < (0.52 if is_gloom else 0.25):
-            # Tapering gnarled root gripping from the shady bank into the sunken path bed
+        elif r_roll < (0.52 if is_gloom else 0.25) and not is_ruts:
             side_sgn = -1 if (nx_v * (-0.7) + ny_v * (-0.7)) < 0 else 1
             r_start = (cx_local[ci] + nx_v * side_sgn * half[ci] * 0.92, cy_local[ci] + ny_v * side_sgn * half[ci] * 0.92)
             r_mid = (
@@ -917,8 +1488,8 @@ def bake_path(spec, seed, centre):
                             img[yy, xx] = ROOT_BARK[clampi(int(round(1.7 + lit * 1.2)), 0, 3)]
             last_feature_a = a_cur
 
-    if spec.get("old_road"):  # kerbstones along both edges where the old road was kept up (more and more towards the city)
-        def rnd(ci, k):  # hashed, not drawn from prng: the neighbour piece lays the very same stones in its margin
+    if spec.get("old_road"):
+        def rnd(ci, k):
             return noise(ci, k, seed + 613) / 255.0
 
         for ci in range(max(4, r_lo - r_lo % 4), min(len(curve) - 4, r_hi), 4):
@@ -926,50 +1497,56 @@ def bake_path(spec, seed, centre):
                 continue
             ang = math.degrees(math.atan2(tangents[ci, 1], tangents[ci, 0]))
             for k, side in ((1, -1.0), (2, 1.0)):
-                if rnd(ci, k) < 0.16:  # a stone gone here and there
+                if rnd(ci, k) < 0.16:
                     continue
                 off = side * (half[ci] - 2.4)
                 _draw_path_slab(img, mask, cx_local[ci] - tangents[ci, 1] * off, cy_local[ci] + tangents[ci, 0] * off,
                                 3.3 + rnd(ci, k + 2), 1.8 + 0.5 * rnd(ci, k + 4), ang - 7 + 14 * rnd(ci, k + 6), seed + ci * 7 + k,
-                                mossy=0.16 + 0.32 * (1.0 - float(city[ci])), at=(x0, y0))
+                                mossy=0.16 + 0.32 * (1.0 - float(city[ci])), at=(wx0, wy0))
 
-    # Shaded 3D slate pebbles & occasional bark chips
-    for _ in range(int(span / 6.5)):
-        ci = prng.randrange(own_lo, own_hi)
-        if half[ci] < 4.0:
-            continue
-        off = prng.uniform(-0.82, 0.82) * half[ci]
-        px_f = cx_local[ci] - tangents[ci, 1] * off
-        py_f = cy_local[ci] + tangents[ci, 0] * off
-        ix, iy = int(px_f), int(py_f)
-        if 3 <= ix < w - 3 and 3 <= iy < h - 3 and keep[iy, ix] and not stone_drawn[iy, ix]:
-            if prng.random() < 0.22:
-                img[iy, ix] = WOOD_CHIP[prng.randrange(1, 4)]
-                if keep[iy, ix + 1]:
-                    img[iy, ix + 1] = WOOD_CHIP[prng.randrange(0, 3)]
-            else:
-                _draw_path_pebble(img, mask, px_f, py_f, prng.choice((1.0, 1.0, 1.5, 2.1)))
+    # World-anchored 3D slate pebbles & occasional bark chips (identical across cuts & junctions)
+    pc_x0, pc_x1 = wx0 // 10, (wx0 + w - 1) // 10
+    pc_y0, pc_y1 = wy0 // 10, (wy0 + h - 1) // 10
+    sizes = (1.0, 1.0, 1.5, 2.1)
+    for wcy in range(pc_y0, pc_y1 + 1):
+        ly_c = clampi(wcy * 10 + 5 - wy0, 0, h - 1)
+        for wcx in range(pc_x0, pc_x1 + 1):
+            lx_c = clampi(wcx * 10 + 5 - wx0, 0, w - 1)
+            cs = int(j_seed_grid[ly_c, lx_c])
+            if noise(wcx, wcy, cs + 409) >= 92:
+                continue
+            lx = wcx * 10 + (noise(wcx, wcy, cs + 411) % 10) - wx0
+            ly = wcy * 10 + (noise(wcx, wcy, cs + 413) % 10) - wy0
+            if 3 <= lx < w - 3 and 3 <= ly < h - 3 and keep[ly, lx] and not stone_drawn[ly, lx]:
+                if noise(wcx, wcy, cs + 415) < 56:
+                    img[ly, lx] = WOOD_CHIP[1 + (noise(wcx, wcy, cs + 417) % 3)]
+                    if keep[ly, lx + 1]:
+                        img[ly, lx + 1] = WOOD_CHIP[noise(wcx, wcy, cs + 419) % 3]
+                else:
+                    sz = sizes[noise(wcx, wcy, cs + 421) & 3]
+                    _draw_path_pebble(img, mask, float(lx), float(ly), sz)
 
-    # Melted turf edge: scalloped overhanging NW grass cushions + curved SE grass blades & wildflowers
+    # Melted turf edge: canonical world-(y, x)-ordered overhanging NW grass cushions + SE blades & wildflowers
     eroded = keep.copy()
     eroded[1:, :] &= keep[:-1, :]
     eroded[:-1, :] &= keep[1:, :]
     eroded[:, 1:] &= keep[:, :-1]
     eroded[:, :-1] &= keep[:, 1:]
     rim_ys, rim_xs = np.nonzero(keep & ~eroded)
-    rim_pts = list(zip(rim_xs.tolist(), rim_ys.tolist()))
-    prng.shuffle(rim_pts)
-    for bx, by in rim_pts:
-        if prng.random() > 0.62:
+    rim_pts = sorted(zip((rim_ys + wy0).tolist(), (rim_xs + wx0).tolist(), rim_xs.tolist(), rim_ys.tolist()))
+    leans = (-1, 0, 0, 1)
+    for wy, wx, bx, by in rim_pts:
+        cs = int(j_seed_grid[by, bx])
+        if noise(wx, wy, cs + 503) > 158:
             continue
-        nw = nw_grid[by, bx]
+        nw = float(nw_grid[by, bx])
         if nw > 0.05:
-            w_clump = prng.randint(2, 4)
+            w_clump = 2 + (noise(wx, wy, cs + 509) % 3)
             for dx in range(w_clump):
                 xx = bx + dx - 1
                 if not (0 <= xx < w):
                     continue
-                drop = 1 if (dx == 0 or dx == w_clump - 1) else prng.randint(1, 2)
+                drop = 1 if (dx == 0 or dx == w_clump - 1) else (1 + (noise(wx + dx, wy, cs + 511) & 1))
                 for dy in range(0, drop):
                     yy = by + dy
                     if 0 <= yy < h and keep[yy, xx]:
@@ -981,37 +1558,50 @@ def bake_path(spec, seed, centre):
                         min(255, int(img[by + drop, xx, 2] * 0.88 + 6)),
                     )
         else:
-            for k in range(prng.randint(2, 4)):
+            n_blades = 2 + (noise(wx, wy, cs + 517) % 3)
+            for k in range(n_blades):
                 xx0 = bx + k - 1
-                ln = prng.randint(2, 5)
-                lean = prng.choice((-1, 0, 0, 1))
+                ln = 2 + (noise(wx + k, wy, cs + 521) % 4)
+                lean = leans[noise(wx + k, wy, cs + 523) & 3]
                 for j in range(ln):
                     xx = xx0 + (lean if j >= ln - 1 else 0)
                     yy = by + 1 - j
                     if 0 <= xx < w and 0 <= yy < h:
                         img[yy, xx] = MEADOW_HI[clampi(2 + (j * 4) // max(ln, 1), 1, 6)]
-            if not is_gloom and prng.random() < 0.045 and 2 <= by < h - 1 and 1 <= bx < w - 1:
-                img[by - 1, bx] = prng.choice(WILDFLOWERS)
+            if not is_gloom and noise(wx, wy, cs + 529) < 12 and 2 <= by < h - 1 and 1 <= bx < w - 1:
+                img[by - 1, bx] = WILDFLOWERS[noise(wx, wy, cs + 531) % len(WILDFLOWERS)]
 
-    # Occasional grass tufts on outer shoulders and grassy median strips
-    for _ in range(int(span / 8.5)):
-        ci = prng.randrange(own_lo, own_hi)
-        if half[ci] <= 5.0:
-            continue
-        in_med = rut_amt[ci] > 0.68 and prng.random() < 0.42
-        lateral = (prng.uniform(-0.14, 0.14) if in_med else prng.choice((-1, 1)) * prng.uniform(0.62, 0.86)) * half[ci]
-        x = int(cx_local[ci] - tangents[ci, 1] * lateral)
-        y = int(cy_local[ci] + tangents[ci, 0] * lateral)
-        if 4 <= x < w - 4 and 6 <= y < h - 2 and keep[y, x] and not stone_drawn[y, x]:
-            tuft(img, x, y, prng.randrange(2, 5), prng, MEADOW_HI[:6])
-    if piece:  # keep only this piece's own stretch (the margin of the neighbours was only there so the edges match), cropped tight
-        owned = near_band & (idx_map >= own_lo) & (idx_map < own_hi)
-        img[~owned] = 0
-        mask[~owned] = 0
-        ys_o, xs_o = np.nonzero(img[..., 3] > 0)
-        if len(ys_o):
-            ya, yb, xa, xb = int(ys_o.min()), int(ys_o.max()) + 1, int(xs_o.min()), int(xs_o.max()) + 1
-            return img[ya:yb, xa:xb].copy(), mask[ya:yb, xa:xb].copy(), (x0 + xa, y0 + ya)
+    # World-anchored occasional grass tufts on outer shoulders & soft strip margins (zero overlap at seams)
+    tc_x0, tc_x1 = wx0 // 12, (wx0 + w - 1) // 12
+    tc_y0, tc_y1 = wy0 // 12, (wy0 + h - 1) // 12
+    for wcy in range(tc_y0, tc_y1 + 1):
+        ly_c = clampi(wcy * 12 + 6 - wy0, 0, h - 1)
+        for wcx in range(tc_x0, tc_x1 + 1):
+            lx_c = clampi(wcx * 12 + 6 - wx0, 0, w - 1)
+            cs = int(j_seed_grid[ly_c, lx_c])
+            if noise(wcx, wcy, cs + 701) >= 108:
+                continue
+            lx = wcx * 12 + (noise(wcx, wcy, cs + 703) % 12) - wx0
+            ly = wcy * 12 + (noise(wcx, wcy, cs + 705) % 12) - wy0
+            if 4 <= lx < w - 4 and 6 <= ly < h - 2 and keep[ly, lx] and not stone_drawn[ly, lx]:
+                if te_grid[ly, lx] >= 0.56 or rut_grid[ly, lx] < 0.25:
+                    trng = random.Random((noise(wcx, wcy, cs + 709) << 16) ^ ((wcx * 73856093) & 0xFFFF) ^ ((wcy * 19349663) & 0xFFFF))
+                    tuft(img, lx, ly, trng.randrange(2, 5), trng, MEADOW_HI[:6])
+
+    # Partition ownership cleanly: piece boundaries + exact Voronoi ownership across junctions (0 overlap, 0 gap)
+    owned = near_band.copy()
+    if piece:
+        owned &= (idx_map >= own_lo) & (idx_map < own_hi)
+    for by0, by1, bx0, bx1, in_j, owner_mine in junction_patches:
+        sub_owned = owned[by0:by1, bx0:bx1]
+        sub_owned[in_j] = owner_mine[in_j]
+
+    img[~owned] = 0
+    mask[~owned] = 0
+    ys_o, xs_o = np.nonzero(img[..., 3] > 0)
+    if len(ys_o):
+        ya, yb, xa, xb = int(ys_o.min()), int(ys_o.max()) + 1, int(xs_o.min()), int(xs_o.max()) + 1
+        return img[ya:yb, xa:xb].copy(), mask[ya:yb, xa:xb].copy(), (x0 + xa, y0 + ya)
     return img, mask, (x0, y0)
 
 
@@ -1169,9 +1759,18 @@ def bake_yard(spec, seed):
 
 # ------------------------------------------------------------------ output
 def save(path, arr):
+    import time
     from PIL import Image
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(arr).save(path)
+    img = Image.fromarray(arr)
+    for k in range(8):
+        try:
+            img.save(path)
+            return
+        except OSError:
+            if k == 7:
+                raise
+            time.sleep(0.35 + k * 0.25)
 
 
 def preview(items, path):
@@ -1330,26 +1929,36 @@ def main():
     sx, sy = world["start"]
     centre = (sx * 16 + 8, sy * 16 + 8)
     seed = int(data.get("seed", 1))
+    road_graph = build_road_graph(data, seed)
     only_path = next((a[7:] for a in sys.argv[1:] if a.startswith("--path=")), "")  # bakes just that path (e.g. hexenwald_path) and merges it into data/ground_baked.json
-    only_paths = "--paths" in sys.argv  # quick rebuild of all paths in data/ground.json (with stone_fields cut-out & gloom)
+    only_paths = "--paths" in sys.argv  # quick rebuild of all paths in data/ground.json (with stone_fields + hallgrat paving cut-out & gloom)
     if only_path or only_paths:
         baked_json = ROOT / "data" / "ground_baked.json"
         out = json.loads(baked_json.read_text(encoding="utf-8"))
         by_id = {d["id"]: d for d in out.get("decals", [])}
+        sf_ids = [sf["id"] for sf in data.get("stone_fields", [])]
         loaded_stones = []
-        for sf in data.get("stone_fields", []):
-            d_sf = by_id.get(sf["id"])
-            sf_path = ROOT / "assets" / "world" / "ground" / (sf["id"] + ".png")
+        for sf_id in sf_ids + [d["id"] for d in out.get("decals", []) if d["id"].startswith("hallgrat_")]:
+            d_sf = by_id.get(sf_id)
+            sf_path = ROOT / "assets" / "world" / "ground" / (sf_id + ".png")
             if d_sf and sf_path.exists():
                 loaded_stones.append((load_png(str(sf_path)), None, (int(d_sf["x"]) - centre[0], int(d_sf["y"]) - centre[1])))
-        targets = [(i, p) for i, p in enumerate(data["paths"]) if (not only_path or p["id"] == only_path or p["id"].startswith(only_path))]
+        if only_path:
+            matched_lids = {_logical_id(p) for p in data["paths"] if p["id"] == only_path or p["id"].startswith(only_path)}
+            partner_lids = set(matched_lids)
+            for lid in matched_lids:
+                for junc in road_graph["by_lid_junctions"].get(lid, []):
+                    partner_lids.update(junc["lids"])
+            targets = [(i, p) for i, p in enumerate(data["paths"]) if p["id"] == only_path or p["id"].startswith(only_path) or _logical_id(p) in partner_lids]
+        else:
+            targets = list(enumerate(data["paths"]))
         rebuilt = {}
         for i, spec in targets:
             glow_img = None
             if spec.get("quartz_caravan"):
                 img, mask, (ox, oy), glow_img = bake_quartz_caravan_path(spec, seed + i * 101 + 7, centre)
             else:
-                img, mask, (ox, oy) = bake_path(spec, seed + i * 101 + 7, centre)
+                img, mask, (ox, oy) = bake_path(spec, seed + i * 101 + 7, centre, road_graph=road_graph)
             if loaded_stones:
                 cut_under_stones(img, mask, (ox, oy), loaded_stones)
             if spec.get("gloom"):
@@ -1369,9 +1978,13 @@ def main():
             rebuilt[spec["id"]] = entry_d
             print("baked", spec["id"], img.shape[1], "x", img.shape[0])
         kept = []
+        hallgrat_entries = []
         seen = set()
         for d in out.get("decals", []):
             did = d["id"]
+            if did.startswith("hallgrat_"):
+                hallgrat_entries.append(d)
+                continue
             if did in rebuilt:
                 kept.append(rebuilt[did])
                 seen.add(did)
@@ -1380,6 +1993,10 @@ def main():
         for did, entry in rebuilt.items():
             if did not in seen:
                 kept.append(entry)
+        # Keep Hallgrat town paving before paths so WorldLevel (reverse order) draws paving on top of road ends
+        sf_set = set(sf_ids)
+        insert_at = max((idx + 1 for idx, d in enumerate(kept) if d["id"] in sf_set), default=0)
+        kept = kept[:insert_at] + hallgrat_entries + kept[insert_at:]
         out["decals"] = kept
         payload = json.dumps(out, separators=(",", ":"))
         tmp_json = ROOT / "data" / "ground_baked.json.tmp"
@@ -1396,8 +2013,10 @@ def main():
             glow_img = None
             if key == "paths" and spec.get("quartz_caravan"):
                 img, mask, (ox, oy), glow_img = bake_quartz_caravan_path(spec, seed + i * 101 + 7, centre)
+            elif key == "paths":
+                img, mask, (ox, oy) = bake_path(spec, seed + i * 101 + 7, centre, road_graph=road_graph)
             else:
-                img, mask, (ox, oy) = fn(spec, seed + i * 101 + (7 if key == "paths" else 0), centre)
+                img, mask, (ox, oy) = fn(spec, seed + i * 101, centre)
             if key == "stone_fields":
                 stones.append((img, mask, (ox, oy)))
             else:

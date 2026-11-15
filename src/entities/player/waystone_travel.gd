@@ -42,6 +42,14 @@ func start(player: Player, statue: WaystoneStatue) -> void:
 		map.travel_chosen.disconnect(_on_chosen)
 	if map.travel_cancelled.is_connected(_on_cancelled):
 		map.travel_cancelled.disconnect(_on_cancelled)
+	if _chosen == GoddessSystem.STARHALL_ID and is_instance_valid(player):
+		player.release_touch()
+		statue.flare(1.0)
+		var goddess: GoddessSystem = GoddessSystem.of(get_tree())
+		if goddess != null:
+			await goddess.travel_to_starhall(player, statue.id)
+		_finish(player)
+		return
 	var target: WaystoneStatue = manager.statue_node(_chosen) if manager != null else null
 	if _chosen == "" or target == null or not is_instance_valid(player):
 		_finish(player)

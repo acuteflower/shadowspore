@@ -19,6 +19,7 @@ const GLOW_BY_DAY: float = 0.3
 const BUILD: Shader = preload("res://assets/shaders/build_pixels.gdshader")
 const BUILD_GLOW: Shader = preload("res://assets/shaders/build_pixels_glow.gdshader")
 const SWAY_UNLIT: Shader = preload("res://assets/shaders/sway_unlit.gdshader")
+const BANNER_TINT: Shader = preload("res://assets/shaders/banner_tint.gdshader")
 
 var manager: TownManager
 var id: int = -1
@@ -96,7 +97,8 @@ func setup(owner_manager: TownManager, structure_id: int) -> void:
 	if bool(_spec.get("pad", false)) and ResourceLoader.exists(DIR + texture_name + "_pad.png"):
 		_pad = Sprite2D.new()
 		_pad.texture = load(DIR + texture_name + "_pad.png") as Texture2D
-		_pad.position = Vector2(0.0, -float(foot[1]) / 2.0)
+		_pad.flip_h = _flipped
+		_pad.position = Vector2(0.0, -float(foot[1]) / 2.0 + float(_spec.get("pad_offset_y", 0.0)))
 		_pad.z_index = -9
 		_pad.show_behind_parent = false
 		add_child(_pad)
@@ -249,7 +251,8 @@ func _make_part(spec: Dictionary) -> void:
 	_sprite.add_child(sprite)
 	var sway: Variant = spec.get("sway")
 	var window: Array = spec.get("window", [0.0, 1.0]) as Array
-	_parts.append({"sprite": sprite, "from": float(window[0]), "to": float(window[1]), "sway": sway})
+	var tint: bool = bool(spec.get("tint", "cloth" in String(spec.texture) or "pennant" in String(spec.texture)))
+	_parts.append({"sprite": sprite, "from": float(window[0]), "to": float(window[1]), "sway": sway, "tint": tint})
 	if spec.has("glow"):
 		var glow: Sprite2D = _make_glow(sprite, DIR + String(spec.texture) + "_glow.png", spec.glow as Dictionary)
 		if sway != null:
@@ -958,8 +961,33 @@ func _update_build(delta: float) -> void:
 		_built_look = true
 		for layer: Dictionary in _layers:
 			(layer.ghost as Sprite2D).queue_free()
-			if not bool(layer.sway):
+			var tinted: bool = false
+			for part: Dictionary in _parts:
+				if part.sprite == layer.sprite and bool(part.get("tint", false)) and part.sway != null:
+					tinted = true
+					var mat: ShaderMaterial = ShaderMaterial.new()
+					mat.shader = BANNER_TINT
+					var sw: Dictionary = part.sway as Dictionary
+					mat.set_shader_parameter("pivot_row", float(sw.get("pivot", 0.0)))
+					mat.set_shader_parameter("amount", float(sw.get("amount", 3.0)))
+					mat.set_shader_parameter("flutter", float(sw.get("flutter", 0.4)))
+					if manager != null:
+						mat.set_shader_parameter("banner_color", TownEmblems.color(manager.look_color))
+					(part.sprite as Sprite2D).material = mat
+					part["tint_mat"] = mat
+					layer["sway"] = false
+					break
+			if not tinted and not bool(layer.sway):
 				(layer.sprite as Sprite2D).material = null
+
+
+func refresh_look() -> void:
+	if manager == null:
+		return
+	var col: Color = TownEmblems.color(manager.look_color)
+	for part: Dictionary in _parts:
+		if part.has("tint_mat"):
+			(part.tint_mat as ShaderMaterial).set_shader_parameter("banner_color", col)
 
 
 func _sway_parts() -> void:
@@ -975,6 +1003,10 @@ func _sway_parts() -> void:
 			var swing: ShaderMaterial = part.glow_mat as ShaderMaterial
 			swing.set_shader_parameter("wind", wind)
 			swing.set_shader_parameter("time", _time)
+		if part.has("tint_mat"):
+			var tint_mat: ShaderMaterial = part.tint_mat as ShaderMaterial
+			tint_mat.set_shader_parameter("wind", wind)
+			tint_mat.set_shader_parameter("time", _time)
 
 
 func _hammer() -> void:

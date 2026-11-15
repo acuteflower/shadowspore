@@ -177,7 +177,7 @@ func _populate(cell: Vector2i) -> void:
 		if kind == "otter":
 			group = 2 if otter_pair else 1
 		for member: int in group:
-			if count(kind) >= int(spec["cap"]) or animals.get_child_count() >= int(settings["max_total"]): break
+			if count(kind) >= int(spec["cap"]) or animals.get_child_count() >= Quality.scaled(int(settings["max_total"]), "wildlife", 1): break
 			var point: Vector2 = at + Vector2(member * 3.0, member * 2.0)
 			if kind in ["shoal", "strider"] and rivers.field_at(point).x > -2.0: continue
 			var animal: RiverAnimal = load("res://src/water/river_animal.tscn").instantiate() as RiverAnimal

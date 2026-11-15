@@ -39,6 +39,14 @@
 		"clear_sight": {
 			"name": "KLARSICHT",
 			"text": "Der Nebel des Hexenwalds weicht vor dir zurück. Du halluzinierst nicht, und die Karte zeigt wieder, wo du gehst."
+		},
+		"prism_break": {
+			"name": "PRISMENBRUCH",
+			"text": "Nach einem Schattenschritt wächst am Ausgangspunkt eine geladene Sonnenquarz-Spitze, die nach {delay} s in Kristallsplittern detoniert ({damage} Schaden). Treibsand und Wüstenhitze bremsen dich nicht mehr.",
+			"delay": 0.6,
+			"damage": 28,
+			"radius": 56,
+			"knockback": 150
 		}
 	}
 }

@@ -215,7 +215,8 @@ func _can_open() -> bool:
 	var hud: CanvasLayer = get_parent() as CanvasLayer
 	if hud == null or not hud.visible or _story_busy():
 		return false
-	return not get_tree().get_first_node_in_group("world") is WorldLevel or (_tracked.quests != null and _tracked.quests.has_flag("hud_unlocked"))
+	var w_node: Node = get_tree().get_first_node_in_group("world")
+	return (w_node == null or not w_node.is_in_group("story_world")) or (_tracked.quests != null and _tracked.quests.has_flag("hud_unlocked"))
 
 
 func _story_busy() -> bool:

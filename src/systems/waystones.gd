@@ -42,6 +42,10 @@ func specs() -> Dictionary:
 	return _specs
 
 
+func register_spec(id: String, spec: Dictionary) -> void:
+	_specs[id] = spec
+
+
 func is_awake(id: String) -> bool:
 	return _awake.has(id)
 

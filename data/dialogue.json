@@ -2144,5 +2144,98 @@
     "text": "Komm wieder, wenn du drei gleiche hast. Dann schleife ich dir einen größeren. Und bring Seeglimmer mit, nachts liegt er im Flachwasser."
    }
   ]
+ },
+ "goddess_rescue_wake": {
+  "lines": [
+   {
+    "speaker": "ELLIE",
+    "mood": "reflective_hurt",
+    "title": "",
+    "text": "Das Licht... es hat mich aus der Finsternis gerissen. Wo bin ich?"
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Sterne... überall unter mir. Und dort oben auf dem Thron... sie sieht aus wie die Statuen."
+   }
+  ]
+ },
+ "goddess_intro": {
+  "flag": "knows_goddess",
+  "lines": [
+   {
+    "speaker": "DIE WÄCHTERIN",
+    "known_flag": "knows_goddess",
+    "known_name": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Tritt näher, kleines Fünkchen. Noch wollte die Leere deinen Namen verschlingen — doch mein Blick ruht wieder auf jener Welt."
+   },
+   {
+    "speaker": "ELLIE",
+    "mood": "",
+    "title": "",
+    "text": "Du... du bist es. Die Göttin auf den Wegsteinen. Hast du mich gerettet?"
+   },
+   {
+    "speaker": "DIE WÄCHTERIN",
+    "known_flag": "knows_goddess",
+    "known_name": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Nennt mich Caelia. Einst hielt mein Sternenlicht die Leere jenseits des Schleiers. Als meine Säulen zerbrachen, fiel mein Hallenraum in Schlaf."
+   },
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Doch du hast meinen Stein berührt und mich gerufen. Einmal konnte ich meine Hand durch das Dunkel strecken und dich hierher tragen."
+   },
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Ich spüre den Riss der Leere in deinem Schritt. Du reißt dich selbst durch Schatten, und sie zehren an dir."
+   },
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Lass mich ihn läutern. Empfange meinen Lichtschritt — schneller, heller, und ein Brandmal für jedes Wesen der Finsternis."
+   },
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Wann immer du an einem meiner erwachten Wegsteine stehst, kannst du über das Siegel zu diesem Thronsaal reisen."
+   }
+  ]
+ },
+ "goddess_return": {
+  "lines": [
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Der Sternensaal erinnert sich an jeden deiner Schritte, Ellie. Mit jeder erwachten Säule kehrt mehr meiner alten Wärme zurück."
+   },
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Bald werde ich dir hier weitere Gaben der Sterne anvertrauen können. Halte das Licht unten am Leben."
+   }
+  ]
+ },
+ "goddess_gifts_placeholder": {
+  "lines": [
+   {
+    "speaker": "CAELIA",
+    "mood": "",
+    "title": "HÜTERIN DES ERSTEN LICHTS",
+    "text": "Die Sternengaben sind noch im Entstehen. Trage zuerst mein Licht durch den Lichtschritt hinaus in die Nacht."
+   }
+  ]
  }
 }

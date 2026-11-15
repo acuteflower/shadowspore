@@ -168,7 +168,67 @@ def mora_shard():
     return px
 
 
-ICONS = {"silver_chain": silver_chain, "wuchtreif": wuchtreif, "schweigtropfen": schweigtropfen, "rissfeder": rissfeder, "clarity_earrings": clarity_earrings, "mora_shard": mora_shard}
+def fessel_des_schmelzers():
+    """Fessel des Ersten Schmelzers (Aurelith's legendary bracelet relic, docs/enemies/boss_aurelith.md):
+    a heavy pharaonic sun-bronze cuff seen at 3/4 with twin faceted sun-quartz fangs and a glowing turquoise-gold core."""
+    px = canvas()
+    sunbronze = [hexc(c) for c in ("5e3d1e", "a87432", "e8b858", "fff0b0")]
+    quartz = [hexc(c) for c in ("4e5d82", "8191b6", "d6e2f5", "ffffff")]
+    turq = [hexc(c) for c in ("2a8c94", "3cc0c6", "78f4e6", "d0fff8")]
+    cx, cy = 7.5, 9.4
+    for y in range(16):
+        for x in range(16):
+            dx, dy = (x - cx) / 5.8, (y - cy) / 3.9
+            outer = dx * dx + dy * dy
+            inner = ((x - cx) / 3.4) ** 2 + ((y - cy) / 1.7) ** 2
+            if outer <= 1.0 and inner >= 1.0 and not (y >= 12 and 6 <= x <= 9):  # open cuff clasp at bottom front
+                light = -(dx * 0.7 + dy * 0.7)
+                put(px, x, y, sunbronze[min(3, max(0, int((light + 1.0) * 2.0)))])
+    # Central rose-cut turquoise-gold sun-prism + flanking white quartz fangs on crown of cuff
+    for (x, y, c) in [(7, 2, 3), (7, 3, 3), (8, 3, 2), (6, 4, 2), (9, 4, 1), (5, 3, 3), (5, 4, 2), (10, 3, 2), (10, 4, 1)]:
+        put(px, x, y, quartz[c])
+    for (x, y, c) in [(7, 4, 3), (8, 4, 2), (7, 5, 2), (8, 5, 1), (6, 5, 1), (9, 5, 0)]:
+        put(px, x, y, turq[c])
+    for x in (5, 10):
+        put(px, x, 5, sunbronze[3])
+    return px
+
+
+def ur_prisma():
+    """Ur-Prisma der Schmelze (Aurelith's heart-prism crafting material):
+    an 8-faceted rose-cut sun-quartz crystal framed by ancient golden astrolabe prongs, burning turquoise-gold inside."""
+    px = canvas()
+    quartz = [hexc(c) for c in ("364262", "6e7fa6", "bdd0eb", "ffffff")]
+    core = [hexc(c) for c in ("2a8c94", "78f4e6", "ffe488", "fff8d8")]
+    rows = [
+        (2, 7, 8), (3, 6, 9), (4, 5, 10), (5, 4, 11), (6, 3, 12),
+        (7, 3, 12), (8, 3, 12), (9, 4, 11), (10, 5, 10), (11, 6, 9), (12, 7, 8),
+    ]
+    for y, x0, x1 in rows:
+        for x in range(x0, x1 + 1):
+            dist_c = math.hypot(x - 7.5, y - 7.0)
+            if dist_c <= 2.3:
+                put(px, x, y, core[3 if dist_c < 1.1 else (2 if x <= 7 else 1)])
+            else:
+                nw = (x - 7.5) + (y - 7.0)
+                tone = 3 if nw < -2.2 else (2 if nw < 0.2 else (1 if nw < 2.4 else 0))
+                put(px, x, y, quartz[tone])
+    # Golden astrolabe corner clasps (touching the crystal so it stays 1 connected piece)
+    for (x, y, c) in [(4, 4, 3), (11, 4, 2), (4, 10, 2), (11, 10, 0), (7, 13, 1), (8, 13, 0)]:
+        put(px, x, y, GOLD[c])
+    return px
+
+
+ICONS = {
+    "silver_chain": silver_chain,
+    "wuchtreif": wuchtreif,
+    "schweigtropfen": schweigtropfen,
+    "rissfeder": rissfeder,
+    "clarity_earrings": clarity_earrings,
+    "mora_shard": mora_shard,
+    "fessel_des_schmelzers": fessel_des_schmelzers,
+    "ur_prisma": ur_prisma,
+}
 
 
 def main():

@@ -18,6 +18,9 @@ const OVERFLOW_MAX_ALPHA: float = 0.48
 const OVERFLOW_Z: int = -2 ## above ground/water/bridges, beneath standing entities (y-sorted at 0)
 
 static var _overflow_material: CanvasItemMaterial
+static var limit: int = 16 ## hardware PointLight2Ds at once (Quality; at most the renderer's LIGHT_LIMIT)
+static var small_min: int = 4 ## small lights that always shine (Quality)
+static var breath_step: float = 1.0 / 30.0 ## s between energy updates of a breathing light (Quality)
 
 var _night: float = 0.0
 var budgeted: bool = true: ## false: outside the 16 nearest PointLight2Ds; falls back to an unlit additive glow pool
@@ -29,6 +32,7 @@ var _notifier: VisibleOnScreenNotifier2D
 var _on_screen: bool = true
 var _overflow: Sprite2D
 var _overflow_alpha: float = -1.0
+var _breath_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -114,7 +118,11 @@ func set_night(amount: float) -> void:
 	_update_active()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_breath_wait -= delta
+	if _breath_wait > 0.0:
+		return
+	_breath_wait = breath_step
 	var new_energy: float = _breath_energy()
 	if budgeted:
 		if absf(energy - new_energy) > 0.02:
@@ -158,7 +166,8 @@ static func budget(tree: SceneTree, center: Vector2) -> void:
 			big.append(light)
 
 	big.sort_custom(func(a: NightLight, b: NightLight) -> bool: return a.global_position.distance_squared_to(center) < b.global_position.distance_squared_to(center))
-	var max_big: int = LIGHT_LIMIT - SMALL_MIN
+	var cap: int = mini(limit, LIGHT_LIMIT)
+	var max_big: int = cap - mini(small_min, cap)
 	var allowed_big: int = 0
 	for i: int in big.size():
 		var allow: bool = i < max_big
@@ -168,7 +177,7 @@ static func budget(tree: SceneTree, center: Vector2) -> void:
 			allowed_big += 1
 
 	small.sort_custom(func(a: NightLight, b: NightLight) -> bool: return a.global_position.distance_squared_to(center) < b.global_position.distance_squared_to(center))
-	var room: int = maxi(SMALL_MIN, LIGHT_LIMIT - allowed_big)
+	var room: int = maxi(mini(small_min, cap), cap - allowed_big)
 	for i: int in small.size():
 		var allowed: bool = i < room
 		if small[i].budgeted != allowed:

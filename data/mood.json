@@ -13,6 +13,7 @@
 		{"t": 0.8333, "name": "night", "shadow": [0.72, 0.80, 1.38], "light": [0.90, 1.12, 1.20], "split": 0.84, "vibrance": 0.46, "contrast": 0.13, "bloom": 1.08, "threshold": 0.25, "vignette": 0.62}
 	],
 	"indoors": {"shadow": [0.94, 0.84, 1.18], "light": [1.16, 1.04, 0.88], "split": 0.56, "vibrance": 0.28, "contrast": 0.06, "bloom": 0.76, "threshold": 0.48, "vignette": 0.30},
+	"starhall": {"shadow": [0.76, 0.72, 1.34], "light": [1.06, 1.06, 1.18], "split": 0.80, "vibrance": 0.42, "contrast": 0.14, "bloom": 1.16, "threshold": 0.28, "vignette": 0.50},
 	"hex": {"shadow": [0.80, 0.74, 1.34], "light": [0.90, 1.22, 0.92], "split": 0.92, "vibrance": 0.42, "contrast": 0.12, "bloom": 1.08, "threshold": 0.24, "vignette": 0.54},
 	"desert": {"shadow": [0.90, 0.84, 1.20], "light": [1.14, 1.06, 0.88], "split": 0.62, "vibrance": 0.46, "contrast": 0.11, "bloom": 0.42, "threshold": 0.72, "vignette": 0.14},
 	"desert_storm": {"shadow": [0.92, 0.72, 1.34], "light": [1.22, 0.98, 1.12], "split": 0.86, "vibrance": 0.50, "contrast": 0.13, "bloom": 0.88, "threshold": 0.42, "vignette": 0.36}

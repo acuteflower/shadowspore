@@ -42,7 +42,19 @@
  },
  "hints": {
   "moonbell": {"name": "NEBELWALD", "area": [699, 655, 95]},
-  "mist_lily": {"name": "NEBELWALD", "area": [699, 655, 95]}
+  "mist_lily": {"name": "NEBELWALD", "area": [699, 655, 95]},
+  "glow_cap": {"name": "NEBELWALD", "area": [699, 655, 95]},
+  "dusk_berry": {"name": "LICHTUNG", "area": [781, 665, 110]},
+  "ember_berry": {"name": "SÜDLICHTUNG", "area": [765, 725, 105]},
+  "dusk_blossom": {"name": "WINDWIESE", "area": [825, 620, 115]},
+  "ember_carrot": {"name": "FELDRAIN", "area": [790, 695, 100]},
+  "night_beet": {"name": "NEBELSAUM", "area": [720, 680, 105]},
+  "fish_silverling": {"name": "WASSERLAUF", "area": [745, 760, 130]},
+  "fish_trout": {"name": "FLUSSLAUF", "area": [745, 785, 140]},
+  "fish_eel": {"name": "WESTSEE", "area": [734, 908, 45]},
+  "iron_ore": {"name": "STEINBRUCH", "area": [754, 700, 65]},
+  "shadow_spider": {"name": "WALDRAND", "area": [760, 675, 130]},
+  "void_listener": {"name": "DÄMMERRAND", "area": [730, 695, 140]}
  },
  "post": {"chance": 0.8},
  "lifetime": [3, 5],
@@ -67,7 +79,10 @@
   {"id": "torben_spider", "kind": "kill", "givers": ["torben"], "species": "shadow_spider", "count": [2, 4], "copper_each": [7, 11], "xp_each": 3, "trust": 4, "text": "{count}X {species}. NERVEN."},
   {"id": "jorun_rope", "kind": "fetch", "givers": ["jorun"], "item": "rope", "count": [2, 4], "copper_each": [8, 12], "xp_each": 2, "trust": 4, "min_day": 4, "text": "NÄCHSTE FAHRT BRAUCHT FRISCHE LEINEN: {count} {item} FÜR DEN WAGEN."},
   {"id": "jorun_plank", "kind": "fetch", "givers": ["jorun"], "item": "plank", "count": [4, 8], "copper_each": [10, 14], "xp_each": 2, "trust": 4, "min_day": 4, "text": "DIE LADEBORDWAND KNARRT. BRING MIR BEIM HALT {count} {item}."},
-  {"id": "jorun_glow", "kind": "fetch", "givers": ["jorun"], "item": "glow_cap", "count": [4, 7], "copper_each": [6, 9], "xp_each": 2, "trust": 3, "min_day": 4, "text": "FÜR DIE WEGELATERNEN AUF DEM RÜCKWEG: {count} {item}."}
+  {"id": "jorun_glow", "kind": "fetch", "givers": ["jorun"], "item": "glow_cap", "count": [4, 7], "copper_each": [6, 9], "xp_each": 2, "trust": 3, "min_day": 4, "text": "FÜR DIE WEGLATERNEN AUF DEM RÜCKWEG: {count} {item}."},
+  {"id": "bauwunsch_bretter", "kind": "fetch", "givers": ["gustav"], "item": "reed", "count": [6, 10], "copper_each": [4, 6], "xp_each": 3, "trust": 5, "min_day": 3, "min_trust": 10, "why": "BAUWUNSCH", "unlocks": "recipe_plank_bulk", "unlock_label": "REZEPT: BRETTERBÜNDEL", "text": "FÜR NEUE SCHALUNG BRAUCHE ICH {count} {item} — DANN ZEIGE ICH DIR MEINEN BRETTERSCHNITT."},
+  {"id": "bauwunsch_glut", "kind": "fetch", "givers": ["torben"], "item": "resin", "count": [4, 7], "copper_each": [5, 8], "xp_each": 3, "trust": 5, "min_day": 4, "min_trust": 20, "why": "BAUWUNSCH", "unlocks": "recipe_glutschmelze", "unlock_label": "REZEPT: GLUTSCHMELZE", "text": "{count} {item} FÜR DIE ESSE. HÄLT DIE GLUT HEISS — ICH ZEIGE DIR EINE BESSERE SCHMELZE."},
+  {"id": "bauwunsch_saat", "kind": "fetch", "givers": ["gustav"], "item": "glow_cap", "count": [5, 8], "copper_each": [5, 7], "xp_each": 3, "trust": 5, "min_day": 4, "min_trust": 20, "why": "BAUWUNSCH", "unlocks": "recipe_amber_seeds", "unlock_label": "REZEPT: BERNSTEINKORN-SAAT", "text": "{count} {item} FÜR SAATBEIZE — DANN KÖNNEN WIR BERNSTEINKORN-SAAT SELBST PRESSEN."}
  ],
  "story": [
   {"id": "torben_notice", "quest": "torben_smithy", "giver": "valdric", "icon": "res://assets/ui/board/story_torben.png", "title": "HAMMERSCHLÄGE IM NORDEN", "text": "NÖRDLICH DER LICHTUNG KLINGT EISEN AUF STEIN. JEMAND SCHLÄGT DORT ALLEIN ERZ. SIEH NACH, BEVOR DIE NACHT IHN FINDET.", "after": "town_board", "flag": ""},

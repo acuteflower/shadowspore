@@ -62,6 +62,10 @@ func setup(interior_id: String, data: Dictionary) -> void:
 	y_sort_enabled = true
 	_dir = String(data.dir)
 	size = _vec(data.size)
+	if bool(data.get("custom_starhall", false)):
+		var hall: StarHallRoom = StarHallRoom.new()
+		add_child(hall)
+		return
 	_backdrop()
 	for item: Dictionary in data.shell as Array:
 		var sprite: Sprite2D = _sprite_sorted(String(item.tex), _vec(item.pos)) if bool(item.get("sorted", false)) else _sprite(String(item.tex), _vec(item.pos), int(item.get("z", 0)))
@@ -397,6 +401,9 @@ func set_renewed(on: bool) -> void:
 	_drips.clear()
 	if tree != null:
 		tree.call("clear_stump")
+	for node: Interactable in pickups:
+		if node is InteriorPickup and (node as InteriorPickup).prop_id.begins_with("mushrooms"):
+			(node as InteriorPickup).apply_gone()
 
 
 func _reskin(node: Node) -> void:

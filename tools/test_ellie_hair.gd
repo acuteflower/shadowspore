@@ -26,29 +26,44 @@ func _run() -> void:
 	var sheet: Image = player._sprite.texture.get_image()
 	check(sheet.get_size() == Vector2i(1056, 896), "main sheet keeps its expected frame layout")
 	check(player._rig_hand.size() == 352 and player._rig_shoulder.size() == 352, "all main-sheet hand and shoulder points load")
-	for sector: int in 8:
-		var direction: Vector2 = Vector2.RIGHT.rotated(float(sector) * PI / 4.0)
-		player.facing = direction
-		player.velocity = direction * player.sprint_speed
-		player.sprinting = true
-		player._gait = 2
-		player._sector = sector
-		var masks: Array[PackedByteArray] = []
-		for phase: int in 6:
-			player._walk_time = float(phase)
-			player._last_step = phase
-			player._animate(0.0)
-			check(player._sprite.frame == sector * Player.SHEET_COLS + 6 + phase, "sector %d jog phase %d selects the correct sprite" % [sector, phase])
-			var mask: PackedByteArray = PackedByteArray()
-			for y: int in range(5, 43):
-				for x: int in 48:
-					mask.append(1 if is_hair(sheet.get_pixel((6 + phase) * 48 + x, sector * 56 + y)) else 0)
-			masks.append(mask)
-		var changed: int = 0
-		for i: int in masks[0].size():
-			if masks[0][i] != masks[3][i]:
-				changed += 1
-		check(changed >= 5, "sector %d hair changes visibly between opposite foot contacts (%d pixels)" % [sector, changed])
+	var all_styles: Array[String] = ["default", "blade_bob", "storm_tail", "moon_knot", "dusk_braids", "night_bun"]
+	for style_id: String in all_styles:
+		var hf_tex: Texture2D = load("res://assets/characters/hair/%s/player.png" % style_id) as Texture2D
+		var hb_tex: Texture2D = load("res://assets/characters/hair/%s/player_back.png" % style_id) as Texture2D
+		check(hf_tex != null and hb_tex != null, "%s main hair front/back sheets load" % style_id)
+		if hf_tex == null or hb_tex == null:
+			continue
+		var hf_img: Image = hf_tex.get_image()
+		var hb_img: Image = hb_tex.get_image()
+		for sector: int in 8:
+			var direction: Vector2 = Vector2.RIGHT.rotated(float(sector) * PI / 4.0)
+			player.facing = direction
+			player.velocity = direction * player.sprint_speed
+			player.sprinting = true
+			player._gait = 2
+			player._sector = sector
+			var masks: Array[PackedByteArray] = []
+			for phase: int in 6:
+				player._walk_time = float(phase)
+				player._last_step = phase
+				player._animate(0.0)
+				if style_id == "default":
+					check(player._sprite.frame == sector * Player.SHEET_COLS + 6 + phase, "sector %d jog phase %d selects the correct sprite" % [sector, phase])
+				var mask: PackedByteArray = PackedByteArray()
+				for y: int in range(3, 46):
+					for x: int in 48:
+						var px_f: Color = hf_img.get_pixel((6 + phase) * 48 + x, sector * 56 + y)
+						var px_b: Color = hb_img.get_pixel((6 + phase) * 48 + x, sector * 56 + y)
+						mask.append(1 if (px_f.a > 0.1 or px_b.a > 0.1) else 0)
+				masks.append(mask)
+			var max_diff: int = 0
+			for p_other: int in range(1, 6):
+				var diff: int = 0
+				for i: int in masks[0].size():
+					if masks[0][i] != masks[p_other][i]:
+						diff += 1
+				max_diff = maxi(max_diff, diff)
+			check(max_diff >= 5, "%s sector %d hair animates dynamically across sprint stride (%d pixels)" % [style_id, sector, max_diff])
 	player.facing = Vector2.RIGHT
 	player.velocity = Vector2.RIGHT * player.sprint_speed
 	player._sector = 0

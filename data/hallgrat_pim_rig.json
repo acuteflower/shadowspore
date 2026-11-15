@@ -1,0 +1,50 @@
+{
+  "frame": [
+    76,
+    96
+  ],
+  "feet": [
+    38,
+    80
+  ],
+  "frames": 38,
+  "rows": 8,
+  "height": 49,
+  "clips": {
+    "idle": {
+      "start": 0,
+      "count": 4,
+      "fps": 3
+    },
+    "walk": {
+      "start": 4,
+      "count": 6,
+      "fps": 8
+    },
+    "talk": {
+      "start": 10,
+      "count": 4,
+      "fps": 5
+    },
+    "wave": {
+      "start": 14,
+      "count": 6,
+      "fps": 7
+    },
+    "polish": {
+      "start": 20,
+      "count": 6,
+      "fps": 6
+    },
+    "light": {
+      "start": 26,
+      "count": 6,
+      "fps": 5
+    },
+    "run": {
+      "start": 32,
+      "count": 6,
+      "fps": 12
+    }
+  }
+}

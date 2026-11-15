@@ -269,7 +269,7 @@ func _populate(cell: Vector2i) -> void:
 		var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
 		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 		rng.seed = hash(Vector3i(cell.x, cell.y, _seed + hash(species)))
-		if _residents.get_child_count() >= int(spec["max_loaded"]) or _count(species) >= int(spec["max_species_loaded"]) or rng.randf() > float(spec["chunk_chance"]):
+		if _residents.get_child_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _count(species) >= int(spec["max_species_loaded"]) or rng.randf() > float(spec["chunk_chance"]):
 			continue
 		var center: Vector2 = Vector2.ZERO
 		var score: float = -INF
@@ -286,7 +286,7 @@ func _populate(cell: Vector2i) -> void:
 		var count: int = rng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
 		var spawned: int = 0
 		for i: int in count:
-			if _residents.get_child_count() >= int(spec["max_loaded"]) or _count(species) >= int(spec["max_species_loaded"]):
+			if _residents.get_child_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _count(species) >= int(spec["max_species_loaded"]):
 				break
 			var spacing: Vector2 = Vector2(16.0 * i, 10.0 * i) if species in ["jerboa", "agama", "fennec"] else (Vector2(19.0 * i, 12.0 * i) if species in ["boar", "squirrel", "hex_toad"] else Vector2(25.0 * i, 15.0 * i))
 			var point: Vector2 = center + spacing
@@ -324,7 +324,7 @@ func _populate(cell: Vector2i) -> void:
 ## A visitor of the town (TownCritters): one animal of `species` at `point` that goes to `to` and sniffs towards `look`. Null when the caps or the ground forbid it.
 func spawn_visitor(species: String, point: Vector2, to: Vector2, look: Vector2) -> WoodlandMammal:
 	var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
-	if _count(species) >= int(spec["max_species_loaded"]) or _residents.get_child_count() >= int(spec["max_loaded"]) or not _spawn_safe(point, species):
+	if _count(species) >= int(spec["max_species_loaded"]) or _residents.get_child_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or not _spawn_safe(point, species):
 		return null
 	var animal: WoodlandMammal = (load(String(spec["scene"])) as PackedScene).instantiate() as WoodlandMammal
 	_serial += 1

@@ -92,11 +92,53 @@ func _run() -> void:
 					swimmer._swim_water._process(0.05)
 			camera.position = at + Vector2(0, -12)
 			camera.zoom = Vector2(4.0, 4.0)
+	# --mirror (with --lake=K): Ellie stands on the lake's north shore, looking at her mirror image (docs/wasserspiegelung.md).
+	if OS.get_cmdline_user_args().has("--mirror"):
+		var shore: Vector2 = at
+		while world._rivers.field_at(shore).x <= 0.0 and shore.y > at.y - 2000.0:
+			shore.y -= 4.0
+		shore.y -= 3.0
+		var mirror_player: Player = load("res://src/entities/player/player.tscn").instantiate() as Player
+		mirror_player.name = "2"
+		mirror_player.position = shore
+		world.get_node("Players").add_child(mirror_player)
+		mirror_player.set_physics_process(false)
+		(mirror_player.get_node("Camera2D") as Camera2D).enabled = false
+		mirror_player.facing = Vector2.DOWN
+		for i: int in 12:
+			mirror_player._animate(0.05)
+		camera.position = shore + Vector2(0, 18)
+		camera.zoom = Vector2(2.4, 2.4)
 	TimeManager.unlock()
 	TimeManager.time_of_day = 0.0 if OS.get_cmdline_user_args().has("--night") else 0.55
+	# --time=T (0..1), --day=N (moon phase = N mod 8, 4 full), --sky (with --lake=K: the lake's deep water where the moon's reflection lies), --zoom=Z
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--time="): TimeManager.time_of_day = float(arg.trim_prefix("--time="))
+		if arg.begins_with("--day="): TimeManager.day = int(arg.trim_prefix("--day="))
+		if arg.begins_with("--zoom="): camera.zoom = Vector2.ONE * float(arg.trim_prefix("--zoom="))
+	if OS.get_cmdline_user_args().has("--sky"):
+		var run: float = clampf(fposmod(TimeManager.time_of_day - 0.78, 1.0) / 0.462, 0.0, 1.0)
+		var view: Vector2 = Vector2(640, 360) / camera.zoom
+		var moon_at: Vector2 = view * Vector2(lerpf(0.86, 0.14, run), 0.34 - 0.16 * sin(PI * run))
+		for arg: String in OS.get_cmdline_user_args():
+			if arg.begins_with("--lake="):
+				var lakes: Array = DataRegistry.table("lakes_baked")["lakes"]
+				var deep: Array = (lakes[int(arg.trim_prefix("--lake=")) % lakes.size()] as Dictionary)["deep"]
+				camera.position = Vector2(float(deep[0]), float(deep[1])) - moon_at + view * 0.5 + Vector2(0, -20)
+		var view_cell: Vector2i = Vector2i((camera.position / 512.0).floor())
+		for dy: int in range(-1, 2):
+			for dx: int in range(-1, 2):
+				if not world._chunks.has(view_cell + Vector2i(dx, dy)): world._load_chunk(view_cell + Vector2i(dx, dy))
 	for i: int in 8: await get_tree().process_frame
+	for arg: String in OS.get_cmdline_user_args(): ## --weather=ID holds a weather state (clear, rain, storm ...)
+		if arg.begins_with("--weather=") and WeatherManager.current != null:
+			WeatherManager.current.force(arg.trim_prefix("--weather="))
+			for i: int in 150: await get_tree().process_frame
+	if OS.get_cmdline_user_args().has("--mirror"):
+		for i: int in 8: await get_tree().process_frame ## the mirror chooses what to show a few times a second
 	if not capture.is_empty():
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png(capture)
 		print("World river capture: ", at)
+		if WaterReflections.current != null: print("mirror: ", WaterReflections.current.drawn_items, " copies, ", WaterReflections.current.cost_usec, " usec")
 		get_tree().quit()

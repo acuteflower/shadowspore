@@ -20,6 +20,7 @@ var _god_mode: Button
 var _infinite_stamina: Button
 var _level_up: Button
 var _map_unlock: Button
+var _goddess_unlock: Button
 var _section: Section = Section.ITEMS
 var _weather_ids: Array[String] = [""]
 @onready var _list: VBoxContainer = %ItemList
@@ -47,6 +48,7 @@ func bind(player: Node) -> void:
 	_level_up = _add_cheat("+1 Level", _raise_level)
 	_level_up.tooltip_text = "Stufenbelohnungen holst du im Fortschrittsmenü (P) ab."
 	_map_unlock = _add_cheat("Ganze Karte aufdecken", _toggle_map)
+	_goddess_unlock = _add_cheat("Wächterin über Statuen freischalten", _unlock_goddess)
 	_add_cheat("Stufenbelohnungen öffnen", _open_level_rewards)
 	_setup_world()
 
@@ -219,6 +221,11 @@ func _refresh_cheats() -> void:
 	_map_unlock.disabled = fog == null
 	_map_unlock.text = "Kartennebel wiederherstellen" if fog != null and fog.is_reveal_all() else "Ganze Karte aufdecken"
 	_map_unlock.tooltip_text = "In dieser Welt gibt es keine Weltkarte." if fog == null else ""
+	var goddess: GoddessSystem = GoddessSystem.of(get_tree())
+	var introduced: bool = goddess != null and goddess.is_introduced_player(_player)
+	_goddess_unlock.disabled = goddess == null or introduced
+	_goddess_unlock.text = "Wächterin über Statuen · Freigeschaltet" if introduced else "Wächterin über Statuen freischalten"
+	_goddess_unlock.tooltip_text = "In dieser Welt gibt es keine Wächterin." if goddess == null else ""
 
 
 func _toggle_god_mode() -> void:
@@ -271,6 +278,17 @@ func _toggle_map() -> void:
 	else:
 		fog.reveal_all()
 		_status.text = "Ganze Karte aufgedeckt"
+	_refresh_cheats()
+
+
+func _unlock_goddess() -> void:
+	if not visible or not _can_use():
+		return
+	var goddess: GoddessSystem = GoddessSystem.of(get_tree())
+	if goddess == null:
+		return
+	goddess.debug_unlock_statues(_player)
+	_status.text = "Wächterin über Statuen freigeschaltet"
 	_refresh_cheats()
 
 

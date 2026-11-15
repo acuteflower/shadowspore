@@ -46,3 +46,10 @@ func set_focused(on: bool) -> void:
 ## Where the prompt hovers, relative to the object.
 func prompt_position() -> Vector2:
 	return Vector2(0, -24)
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, get("reflect_moving") == true)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

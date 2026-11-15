@@ -76,6 +76,7 @@ func update(indoors: bool) -> void:
 	fog = maxf(night * clampf(0.22 + 0.34 * (1.0 - moon) * 2.0 + NightRules.fog_boost(special), 0.0, 1.0), mist)
 	hex = 0.0 if deep <= 0.003 else 0.74 + 0.22 * night
 	clearing = move_toward(clearing, 230.0 if _clear_sighted() else 0.0, 150.0 * get_process_delta_time()) ## putting them on: the mist draws back as a wave
+	_push_sky(night)
 	_fog_material.set_shader_parameter("hex", hex)
 	_fog_material.set_shader_parameter("clear_px", clearing)
 	_layer.visible = night > 0.003 or fog > 0.003 or hex > 0.003
@@ -116,6 +117,16 @@ func _push_transform() -> void:
 	for material: ShaderMaterial in [_moon_material, _fog_material]:
 		material.set_shader_parameter("world_origin", _origin)
 		material.set_shader_parameter("view_px", _view)
+	RenderingServer.global_shader_parameter_set(&"g_sky_view", Vector4(_origin.x, _origin.y, _view.x, _view.y))
+
+
+## The night sky that water mirrors (night_sky.gdshaderinc, docs/wasserspiegelung.md): x how far the night has run (dusk 0 .. dawn 1, the moon
+## crosses the sky with it), y the moon's phase, z how much sky shows (0 by day and indoors; fog veils it), w how bright the moon is.
+func _push_sky(night: float) -> void:
+	var run: float = clampf(fposmod(TimeManager.time_of_day - 0.78, 1.0) / 0.462, 0.0, 1.0)
+	var veil: float = clampf(fog, 0.0, 1.0)
+	var strength: float = smoothstep(0.15, 0.8, night) * (1.0 - 0.55 * veil)
+	RenderingServer.global_shader_parameter_set(&"g_sky", Vector4(run, TimeManager.moon_phase(), strength, clampf(0.55 + 0.6 * (moon - 0.65) / 0.35, 0.0, 1.0) * (1.0 - 0.5 * veil)))
 
 
 ## The (up to eight) circles of light nearest to the middle of the screen that reach into it: x, y, radius.

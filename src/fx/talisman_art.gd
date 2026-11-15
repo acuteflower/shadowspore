@@ -19,6 +19,7 @@ const METALS: Dictionary = { ## dark .. highlight
 	"gold": ["6a4a2a", "a07a3a", "d8b45a", "f6e0a0"],
 	"voidsteel": ["14092e", "261a4a", "35227a", "7d57e0"],
 	"ravensteel": ["14102a", "2c2150", "5a4a9a", "a08cf0"], ## blue-black with a violet sheen, a raven's feather (Rissfeder)
+	"sunbronze": ["5e3d1e", "a87432", "e8b858", "fff0b0"], ## ancient desert sun-bronze cuff (Fessel des Ersten Schmelzers)
 }
 const INK: Color = Color("1b1a2e")
 const TORSO_HIDDEN: int = -10 ## percent: the torso faces away: no chain, no pendant

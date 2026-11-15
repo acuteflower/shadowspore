@@ -386,9 +386,14 @@ func arm_tint() -> Color:
 	return Color.html(String(outfit_entry().get("arm_tint", "#ffffff")))
 
 
-## Stable numeric key for `AttackComponent._arm_pose_key()` so changing outfit triggers an immediate arm redraw.
+## True when the active hairstyle uses a non-default silhouette (or `"none"`), so `ArmPainter` ignores baked default-hair depth.
+func is_custom_hair_style() -> bool:
+	return String(hair_entry().get("folder", "default")) != "default"
+
+
+## Stable numeric key for `AttackComponent._arm_pose_key()` so changing outfit or hairstyle triggers an immediate arm redraw.
 func arm_pose_token() -> float:
-	return float((effective_outfit_id().hash() & 0xFFFF))
+	return float(((effective_outfit_id() + "|" + effective_hair_id()).hash() & 0xFFFF))
 
 
 func export_data() -> Dictionary:
@@ -562,10 +567,13 @@ func _load_cached(path: String) -> Texture2D:
 func _sync_material() -> void:
 	if _sprite == null:
 		return
-	var mat: ShaderMaterial = _sprite.material as ShaderMaterial
+	apply_to_material(_sprite.material as ShaderMaterial, _sprite.texture)
+
+
+## Applies the active outfit and hair layers + dye tints to any `hit_flash.gdshader` material.
+func apply_to_material(mat: ShaderMaterial, base_tex: Texture2D) -> void:
 	if mat == null:
 		return
-	var base_tex: Texture2D = _sprite.texture
 	if base_tex == null or base_tex.resource_path == "":
 		mat.set_shader_parameter("use_cosmetics", false)
 		return

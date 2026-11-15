@@ -862,3 +862,10 @@ func _request_snapshot() -> void:
 		if rider != 0:
 			_ride.rpc_id(multiplayer.get_remote_sender_id(), rider)
 		_act.rpc_id(multiplayer.get_remote_sender_id(), state, _duration, facing, _start, _end, _bend, _height_from if _moving else _height, _height_to if _moving else _height, _cruise, _perch_path, _elapsed)
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, true)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

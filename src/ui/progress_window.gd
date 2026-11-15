@@ -145,7 +145,8 @@ func _can_open() -> bool:
 	if hud != null and not hud.visible:
 		return false
 	var quests: QuestComponent = _player.get("quests") as QuestComponent
-	return not get_tree().get_first_node_in_group("world") is WorldLevel or (quests != null and quests.has_flag("hud_unlocked"))
+	var w_node: Node = get_tree().get_first_node_in_group("world")
+	return (w_node == null or not w_node.is_in_group("story_world")) or (quests != null and quests.has_flag("hud_unlocked"))
 
 
 func _set_open(open: bool) -> void:

@@ -1,6 +1,9 @@
 shader_type canvas_item;
 render_mode unshaded, blend_add;
 #include "res://assets/shaders/river_noise.gdshaderinc"
+#include "res://assets/shaders/daylight.gdshaderinc"
+#include "res://assets/shaders/water_reflect.gdshaderinc"
+#include "res://assets/shaders/night_sky.gdshaderinc"
 
 // Night glow of a river chunk, drawn on top of the water with the same field texture
 // (R coverage, G depth, BA direction). Plankton drifts downstream, slow luminous
@@ -18,7 +21,17 @@ void fragment() {
     vec2 pixel = floor(UV * vec2(textureSize(TEXTURE, 0))) + floor(world_origin);
     float oasis_m = g_gloom_rect.z > 0.0 ? smoothstep(0.42, 0.68, texture(g_arid, (pixel - g_gloom_rect.xy) / g_gloom_rect.zw).r) : 0.0;
     vec3 glow = vec3(0.0);
+    vec3 sky = vec3(0.0);
     if (mask.r > 0.5) {
+        // The night sky mirrored (night_sky.gdshaderinc): stars and moon, hidden behind the mirror images of trees, people and houses.
+        float calm = texture(bank_map, UV).b;
+        float wobble = mix(1.1, 0.3, calm) + g_rain * 1.4 + g_storm * 0.8;
+        float rough = (1.0 - calm) * 0.8 + g_rain + g_storm;
+        sky = night_sky_at(pixel, wobble, rough, g_water_time);
+        if (sky != vec3(0.0)) {
+            float blocked = reflect_at(pixel, wobble, g_water_time).a;
+            sky *= (1.0 - blocked) * mix(0.55, 1.0, smoothstep(0.08, 0.45, mask.g));
+        }
         vec2 flow = mask.ba * 2.0 - 1.0;
         if (length(flow) < 0.02) { flow = vec2(0.0, 1.0); }
         flow = normalize(flow);
@@ -59,5 +72,5 @@ void fragment() {
             glow += speck_c * (0.4 + 0.6 * tw);
         }
     }
-    COLOR = vec4(glow * night * 1.18, 1.0);
+    COLOR = vec4(glow * night * 1.18 + sky, 1.0);
 }

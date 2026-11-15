@@ -57,6 +57,8 @@ var _slot_of: Dictionary = {} ## offer id -> place on the panel
 var _ghosts: Array[Dictionary] = [] ## notices that ran out and still hang for a moment: {id, k, slot, t, phase "hang" | "tug" | "carry" | "blow", p, bird}
 var _seen_first: bool = false
 var _wet: float = 0.0
+var _was_wet: bool = false
+var _wet_sound_cd: float = 0.0
 var _reading: float = 0.0
 var _attention: float = 0.0
 var _sounds: Array[Dictionary] = [] ## {t seconds to go, name, db}
@@ -117,6 +119,12 @@ func _update_world(delta: float) -> void:
 	if WeatherManager.current != null and structure != null:
 		target = clampf(WeatherManager.current.exposure_at(structure.global_position) * 1.5, 0.0, 1.0)
 	_wet = move_toward(_wet, target, delta / (25.0 if target > _wet else 40.0))
+	_wet_sound_cd = maxf(_wet_sound_cd - delta, 0.0)
+	var soaking: bool = _wet >= 0.25 and target >= 0.25
+	if soaking and not _was_wet and _wet_sound_cd <= 0.0 and _near_local(260.0):
+		_sounds.append({"t": 0.1, "name": "wet", "db": -10.0})
+		_wet_sound_cd = 28.0
+	_was_wet = soaking
 
 
 func _gust() -> float:

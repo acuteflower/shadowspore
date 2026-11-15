@@ -131,6 +131,9 @@ func _run() -> void:
 		return _fail("the dead boss never left")
 	if not await _until_pressing(func() -> bool: return _story.hologram.active, 60 * 30): ## her last words wait for E
 		return _fail("the hologram did not appear after the quest")
+	var holo_marker: Dictionary = _story.hologram.map_marker()
+	if String(holo_marker.get("id", "")) != "mornath":
+		return _fail("the hologram does not expose its map marker after defeating Mornath")
 	# 6. the hologram calls him again, no quest
 	await _frames(120)
 	if _story.hologram.prompt() != "MORNATH RUFEN":

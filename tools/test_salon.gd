@@ -43,8 +43,9 @@ func _run() -> void:
 
 	var app: AppearanceComponent = player.appearance
 	_check(app != null, "player has AppearanceComponent")
-	_check(app.salon_hair_styles().size() == 1 and app.salon_hair_styles()[0] == "default", "salon shows only the single existing hairstyle right now")
-	_check(app.salon_outfit_styles().size() == 1 and app.salon_outfit_styles()[0] == "default", "salon shows current Reisegewand outfit right now")
+	_check(app.salon_hair_styles().size() == 6 and app.salon_hair_styles()[0] == "default", "salon lists all 6 hairstyles (%s)" % ",".join(app.salon_hair_styles()))
+	_check(app.salon_hair_styles().has("moon_knot") and app.salon_hair_styles().has("storm_tail"), "salon includes Sternenschleier (moon_knot) and Sturmschweif (storm_tail)")
+	_check(app.salon_outfit_styles().size() == 2 and app.salon_outfit_styles()[0] == "default" and app.salon_outfit_styles().has("perlenbluete"), "salon lists Reisegewand and Perlenblüte (%s)" % ",".join(app.salon_outfit_styles()))
 	_check(app.salon_hair_colors().size() >= 8, "salon offers multiple hair color variants (%d)" % app.salon_hair_colors().size())
 	_check(app.salon_outfit_colors().size() >= 8, "salon offers multiple outfit color variants (%d)" % app.salon_outfit_colors().size())
 
@@ -102,12 +103,40 @@ func _run() -> void:
 
 	if window != null:
 		_check(window.tabs.size() == 3 and String(window.tabs[0].kind) == "hair" and String(window.tabs[1].kind) == "outfit" and String(window.tabs[2].kind) == "dye", "SalonWindow has FRISUR, OUTFIT, and FÄRBEN tabs")
-		_check(window.rows.size() == 1 and String(window.rows[0].get("tag", "")) == "AKTIV", "FRISUR tab shows active current hairstyle")
+		_check(window.rows.size() == 6 and String(window.rows[0].get("tag", "")) == "AKTIV", "FRISUR tab shows all 6 hairstyles with default AKTIV")
 
-		# Switch to OUTFIT tab and verify active current outfit is shown
+		# Preview and apply the special hairstyle Sternenschleier (moon_knot)
+		var moon_idx: int = -1
+		for idx_h: int in window.rows.size():
+			if String(window.rows[idx_h].get("style_id", "")) == "moon_knot":
+				moon_idx = idx_h
+				_check(bool(window.rows[idx_h].get("special", false)) and String(window.rows[idx_h].get("sub", "")).contains("STERNENGLANZ"), "moon_knot row has STERNENGLANZ special badge")
+				break
+		_check(moon_idx > 0, "FRISUR tab contains moon_knot")
+		if moon_idx > 0:
+			window.focus = moon_idx
+			await _frames(2)
+			_check(app.effective_hair_id() == "moon_knot" and app.hair_id == "default", "focusing Sternenschleier previews moon_knot live")
+			window._press("apply", false)
+			await _frames(2)
+			_check(app.hair_id == "moon_knot", "confirming ÜBERNEHMEN commits hair_id=moon_knot")
+
+		# Switch to OUTFIT tab, verify Reisegewand + legendary Perlenblüte, preview & equip Perlenblüte, then restore default for dye check
 		window._set_tab(1)
 		await _frames(2)
-		_check(window.rows.size() == 1 and String(window.rows[0].get("tag", "")) == "AKTIV", "OUTFIT tab shows current Reisegewand as AKTIV")
+		_check(window.rows.size() == 2 and String(window.rows[0].get("tag", "")) == "AKTIV", "OUTFIT tab shows Reisegewand (AKTIV) and Perlenblüte")
+		_check(bool(window.rows[1].get("legendary", false)) and String(window.rows[1].get("sub", "")).contains("LEGENDÄR"), "Perlenblüte row has LEGENDÄR · FRÜHJAHR 2027 badge")
+		window.focus = 1
+		await _frames(2)
+		_check(app.effective_outfit_id() == "perlenbluete" and app.outfit_id == "default", "focusing Perlenblüte previews perlenbluete live in mirror")
+		window._press("apply", false)
+		await _frames(2)
+		_check(app.outfit_id == "perlenbluete", "confirming ÜBERNEHMEN commits outfit_id=perlenbluete")
+		window.focus = 0
+		await _frames(2)
+		window._press("apply", false)
+		await _frames(2)
+		_check(app.outfit_id == "default", "switching back to Reisegewand commits outfit_id=default")
 
 		# Switch to FÄRBEN tab and verify categorized sections (HAARE + OUTFIT)
 		window._set_tab(2)
@@ -133,10 +162,10 @@ func _run() -> void:
 		if blonde_idx > 0:
 			window.focus = blonde_idx
 			await _frames(2)
-			_check(app.effective_hair_id() == "blonde" and app.hair_id == "default", "focusing Sonnenblond previews hair dye live without committing yet")
+			_check(app.effective_hair_id() == "moon_knot:blonde" and app.hair_id == "moon_knot", "focusing Sonnenblond previews moon_knot:blonde live without committing yet")
 			window._press("apply", false)
 			await _frames(2)
-			_check(app.hair_id == "blonde", "confirming ÜBERNEHMEN commits hair_id=blonde")
+			_check(app.hair_id == "moon_knot:blonde", "confirming ÜBERNEHMEN commits hair_id=moon_knot:blonde")
 
 		# Stepping across the OUTFIT section header lands on selectable outfit_color
 		if outfit_sec_idx > 1 and forest_idx > outfit_sec_idx:
@@ -146,10 +175,10 @@ func _run() -> void:
 			_check(window.focus == outfit_sec_idx + 1 and String(window.rows[window.focus].get("kind", "")) == "outfit_color", "_move skips OUTFIT section header into outfit colors")
 			window.focus = forest_idx
 			await _frames(2)
-			_check(app.effective_outfit_id() == "forest" and app.outfit_id == "default" and app.effective_hair_id() == "blonde", "focusing Waldläufer previews outfit dye while keeping hair blonde")
+			_check(app.effective_outfit_id() == "forest" and app.outfit_id == "default" and app.effective_hair_id() == "moon_knot:blonde", "focusing Waldläufer previews outfit dye while keeping hair moon_knot:blonde")
 			window._press("apply", false)
 			await _frames(2)
-			_check(app.outfit_id == "forest" and app.hair_id == "blonde", "confirming ÜBERNEHMEN commits outfit_id=forest without altering hair")
+			_check(app.outfit_id == "forest" and app.hair_id == "moon_knot:blonde", "confirming ÜBERNEHMEN commits outfit_id=forest without altering hair")
 
 		# Collapsing HAARE hides hair colors and shifts focus cleanly to outfit_color
 		window._toggle_section("hair")
@@ -163,7 +192,7 @@ func _run() -> void:
 		app.request_hair("default")
 		app.request_outfit("default")
 		app.import_data(saved)
-		_check(app.hair_id == "blonde" and app.outfit_id == "forest", "appearance export/import keeps hair and outfit dye choices")
+		_check(app.hair_id == "moon_knot:blonde" and app.outfit_id == "forest", "appearance export/import keeps hairstyle + dye and outfit dye choices")
 
 		# Closing SalonWindow stands Ellie back up cleanly
 		window._close()

@@ -15,9 +15,17 @@ var _phys: float = 0.0
 var _holes: int = 0
 
 
+var _gpu: float = 0.0
+var _rcpu: float = 0.0
+
+
 func _ready() -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	Engine.max_fps = 0
+	get_tree().auto_accept_quit = false ## a benchmark window must not be closed halfway
+	DisplayServer.window_set_title("SHADOWSPORE BENCHMARK - laeuft, bitte nicht schliessen")
+	Quality.adaptive = false ## measure the chosen level (`-- --quality=N`), not the governor's
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 	_run.call_deferred()
 
 
@@ -171,6 +179,9 @@ func _measure(label: String, frames: int, step: Callable) -> void:
 	_times.clear()
 	_proc = 0.0
 	_phys = 0.0
+	_gpu = 0.0
+	_rcpu = 0.0
+	var vp: RID = get_viewport().get_viewport_rid()
 	var last: int = Time.get_ticks_usec()
 	for i: int in frames:
 		await get_tree().process_frame
@@ -180,6 +191,8 @@ func _measure(label: String, frames: int, step: Callable) -> void:
 		_times.append(dt)
 		_proc += Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
 		_phys += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+		_gpu += RenderingServer.viewport_get_measured_render_time_gpu(vp)
+		_rcpu += RenderingServer.viewport_get_measured_render_time_cpu(vp)
 		step.call(dt / 1000.0)
 	var sorted: PackedFloat32Array = _times.duplicate()
 	sorted.sort()
@@ -188,6 +201,7 @@ func _measure(label: String, frames: int, step: Callable) -> void:
 	var over: int = 0
 	for t: float in _times:
 		if t > 16.7: over += 1
+	print("%-8s render cpu %.2f ms  gpu %.2f ms  (quality %s)" % [label, _rcpu / frames, _gpu / frames, Quality.NAMES[Quality.effective]])
 	print("%-8s avg %.2f ms  p50 %.2f  p95 %.2f  p99 %.2f  max %.2f  >16.7ms: %d | process %.2f  physics %.2f  nodes %d  draw calls %d" % [label, total / frames,
 		sorted[frames / 2], sorted[int(frames * 0.95)], sorted[int(frames * 0.99)], sorted[frames - 1], over, _proc / frames, _phys / frames,
 		Performance.get_monitor(Performance.OBJECT_NODE_COUNT), Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)])

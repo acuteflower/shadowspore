@@ -1,5 +1,6 @@
 shader_type canvas_item;
 #include "res://assets/shaders/daylight.gdshaderinc"
+#include "res://assets/shaders/water_reflect.gdshaderinc"
 // Lights the meadow over large areas so the tiles never read as a grid: sunlit and shaded
 // patches, and slow drifting mist shadows. The patches blend smoothly between the palette's
 // greens; only the grass blades stay crisp whole-step pixels.
@@ -610,6 +611,8 @@ void fragment() {
 				vec3 deep = mix(vec3(0.15, 0.26, 0.36), vec3(0.05, 0.07, 0.15), g_night);
 				vec3 water = mix(sky, deep, 0.55 * depth);
 				c.rgb = mix(c.rgb * 0.6, water, 0.55 + 0.30 * smoothstep(0.0, 0.5, depth));
+				vec4 mirror = reflect_at(px, 0.35 + 0.9 * rl, TIME); // a puddle is a small, still mirror (WaterReflections)
+				if (mirror.a > 0.02) { c.rgb = mix(c.rgb, reflect_tint(mirror.rgb, c.rgb), mirror.a * (0.68 + 0.2 * depth) * (1.0 - 0.3 * rl)); }
 				float streak = hash(vec2(floor((px.x + wob * 6.0) / 3.0), floor(px.y / 2.0) + 17.0));
 				if (streak > 0.93) { c.rgb = mix(c.rgb, mix(vec3(0.93, 0.97, 1.0), vec3(0.62, 0.68, 0.95), g_night), 0.22 + 0.18 * (1.0 - depth)); }
 				if (streak < 0.05) { c.rgb *= 0.88; }

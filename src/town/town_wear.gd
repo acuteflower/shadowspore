@@ -45,6 +45,8 @@ static func compute(structures: Dictionary, paths: Array, day: int) -> Dictionar
 		var margin: float = float(trample.margin)
 		var rect: Rect2 = TownRules.foot_rect(String(data.p), float(data.x), float(data.y))
 		splat(out, rect, strength, margin)
+		if bool(spec.get("pad", false)):
+			splat(out, rect.grow_individual(6.0, 4.0, 6.0, 10.0), maxf(strength, 0.90), 4.0)
 		if bool(trample.get("front", false)):
 			var front: Rect2 = TownRules.front_rect(String(data.p), float(data.x), float(data.y))
 			if front.has_area():

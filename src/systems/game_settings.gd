@@ -9,7 +9,8 @@ const DEFAULTS: Dictionary = {
 	"master": 80, "music": 70, "sfx": 80,
 	"fullscreen": false, "vsync": true, "shake": 100,
 	"numbers": true, "language": "de", "position": true, "cursor": true,
-	"weather_fx": 2, "flash_soft": false, "journal_still": false,
+	"quality": -1, "fps_cap": 7, "adaptive": true, "pixel_res": false,
+	"weather_fx": 2, "flash_soft": false, "reflections": true, "sun_shadows": true, "journal_still": false,
 	"player_name": "ELLIE",
 }
 
@@ -52,6 +53,10 @@ static func apply() -> void:
 	if fullscreen != is_fullscreen:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if bool(get_value("vsync")) else DisplayServer.VSYNC_DISABLED)
+	var main_loop: SceneTree = Engine.get_main_loop() as SceneTree
+	var quality: Node = main_loop.root.get_node_or_null(^"Quality") if main_loop != null and main_loop.root != null else null
+	if quality != null and quality.is_node_ready():
+		quality.call(&"sync_settings") ## graphics level, adaptive governor, frame cap (src/autoload/quality.gd)
 
 
 static func save() -> void:

@@ -7,6 +7,8 @@ extends RefCounted
 ## selected) with a dotted route from here and a card; HOLDING the left mouse button (or E) on it fills a ring of light, and when it closes `update` returns its id.
 
 const HOLD_SECONDS: float = 1.15
+const STARHALL_ID: String = "starhall"
+const STARHALL_SCREEN: Vector2 = Vector2(320.0, 58.0)
 const TEAL: Color = Color("78f4e6")
 const GOLD: Color = Color("e6c468")
 const VIOLET: Color = Color("b99bff")
@@ -27,6 +29,7 @@ var _tile: Dictionary = {} ## id -> tile
 var _name: Dictionary = {} ## id -> name
 var _awake: Dictionary = {} ## id -> bool
 var _seen: Dictionary = {} ## id -> its place has been seen (the name shows)
+var _starhall_open: bool = false ## travel mode: Star Hall unlocked & eligible
 var _age: float = 0.0
 
 
@@ -43,6 +46,8 @@ func destinations() -> Array[String]:
 	if travel_from != "":
 		var origin: Vector2 = tile_of(travel_from)
 		list.sort_custom(func(a: String, b: String) -> bool: return tile_of(a).distance_to(origin) < tile_of(b).distance_to(origin))
+	if _starhall_open:
+		list.push_front(STARHALL_ID)
 	return list
 
 
@@ -50,6 +55,7 @@ func destinations() -> Array[String]:
 func update(delta: float, tree: SceneTree, cursor: Vector2, to_screen: Callable, mouse_hold: bool, key_hold: bool, key_step: int) -> String:
 	_age += delta
 	var manager: Waystones = Waystones.of(tree)
+	var goddess: GoddessSystem = GoddessSystem.of(tree)
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	_ids.clear()
 	if manager != null:
@@ -62,6 +68,11 @@ func update(delta: float, tree: SceneTree, cursor: Vector2, to_screen: Callable,
 			_awake[id] = bool(entry.awake)
 			_seen[id] = discovery != null and discovery.is_seen(_tile[id] as Vector2)
 			_screen[id] = to_screen.call(_tile[id]) as Vector2
+	_starhall_open = travel_from != "" and goddess != null and manager != null and manager.awake_count() > 0
+	if _starhall_open:
+		_screen[STARHALL_ID] = STARHALL_SCREEN
+		_name[STARHALL_ID] = "STERNENSAAL"
+		_awake[STARHALL_ID] = true
 	hover = ""
 	var best: float = 15.0
 	for id: String in _ids:
@@ -71,6 +82,10 @@ func update(delta: float, tree: SceneTree, cursor: Vector2, to_screen: Callable,
 		if distance < best:
 			best = distance
 			hover = id
+	var star_hit: Rect2 = Rect2(STARHALL_SCREEN + Vector2(-46.0, -24.0), Vector2(92.0, 54.0))
+	var star_card: Rect2 = Rect2(Vector2(STARHALL_SCREEN.x - 95.0, STARHALL_SCREEN.y + 30.0), Vector2(190.0, 49.0))
+	if _starhall_open and (STARHALL_SCREEN.distance_to(cursor) < 26.0 or star_hit.has_point(cursor) or (target == STARHALL_ID and star_card.has_point(cursor))):
+		hover = STARHALL_ID
 	if travel_from == "":
 		target = ""
 		hold = 0.0
@@ -92,9 +107,9 @@ func update(delta: float, tree: SceneTree, cursor: Vector2, to_screen: Callable,
 	return ""
 
 
-## True while the mouse is over a statue the player could travel to (the press then starts the hold instead of a drag).
+## True while the mouse is over a statue (or the Star Hall seal) the player could travel to (the press then starts the hold instead of a drag).
 func can_press() -> bool:
-	return travel_from != "" and hover != "" and hover != travel_from and bool(_awake.get(hover, false))
+	return travel_from != "" and hover != "" and hover != travel_from and (hover == STARHALL_ID or bool(_awake.get(hover, false)))
 
 
 ## `ring`: the fog-lifting ring of a statue that has just woken (`MapWindow.present`): [statue tile, radius in tiles, age in seconds].
@@ -115,8 +130,31 @@ func draw(canvas: CanvasItem, scale: float, fade: float, time: float, size: Vect
 		var choice: bool = traveling and not here
 		var lit: bool = id == target and choice
 		_draw_marker(canvas, at, id, here, choice, lit, scale, fade, time)
+	if traveling and _starhall_open:
+		_draw_starhall_marker(canvas, STARHALL_SCREEN, target == STARHALL_ID, fade, time)
 	if traveling and target != "":
 		_draw_card(canvas, target, fade, size, time)
+
+
+func _draw_starhall_marker(canvas: CanvasItem, at: Vector2, lit: bool, fade: float, time: float) -> void:
+	var phase: float = 0.5 + 0.5 * sin(time * 2.6)
+	var big: float = 2.0
+	VineStyle.glow(canvas, at, 28.0 + 4.0 * phase, GOLD, (0.68 if lit else 0.45) * fade)
+	for k: int in (3 if lit else 2):
+		var t: float = fposmod(time * 0.6 + k * (0.34 if lit else 0.5), 1.0)
+		VineStyle.ring(canvas, at, 12 + int(t * (22.0 if lit else 15.0)), Color(GOLD.lerp(TEAL, t), (1.0 - t) * (0.9 if lit else 0.55) * fade), 0.7)
+	canvas.draw_set_transform(at.round(), 0.0, Vector2(big, big))
+	for r: int in range(-4, 5):
+		canvas.draw_rect(Rect2(Vector2(0, r), Vector2.ONE), Color(GOLD.lerp(Color.WHITE, phase * 0.4), fade))
+		canvas.draw_rect(Rect2(Vector2(r, 0), Vector2.ONE), Color(GOLD.lerp(TEAL, 0.35), fade))
+	for d: Vector2i in [Vector2i(-2, -2), Vector2i(2, -2), Vector2i(-2, 2), Vector2i(2, 2), Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)]:
+		canvas.draw_rect(Rect2(Vector2(d), Vector2.ONE), Color(TEAL.lerp(Color.WHITE, 0.35 * phase), fade))
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if lit:
+		_draw_hold(canvas, at, fade, time)
+	var label: String = "STERNENSAAL"
+	var tc: Color = GOLD.lerp(Color("fff0b0"), 0.35 if lit else 0.1)
+	PixelText.draw(canvas, label, Vector2i(roundi(at.x) - PixelText.width(label) / 2, roundi(at.y + 18.0)), Color(tc, 0.96 * fade), Color(VineStyle.OUTLINE, 0.92 * fade))
 
 
 func _draw_marker(canvas: CanvasItem, at: Vector2, id: String, here: bool, choice: bool, lit: bool, scale: float, fade: float, time: float) -> void:
@@ -241,8 +279,7 @@ func _draw_wake_rings(canvas: CanvasItem, at: Vector2, radius: float, age: float
 func _draw_card(canvas: CanvasItem, id: String, fade: float, size: Vector2, time: float) -> void:
 	var at: Vector2 = _screen[id] as Vector2
 	var title: String = String(_name[id])
-	var distance: int = roundi(tile_of(id).distance_to(tile_of(travel_from)))
-	var line: String = "%d M ENTFERNT" % distance
+	var line: String = "HEILIGTUM DER WÄCHTERIN" if id == STARHALL_ID else "%d M ENTFERNT" % roundi(tile_of(id).distance_to(tile_of(travel_from)))
 	var width: float = maxf(PixelText.width(title) * 2.0, 112.0) + 24.0
 	var box: Rect2 = Rect2(at + Vector2(-width / 2.0, 30.0), Vector2(width, 49.0))
 	if box.end.y > size.y - 40.0:

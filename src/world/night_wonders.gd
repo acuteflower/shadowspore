@@ -29,6 +29,7 @@ var _sky_canvas: Node2D
 var _banner: TownBanner
 
 var _last_starfall_day: int = -1
+var _starfall_schedule: Array[float] = []
 var _last_stag_day: int = -1
 var _dir_clock: float = 4.0
 var _drop_serial: int = 0
@@ -89,6 +90,7 @@ func _on_peer_connected(peer_id: int) -> void:
 
 func _on_day_started(_day: int) -> void:
 	if multiplayer.is_server():
+		_starfall_schedule.clear()
 		cool_all_craters()
 
 
@@ -142,9 +144,14 @@ func _host_natural_tick() -> void:
 	var rain_amt: float = WeatherManager.current.rain if WeatherManager.current != null else 0.0
 	var tod: float = TimeManager.time_of_day
 
-	if _last_starfall_day != TimeManager.day and (tod >= 0.88 or tod <= 0.12) and rain_amt <= 0.2:
+	if _last_starfall_day != TimeManager.day:
 		_last_starfall_day = TimeManager.day
-		if _rng.randf() < 0.32:
+		_plan_nightly_starfalls()
+
+	if not _starfall_schedule.is_empty() and rain_amt <= 0.2:
+		var prog: float = TimeManager.night_progress()
+		if prog >= _starfall_schedule[0]:
+			_starfall_schedule.remove_at(0)
 			trigger_starfall()
 
 	if _last_stag_day != TimeManager.day and rain_amt <= 0.25 and _stags.is_empty():
@@ -154,6 +161,34 @@ func _host_natural_tick() -> void:
 
 
 # ---------------------------------------------------------------- 1. Starfall & StarCrater
+
+static func starfall_min_count(level: int, night_num: int) -> int:
+	var lvl: int = maxi(level, 1)
+	var n: int = maxi(night_num, 1)
+	return ceili(1.0 + float(lvl) * 0.1 + float(n) * 0.2)
+
+
+func _player_group_level() -> int:
+	var levels: Array[int] = []
+	for p: Player in Player.all:
+		if is_instance_valid(p) and p.progress != null:
+			levels.append(p.progress.level)
+	return NightRules.group_level(levels)
+
+
+func _plan_nightly_starfalls() -> void:
+	_starfall_schedule.clear()
+	var min_count: int = starfall_min_count(_player_group_level(), TimeManager.day)
+	var total: int = min_count + (1 if _rng.randf() < 0.25 else 0)
+	var start_p: float = clampf(TimeManager.night_progress(), 0.0, 0.85)
+	var end_p: float = 0.92
+	var span: float = maxf(end_p - start_p, 0.05)
+	for i: int in total:
+		var lo: float = start_p + span * (float(i) / float(total))
+		var hi: float = start_p + span * (float(i + 1) / float(total))
+		_starfall_schedule.append(_rng.randf_range(lo, lerpf(lo, hi, 0.85)))
+	_starfall_schedule.sort()
+
 
 func trigger_starfall(forced_target: Vector2 = Vector2.INF) -> Vector2:
 	if not multiplayer.is_server():

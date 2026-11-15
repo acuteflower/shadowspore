@@ -132,6 +132,46 @@ static func ring(canvas: CanvasItem, center: Vector2, radius: int, color: Color,
 		canvas.draw_rect(Rect2(roundf(center.x + cos(angle) * radius), roundf(center.y + sin(angle) * radius), 1, 1), color)
 
 
+## Outer boundary of overlapping pixel circles `(cx, cy, radius)`: interior arcs inside another circle are skipped.
+static func ring_union(canvas: CanvasItem, circles: Array[Vector3], bounds: Vector2, color: Color, dash: float = 1.0) -> void:
+	var count: int = circles.size()
+	for i: int in count:
+		var c: Vector3 = circles[i]
+		var radius: int = int(c.z)
+		if radius < 3 or c.x + c.z < 0.0 or c.y + c.z < 0.0 or c.x - c.z > bounds.x or c.y - c.z > bounds.y:
+			continue
+		var duplicate: bool = false
+		for j: int in i:
+			var other: Vector3 = circles[j]
+			if absf(c.x - other.x) < 0.5 and absf(c.y - other.y) < 0.5 and absf(c.z - other.z) < 1.0:
+				duplicate = true
+				break
+		if duplicate:
+			continue
+		var steps: int = radius * 8
+		for s: int in steps:
+			if float(s % 6) / 6.0 > dash:
+				continue
+			var angle: float = s * TAU / steps
+			var px: float = c.x + cos(angle) * radius
+			var py: float = c.y + sin(angle) * radius
+			var inside: bool = false
+			for j: int in count:
+				if j == i:
+					continue
+				var other: Vector3 = circles[j]
+				var r_other: float = float(int(other.z)) - 0.5
+				if r_other <= 0.0:
+					continue
+				var dx: float = px - other.x
+				var dy: float = py - other.y
+				if dx * dx + dy * dy < r_other * r_other:
+					inside = true
+					break
+			if not inside:
+				canvas.draw_rect(Rect2(roundf(px), roundf(py), 1, 1), color)
+
+
 ## The dark room behind full-screen menus: a radial vignette.
 static func make_vignette() -> GradientTexture2D:
 	var gradient: Gradient = Gradient.new()

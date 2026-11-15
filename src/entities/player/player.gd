@@ -149,6 +149,7 @@ const SHEET_COLS: int = 22
 @export var step_range: float = 54.0 ## px the shadow step carries her (Alt; stops short at walls)
 @export var step_stamina: float = 14.0 ## base stamina of one step; `step_cost()` adds 1 per level (not enough: no step)
 @export var step_grace: float = 0.26 ## seconds from the push-off no blow can touch her (dissolved and condensing; damage over time still ticks)
+var light_step: bool = false ## purified into Caelia's Lichtschritt (extended range, shorter cooldown, light shockwave at arrival)
 @export_group("Sprint")
 @export var sprint_speed: float = 124.0 ## px/s while sprinting
 @export var burst_speed: float = 260.0 ## px/s right after pressing sprint, decays into sprint_speed
@@ -348,6 +349,9 @@ func _ready() -> void:
 	add_child(_drink_fx)
 	_feed_fx = FeedFx.new()
 	add_child(_feed_fx)
+	var blossom_breeze: BlossomBreeze = BlossomBreeze.new()
+	blossom_breeze.name = "BlossomBreeze"
+	add_child(blossom_breeze)
 	_main_sheet = _sprite.texture
 	_sprite.add_child(TalismanLayer.new()) ## the worn necklace and earrings
 	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", BLOOD_MAPS[0])
@@ -378,28 +382,30 @@ func _ready() -> void:
 		tracked.setup(self, quests)
 		quests.story_event.connect(func(event_name: String) -> void:
 			var story_world: Node = get_tree().get_first_node_in_group("world")
-			if event_name == "ambush:crossroad" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_ambush(self)
-			elif event_name == "wake:hut" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_wake(self)
-			elif event_name == "meet:knight" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_knight_meet(self)
-			elif event_name == "follow:knight" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_knight_walk(self)
-			elif event_name.begins_with("story:") and story_world is WorldLevel:
-				(story_world as WorldLevel).play_story_dialogue(self, event_name.trim_prefix("story:"))
-			elif event_name == "finale:hut" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_hut_finale(self)
-			elif event_name == "cabin:fight" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_cabin_spider(self)
-			elif event_name == "wagon:fight" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_gustav_rescue(self, "fight")
-			elif event_name == "wagon:meet" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_gustav_rescue(self, "meet")
-			elif event_name == "escort:gustav" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_gustav_escort(self)
-			elif event_name == "welcome:gustav" and story_world is WorldLevel:
-				(story_world as WorldLevel).start_gustav_welcome(self))
+			if story_world == null or not story_world.is_in_group("story_world"):
+				return
+			if event_name == "ambush:crossroad" and story_world.has_method("start_ambush"):
+				story_world.call("start_ambush", self)
+			elif event_name == "wake:hut" and story_world.has_method("start_wake"):
+				story_world.call("start_wake", self)
+			elif event_name == "meet:knight" and story_world.has_method("start_knight_meet"):
+				story_world.call("start_knight_meet", self)
+			elif event_name == "follow:knight" and story_world.has_method("start_knight_walk"):
+				story_world.call("start_knight_walk", self)
+			elif event_name.begins_with("story:") and story_world.has_method("play_story_dialogue"):
+				story_world.call("play_story_dialogue", self, event_name.trim_prefix("story:"))
+			elif event_name == "finale:hut" and story_world.has_method("start_hut_finale"):
+				story_world.call("start_hut_finale", self)
+			elif event_name == "cabin:fight" and story_world.has_method("start_cabin_spider"):
+				story_world.call("start_cabin_spider", self)
+			elif event_name == "wagon:fight" and story_world.has_method("start_gustav_rescue"):
+				story_world.call("start_gustav_rescue", self, "fight")
+			elif event_name == "wagon:meet" and story_world.has_method("start_gustav_rescue"):
+				story_world.call("start_gustav_rescue", self, "meet")
+			elif event_name == "escort:gustav" and story_world.has_method("start_gustav_escort"):
+				story_world.call("start_gustav_escort", self)
+			elif event_name == "welcome:gustav" and story_world.has_method("start_gustav_welcome"):
+				story_world.call("start_gustav_welcome", self))
 		var hud: Node = HUD_SCENE.instantiate()
 		_hud = hud
 		add_child(hud)
@@ -483,6 +489,9 @@ func _update_desert_heat(delta: float) -> void:
 	if effects != null and effects.has("refreshed"):
 		heat_amount = move_toward(heat_amount, 0.0, DesertHeat.COOL_REFRESHED_RATE * delta)
 		return
+	if talismans != null and talismans.perks.has("prism_break"): ## Fessel des Ersten Schmelzers: desert heat never slows her
+		heat_amount = move_toward(heat_amount, 0.0, DesertHeat.COOL_REFRESHED_RATE * delta)
+		return
 	var drive: float = DesertHeat.heat_drive(get_tree(), global_position)
 	heat_amount = clampf(heat_amount + drive * delta, 0.0, 1.0)
 
@@ -491,6 +500,8 @@ func _physics_process(delta: float) -> void:
 	if sub_pos != _last_surface_tile:
 		_last_surface_tile = sub_pos
 		var surf_id: String = Terrain.surface_at(global_position)
+		if surf_id == "quicksand" and talismans != null and talismans.perks.has("prism_break"):
+			surf_id = "quartz" ## Fessel des Ersten Schmelzers freezes quicksand underfoot
 		_surface = Terrain.surface_data(surf_id)
 		var on_water_deck: bool = false
 		for patch: Node in Terrain.patches:
@@ -592,14 +603,30 @@ func _try_blink() -> void:
 
 ## Alt: a short straight step through the void, the way she is walking, or towards the cursor (or where she looks) when she stands.
 ## Stops short at walls; too short a way is no step at all. True when it started.
+func effective_step_range() -> float:
+	return step_range + (18.0 if light_step else 0.0)
+
+
+func set_light_step(on: bool) -> void:
+	light_step = on
+	if multiplayer.is_server():
+		_rpc_light_step.rpc(on)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_light_step(on: bool) -> void:
+	light_step = on
+
+
 func _try_shadow_step(input_dir: Vector2) -> bool:
 	var way: Vector2 = input_dir.normalized()
 	if way == Vector2.ZERO:
 		way = InputManager.aim_vector(global_position + BODY_CENTER).normalized() if InputManager.using_mouse else facing.normalized()
 	if way == Vector2.ZERO:
 		way = facing.normalized()
-	var hit: KinematicCollision2D = move_and_collide(way * step_range, true)
-	var travel: Vector2 = way * step_range if hit == null else hit.get_travel()
+	var reach: float = effective_step_range()
+	var hit: KinematicCollision2D = move_and_collide(way * reach, true)
+	var travel: Vector2 = way * reach if hit == null else hit.get_travel()
 	if travel.length() < 12.0:
 		return false
 	if not stamina.spend(step_cost()):
@@ -613,13 +640,13 @@ func _try_shadow_step(input_dir: Vector2) -> bool:
 	return true
 
 
-## Stamina one shadow step costs: 14 + 1 per level (level 1 = 15), increased up to +15 % under desert midday heat.
+## Stamina one shadow step costs: 14 + 1 per level (level 1 = 15), 20% less once purified into Lichtschritt.
 func step_cost() -> float:
-	return (step_stamina + float(progress.level)) * (1.0 + DesertHeat.STAMINA_COST_PENALTY * heat_amount)
+	var mult: float = 0.8 if light_step else 1.0
+	return (step_stamina + float(progress.level)) * mult * (1.0 + DesertHeat.STAMINA_COST_PENALTY * heat_amount)
 
 
-## The shadow step on every peer: she dips, pushes off, dissolves into the void from her leading edge, is put down at `to` and condenses
-## out of the same void (`_animate_step`, `ShadowStepFx`, `hit_flash.gdshader` step_*).
+## The shadow step on every peer: she dips, pushes off, dissolves into the void (or starlight when `light_step` is active) from her leading edge, is put down at `to` and condenses.
 @rpc("authority", "call_local", "reliable")
 func play_shadow_step(from: Vector2, to: Vector2, way: Vector2) -> void:
 	_cancel_standby()
@@ -631,12 +658,31 @@ func play_shadow_step(from: Vector2, to: Vector2, way: Vector2) -> void:
 	_step_moved = false
 	_step_heard = false
 	if multiplayer.is_server():
-		health.grant_grace(step_grace) ## the host decides hits: while she is in the void nothing reaches her
+		health.grant_grace(step_grace + (0.06 if light_step else 0.0)) ## the host decides hits: while she is in the step nothing reaches her
+		if light_step:
+			get_tree().create_timer(STEP_BACK).timeout.connect(func() -> void:
+				if is_instance_valid(self) and health.current > 0.0:
+					_light_step_burst(from, to))
 	talismans.note_blink() ## Rissfeder: the next blow within a few seconds dives in harder (it was the blink's perk)
-	var fx: ShadowStepFx = ShadowStepFx.new()
-	get_tree().current_scene.add_child(fx)
-	fx.setup(from, to, _step_dir, STEP_GONE, STEP_BACK)
+	if talismans != null and talismans.perks.has("prism_break"): ## Fessel des Ersten Schmelzers: leaves a detonating sun-quartz spike
+		PrismSpikeFx.spawn(get_tree().current_scene, self, from, talismans.perks["prism_break"] as Dictionary)
+	if light_step:
+		var lfx: LightStepFx = LightStepFx.new()
+		get_tree().current_scene.add_child(lfx)
+		lfx.setup(from, to, _step_dir, STEP_GONE, STEP_BACK)
+	else:
+		var fx: ShadowStepFx = ShadowStepFx.new()
+		get_tree().current_scene.add_child(fx)
+		fx.setup(from, to, _step_dir, STEP_GONE, STEP_BACK)
 	Sfx.at(self, "step_out", from, -3.0)
+
+
+## Host only: arrival light shockwave of Caelia's Lichtschritt damages & staggers shadow creatures at arrival.
+func _light_step_burst(_from: Vector2, to: Vector2) -> void:
+	if not multiplayer.is_server():
+		return
+	for target: HurtboxComponent in HitScan.circle(self, to + Vector2(0.0, -12.0), 46.0, AttackComponent.HURTBOX_MASK):
+		target.take_hit(14.0, to, 130.0, name.to_int())
 
 
 ## One frame of the shadow step: her sheet frame, the dissolve / condense in the shader, a little slide along the step, the move itself.
@@ -667,6 +713,7 @@ func _animate_step(delta: float) -> void:
 		material.set_shader_parameter("step_mode", 0)
 	material.set_shader_parameter("step_dir", _step_dir)
 	material.set_shader_parameter("step_seed", floorf(t * 30.0))
+	material.set_shader_parameter("step_light", light_step)
 	var slide: Vector2
 	if t < STEP_BACK:
 		var k: float = clampf(t / STEP_GONE, 0.0, 1.0)
@@ -693,6 +740,7 @@ func _finish_step() -> void:
 		_step_moved = true
 		global_position = _step_to
 	(_sprite.material as ShaderMaterial).set_shader_parameter("step_mode", 0)
+	(_sprite.material as ShaderMaterial).set_shader_parameter("step_light", false)
 	_sprite.position = Vector2(0.0, _sink)
 	_set_step_extras(true)
 
@@ -808,8 +856,15 @@ func _on_healed(amount: float) -> void:
 func _on_health_changed(current: float, _maximum: float) -> void:
 	if _was_dead and current > 0.0: ## respawned
 		var level: TestLevel = get_parent().get_parent() as TestLevel ## players hang under the level's `Players` node
-		global_position = level.spawn_point() if level else SPAWN_POINT
+		if level != null and level.has_method("respawn_point_for"):
+			global_position = level.call("respawn_point_for", name.to_int()) as Vector2
+		elif level != null and level.has_method("spawn_point_for"):
+			global_position = level.call("spawn_point_for", name.to_int()) as Vector2
+		else:
+			global_position = level.spawn_point() if level else SPAWN_POINT
 		velocity = Vector2.ZERO
+		if level != null and level.has_method("on_player_respawned"):
+			level.call("on_player_respawned", self)
 		_camera.reset_smoothing()
 		sync_wound_visuals()
 	_was_dead = current <= 0.0
@@ -829,8 +884,8 @@ func _respawn_after_delay() -> void:
 	if health.current > 0.0:
 		return
 	var world: Node = get_tree().get_first_node_in_group("world")
-	if world is WorldLevel and not (world as WorldLevel).opening_over: ## still in the opening: she comes back wounded
-		health.set_health(health.max_health * (world as WorldLevel).starting_health_ratio())
+	if world != null and world.is_in_group("story_world") and not bool(world.get("opening_over")): ## still in the opening: she comes back wounded
+		health.set_health(health.max_health * float(world.call("starting_health_ratio")))
 	else:
 		health.heal_full()
 
@@ -1970,8 +2025,16 @@ func _animate(delta: float) -> void:
 	var a3_0: Array[Vector3] = GripRig.frame_arm3(arm_tex0, arm_f0)
 	var a3_1: Array[Vector3] = GripRig.frame_arm3(arm_tex1, arm_f1)
 	attack.rig_arm3 = GripRig.shift_arm3(GripRig.blend_arm3(a3_0, a3_1, arm_blend), _sprite.skew, vert_dy)
-	var blood_tex: Texture2D = (_sprite.material as ShaderMaterial).get_shader_parameter("blood_map") as Texture2D
+	var smat: ShaderMaterial = _sprite.material as ShaderMaterial
+	var blood_tex: Texture2D = smat.get_shader_parameter("blood_map") as Texture2D
 	var dsrc: Dictionary = ArmPainter.depth_source(blood_tex)
+	var custom_hair: bool = appearance == null or String(appearance.hair_entry().get("folder", "default")) != ""
+	var hf_bytes: PackedByteArray = PackedByteArray()
+	if custom_hair and bool(smat.get_shader_parameter("has_hair_front")):
+		var hf_tex: Texture2D = smat.get_shader_parameter("hair_front_tex") as Texture2D
+		var hsrc: Dictionary = ArmPainter.hair_source(hf_tex)
+		if bool(hsrc.get("valid", false)):
+			hf_bytes = hsrc["bytes"] as PackedByteArray
 	if bool(dsrc.get("valid", false)) and _sprite.hframes > 0 and _sprite.vframes > 0:
 		var cw: int = int(dsrc["w"]) / _sprite.hframes
 		var ch: int = int(dsrc["h"]) / _sprite.vframes
@@ -1981,6 +2044,8 @@ func _animate(delta: float) -> void:
 			"valid": true,
 			"tex_id": blood_tex.get_instance_id() % 1000000,
 			"bytes": dsrc["bytes"],
+			"custom_hair": custom_hair,
+			"hf_bytes": hf_bytes,
 			"w": dsrc["w"],
 			"h": dsrc["h"],
 			"cell_x": col_i * cw,
@@ -2365,6 +2430,7 @@ func _use_sheet(sheet: int) -> void:
 			_sprite.vframes = 8
 			if _swim_under == null:
 				_swim_under = Sprite2D.new()
+				_swim_under.name = "SwimUnder" ## (WaterReflections leaves it out: it lies under the surface)
 				_swim_under.show_behind_parent = true
 				_swim_under.modulate = Color(0.55, 0.9, 0.95, 0.5)
 				_sprite.add_child(_swim_under)
@@ -2461,3 +2527,22 @@ class _CoopNameplate extends Node2D:
 		var y: int = -30
 		draw_rect(Rect2(float(x - 5), float(y + 2), 3.0, 3.0), tone)
 		PixelText.draw(self, pname, Vector2i(x, y), Color(tone, 0.92), Color(VineStyle.OUTLINE, 0.9))
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, true)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)
+
+## Her waterline for the mirror image: the feet, or the surface on her legs while she wades.
+func reflection_line() -> float:
+	var sink: float = _water.submerge if _water != null and swim == 0 else 0.0
+	return global_position.y - sink
+
+
+## Custom-drawn parts of her mirror image: the sword arm (painted, not a sprite).
+func reflection_painters() -> Array:
+	if attack == null or attack.arm_node() == null:
+		return []
+	return [{"source": attack.arm_node(), "paint": attack.paint_arm}]

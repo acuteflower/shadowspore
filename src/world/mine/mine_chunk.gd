@@ -28,7 +28,7 @@ var _frames: int = 0
 func _exit_tree() -> void:
 	if is_instance_valid(decor):
 		decor.queue_free()
-	var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel if is_inside_tree() else null
+	var world: Variant = get_tree().get_first_node_in_group("world") if is_inside_tree() else null
 	for rock: WorldProp in rocks:
 		if is_instance_valid(rock):
 			if world != null and world._things.get(rock.cell) == rock:

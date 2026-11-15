@@ -11,19 +11,20 @@ extends Node
 ## Plays on the bus "Music" (made by `GameSettings.apply`, volume = the MUSIK slider).
 
 const FOLDER: String = "res://assets/audio/music/"
-const NAMES: Array[String] = ["day", "hexenwald", "desert", "night", "combat", "boss"]
+const NAMES: Array[String] = ["day", "hexenwald", "desert", "night", "combat", "boss", "starhall"]
 const DAY: int = 0
 const HEXENWALD: int = 1
 const DESERT: int = 2
 const NIGHT: int = 3
 const COMBAT: int = 4
 const BOSS: int = 5
+const STARHALL: int = 6
 const MAX_PLAYLIST: int = 8
 const PLAYLIST_GAP: float = 2.5 ## seconds of calm air between two full biome playlist tracks
-const LEVEL_DB: Array[float] = [-11.5, -11.5, -11.5, -11.0, -9.0, -8.0]
+const LEVEL_DB: Array[float] = [-11.5, -11.5, -11.5, -11.0, -9.0, -8.0, -9.5]
 const INDOOR_DB: float = -7.0 ## rooms and the mine: the outdoor biome track, further away
-const FADE_IN: Array[float] = [5.0, 5.0, 5.0, 5.0, 1.2, 0.8] ## seconds
-const FADE_OUT: Array[float] = [3.5, 3.5, 3.5, 3.5, 4.0, 5.0]
+const FADE_IN: Array[float] = [5.0, 5.0, 5.0, 5.0, 1.2, 0.8, 2.8] ## seconds
+const FADE_OUT: Array[float] = [3.5, 3.5, 3.5, 3.5, 4.0, 5.0, 2.5]
 const BIOME_ENTER: float = 0.45 ## BiomeBlend weight above which a biome track takes over
 const COMBAT_RANGE: float = 160.0 ## a shadow creature this close to the camera's middle = a fight
 const BOSS_RANGE: float = 620.0
@@ -34,6 +35,7 @@ var night: float = 0.0 ## 0 day .. 1 night (true clock night from TimeManager)
 var gloom: float = 0.0 ## 0 meadow .. 1 Hexenwald (preserved while indoors)
 var arid: float = 0.0 ## 0 meadow .. 1 Sonnenquarz-Öde (preserved while indoors)
 var indoors: bool = false
+var in_starhall: bool = false ## local player is in the Star Hall pocket dimension
 var vista_mode: bool = false ## local player is seated at a panoramic VistaPoint
 
 const VISTA_DUCK_DB: float = -5.5
@@ -45,9 +47,9 @@ var _vista_breeze: AudioStreamPlayer
 
 var _players: Array[AudioStreamPlayer] = []
 var _playlists: Array = [] ## Array[Array[AudioStream]] per slot
-var _track_idx: Array[int] = [0, 0, 0, 0, 0, 0]
-var _gap_left: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-var _amount: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] ## 0..1 share of each track
+var _track_idx: Array[int] = [0, 0, 0, 0, 0, 0, 0]
+var _gap_left: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+var _amount: Array[float] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] ## 0..1 share of each track
 var _current: int = DAY
 var _hold: float = 0.0
 var _check: float = 0.0
@@ -124,7 +126,7 @@ func _on_track_finished(slot: int) -> void:
 		return
 	_track_idx[slot] = (_track_idx[slot] + 1) % list.size()
 	_players[slot].stream = list[_track_idx[slot]]
-	_gap_left[slot] = 0.0 if slot >= COMBAT else PLAYLIST_GAP
+	_gap_left[slot] = 0.0 if (slot == COMBAT or slot == BOSS) else PLAYLIST_GAP
 
 
 func _process(delta: float) -> void:
@@ -139,6 +141,8 @@ func _process(delta: float) -> void:
 	var has_hex: bool = not (_playlists[HEXENWALD] as Array[AudioStream]).is_empty()
 	var has_desert: bool = not (_playlists[DESERT] as Array[AudioStream]).is_empty()
 	var want: int = wanted_biome(night, gloom, arid, has_hex, has_desert, _threat, _hold, _current)
+	if in_starhall and not (_playlists[STARHALL] as Array[AudioStream]).is_empty():
+		want = STARHALL
 	_current = want
 	var calm_vista: bool = vista_mode and _threat < 0 and _hold <= 0.0 and not indoors
 	_vista_blend = move_toward(_vista_blend, 1.0 if calm_vista else 0.0, delta / (1.8 if calm_vista else 0.9))
@@ -194,10 +198,10 @@ func _apply(i: int) -> void:
 		return
 	var amount: float = _amount[i]
 	if amount <= 0.001:
-		if i >= COMBAT:
+		if i == COMBAT or i == BOSS:
 			p.stop() ## a fight always starts from its first bar
 		elif p.playing:
-			p.stream_paused = true ## world tracks go on where they paused
+			p.stream_paused = true ## world and starhall tracks go on where they paused
 		return
 	if _gap_left[i] > 0.0:
 		return

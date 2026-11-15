@@ -70,7 +70,7 @@ func _populate(cell: Vector2i) -> void:
 	var mid_px: Vector2 = Vector2(cell) * 512.0 + Vector2(256.0, 256.0)
 	var w_wind: float = MeadowHabitats.wind_meadow_at(mid_px)
 	var bf_chance: float = float(spec["chunk_chance"]) * (1.0 + 1.35 * w_wind)
-	var bf_cap: int = int(spec["max_loaded"]) + (8 if w_wind >= 0.40 else 0)
+	var bf_cap: int = Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) + (8 if w_wind >= 0.40 else 0)
 	if rng.randf() > bf_chance or _butterflies.get_child_count() >= bf_cap:
 		return
 	var flowers: Array[Vector2] = []

@@ -105,7 +105,11 @@ def render_job(job: tuple) -> tuple:
         blood_b = None
         if want_blood:
             depth, code, bl = hero.render(tprims, yaw, model.bob)
-            blood_rows = hero.to_blood(bl, code, hero.LAST_BAND, depth if want_arm3 else None)
+            arm_d = arm_c = None
+            if want_arm3:
+                bh_prims = [p for p in tprims if p.layer in ("body", "body_under", "prop")]
+                arm_d, arm_c, _ = hero._raster_subset(bh_prims)
+            blood_rows = hero.to_blood(bl, code, hero.LAST_BAND, depth if want_arm3 else None, arm_d, arm_c)
             blood_b = np.asarray(blood_rows, dtype=np.uint8).tobytes()
         rig = {k: hero.project(model, yaw, v) for k, v in model.rig.items()}
         arm3 = [int(round(c * 20.0)) for pt in model.arm3 for c in hero.project_3d(model, yaw, pt)] if want_arm3 else None

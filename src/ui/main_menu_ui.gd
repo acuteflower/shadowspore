@@ -246,10 +246,16 @@ func _rebuild_rows() -> void:
 					])
 				1:
 					_rows.append_array([
+						{"id": "quality", "label": "GRAFIKSTUFE", "kind": "weather"},
+						{"id": "adaptive", "label": "ADAPTIVE GRAFIK", "kind": "toggle"},
+						{"id": "fps_cap", "label": "BILDRATE-LIMIT", "kind": "weather"},
+						{"id": "pixel_res", "label": "PIXEL-AUFLÖSUNG", "kind": "toggle"},
 						{"id": "fullscreen", "label": "VOLLBILD", "kind": "toggle"},
 						{"id": "vsync", "label": "VSYNC", "kind": "toggle"},
 						{"id": "shake", "label": "KAMERA-SCHÜTTELN", "kind": "slider"},
 						{"id": "flash_soft", "label": "BLITZE SANFT", "kind": "toggle"},
+						{"id": "reflections", "label": "WASSERSPIEGELUNG", "kind": "toggle"},
+						{"id": "sun_shadows", "label": "SCHATTEN", "kind": "toggle"},
 					])
 				2:
 					_rows.append_array([
@@ -390,7 +396,7 @@ func _input(event: InputEvent) -> void:
 			elif kind == "toggle":
 				_flip(String(row.id))
 			elif kind == "weather":
-				_cycle_weather(dir)
+				Quality.cycle(String(row.id), dir)
 			elif kind == "stepper":
 				_new_world_max = clampi(_new_world_max + dir, 2, 4)
 		get_viewport().set_input_as_handled()
@@ -675,7 +681,7 @@ func _press(row: Dictionary, at: Vector2) -> void:
 		_flip(id)
 		return
 	if kind == "weather":
-		_cycle_weather(1)
+		Quality.cycle(id, 1)
 		return
 	if kind == "stepper":
 		_new_world_max = 2 if _new_world_max >= 4 else _new_world_max + 1
@@ -1092,8 +1098,7 @@ func _draw_row_widget(idx: int, row: Dictionary, rect: Rect2, fade: float, void_
 			var word: String = "AN" if on else "AUS"
 			PixelText.draw(self, word, Vector2i(int(rect.end.x - 28.0), int(rect.position.y + 5.0)), Color(Color("a6e68f") if on else Color("8a84ad"), fade), outline)
 		"weather":
-			var idx_w: int = clampi(int(GameSettings.get_value("weather_fx")), 0, 2)
-			var wtxt: String = ["AUS", "REDUZIERT", "VOLL"][idx_w]
+			var wtxt: String = Quality.label(id) ## weather, graphics level, frame cap (choices)
 			var box: Rect2 = Rect2(rect.end.x - 76.0, rect.position.y + 2.0, 72.0, 13.0)
 			VineStyle.plate(self, box, wtxt, tone if active else tone * 0.35, VineStyle.PETAL if active else UiStyle.TEXT, fade, void_level * 0.3)
 		"stepper":

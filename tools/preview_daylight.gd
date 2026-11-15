@@ -72,6 +72,7 @@ func _run() -> void:
 			for node: Node in get_tree().get_nodes_in_group("night_watchers"): node.call("fill_now")
 			for _k: int in 100: await get_tree().process_frame
 		if is_instance_valid(DaylightField.current): print("canopy rebuild us: ", DaylightField.current.rebuild_usec)
+		if is_instance_valid(SunShadows.current): print("sun shadows: ", SunShadows.current.drawn_items, " copies, ", SunShadows.current.cost_usec, " usec (avg ", int(SunShadows.current.cost_avg), ", swayed ", SunShadows.current.swayed_items, ")")
 		if dir.is_empty(): continue
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/t%s.png" % [dir, t])

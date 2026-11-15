@@ -36,6 +36,9 @@ RAMPS = {  # dark .. light; bevel: lit rim = last, shaded rim = first, inside = 
     "hagwood": [hexc(c) for c in ("2b1a38", "4c2f5e", "73508a", "a07cb8")],
     "silver": [hexc(c) for c in ("3a4260", "6d7898", "a3adc8", "d6dcef")],
     "bone": [hexc(c) for c in ("4a4560", "8a8698", "b8b4b8", "dedacc", "f6f2e0")],  # Bleichbaum: bleached wood with a violet shade (art_hexenwald.py BONE)  # Fluchsilber of the staff's head  # Hexenulme: nearly black violet bark (docs/magie_konzept.md)
+    "stone": [hexc(c) for c in ("363046", "524b64", "746d86", "9e98ae")],  # matte chipped stone with cool-violet shadows (basic tier-1 tools)
+    "timber": [hexc(c) for c in ("382538", "5c4048", "82605c", "a68378")],  # plain, humble wooden shaft for basic tools
+    "cord": [hexc(c) for c in ("483844", "6e5a56", "967e6a", "baa288")],  # simple fiber/cord lashing
 }
 GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8"), "sword_rift": hexc("c07bff")}
 
@@ -164,47 +167,53 @@ def rift_sword(w, h, tf):
 
 
 def axe(w, h, tf):
+    """Basic stone axe: humble wooden haft, knapped stone wedge head, fiber lashing."""
     ax = 12.0
-    layers = [("handle", stroke_mask([(1.5, ax), (27.0, ax)], 2.0, w, h, tf), "wood")]
-    layers.append(("wrap", stroke_mask([(2.0, ax), (9.0, ax)], 2.0, w, h, tf), "wrap"))
-    blade = poly_mask([(22.4, 11.2), (21.2, 8.2), (19.6, 5.0), (19.4, 2.4), (21.4, 0.8), (25.6, 0.4), (29.4, 1.2), (31.2, 3.0), (30.2, 6.0), (28.4, 9.0), (27.8, 11.2)], w, h, tf)
-    poll = poly_mask([(22.4, 13.0), (27.8, 13.0), (27.4, 16.4), (23.0, 16.6)], w, h, tf)
-    layers.append(("poll", poll, "steel_dark"))
-    layers.append(("eye", poly_mask([(22.2, 10.6), (28.2, 10.6), (28.2, 13.4), (22.2, 13.4)], w, h, tf), "steel_dark"))
-    layers.append(("blade", blade, "steel"))
+    layers = [("handle", stroke_mask([(1.5, ax), (28.5, ax)], 2.2, w, h, tf), "timber")]
+    blade = poly_mask([
+        (22.0, 11.4), (21.2, 8.0), (20.4, 4.4), (21.2, 2.0),
+        (24.0, 0.9), (27.6, 1.3), (29.8, 3.2), (29.4, 6.2),
+        (28.0, 9.0), (26.8, 11.4),
+    ], w, h, tf)
+    butt = poly_mask([(22.2, 12.8), (26.8, 12.8), (26.2, 15.6), (22.8, 15.6)], w, h, tf)
+    layers.append(("butt", butt, "stone"))
+    layers.append(("blade", blade, "stone"))
+    layers.append(("lashing", poly_mask([(21.4, 9.8), (27.4, 9.8), (27.4, 13.6), (21.4, 13.6)], w, h, tf), "lashing"))
     return layers
 
 
 def pickaxe(w, h, tf):
+    """Basic stone pickaxe: humble wooden haft, angular knapped stone pick head, fiber lashing."""
     ax = 11.0
-    layers = [("handle", stroke_mask([(1.5, ax), (27.0, ax)], 2.0, w, h, tf), "wood")]
-    layers.append(("wrap", stroke_mask([(2.0, ax), (9.0, ax)], 2.0, w, h, tf), "wrap"))
-    pts = [(27.0 - 5.4 * (1 - math.cos(a)), ax + 10.2 * math.sin(a)) for a in [(i / 40.0 - 0.5) * math.pi * 0.98 for i in range(41)]]
-    head = stroke_mask(pts, lambda t: 0.9 + 2.9 * math.sin(math.pi * t) ** 0.8, w, h, tf)
-    layers.append(("collar", poly_mask([(23.4, ax - 2.2), (27.4, ax - 2.2), (27.4, ax + 2.2), (23.4, ax + 2.2)], w, h, tf), "steel_dark"))
-    layers.append(("head", head, "steel"))
+    layers = [("handle", stroke_mask([(1.5, ax), (28.0, ax)], 2.2, w, h, tf), "timber")]
+    pts = [(26.5 - 5.2 * (1 - math.cos(a)), ax + 10.0 * math.sin(a)) for a in [(i / 40.0 - 0.5) * math.pi * 0.96 for i in range(41)]]
+    head = stroke_mask(pts, lambda t: 1.3 + 3.2 * math.sin(math.pi * t) ** 0.75, w, h, tf)
+    layers.append(("head", head, "stone"))
+    layers.append(("lashing", poly_mask([(22.6, ax - 2.6), (27.4, ax - 2.6), (27.4, ax + 2.6), (22.6, ax + 2.6)], w, h, tf), "lashing"))
     return layers
 
 
 def sickle(w, h, tf):
+    """Basic stone sickle: humble wooden handle, curved knapped stone blade, fiber lashing."""
     ax = 5.0
-    layers = [("handle", stroke_mask([(1.5, ax), (14.0, ax)], 2.0, w, h, tf), "wood")]
-    layers.append(("wrap", stroke_mask([(2.0, ax), (8.0, ax)], 2.0, w, h, tf), "wrap"))
-    pts = [(14.0 + 8.0 * math.sin(a), ax + 8.0 * (1 - math.cos(a))) for a in [i / 40.0 * 2.25 for i in range(41)]]
-    blade = stroke_mask(pts, lambda t: 3.8 * (1 - t) ** 0.8 + 0.9 * t, w, h, tf)
-    layers.append(("ferrule", poly_mask([(13.0, ax - 1.6), (16.0, ax - 1.6), (16.0, ax + 1.6), (13.0, ax + 1.6)], w, h, tf), "steel_dark"))
-    layers.append(("blade", blade, "steel"))
+    layers = [("handle", stroke_mask([(1.5, ax), (14.5, ax)], 2.2, w, h, tf), "timber")]
+    pts = [(13.8 + 8.0 * math.sin(a), ax + 8.0 * (1 - math.cos(a))) for a in [i / 40.0 * 2.22 for i in range(41)]]
+    blade = stroke_mask(pts, lambda t: 4.0 * (1 - t) ** 0.75 + 1.2 * t, w, h, tf)
+    layers.append(("blade", blade, "stone"))
+    layers.append(("lashing", poly_mask([(11.4, ax - 1.9), (15.6, ax - 1.9), (15.6, ax + 1.9), (11.4, ax + 1.9)], w, h, tf), "lashing"))
     return layers
 
 
 def hoe(w, h, tf):
-    """The hoe (docs/farming.md): a long haft with a broad flat blade turned down at the end, like the garden tools of the town."""
+    """Basic stone hoe: humble wooden haft, broad chipped stone blade, fiber lashing."""
     ax = 6.0
-    layers = [("handle", stroke_mask([(1.5, ax), (26.0, ax)], 2.0, w, h, tf), "wood")]
-    layers.append(("wrap", stroke_mask([(2.0, ax), (8.0, ax)], 2.0, w, h, tf), "wrap"))
-    layers.append(("collar", poly_mask([(23.4, ax - 2.0), (26.8, ax - 2.0), (26.8, ax + 2.2), (23.4, ax + 2.2)], w, h, tf), "steel_dark"))
-    blade = poly_mask([(24.2, ax + 1.6), (27.4, ax + 1.2), (30.6, ax + 9.2), (30.8, ax + 11.2), (24.4, ax + 11.0), (23.4, ax + 8.4)], w, h, tf)
-    layers.append(("blade", blade, "steel"))
+    layers = [("handle", stroke_mask([(1.5, ax), (27.5, ax)], 2.2, w, h, tf), "timber")]
+    blade = poly_mask([
+        (23.6, ax + 1.4), (27.0, ax + 1.0), (29.8, ax + 8.6),
+        (29.4, ax + 11.0), (24.0, ax + 10.6), (23.0, ax + 7.8),
+    ], w, h, tf)
+    layers.append(("blade", blade, "stone"))
+    layers.append(("lashing", poly_mask([(22.4, ax - 2.2), (27.2, ax - 2.2), (27.2, ax + 2.4), (22.4, ax + 2.4)], w, h, tf), "lashing"))
     return layers
 
 
@@ -392,6 +401,25 @@ def compose(item, w, h, tf, material_map=None):
             continue
         if mat == "steel_dark":
             mat = "dark"
+        if mat == "stone":  # matte knapped stone: bevel + subtle directional chip facets (no shiny speculars)
+            ramp = RAMPS["stone"]
+            for (x, y), c in bevel(mask, ramp).items():
+                if c == ramp[2] and ((x // 2 + y) % 5 == 0):
+                    img[(x, y)] = ramp[1]
+                elif c == ramp[3] and ((x + y * 2) % 7 == 0):
+                    img[(x, y)] = ramp[2]
+                else:
+                    img[(x, y)] = c
+            continue
+        if mat == "lashing":  # wrapped fiber/cord lashing around the stone-to-wood joint
+            ramp = RAMPS["cord"]
+            for (x, y), c in bevel(mask, ramp).items():
+                if (x + y) % 3 == 0 and c != ramp[0]:
+                    idx = max(0, ramp.index(c) - 1)
+                    img[(x, y)] = ramp[idx]
+                else:
+                    img[(x, y)] = c
+            continue
         for (x, y), c in bevel(mask, RAMPS[mat]).items():
             img[(x, y)] = c
     return img

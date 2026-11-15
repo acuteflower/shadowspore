@@ -17,6 +17,7 @@ const WALK_SPEED: float = 34.0 ## px/s while she walks in
 const SECTORS: int = 8
 
 var town: TownManager
+var reflect_moving: bool = true ## WaterReflections: checked every rebuild, settlers walk
 var sid: String = ""
 var spec: Dictionary = {}
 var _rig: Dictionary = {}
@@ -50,6 +51,7 @@ var _fear_mode: int = 0 ## 0 the plan, 1 running for cover, 2 hidden indoors, 3 
 var _fear_route: PackedVector2Array = PackedVector2Array()
 var _fear_d: float = 0.0
 var _fear_wait: float = 0.0
+var _cheer_t: float = 0.0
 
 
 func setup(owner_town: TownManager, settler_id: String, fresh: bool) -> void:
@@ -59,6 +61,7 @@ func setup(owner_town: TownManager, settler_id: String, fresh: bool) -> void:
 	_rig = DataRegistry.table(String(spec.art) + "_rig")
 	add_to_group("settlers")
 	add_to_group("quest_actors")
+	town.event.connect(_on_town_event)
 	var sheet: String = "res://assets/characters/%s.png" % String(spec.art)
 	if not _rig.is_empty() and ResourceLoader.exists(sheet):
 		_sprite = _make_sprite(sheet)
@@ -215,10 +218,18 @@ func map_marker() -> Dictionary:
 		"position": global_position if visible else home_position(), "resting": not visible}
 
 
+func _on_town_event(kind: String, _data: Dictionary) -> void:
+	if kind in ["level_up", "market_day"] and visible and not town.alert_on and not town.fear_on:
+		_cheer_t = 2.6
+		_sector = Adventurer.sector_of(town.center - global_position)
+
+
 # ---------- every frame ----------
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _cheer_t > 0.0:
+		_cheer_t = maxf(_cheer_t - delta, 0.0)
 	var plan: Dictionary = plan_at(TimeManager.time_of_day)
 	_spot = resolve_spot(String(plan.spot))
 	var placed: Dictionary = _plan_position(plan)
@@ -261,6 +272,8 @@ func _process(delta: float) -> void:
 		_sector = _alert_sector
 	if _talking and not _moving:
 		wanted = "idle" if _has_clip("idle") else wanted
+	if _cheer_t > 0.0 and not _moving and not _talking:
+		wanted = "wave" if _has_clip("wave") else ("nod" if _has_clip("nod") else ("idle" if _has_clip("idle") else wanted))
 	if wanted != _clip:
 		_clip = wanted
 		_clip_time = 0.0
@@ -388,6 +401,10 @@ func _chips(cfg: Dictionary) -> void:
 func _show() -> void:
 	if _sprite == null:
 		return
+	var hop: float = -absf(sin(_cheer_t * 10.0)) * 3.0 if _cheer_t > 0.0 and not _moving else 0.0
+	_sprite.position.y = hop
+	if _glow != null:
+		_glow.position.y = hop
 	var clips: Dictionary = _rig.get("clips", {}) as Dictionary
 	var clip: Dictionary = clips.get(_clip, clips.get("idle", {})) as Dictionary
 	var count: int = maxi(int(clip.get("count", 1)), 1)
@@ -454,6 +471,8 @@ func _alert_step(delta: float, plan_pos: Vector2) -> void:
 		0, 3:
 			if watching:
 				_alert_start(1, _alert_target())
+				if visible:
+					say("Wache am Rand — haltet die Augen offen!", 2.6)
 		1, 2:
 			if not watching:
 				_alert_start(3, plan_pos)
@@ -549,6 +568,12 @@ func prompt() -> String:
 		return ""
 	if _has_report():
 		return "AUFTRAG ABGEBEN"
+	var player: Player = _local_player()
+	var gift: Dictionary = town.gift_candidate(sid, player)
+	if not gift.is_empty():
+		var gitem: String = String(gift.item)
+		var gname: String = String(DataRegistry.get_entry("items", gitem).get("name", gitem)).to_upper()
+		return "GESCHENK: %s" % gname
 	return "HANDWERK" if is_working() and int((town.residents[sid] as Dictionary).get("talked", -1)) == TimeManager.day else "ANSPRECHEN"
 
 
@@ -593,6 +618,16 @@ func interact(player: Player) -> void:
 		var box: SpeechBox = get_tree().get_first_node_in_group("speech_box") as SpeechBox
 		if box != null and thanks != "":
 			await box.speak(String(spec.name), thanks)
+		_talking = false
+		return
+	var gift: Dictionary = town.gift_candidate(sid, player)
+	if not gift.is_empty():
+		_talking = true
+		_sector = Adventurer.sector_of(player.global_position - global_position)
+		town.request_gift(sid, String(gift.get("item", "")))
+		var gift_lines: Array = spec.get("gift_thanks", []) as Array
+		if not gift_lines.is_empty():
+			say(String(gift_lines[randi() % gift_lines.size()]), 2.6)
 		_talking = false
 		return
 	if spec.has("chat") and not (spec.has("shop") and (is_working() or _order_waits())):

@@ -181,7 +181,7 @@ func _process(_delta: float) -> void:
 func _apply_local_vista_mode(player: Player, active: bool) -> void:
 	var manager: Vistas = Vistas.of(get_tree())
 	var cfg: Dictionary = manager.settings() if manager != null else {}
-	var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+	var world: Variant = get_tree().get_first_node_in_group("world")
 	if world != null:
 		if active:
 			var look_world: Vector2 = global_position + sit_direction() * 220.0

@@ -91,6 +91,8 @@ def lay(run):
 
     if style == "stadt":
         return lay_rampart(run, rng, total), at, total, arc
+    if style == "koppel":
+        return lay_fence(run, rng, total), at, total, arc
     things = []
     T = 2.4 if style == "garten" else 2.7
     posts = run.get("posts", [False, False])
@@ -150,6 +152,24 @@ def lay(run):
         if has:
             things.append((3.0 if k == 0 else total - 3.0, "post", (rng.random(), style)))
     return things, at, total, arc
+
+
+def lay_fence(run, rng, total):
+    """The paddock's wooden fence: split posts about 11 px apart (a little crooked), two rails between each pair (now and then one sagging
+    or a third, newer one nailed on), grass at the posts; strong gate posts with a cap where the run ends at the gate."""
+    things = []
+    posts = run.get("posts", [False, False])
+    n = max(1, int(round(total / 11.0)))
+    ss = [total * k / n for k in range(n + 1)]
+    for k, s in enumerate(ss):
+        gate = (k == 0 and posts[0]) or (k == n and posts[1])
+        things.append((s, "gpost" if gate else "fpost", (rng.uniform(-0.12, 0.12), rng.uniform(-0.12, 0.12), rng.random())))
+        if rng.random() < 0.55:
+            things.append((s + 0.01, "tuft_out", (rng.random(),)))
+    for k in range(n):
+        q = rng.random()
+        things.append(((ss[k] + ss[k + 1]) / 2, "rails", (ss[k], ss[k + 1], q)))
+    return things
 
 
 def lay_rampart(run, rng, total):
@@ -432,6 +452,30 @@ def build_piece(run, things, at, lo, hi, feet):
             m.limb(c + V(0, y - 2.0, 0), c - out_ * 1.6 + V(0, y + 1.5, 0), 0.3, 0.3, hut_lib.IRON)
             m.ell(c - out_ * 1.7 + V(0, y + 1.6, 0), (0.7, 0.5, 0.7), hut_lib.IRON)
             m.ell(c - out_ * 1.7 + V(0, y + 3.0, 0), (0.7, 1.4, 0.7), FIRE)
+        elif kind in ("fpost", "gpost"):
+            lx, lz, q = a
+            top = 12.5 if kind == "fpost" else 17.0
+            r = 0.75 if kind == "fpost" else 1.25
+            hut_lib.log(m, base + V(0, 0.0, 0), base + V(lx, top, lz), r, hut_lib.BARK, step=0.8)
+            m.ell(base + V(lx, top + 0.2, lz), (r * 0.9, 0.35, r * 0.9), hut_lib.PLANK_W)
+            if kind == "gpost":
+                m.ell(base + V(lx, top + 1.0, lz), (2.0, 0.7, 1.8), hut_lib.PLANK)
+                m.ell(base + V(0, 0.6, 0), (2.4, 0.8, 2.0), STONE)
+                if q < 0.5:  # a lantern on the gate post
+                    hut_lib.log(m, base + V(lx, top - 1.0, lz), base + V(lx + 2.6, top - 1.0, lz), 0.2, hut_lib.IRON, step=0.4)
+                    m.ell(base + V(lx + 2.6, top - 3.2, lz), (0.9, 1.4, 0.9), FIRE)
+                    m.ell(base + V(lx + 2.6, top - 1.6, lz), (1.1, 0.35, 1.0), hut_lib.IRON)
+        elif kind == "rails":
+            s0, s1, q = a
+            pa, pb = at(s0), at(s1)
+            A = to_model(pa[0] - feet[0], pa[1] - feet[1])
+            B = to_model(pb[0] - feet[0], pb[1] - feet[1])
+            for y0, y1, mat in ((9.6, 9.6 - (2.4 if q < 0.1 else 0.0), hut_lib.PLANK_W), (5.2, 5.2, hut_lib.PLANK)):
+                mid = (A + B) / 2 + V(0, (y0 + y1) / 2 - 0.5, 0)
+                hut_lib.log(m, A + V(0, y0, 0), mid, 0.42, mat, step=0.7)
+                hut_lib.log(m, mid, B + V(0, y1, 0), 0.42, mat, step=0.7)
+            if q > 0.9:  # a newer board nailed on low
+                hut_lib.log(m, A + V(0, 2.4, 0), B + V(0, 2.6, 0), 0.38, hut_lib.PLANK_W, step=0.7)
         elif kind == "tower":
             q, top = a
             build_tower(m, base, q, top, rng)
@@ -581,13 +625,32 @@ def shadow(arr, pts, feet, ox, oy):
 def main():
     town = json.loads((hh.DATA.parent / "hallgrat.json").read_text(encoding="utf-8"))
     data = json.loads(hh.DATA.read_text(encoding="utf-8"))
+    import hashlib
+    src_hash = hashlib.md5(Path(__file__).read_bytes()).hexdigest()
+    old_cache = data.get("wall_cache", {}) if "--all" not in sys.argv else {}
+    old_types = dict(data["types"])
+    old_pieces = data.get("wall_pieces", [])
     data["types"] = {k: v for k, v in data["types"].items() if not k.startswith("wand_")}
     OUT.mkdir(parents=True, exist_ok=True)
+    cache = {}
+    keep = set()
+    for run in town.get("wall_runs", []):  # a run that is exactly as it was (and this script too) keeps its pictures
+        key_ = hashlib.md5((json.dumps(run, sort_keys=True) + src_hash).encode()).hexdigest()
+        cache[str(run["id"])] = key_
+        if old_cache.get(str(run["id"])) == key_:
+            keep.add(run["id"])
     for old in OUT.glob("wand_*.png"):
-        old.unlink()
+        if int(old.stem.split("_")[1]) not in keep:
+            old.unlink()
     pieces = []
     shown = []
     for run in town.get("wall_runs", []):
+        if run["id"] in keep:
+            mine = [pc for pc in old_pieces if pc["type"].startswith("wand_%d_" % run["id"])]
+            for pc in mine:
+                data["types"][pc["type"]] = old_types[pc["type"]]
+            pieces += mine
+            continue
         things, at, total, arc = lay(run)
         pts = [tuple(p) for p in run["pts"]]
         n_pieces = max(1, int(round((len(pts) - 1) / PIECE)))
@@ -641,6 +704,8 @@ def main():
             data["types"][key] = {"size": [arr.shape[1], arr.shape[0]], "feet": [cw // 2 - x0, ground - y0],
                                   "foot": [int(max(xs_) - min(xs_)) + 6, int(span_y) + 6], "lights": lit, "chain": chain,
                                   "dir": "walls/"}
+            if run["style"] == "koppel":
+                data["types"][key]["thick"] = 5.0
             if tall:
                 data["types"][key]["thick"] = 16.0
                 data["types"][key]["towers"] = [[round(at(t)[0] - feet[0], 1), round(at(t)[1] - feet[1] - 1.0, 1), round(TOWER_R * K, 1)]
@@ -648,6 +713,8 @@ def main():
             pieces.append({"type": key, "px": list(feet)})
             shown.append(arr)
     data["wall_pieces"] = pieces
+    data["wall_cache"] = cache
+    print("kept %d runs as they were" % len(keep))
     hh.DATA.write_text(json.dumps(data, indent="\t") + "\n", encoding="utf-8")
     print("%d wall runs in %d pieces" % (len(town.get("wall_runs", [])), len(pieces)))
     png = [a for a in sys.argv[1:] if a.endswith(".png")]

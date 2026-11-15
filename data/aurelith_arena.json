@@ -1,0 +1,24 @@
+{
+  "_doc": "Das Singende Becken (Wuesten-Boss Aurelith, docs/enemies/boss_aurelith.md). tile = Zentrum des L0-Duenenbeckens in Region 33. Frei erreichbar ab Tag 1 ohne Story-Sperre.",
+  "id": "singing_basin",
+  "tile": [626, 69],
+  "clear_radius": 20,
+  "species": "boss_aurelith",
+  "arena_rx": 290.0,
+  "arena_ry": 210.0,
+  "wall_teeth": 44,
+  "spawn_range": 520.0,
+  "leash": 640.0,
+  "reset_seconds": 8.0,
+  "silence_seconds": 0.85,
+  "awaken_rise_seconds": 1.35,
+  "awaken_slam_seconds": 1.55,
+  "guardians": [
+    {"offset": [-118, -72], "variant": 0, "dormant": true},
+    {"offset": [122, -68], "variant": 2, "dormant": false},
+    {"offset": [144, 14], "variant": 1, "dormant": true},
+    {"offset": [96, 86], "variant": 0, "dormant": false},
+    {"offset": [-94, 88], "variant": 2, "dormant": false},
+    {"offset": [-142, 12], "variant": 1, "dormant": true}
+  ]
+}

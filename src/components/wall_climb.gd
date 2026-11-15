@@ -103,7 +103,7 @@ func _available() -> bool:
 
 
 func _landing(heading: Vector2) -> Vector2:
-	var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+	var world: Variant = get_tree().get_first_node_in_group("world")
 	var relief: Relief = Terrain.relief
 	var start: Vector2 = _player.global_position
 	if world == null or relief == null or heading.is_zero_approx() or not _outdoor_floor(world, start):
@@ -148,7 +148,7 @@ func _landing(heading: Vector2) -> Vector2:
 	return end if _clear_between(start, end, _wall_rids()) else Vector2.INF
 
 
-func _outdoor_floor(world: WorldLevel, point: Vector2) -> bool:
+func _outdoor_floor(world: Variant, point: Vector2) -> bool:
 	return Interiors.slot_at(point) < 0 and not MineManager.in_mine(point) and world.navigation_floor(point)
 
 
@@ -242,7 +242,7 @@ func step(delta: float) -> void:
 	var next: float = minf(_elapsed + delta, SECONDS)
 	var point: Vector2 = _position_at(next)
 	if multiplayer.is_server():
-		var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+		var world: Variant = get_tree().get_first_node_in_group("world")
 		if world == null or not _outdoor_floor(world, point) or not _outdoor_floor(world, _end) or not _clear_at(_end) or not _clear_between(_position_at(_elapsed), point, _walls):
 			interrupt()
 			return

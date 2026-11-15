@@ -100,7 +100,7 @@ static func compute_bundle(
 			var ty: float = float(gy * CELL) + 2.0
 			var tile_i: Vector2i = Vector2i(int(tx), int(ty))
 			var super_id: int = map.super_at(tile_i)
-			if super_id < 0 or super_id >= 5:
+			if super_id < 0 or map.biome_at(tile_i) != "meadow":
 				deep[idx] = 0.0
 				wind[idx] = 0.0
 				pasture[idx] = 0.0

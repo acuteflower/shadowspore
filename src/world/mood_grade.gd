@@ -9,6 +9,7 @@ const FIELDS: Array[String] = ["split", "vibrance", "contrast", "bloom", "thresh
 var _material: ShaderMaterial
 var _keys: Array[Dictionary] = []
 var _indoors: Dictionary = {}
+var _starhall: Dictionary = {}
 var _hex: Dictionary = {}
 var _desert: Dictionary = {}
 var _desert_storm: Dictionary = {}
@@ -24,6 +25,7 @@ func _ready() -> void:
 	for entry: Variant in data.get("keys", []) as Array:
 		_keys.append(_parse(entry as Dictionary))
 	_indoors = _parse(data.get("indoors", {}) as Dictionary)
+	_starhall = _parse(data.get("starhall", data.get("indoors", {})) as Dictionary)
 	_hex = _parse(data.get("hex", {}) as Dictionary)
 	_desert = _parse(data.get("desert", {}) as Dictionary)
 	_desert_storm = _parse(data.get("desert_storm", {}) as Dictionary)
@@ -59,11 +61,11 @@ static func blend(a: Dictionary, b: Dictionary, weight: float) -> Dictionary:
 	return out
 
 
-## Every frame (DayNight): `indoors` = a room or the mine, `gloom` = the Hexenwald's share, `arid` = Sonnenquarz-Öde's share, `arcane_storm` = Arkanes Quarzgewitter.
-func follow(indoors: bool, gloom: float, arid: float = 0.0, arcane_storm: float = 0.0) -> void:
+## Every frame (DayNight): `indoors` = a room or the mine, `gloom` = the Hexenwald's share, `arid` = Sonnenquarz-Öde's share, `arcane_storm` = Arkanes Quarzgewitter, `starhall` = Der Sternensaal.
+func follow(indoors: bool, gloom: float, arid: float = 0.0, arcane_storm: float = 0.0, starhall: bool = false) -> void:
 	if not visible:
 		return
-	var mood: Dictionary = _indoors if indoors else mood_at(TimeManager.time_of_day)
+	var mood: Dictionary = _starhall if (indoors and starhall) else (_indoors if indoors else mood_at(TimeManager.time_of_day))
 	if not indoors:
 		if gloom > 0.0:
 			mood = blend(mood, _hex, gloom)

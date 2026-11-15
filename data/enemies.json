@@ -1196,5 +1196,135 @@
    "death": "res://assets/audio/golem/death.wav",
    "volume_db": -7
   }
+ },
+ "boss_aurelith": {
+  "name": "Aurelith, Herz des Sonnenquarzes",
+  "boss": true,
+  "max_health": 2500,
+  "heavy_knockback": 180,
+  "hover_speed": 54,
+  "bar_range": 420,
+  "shake_radius": 340,
+  "pickaxe_multiplier": 1.0,
+  "intro": {
+   "name": "AURELITH",
+   "epithet": "HERZ DES SONNENQUARZES",
+   "range": 720
+  },
+  "fight": {
+   "phases": [
+    0.66,
+    0.33
+   ],
+   "entrance": {
+    "rise": 1.35,
+    "slam": 1.55,
+    "slam_hit": 0.58,
+    "card": 4.4
+   },
+   "transition1": {
+    "text": "MANTELBRUCH",
+    "scream_at": 1.45,
+    "title_at": 1.95,
+    "leave_at": 3.55,
+    "end": 4.15,
+    "hot": 0.0
+   },
+   "transition2": {
+    "text": "SONNENSCHMELZE",
+    "scream_at": 1.55,
+    "title_at": 2.05,
+    "leave_at": 3.75,
+    "end": 4.35,
+    "hot": 0.15
+   },
+   "preferred_min": 88,
+   "preferred_max": 152
+  },
+  "loot": {
+   "award": "all",
+   "xp": 460,
+   "copper": {
+    "min": 380,
+    "max": 560
+   },
+   "chest": {
+    "tier": "legendary",
+    "delay": 3.65,
+    "bonus": [
+     {
+      "pool": "epic_finds",
+      "count": [
+       1,
+       1
+      ]
+     },
+     {
+      "pool": "rare_mats",
+      "count": [
+       1,
+       2
+      ]
+     }
+    ]
+   },
+   "relics": [
+    {
+     "id": "fessel_des_schmelzers",
+     "first": 1.0,
+     "chance": 0.12
+    }
+   ],
+   "items": [
+    {
+     "id": "ur_prisma",
+     "chance": 1.0,
+     "min": 1,
+     "max": 2
+    },
+    {
+     "id": "sun_quartz",
+     "chance": 1.0,
+     "min": 6,
+     "max": 10
+    },
+    {
+     "id": "prism_shard",
+     "chance": 1.0,
+     "min": 3,
+     "max": 5
+    },
+    {
+     "id": "ruin_stone",
+     "chance": 1.0,
+     "min": 4,
+     "max": 7
+    }
+   ]
+  },
+  "audio": {
+   "awaken": "res://assets/audio/aurelith/awaken_roar.wav",
+   "charge": "res://assets/audio/aurelith/gauntlet_launch.wav",
+   "slam": "res://assets/audio/aurelith/anvil_slam.wav",
+   "yank": "res://assets/audio/aurelith/chain_yank.wav",
+   "erupt": "res://assets/audio/aurelith/fault_crack.wav",
+   "quicksand": "res://assets/audio/aurelith/quicksand_swirl.wav",
+   "blade": "res://assets/audio/aurelith/blade_forge.wav",
+   "geode": "res://assets/audio/aurelith/geode_cast.wav",
+   "mantle": "res://assets/audio/aurelith/mantle_shatter.wav",
+   "beam": "res://assets/audio/aurelith/solar_beam.wav",
+   "press": "res://assets/audio/aurelith/temple_press.wav",
+   "mirage": "res://assets/audio/aurelith/mirage_rush.wav",
+   "meltdown": "res://assets/audio/aurelith/solar_meltdown.wav",
+   "tsunami": "res://assets/audio/aurelith/tsunami_roar.wav",
+   "core": "res://assets/audio/aurelith/core_deflect.wav",
+   "zenith": "res://assets/audio/aurelith/zenith_charge.wav",
+   "stagger": "res://assets/audio/aurelith/overheat_stagger.wav",
+   "collapse": "res://assets/audio/aurelith/harmonic_collapse.wav",
+   "harp": "res://assets/audio/observatory/wind_harp.wav",
+   "surge": "res://assets/audio/observatory/storm_surge.wav",
+   "chime": "res://assets/audio/observatory/noon_chime.wav",
+   "volume_db": -4
+  }
  }
 }

@@ -596,6 +596,71 @@ func _run() -> void:
 		_check(town.structure_level(plaza_id) == 2, "plaza reaches Lv 2 (%d)" % town.structure_level(plaza_id))
 		_check(town.worth() > worth_before + 3.0, "Lv 2 plaza adds worth (%.1f -> %.1f)" % [worth_before, town.worth()])
 		_check(plaza_view != null and String(plaza_view._spec.texture) == "plaza_2", "Lv 2 plaza view uses plaza_2 art (%s)" % (String(plaza_view._spec.texture) if plaza_view != null else "null"))
+	# --- Etappe 3: settler gifts, Valdric night lamp tend, alert event
+	var gustav_node: Settler = town.settler_node("gustav")
+	if gustav_node != null:
+		player.request_teleport(gustav_node.global_position + Vector2(0, 12))
+		await _frames(4)
+	player.inventory.give("resin", 2)
+	var resin_slot: int = -1
+	for i: int in player.inventory.slots.size():
+		if String((player.inventory.slots[i] as Dictionary).get("id", "")) == "resin":
+			resin_slot = i
+			break
+	if resin_slot < 0:
+		player.inventory.slots[0] = {"id": "resin", "count": 2}
+		resin_slot = 0
+	elif resin_slot >= 8:
+		var tmp: Variant = player.inventory.slots[0]
+		player.inventory.slots[0] = player.inventory.slots[resin_slot]
+		player.inventory.slots[resin_slot] = tmp
+		resin_slot = 0
+	player.inventory.selected = resin_slot
+	var gustav_trust_before: int = town.trust_of("gustav")
+	_check(not town.gift_candidate("gustav", player).is_empty(), "held resin shows gift candidate for gustav")
+	town.request_gift("gustav", "resin")
+	await _frames(2)
+	_check(town.trust_of("gustav") > gustav_trust_before and int((town.residents["gustav"] as Dictionary).get("gifted", -1)) == TimeManager.day, "giving gift increases trust and marks gifted day")
+	_check(town.gift_candidate("gustav", player).is_empty(), "second gift on same day is blocked")
+	if not town.residents.has("valdric"):
+		town.add_resident("valdric")
+	var tend_lamp_id: int = town.next_id
+	town.next_id += 1
+	town._rpc_added(tend_lamp_id, {"p": "lamp_post", "x": town.center.x + 80.0, "y": town.center.y + 40.0, "f": 0, "g": TownManager.PROGRESS_FULL, "d": TimeManager.day, "u": {"f": 0, "l": 1}}, [])
+	_set_stock(town, "glow_cap", 2)
+	var saved_tod: float = TimeManager.time_of_day
+	TimeManager.time_of_day = 0.0
+	town._valdric_tend_lamps()
+	TimeManager.time_of_day = saved_tod
+	_check(int(town.lamp_u(tend_lamp_id).f) > 0 and int(town.stock.get("glow_cap", 0)) == 1, "valdric refills empty lamp from stockpile glow_cap at night")
+	var alert_fired: Array[bool] = [false]
+	var on_ev: Callable = func(kind: String, _payload: Dictionary) -> void:
+		if kind == "alert":
+			alert_fired[0] = true
+	town.event.connect(on_ev)
+	town.set_alert(true, 0.8)
+	_check(alert_fired[0], "set_alert(true) emits town alert event")
+	town.set_alert(false, 0.0)
+	town.event.disconnect(on_ev)
+	# --- Etappe 4: world banner tinting & settler cheer reaction
+	town.request_look(1, 2)
+	await _frames(3)
+	var found_tinted: bool = false
+	for sid_view: Variant in town._views.values():
+		var st_view: TownStructure = sid_view as TownStructure
+		if st_view == null:
+			continue
+		for part: Dictionary in st_view._parts:
+			if part.has("tint_mat"):
+				var c: Color = (part.tint_mat as ShaderMaterial).get_shader_parameter("banner_color") as Color
+				if c.is_equal_approx(TownEmblems.color(1)):
+					found_tinted = true
+	_check(found_tinted, "built banner/pennant parts receive town look_color tint")
+	if gustav_node != null and gustav_node.visible:
+		town.emit_event("level_up", {"level": town.level()})
+		_check(gustav_node._cheer_t > 0.0, "settler cheers on level_up event")
+	var jorun_tex: Texture2D = load(DialogueBox.LATE_PORTRAITS.get("JORUN", "")) as Texture2D
+	_check(jorun_tex != null and DialogueArt.valid_portrait(jorun_tex) and DialogueBox.LATE_PORTRAITS.has("FREMDER HÄNDLER"), "jorun portrait matches shared 103x153 grid")
 	# --- saving and loading
 	var saved: Dictionary = town.export_state()
 	var text: String = JSON.stringify(saved)
@@ -607,6 +672,7 @@ func _run() -> void:
 	await _frames(20)
 	_check(town.structures.size() == count and town.trust_of("gustav") == trust and JSON.stringify(town.stock, "", true) == stock_text, "the state survives the save file (%d pieces, trust %d)" % [town.structures.size(), town.trust_of("gustav")])
 	_check(plaza_id < 0 or town.structure_level(plaza_id) == 2, "plaza upgrade level survives import_state")
+	_check(int((town.residents["gustav"] as Dictionary).get("gifted", -1)) == TimeManager.day, "gustav gifted day survives import_state")
 	_check(town.settler_node("gustav") != null and town.view_of(shop_id) != null, "the settler and the pictures are rebuilt")
 	_check(town.cleared.has(soft_cell) or soft_cell.x < 0, "cleared props stay cleared")
 	_check(world._town_node.cleared.has(soft_cell) or soft_cell.x < 0, "and the world knows")

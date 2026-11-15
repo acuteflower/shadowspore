@@ -146,6 +146,20 @@
 		},
 		"sound": "quartz"
 	},
+	"quicksand": {
+		"speed": 0.72,
+		"submerge": 3,
+		"step": {
+			"kind": "puff",
+			"color": "#d8a056",
+			"amount": 6
+		},
+		"footprint": {
+			"color": "#60382e",
+			"seconds": 6
+		},
+		"sound": "sand"
+	},
 	"puddle": {
 		"speed": 0.96,
 		"step": {

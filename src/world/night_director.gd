@@ -1282,6 +1282,8 @@ func _pick_goal(pos: Vector2, behavior: NightBehavior, players: Array[Player]) -
 
 ## Is the night open for a raid? The ladder must allow them, a scout must have looked at the base and the beat must not be a lull.
 func _raids_open(progress: float) -> bool:
+	if _world.has_method("raids_allowed") and not bool(_world.call("raids_allowed")):
+		return false
 	if _force_raid:
 		return true
 	var current: Dictionary = stage()
@@ -1294,6 +1296,9 @@ func _raids_open(progress: float) -> bool:
 ## Besides the lure the night has two raids of its own: the call of a listener in the middle of the night and the last rush before dawn.
 func _lure_tick(players: Array[Player], progress: float) -> void:
 	var cfg: Dictionary = NightRules.config().lure as Dictionary
+	if _world.has_method("raids_allowed") and not bool(_world.call("raids_allowed")):
+		lure = maxf(0.0, lure - float(cfg.decay) * TICK)
+		return
 	var town: TownManager = _world.town()
 	_raid_cooldown = maxf(0.0, _raid_cooldown - TICK)
 	_caller_wait = maxf(0.0, _caller_wait - TICK)

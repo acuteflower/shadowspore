@@ -259,6 +259,8 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 	_text(Vector2(lx, cy + 14.0), extras, LIT)
 	if BoardRules.is_urgent(offer):
 		_text(Vector2(area.position.x, cy + 26.0), "EILZETTEL: BIS ZUR DÄMMERUNG, DOPPELTER LOHN", RUSH)
+	elif String(offer.get("ull", "")) != "":
+		_text(Vector2(area.position.x, cy + 26.0), "SCHALTET FREI: %s" % String(offer.ull), LIT)
 	var bonus: Dictionary = offer.get("b", {}) as Dictionary
 	if not bonus.is_empty():
 		draw_chip(Vector2(area.end.x - 60.0, cy + 10.0), String(bonus.id), int(bonus.n), int(bonus.n))

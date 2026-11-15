@@ -563,7 +563,7 @@ def write_json(parts, mx, hz1):
     tx, ty = proj(TOWER[0], TOWER_TOP + 4.0, TOWER[1])
     pieces = data["pieces"]
     entry = {
-        "name": "SCHMIEDE", "needs_resident": "torben", "category": "craft", "texture": "smithy", "frame": [FW, FH], "feet": GROUND, "foot": [112, 38], "snap": 8, "pad": True,
+        "name": "SCHMIEDE", "needs_resident": "torben", "category": "craft", "texture": "smithy", "frame": [FW, FH], "feet": GROUND, "foot": [112, 38], "snap": 8, "pad": True, "pad_offset_y": 5.0,
         "cost": {"wood": 16, "stone": 30, "plank": 6, "iron_ore": 8}, "build_seconds": 40.0, "reach": 64.0, "worth": 18, "role": "smith", "glow": True,
         "anim": {"frames": FRAMES, "fps": 7},
         "light": {"color": "ff8a3a", "radius": 78, "energy": 1.15, "at": [round(sx), round(sy) - 6], "flicker": 0.4},
@@ -607,7 +607,7 @@ def main():
     save(OUT / "smithy.png", arr)
     strip = np.concatenate(glows, axis=1)
     save(OUT / "smithy_glow.png", strip)
-    pad_dark("smithy", 112, 38, 7)
+    T.pad("smithy", 112, 38, 7)
     parts = parts_and_light(arr, mx, hz1)
     wear_set()
     print("smithy", arr.shape, "glow strip", strip.shape)

@@ -286,25 +286,49 @@ def path_stone():
 
 
 # ------------------------------------------------------------------ the ground under big pieces
-def pad(name, foot_w, foot_h, seed):
-    """Trodden earth with a few chips and tufts, dithered into the meadow at the edge. Drawn flat under the piece."""
-    w, hh = int(foot_w) + 14, int(foot_h) + 12
-    arr = np.zeros((hh, w, 4), np.uint8)
-    earth = [hexc(c)[:3] for c in ("4a3a30", "6b5646", "8a7258", "a88c6a")]  # trodden dry earth, like the footpath's
-    stone = h.RAMPS[STONE][2][:3]
-    for y in range(hh):
-        for x in range(w):
-            dx, dy = (x + 0.5 - w / 2) / (w / 2), (y + 0.5 - hh / 2) / (hh / 2)
-            r = (abs(dx) ** 3.2 + abs(dy) ** 3.2) ** (1 / 3.2) + (fbm(x * 0.18, y * 0.22, seed) - 0.5) * 0.4
-            if r > 1.0 - 0.1 * bayer(x, y):
-                continue
-            tone = 1 + (fbm(x * 0.3, y * 0.4, seed + 4) > 0.5) + (r < 0.6 and fbm(x * 0.5, y * 0.6, seed + 8) > 0.6)
-            if r > 0.84:
-                tone = 0 if bayer(x, y) < 0.5 else 1
-            arr[y, x] = (*earth[min(tone, 3)], 255)
-            if hsh(x, y, seed) > 0.985:
-                arr[y, x, :3] = stone
-    save(OUT / f"{name}_pad.png", arr)
+def pad(name, foot_w, foot_h, seed, side=16, back=10, front=20):
+    """Packed earth in the exact Hallgrat stable yard style (bake_hallgrat_ground.paint_earth): warm violet-tan earth, Bayer dithering, churned damp patches, fine straw wisps and frayed rim tufts."""
+    import bake_ground as bg
+    import bake_hallgrat_ground as bh
+
+    w, hh = int(foot_w) + side * 2, int(foot_h) + back + front
+    x0, y0 = int(seed) * 43 + 17, int(seed) * 29 + 11
+    Y, X = np.mgrid[y0:y0 + hh, x0:x0 + w].astype(np.float64) + 0.5
+    nx = (np.arange(w)[None, :] + 0.5 - w * 0.5) / max(w * 0.5 - 5.5, 1.0)
+    ny = (np.arange(hh)[:, None] + 0.5 - hh * 0.5) / max(hh * 0.5 - 5.5, 1.0)
+    inside = (np.abs(nx) ** 3.6 + np.abs(ny) ** 3.6) <= 1.0
+    sd = bg._signed_distance(inside, 20)
+    rag_amp = min(1.0, hh / 48.0)
+    rag = ((bg.vnoise_at(x0, y0, w, hh, 7, seed + 1) - 0.5) * 5.0 + (bg.vnoise_at(x0, y0, w, hh, 3, seed + 2) - 0.5) * 2.0) * rag_amp
+    edge = -sd + rag
+    bay = bg.BAYER[np.arange(hh)[:, None] % 4, np.arange(w)[None, :] % 4]
+    ok = (edge > 0.0) & ~((edge < 5.5) & (bay > edge / 5.5))
+
+    big = bg.vnoise_at(x0, y0, w, hh, 26, seed + 1)
+    mid = bg.vnoise_at(x0, y0, w, hh, 9, seed + 2)
+    fine = bh.hash2(np.floor(X / 2.0), np.floor(Y / 2.0), seed + 3)
+    tone = 0.9 + big * 1.3 + (mid - 0.5) * 1.0 + (fine - 0.5) * 0.6 + (bay - 0.5) * 0.4
+    tone = tone - np.clip((big - 0.62) * 6.0, 0, 1.4)
+    col = bh.EARTH[np.clip(np.rint(tone), 0, len(bh.EARTH) - 1).astype(int)].copy()
+
+    sx, sy = np.floor(X / 5.0), np.floor(Y / 4.0)
+    sh = bh.hash2(sx, sy, seed + 7)
+    along = (X - sx * 5.0) - (Y - sy * 4.0) * np.where(bh.hash2(sx, sy, seed + 8) > 0.5, 1.0, -1.0)
+    straw = (sh > 0.915 - mid * 0.08) & (np.abs(along - 2.0) < 0.7) & ((Y - sy * 4.0) < 3.0)
+    col[straw] = bh.STRAWC[np.clip((bh.hash2(X, Y, seed + 9) * 3).astype(int), 0, 2)][straw]
+
+    img = np.zeros((hh, w, 4), np.uint8)
+    img[ok, :3] = col[ok].astype(np.uint8)
+    img[ok, 3] = 255
+
+    import random
+
+    rng = random.Random(seed + 50)
+    for _ in range(max(4, int(w * hh / 140))):
+        x, y = rng.randrange(4, w - 4), rng.randrange(6, hh - 2)
+        if ok[y, x] and edge[y, x] < 6.0:
+            bg.tuft(img, x, y, rng.randrange(2, 5), rng, bg.MEADOW_HI[:6])
+    save(OUT / f"{name}_pad.png", img)
 
 
 # ------------------------------------------------------------------ stockpile

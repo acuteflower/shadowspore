@@ -42,7 +42,7 @@ var _live_ids: Dictionary = {} ## scratch set of the players alive this frame
 const HARVEST_LAYER: int = 1 << 4 ## physics layer 5, the one weapons hit (data/harvest.json "clover": the sickle cuts it)
 const HARVEST_SPREAD: float = 0.55 ## the hurtbox is three discs along the field's long axis, this far apart (x radius)
 var key: String = "" ## "c:x,y" of the field's centre: its harvest state is kept under this key (WorldLevel)
-var level: WorldLevel ## who keeps the state; null in the workbenches
+var level: Variant ## who keeps the state; null in the workbenches
 var cut: bool = false ## cut by the sickle: hidden until it grows back at sunrise
 var _harvest: HarvestHurtbox
 var _kick: float = 0.0 ## 0..1: how hard something just rustled the clumps
@@ -69,7 +69,7 @@ static func plan(rng: RandomNumberGenerator) -> Dictionary:
 	}
 
 
-func setup(field: Dictionary, center: Vector2, world: WorldLevel = null) -> void:
+func setup(field: Dictionary, center: Vector2, world: Variant = null) -> void:
 	position = center
 	name = "CloverField"
 	y_sort_enabled = true ## the bands sort with Ellie, trees and bushes in the level's Props chain

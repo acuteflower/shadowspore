@@ -63,7 +63,7 @@ func _populate(cell: Vector2i) -> void:
 	var gloom: float = BiomeBlend.amount_at(Vector2(cell) * CHUNK_PIXELS + Vector2.ONE * CHUNK_PIXELS * 0.5) ## 0 on all old land: there the draws and numbers stay exactly as they were
 	for species: String in ["crow", "raven"]:
 		var spec: Dictionary = local_spec(species, gloom)
-		if rng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
+		if rng.randf() > float(spec["chunk_chance"]) or _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 			continue
 		var center: Vector2 = Vector2.ZERO
 		var found: bool = false
@@ -78,7 +78,7 @@ func _populate(cell: Vector2i) -> void:
 		var id: String = "%s_%d_%d" % [species, cell.x, cell.y]
 		var count: int = rng.randi_range(int(spec["group_min"]), int(spec["group_max"]))
 		for i: int in count:
-			if _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
+			if _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 				break
 			var point: Vector2 = center
 			if i > 0 and spec.has("spacing"): ## a big flock of the Hexenwald: a tight crowd, bird beside bird (a sunflower spiral, jittered)
@@ -125,7 +125,7 @@ func _populate_owl(cell: Vector2i, gloom: float, flock: Array[WildCorvid]) -> vo
 	var w_deep_owl: float = MeadowHabitats.deep_forest_at(mid_px)
 	var owl_chance: float = float(spec["chunk_chance"]) * (1.0 + 1.85 * w_deep_owl)
 	var owl_cap: int = int(spec.get("max_species_loaded", 2)) + (2 if w_deep_owl >= 0.40 else 0)
-	if owl_rng.randf() > owl_chance or _wild_count() >= int(spec["max_loaded"]) or _species_count("owl") >= owl_cap:
+	if owl_rng.randf() > owl_chance or _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count("owl") >= owl_cap:
 		return
 	var margin: float = float(spec["spawn_margin"])
 	var center: Vector2 = Vector2.ZERO
@@ -170,7 +170,7 @@ func _populate_desert_falcon(cell: Vector2i, flock: Array[WildCorvid]) -> void:
 	var frng: RandomNumberGenerator = RandomNumberGenerator.new()
 	frng.seed = hash(Vector3i(cell.x, cell.y, _seed + 19427))
 	var spec: Dictionary = DataRegistry.get_entry("wildlife", "desert_falcon")
-	if frng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count("desert_falcon") >= int(spec.get("max_species_loaded", 3)):
+	if frng.randf() > float(spec["chunk_chance"]) or _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count("desert_falcon") >= int(spec.get("max_species_loaded", 3)):
 		return
 	var margin: float = float(spec["spawn_margin"])
 	var center: Vector2 = Vector2.ZERO
@@ -214,7 +214,7 @@ func _populate_songbirds(cell: Vector2i, flock: Array[WildCorvid]) -> void:
 		var srng: RandomNumberGenerator = RandomNumberGenerator.new()
 		srng.seed = hash(Vector3i(cell.x, cell.y, _seed + int(seeds[species])))
 		var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
-		if srng.randf() > float(spec["chunk_chance"]) or _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", 3)):
+		if srng.randf() > float(spec["chunk_chance"]) or _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count(species) >= int(spec.get("max_species_loaded", 3)):
 			continue
 		var margin: float = float(spec["spawn_margin"])
 		var center: Vector2 = Vector2.ZERO
@@ -234,7 +234,7 @@ func _populate_songbirds(cell: Vector2i, flock: Array[WildCorvid]) -> void:
 		var flock_key: String = "%s_%d_%d" % [species, cell.x, cell.y]
 		var scene: PackedScene = load(String(spec["scene"])) as PackedScene
 		for i: int in count:
-			if _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", 3)):
+			if _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count(species) >= int(spec.get("max_species_loaded", 3)):
 				break
 			var point: Vector2 = center if i == 0 else (center + Vector2.from_angle(srng.randf() * TAU) * srng.randf_range(16.0, float(spec["group_radius"])))
 			if i > 0 and (not _floor(point, species) or not _clear(point, 5.0) or not _player_clear(point, float(spec["alert_range"]))):
@@ -286,7 +286,7 @@ static func local_spec(species: String, gloom: float) -> Dictionary:
 ## A visitor of the town (TownCritters): one bird of `species` at `point`, grounded, wanting a roof (`visit_roof`). Null when the caps, the ground or the people forbid it.
 func spawn_visitor(species: String, point: Vector2, flock: String) -> WildCorvid:
 	var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
-	if _wild_count() >= int(spec["max_loaded"]) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
+	if _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count(species) >= int(spec.get("max_species_loaded", spec["max_loaded"])):
 		return null
 	if not _floor(point, species) or not _clear(point, 6.0) or not _player_clear(point, float(spec["alert_range"])):
 		return null

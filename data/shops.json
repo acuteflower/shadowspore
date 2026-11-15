@@ -976,5 +976,266 @@
     "WIE VERSPROCHEN MITGEBRACHT."
    ]
   }
+ },
+ "tamsa_glass": {
+  "title": "GLASSCHLEIFEREI",
+  "npc": "tamsa",
+  "role": "glass",
+  "reach": 90.0,
+  "tabs": [
+   {
+    "id": "buy",
+    "name": "KAUFEN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "VERKAUFEN",
+    "kind": "sell"
+   }
+  ],
+  "buy": [
+   {
+    "item": "crystal_banish_1",
+    "price": 70,
+    "trust": 0
+   },
+   {
+    "item": "crystal_roots_1",
+    "price": 70,
+    "trust": 0
+   },
+   {
+    "item": "crystal_embers_1",
+    "price": 70,
+    "trust": 10
+   },
+   {
+    "item": "crystal_veil_1",
+    "price": 70,
+    "trust": 10
+   },
+   {
+    "item": "gem_lens_1",
+    "price": 55,
+    "trust": 0
+   },
+   {
+    "item": "gem_wild_1",
+    "price": 55,
+    "trust": 0
+   },
+   {
+    "item": "gem_tinder_1",
+    "price": 55,
+    "trust": 20
+   },
+   {
+    "item": "gem_haze_1",
+    "price": 55,
+    "trust": 20
+   }
+  ],
+  "sell": [
+   {
+    "item": "lake_glimmer",
+    "price": 10
+   },
+   {
+    "item": "lake_moonstone",
+    "price": 7
+   },
+   {
+    "item": "void_splinter",
+    "price": 8
+   },
+   {
+    "item": "stone",
+    "price": 1
+   }
+  ],
+  "lines": {
+   "open": [
+    "WAS SUCHST DU? ICH HAB ALLES, WAS GLITZERT.",
+    "VORSICHT, DAS REGAL WACKELT."
+   ],
+   "buy": [
+    "GUTE WAHL! DER IST SAUBER GESCHLIFFEN."
+   ],
+   "sell": [
+    "OH, ROHSTEIN! DEN NEHM ICH."
+   ],
+   "no_trust": [
+    "DEN GEB ICH NOCH NICHT HER."
+   ],
+   "missing": [
+    "DA FEHLT NOCH KUPFER."
+   ]
+  }
+ },
+ "hedda_inn": {
+  "title": "DIE GRAUE STUFE",
+  "npc": "hedda",
+  "role": "inn",
+  "reach": 90.0,
+  "tabs": [
+   {
+    "id": "buy",
+    "name": "KAUFEN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "VERKAUFEN",
+    "kind": "sell"
+   }
+  ],
+  "buy": [
+   {
+    "item": "dusk_berry",
+    "price": 4,
+    "trust": 0
+   },
+   {
+    "item": "earth_tuber",
+    "price": 6,
+    "trust": 0
+   },
+   {
+    "item": "amber_grain",
+    "price": 6,
+    "trust": 0
+   },
+   {
+    "item": "moon_leek",
+    "price": 8,
+    "trust": 10
+   },
+   {
+    "item": "brook_mint",
+    "price": 8,
+    "trust": 10
+   },
+   {
+    "item": "ember_berry",
+    "price": 12,
+    "trust": 20
+   }
+  ],
+  "sell": [
+   {
+    "item": "fish_trout",
+    "price": 6
+   },
+   {
+    "item": "fish_carp",
+    "price": 7
+   },
+   {
+    "item": "fish_pike",
+    "price": 10
+   },
+   {
+    "item": "glow_cap",
+    "price": 4
+   },
+   {
+    "item": "dusk_berry",
+    "price": 2
+   }
+  ],
+  "lines": {
+   "open": [
+    "HUNGER? DANN BIST DU HIER RICHTIG.",
+    "SETZ DICH, ICH KOMM GLEICH."
+   ],
+   "buy": [
+    "LASS ES DIR SCHMECKEN."
+   ],
+   "sell": [
+    "FRISCH? DANN KOMMT ES IN DEN TOPF."
+   ],
+   "no_trust": [
+    "DAS HEB ICH FÜR STAMMGÄSTE AUF."
+   ],
+   "missing": [
+    "DAS REICHT NICHT, KIND."
+   ]
+  }
+ },
+ "ilvane_hall": {
+  "title": "HÜTERHALLE",
+  "npc": "ilvane",
+  "role": "keeper",
+  "reach": 90.0,
+  "tabs": [
+   {
+    "id": "buy",
+    "name": "KAUFEN",
+    "kind": "buy"
+   },
+   {
+    "id": "sell",
+    "name": "VERKAUFEN",
+    "kind": "sell"
+   }
+  ],
+  "buy": [
+   {
+    "item": "grave_candle",
+    "price": 12,
+    "trust": 0
+   },
+   {
+    "item": "vial_empty",
+    "price": 4,
+    "trust": 0
+   },
+   {
+    "item": "wound_leaf",
+    "price": 10,
+    "trust": 0
+   },
+   {
+    "item": "lake_moonstone",
+    "price": 18,
+    "trust": 20
+   }
+  ],
+  "sell": [
+   {
+    "item": "moonbell",
+    "price": 6
+   },
+   {
+    "item": "mist_lily",
+    "price": 6
+   },
+   {
+    "item": "grave_candle",
+    "price": 5
+   },
+   {
+    "item": "resin",
+    "price": 3
+   }
+  ],
+  "lines": {
+   "open": [
+    "SPRICH LEISE. WAS BRAUCHST DU?"
+   ],
+   "buy": [
+    "MÖGE ES DIR LEUCHTEN."
+   ],
+   "sell": [
+    "DIE WÄCHTERIN DANKT DIR."
+   ],
+   "no_trust": [
+    "NOCH NICHT, KIND."
+   ],
+   "missing": [
+    "DAS IST ZU WENIG."
+   ]
+  }
  }
 }

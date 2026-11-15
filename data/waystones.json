@@ -60,6 +60,27 @@
 			"tile": [915, 308],
 			"reveal": 15.0,
 			"clear_radius": 5
+		},
+		{
+			"id": "quarz_wachterin",
+			"name": "WÄCHTERIN DER QUARZDÜNEN",
+			"tile": [712, 234],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "sonnen_wachterin",
+			"name": "WÄCHTERIN DER SONNENÖDE",
+			"tile": [908, 80],
+			"reveal": 15.0,
+			"clear_radius": 5
+		},
+		{
+			"id": "hexen_wachterin",
+			"name": "WÄCHTERIN DES HEXENWALDS",
+			"tile": [760, 830],
+			"reveal": 15.0,
+			"clear_radius": 5
 		}
 	]
 }

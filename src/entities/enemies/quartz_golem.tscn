@@ -54,6 +54,9 @@ properties/7/replication_mode = 0
 properties/8/path = NodePath(".:start_dormant")
 properties/8/spawn = true
 properties/8/replication_mode = 0
+properties/9/path = NodePath(".:pickaxe_override")
+properties/9/spawn = true
+properties/9/replication_mode = 0
 
 [node name="QuartzGolem" type="CharacterBody2D"]
 collision_layer = 4

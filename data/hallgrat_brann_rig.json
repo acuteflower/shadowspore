@@ -1,0 +1,45 @@
+{
+  "frame": [
+    76,
+    96
+  ],
+  "feet": [
+    38,
+    80
+  ],
+  "frames": 28,
+  "rows": 8,
+  "height": 60,
+  "clips": {
+    "idle": {
+      "start": 0,
+      "count": 4,
+      "fps": 3
+    },
+    "walk": {
+      "start": 4,
+      "count": 6,
+      "fps": 8
+    },
+    "talk": {
+      "start": 10,
+      "count": 4,
+      "fps": 5
+    },
+    "wave": {
+      "start": 14,
+      "count": 6,
+      "fps": 7
+    },
+    "guard": {
+      "start": 20,
+      "count": 4,
+      "fps": 2
+    },
+    "halt": {
+      "start": 24,
+      "count": 4,
+      "fps": 4
+    }
+  }
+}

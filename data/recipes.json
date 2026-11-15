@@ -341,5 +341,57 @@
   "seconds": 4.0,
   "trust": 30,
   "info": "EIN GESPALTENER BLEICHAST, ZWEI ZINKEN, EIN SCHATTENKERN IN DER GABEL"
+ },
+ "plank_bulk": {
+  "name": "BRETTERBÜNDEL",
+  "station": "workshop",
+  "npc": "gustav",
+  "by": "self",
+  "needs_unlock": "recipe_plank_bulk",
+  "in": {
+   "wood": 5,
+   "resin": 1
+  },
+  "out": {
+   "plank": 8
+  },
+  "seconds": 1.8,
+  "trust": 0,
+  "info": "GUSTAVS SCHALUNGSSCHNITT: MEHR BRETTER PRO STAMM"
+ },
+ "iron_smelt_bulk": {
+  "name": "GLUTSCHMELZE",
+  "station": "smithy",
+  "npc": "torben",
+  "by": "self",
+  "needs_unlock": "recipe_glutschmelze",
+  "in": {
+   "iron_ore": 5,
+   "glow_cap": 1
+  },
+  "out": {
+   "iron_ingot": 4
+  },
+  "seconds": 3.8,
+  "trust": 0,
+  "info": "TORBENS SPARSAME GLUT: MEHR BARREN AUS DEM ERZ"
+ },
+ "amber_seed_press": {
+  "name": "BERNSTEINKORN-SAAT",
+  "station": "workshop",
+  "npc": "gustav",
+  "by": "self",
+  "needs_unlock": "recipe_amber_seeds",
+  "in": {
+   "glow_cap": 2,
+   "seed_fluff": 2,
+   "earth_tuber": 1
+  },
+  "out": {
+   "amber_grain_seed": 3
+  },
+  "seconds": 2.0,
+  "trust": 0,
+  "info": "GEPRESSTE NACHTSAAT FÜR LICHTE ÄHREN"
  }
 }

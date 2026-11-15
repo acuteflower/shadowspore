@@ -208,6 +208,46 @@ def paint_flags(X, Y, seed):
     return col, ids
 
 
+STRAWC = np.array([[0x8a, 0x6e, 0x3e], [0xb8, 0x96, 0x52], [0xdc, 0xbe, 0x74]], dtype=np.float32)
+PUDDLE = np.array([[0x2c, 0x26, 0x40], [0x3c, 0x38, 0x5c], [0x5c, 0x5e, 0x88]], dtype=np.float32)
+
+
+def paint_earth(X, Y, edge, seed):
+    """The stable yard and the paddock: packed earth trodden by hooves, darker where it is churned, wisps of straw, hoof prints, a few
+    puddles holding the sky, grass taking back the rim."""
+    x0, y0 = int(X[0, 0]), int(Y[0, 0])
+    h_, w_ = X.shape
+    big = bg.vnoise_at(x0, y0, w_, h_, 26, seed + 1)
+    mid = bg.vnoise_at(x0, y0, w_, h_, 9, seed + 2)
+    fine = hash2(np.floor(X / 2.0), np.floor(Y / 2.0), seed + 3)
+    bay = BAYER[Y.astype(int) % 4, X.astype(int) % 4]
+    tone = 0.9 + big * 1.3 + (mid - 0.5) * 1.0 + (fine - 0.5) * 0.6 + (bay - 0.5) * 0.4
+    tone = tone - np.clip((big - 0.62) * 6.0, 0, 1.4)          # churned, damp patches
+    col = EARTH[np.clip(np.rint(tone), 0, len(EARTH) - 1).astype(int)].copy()
+    # hoof prints: little dark crescents on a jittered grid, more where it is churned
+    cx, cy = np.floor(X / 7.0), np.floor(Y / 5.0)
+    hx = hash2(cx, cy, seed + 4)
+    ux = X - (cx * 7.0 + 1.5 + hash2(cx, cy, seed + 5) * 4.0)
+    uy = Y - (cy * 5.0 + 1.0 + hash2(cx, cy, seed + 6) * 3.0)
+    ring = (ux * ux / 2.4 + uy * uy / 1.4)
+    hoof = (hx > 0.86 - big * 0.25) & (ring < 1.4) & (ring > 0.45) & (uy > -0.4)
+    col[hoof] = EARTH[0]
+    lit = (hx > 0.86 - big * 0.25) & (ring < 1.6) & (uy < -0.6) & (ring > 0.6)
+    col[lit] = EARTH[3]
+    # straw: short slanted wisps
+    sx, sy = np.floor(X / 5.0), np.floor(Y / 4.0)
+    sh = hash2(sx, sy, seed + 7)
+    along = (X - sx * 5.0) - (Y - sy * 4.0) * np.where(hash2(sx, sy, seed + 8) > 0.5, 1.0, -1.0)
+    straw = (sh > 0.9 - mid * 0.1) & (np.abs(along - 2.0) < 0.7) & ((Y - sy * 4.0) < 3.0)
+    col[straw] = STRAWC[np.clip((hash2(X, Y, seed + 9) * 3).astype(int), 0, 2)][straw]
+    # puddles in the lowest churned spots
+    pud = (big > 0.84) & (mid > 0.62)
+    col = np.where(pud[..., None], PUDDLE[np.clip(((mid - 0.62) * 6 + bay).astype(int), 0, 1)], col)
+    col = np.where((pud & ~np.roll(pud, 1, 0))[..., None], PUDDLE[2], col)
+    ids = np.where(pud, 0.0, 0.5)
+    return col, ids, pud
+
+
 def simplify(pts, eps):
     """Douglas-Peucker: the routed ways go in tile steps, a street should not."""
     if len(pts) < 3:
@@ -290,11 +330,29 @@ def bake(spec, town, relief, seed):
         shape = edge > 0
         if style == "flags":
             col, ids = paint_flags(X, Y, seed)
+        elif style == "erde":
+            col, ids, _ = paint_earth(X, Y, edge, seed)
         else:
             col, ids = paint_square(X, Y, edge, seed)
         U, V = Y, X  # the landings at a square's stairs follow its rows
     floor_ok, near = floor_mask(X, Y, relief)
     ok = shape & floor_ok
+    if style == "erde":  # trodden earth: no stones to lose, only the rim frays into the grass
+        bayer = BAYER[(Y.astype(int)) % 4, (X.astype(int)) % 4]
+        ok &= ~((edge < 7.0) & (bayer > edge / 7.0))
+        img = np.zeros((h, w, 4), dtype=np.uint8)
+        mask = np.zeros((h, w, 4), dtype=np.uint8)
+        img[ok, :3] = col[ok].astype(np.uint8)
+        img[ok, 3] = 255
+        mask[ok] = (bg.PATH_CODE, 0, 0, 255)
+        rng = __import__("random").Random(seed)
+        for _ in range(int(w * h / 140)):
+            x, y = rng.randrange(4, w - 4), rng.randrange(6, h - 2)
+            if ok[y, x] and (edge[y, x] < 9 or rng.random() < 0.08):
+                bg.tuft(img, x, y, rng.randrange(2, 5), rng, bg.MEADOW_HI[:6])
+        ys, xs = np.nonzero(img[..., 3] > 0)
+        ya, yb, xa, xb = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+        return img[ya:yb, xa:xb], mask[ya:yb, xa:xb], (int(x0 + xa), int(y0 + ya)), ok
     if style == "setts":  # landings: a row of broad slabs where the street meets a stair, laid parallel to its steps
         lsid, ljoint, _ = setts_field(U, V, seed + 40, length=8.0, base=14.0)
         land = near & shape & (edge >= 4.5)
@@ -360,6 +418,7 @@ def main():
     baked_path = os.path.join(ROOT, "data/ground_baked.json")
     baked = json.load(open(baked_path, encoding="utf-8"))
     decals = [d for d in baked["decals"] if not d["id"].startswith("hallgrat_")]
+    hallgrat_decals = []
     paved = {}
     shown = []
     jobs = [(spec, 7100 + i * 37) for i, spec in enumerate(town.get("paving", []))]
@@ -377,9 +436,9 @@ def main():
         name = "hallgrat_" + spec["id"]
         save_retry(bg.ROOT / "assets" / "world" / "ground" / (name + ".png"), img)
         save_retry(bg.ROOT / "assets" / "world" / "ground" / (name + "_mask.png"), mask)
-        decals.append({"id": name, "texture": "res://assets/world/ground/%s.png" % name, "mask": "res://assets/world/ground/%s_mask.png" % name, "x": ox, "y": oy})
+        hallgrat_decals.append({"id": name, "texture": "res://assets/world/ground/%s.png" % name, "mask": "res://assets/world/ground/%s_mask.png" % name, "x": ox, "y": oy})
         shown.append((img, ox, oy))
-        stone = mask[..., 0] == bg.STONE_CODE
+        stone = mask[..., 0] > 0
         hh, ww = stone.shape
         for ty in range(oy // 16, (oy + hh) // 16 + 1):
             for tx in range(ox // 16, (ox + ww) // 16 + 1):
@@ -398,7 +457,9 @@ def main():
                 runs.append([y, a, b])
                 a = b = x
         runs.append([y, a, b])
-    baked["decals"] = decals
+    sf_ids = {s["id"] for s in json.load(open(os.path.join(ROOT, "data/ground.json"), encoding="utf-8")).get("stone_fields", [])}
+    insert_at = max((idx + 1 for idx, d in enumerate(decals) if d["id"] in sf_ids), default=0)
+    baked["decals"] = decals[:insert_at] + hallgrat_decals + decals[insert_at:]
     baked["hallgrat_clear"] = runs
     baked["hallgrat_streets"] = street_runs if street_runs is not None else runs
     tmp = baked_path + ".tmp"

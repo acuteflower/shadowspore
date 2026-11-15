@@ -29,6 +29,11 @@ const LATE_PORTRAITS: Dictionary = {
 	"ESMA": "res://assets/ui/portrait_esma.png",
 	"MORWENNA": "res://assets/ui/portrait_morwenna.png",
 	"ILVA": "res://assets/ui/portrait_lake_witch.png", ## the lake witch (docs/seehexe_konzept.md): no portrait yet, so none is shown
+	"JORUN": "res://assets/ui/portrait_jorun.png",
+	"FREMDER HÄNDLER": "res://assets/ui/portrait_jorun.png",
+	"DIE WÄCHTERIN": "res://assets/ui/portrait_goddess.png",
+	"WÄCHTERIN": "res://assets/ui/portrait_goddess.png",
+	"CAELIA": "res://assets/ui/portrait_goddess.png",
 }
 ## Speakers with a baked speaking portrait: name plate text -> sheet description (`SpeechPortrait`, made by tools/art_gustav_portrait.py). They share one
 ## instance per sheet, so the stranger and Gustav blink and talk the same. Each also stays in LATE_PORTRAITS as the still fallback.
@@ -36,6 +41,7 @@ const TALKING_PORTRAITS: Dictionary = {
 	## Speaking and blinking are switched off for now: Gustav shows his still portrait (the baked sheet stays in assets/ui/portrait_gustav_talk.png).
 }
 var _talkers: Dictionary = {}
+var _npc_strips: Dictionary = {} ## path -> Array[Texture2D] ([open, blink] from 206x153 strips)
 const UNKNOWN_SHADER: Shader = preload("res://assets/shaders/unknown_portrait.gdshader")
 var _npc: TextureRect
 var _npc_ink: ShaderMaterial
@@ -233,8 +239,23 @@ func _portrait_for(speaker: String) -> Texture2D:
 	if NPC_PORTRAITS.has(speaker):
 		return NPC_PORTRAITS[speaker] as Texture2D
 	if LATE_PORTRAITS.has(speaker) and ResourceLoader.exists(String(LATE_PORTRAITS[speaker])):
-		var texture: Texture2D = load(String(LATE_PORTRAITS[speaker])) as Texture2D
-		return texture if DialogueArt.valid_portrait(texture) else null
+		var path: String = String(LATE_PORTRAITS[speaker])
+		var texture: Texture2D = load(path) as Texture2D
+		if DialogueArt.valid_portrait(texture):
+			return texture
+		if texture != null and texture.get_height() == DialogueArt.LOGICAL_SIZE.y and texture.get_width() >= DialogueArt.LOGICAL_SIZE.x * 2:
+			if not _npc_strips.has(path):
+				var frames: Array[Texture2D] = []
+				var count: int = texture.get_width() / DialogueArt.LOGICAL_SIZE.x
+				for i: int in count:
+					var atlas: AtlasTexture = AtlasTexture.new()
+					atlas.atlas = texture
+					atlas.region = Rect2(float(i * DialogueArt.LOGICAL_SIZE.x), 0.0, float(DialogueArt.LOGICAL_SIZE.x), float(DialogueArt.LOGICAL_SIZE.y))
+					frames.append(atlas)
+				_npc_strips[path] = frames
+			var strip: Array[Texture2D] = _npc_strips[path] as Array[Texture2D]
+			var blinking: bool = strip.size() > 1 and fposmod(_time, 4.2) > 4.04
+			return strip[1] if blinking else strip[0]
 	return null
 
 

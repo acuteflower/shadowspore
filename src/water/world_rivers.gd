@@ -58,6 +58,10 @@ func _ready() -> void:
 	y_sort_enabled = true
 	fauna = load("res://src/water/river_fauna.tscn").instantiate() as RiverFauna
 	add_child(fauna)
+	var mirror: WaterReflections = WaterReflections.new() ## mirror images in the water and in rain puddles
+	mirror.name = "Reflections"
+	mirror.rivers = self
+	add_child(mirror)
 	Terrain.patches.append(self)
 	tree_exiting.connect(func() -> void: Terrain.patches.erase(self))
 

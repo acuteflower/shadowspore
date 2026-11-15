@@ -1,0 +1,115 @@
+{
+  "id": "start_path",
+  "continent": "main",
+  "name": "ALTER ABSTIEG",
+  "subtitle": "Vergessener Vorhof & Schleichpfad",
+  "biome": "meadow",
+  "width": 104,
+  "height": 130,
+  "world_seed": 104130,
+  "old_world_tile_offset": [438, 594],
+  "perimeter": {
+    "margin": 9,
+    "noise_depth": 11,
+    "tree_wall": true,
+    "cliff_rim": true
+  },
+  "spawns": {
+    "default": {
+      "tile": [25, 22],
+      "face": [0, 1]
+    },
+    "respawn": {
+      "tile": [25, 22],
+      "face": [0, 1]
+    },
+    "from_home_valley": {
+      "tile": [90, 103],
+      "face": [-1, 0]
+    }
+  },
+  "portals": [
+    {
+      "id": "to_home_valley",
+      "tile": [96, 103],
+      "size": [64, 84],
+      "target_zone": "home_valley",
+      "target_spawn": "from_start_path",
+      "trigger": "walk",
+      "label": "VALDRICS TAL",
+      "locked": false,
+      "dir": "east"
+    },
+    {
+      "id": "to_south_blocked",
+      "tile": [72, 120],
+      "size": [72, 48],
+      "target_zone": "harbor_south",
+      "target_spawn": "default",
+      "trigger": "interact",
+      "label": "SÜDPFAD",
+      "locked": true,
+      "locked_hint": "Steinschlag und dichtes Wurzelwerk blockieren den alten Südpfad.",
+      "dir": "south"
+    }
+  ],
+  "decals": [
+    {
+      "id": "start_ruins",
+      "texture": "res://assets/world/ground/start_ruins.png",
+      "mask": "res://assets/world/ground/start_ruins_mask.png",
+      "pos": [118, 138]
+    },
+    {
+      "id": "footpath_start",
+      "texture": "res://assets/world/ground/footpath_start.png",
+      "mask": "res://assets/world/ground/footpath_start_mask.png",
+      "pos": [321, 386]
+    },
+    {
+      "id": "footpath_branch",
+      "texture": "res://assets/world/ground/footpath_branch.png",
+      "mask": "res://assets/world/ground/footpath_branch_mask.png",
+      "pos": [972, 1581]
+    }
+  ],
+  "manhole": {
+    "pos": [262, 240]
+  },
+  "guards": [
+    {
+      "enemy": "guard_spider",
+      "pos": [444, 1221],
+      "face": [0.64, -0.77]
+    },
+    {
+      "enemy": "guard_spider",
+      "pos": [572, 1067],
+      "face": [-0.64, 0.77]
+    }
+  ],
+  "fallen_knight": {
+    "tile": [55, 91]
+  },
+  "signpost": {
+    "id": "crossroad",
+    "tile": [63, 105],
+    "variant": 0,
+    "dialogue": "sign_crossroad",
+    "flag": "read_sign"
+  },
+  "clear_rects": [
+    [10, 9, 28, 28],
+    [22, 26, 22, 42],
+    [38, 60, 26, 36],
+    [52, 86, 26, 36],
+    [60, 98, 42, 11]
+  ],
+  "berry_free_baked": true,
+  "wildlife_cap": 10,
+  "night_spawns": {
+    "enabled": true,
+    "require_opening_over": true,
+    "max_enemies": 6
+  }
+}

@@ -1,0 +1,1111 @@
+{
+	"about": "Hallgrats Bewohner (docs/hallgrat_bewohner_konzept.md). Spots: door = Tür eines Gebäudes aus hallgrat.json placed (inside true = sie gehen hinein und sind weg), place = Platz aus places mit at = Kacheln vom Mittelpunkt, building = Gebäude mit at = px von den Füßen, px = feste Weltpixel. schedule = [von, bis, spot] in Anteilen des Tages; zu Beginn eines Eintrags laufen sie vom vorigen Spot los. Platzhalterfiguren: look = Farben.",
+	"walk_speed": 30.0,
+	"load_margin": 40,
+	"residents": {
+		"brann": {
+			"name": "BRANN",
+			"title": "TORWÄCHTERIN",
+			"look": {
+				"coat": "6e2a33",
+				"under": "3a3346",
+				"skin": "c8946a",
+				"hair": "8c8a96",
+				"tall": 1.05
+			},
+			"spots": {
+				"gate": {
+					"px": [
+						2988,
+						5470
+					],
+					"face": [
+						1,
+						0
+					],
+					"clip": "guard"
+				},
+				"gate_night": {
+					"px": [
+						2992,
+						5476
+					],
+					"face": [
+						1,
+						0
+					],
+					"clip": "guard"
+				},
+				"well": {
+					"place": "brunnenhof",
+					"at": [
+						0,
+						2
+					],
+					"face": [
+						0,
+						-1
+					],
+					"clip": "idle"
+				},
+				"home": {
+					"door": "torhaus",
+					"inside": true
+				}
+			},
+			"schedule": [
+				[
+					0.2,
+					0.5,
+					"gate"
+				],
+				[
+					0.5,
+					0.56,
+					"well"
+				],
+				[
+					0.56,
+					0.86,
+					"gate"
+				],
+				[
+					0.86,
+					0.95,
+					"gate_night"
+				],
+				[
+					0.95,
+					0.2,
+					"home"
+				]
+			]
+		},
+		"ilvane": {
+			"name": "ILVANE",
+			"title": "HÜTERIN DER WÄCHTERIN",
+			"look": {
+				"coat": "d8d0e8",
+				"under": "5a4a6e",
+				"skin": "d9b090",
+				"hair": "e8e4f0",
+				"tall": 1.0
+			},
+			"spots": {
+				"sweep": {
+					"place": "forum",
+					"at": [
+						-3,
+						4
+					],
+					"face": [
+						1,
+						0
+					],
+					"clip": "sweep"
+				},
+				"hall": {
+					"door": "hueterhalle",
+					"face": [
+						0,
+						1
+					],
+					"clip": "idle"
+				},
+				"kneel": {
+					"place": "forum",
+					"at": [
+						0,
+						3
+					],
+					"face": [
+						0,
+						-1
+					],
+					"clip": "kneel"
+				},
+				"home": {
+					"door": "hueterhalle",
+					"inside": true
+				}
+			},
+			"schedule": [
+				[
+					0.18,
+					0.3,
+					"sweep"
+				],
+				[
+					0.3,
+					0.45,
+					"hall"
+				],
+				[
+					0.45,
+					0.6,
+					"kneel"
+				],
+				[
+					0.6,
+					0.8,
+					"hall"
+				],
+				[
+					0.8,
+					0.95,
+					"kneel"
+				],
+				[
+					0.95,
+					0.18,
+					"home"
+				]
+			]
+		},
+		"odrik": {
+			"name": "ODRIK",
+			"title": "STEINMETZMEISTER",
+			"look": {
+				"coat": "7a6a52",
+				"under": "4a3a2e",
+				"skin": "b98260",
+				"hair": "c8c0b0",
+				"tall": 1.1
+			},
+			"spots": {
+				"yard": {
+					"place": "steinmetzhof",
+					"at": [
+						0,
+						0
+					],
+					"face": [
+						0,
+						-1
+					],
+					"clip": "chisel"
+				},
+				"inn": {
+					"door": "gasthaus",
+					"face": [
+						0,
+						1
+					],
+					"clip": "idle"
+				},
+				"evening": {
+					"door": "gasthaus",
+					"inside": true
+				},
+				"home": {
+					"door": "staffeln_2_1",
+					"inside": true
+				}
+			},
+			"schedule": [
+				[
+					0.24,
+					0.48,
+					"yard"
+				],
+				[
+					0.48,
+					0.56,
+					"inn"
+				],
+				[
+					0.56,
+					0.8,
+					"yard"
+				],
+				[
+					0.82,
+					0.92,
+					"evening"
+				],
+				[
+					0.92,
+					0.24,
+					"home"
+				]
+			]
+		},
+		"tamsa": {
+			"name": "TAMSA",
+			"title": "GLASSCHLEIFERIN",
+			"look": {
+				"coat": "3a7a8c",
+				"under": "2a2438",
+				"skin": "e0b898",
+				"hair": "c0503a",
+				"tall": 0.95
+			},
+			"spots": {
+				"grind": {
+					"place": "glasschleiferei",
+					"at": [
+						0,
+						1
+					],
+					"face": [
+						0,
+						-1
+					],
+					"clip": "grind"
+				},
+				"market": {
+					"place": "steinmarkt",
+					"at": [
+						-3,
+						2
+					],
+					"face": [
+						1,
+						0
+					],
+					"clip": "idle"
+				},
+				"shop": {
+					"door": "staffeln_2_0",
+					"face": [
+						0,
+						1
+					],
+					"clip": "idle"
+				},
+				"home": {
+					"door": "staffeln_2_0",
+					"inside": true
+				}
+			},
+			"schedule": [
+				[
+					0.26,
+					0.44,
+					"grind"
+				],
+				[
+					0.44,
+					0.52,
+					"market"
+				],
+				[
+					0.52,
+					0.76,
+					"grind"
+				],
+				[
+					0.76,
+					0.86,
+					"shop"
+				],
+				[
+					0.86,
+					0.26,
+					"home"
+				]
+			]
+		},
+		"pim": {
+			"name": "PIM",
+			"title": "LICHTKNECHT",
+			"look": {
+				"coat": "c08a3a",
+				"under": "3a3346",
+				"skin": "e8c0a0",
+				"hair": "6b4a32",
+				"tall": 0.85
+			},
+			"spots": {
+				"store": {
+					"door": "lagerhaus",
+					"face": [
+						0,
+						1
+					],
+					"clip": "polish"
+				},
+				"market": {
+					"place": "steinmarkt",
+					"at": [
+						3,
+						-2
+					],
+					"face": [
+						0,
+						1
+					],
+					"clip": "idle"
+				},
+				"forum": {
+					"place": "forum",
+					"at": [
+						4,
+						5
+					],
+					"face": [
+						-1,
+						0
+					],
+					"clip": "polish"
+				},
+				"tower": {
+					"door": "mondturm",
+					"face": [
+						0,
+						1
+					],
+					"clip": "idle"
+				},
+				"home": {
+					"door": "lagerhaus",
+					"inside": true
+				}
+			},
+			"schedule": [
+				[
+					0.22,
+					0.4,
+					"store"
+				],
+				[
+					0.4,
+					0.55,
+					"market"
+				],
+				[
+					0.55,
+					0.7,
+					"forum"
+				],
+				[
+					0.7,
+					0.77,
+					"store"
+				],
+				[
+					0.77,
+					0.79,
+					"tower"
+				],
+				[
+					0.92,
+					0.22,
+					"home"
+				]
+			],
+			"lamp_round": [
+				0.79,
+				0.92
+			]
+		},
+		"hedda": {
+			"name": "HEDDA",
+			"title": "WIRTIN",
+			"look": {
+				"coat": "8c3a4a",
+				"under": "e8dcc0",
+				"skin": "d0a080",
+				"hair": "4a3020",
+				"tall": 1.0
+			},
+			"spots": {
+				"sweep": {
+					"door": "gasthaus",
+					"face": [
+						1,
+						0
+					],
+					"clip": "sweep"
+				},
+				"market": {
+					"place": "steinmarkt",
+					"at": [
+						0,
+						4
+					],
+					"face": [
+						0,
+						-1
+					],
+					"clip": "idle"
+				},
+				"front": {
+					"building": "gasthaus",
+					"at": [
+						-10,
+						22
+					],
+					"face": [
+						0,
+						1
+					],
+					"clip": "serve"
+				},
+				"home": {
+					"door": "gasthaus",
+					"inside": true
+				}
+			},
+			"schedule": [
+				[
+					0.2,
+					0.3,
+					"sweep"
+				],
+				[
+					0.3,
+					0.4,
+					"market"
+				],
+				[
+					0.4,
+					0.95,
+					"front"
+				],
+				[
+					0.95,
+					0.2,
+					"home"
+				]
+			]
+		}
+	},
+	"extras": {
+		"seed": 7331,
+		"count": 24,
+		"jitter": 0.012,
+		"palettes": {
+			"a": [
+				[
+					"31405e",
+					"475c80",
+					"6680a6",
+					"93aacb"
+				],
+				[
+					"3a1420",
+					"5c2232",
+					"823446",
+					"a8525e"
+				],
+				[
+					"24321e",
+					"37492c",
+					"51663e",
+					"748a58"
+				],
+				[
+					"4a3412",
+					"6e4e1c",
+					"96702c",
+					"bc9446"
+				],
+				[
+					"2c1e16",
+					"463022",
+					"644632",
+					"86604a"
+				],
+				[
+					"2e2838",
+					"463c54",
+					"645876",
+					"8a7e9c"
+				],
+				[
+					"16343a",
+					"245056",
+					"386e72",
+					"5a9494"
+				]
+			],
+			"b": [
+				[
+					"5d4b33",
+					"82694a",
+					"a88c65",
+					"cfb68d"
+				],
+				[
+					"6a604e",
+					"9c927a",
+					"c8bea2",
+					"ece4cc"
+				],
+				[
+					"4e2214",
+					"74361e",
+					"9a4e2c",
+					"be7044"
+				],
+				[
+					"1e1c24",
+					"302c38",
+					"46404e",
+					"605a68"
+				],
+				[
+					"3a4434",
+					"56634c",
+					"76846a",
+					"9aa88c"
+				]
+			],
+			"h": [
+				[
+					"2d1d13",
+					"4b321f",
+					"6d4b2f",
+					"936b45"
+				],
+				[
+					"120e10",
+					"221a1c",
+					"362a2c",
+					"4c3c3c"
+				],
+				[
+					"4a1c10",
+					"6e2c18",
+					"944226",
+					"b85e38"
+				],
+				[
+					"6a5428",
+					"94783a",
+					"bca052",
+					"dcc478"
+				],
+				[
+					"3e3a3a",
+					"5e5856",
+					"827a76",
+					"a69e98"
+				],
+				[
+					"3c1a10",
+					"5a2a18",
+					"7c3e24",
+					"a05634"
+				]
+			]
+		},
+		"roles": {
+			"wache": {
+				"fixed": 3,
+				"kinds": [
+					12
+				],
+				"night": true,
+				"day": [
+					[
+						0.0,
+						"gate:osttor",
+						"idle"
+					],
+					[
+						0.24,
+						"door:torhaus",
+						"idle"
+					],
+					[
+						0.26,
+						"home",
+						"idle"
+					],
+					[
+						0.76,
+						"place:torgasse",
+						"idle"
+					],
+					[
+						0.82,
+						"gate:forumtor",
+						"idle"
+					],
+					[
+						0.92,
+						"place:forum",
+						"idle"
+					]
+				]
+			},
+			"haendler": {
+				"weight": 3,
+				"kinds": [
+					1,
+					5,
+					10,
+					11,
+					3
+				],
+				"day": [
+					[
+						0.22,
+						"home"
+					],
+					[
+						0.28,
+						"stall",
+						"work"
+					],
+					[
+						0.45,
+						"stall",
+						"talk"
+					],
+					[
+						0.55,
+						"stall",
+						"idle"
+					],
+					[
+						0.62,
+						"stall",
+						"work"
+					],
+					[
+						0.77,
+						"home"
+					]
+				]
+			},
+			"traeger": {
+				"weight": 3,
+				"kinds": [
+					2,
+					7,
+					0,
+					10
+				],
+				"day": [
+					[
+						0.23,
+						"home"
+					],
+					[
+						0.3,
+						"door:lagerhaus",
+						"idle"
+					],
+					[
+						0.36,
+						"place:karrenhof",
+						"idle"
+					],
+					[
+						0.44,
+						"place:steinmarkt",
+						"idle"
+					],
+					[
+						0.52,
+						"door:lagerhaus",
+						"idle"
+					],
+					[
+						0.6,
+						"place:karrenhof",
+						"idle"
+					],
+					[
+						0.68,
+						"stall",
+						"talk"
+					],
+					[
+						0.76,
+						"home"
+					],
+					[
+						0.8,
+						"inn",
+						"talk",
+						0.6
+					],
+					[
+						0.91,
+						"home"
+					]
+				]
+			},
+			"steinsetzer": {
+				"weight": 2,
+				"kinds": [
+					8,
+					2,
+					7
+				],
+				"day": [
+					[
+						0.24,
+						"home"
+					],
+					[
+						0.3,
+						"place:steinmetzhof",
+						"work"
+					],
+					[
+						0.47,
+						"bench",
+						"sit"
+					],
+					[
+						0.55,
+						"deco:deko_quader",
+						"work"
+					],
+					[
+						0.68,
+						"place:steinmetzhof",
+						"work"
+					],
+					[
+						0.78,
+						"home"
+					],
+					[
+						0.8,
+						"inn",
+						"talk",
+						0.6
+					],
+					[
+						0.91,
+						"home"
+					]
+				]
+			},
+			"marktgaenger": {
+				"weight": 4,
+				"kinds": [
+					0,
+					1,
+					3,
+					5,
+					6,
+					11
+				],
+				"day": [
+					[
+						0.27,
+						"home"
+					],
+					[
+						0.34,
+						"place:steinmarkt",
+						"idle"
+					],
+					[
+						0.42,
+						"stall",
+						"talk"
+					],
+					[
+						0.5,
+						"place:forum",
+						"idle"
+					],
+					[
+						0.58,
+						"well",
+						"talk"
+					],
+					[
+						0.66,
+						"bench",
+						"sit"
+					],
+					[
+						0.75,
+						"home"
+					],
+					[
+						0.8,
+						"inn",
+						"talk",
+						0.6
+					],
+					[
+						0.91,
+						"home"
+					]
+				]
+			},
+			"alte": {
+				"weight": 2,
+				"kinds": [
+					4,
+					9,
+					5
+				],
+				"day": [
+					[
+						0.3,
+						"home"
+					],
+					[
+						0.36,
+						"bench",
+						"sit"
+					],
+					[
+						0.55,
+						"well",
+						"talk"
+					],
+					[
+						0.64,
+						"bench",
+						"sit"
+					],
+					[
+						0.73,
+						"home"
+					]
+				]
+			},
+			"waescherin": {
+				"weight": 2,
+				"kinds": [
+					1,
+					10,
+					5
+				],
+				"day": [
+					[
+						0.22,
+						"home"
+					],
+					[
+						0.3,
+						"deco:deko_waesche",
+						"work"
+					],
+					[
+						0.46,
+						"well",
+						"work"
+					],
+					[
+						0.56,
+						"deco:deko_waesche",
+						"work"
+					],
+					[
+						0.72,
+						"home"
+					]
+				]
+			}
+		},
+		"lines": {
+			"wache": [
+				"Weitergehen. Hier gibt's nichts zu sehen.",
+				"Die Mauer schläft nie. Wir auch nicht.",
+				"Halt dich an die Laternen."
+			],
+			"haendler": [
+				"Frisch vom Glaskamm! Na ja, fast.",
+				"Zwei Kupfer, weil du so ehrlich guckst.",
+				"Schau ruhig, Schauen kostet nichts."
+			],
+			"traeger": [
+				"Platz da, das ist schwer!",
+				"Noch drei Fuhren bis Mittag.",
+				"Wer hat diese Treppen bloß gebaut?"
+			],
+			"steinsetzer": [
+				"Stein auf Stein, seit hundert Jahren.",
+				"Pass auf, wo du hintrittst, der Mörtel ist frisch.",
+				"Odrik sieht jeden schiefen Stein."
+			],
+			"marktgaenger": [
+				"Die Rüben waren gestern billiger.",
+				"Bist du neu hier? Man sieht's an den Stiefeln.",
+				"Hast du die Glocke gehört? Nein? Kommt noch."
+			],
+			"alte": [
+				"Früher war hier mehr los. Und weniger Treppen.",
+				"Setz dich, Kind, die Bank ist breit genug.",
+				"Ich hab die Schwarze Mauer noch ohne Moos gesehen."
+			],
+			"waescherin": [
+				"Das trocknet heute nie.",
+				"Pass auf die Laken auf!",
+				"Im Brunnenhof ist das Wasser am weichsten."
+			],
+			"any": [
+				"Schöner Tag, nicht?",
+				"Hallgrat grüßt dich.",
+				"Hmm?"
+			],
+			"night": [
+				"So spät noch unterwegs?",
+				"Geh lieber rein, bevor es dunkel wird."
+			]
+		}
+	},
+	"reactions": {
+		"greet_stranger": [
+			"Eine Fremde.",
+			"Neu hier?",
+			"Hm. Vom Westweg?"
+		],
+		"greet_known": [
+			"Ah, du wieder!",
+			"Guten Tag!",
+			"Schön, dich zu sehen."
+		],
+		"startle": [
+			"He! Pass doch auf!",
+			"Langsam!",
+			"Steck das weg!"
+		],
+		"hurt": [
+			"Du blutest ja!",
+			"Geh zu Ilvane, Kind.",
+			"Setz dich hin, bevor du umfällst."
+		],
+		"rain": [
+			"Schnell, unters Dach!",
+			"Na toll, Regen.",
+			"Wieder nass bis auf die Knochen."
+		]
+	},
+	"sounds": {
+		"folder": "res://assets/audio/hallgrat_people/",
+		"max": 8,
+		"clips": {
+			"chisel": {
+				"files": [
+					"chisel_a",
+					"chisel_b",
+					"chisel_c"
+				],
+				"frames": [
+					3
+				],
+				"db": -9.0,
+				"range": 280.0
+			},
+			"grind": {
+				"files": [
+					"grind"
+				],
+				"frames": [
+					0
+				],
+				"db": -14.0,
+				"range": 220.0
+			},
+			"sweep": {
+				"files": [
+					"sweep_a",
+					"sweep_b"
+				],
+				"frames": [
+					1,
+					4
+				],
+				"db": -16.0,
+				"range": 160.0
+			},
+			"light": {
+				"files": [
+					"lamp"
+				],
+				"frames": [
+					3
+				],
+				"db": -12.0,
+				"range": 220.0,
+				"once": true
+			},
+			"polish": {
+				"files": [
+					"polish"
+				],
+				"frames": [
+					2
+				],
+				"db": -18.0,
+				"range": 140.0,
+				"chance": 0.5
+			},
+			"serve": {
+				"files": [
+					"serve"
+				],
+				"frames": [
+					1
+				],
+				"db": -14.0,
+				"range": 180.0
+			},
+			"work": {
+				"files": [
+					"chisel_a",
+					"chisel_b",
+					"chisel_c"
+				],
+				"frames": [
+					2
+				],
+				"db": -17.0,
+				"range": 200.0,
+				"chance": 0.4
+			}
+		},
+		"voices": [
+			{
+				"who": "hedda",
+				"clips": [
+					"sweep",
+					"serve",
+					"idle"
+				],
+				"files": [
+					"sing_0",
+					"sing_1",
+					"sing_2"
+				],
+				"every": [
+					22.0,
+					50.0
+				],
+				"db": -15.0,
+				"range": 200.0
+			},
+			{
+				"role": "haendler",
+				"clips": [
+					"idle",
+					"talk"
+				],
+				"files": [
+					"call_0",
+					"call_1",
+					"call_2"
+				],
+				"every": [
+					24.0,
+					60.0
+				],
+				"db": -13.0,
+				"range": 320.0,
+				"day": true
+			}
+		],
+		"murmur": {
+			"file": "murmur",
+			"building": "gasthaus",
+			"radius": 110.0,
+			"min": 3,
+			"db": -12.0,
+			"range": 360.0
+		}
+	}
+}

@@ -28,9 +28,9 @@
 **Maßstab & Silhouette:** Kolossales, frei schwebendes Astral-Quarz-Wesen mit **`~156–162 px` Gesamthöhe** (Boden `(0,0)` bis Spitze der 9-teiligen Kathedral-Krone) und **`~168 px` Spanne** (über `~3,8×` so groß wie Ellie `42 px` und `~5,5×` so groß wie ein kleiner Quarzwächter `29 px`). Gebaut als rein organisches, prozedural 3/4-projiziertes (`SQUASH = 0.72`), tiefensortiertes Pixel-Art-Rig (`AurelithRig`) aus zackig abgeschlagenen Canyon-Sandstein-Massen (keine Fabrik-Quader, keine Roboterbeine), geschichteten Fels-Strata, glühenden Bruchrissen, facettierten Quarz-Drusen und getrenntem weltbeleuchtetem `Body` sowie unbeleuchtetem additivem `Glow`.
 
 ### Farb- & Material-System (`docs/design_guide.md` & `tools/art_desert_ruins.py`)
-* **Geschichteter Wüstensandstein:** 1-px-Kontur `#241626` (nie `#000000`), Schatten `#483038` → `#785042` → Ocker `#aa7a4e` → Sonnenfläche `#d8a868` → NW-Grat `#f2cf8e`, belebt durch deterministische horizontale Schicht-Cluster, Abbruchkanten und magische Rissverzweigungen (Licht stets von links oben).
-* **Antikes Ruinengold:** `#6f5020` → `#b48a38` → `#e6c468` → `#fff0b0` für Brustbögen, Schulterklammern, Kronenfassungen und Armillar-Ringe.
-* **Facettierter Sonnenquarz:** Kontur `#282238`, Tiefenschatten `#364262` → `#5b698e` → `#8191b6` → `#a2b3d4` → `#d6e2f5` → scharfer NW-Lichtgrat `#ffffff` mit innerer Brechungsglut.
+* **Voronoi-gemauerter Wüstensandstein & Quarzkrusten:** 1-px-Kontur `#241626` (nie `#000000`), Schatten `#483038` → `#785042` → Ocker `#aa7a4e` → Sonnenfläche `#d8a868` → NW-Grat `#f2cf8e`. Jeder Felsblock wird pro Pixel mit **2D-Voronoi-Steinplatten**, dunklen Mörtel-/Rissfugen, 1-px-Sonnenkanten, **4×4-Bayer-Dithering**, diagonalen Sedimentschichten, aufgesinterten weißen Bodenquarz-Krusten und **6 unterschiedlichen asymmetrischen Reliefs** (gebrochene Goldbänder, versenkte Sonnen-Kartuschen, aufgebrochene Mini-Drusen, Gold-Eckklammern, Quarz-Gesteinsadern und Astrolabium-Bögen) gebacken.
+* **Antikes Ruinengold:** `#6f5020` → `#b48a38` → `#e6c468` → `#fff0b0` für Brustbögen, gestufte Pharaonen-Stirnleisten, Knöchelplatten, Kronenfassungen und gravierte Armillar-Ringe.
+* **5 Individuelle Sonnenquarz-Morphologien & Spektralbrechung:** Kontur `#282238`, Tiefenschatten `#364262` → `#5b698e` → `#8191b6` → `#a2b3d4` → `#d6e2f5` → NW-Grat `#ffffff`. Kein Kristall gleicht dem nächsten dank fünf gebackener Wuchsformen (`CATHEDRAL_HEX`, schräg abgescherte Spaltfläche `CLEAVED_TABLE`, Mutter-Tochter-Zwilling `TWIN_CLUSTER`, schartige Kampfklaue `BATTLE_NOTCHED`, zweispitzige Druse `DRUSE_CROWN`), verschneiten Wurzelkrusten, Wachstumsriefen und feinen diagonalen Spektralbändern in Türkis (`#6cf0e4`), Violett (`#b58cff`) und Sonnengold (`#ffe08a`).
 * **Strömende Magie nach Kampfphase:**
   * **Stage 1:** Strahlendes **Türkis & Sonnengold** (`#2a8c94`, `#78f4e6`, `#d0fff8` + `#ffe488`).
   * **Stage 2 (`prism_release`):** Aufgebrochenes **Weiß-Gold & Arkan-Violett/Magenta** (`#6636ad`, `#b47aff`, `#ff8ae2`, `#78f4e6`, `#fff0b0`).
@@ -118,9 +118,9 @@ Ein trockener Himmelsblitz schlägt direkt in das offene Prisma-Herz ein; das We
 ### Gebündelter 6-Pakete-Umsetzungsplan
 | Paket | Fokus | Status |
 |---|---|---|
-| **Paket 1** | **Master-Dossier (`docs/enemies/boss_aurelith.md`), 3-Stufen-Facetten-Rig (`AurelithRig`) & OpenGL3-Vorschau (`tools/preview_aurelith.tscn`)** | **In Arbeit (aktuell)** |
-| **Paket 2** | **Das Singende Becken (`Tile 626, 69`), 6 Wächter, Seelen-Sog-Trigger, Selbst-Erschaffung & dynamischer Quarz-/Sturmwall** | Offen |
-| **Paket 3** | **Kampf-Fundament (Host/Koop), Bodenmagie (`Sand ↔ Quarz`, Treibsand, Tagesschatten) & Stage 1 (`100 %–66 %`)** | Offen |
-| **Paket 4** | **Phasenwechsel `DER MANTEL BRICHT` & Stage 2 (`66 %–33 %`, Brennstrahl mit Golem-Prisma-Brechung, Tempel-Presse, Triade)** | Offen |
-| **Paket 5** | **Phasenwechsel `DIE SONNENSCHMELZE` (lokales Quarzgewitter) & Stage 3 (`33 %–0 %`, Tsunami, Zwillingsklingen, Armillar-Gericht, `ZENIT-NOVA`)** | Offen |
-| **Paket 6** | **Harmonischer Zerfall, Synthetische Audio-Suite (`tools/audio_*.py`), `Glutreliquiar`, Armband-Relikt, Hologramm & Testsuite** | Offen |
+| **Paket 1** | **Master-Dossier (`docs/enemies/boss_aurelith.md`), 3-Stufen-Facetten-Rig (`AurelithRig`) & OpenGL3-Vorschau (`tools/preview_aurelith.tscn`)** | **Abgeschlossen (v3)** |
+| **Paket 2** | **Das Singende Becken (`Tile 626, 69`), 6 Wächter, Seelen-Sog-Trigger, Selbst-Erschaffung & dynamischer Quarz-/Sturmwall** | **Abgeschlossen** |
+| **Paket 3** | **Kampf-Fundament (Host/Koop), Bodenmagie (`Sand ↔ Quarz`, Treibsand, Tagesschatten) & Stage 1 (`100 %–66 %`)** | **Abgeschlossen** |
+| **Paket 4** | **Phasenwechsel `DER MANTEL BRICHT` & Stage 2 (`66 %–33 %`, Brennstrahl mit Golem-Prisma-Brechung, Tempel-Presse, Triade)** | **Abgeschlossen** |
+| **Paket 5** | **Phasenwechsel `DIE SONNENSCHMELZE` (lokales Quarzgewitter) & Stage 3 (`33 %–0 %`, Tsunami, Zwillingsklingen, Armillar-Gericht, `ZENIT-NOVA`)** | **Abgeschlossen** |
+| **Paket 6** | **Harmonischer Zerfall, Synthetische Audio-Suite (`tools/audio_*.py`), `Glutreliquiar`, Armband-Relikt, Hologramm & Testsuite** | **Abgeschlossen** |

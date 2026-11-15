@@ -170,7 +170,7 @@ def main():
     entries = []
     for k in range(n_pieces):
         a0, a1 = total * k / n_pieces, total * (k + 1) / n_pieces
-        entries.append('  {"id": "westweg_%d", "width": %d, "taper_in": 120, "taper_out": 6, "old_road": true, "seed": 4711, "arc": [%.1f, %.1f], "points": %s}'
+        entries.append('  {"id": "westweg_%d", "width": %d, "taper_in": 0, "taper_out": 6, "ruts": true, "seed": 4711, "arc": [%.1f, %.1f], "points": %s}'
                        % (k + 1, WIDTH, a0, a1, json.dumps(rel, separators=(",", ":"))))
     path = os.path.join(ROOT, "data/ground.json")
     text = open(path, encoding="utf-8").read()

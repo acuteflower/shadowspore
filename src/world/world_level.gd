@@ -80,6 +80,7 @@ var _pending_commit: ChunkBuild ## committed ground waiting one frame for its pr
 var night: NightDirector ## host: spawns and steers the creatures of the night
 var desert_observatory: DesertObservatory ## Die Zenitwarte: grand 5-zone observatory landmark in Region 34
 var desert_ruins: DesertRuins ## active quartz arches, conduits, obelisks & seals across Sonnenquarz-Öde
+var aurelith_arena: AurelithArena ## Das Singende Becken (`Tile 626, 69`, Region 33): Aurelith's 6-guardian desert boss basin
 var desert_guardians: DesertGuardians ## host: spawns 24/7 QuartzGolem guardians exclusively on ground-quartz outcrops
 var meadow_landmarks: MeadowLandmarks ## SolitaryTree hilltop oaks, ForestShrines & SunbeamShafts across the 3 meadow macro-landscapes
 var meadow_pois: MeadowPois ## Red Order monuments, OldWatermills, BrokenStoneBridges & FisherPiers across the meadow biome
@@ -187,6 +188,7 @@ class ChunkBuild:
 
 func _fill_ground() -> void:
 	RenderingServer.set_default_clear_color(Color("120e1f")) ## the void behind the land
+	add_to_group("story_world")
 	LightTexture.prewarm(PackedInt32Array([24, 26, 28, 34, 36, 40])) ## the common glow/night light cookies, before the first chunk needs them
 	_map = RegionMap.new(0, DataRegistry.table("world_map"))
 	_tiles = DataRegistry.table("grass_tiles")
@@ -221,6 +223,9 @@ func _fill_ground() -> void:
 	var waystones: Waystones = Waystones.new() ## the goddess statues (teleport points): which are awake (docs/waystones.md)
 	waystones.name = "Waystones"
 	add_child(waystones)
+	var goddess: GoddessSystem = GoddessSystem.new() ## Caelia & the Star Hall sanctuary (docs/goettin_konzept.md)
+	goddess.name = "GoddessSystem"
+	add_child(goddess)
 	var vistas: Vistas = Vistas.new() ## the panoramic cliff-edge VistaPoints (docs/wiesenbiom_ausbau_konzept.md)
 	vistas.name = "Vistas"
 	add_child(vistas)
@@ -280,6 +285,11 @@ func _fill_ground() -> void:
 	_stone_cells.merge(obs_spec.get("stones", {}) as Dictionary)
 	add_child(desert_observatory)
 	desert_ruins = null ## non-observatory desert ruins disabled pending redesign
+	aurelith_arena = AurelithArena.new()
+	var aur_spec: Dictionary = aurelith_arena.setup(self)
+	_generator.blocked_cells.merge(aur_spec.get("blocked", {}) as Dictionary)
+	_stone_cells.merge(aur_spec.get("stones", {}) as Dictionary)
+	add_child(aurelith_arena)
 	desert_guardians = DesertGuardians.new()
 	desert_guardians.name = "DesertGuardians"
 	desert_guardians.setup(self, _generator.blocked_cells)
@@ -710,6 +720,9 @@ func _init_step_stage0() -> void:
 	var waystones: Waystones = Waystones.new()
 	waystones.name = "Waystones"
 	add_child(waystones)
+	var goddess: GoddessSystem = GoddessSystem.new()
+	goddess.name = "GoddessSystem"
+	add_child(goddess)
 	var vistas: Vistas = Vistas.new()
 	vistas.name = "Vistas"
 	add_child(vistas)
@@ -980,6 +993,11 @@ func _init_step_stage4(deadline: int) -> void:
 			return
 	if _init_stage4_sub == 2:
 		desert_ruins = null ## non-observatory desert ruins disabled pending redesign
+		aurelith_arena = AurelithArena.new()
+		var aur_spec: Dictionary = aurelith_arena.setup(self)
+		_generator.blocked_cells.merge(aur_spec.get("blocked", {}) as Dictionary)
+		_stone_cells.merge(aur_spec.get("stones", {}) as Dictionary)
+		add_child(aurelith_arena)
 		_init_stage4_sub = 3
 		if Time.get_ticks_usec() >= deadline:
 			return
@@ -1224,6 +1242,18 @@ func debug_morwenna(player: Player, fight: bool) -> void:
 		witch_arena.debug_fight()
 
 
+## Developer: puts her in the Singing Basin (`Tile 626, 69`); `mode_id`: `0` basin only, `1` Stage 1 awaken, `2` Stage 2, `3` Stage 3.
+func debug_aurelith(player: Player, fight: bool, stage_idx: int = 1) -> void:
+	if player == null or aurelith_arena == null or not player.is_multiplayer_authority():
+		return
+	player.request_teleport(aurelith_arena.basin_position() + Vector2(0, 148))
+	if fight:
+		if stage_idx >= 2:
+			aurelith_arena.debug_phase(stage_idx - 1)
+		else:
+			aurelith_arena.debug_fight()
+
+
 func has_arena_story() -> bool:
 	for child: Node in get_children():
 		if child is ArenaStory:
@@ -1373,7 +1403,7 @@ func _rpc_bed_sleep(leave: bool) -> void:
 		if _bed_ready.erase(sender):
 			_sync_bed_waiting()
 		return
-	if _sleeping_now or not opening_over or not TimeManager.can_sleep_now():
+	if _sleeping_now or (not opening_over and TimeManager.locked) or not TimeManager.can_sleep_now():
 		return
 	_bed_ready[sender] = true
 	var needed: Array[int] = _living_bed_peers()
@@ -1754,7 +1784,8 @@ func resume_story(player: Player) -> void:
 	if hut_room != null and player.quests != null: ## a save from while the hut was being renewed: what is gone stays gone
 		for node: Interactable in hut_room.pickups:
 			var spot: InteriorPickup = node as InteriorPickup
-			if player.quests.has_flag(String(spot.spec.flag)):
+			var all_flag: String = String(spot.spec.get("all_flag", ""))
+			if player.quests.has_flag(String(spot.spec.flag)) or (all_flag != "" and player.quests.has_flag(all_flag)):
 				spot.apply_gone()
 		if hut_room.tree != null and player.quests.has_flag("hut_tree_felled"):
 			(hut_room.tree as HutTree).set_felled(true)
@@ -2040,7 +2071,7 @@ func _make_layer(biome: String, tint: Color) -> TileMapLayer:
 ## Keeps the chunks around the players painted: `all` loads the whole ring now (start), otherwise
 ## nearest first. Runtime preparation is budgeted; activation is atomic.
 func _stream(all: bool) -> void:
-	var stream_budget: int = LOAD_STREAM_BUDGET_USEC if loading_in_steps else STREAM_BUDGET_USEC
+	var stream_budget: int = LOAD_STREAM_BUDGET_USEC if loading_in_steps else int(Quality.get_value("stream_usec")) ## graphics level (CPU headroom)
 	var frame_deadline: int = Time.get_ticks_usec() + stream_budget ## one budget for adding last frame's props and preparing the next chunk
 	_finish_commit(frame_deadline) ## the ground committed last frame gets its props now (over several frames when it has many)
 	var centers: Array[Vector2i] = []
@@ -2118,7 +2149,7 @@ func _stream(all: bool) -> void:
 			_building = _take_build(best)
 		if Jobs.threaded and not missing.is_empty(): ## the next few chunks are prepared by the workers while the nearest one is finished here
 			missing.sort()
-			var prefetch_count: int = LOAD_PREFETCH if loading_in_steps else PREFETCH
+			var prefetch_count: int = LOAD_PREFETCH if loading_in_steps else int(Quality.get_value("prefetch"))
 			for i: int in mini(prefetch_count, missing.size()):
 				_prefetch(Vector2i(missing[i].y, missing[i].z))
 		if _building != null and _pending_commit == null:
@@ -2136,7 +2167,7 @@ func _stream(all: bool) -> void:
 			if not all and time_now >= frame_deadline and not is_teleport_dest:
 				pass
 			else:
-				var deadline: int = 0 if is_teleport_dest else (frame_deadline if loading_in_steps else ((frame_deadline - STREAM_BUDGET_USEC + STREAM_OWN_CHUNK_USEC) if best_d == 0 else (frame_deadline - STREAM_BUDGET_USEC + STREAM_URGENT_USEC if best_d <= 2 else frame_deadline)))
+				var deadline: int = 0 if is_teleport_dest else (frame_deadline if loading_in_steps else ((frame_deadline - stream_budget + STREAM_OWN_CHUNK_USEC) if best_d == 0 else (frame_deadline - stream_budget + STREAM_URGENT_USEC if best_d <= 2 else frame_deadline)))
 				if _advance_chunk(_building, deadline):
 					var finished: ChunkBuild = _building
 					_building = null

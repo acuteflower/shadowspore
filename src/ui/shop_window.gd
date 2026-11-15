@@ -155,7 +155,7 @@ func _recipe_row(id: String) -> Dictionary:
 	var item: String = String(out.keys()[0])
 	var by_npc: bool = String(recipe.get("by", "self")) == "npc"
 	var why: String = town.order_block(id, player) if by_npc else town.recipe_block(id, player)
-	var state: int = OK if why == "" else (LOCKED if "TRAUT" in why else MISSING)
+	var state: int = OK if why == "" else (LOCKED if ("TRAUT" in why or "BAUWUNSCH" in why) else MISSING)
 	return {"kind": "order" if by_npc else "craft", "recipe": id, "item": item, "count": int(out[item]), "name": String(recipe.name), "sub": _needs_text(recipe),
 		"tag": duration_text(float(recipe.get("work", 0.0))) if by_npc else "", "tag_color": DIM, "state": state, "why": why}
 

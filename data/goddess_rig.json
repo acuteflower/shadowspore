@@ -1,0 +1,52 @@
+{
+  "texture": "res://assets/characters/goddess.png",
+  "glow_texture": "res://assets/characters/goddess_glow.png",
+  "frame_size": [
+    96,
+    112
+  ],
+  "feet": [
+    48,
+    94
+  ],
+  "standing_height_px": 66,
+  "columns": 26,
+  "rows": 3,
+  "default_row": 0,
+  "facings": [
+    "S",
+    "SE",
+    "SW"
+  ],
+  "row_by_facing": {
+    "S": 0,
+    "SE": 1,
+    "SW": 2
+  },
+  "clips": {
+    "sit_idle": {
+      "start": 0,
+      "count": 6,
+      "fps": 6,
+      "loop": true
+    },
+    "sit_talk": {
+      "start": 6,
+      "count": 6,
+      "fps": 7,
+      "loop": true
+    },
+    "sit_bless": {
+      "start": 12,
+      "count": 8,
+      "fps": 8,
+      "loop": false
+    },
+    "stand_idle": {
+      "start": 20,
+      "count": 6,
+      "fps": 6,
+      "loop": true
+    }
+  }
+}

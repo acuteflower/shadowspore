@@ -7,6 +7,7 @@ extends BoardWindow
 ##  - FÄRBEN: categorized list of Hair and Outfit dyes with live mirror preview and host-authoritative commits.
 
 const INK: Color = Color("100716")
+const LEGENDARY: Color = Color("ffb347")
 
 var seat: BenchSeat
 
@@ -156,15 +157,18 @@ func _rebuild() -> void:
 			for style_id: String in styles:
 				var cfg: Dictionary = app.hair_style_entry(style_id)
 				var is_active: bool = style_id == eq_hair_style
+				var is_special: bool = bool(cfg.get("special", false))
+				var sub_label: String = "FRISUR  -  STERNENGLANZ" if is_special else ("FRISUR  -  STANDARD" if bool(cfg.get("starter", false)) else "FRISUR  -  GEFUNDEN")
 				rows.append({
 					"kind": "hair_style",
 					"style_id": style_id,
+					"special": is_special,
 					"name": String(cfg.get("name", style_id)).to_upper(),
-					"sub": "FRISUR  -  STANDARD" if bool(cfg.get("starter", false)) else "FRISUR  -  GEFUNDEN",
+					"sub": sub_label,
 					"tag": "AKTIV" if is_active else "",
 					"tag_color": LIT if is_active else GOLD,
-					"icon": _hair_style_icon(focused_hair_tint),
-					"ring": LIT if is_active else Color("4a4180"),
+					"icon": _hair_style_icon(style_id, focused_hair_tint),
+					"ring": LIT if is_active else (GOLD if is_special else Color("4a4180")),
 					"info": String(cfg.get("info", "")),
 					"style_count": styles.size(),
 					"state": OK,
@@ -175,15 +179,22 @@ func _rebuild() -> void:
 			for outfit_key: String in outfits:
 				var cfg: Dictionary = app.outfit_style_entry(outfit_key)
 				var is_active: bool = outfit_key == eq_outfit_style
+				var is_legendary: bool = String(cfg.get("rarity", "")) == "legendary"
+				var season_lbl: String = String(cfg.get("season_label", "")).to_upper()
+				var sub_txt: String = "OUTFIT  -  STANDARD" if bool(cfg.get("starter", false)) else "OUTFIT  -  GEFUNDEN"
+				if is_legendary:
+					sub_txt = ("OUTFIT  -  LEGENDÄR  -  %s" % season_lbl) if season_lbl != "" else "OUTFIT  -  LEGENDÄR"
 				rows.append({
 					"kind": "outfit_style",
 					"style_id": outfit_key,
+					"legendary": is_legendary,
+					"season_label": season_lbl,
 					"name": String(cfg.get("name", outfit_key)).to_upper(),
-					"sub": "OUTFIT  -  STANDARD" if bool(cfg.get("starter", false)) else "OUTFIT  -  GEFUNDEN",
+					"sub": sub_txt,
 					"tag": "AKTIV" if is_active else "",
-					"tag_color": LIT if is_active else GOLD,
-					"icon": _outfit_icon(focused_outfit_tint),
-					"ring": LIT if is_active else Color("4a4180"),
+					"tag_color": LIT if is_active else (LEGENDARY if is_legendary else GOLD),
+					"icon": _outfit_icon(outfit_key, focused_outfit_tint),
+					"ring": LIT if is_active else (LEGENDARY if is_legendary else Color("4a4180")),
 					"info": String(cfg.get("info", "")),
 					"outfit_count": outfits.size(),
 					"state": OK,
@@ -201,7 +212,7 @@ func _rebuild() -> void:
 				"count": hair_colors.size(),
 				"swatch": eq_hc_cfg.get("swatch", []) as Array,
 				"accent": LIT,
-				"icon": _hair_style_icon(focused_hair_tint),
+				"icon": _hair_style_icon(eq_hair_style, focused_hair_tint),
 				"collapsed": hair_collapsed,
 				"state": OK,
 				"why": "",
@@ -239,7 +250,7 @@ func _rebuild() -> void:
 				"count": outfit_colors.size(),
 				"swatch": eq_oc_cfg.get("swatch", []) as Array,
 				"accent": GOLD,
-				"icon": _outfit_icon(focused_outfit_tint),
+				"icon": _outfit_icon(eq_outfit_style, focused_outfit_tint),
 				"collapsed": outfit_collapsed,
 				"state": OK,
 				"why": "",
@@ -534,11 +545,19 @@ func _detail(area: Rect2, row: Dictionary) -> void:
 			base_name = String(app.outfit_style_entry(String(o_parts.get("style", "default"))).get("name", "REISEGEWAND")).to_upper()
 		_text(Vector2(sx + 6.0, sy + 2.0), "%s + %s" % [base_name, String(row.get("name", ""))], TEXT)
 	elif row_kind == "hair_style":
-		var style_count: int = int(row.get("style_count", 1))
-		_text(Vector2(area.position.x, area.position.y + 48.0), "VERFÜGBARE FRISUREN: %d" % style_count, LIT if style_count > 1 else DIM)
+		if bool(row.get("special", false)):
+			_text(Vector2(area.position.x, area.position.y + 48.0), "STERNENPRISMEN LEUCHTEN SANFT BEI NACHT", Color("6ce8dc"))
+		else:
+			var style_count: int = int(row.get("style_count", 1))
+			_text(Vector2(area.position.x, area.position.y + 48.0), "VERFÜGBARE FRISUREN: %d" % style_count, LIT if style_count > 1 else DIM)
 	elif row_kind == "outfit_style":
-		var outfit_count: int = int(row.get("outfit_count", 1))
-		_text(Vector2(area.position.x, area.position.y + 48.0), "VERFÜGBARE OUTFITS: %d" % outfit_count, LIT if outfit_count > 1 else DIM)
+		if bool(row.get("legendary", false)):
+			var s_lbl: String = String(row.get("season_label", ""))
+			var prefix: String = ("SAISONAL - %s - " % s_lbl) if s_lbl != "" else "LEGENDÄR - "
+			_text(Vector2(area.position.x, area.position.y + 48.0), prefix + "BLÜTENBLÄTTER WEHEN IM WIND", LEGENDARY)
+		else:
+			var outfit_count: int = int(row.get("outfit_count", 1))
+			_text(Vector2(area.position.x, area.position.y + 48.0), "VERFÜGBARE OUTFITS: %d" % outfit_count, LIT if outfit_count > 1 else DIM)
 	var action_note: String = "VORSCHAU IM SPIEGEL - E ZUM ÜBERNEHMEN" if _has_pending_change() else "AKTUELL IM SPIEGEL ANGELEGT"
 	_text(Vector2(area.position.x, area.position.y + 60.0), action_note, GOLD if _has_pending_change() else DIM)
 
@@ -627,8 +646,8 @@ func close_from_seat() -> void:
 
 # ---------- procedural 16x16 icons ----------
 
-func _hair_style_icon(tint: Color) -> ImageTexture:
-	var key: String = "style:%s" % tint.to_html(false)
+func _hair_style_icon(style_id: String, tint: Color) -> ImageTexture:
+	var key: String = "style:%s:%s" % [style_id, tint.to_html(false)]
 	if _icon_cache.has(key):
 		return _icon_cache[key] as ImageTexture
 	var base: Color = Color("c8b4e4") if tint == Color.WHITE else tint
@@ -636,25 +655,130 @@ func _hair_style_icon(tint: Color) -> ImageTexture:
 	var c1: Color = base.darkened(0.18)
 	var c2: Color = base.lightened(0.25)
 	var c3: Color = base.lightened(0.65)
-	var grid: PackedStringArray = [
-		"................",
-		".....OOOOOO.....",
-		"...OO223322OO...",
-		"..O1233222211O..",
-		"..O1221111221O..",
-		".O011......110O.",
-		".O01........10O.",
-		".O01........10O.",
-		".O012......210O.",
-		".O012......210O.",
-		"..O011....110O..",
-		"..O001....100O..",
-		"...O0......0O...",
-		"................",
-		"................",
-		"................",
-	]
-	var tex: ImageTexture = _raster_icon(grid, {"O": INK, "0": c0, "1": c1, "2": c2, "3": c3})
+	var gold_hi: Color = Color("f0c878")
+	var gold_lo: Color = Color("a87832")
+	var teal_hi: Color = Color("6ce8dc")
+	var leather_c: Color = Color("4a2f3b")
+	var grid: PackedStringArray
+	match style_id:
+		"blade_bob":
+			grid = [
+				"................",
+				"....OOOOOOOO....",
+				"...O23332221O...",
+				"..O2332211GGO...",
+				"..O12211.Gg10O..",
+				".O0122.....10O..",
+				".O0122......OO..",
+				".O0121..........",
+				".O011O..........",
+				"..O01O..........",
+				"...OO...........",
+				"................",
+				"................",
+				"................",
+				"................",
+				"................",
+			]
+		"storm_tail":
+			grid = [
+				".........OOOO...",
+				"....OOOOOG322O..",
+				"...O2332GL2321O.",
+				"..O123211GO2210O",
+				"..O121....O1210O",
+				".O01O......O120O",
+				".OO........O110O",
+				"...........O010O",
+				"..........O011O.",
+				"..........O010O.",
+				"...........O0O..",
+				"............O...",
+				"................",
+				"................",
+				"................",
+				"................",
+			]
+		"moon_knot":
+			grid = [
+				"....OG....GO....",
+				"...OG3OOOO3GO...",
+				"..O2GTT33TTg2O..",
+				"..O12GGGGGG21O..",
+				".O012211112210O.",
+				".O02O.O22O.O20O.",
+				".O01O.O21O.O10O.",
+				".O0TO.O21O.OT0O.",
+				"..O1O.O12O.O1O..",
+				"..OO..O1TO..OO..",
+				"......O11O......",
+				".......OO.......",
+				"................",
+				"................",
+				"................",
+				"................",
+			]
+		"dusk_braids":
+			grid = [
+				"................",
+				"....OOOOOOOO....",
+				"...O23322332O...",
+				"..O1231OO1321O..",
+				".O012O....O210O.",
+				".O021O....O120O.",
+				".O012O....O210O.",
+				".O021O....O120O.",
+				".O012O....O210O.",
+				"..OGGO....OGGO..",
+				".O021O....O120O.",
+				"..O0O......O0O..",
+				"................",
+				"................",
+				"................",
+				"................",
+			]
+		"night_bun":
+			grid = [
+				"..........OO....",
+				".....OOOOOTGO...",
+				"....O23321G1O...",
+				"....O1322G20O...",
+				"...OOGGGGGG0OO..",
+				"..O2332222110O..",
+				"..O1221..1121O..",
+				".O01O......O20O.",
+				".OO.........O1O.",
+				"...........O20O.",
+				"............OO..",
+				"................",
+				"................",
+				"................",
+				"................",
+				"................",
+			]
+		_:
+			grid = [
+				"................",
+				".....OOOOOO.....",
+				"...OO223322OO...",
+				"..O12332222G1O..",
+				"..O1221111221O..",
+				".O011......110O.",
+				".O01........10O.",
+				".O01........10O.",
+				".O012......210O.",
+				".O012......210O.",
+				"..O011....110O..",
+				"..O001....100O..",
+				"...O0......0O...",
+				"................",
+				"................",
+				"................",
+			]
+	var tex: ImageTexture = _raster_icon(grid, {
+		"O": INK, "0": c0, "1": c1, "2": c2, "3": c3,
+		"G": gold_hi, "g": gold_lo, "T": teal_hi, "L": leather_c,
+	})
 	_icon_cache[key] = tex
 	return tex
 
@@ -724,15 +848,45 @@ func _outfit_dye_icon(color_id: String, swatch: Array) -> ImageTexture:
 	return tex
 
 
-func _outfit_icon(tint: Color) -> ImageTexture:
-	var key: String = "outfit:%s" % tint.to_html(false)
+func _outfit_icon(style_id: String, tint: Color) -> ImageTexture:
+	var key: String = "outfit:%s:%s" % [style_id, tint.to_html(false)]
 	if _icon_cache.has(key):
 		return _icon_cache[key] as ImageTexture
+	var clasp: Color = Color("f0c878")
+	if style_id == "perlenbluete":
+		var silk_base: Color = Color("f2ecee") if tint == Color.WHITE else tint.lerp(Color("f8f4f8"), 0.45)
+		var s0: Color = silk_base.darkened(0.24)
+		var s1: Color = silk_base.darkened(0.08)
+		var s2: Color = silk_base.lightened(0.18)
+		var blush: Color = Color("f6bac6")
+		var ice_b: Color = Color("9ce6f2")
+		var qipao_grid: PackedStringArray = [
+			"................",
+			".....OOOOOO.....",
+			"....O1CCCC1O....",
+			"...O222CC112O...",
+			"..O22C1222122O..",
+			"..OC1O2222O1CO..",
+			"...OO.O212O.OO..",
+			".....O12I21O....",
+			".....O1BB21O....",
+			"....O01B2210O...",
+			"....O012221CO...",
+			"....O012221CO...",
+			"....O0CCCCCC0O..",
+			".....OOOOOOOO...",
+			"................",
+			"................",
+		]
+		var qtex: ImageTexture = _raster_icon(qipao_grid, {
+			"O": INK, "0": s0, "1": s1, "2": s2, "C": clasp, "B": blush, "I": ice_b,
+		})
+		_icon_cache[key] = qtex
+		return qtex
 	var base: Color = Color("6b5694") if tint == Color.WHITE else tint
 	var c0: Color = base.darkened(0.45)
 	var c1: Color = base
 	var c2: Color = base.lightened(0.28)
-	var clasp: Color = Color("f0c878")
 	var grid: PackedStringArray = [
 		"................",
 		"....OO....OO....",

@@ -9,10 +9,12 @@ var _motes: CPUParticles2D
 var _time: float = 0.0
 const DROP: PackedScene = preload("res://src/entities/drops/item_drop.tscn")
 var states: Dictionary = {}
-var _world: WorldLevel
+var _world: Variant
 
 func _ready() -> void:
-	_world = get_parent() as WorldLevel
+	_world = get_parent()
+	if _world == null or not _world.is_in_group("world"):
+		_world = get_tree().get_first_node_in_group("world")
 	var sprite: Sprite2D = Sprite2D.new()
 	sprite.texture = ART
 	sprite.offset = Vector2(0, -15)

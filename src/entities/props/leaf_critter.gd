@@ -165,8 +165,9 @@ func refresh(fx: String) -> void:
 		_withdraw = 0.0
 	_day = TimeManager.day
 	visible = available()
-	if _bush.level != null and _bush.level._pending_commit != null:
-		if _bush.level._pending_commit.chunk.things.has(_bush):
+	var pending_commit: Variant = _bush.level.get("_pending_commit") if _bush.level != null else null
+	if pending_commit != null:
+		if pending_commit.chunk.things.has(_bush):
 			_settled = false
 			visible = false
 	set_process(kind != "")

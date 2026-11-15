@@ -25,7 +25,7 @@ static func _day_quartz_material() -> ShaderMaterial:
 const SPARKS: Texture2D = preload("res://assets/fx/dust.png")
 const GLOW_BY_DAY: float = 0.22 ## how visible the glowing parts are in daylight
 
-var level: WorldLevel
+var level: Variant
 var cell: Vector2i = Vector2i.ZERO
 var kind: String = ""
 var variant: int = 0
@@ -50,7 +50,7 @@ const BLIGHT_GLOW: Color = Color(0.72, 0.38, 1.0)
 @onready var _hurtbox: HarvestHurtbox = get_node_or_null("Hurtbox") as HarvestHurtbox
 
 
-func setup(world: WorldLevel, at: Vector2i, prop_kind: String, prop_variant: int) -> void:
+func setup(world: Variant, at: Vector2i, prop_kind: String, prop_variant: int) -> void:
 	level = world
 	cell = at
 	kind = prop_kind

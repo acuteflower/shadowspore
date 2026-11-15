@@ -73,7 +73,7 @@ func _ready() -> void:
 		var chests: LootChests = LootChests.of(get_tree())
 		if chests != null:
 			var bank_pt: Vector2 = pos_pos if chest_bank == "pos" else neg_pos
-			var off: Vector2 = Vector2(36.0 if chest_bank == "pos" else -36.0, -18.0) if axis == "ew" else Vector2(28.0, 34.0 if chest_bank == "pos" else -34.0)
+			var off: Vector2 = Vector2(44.0 if chest_bank == "pos" else -44.0, -25.0) if axis == "ew" else Vector2(32.0, 36.0 if chest_bank == "pos" else -36.0)
 			chests.place(bridge_id + "_chest", chest_tier, bank_pt + off, chest_bank == "pos")
 
 

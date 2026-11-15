@@ -686,6 +686,55 @@ Die Rothalle findet weiterhin keinen Platz (das war schon vorher so).
 
 Reihenfolge der Werkzeuge: `place_hallgrat_buildings.py` -> `bake_hallgrat_ground.py` -> `place_hallgrat_deco.py` -> `art_hallgrat_walls.py` (bei neuen Typen vorher `art_hallgrat_deco.py`) -> `--import`.
 
+### 14.9 Stufe 3f: Laufwege frei, mehr Leben, der Stall mit Hof und Koppel (gebaut 2026-11-14)
+
+**Laufwege bleiben frei.** `place_hallgrat_deco.py` kennt jetzt die Laufbahnen:
+- `lane`: die Mittellinie jeder Straße (halbe Breite minus 7 px) und jeder Türweg. Hier steht nie etwas.
+- `rim`: ein Rand von 24 px an den Kanten gepflasterter Plätze. Dort darf Deko stehen, wo niemand läuft.
+- `place(..., street=True)` verlangt `off_way` (nicht auf einer Bahn, und nicht mitten auf dem Pflaster außer am Rand).
+- `street="square"` verbietet nur die Bahn. Das gilt für Marktstände und Brunnen, die mitten auf einem Platz stehen sollen.
+
+**Neue Deko** (`art_hallgrat_deco.py`):
+- Eimer, Blumentöpfe, Regentonne, Amboss, Schleifstein, Anschlagbrett
+- Taubenschlag, Bienenkörbe, Vogelscheuche, Kräuterbeet
+- Heuraufe, Sattelbock, Misthaufen, Aufsitzstein, Wagenräder, Leiterwagen, Pferdetrog
+- Marktstände `markt_s0/s1/s2`, `markt_n0/n2`
+- die Windmühle `muehle`: ein sich verjüngender Steinturm mit Schieferhaube, vier Gitterflügeln (zwei mit Leinen bespannt), einem erleuchteten Fenster und Säcken am Fuß
+
+**Szenen an den Häusern:**
+- An Türen stehen Töpfe und Eimer.
+- An Seitenwänden steht eine Regentonne.
+- Werkstätten bekommen Amboss oder Schleifstein.
+- Beide Hausecken bekommen eine Szene.
+
+**Kleine Bilder im Grünen** (`VIGNETTES`): Garten, Tauben, Acker, Wasser, Wäsche und Werk, gewählt nach Viertel. Es gibt höchstens 34 davon, mindestens 120 px auseinander.
+
+**Benannte Orte:** neue Dinge für felder, windmuehle, gasthaus, vogtshaus, rothalle und archiv. Auf dem Steinmarkt stehen bis zu fünf Marktstände.
+
+**Der Stall:** `stall()` in `art_hallgrat_houses.py` wurde neu gebaut:
+- Karrentor mit Bändern und Hufeisen
+- angebautes Pultdach aus Brettern über vier Boxen mit Halbtüren (Name an jeder Box)
+- Sattelkammer, zwei Laternen, Gaube mit Heuaufzug, Wetterfahne mit Pferd
+
+Mit `--only=stall` rendert das Skript nur diesen Typ neu.
+
+**Der Stallhof:**
+- Pflasterstil `erde` (`stallhof` in `paving`, bewusst als letzter Eintrag, damit die Saaten der anderen Pflaster gleich bleiben).
+- `paint_earth` in `bake_hallgrat_ground.py` malt festgetretene Erde mit Hufspuren, Stroh und ein paar Pfützen.
+- Darauf eine Szene: Leiterwagen, Räder, Aufsitzstein, Trog, Sattelbock, Heu, Mist.
+
+**Die Koppel:**
+- `stallungen.koppel` (px-Polygon) wird zu einem Mauerlauf im Stil `koppel`.
+- `art_hallgrat_walls.py lay_fence` baut daraus einen Holzzaun: Pfosten etwa alle 11 px, zwei durchhängende Latten und Torpfosten mit Laterne an den Enden.
+- Die Kollision ist `thick` 5.
+- In der Koppel stehen Heuraufen, ein Trog und Heu. Sonst wächst dort nichts.
+
+**Mauer-Cache:** `art_hallgrat_walls.py` merkt sich pro Lauf einen Hash (`wall_cache` in `hallgrat_art.json`). Unveränderte Läufe behält es samt Bildern, nur neue oder geänderte Läufe werden neu gerendert. `--all` erzwingt alles neu.
+
+Bilder: `docs/img/hallgrat_stall.png` (Stall, Hof, Koppel), `docs/img/hallgrat_markt.png` (Steinmarkt). Die Windmühle hält Abstand zu jedem Haus, damit ihre Flügel kein Dach überdecken.
+
+**Reihenfolge:** `bake_hallgrat_ground.py` -> `place_hallgrat_deco.py` -> `art_hallgrat_deco.py` -> `art_hallgrat_walls.py` -> `--import`.
+
 ## 15. Ideenspeicher (alles, was noch nirgends hineinpasste)
 
 - Eine **Sonnenuhr** am Forum, deren Schatten die Mondphase *und* die Stadtstufe anzeigt.

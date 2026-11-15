@@ -2511,5 +2511,42 @@
    ]
   },
   "description": "Schweres weinrot-goldenes Wappenmedaillon eines Kommandanten des Roten Ordens. Selbst nach Jahren im Wiesenwind liegt es warm und unerschütterlich auf der Brust."
+ },
+ "fessel_des_schmelzers": {
+  "name": "Fessel des Ersten Schmelzers",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "bracelet",
+  "rarity": "legendary",
+  "enchant_slots": 2,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/fessel_des_schmelzers.png",
+  "bonus": {
+   "damage": 0.1,
+   "heavy_damage": 0.22,
+   "charge_speed": 0.3
+  },
+  "perks": [
+   "prism_break"
+  ],
+  "look": {
+   "metal": "sunbronze",
+   "stone": "78f4e6",
+   "stones": 2,
+   "glow": true,
+   "glint": true
+  },
+  "description": "Schwere Sonnenbronze-Fessel aus Aureliths geborstenem Mantel, gekrönt von drei singenden Quarzfängen. Unter deinem Schritt gefriert loser Dünensand zu klingendem Glas."
+ },
+ "ur_prisma": {
+  "name": "Ur-Prisma der Schmelze",
+  "kind": "material",
+  "rarity": "legendary",
+  "enchant_slots": 0,
+  "max_stack": 20,
+  "hotbar": false,
+  "icon": "res://assets/items/ur_prisma.png",
+  "description": "Ein warm pulsierender Splitter aus Aureliths Rosenschliff-Herz. In seinen acht Facetten brennt noch das gesammelte Zenitlicht der Himmelsbaumeister."
  }
 }

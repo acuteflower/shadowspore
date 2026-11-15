@@ -248,6 +248,10 @@ func _build_test_tools() -> void:
 		_add(0, "button", "ZUR SEEHEXE", "", {"action": "lake_witch"}) ## docs/seehexe_konzept.md: in front of her house at the Hexenwald lake
 		_add(0, "button", "SEEHEXE: QUEST STARTEN", "", {"action": "lake_witch_quest"}) ## the entry quest from the start, the ring asleep (host)
 		_add(0, "button", "SEEHEXE BEKANNT", "", {"action": "lake_witch_known"}) ## the ring awake, the quest done, the staff in the bag (host)
+		_add(0, "button", "IN DEN STERNENSAAL", "", {"action": "starhall_go"})
+		_add(0, "button", "GÖTTIN: RETTUNG AUSLÖSEN", "", {"action": "starhall_rescue"})
+		_add(0, "button", "LICHTSCHRITT EIN/AUS", "", {"action": "starhall_light_step"})
+		_add(0, "button", "GÖTTIN ZURÜCKSETZEN", "", {"action": "starhall_reset"})
 		_add(0, "button", "KRÄHENFUTTER BEKOMMEN", "", {"action": "food:crow"}) ## 20 of every loved food, 10 of every liked one (host)
 		_add(0, "button", "RABENFUTTER BEKOMMEN", "", {"action": "food:raven"})
 		_add(0, "button", "MORNATH: ERSTER KILL", "", {"action": "relics_reset"}) ## the next Mornath kill counts as the first again (100 % Rissfeder)
@@ -305,6 +309,14 @@ func _build_test_tools() -> void:
 		_add(0, "button", "ZUM RABENBAUM", "", {"action": "morwenna_tree"})
 		_add(0, "button", "MORWENNA SOFORT", "", {"action": "morwenna_fight"})
 		_add(0, "button", "SPIEGELHEXE-QUEST", "", {"action": "morwenna_quest"})
+	if story_world != null and _player != null and story_world.aurelith_arena != null:
+		_add(0, "heading", "AURELITH")
+		_add(0, "button", "ZUM SINGENDEN BECKEN", "", {"action": "aurelith_basin"})
+		_add(0, "button", "AURELITH SOFORT", "", {"action": "aurelith_fight"})
+		_add(0, "button", "STAGE 2 (PRISMA)", "", {"action": "aurelith_stage2"})
+		_add(0, "button", "STAGE 3 (SCHMELZE)", "", {"action": "aurelith_stage3"})
+		if multiplayer.is_server():
+			_add(0, "button", "FESSEL DES SCHMELZERS", "", {"action": "aurelith_relic"})
 	if story_world != null and multiplayer.is_server() and multiplayer.get_peers().is_empty():
 		_add(0, "heading", "MINE")
 		for lvl: int in [1, 5, 10, 20]:
@@ -317,6 +329,18 @@ func _build_test_tools() -> void:
 			_tp_text = "%d, %d" % [int(floorf(feet.x / 16.0)), int(floorf(feet.y / 16.0))]
 		_add(1, "field", "KOORDINATEN", "tp")
 		_add(1, "button", "ZUM ZIEL", "", {"action": "teleport"})
+	var zworld: Node = get_tree().get_first_node_in_group("zone_world")
+	if zworld != null:
+		_add(0, "heading", "ZONENWELT (TEST)")
+		_add(0, "button", "ZONE: ALTER ABSTIEG", "", {"action": "zone_start"})
+		_add(0, "button", "ZONE: VALDRICS TAL", "", {"action": "zone_home"})
+		if multiplayer.is_server() and multiplayer.get_peers().is_empty():
+			_add(0, "button", "ZURÜCK IN DIE HAUPTWELT", "", {"action": "zones_leave"})
+	elif multiplayer.is_server() and multiplayer.get_peers().is_empty():
+		_add(0, "heading", "ZONENWELT (TEST)")
+		_add(0, "button", "ZONENWELT BETRETEN (NEU)", "", {"action": "zones_enter"})
+		if SaveGame.exists(SaveGame.ZONES_PATH):
+			_add(0, "button", "ZONENWELT BETRETEN (WEITER)", "", {"action": "zones_continue"})
 	_add(1, "heading", "WELTWERKSTATT")
 	if multiplayer.is_server() and multiplayer.get_peers().is_empty() and get_tree().get_first_node_in_group("world") is WorldLevel:
 		_add(1, "button", "MAP-EDITOR ÖFFNEN", "", {"action": "editor"})
@@ -352,6 +376,10 @@ func _build_tab() -> void:
 			_add(0, "heading", "BILD")
 			_add(0, "toggle", "VOLLBILD", "fullscreen")
 			_add(0, "toggle", "VSYNC", "vsync")
+			_add(0, "button", "GRAFIK: %s" % Quality.label("quality"), "", {"action": "cycle:quality"}) ## graphics level (src/autoload/quality.gd)
+			_add(0, "toggle", "ADAPTIVE GRAFIK", "adaptive") ## lowers the level for a while when frames run long
+			_add(0, "button", "BILDRATE: %s" % Quality.label("fps_cap"), "", {"action": "cycle:fps_cap"})
+			_add(0, "toggle", "PIXEL-AUFLÖSUNG", "pixel_res") ## draw at 640x360 and scale up (cheap on weak GPUs)
 			_add(0, "slider", "SCHÜTTELN", "shake")
 			_add(0, "button", "FÄHIGKEITEN (%s)" % _key_of("skills"), "", {"action": "skills"}) ## the skill graph: the same view as F / Start
 			_add(0, "button", "FORTSCHRITT (%s)" % _key_of("progress"), "", {"action": "progress"}) ## the road of levels: the same view as P
@@ -362,6 +390,8 @@ func _build_tab() -> void:
 			_add(1, "toggle", "EIGENER CURSOR", "cursor") ## the pixel cursor (GameCursor); off = the system pointer
 			_add(1, "button", "WETTER-EFFEKTE: %s" % ["AUS", "REDUZIERT", "VOLL"][clampi(int(GameSettings.get_value("weather_fx")), 0, 2)], "", {"action": "weather_fx"})
 			_add(1, "toggle", "BLITZE SANFT", "flash_soft") ## accessibility: weaker flashes, no bolt drawing
+			_add(1, "toggle", "WASSERSPIEGELUNG", "reflections") ## mirror images in water and puddles (WaterReflections)
+			_add(1, "toggle", "SCHATTEN", "sun_shadows") ## cast shadows from sun and moon (SunShadows)
 			_add(1, "toggle", "TAGEBUCH OHNE BEWEGUNG", "journal_still")
 			_add(1, "choice", "SPRACHE", "language", {"soon": true, "text": "DEUTSCH"})
 			_add(1, "heading", "STEUERUNG")
@@ -722,6 +752,11 @@ func _run_action(action: String) -> void:
 		chests.request_dev(parts[1], hero.global_position + ahead * 40.0, parts.size() > 2)
 		_set_open(false)
 		return
+	if action.begins_with("cycle:"): ## choices shared with the main menu (graphics level, frame cap)
+		Quality.cycle(action.trim_prefix("cycle:"), 1)
+		_dirty = true
+		_build_items()
+		return
 	if action == "weather_fx":
 		GameSettings.set_value("weather_fx", (int(GameSettings.get_value("weather_fx")) + 2) % 3) ## 2 full -> 1 reduced -> 0 off -> 2
 		_dirty = true
@@ -901,6 +936,23 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			witch_world.debug_morwenna(_player as Player, action == "morwenna_fight")
+		"aurelith_basin", "aurelith_fight", "aurelith_stage2", "aurelith_stage3":
+			var aur_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+			if aur_world == null or _player == null or aur_world.aurelith_arena == null:
+				_failed_flash = 2.5
+				return
+			_set_open(false)
+			_open_t = 0.0
+			visible = false
+			var stg: int = 2 if action == "aurelith_stage2" else (3 if action == "aurelith_stage3" else 1)
+			aur_world.debug_aurelith(_player as Player, action != "aurelith_basin", stg)
+		"aurelith_relic":
+			var aur_wearer: Player = _player as Player
+			if aur_wearer == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if aur_wearer.inventory.count_item("fessel_des_schmelzers") == 0 and not TalismanRules.worn_ids(aur_wearer.inventory.equipment).has("fessel_des_schmelzers"):
+				aur_wearer.inventory.give("fessel_des_schmelzers", 1)
 		"return_home":
 			var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if world == null or not world.debug_can_return_home():
@@ -910,6 +962,14 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			world.debug_return_home()
+		"zone_start", "zone_home":
+			var zw: Node = get_tree().get_first_node_in_group("zone_world")
+			if zw != null and _player != null and zw.has_method("travel_to_zone"):
+				var target_z: String = "start_path" if action == "zone_start" else "home_valley"
+				zw.call("travel_to_zone", _player.name.to_int(), target_z, "default")
+				_set_open(false)
+			else:
+				_failed_flash = 2.5
 		"editor":
 			var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if world == null or not multiplayer.is_server() or not multiplayer.get_peers().is_empty():
@@ -1026,6 +1086,12 @@ func _run_action(action: String) -> void:
 		"trials_enter", "trials_leave": ## the trials' test world (TrialLevel) and back
 			_set_open(false)
 			GameLauncher.launch(get_tree(), {"mode": "new", "world": "trials"} if action == "trials_enter" else {"mode": "continue"})
+		"zones_enter", "zones_continue", "zones_leave": ## experimental zoned continent test world (ZoneWorld, docs/zonen_kontinent_konzept.md)
+			_set_open(false)
+			if action == "zones_leave":
+				GameLauncher.launch(get_tree(), {"mode": "continue"})
+			else:
+				GameLauncher.launch(get_tree(), {"mode": "continue" if action == "zones_continue" else "new", "world": "zones"})
 		"moon:4", "moon:0": ## dev, host: the day moves on to the next one with that moon (the clock keeps its time)
 			if not multiplayer.is_server():
 				_failed_flash = 2.5
@@ -1176,6 +1242,22 @@ func _run_action(action: String) -> void:
 			var p_pos: Vector2 = (_player as Player).global_position + Vector2(44.0, 0.0)
 			world_node.call("spawn_quartz_golem", p_pos, PI, randi() % 3, false)
 			_set_open(false)
+		"starhall_go", "starhall_rescue", "starhall_light_step", "starhall_reset":
+			var gs: GoddessSystem = GoddessSystem.of(get_tree())
+			var dev_p: Player = _player as Player
+			if gs == null or dev_p == null or not multiplayer.is_server():
+				_failed_flash = 2.5
+				return
+			if action == "starhall_go":
+				gs.debug_enter_starhall(dev_p)
+				_set_open(false)
+			elif action == "starhall_rescue":
+				_set_open(false)
+				gs.debug_trigger_rescue(dev_p)
+			elif action == "starhall_light_step":
+				gs.debug_grant_light_step(dev_p, not dev_p.light_step)
+			else:
+				gs.debug_reset(dev_p)
 		"relics_reset": ## forget the boss kills of every player: the next kill of Mornath drops the Rissfeder for certain again (host)
 			var ledger: BossRelics = BossRelics.of(get_tree())
 			if ledger == null or not multiplayer.is_server():

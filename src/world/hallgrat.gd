@@ -14,6 +14,7 @@ var deco: Array[HallgratBuilding] = [] ## the small things of the streets
 var low_walls: Array[HallgratBuilding] = [] ## the pieces of the low walls along the ways
 var leitsteine: Array[HallgratLeitstein] = []
 var bell_at: Vector2 = Vector2.INF ## px: the moon tower's bell
+var people: HallgratPeople ## the town's residents (docs/hallgrat_bewohner_konzept.md)
 var _last_time: float = -1.0
 var _clear: Array[Vector2i] = []
 
@@ -85,6 +86,9 @@ func setup() -> Array[Vector2]:
 		if String(b2.id) == "mondturm":
 			var at2: Array = b2.px as Array
 			bell_at = Vector2(float(at2[0]), float(at2[1]) - 60.0)
+	people = HallgratPeople.new()
+	people.setup()
+	add_child(people)
 	for district: Dictionary in data.get("districts", []) as Array: ## no wild trees or bushes between the houses of the town's core
 		if not ["stille", "staffeln", "fuss"].has(String(district.id)):
 			continue

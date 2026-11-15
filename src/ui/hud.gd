@@ -166,7 +166,7 @@ func bind(player: Node) -> void:
 	$BlinkIcon.bind(player.stepper) ## the skill crystal shows the shadow step (the blink is archived)
 	$Hotbar.bind(player.inventory)
 	$Hotbar.bind_progress(player.progress)
-	$InventoryWindow.bind(player.inventory, $Hotbar)
+	$InventoryWindow.bind(player.inventory, $Hotbar, player.appearance)
 	$MapWindow.bind(player)
 	$SkillTreeWindow.bind(player)
 	$ProgressWindow.bind(player)
@@ -224,7 +224,8 @@ func bind(player: Node) -> void:
 	var mod_menu: Control = preload("res://src/ui/mod_menu.tscn").instantiate() as Control
 	add_child(mod_menu)
 	mod_menu.call("bind", player)
-	_story_world = get_tree().get_first_node_in_group("world") is WorldLevel
+	var w_node: Node = get_tree().get_first_node_in_group("world")
+	_story_world = w_node != null and w_node.is_in_group("story_world")
 	_story_quests = player.quests
 	if _story_quests != null:
 		_story_quests.changed.connect(_refresh_story_hud)

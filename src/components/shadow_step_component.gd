@@ -24,6 +24,8 @@ func is_ready() -> bool:
 
 func start_cooldown() -> void:
 	var talismans: TalismanComponent = get_node_or_null("../TalismanComponent") as TalismanComponent
-	total = cooldown * (talismans.blink_scale() if talismans != null else 1.0)
+	var parent_node: Node = get_parent()
+	var light_factor: float = 0.78 if (parent_node != null and bool(parent_node.get("light_step"))) else 1.0
+	total = cooldown * light_factor * (talismans.blink_scale() if talismans != null else 1.0)
 	cooldown_left = total
 	cooldown_changed.emit(cooldown_left, total)

@@ -26,6 +26,13 @@ func _ready() -> void:
 		label.text = DIRECTIONS[sector]
 		label.position = Vector2(18 + 155 * (sector % 4), 30 + 160 * (sector / 4))
 		add_child(label)
+	var hair_arg: String = "default"
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--hair="):
+			hair_arg = arg.trim_prefix("--hair=")
+	for player: Player in players:
+		if player.appearance != null:
+			player.appearance.set_hair(hair_arg)
 	for arg: String in OS.get_cmdline_user_args():
 		if arg.begins_with("--record="):
 			recording = true

@@ -71,7 +71,7 @@ func _physics_process(delta: float) -> void:
 	knight.set_present(quests.is_active(quest_id))
 	knight.inspectable = step == "inspect"
 	var boss_here: bool = level.arena_boss_present(arena_id)
-	hologram.set_active((quests.is_finished(quest_id) or step == "fight") and not boss_here and not _outro_running)
+	hologram.set_active((quests.is_finished(quest_id) or quests.has_flag("mornath_defeated") or step == "fight") and not boss_here and not _outro_running)
 
 
 ## E at the knight (local player): the search and the boss's entrance.
@@ -95,10 +95,12 @@ func boss_defeated(arena: String) -> void:
 	if arena != arena_id:
 		return
 	var player: Player = _local_player()
-	if player == null or player.quests.active_step_id(quest_id) != "fight":
+	if player == null:
 		return
-	player.quests.set_flag("mornath_defeated") ## ends the quest: the hologram comes later, after the outro
-	_outro(player)
+	var was_fight: bool = player.quests.active_step_id(quest_id) == "fight"
+	player.quests.set_flag("mornath_defeated") ## ends the quest (or marks victory if quest was not active): the hologram comes after the outro
+	if was_fight and not _outro_running:
+		_outro(player)
 
 
 func _outro(player: Player) -> void:

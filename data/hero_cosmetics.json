@@ -43,6 +43,19 @@
 			"arm_style": "bare",
 			"arm_tint": "#ffffff",
 			"salon": false
+		},
+		"perlenbluete": {
+			"name": "Perlenblüte",
+			"folder": "perlenbluete",
+			"tint": "#ffffff",
+			"arm_style": "perlenbluete",
+			"arm_tint": "#ffffff",
+			"rarity": "legendary",
+			"season": "spring_2027",
+			"season_label": "FRÜHJAHR 2027",
+			"starter": true,
+			"salon": false,
+			"info": "EDLES PERLMUTT-SEIDEN-QIPAO MIT GOLDPASPELN, PANKOU-KNOTEN UND ERHABENER FRÜHLINGSSTICKEREI."
 		}
 	},
 	"outfit_styles": {
@@ -53,6 +66,17 @@
 			"starter": true,
 			"salon": true,
 			"info": "DEIN BEWÄHRTES REISEGEWAND. WEITERE OUTFITS FINDEST DU SPÄTER IN DER WELT."
+		},
+		"perlenbluete": {
+			"name": "Perlenblüte",
+			"folder": "perlenbluete",
+			"arm_style": "perlenbluete",
+			"rarity": "legendary",
+			"season": "spring_2027",
+			"season_label": "FRÜHJAHR 2027",
+			"starter": true,
+			"salon": true,
+			"info": "PERLMUTT-SEIDEN-QIPAO MIT STEHKRAGEN, GOLDPASPELN UND 3D-LOTUSSTICKEREI. VERWEHT BLÜTEN IM WIND."
 		}
 	},
 	"outfit_colors": {
@@ -135,7 +159,43 @@
 			"folder": "default",
 			"starter": true,
 			"salon": true,
-			"info": "DEIN OFFENES, FLIESSENDES HAAR. WEITERE FRISUREN FINDEST DU SPÄTER IN DER WELT."
+			"info": "DEIN OFFENES, FLIESSENDES HAAR MIT SCHRÄGEM PONY UND GOLDENER SCHLÄFENSPANGE."
+		},
+		"blade_bob": {
+			"name": "Klingenbob",
+			"folder": "blade_bob",
+			"starter": true,
+			"salon": true,
+			"info": "ASYMMETRISCHER KINNSCHNITT MIT HINTERSTECKTER OHRPARTIE UND GEKREUZTEN GOLDNADELN."
+		},
+		"storm_tail": {
+			"name": "Sturmschweif",
+			"folder": "storm_tail",
+			"starter": true,
+			"salon": true,
+			"info": "SCHWUNGVOLLER SCHWERTKÄMPFER-ZOPF IN EINER GOLDGEFASSTEN LEDERMANSCHETTE."
+		},
+		"moon_knot": {
+			"name": "Sternenschleier",
+			"folder": "moon_knot",
+			"starter": true,
+			"salon": true,
+			"special": true,
+			"info": "HALBHOHER KRONENKNOTEN MIT GOLDENER MONDSICHEL UND NACHTLEUCHTENDEN STERNENPRISMEN."
+		},
+		"dusk_braids": {
+			"name": "Dämmerflechten",
+			"folder": "dusk_braids",
+			"starter": true,
+			"salon": true,
+			"info": "ZWEI DICHT GEFLOCHTENE SCHULTERZÖPFE MIT GOLDRINGEN UND LEBENDIGEN QUASTENSPITZEN."
+		},
+		"night_bun": {
+			"name": "Nachtkrone",
+			"folder": "night_bun",
+			"starter": true,
+			"salon": true,
+			"info": "EDEL GEDREHTER KRONENKNOTEN MIT TÜRKIS-GOLDENER HAARNADEL UND GESCHWUNGENER WANGENLOCKE."
 		}
 	},
 	"hair_colors": {

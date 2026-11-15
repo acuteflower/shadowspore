@@ -164,8 +164,20 @@ func world_position(pos: Vector2) -> Vector2:
 	var inside: Interior = interior_at(pos)
 	if inside == null:
 		return pos
+	if inside.id == GoddessSystem.STARHALL_ID:
+		return GoddessSystem.starhall_world_anchor(get_tree(), pos)
 	var hut: Node2D = _entrances.get(String(inside.spec.adjacent.to) if inside.spec.has("adjacent") else inside.id) as Node2D
 	return hut.get("exit_position") as Vector2 if hut != null else Vector2.ZERO
+
+
+func in_starhall(pos: Vector2) -> bool:
+	var inside: Interior = interior_at(pos)
+	return inside != null and inside.id == GoddessSystem.STARHALL_ID
+
+
+func starhall_position() -> Vector2:
+	var hall: Interior = interior(GoddessSystem.STARHALL_ID)
+	return hall.entry_position() if hall != null else Vector2.ZERO
 
 
 func register_entrance(id: String, hut: Node2D) -> void:
@@ -181,8 +193,11 @@ func anchor_position(anchor: String) -> Vector2:
 	return Vector2.INF
 
 
-## `Terrain.patches`: the floors inside are wood.
+## `Terrain.patches`: the floors inside are wood by default (or the interior's configured `surface`, e.g. stone in the Star Hall).
 func surface_at(pos: Vector2) -> String:
+	var inside: Interior = interior_at(pos)
+	if inside != null:
+		return String(inside.spec.get("surface", "wood"))
 	return "wood" if slot_at(pos) >= 0 else ""
 
 
@@ -244,13 +259,16 @@ func _process(delta: float) -> void:
 	elif slot < 0:
 		_here_id = ""
 	# the room's ambience fades in and out with the door; the boards creak now and then under her feet
-	var want: float = -9.0 if slot >= 0 else -80.0
+	var cur_room: Interior = interior_at(_player.global_position) if slot >= 0 else null
+	var mute_ambient: bool = cur_room != null and bool(cur_room.spec.get("no_ambient", false))
+	var allow_creak: bool = cur_room == null or not bool(cur_room.spec.get("no_creak", false))
+	var want: float = -9.0 if slot >= 0 and not mute_ambient else -80.0
 	_ambient.volume_db = move_toward(_ambient.volume_db, want, 60.0 * delta)
-	if slot >= 0 and not _ambient.playing:
+	if slot >= 0 and not mute_ambient and not _ambient.playing:
 		_ambient.play()
-	elif slot < 0 and _ambient.playing and _ambient.volume_db <= -79.0:
+	elif (slot < 0 or mute_ambient) and _ambient.playing and _ambient.volume_db <= -79.0:
 		_ambient.stop()
-	if slot >= 0 and _player.velocity.length() > 20.0:
+	if slot >= 0 and allow_creak and _player.velocity.length() > 20.0:
 		_step_clock += delta
 		if _step_clock > 0.42:
 			_step_clock = 0.0
@@ -280,10 +298,18 @@ func apply_view(player: Player) -> void:
 		camera.limit_right = int(rect.end.x)
 		camera.limit_bottom = int(rect.end.y)
 	else:
-		camera.limit_left = -10000000
-		camera.limit_top = -10000000
-		camera.limit_right = 10000000
-		camera.limit_bottom = 10000000
+		var world: Node = get_tree().get_first_node_in_group("world")
+		var bounds: Rect2 = world.call("camera_bounds_for", player.global_position) if world != null and world.has_method("camera_bounds_for") else Rect2()
+		if bounds.has_area():
+			camera.limit_left = int(bounds.position.x)
+			camera.limit_top = int(bounds.position.y)
+			camera.limit_right = int(bounds.end.x)
+			camera.limit_bottom = int(bounds.end.y)
+		else:
+			camera.limit_left = -10000000
+			camera.limit_top = -10000000
+			camera.limit_right = 10000000
+			camera.limit_bottom = 10000000
 	camera.reset_smoothing()
 	_view_key = _view_key_at(player.global_position)
 
@@ -389,8 +415,8 @@ func use_passage(player: Player, way: Doorway) -> void:
 
 
 ## A change of place without a door (the mine's stairs and lift): the dark closes in as an iris, `move` runs (it moves the player), the dark opens.
-func transit(player: Player, move: Callable) -> void:
-	if _busy or player.story_lock:
+func transit(player: Player, move: Callable, allow_locked: bool = false) -> void:
+	if _busy or (not allow_locked and player.story_lock):
 		return
 	_busy = true
 	player.story_lock = true

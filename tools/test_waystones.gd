@@ -37,7 +37,7 @@ func _run() -> void:
 	_check("statue exists", statue != null and manager != null)
 	_check("statue is on the plateau tile", statue.position.is_equal_approx(Vector2(840, 649) * 16.0 + Vector2(8, 8)))
 	_check("dormant prompt", statue.prompt() == "AKTIVIEREN" and not statue.awake)
-	_check("registered", manager.entries().size() == 8 and not bool(manager.entries()[0].awake))
+	_check("registered", manager.entries().size() == 11 and not bool(manager.entries()[0].awake))
 	player.global_position = statue.global_position + Vector2(0, 40)
 	var far: Vector2 = Vector2(840 + 50, 649)
 	_check("far tile unseen before", not discovery.is_seen(far))
@@ -120,7 +120,7 @@ func _travel_test(world: WorldLevel, player: Player, manager: Waystones, first: 
 		await get_tree().create_timer(0.2).timeout
 		waited += 0.2
 	await get_tree().create_timer(1.6).timeout
-	_check("map opened in travel mode", map.visible and map._ways.travel_from == first.id and map._ways.destinations() == [second.id])
+	_check("map opened in travel mode", map.visible and map._ways.travel_from == first.id and map._ways.destinations().has(second.id) and map._ways.destinations().has(GoddessSystem.STARHALL_ID))
 	_check("she stands at the statue with palms on it", player.touch_hold and player.global_position.distance_to(first.global_position + Vector2(0, 15)) < 6.0)
 	map._cursor = map._to_screen(Vector2(598, 523))
 	map._ws_mouse = true

@@ -10,12 +10,15 @@ const FAST_SPEED: float = 110.0 ## px/s: above this the rig follows every frame 
 const SCREEN_MARGIN: float = 120.0 ## px around the view that still count as on screen (limbs reach out)
 const MAX_STEP: float = 0.12 ## a frame hitch is advanced as at most this much (springs and steps stay stable)
 
-var hz: float = 30.0
-var fast_hz: float = 60.0
+static var base_hz: float = 30.0 ## set by Quality (graphics level): rigs that keep the default rate follow it
+static var base_fast_hz: float = 60.0
+
+var hz: float = -1.0 ## < 0: follow `base_hz`
+var fast_hz: float = -1.0 ## < 0: follow `base_fast_hz`
 var _acc: float = 0.0
 
 
-func _init(rate: float = 30.0, fast_rate: float = 60.0) -> void:
+func _init(rate: float = -1.0, fast_rate: float = -1.0) -> void:
 	hz = rate
 	fast_hz = fast_rate
 
@@ -24,10 +27,12 @@ func _init(rate: float = 30.0, fast_rate: float = 60.0) -> void:
 func step(rig: CanvasItem, delta: float, speed: float = 0.0) -> float:
 	if delta <= 0.0:
 		return delta
+	var slow: float = hz if hz > 0.0 else base_hz
+	var fast: float = fast_hz if fast_hz > 0.0 else base_fast_hz
 	if not on_screen(rig):
 		if OFFSCREEN_HZ <= 0.0:
 			# Rig is paused offscreen; keep _acc primed so it rebuilds immediately upon entering view
-			_acc = minf(_acc + delta, 1.0 / hz)
+			_acc = minf(_acc + delta, 1.0 / slow)
 			return -1.0
 		_acc += delta
 		if _acc < 1.0 / OFFSCREEN_HZ - 0.0005:
@@ -36,7 +41,7 @@ func step(rig: CanvasItem, delta: float, speed: float = 0.0) -> float:
 		_acc = 0.0
 		return off_out
 	_acc += delta
-	var rate: float = fast_hz if speed > FAST_SPEED else hz
+	var rate: float = fast if speed > FAST_SPEED else slow
 	if _acc < 1.0 / rate - 0.0005:
 		return -1.0
 	var out: float = minf(_acc, MAX_STEP)

@@ -6,15 +6,22 @@ extends RefCounted
 
 const PATH: String = "user://save.json"
 const COOP_PATH: String = "user://coop_save.json"
+const ZONES_PATH: String = "user://save_zones.json"
+const COOP_ZONES_PATH: String = "user://coop_save_zones.json"
 const VERSION: int = 1
 
 
+static func is_zones_world(tree: SceneTree) -> bool:
+	return tree.get_first_node_in_group("zone_world") != null
+
+
 static func path_for(tree: SceneTree) -> String:
+	var zones: bool = is_zones_world(tree)
 	if tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer:
 		if not NetworkManager.active_save_path.is_empty():
 			return NetworkManager.active_save_path
-		return COOP_PATH
-	return PATH
+		return COOP_ZONES_PATH if zones else COOP_PATH
+	return ZONES_PATH if zones else PATH
 
 
 static func exists(path: String = PATH) -> bool:
@@ -72,6 +79,8 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 		data["things"] = world.call("export_things")
 	if world != null and world.has_method("export_story"):
 		data["story"] = world.call("export_story")
+	if world != null and world.has_method("export_zone_state"):
+		data["zone_world"] = world.call("export_zone_state")
 	var mines: MineManager = tree.get_first_node_in_group("mines") as MineManager
 	if mines != null:
 		data["mine"] = mines.export_state() ## opened chests, mended lifts, depth, kills; the mined rocks are in "things"
@@ -84,6 +93,11 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and waystones.awake_count() > 0:
 		data["waystones"] = waystones.export_state() ## the awakened goddess statues (docs/waystones.md)
+	var goddess: GoddessSystem = GoddessSystem.of(tree)
+	if goddess != null:
+		var g_state: Dictionary = goddess.export_state()
+		if not (g_state.get("introduced", {}) as Dictionary).is_empty() or not (g_state.get("light_step", {}) as Dictionary).is_empty():
+			data["goddess"] = g_state
 	var rings: Dictionary = {}
 	for node: Node in tree.get_nodes_in_group("ward_rings"):
 		rings[(node as WardRing).id] = (node as WardRing).export_state()
@@ -92,6 +106,9 @@ static func save(tree: SceneTree, path: String = "") -> bool:
 	var witch: WitchArena = tree.get_first_node_in_group("witch_arena") as WitchArena
 	if witch != null and (witch.released or witch.opened):
 		data["witch"] = witch.export_state() ## Morwenna was released: the Rabenbaum stays free (docs/enemies/boss_mora.md)
+	var aurelith: AurelithArena = tree.get_first_node_in_group("aurelith_arena") as AurelithArena
+	if aurelith != null and aurelith.released:
+		data["aurelith"] = aurelith.export_state() ## Aurelith was defeated in the Singing Basin (docs/enemies/boss_aurelith.md)
 	var relics: BossRelics = BossRelics.of(tree)
 	if relics != null:
 		data["relics"] = relics.export_state() ## boss kills per player and the relics not picked up yet (docs/rissfeder.md)
@@ -183,6 +200,8 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	if player.tracked != null and saved.has("board_local"):
 		player.tracked.import_data(saved.board_local as Dictionary)
 	var world: Node = tree.get_first_node_in_group("world")
+	if world != null and world.has_method("import_zone_state") and data.has("zone_world"):
+		world.call("import_zone_state", data.get("zone_world", {}))
 	if world != null and world.has_method("import_things"):
 		world.call("import_things", data.get("things", {}))
 	if world != null and world.has_method("import_story"):
@@ -199,6 +218,9 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and data.has("waystones"):
 		waystones.import_state(data.waystones as Dictionary)
+	var goddess: GoddessSystem = GoddessSystem.of(tree)
+	if goddess != null and data.has("goddess"):
+		goddess.import_state(data.goddess as Dictionary)
 	for ring_id: Variant in (data.get("ward_rings", {}) as Dictionary):
 		var ring: WardRing = WardRing.by_id(tree, String(ring_id))
 		if ring != null:
@@ -206,6 +228,9 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	var witch: WitchArena = tree.get_first_node_in_group("witch_arena") as WitchArena
 	if witch != null and data.has("witch"):
 		witch.import_state(data.witch as Dictionary)
+	var aurelith: AurelithArena = tree.get_first_node_in_group("aurelith_arena") as AurelithArena
+	if aurelith != null and data.has("aurelith"):
+		aurelith.import_state(data.aurelith as Dictionary)
 	var relics: BossRelics = BossRelics.of(tree)
 	if relics != null and data.has("relics"):
 		relics.import_state(data.relics as Dictionary)

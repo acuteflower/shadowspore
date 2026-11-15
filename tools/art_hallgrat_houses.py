@@ -427,14 +427,58 @@ def torhaus(rng):
 
 
 def stall(rng):
+    """The stables: a long stone hall with the big arched cart door, a hayloft dormer with a hoist, and along the front a slate lean-to on
+    wooden posts over four boxes with stable half-doors (the upper leaves open into the dark), lanterns hung from its beam, a tack room at
+    the end; a horseshoe over the cart door, tie rings, a weathervane horse on the ridge."""
     m = h.Model()
     W, D, eave, ridge = 118.0, 88.0, 38.0, 64.0
     body(m, rng, W, D, eave, ridge=ridge)
     door(m, -34.0, 26.0, 26.0, 0.0, arch=True, steps=0, porch=False)         # the big double door for carts and animals
     log(m, V(-34.0, 1.0, 3.8), V(-34.0, 22.0, 3.8), 0.6, BARK_D, step=0.9)   # the meeting of its two leaves
-    for wx in (-90.0, -70.0, 8.0, 30.0, 52.0, 74.0, 96.0):                  # small high windows of the boxes
-        window(m, wx, 20.0, 6.0, 6.0, 0.0, lit=wx in (30.0, 74.0), shutters=False)
-    door(m, 60.0, 10.0, 18.0, 0.0, arch=False)                                # the tack room
+    for y in (8.0, 17.0):                                                     # iron strap hinges on the leaves
+        for x in (-46.0, -22.0):
+            log(m, V(x, y, 3.9), V(x + (6.0 if x < -34 else -6.0), y, 3.9), 0.35, IRON, step=0.5)
+    for k in range(9):                                                        # a horseshoe over the cart door, for luck
+        a = math.pi * (0.1 + 0.8 * k / 8)
+        m.ell(V(-34.0 + math.cos(a) * 2.2, 33.0 + math.sin(a) * 2.2, 3.4), (0.6, 0.6, 0.4), IRON)
+    for wx in (-90.0, -70.0):                                                 # small high windows of the west boxes
+        window(m, wx, 20.0, 6.0, 6.0, 0.0, lit=wx == -70.0, shutters=False)
+    # the lean-to over the boxes: posts, a beam, slate sloping down from the wall
+    x0, x1, zp = -8.0, 112.0, 11.0
+    for px in (-6.0, 24.0, 54.0, 84.0, 110.0):
+        log(m, V(px, 0.6, zp), V(px, 24.0, zp), 0.95, BARK, step=0.9)
+        m.ell(V(px, 0.7, zp), (1.8, 0.8, 1.6), STONE)
+        for side in (-1, 1):                                                  # braces
+            if x0 < px + side * 6 < x1:
+                log(m, V(px, 19.5, zp), V(px + side * 5.0, 24.0, zp), 0.4, BARK_D, step=0.6)
+    log(m, V(x0, 24.6, zp), V(x1, 24.6, zp), 1.0, BARK_D, step=1.0)
+    for k in range(int((x1 - x0) / 3.0) + 1):                                # a board roof: weathered planks, a batten now and then
+        x = x0 + k * 3.0
+        slab(m, V(x, 32.0, 0.6), V(x, 25.4, zp + 2.2), 1.7, 0.6, PLANK_W if k % 3 else PLANK, (0, 0.8, 0.6), step=1.1)
+    for x in (x0 + 20.0, x0 + 60.0, x0 + 100.0):
+        log(m, V(x, 31.6, 1.4), V(x, 25.8, zp + 1.8), 0.35, BARK_D, step=0.6)
+    for k in range(8):
+        hut_lib.tuft(m, V(rng.uniform(x0, x1), 25.8, zp + 2.0), rng, blades=3, height=1.6, mat=MOSS)
+    for k in range(4):                                                        # four boxes with stable half-doors
+        bx = 9.0 + k * 22.0
+        ashlar_z(m, rng, bx - 6.0, bx + 6.0, 0.6, 0.8, 0.4)
+        m.ell(V(bx, 13.2, 0.5), (6.0, 4.4, 0.6), GAP)                        # the open upper leaf: the dark of the box
+        slab(m, V(bx - 5.6, 8.0, 1.4), V(bx + 5.6, 8.0, 1.4), 8.6, 0.8, PLANK if k % 2 else PLANK_W, (0, 0, 1), step=0.9)
+        log(m, V(bx - 5.0, 4.2, 2.0), V(bx + 5.0, 11.8, 2.0), 0.4, BARK_D, step=0.6)   # the Z brace
+        log(m, V(bx - 5.6, 11.9, 2.0), V(bx + 5.6, 11.9, 2.0), 0.45, BARK_D, step=0.6)
+        log(m, V(bx - 5.6, 4.0, 2.0), V(bx + 5.6, 4.0, 2.0), 0.45, BARK_D, step=0.6)
+        slab(m, V(bx + 5.6, 18.0, 4.6), V(bx + 5.6, 13.4, 4.6), 0.6, 4.8, PLANK_W, (1, 0, 0), step=0.8)   # the upper leaf folded back
+        for k2 in range(6):                                                   # an iron tie ring beside the box
+            a = k2 / 6 * math.tau
+            m.ell(V(bx + 8.4 + math.cos(a) * 1.0, 10.0 + math.sin(a) * 1.0, 1.0), (0.35, 0.35, 0.3), IRON)
+        m.ell(V(bx - 2.0, 17.6, 1.2), (3.4, 0.5, 0.3), WINE if k % 2 == 0 else OCHRE)   # a name board over each box
+    door(m, 102.0, 9.0, 18.0, 0.0, arch=False, porch=False)                   # the tack room
+    m.ell(V(102.0, 21.6, 1.0), (2.6, 1.6, 0.6), PLANK_W)                     # a saddle painted on its board
+    for lx in (31.0, 79.0):                                                   # lanterns hung from the beam
+        log(m, V(lx, 24.0, zp), V(lx, 18.6, zp), 0.15, IRON, step=0.4)
+        m.ell(V(lx, 18.4, zp), (1.6, 0.5, 1.5), IRON)  # (hung from the beam at 24.6)
+        m.ell(V(lx, 16.4, zp), (1.1, 1.8, 1.0), FIRE, kind="emit")
+        m.ell(V(lx, 14.6, zp), (1.4, 0.4, 1.3), IRON)
     roof_along_x(m, rng, -W, W, -D, 0.0, eave, ridge)
     # the hayloft: a dormer in the roof with a door and a hoist beam, straw poking out
     hx = -34.0
@@ -444,17 +488,28 @@ def stall(rng):
         m.ell(V(hx - 4.0 + k * 1.6, eave + 2.5 + (k % 3) * 0.4, -2.6), (1.6, 0.8, 1.0), STRAW)
     log(m, V(hx, eave + 18.0, -6.0), V(hx, eave + 18.0, 8.0), 1.0, BARK, step=1.0)
     log(m, V(hx, eave + 18.0, 8.0), V(hx, eave + 8.0, 8.0), 0.25, LINEN, step=0.6)
+    m.ell(V(hx, eave + 7.0, 8.0), (1.4, 1.4, 1.4), STRAW)                   # a bale on the hoist rope
     for side in (-1, 1):
         slab(m, V(hx + side * 13, eave + 20, -12.0), V(hx + side * 13, eave - 1, 2.0), 1.0, 2.0, ROOF, (side, 0.6, 0.3), step=1.2)
-    for k in range(5):                                                       # a stack of hay beside the door and a cart wheel leaning on the wall
+    for k in range(5):                                                       # a stack of hay beside the door
         m.ell(V(-68.0 + k * 3.0, 2.2 + (k % 2) * 3.0, 6.0), (4.0, 2.4, 3.0), STRAW)
-    for k in range(14):
-        a = 2 * math.pi * k / 14
-        m.ell(V(-4.0 + math.cos(a) * 7.0, 8.0 + math.sin(a) * 7.0, 5.0), (1.3, 1.3, 0.9), PLANK_W)
-    log(m, V(-11.0, 8.0, 5.2), V(3.0, 8.0, 5.2), 0.5, BARK, step=0.8)
-    log(m, V(-4.0, 1.0, 5.2), V(-4.0, 15.0, 5.2), 0.5, BARK, step=0.8)
+    # the weathervane horse on the ridge
+    vx, vz = 40.0, -D * 0.5
+    log(m, V(vx, ridge - 2.0, vz), V(vx, ridge + 14.0, vz), 0.35, IRON, step=0.6)
+    m.ell(V(vx, ridge + 15.6, vz), (3.2, 1.3, 0.4), IRON)                   # body
+    m.ell(V(vx + 3.4, ridge + 17.6, vz), (1.0, 1.8, 0.4), IRON, R=rot_z(-0.5))   # neck and head
+    m.ell(V(vx + 4.6, ridge + 18.6, vz), (1.4, 0.7, 0.4), IRON)
+    for lx in (-2.2, 2.2):
+        log(m, V(vx + lx, ridge + 14.8, vz), V(vx + lx * 1.3, ridge + 12.2, vz), 0.3, IRON, step=0.4)
+    log(m, V(vx - 3.0, ridge + 16.2, vz), V(vx - 5.4, ridge + 14.0, vz), 0.35, IRON, step=0.4)
+    for k in (-1, 1):
+        log(m, V(vx, ridge + 11.0, vz), V(vx + k * 4.0, ridge + 11.0, vz), 0.2, IRON, step=0.4)
     chimney(m, rng, 60.0, -D * 0.5, ridge - 10, ridge + 6)
-    return m, dict(W=W, D=D, lights=[[30.0, 23.0], [74.0, 23.0]], moss=0.15)
+    for k in range(4):                                                       # ivy on the west end, moss on the old stones
+        hut_lib.ivy(m, V(-W + 8 + k * 9, eave - 1.0, 2.2), rng.uniform(10, 24), rng)
+    for k in range(10):
+        hut_lib.tuft(m, V(rng.uniform(-W, W), 0.4, rng.uniform(1.5, 4.0)), rng, blades=5, height=rng.uniform(3, 5))
+    return m, dict(W=W, D=D, lights=[[31.0, 16.0], [79.0, 16.0]], moss=0.18)
 
 
 # ------------------------------------------------------------------ the market round the Wächterin (forum stalls)
@@ -844,7 +899,12 @@ def main():
         if "wall_pieces" in old:
             data["wall_pieces"] = old["wall_pieces"]
     shown = []
+    only = [a[7:].split(",") for a in sys.argv[1:] if a.startswith("--only=")]
+    if only:  # rebuild just these types (their views), keep every other picture as it is
+        data["types"].update({k: v for k, v in old.get("types", {}).items()})
     for i, name in enumerate(TYPES):
+        if only and name not in only[0]:
+            continue
         views = ("s",) if name.startswith(("stand_", "mauer", "leitstein")) else ("s", "n", "e") + (("se", "ne") if name in DIAG_TYPES else ())
         for view in views:
             key = name if view == "s" else "%s_%s" % (name, view)

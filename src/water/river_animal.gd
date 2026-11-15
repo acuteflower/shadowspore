@@ -597,3 +597,10 @@ func _fly_from_threat(aux: int) -> void:
 				home = point
 			return
 	_act.rpc(Mode.REST, position, position, Vector2.ZERO, 1.0, facing, 0.0, 0)
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, true)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

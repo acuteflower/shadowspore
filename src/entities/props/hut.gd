@@ -38,6 +38,7 @@ var _vane: Sprite2D ## the weathervane on the renewed roof ridge: turns with the
 var _vane_dir: float = 1.0
 var _banner_mat: ShaderMaterial ## the town banner at the renewed roof's right end: its rows sway in the wind
 var _sway_mats: Array[ShaderMaterial] = [] ## every swaying picture of the renewed hut (the banners, the flags)
+var _banner_mats: Array[ShaderMaterial] = [] ## every picture tinted in the town's banner colour (`banner_tint.gdshader`)
 var _banner_left: Sprite2D ## the second banner (village and up), at the roof's left end
 var _flags: Array[Sprite2D] = [] ## flags on the ridge (borough: one, town: two)
 var _ivy: Array[Sprite2D] = [] ## the ivy that climbs the right corner with the days
@@ -182,8 +183,8 @@ func _ready() -> void:
 			var which: String = String(seat[0])
 			spot.use = func(player: Player) -> void:
 				var world: Node = get_tree().get_first_node_in_group("world")
-				if world is WorldLevel:
-					(world as WorldLevel).start_fire_scene(player, which)
+				if world != null and world.has_method("start_fire_scene"):
+					world.call("start_fire_scene", player, which)
 			add_child(spot)
 	exit_position = global_position + Vector2(0, float(look.exit))
 	if art == "cabin": ## a board lies across the doorstep: carried aside with E, only then the door can be used
@@ -216,14 +217,14 @@ func set_renewed(on: bool) -> void:
 		_vane.position = Vector2(36.0, -81.0)
 		_picture.add_child(_vane) ## a child of the picture: drawn right after the roof it stands on (as a child of the y-sorting hut it would sort behind it)
 	if ResourceLoader.exists(dir + "banner.png"):
-		var banner: Sprite2D = _hang(dir + "banner.png", Vector2(171.0 - 104.0, 88.0 - 174.0), 9.0, 3.0) ## frame pixel (171, 88): the bracket sits at the roof's peak, right end
+		var banner: Sprite2D = _hang(dir + "banner.png", Vector2(171.0 - 104.0, 88.0 - 174.0), 9.0, 3.0, true) ## frame pixel (171, 88): the bracket sits at the roof's peak, right end
 		_banner_mat = banner.material as ShaderMaterial
-		_banner_left = _hang(dir + "banner.png", Vector2(14.0 - 104.0, 88.0 - 174.0), 9.0, 3.0) ## its twin on the left (village and up)
+		_banner_left = _hang(dir + "banner.png", Vector2(14.0 - 104.0, 88.0 - 174.0), 9.0, 3.0, true) ## its twin on the left (village and up)
 		_banner_left.flip_h = true
 		_banner_left.visible = false
 	if ResourceLoader.exists(dir + "hut_flag.png"):
 		for k: int in 2:
-			var flag: Sprite2D = _hang(dir + "hut_flag.png", Vector2((98.0 + 24.0 * k) - 104.0, 65.0 - 174.0), -1.0, 0.0) ## the pole's foot on the ridge
+			var flag: Sprite2D = _hang(dir + "hut_flag.png", Vector2((98.0 + 24.0 * k) - 104.0, 65.0 - 174.0), 0.0, 0.0, true) ## the pole's foot on the ridge
 			flag.flip_h = k == 1
 			flag.visible = false
 			_flags.append(flag)
@@ -266,20 +267,22 @@ func _add_smoke(at: Vector2, tint: Color) -> void:
 
 
 ## A picture that hangs from a bracket and sways with the wind (rows below `pivot` slide in whole pixels, `sway_rows.gdshader`).
-func _hang(path: String, at: Vector2, pivot: float, amount: float) -> Sprite2D:
+func _hang(path: String, at: Vector2, pivot: float, amount: float, tint: bool = false) -> Sprite2D:
 	var sprite: Sprite2D = Sprite2D.new()
 	sprite.texture = load(path) as Texture2D
 	sprite.centered = false
 	sprite.position = at
 	if pivot >= 0.0: ## (a negative pivot: it does not sway)
 		var mat: ShaderMaterial = ShaderMaterial.new()
-		mat.shader = load("res://assets/shaders/sway_rows.gdshader") as Shader
+		mat.shader = load("res://assets/shaders/banner_tint.gdshader" if tint else "res://assets/shaders/sway_rows.gdshader") as Shader
 		mat.set_shader_parameter("pivot_row", pivot) ## the bracket and the crossbar stay put
 		mat.set_shader_parameter("amount", amount)
-		mat.set_shader_parameter("flutter", 0.8)
+		mat.set_shader_parameter("flutter", 0.0 if amount <= 0.0 else 0.8)
 		mat.set_shader_parameter("cell_w", 30.0)
 		sprite.material = mat
 		_sway_mats.append(mat)
+		if tint:
+			_banner_mats.append(mat)
 	_picture.add_child(sprite)
 	return sprite
 
@@ -290,6 +293,11 @@ func _refresh_town_look() -> void:
 		_town = get_tree().get_first_node_in_group("town") as TownManager
 	if _town == null or not _town.founded or _banner_mat == null:
 		return
+	if not _town.changed.is_connected(_refresh_town_look):
+		_town.changed.connect(_refresh_town_look)
+	var col: Color = TownEmblems.color(_town.look_color)
+	for bm: ShaderMaterial in _banner_mats:
+		bm.set_shader_parameter("banner_color", col)
 	var level: int = _town.level()
 	var age: int = TimeManager.day - int((_town.structures.get(0, {}) as Dictionary).get("b", TimeManager.day))
 	var wanted: Array[bool] = [level >= 2]
@@ -371,3 +379,10 @@ func _watch_for_player() -> void:
 			continue
 		if player.quests.active_step_id("lumberjack") == "find_lumberjack" and player.global_position.distance_to(global_position) < 340.0:
 			player.quests.set_flag("cabin_near")
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, false)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

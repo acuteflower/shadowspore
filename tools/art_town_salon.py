@@ -785,6 +785,7 @@ def make():
     petals(base)
     base = soft_shadow(base, CX, GROUND + 6.5, 49.0, 6.0)
     save(OUT / "salon.png", base)
+    T.pad("salon", 72, 18, 11, side=14, back=10, front=16)
     glow = base_glow(base, mask, box, pts, mir)
     save(OUT / "salon_glow.png", glow)
     canopy, (ax, ay) = T.part("salon_canopy", canopy_part(), FW, FH, GROUND, seed=181)
@@ -804,7 +805,7 @@ def make():
     glass_c = [round((box[0] + box[1] + 1) / 2 - CX, 1), round((box[2] + box[3] + 1) / 2 - GROUND, 1)]
     ledge_c = [ledge_point(0.0, 1.6)[0] - CX, ledge_point(0.0, 1.6)[1] + 1 - GROUND]
     entry = {
-        "name": "FREILUFTSALON", "needs": "plaza", "category": "living", "texture": "salon", "frame": [FW, FH], "feet": GROUND, "foot": [72, 18], "snap": 8,
+        "name": "FREILUFTSALON", "needs": "plaza", "category": "living", "texture": "salon", "frame": [FW, FH], "feet": GROUND, "foot": [72, 18], "snap": 8, "pad": True, "pad_offset_y": 3.0,
         "limit": 1, "salon": True, "cost": {"plank": 12, "iron_ingot": 4, "willow_thread": 6, "prism_shard": 4}, "build_seconds": 18.0, "wave": 32, "worth": 8,
         "info": "EIN FRISIERPLATZ UNTER FREIEM HIMMEL. HIER KANNST DU DEIN AUSSEHEN ÄNDERN.", "glow": True, "anim": {"frames": 8, "fps": 6},
         "light": {"color": "ffc890", "radius": 48, "energy": 0.6, "at": lamp_at, "flicker": 0.15},

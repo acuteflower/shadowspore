@@ -10,10 +10,6 @@
     "wind_flowers": ["sunbloom", "moonbell", "spark_poppy", "puffseed"]
   },
   "super_affinity": {
-    "0": {"deep_forest": -0.18, "wind_meadow": 0.24, "old_pasture": 0.16},
-    "1": {"deep_forest": -0.06, "wind_meadow": 0.08, "old_pasture": 0.24},
-    "2": {"deep_forest": -0.10, "wind_meadow": 0.26, "old_pasture": 0.04},
-    "3": {"deep_forest": 0.32, "wind_meadow": -0.16, "old_pasture": 0.06},
-    "4": {"deep_forest": 0.16, "wind_meadow": 0.14, "old_pasture": -0.06}
+    "0": {"deep_forest": 0.0, "wind_meadow": 0.0, "old_pasture": 0.0}
   }
 }

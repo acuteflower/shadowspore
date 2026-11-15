@@ -140,7 +140,11 @@ func _target(step: Dictionary) -> Vector2:
 	if not step.has("tile"):
 		return Vector2.INF
 	var tile: Array = step.tile as Array
-	return Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8.0, 8.0)
+	var tile_v: Vector2i = Vector2i(int(tile[0]), int(tile[1]))
+	var world: Node = get_tree().get_first_node_in_group("world")
+	if world != null and world.has_method("resolve_quest_tile"):
+		tile_v = world.call("resolve_quest_tile", tile_v)
+	return Vector2(tile_v) * 16.0 + Vector2(8.0, 8.0)
 
 
 var _task_clock: float = 0.0

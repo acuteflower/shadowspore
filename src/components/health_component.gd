@@ -80,12 +80,21 @@ func take_tick(amount: float, source: int = 0) -> void:
 	_notify_tick.rpc(amount, _warded(maxf(current - amount, floor_value)))
 
 
-## Host only: `left` is the health a blow would leave. A ward (talisman) may turn a lethal one into a survived one; anything else passes unchanged.
+## Host only: `left` is the health a blow would leave. A ward (talisman) or story_ward (Goddess rescue) may turn a lethal blow into a survived one.
+var story_ward: Callable
+
 func _warded(left: float) -> float:
-	if left > 0.0 or not ward.is_valid():
+	if left > 0.0:
 		return left
-	var kept: float = float(ward.call(left))
-	return kept if kept > 0.0 else left
+	if story_ward.is_valid():
+		var rescued: float = float(story_ward.call(left))
+		if rescued > 0.0:
+			return rescued
+	if ward.is_valid():
+		var kept: float = float(ward.call(left))
+		if kept > 0.0:
+			return kept
+	return left
 
 
 ## Host only: no further hit counts for `seconds` (the grace a ward gives).

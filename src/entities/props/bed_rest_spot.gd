@@ -16,8 +16,8 @@ var _speech_cooldown: float = 0.0
 func _process(delta: float) -> void:
 	_speech_cooldown = maxf(0.0, _speech_cooldown - delta)
 	var player: Player = _local_player()
-	var world: WorldLevel = _world()
-	if player != null and world != null and world.is_waiting_in_bed(player):
+	var world: Variant = _world()
+	if player != null and world != null and world.has_method("is_waiting_in_bed") and bool(world.call("is_waiting_in_bed", player)):
 		if player.global_position.distance_to(global_position) > radius + 36.0:
 			world.request_bed_leave(player)
 	if _focused:
@@ -40,11 +40,11 @@ func prompt() -> String:
 		return ""
 	if _story_active():
 		return ""
-	var world: WorldLevel = _world()
-	if world == null or not world.opening_over:
+	var world: Variant = _world()
+	if world == null or (not bool(world.get("opening_over")) and TimeManager.locked):
 		return ""
 	var texts: Dictionary = SleepRules.text_cfg()
-	if world.is_waiting_in_bed(player):
+	if world.has_method("is_waiting_in_bed") and bool(world.call("is_waiting_in_bed", player)):
 		return String(texts.get("leave_prompt", "AUFSTEHEN"))
 	return String(texts.get("prompt", "SCHLAFEN"))
 
@@ -53,8 +53,8 @@ func prompt_hint() -> String:
 	if prompt() == "":
 		return ""
 	var player: Player = _local_player()
-	var world: WorldLevel = _world()
-	if player != null and world != null and world.is_waiting_in_bed(player):
+	var world: Variant = _world()
+	if player != null and world != null and world.has_method("is_waiting_in_bed") and bool(world.call("is_waiting_in_bed", player)):
 		return ""
 	if TimeManager.can_sleep_now():
 		return ""
@@ -70,10 +70,10 @@ func prompt_position() -> Vector2:
 
 
 func interact(player: Player) -> void:
-	var world: WorldLevel = _world()
+	var world: Variant = _world()
 	if world == null or player == null:
 		return
-	if world.is_waiting_in_bed(player):
+	if world.has_method("is_waiting_in_bed") and bool(world.call("is_waiting_in_bed", player)):
 		world.request_bed_leave(player)
 		return
 	if not TimeManager.can_sleep_now():
@@ -100,6 +100,6 @@ func _local_player() -> Player:
 	return null
 
 
-func _world() -> WorldLevel:
+func _world() -> Variant:
 	var node: Node = get_tree().get_first_node_in_group("world")
-	return node as WorldLevel
+	return node if node != null and node.is_in_group("story_world") else null

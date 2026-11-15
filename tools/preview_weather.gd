@@ -38,6 +38,19 @@ func _run() -> void:
 	var camera: Camera2D = Camera2D.new()
 	camera.position = at
 	world.add_child(camera)
+	# --ellies: a grid of standing Ellies, to see their mirror images in the puddles (docs/wasserspiegelung.md).
+	if OS.get_cmdline_user_args().has("--ellies"):
+		var n: int = 0
+		for gy: int in range(-2, 3):
+			for gx: int in range(-3, 4):
+				var e: Player = load("res://src/entities/player/player.tscn").instantiate() as Player
+				n += 1
+				e.name = str(100 + n)
+				e.position = at + Vector2(gx * 80.0, gy * 64.0)
+				world.get_node("Players").add_child(e)
+				e.set_physics_process(false)
+				(e.get_node("Camera2D") as Camera2D).enabled = false
+				e.facing = Vector2.DOWN
 	TimeManager.unlock()
 	TimeManager.locked = true
 	TimeManager.day = 5
@@ -55,6 +68,7 @@ func _run() -> void:
 			w.flash_age = 0.0
 			await get_tree().process_frame
 			await get_tree().process_frame
+		if WaterReflections.current != null: print("mirror: ", WaterReflections.current.drawn_items, " copies, ", WaterReflections.current.cost_usec, " usec")
 		print("state ", s, " -> ", w.state_id, " cloud ", snappedf(w.cloud, 0.01), " rain ", snappedf(w.rain, 0.01), " local ", snappedf(w.local_rain, 0.01), " wet ", snappedf(w.ground_wet, 0.01), " flash ", snappedf(w.flash, 0.01))
 		if dir.is_empty(): continue
 		await RenderingServer.frame_post_draw

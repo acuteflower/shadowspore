@@ -149,7 +149,7 @@ func _populate(cell: Vector2i) -> void:
 				continue
 		var extra_bee: int = 3 if w_wind_tiny >= 0.40 else 0
 		var count: int = rng.randi_range(int(spec["group_min"]) + extra_bee, int(spec["group_max"]) + extra_bee)
-		var cap_tiny: int = int(spec["max_loaded"]) + (8 if w_wind_tiny >= 0.40 else 0)
+		var cap_tiny: int = Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) + (8 if w_wind_tiny >= 0.40 else 0)
 		for i: int in count:
 			var current: int = 0
 			for node: Node in _animals.get_children():
@@ -219,7 +219,7 @@ func _populate_scarab(cell: Vector2i, settled: Dictionary) -> void:
 		for node: Node in _animals.get_children():
 			if (node as TinyWildlife).species == "scarab" and not node.is_queued_for_deletion():
 				current += 1
-		if current >= int(spec["max_loaded"]):
+		if current >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1):
 			break
 		var at: Vector2 = Vector2.ZERO
 		var valid: bool = false

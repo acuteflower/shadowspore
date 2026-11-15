@@ -12,8 +12,8 @@ const COSP: float = 0.89879
 const SCALE: float = 0.92 ## art_hero3d.SCALE: model units to pixels
 const UPPER: float = 6.6 * SCALE ## upper arm, shoulder to elbow (the renderer's ik2 lengths)
 const FORE: float = 6.0 * SCALE ## forearm, elbow to wrist
-const PALM: float = 0.9 * SCALE ## wrist to the middle of the fist (the rig's "hand" point = where the grip sits)
-const SHOULDER_OUT: float = 4.5 * SCALE ## her right shoulder sits this far to her right of the body's axis
+const PALM: float = 0.85 * SCALE ## wrist to the middle of the fist (the rig's "hand" point = where the grip sits)
+const SHOULDER_OUT: float = 3.45 * SCALE ## her right shoulder sits this far to her right of the body's axis
 const LIGHT: Vector3 = Vector3(-0.5, 0.5, 0.72) ## art_hero3d LIGHT (-0.5, 0.72, 0.5) in this space (y and z swapped); normalised in `light()`
 const SCREEN_DOWN: Vector3 = Vector3(0.0, SINP, -COSP) ## the 3D direction that shows as straight down on the screen with no depth
 const VIEW: Vector3 = Vector3(0.0, COSP, SINP) ## toward the camera

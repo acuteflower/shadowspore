@@ -331,7 +331,7 @@
    "build_seconds": 2.5,
    "wave": 24,
    "worth": 1,
-   "info": "DAS BANNER DER STADT",
+   "info": "ZEIGT DIE FARBEN DER STADT",
    "glow": false,
    "preview": "banner_post_preview",
    "fireflies": true,
@@ -385,6 +385,8 @@
     18
    ],
    "snap": 8,
+   "pad": true,
+   "pad_offset_y": 3.0,
    "limit": 1,
    "salon": true,
    "cost": {
@@ -556,6 +558,7 @@
    ],
    "snap": 8,
    "pad": true,
+   "pad_offset_y": 5.0,
    "cost": {
     "wood": 14,
     "stone": 4
@@ -789,6 +792,7 @@
    ],
    "snap": 8,
    "pad": true,
+   "pad_offset_y": 5.0,
    "cost": {
     "wood": 24,
     "stone": 10,
@@ -811,7 +815,7 @@
     ],
     "flicker": 0.3
    },
-   "info": "WERKBANK UND SCHMIEDE",
+   "info": "WERKBANK FÜR HOLZ UND WERKZEUG",
    "paths": true,
    "front": [
     96,
@@ -991,6 +995,8 @@
     10
    ],
    "snap": 8,
+   "pad": true,
+   "pad_offset_y": 3.0,
    "cost": {
     "wood": 8,
     "plant_fiber": 2
@@ -1024,7 +1030,12 @@
    "front": [
     40,
     16
-   ]
+   ],
+   "trample": {
+    "strength": 0.85,
+    "margin": 8,
+    "front": true
+   }
   },
   "smithy": {
    "needs": "plaza",
@@ -1043,6 +1054,7 @@
    ],
    "snap": 8,
    "pad": true,
+   "pad_offset_y": 5.0,
    "cost": {
     "wood": 16,
     "stone": 30,

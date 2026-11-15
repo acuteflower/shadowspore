@@ -15,12 +15,17 @@ var _rect: Rect2 ## the picture, local px (for the fade)
 var _foot: Vector2
 var _check: float = 0.0
 var _time: float = 0.0
+var _lamp: bool = false ## a street lantern: it burns only once Pim has lit it (`HallgratPeople.lamp_lit`)
+var _at: Vector2 = Vector2.ZERO
+var _light: NightLight
 
 
 func setup(type: String, at: Vector2, mirrored: bool) -> void:
 	type_id = type
 	flip = mirrored
 	position = at
+	_at = at
+	_lamp = type == "deko_laterne"
 	name = "Building_" + type
 
 
@@ -60,6 +65,7 @@ func _ready() -> void:
 		light.base_energy = 0.45
 		light.glow_color = Color("ffb35a")
 		add_child(light)
+		_light = light
 	_time = fposmod(position.x * 0.01, 7.0)
 	if not bool(info.get("solid", true)): ## a flower bed, a heap of rubble: walked over
 		return
@@ -120,7 +126,10 @@ func _process(delta: float) -> void:
 	_time += delta
 	if _glow != null:
 		var night: float = TimeManager.night_amount()
-		_glow.modulate.a = lerpf(0.0, 1.0, night) * (0.9 + 0.1 * sin(_time * 1.7))
+		var lit: bool = not _lamp or HallgratPeople.lamp_lit(_at, TimeManager.time_of_day)
+		_glow.modulate.a = lerpf(0.0, 1.0, night) * (0.9 + 0.1 * sin(_time * 1.7)) * (1.0 if lit else 0.0)
+		if _light != null:
+			_light.visible = lit
 	_check -= delta
 	if _check > 0.0 or _sprite == null:
 		return
@@ -153,3 +162,10 @@ func footprint_cells() -> Array[Vector2i]:
 		for x: int in range(x0, x1 + 1):
 			out.append(Vector2i(x, y))
 	return out
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, false)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

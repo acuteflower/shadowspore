@@ -1366,8 +1366,8 @@ func _spring_to(target: Vector3, hand_acc: Vector2, delta: float, spring: Dictio
 	var goal_pitch: float = GripRig.pitch_of(target)
 	goal_pitch += clampf(hand_acc.y * inertia, -0.3, 0.3) ## the fist drops: the tip stays up a moment, and the other way round
 	goal_yaw += clampf(hand_acc.x * inertia * sin(_yaw), -0.3, 0.3)
-	var max_dt: float = float(spring.get("max_dt", 0.034))
-	var steps: int = clampi(ceili(delta / max_dt), 1, 8)
+	var max_dt: float = minf(float(spring.get("max_dt", 0.034)), 0.25 / omega)
+	var steps: int = clampi(ceili(delta / max_dt), 1, 16)
 	var h: float = delta / float(steps)
 	for i: int in steps:
 		var acc_yaw: float = omega * omega * wrapf(goal_yaw - _yaw, -PI, PI) - 2.0 * zeta * omega * _yaw_v
@@ -1448,10 +1448,20 @@ func mirror_material(source: Material) -> void:
 
 ## Her sword arm, painted like her left one (ArmPainter); a worn bracelet sits on the violet band.
 func _draw_arm() -> void:
-	var drawn: Array[Vector2] = ArmPainter.paint(_arm, _arm_sort.position, _shoulder3, _elbow3, _wrist3, _fist3, 1.0, depth_ctx)
+	paint_arm(_arm)
+
+
+## Paints the sword arm on `canvas` in the arm node's own coordinates (the arm itself, and its mirror image in water: WaterReflections).
+func paint_arm(canvas: CanvasItem) -> void:
+	var drawn: Array[Vector2] = ArmPainter.paint(canvas, _arm_sort.position, _shoulder3, _elbow3, _wrist3, _fist3, 1.0, depth_ctx)
 	var bracelet: String = _talismans.worn_id("bracelet") if _talismans != null else ""
 	if bracelet != "": ## the worn bracelet (Wuchtreif ...) takes the place of the band
-		TalismanArt.draw_bracelet(_arm, bracelet, drawn[0], drawn[1], float(Time.get_ticks_msec()) / 1000.0)
+		TalismanArt.draw_bracelet(canvas, bracelet, drawn[0], drawn[1], float(Time.get_ticks_msec()) / 1000.0)
+
+
+## The node the sword arm is drawn on (its transform and material are the arm's).
+func arm_node() -> CanvasItem:
+	return _arm
 
 
 ## The blade's trail: a wedge that grows with the sweep, brightest at the blade, fading afterwards.

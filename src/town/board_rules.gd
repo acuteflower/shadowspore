@@ -51,16 +51,19 @@ static func story_entries() -> Array:
 
 
 ## Can this template be posted now by `giver` (a resident with `trust`) on `day`?
-static func eligible(template: Dictionary, giver: String, trust: int, day: int) -> bool:
+static func eligible(template: Dictionary, giver: String, trust: int, day: int, unlocked: Dictionary = {}) -> bool:
 	var givers: Array = template.get("givers", []) as Array
 	if not givers.is_empty() and not givers.has(giver):
+		return false
+	var req_unlock: String = String(template.get("unlocks", ""))
+	if req_unlock != "" and unlocked.has(req_unlock):
 		return false
 	return day >= int(template.get("min_day", 0)) and trust >= int(template.get("min_trust", 0))
 
 
 ## Rolls one new simple notice, or {} when nothing fits. `residents` is TownManager.residents (id -> {trust}), `open` the notices that hang now.
 ## A giver has at most `per_giver` open notices and no template hangs twice at once.
-static func roll(rng: RandomNumberGenerator, residents: Dictionary, open: Array, day: int, id: int) -> Dictionary:
+static func roll(rng: RandomNumberGenerator, residents: Dictionary, open: Array, day: int, id: int, unlocked: Dictionary = {}) -> Dictionary:
 	var per_giver: int = limit("per_giver")
 	var used: Dictionary = {}
 	var hanging: Dictionary = {}
@@ -76,7 +79,7 @@ static func roll(rng: RandomNumberGenerator, residents: Dictionary, open: Array,
 		for giver: String in residents:
 			if int(used.get(giver, 0)) >= per_giver:
 				continue
-			if eligible(template, giver, int((residents[giver] as Dictionary).get("trust", 0)), day):
+			if eligible(template, giver, int((residents[giver] as Dictionary).get("trust", 0)), day, unlocked):
 				choices.append([template, giver])
 	if choices.is_empty():
 		return {}
@@ -102,6 +105,11 @@ static func make(rng: RandomNumberGenerator, template: Dictionary, giver: String
 		"x": count * int(template.get("xp_each", 0)), "tr": int(template.get("trust", 0)), "b": bonus,
 		"d": day, "e": day + rng.randi_range(int(life[0]), int(life[1])),
 	}
+	var ul: String = String(template.get("unlocks", ""))
+	if ul != "":
+		offer["ul"] = ul
+		offer["ull"] = String(template.get("unlock_label", ul.to_upper()))
+		offer["w"] = String(template.get("why", "BAUWUNSCH"))
 	offer["txt"] = text_of(offer, String(template.get("text", "")))
 	return offer
 

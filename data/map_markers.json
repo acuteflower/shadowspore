@@ -83,6 +83,41 @@
       ]
     ]
   },
+  "aurelith": {
+    "kind": "boss",
+    "name": "AURELITH",
+    "title": "HERZ DES SONNENQUARZES",
+    "extra": "ERNEUTER KAMPF BEREIT",
+    "color": "78f4e6",
+    "ghost": "ffd86b",
+    "rows": [
+      ".X.X.",
+      "XXXXX",
+      ".XXX.",
+      "XX.XX",
+      "..X.."
+    ],
+    "frames": [
+      [
+        "...X.X.X...",
+        "..XXXXXXX..",
+        ".XX.XXX.XX.",
+        "XXXXXXXXXXX",
+        ".XX.XXX.XX.",
+        "...XXXXX...",
+        "....XXX...."
+      ],
+      [
+        "..X..X..X..",
+        "..XXXXXXX..",
+        "XX..XXX..XX",
+        ".XXXXXXXXX.",
+        "XX..XXX..XX",
+        "...XXXXX...",
+        "....X.X...."
+      ]
+    ]
+  },
   "jorun": {
     "color": "7fa6e0",
     "rows": [

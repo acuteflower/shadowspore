@@ -1,6 +1,7 @@
 shader_type canvas_item;
 #include "res://assets/shaders/daylight.gdshaderinc"
 #include "res://assets/shaders/river_noise.gdshaderinc"
+#include "res://assets/shaders/water_reflect.gdshaderinc"
 global uniform float g_night; // 0..1 night (DayNight): moon glints
 global uniform float g_sun; // 0..1 sun height (DayNight): sun glints and caustics
 
@@ -64,8 +65,18 @@ void fragment() {
         if (mask.g < 0.48 && fixed_detail.r > 0.3) {
             color = mix(color, mix(vec3(0.54, 0.54, 0.43), vec3(0.68, 0.78, 0.72), oasis_m), (1.0 - mask.g / 0.48) * 0.72);
         }
+        // Mirror images (WaterReflections): calm lakes hold a clear picture, rivers and rain break it into sliding rows.
+        float rough = mix(1.1, 0.3, calm) + g_rain * 1.4 + g_storm * 0.8;
+        vec4 mirror = reflect_at(pixel, rough, g_water_time);
+        if (mirror.a > 0.02) {
+            float strength = mix(0.70, 0.90, calm) * (1.0 - 0.35 * g_rain) * mix(0.75, 1.0, smoothstep(0.1, 0.5, mask.g));
+            // thin bright gaps where a ripple crest catches the sky instead of the picture
+            float crest = sin(pixel.y * 0.93 + floor(pixel.x / 7.0) * 1.9 - g_water_time * mix(2.2, 0.9, calm));
+            if (crest > mix(0.80, 0.93, calm)) { strength *= 0.3; }
+            color = mix(color, reflect_tint(mirror.rgb, color), mirror.a * strength);
+        }
         // Broken, multi-pixel painted reflection clusters flowing downstream.
-        vec2 q = floor(vec2(dot(pixel, flow), dot(pixel, across)));
+        vec2 q =floor(vec2(dot(pixel, flow), dot(pixel, across)));
         q.x -= floor(g_water_time * mix(1.5, 0.24, calm));
         vec2 cell = floor(q / vec2(22.0, 12.0));
         vec2 local = mod(q, vec2(22.0, 12.0));
@@ -79,13 +90,7 @@ void fragment() {
         if (seed > 0.60 + mask.g * 0.05 && abs(local.y - wave - 3.0) < 1.0 && local.x > 5.0 && local.x < 15.0) {
             color = mix(color, vec3(0.48, 0.60, 0.60), 0.48);
         }
-        if (g_night > 0.5) { // a few cold glints of moonlight
-            vec2 mc = floor(pixel / vec2(7.0, 4.0));
-            float mh = hash21(mc + 77.0);
-            if (mh > 0.96 && fract(g_water_time * 0.15 + mh * 5.0) < 0.2 && mod(pixel.x, 7.0) == 3.0 && mod(pixel.y, 4.0) == 2.0) {
-                color = mix(color, vec3(0.78, 0.88, 1.0), 0.8 * g_night);
-            }
-        }
+        // Moonlight on the water: the reflected moon, its glade and the stars are added by the unlit night pass (river_glow.gdshader, night_sky.gdshaderinc).
         if (g_rain > 0.02 && arid_w < 0.45) { // rain: little rings spread where drops land (docs/wetter_konzept.md 6.3); never in the desert
             float rl = rain_local(pixel) * (1.0 - smoothstep(0.18, 0.45, arid_w));
             if (rl > 0.03) {

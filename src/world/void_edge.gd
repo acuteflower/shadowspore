@@ -74,7 +74,8 @@ func _process(delta: float) -> void:
 	var top_left: Vector2 = (inverse * Vector2.ZERO).floor() - Vector2.ONE * 2.0
 	var bottom_right: Vector2 = (inverse * get_viewport_rect().size).ceil() + Vector2.ONE * 2.0
 
-	if not _is_void_near(top_left, bottom_right):
+	var center: Vector2 = (top_left + bottom_right) * 0.5
+	if Interiors.slot_at(center) >= 0 or not _is_void_near(top_left, bottom_right):
 		visible = false
 		return
 

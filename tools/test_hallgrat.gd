@@ -104,9 +104,18 @@ func _run() -> void:
 	var pts: Array = spec.get("points", []) as Array
 	var off: int = 0
 	for i: int in range(3, pts.size() - 1):
-		var at: Vector2 = centre + Vector2(float((pts[i] as Array)[0]), float((pts[i] as Array)[1]))
-		var surface: String = Terrain.surface_at(at)
-		if surface != "path" and surface != "stone":
+		var p_curr: Vector2 = Vector2(float((pts[i] as Array)[0]), float((pts[i] as Array)[1]))
+		var p_prev: Vector2 = Vector2(float((pts[i - 1] as Array)[0]), float((pts[i - 1] as Array)[1]))
+		var p_next: Vector2 = Vector2(float((pts[i + 1] as Array)[0]), float((pts[i + 1] as Array)[1]))
+		var tangent: Vector2 = (p_next - p_prev).normalized()
+		var normal: Vector2 = Vector2(-tangent.y, tangent.x)
+		var at: Vector2 = centre + p_curr
+		var s_mid: String = Terrain.surface_at(at)
+		var s_left: String = Terrain.surface_at(at + normal * 6.5)
+		var s_right: String = Terrain.surface_at(at - normal * 6.5)
+		var mid_ok: bool = (s_mid == "path" or s_mid == "stone")
+		var ruts_ok: bool = (s_left == "path" or s_left == "stone") and (s_right == "path" or s_right == "stone")
+		if not mid_ok and not ruts_ok:
 			off += 1
 	_check(pts.size() > 20 and off <= 2, "the road is path or paving underfoot along its whole length (%d of %d points off)" % [off, pts.size()])
 	var end: Vector2 = centre + Vector2(float((pts[pts.size() - 2] as Array)[0]), float((pts[pts.size() - 2] as Array)[1]))

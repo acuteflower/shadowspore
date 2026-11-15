@@ -26,9 +26,9 @@ func _ready() -> void:
 func _run() -> void:
 	var data: Dictionary = DataRegistry.table("world_map")
 	var map: RegionMap = RegionMap.new(0, data)
-	_check(map.supers.size() == 7 and map.regions.size() == 35, "seven areas, 35 regions")
+	_check(map.supers.size() == 3 and map.regions.size() == 35, "three areas, 35 regions")
 	_check(map.own_biomes.has("quartz_desert") and map.own_biomes.has("witch_forest"), "own_biomes has witch_forest and quartz_desert")
-	_check(map.area_name(6) == "Sonnenquarz-Öde" and map.super_at(DESERT_DEEP) == 6 and map.biome_at(DESERT_DEEP) == "quartz_desert", "super 6 is Sonnenquarz-Öde")
+	_check(map.area_name(2) == "Sonnenquarz-Öde" and map.super_at(DESERT_DEEP) == 2 and map.biome_at(DESERT_DEEP) == "quartz_desert", "super 2 is Sonnenquarz-Öde")
 	_check(map.biome_at(HUT) == "meadow" and map.biome_at(HEX_CENTRE) == "witch_forest", "town and Hexenwald keep their biomes")
 
 	# Arid blend field vs gloom blend field (strictly independent!)
@@ -359,7 +359,7 @@ func _run() -> void:
 	var window: MapWindow = MapWindow.new()
 	add_child(window)
 	window._load_data()
-	_check(window._area_names.has("Sonnenquarz-Öde") and (window._material.get_shader_parameter("area_biomes") as PackedInt32Array)[6] == 6, "world map registers Sonnenquarz-Öde with palette 6")
+	_check(window._area_names.has("Sonnenquarz-Öde") and (window._material.get_shader_parameter("area_biomes") as PackedInt32Array)[2] == 6, "world map registers Sonnenquarz-Öde with palette 6")
 	window.queue_free()
 
 	# WorldWind desert sand drift stays scalar horizontal (y == 0) with bounded speed

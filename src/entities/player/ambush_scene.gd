@@ -27,7 +27,7 @@ const MIN_HITS: int = 3
 const REINFORCEMENT_DELAY: float = 0.65
 
 var _player: Player
-var _world: WorldLevel
+var _world: Variant
 var _eyes: AmbushEyes
 var _vignette: ColorRect
 var _flash: ColorRect
@@ -43,7 +43,7 @@ var _beat_clock: float = 0.0
 var _dread: float = 0.0 ## 0..1, drives the vignette and the heartbeat
 
 
-func start(player: Player, world: WorldLevel) -> void:
+func start(player: Player, world: Variant) -> void:
 	_player = player
 	_world = world
 	process_mode = Node.PROCESS_MODE_ALWAYS

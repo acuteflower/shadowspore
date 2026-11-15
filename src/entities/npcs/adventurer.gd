@@ -200,3 +200,10 @@ func _afterimage() -> void:
 	var tween: Tween = ghost.create_tween().set_ignore_time_scale(true)
 	tween.tween_property(ghost, "modulate:a", 0.0, 0.22)
 	tween.tween_callback(ghost.queue_free)
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, true)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

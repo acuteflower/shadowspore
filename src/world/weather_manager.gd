@@ -132,6 +132,15 @@ func follow(is_indoors: bool, delta: float) -> void:
 	var desert_share: float = 0.0 if indoors else smoothstep(0.28, 0.65, arid_here)
 	var want_res: float = clampf(raw_rain * 1.35 + raw_storm * 0.35, 0.0, 1.0) * desert_share
 	var want_arc: float = clampf(raw_storm * 1.25, 0.0, 1.0) * desert_share
+	if not indoors:
+		for b_node: Node in get_tree().get_nodes_in_group("bosses"):
+			if b_node is Node2D and b_node.has_method("is_storm_stage") and bool(b_node.call("is_storm_stage")):
+				var bd: float = (b_node as Node2D).global_position.distance_to(focus)
+				if bd <= 680.0:
+					var falloff: float = 1.0 - smoothstep(420.0, 680.0, bd)
+					desert_share = maxf(desert_share, falloff)
+					want_res = maxf(want_res, 0.86 * falloff)
+					want_arc = maxf(want_arc, 0.94 * falloff)
 	desert_resonance = lerpf(desert_resonance, want_res, k) * (0.0 if desert_share <= 0.001 else 1.0)
 	desert_arcane_storm = lerpf(desert_arcane_storm, want_arc, k) * (0.0 if desert_share <= 0.001 else 1.0)
 	rain *= arid_dry

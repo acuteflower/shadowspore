@@ -52,6 +52,7 @@ var _crown_shape_name: String = "cone"
 var _crown_dome_height: float = 0.0
 var _fades_crown: bool = true
 var _on_screen: bool = true
+var _sway_wait: float = 0.0 ## idle wind sway is refreshed at the graphics level's `sway_hz`
 var _notifier: VisibleOnScreenNotifier2D
 var _vines: Sprite2D ## plants.json `vines`: ropes hanging from the crown that breathe (vine_breathe.gdshader), with their buds' light as a child
 var _vine_glow: Sprite2D
@@ -113,8 +114,10 @@ func _setup_prop() -> void:
 	var rect_w: float = (_tree_half + 16.0) * 2.0
 	var rect_h: float = _tree_top + 24.0
 	_notifier.rect = Rect2(-rect_w * 0.5, -_tree_top - 16.0, rect_w, rect_h)
-	_notifier.screen_entered.connect(func() -> void: _on_screen = true)
-	_notifier.screen_exited.connect(func() -> void: _on_screen = false)
+	_notifier.screen_entered.connect(func() -> void:
+		_on_screen = true
+		set_process(true))
+	_notifier.screen_exited.connect(func() -> void: _on_screen = false) ## `_process` switches itself off once nothing moves
 	add_child(_notifier)
 	if variant >= int(_spec.get("light_from", 2)): ## a soft pool of light on the ground under the bigger trees (only those: woods have many trees)
 		_light = NightLight.new()
@@ -255,6 +258,11 @@ func is_depleted() -> bool:
 	return state.has("f")
 
 
+## True while the felled part is toppling (SunShadows re-reads its parts and moves its shadow every frame).
+func is_falling() -> bool:
+	return _falling
+
+
 ## Blossom trees: E picks the blossoms (the crown shows green with a few left, back after a few days).
 func prompt() -> String:
 	if not opening_locked() and _spec.has("pickup") and not is_depleted() and not _picked():
@@ -311,14 +319,19 @@ func _process(delta: float) -> void:
 	if _twitches:
 		_twitch(delta)
 	if not _on_screen and _wobble <= 0.002 and not _covering:
+		if not _twitches:
+			set_process(false) ## off screen and still: hundreds of loaded trees cost nothing per frame (woken by the notifier or a hit)
 		return
-	_sway(delta)
+	_sway_wait -= delta
+	if _wobble > 0.002 or _sway_wait <= 0.0:
+		_sway(delta)
+		_sway_wait = 1.0 / float(Quality.get_value("sway_hz")) if _wobble <= 0.002 else 0.0
 	if not _crown.visible or not _fades():
 		return
 	# The covering test runs at about 10 Hz; the result (and the fade tween) is kept between checks.
 	_cover_wait -= delta
 	if _cover_wait > 0.0: return
-	_cover_wait = 0.1
+	_cover_wait = 1.0 / float(Quality.get_value("tree_cover_hz"))
 	var covering: bool = false
 	for player: Player in Player.all:
 		if player.global_position.distance_to(global_position) < WATCH_DISTANCE and _covers((player.global_position - global_position) / scale.x):
@@ -335,6 +348,7 @@ func _process(delta: float) -> void:
 
 ## A hit shakes the tree: the crown sways far, the trunk hardly, first away from whoever hit it.
 func _shake(amount: float) -> void:
+	set_process(true)
 	_wobble = maxf(_wobble, amount)
 	_wobble_time = 0.0
 	_wobble_dir = _away_from_player()

@@ -24,9 +24,9 @@ func _run() -> void:
 	for area: Dictionary in map.supers:
 		names.append(map.area_name(int(area.id)))
 		for id: int in area.regions:
-			if int(area.id) < 5:
+			if int(area.id) == 0:
 				_check(map.biome_at(map.anchor(id)) == "meadow", "region %d uses meadow" % id)
-	_check(names.size() == 7 and names.has("Hexenwald") and names.has("Sonnenquarz-Öde") and names.has("Die Lichtung") and names.has("Nebelwald") and names.has("Glasklippen") and names.has("Versunkene Ruinen") and names.has("Das Leerenblühen"), "all area names survive including Sonnenquarz-Öde")
+	_check(names.size() == 3 and names.has("Die Lichtung") and names.has("Hexenwald") and names.has("Sonnenquarz-Öde"), "all three area names survive: Die Lichtung, Hexenwald, Sonnenquarz-Öde")
 	var roundtrip: RegionMap = RegionMap.new(0, map.to_data())
 	_check(roundtrip.to_data() == map.to_data(), "serialization preserves area names, topology and biome policy")
 	_check(map.biome_at(Vector2i.ZERO).is_empty(), "outside the island stays outside the biome")
@@ -77,7 +77,7 @@ func _run() -> void:
 	world.get_node("Wildlife").process_mode = Node.PROCESS_MODE_DISABLED
 	for loaded: Vector2i in world._chunks.keys(): world._unload_chunk(loaded)
 	for area: Dictionary in map.supers:
-		if int(area.id) >= 5:
+		if int(area.id) >= 1:
 			continue
 		var at: Vector2i = map.anchor(int((area.regions as Array)[0]))
 		_check(world._land_biome(at) == "meadow", "world habitat in " + map.area_name(int(area.id)))
@@ -92,9 +92,9 @@ func _run() -> void:
 	add_child(window)
 	window._load_data()
 	_check(window._area_names == names, "map keeps territory names independently of its biome palette")
-	_check(window._area_colors.slice(0, 5).all(func(color: Color) -> bool: return color == Color(String(DataRegistry.get_entry("biomes", "meadow").color))), "the five old map areas share one colour")
+	_check(window._area_colors[0] == Color(String(DataRegistry.get_entry("biomes", "meadow").color)), "the unified central meadow area uses the meadow colour")
 	var area_biomes: PackedInt32Array = window._material.get_shader_parameter("area_biomes")
-	_check(area_biomes == PackedInt32Array([0, 0, 0, 0, 0, 5, 6]), "the five old shader territories use meadow symbols and palette, the Hexenwald and Sonnenquarz-Öde their own")
+	_check(area_biomes == PackedInt32Array([0, 5, 6]), "the unified meadow territory uses meadow symbols and palette, the Hexenwald and Sonnenquarz-Öde their own")
 	var texture: Texture2D = window._material.get_shader_parameter("areas") as Texture2D
 	var area_image: Image = texture.get_image()
 	var borders: bool = true

@@ -23,14 +23,14 @@ var perch_point: Vector2
 var perch_height: float = 9.0
 var _shadow: Node2D
 var key: String = "" ## "l:x,y" of the log: its harvest state is kept under this key (WorldLevel)
-var level: WorldLevel ## who keeps the state; null in the workbenches
+var level: Variant ## who keeps the state; null in the workbenches
 var gone: bool = false ## chopped up: hidden for good, perches are given up
 var _body: StaticBody2D
 var _harvest: HarvestHurtbox
 var _fade: Tween
 var _shake: Tween
 
-func setup(at: Vector2, index: int, world: WorldLevel = null) -> void:
+func setup(at: Vector2, index: int, world: Variant = null) -> void:
 	position = at
 	frame = index
 	level = world

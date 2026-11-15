@@ -44,6 +44,7 @@ def quest_board():
     for _ in range(6):
         m.ell(V(rng.uniform(-23, 23), 39.6, z + rng.uniform(-2, 2.5)), (rng.uniform(1.4, 3.0), 0.45, 1.1), t.MOSS_L if rng.random() < 0.6 else t.MOSS)
     arr = to_array(hut_lib.render(m, 56, 56, 50))
+    t.pad("quest_board", 40, 10, 13, side=14, back=10, front=16)
     return t.put("quest_board", t.finish(arr, 62, 50, 20, 2.4))
 
 

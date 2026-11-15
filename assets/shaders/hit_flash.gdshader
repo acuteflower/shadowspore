@@ -29,6 +29,7 @@ uniform int step_mode = 0;
 uniform float step_amt : hint_range(0.0, 1.0) = 0.0;
 uniform vec2 step_dir = vec2(1.0, 0.0);
 uniform float step_seed = 0.0;
+uniform bool step_light = false;
 // Nebelschleier (VeilFx, docs/magie_konzept.md): `veil` 0..1 veiled, `veil_keep` how much of her stays (drifting mist holes eat the rest),
 // `veil_seed` changes with every glitch tick (rows slip sideways).
 uniform float veil : hint_range(0.0, 1.0) = 0.0;
@@ -73,14 +74,18 @@ vec3 cosmetic_dye(vec3 rgb, vec3 tint, bool is_hair) {
 		vec3 light = mix(tint, vec3(1.0, 0.98, 0.95), 0.72);
 		return mix(dark, light, t);
 	}
-	float t = clamp((lum - 0.055) / 0.55, 0.0, 1.0);
+	float t = lum <= 0.50
+		? clamp((lum - 0.055) / 0.445, 0.0, 1.0) * 0.78
+		: 0.78 + clamp((lum - 0.50) / 0.48, 0.0, 1.0) * 0.22;
 	vec3 dark = tint * 0.22;
-	vec3 light = mix(tint, vec3(0.96, 0.92, 0.98), 0.42);
+	float hi_mix = 0.38 + 0.36 * clamp((lum - 0.52) / 0.46, 0.0, 1.0);
+	vec3 light = mix(tint, vec3(0.98, 0.96, 0.99), hi_mix);
 	return mix(dark, light, t);
 }
 
-vec4 sample_hero(vec4 base_col, vec2 uv) {
+vec4 sample_hero_ex(vec4 base_col, vec2 uv, out float outfit_lume) {
 	vec4 col = base_col;
+	outfit_lume = 0.0;
 	if (has_hair_back && (col.a < 0.01 || (col.a < 0.30 && (col.r + col.g + col.b) < 0.01))) {
 		vec4 hb = texture(hair_back_tex, uv);
 		if (hb.a > 0.01) {
@@ -91,15 +96,24 @@ vec4 sample_hero(vec4 base_col, vec2 uv) {
 		vec4 of_px = texture(outfit_tex, uv);
 		if (of_px.a > 0.01) {
 			col = vec4(cosmetic_dye(of_px.rgb, outfit_tint.rgb, false), of_px.a * outfit_tint.a);
+			bool ice_bloom = (of_px.g > of_px.r + 0.14 && of_px.b > of_px.r + 0.14);
+			bool gold_silk = (of_px.r > of_px.b + 0.22 && of_px.g > of_px.b + 0.10);
+			outfit_lume = ice_bloom ? 1.0 : (gold_silk ? 0.45 : 0.0);
 		}
 	}
 	if (has_hair_front) {
 		vec4 hf = texture(hair_front_tex, uv);
 		if (hf.a > 0.01) {
 			col = vec4(cosmetic_dye(hf.rgb, hair_tint.rgb, true), hf.a * hair_tint.a);
+			outfit_lume = 0.0;
 		}
 	}
 	return col;
+}
+
+vec4 sample_hero(vec4 base_col, vec2 uv) {
+	float unused_lume = 0.0;
+	return sample_hero_ex(base_col, uv, unused_lume);
 }
 
 float step_hash(vec2 p) {
@@ -122,8 +136,9 @@ vec2 step_cover(vec2 px) {
 }
 
 void fragment() {
+	float outfit_lume = 0.0;
 	if (use_cosmetics) {
-		COLOR = sample_hero(texture(TEXTURE, UV), UV) * v_modulate;
+		COLOR = sample_hero_ex(texture(TEXTURE, UV), UV, outfit_lume) * v_modulate;
 	}
 	if (wound > 0.0 && COLOR.a > 0.01) {
 		float lum = dot(COLOR.rgb, vec3(0.3, 0.59, 0.11));
@@ -164,6 +179,13 @@ void fragment() {
 		}
 	}
 	COLOR.rgb = day_grade(COLOR.rgb, daylight_position, 1.0);
+	if (outfit_lume > 0.05 && COLOR.a > 0.01) {
+		// Soft moonlit-silk luminescence on embroidered ice-lotus & champagne-gold threads at night
+		float night_k = clamp(1.0 - g_day_strength, 0.0, 1.0);
+		float breathe = 0.5 + 0.5 * sin(g_day_clock * 1.6 + floor(local_px.y) * 0.35);
+		COLOR.rgb = COLOR.rgb * (1.0 + night_k * outfit_lume * (0.52 + 0.18 * breathe))
+			+ mix(vec3(0.06, 0.05, 0.02), vec3(0.03, 0.08, 0.10), step(0.7, outfit_lume)) * night_k * breathe;
+	}
 	COLOR.rgb = mix(COLOR.rgb, flash_color.rgb, flash);
 	if (veil > 0.0 && COLOR.a > 0.01) {
 		vec2 cell = floor(local_px);
@@ -207,19 +229,31 @@ void fragment() {
 			} else {
 				COLOR.rgb *= 0.25;
 			}
-			COLOR.rgb = mix(COLOR.rgb, vec3(0.62, 0.36, 1.0), 0.18 * busy);
+			vec3 slip_tint = step_light ? vec3(0.47, 0.96, 0.90) : vec3(0.62, 0.36, 1.0);
+			COLOR.rgb = mix(COLOR.rgb, slip_tint, 0.18 * busy);
 		}
 		vec2 cover = step_cover(local_px);
 		if (cover.x < 0.5) {
 			COLOR.a = 0.0;
 		} else if (cover.y > 0.0) {
-			// the void band: black flesh going in, a cold violet rim at the front, magenta sparks flickering in it
-			vec3 void_col = mix(vec3(0.016, 0.008, 0.035), vec3(0.15, 0.07, 0.29), smoothstep(0.35, 0.8, cover.y));
-			if (cover.y > 0.82) {
-				void_col = vec3(0.66, 0.42, 1.0);
-			}
-			if (step_hash(floor(local_px) + 0.5) > 0.9 && cover.y > 0.4) {
-				void_col = vec3(1.0, 0.24, 0.86);
+			vec3 void_col;
+			if (step_light) {
+				void_col = mix(vec3(0.16, 0.55, 0.58), vec3(0.47, 0.96, 0.90), smoothstep(0.30, 0.80, cover.y));
+				if (cover.y > 0.80) {
+					void_col = vec3(1.0, 0.94, 0.69);
+				}
+				if (step_hash(floor(local_px) + 0.5) > 0.88 && cover.y > 0.35) {
+					void_col = vec3(1.0, 0.98, 0.88);
+				}
+			} else {
+				// the void band: black flesh going in, a cold violet rim at the front, magenta sparks flickering in it
+				void_col = mix(vec3(0.016, 0.008, 0.035), vec3(0.15, 0.07, 0.29), smoothstep(0.35, 0.8, cover.y));
+				if (cover.y > 0.82) {
+					void_col = vec3(0.66, 0.42, 1.0);
+				}
+				if (step_hash(floor(local_px) + 0.5) > 0.9 && cover.y > 0.4) {
+					void_col = vec3(1.0, 0.24, 0.86);
+				}
 			}
 			COLOR.rgb = mix(COLOR.rgb, void_col, smoothstep(0.0, 0.25, cover.y));
 		}

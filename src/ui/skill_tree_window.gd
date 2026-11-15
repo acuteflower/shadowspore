@@ -119,7 +119,8 @@ func _can_open() -> bool:
 	if hud != null and not hud.visible:
 		return false
 	var quests: QuestComponent = _player.get("quests") as QuestComponent
-	return not get_tree().get_first_node_in_group("world") is WorldLevel or (quests != null and quests.has_flag("hud_unlocked"))
+	var w_node: Node = get_tree().get_first_node_in_group("world")
+	return (w_node == null or not w_node.is_in_group("story_world")) or (quests != null and quests.has_flag("hud_unlocked"))
 
 
 func _set_open(open: bool) -> void:
@@ -338,7 +339,13 @@ func _cycle(id: String) -> float:
 	return fposmod(_time * 0.22 + offset - _depth(id) * 0.18, 1.0)
 
 
+func _has_light_step() -> bool:
+	return _player != null and bool(_player.get("light_step"))
+
+
 func _color(id: String) -> Color:
+	if id == "shadow_step" and _has_light_step():
+		return Color("e6c468")
 	var node: Dictionary = _skills.definitions()[id]
 	return Color(String(DataRegistry.get_entry("skills", "branches")[node.branch].color))
 
@@ -712,10 +719,13 @@ func _draw_details() -> void:
 		kind = " / UPGRADE"
 	elif unlock:
 		kind = " / LERNBAR"
-	_text(_chrome, String(branch.name) + kind, Vector2(12, y + 12), color)
-	_text(_chrome, String(node.name), Vector2(12, y + 25), TEXT, 2.0)
+	var branch_label: String = "STERNENLICHT" if (_selected == "shadow_step" and _has_light_step()) else String(branch.get("name", ""))
+	var node_label: String = "LICHTSCHRITT" if (_selected == "shadow_step" and _has_light_step()) else String(node.get("name", ""))
+	var node_desc: String = "GÖTTLICHES LICHT DER WÄCHTERIN: WEITER, SCHNELLER, UND BLENDET SCHATTENWESEN." if (_selected == "shadow_step" and _has_light_step()) else String(node.get("description", ""))
+	_text(_chrome, branch_label + kind, Vector2(12, y + 12), color)
+	_text(_chrome, node_label, Vector2(12, y + 25), TEXT, 2.0)
 	if _skills.is_awake(_selected) or upgrade or unlock:
-		_text(_chrome, String(node.description), Vector2(12, y + 46), DIM)
+		_text(_chrome, node_desc, Vector2(12, y + 46), DIM)
 		_text(_chrome, _detail_line(_selected), Vector2(12, y + 59), color)
 		if upgrade or unlock:
 			_text(_chrome, _requirement(_selected), Vector2(12, y + 70), _requirement_color(_selected, color))
@@ -733,7 +743,8 @@ func _detail_line(id: String) -> String:
 	if id == "shadow_step":
 		var player: Player = _player as Player
 		if player != null and player.stepper != null:
-			return "%s / REICHWEITE %d / %.1f S / %d AUSDAUER" % [VineStyle.key_name("shadow_step", "ALT"), roundi(player.step_range), player.stepper.cooldown, roundi(player.step_cost())]
+			var cd: float = player.stepper.cooldown * (0.78 if _has_light_step() else 1.0)
+			return "%s / REICHWEITE %d / %.2f S / %d AUSDAUER" % [VineStyle.key_name("shadow_step", "ALT"), roundi(player.effective_step_range()), cd, roundi(player.step_cost())]
 	if id == "sneak":
 		var stealth: StealthComponent = _player.get_node_or_null("StealthComponent") as StealthComponent
 		if stealth != null:
@@ -974,7 +985,7 @@ func _draw_orbs() -> void:
 				var pos: Vector2 = at + Vector2.from_angle(angle) * age * (25 + VineStyle.rand(spark + 3) * 25)
 				_orbs.draw_rect(Rect2(pos.round(), Vector2.ONE), Color(tone, maxf(0.0, 1.0 - age) * alpha))
 		if awake or unlock:
-			var label: String = String((_skills.definitions()[id] as Dictionary).name)
+			var label: String = "LICHTSCHRITT" if (id == "shadow_step" and _has_light_step()) else String((_skills.definitions()[id] as Dictionary).name)
 			var label_at: Vector2 = at + Vector2(-PixelText.width(label) * 0.5, radius + 11)
 			_text(_orbs, label, label_at, Color(tone, alpha * _ui_visibility(label_at)))
 			var next_id: String = _next_open(id)

@@ -9,7 +9,7 @@ const SHUT: AudioStream = preload("res://assets/audio/hut/creak_b.wav")
 ## `rest`: a later night (the town quest: "rest until morning"): the same bed, nothing of the story is set again.
 func start(
 	player: Player,
-	world: WorldLevel,
+	world: Variant,
 	rest: bool = false,
 	wake_time: float = -1.0,
 	advance_time: bool = true,

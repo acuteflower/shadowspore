@@ -18,7 +18,10 @@ const OPEN_SECONDS: float = 0.75
 const CLOSE_SECONDS: float = 0.3
 const HERO_FEET: Vector2 = Vector2(150, 262)
 const HERO_SHEET: Texture2D = preload("res://assets/characters/player.png")
+const HERO_BLOOD: Texture2D = preload("res://assets/characters/player_blood.png")
+const HERO_SHADER: Shader = preload("res://assets/shaders/hit_flash.gdshader")
 const HERO_FRAME: Vector2i = Vector2i(48, 56)
+const HERO_SHEET_COLS: int = 22
 const HERO_FEET_IN_FRAME: Vector2 = Vector2(24, 51)
 const CANOPY: Vector2 = Vector2(78.0, 292.0) ## the branch everything she wears hangs from: y at the root, length (grows from the left edge)
 const GARLAND: Vector2 = Vector2(86.0, 214.0) ## the charm string of the talismans: from x to x along the canopy
@@ -37,6 +40,7 @@ const BACK: Color = Color("0b0714") ## the dark husk behind every place
 const RARITIES: Array[String] = ["common", "uncommon", "rare", "epic", "legendary"]
 
 var _inventory: InventoryComponent
+var _appearance: AppearanceComponent
 var _slots: Array[ItemSlot] = []
 var _hotbar_slots: Array[ItemSlot] = []
 var _tags: Array[Dictionary] = [] ## per slot: {group ("bag" / "charm" / a liana), delay, len; bag: row, col; equipment: index in its group}
@@ -47,6 +51,9 @@ var _pop: Array[float] = []
 var _last: Array[Dictionary] = []
 var _tooltip: ItemTooltip
 var _overlay: Control
+var _hero_view: Control
+var _hero_talismans: Control
+var _hero_material: ShaderMaterial
 var _vignette: GradientTexture2D
 var _pool: GradientTexture2D ## a soft dark pool behind each group, so items read over a bright world
 var _hover: ItemSlot
@@ -80,8 +87,9 @@ func _radial(inner: Color, outer: Color, from: float, center: Vector2) -> Gradie
 	return texture
 
 
-func bind(inventory: InventoryComponent, hotbar: Hotbar) -> void:
+func bind(inventory: InventoryComponent, hotbar: Hotbar, appearance: AppearanceComponent = null) -> void:
 	_inventory = inventory
+	_appearance = appearance
 	var table: Dictionary = DataRegistry.table("equipment_slots")
 	var groups: Dictionary = {} ## group -> slot names, in the table's order
 	for slot_name: String in table.keys():
@@ -105,6 +113,23 @@ func bind(inventory: InventoryComponent, hotbar: Hotbar) -> void:
 		slot.hovered.connect(func(s: ItemSlot) -> void: _hover = s; _on_slot_hovered(s))
 		slot.unhovered.connect(func() -> void: _hover = null; _tooltip.hide())
 		_hotbar_slots.append(slot)
+	_hero_material = ShaderMaterial.new()
+	_hero_material.shader = HERO_SHADER
+	_hero_view = Control.new()
+	_hero_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hero_view.material = _hero_material
+	_hero_view.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hero_view.draw.connect(_draw_hero_sprite)
+	add_child(_hero_view)
+	_hero_talismans = Control.new()
+	_hero_talismans.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hero_talismans.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_hero_talismans.draw.connect(_draw_hero_talismans)
+	add_child(_hero_talismans)
+	if _appearance != null:
+		_sync_hero_material()
+		if not _appearance.changed.is_connected(_sync_hero_material):
+			_appearance.changed.connect(_sync_hero_material)
 	_tooltip = ItemTooltip.new()
 	_tooltip.visible = false
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -116,6 +141,11 @@ func bind(inventory: InventoryComponent, hotbar: Hotbar) -> void:
 	add_child(_overlay)
 	add_child(_tooltip)
 	inventory.changed.connect(_on_inventory_changed)
+
+
+func _sync_hero_material() -> void:
+	if _appearance != null and _hero_material != null:
+		_appearance.apply_to_material(_hero_material, HERO_SHEET)
 
 
 func _make_slot(kind: String, ref: Variant, tag: Dictionary) -> void:
@@ -169,6 +199,10 @@ func _process(delta: float) -> void:
 		var viewport: Vector2 = get_viewport_rect().size
 		_tooltip.global_position = (get_global_mouse_position() + Vector2(12, 10)).min(viewport - _tooltip.size)
 	queue_redraw()
+	if _hero_view != null:
+		_hero_view.queue_redraw()
+	if _hero_talismans != null:
+		_hero_talismans.queue_redraw()
 	_overlay.queue_redraw()
 
 
@@ -491,12 +525,85 @@ func _draw_hero(fade: float, void_level: float) -> void:
 		for k: int in 14:
 			var rx: float = center.x + (VineStyle.rand(k + 300) - 0.5) * 90.0
 			draw_rect(Rect2(roundf(rx), roundf(center.y - grow * (30.0 + VineStyle.rand(k + 330) * 60.0)), 1, 1), Color(tone, _ritual_pulse))
+
+
+func _hero_frame_info() -> Dictionary:
+	var p: float = clampf((_open_t - 0.15) / 0.5, 0.0, 1.0)
 	var frame: int = 12 + int(_time * 4.0) % 4 ## idle loop
-	var source: Rect2 = Rect2(frame * HERO_FRAME.x, _hero_sector * HERO_FRAME.y, HERO_FRAME.x, HERO_FRAME.y)
 	var top_left: Vector2 = HERO_FEET - HERO_FEET_IN_FRAME * 2.0 + Vector2(0, -roundf(sin(_time * 1.5) * 1.0) - (1.0 - p) * 24.0)
-	draw_texture_rect_region(HERO_SHEET, Rect2(top_left, Vector2(HERO_FRAME) * 2.0), source, Color(1, 1, 1, p * fade))
-	if p * fade > 0.6: ## her necklace and earrings (the bracelet sits on the sword arm, which the sheet does not hold)
-		TalismanArt.draw_worn(self, self, TalismanRules.worn_ids(_inventory.equipment), TalismanArt.frame_data(HERO_SHEET, _hero_sector * 22 + frame), top_left + HERO_FEET_IN_FRAME * 2.0, 2.0, _time, 0.6)
+	return {"p": p, "frame": frame, "top_left": top_left}
+
+
+func _draw_hero_sprite() -> void:
+	var info: Dictionary = _hero_frame_info()
+	var p: float = float(info["p"])
+	var frame: int = int(info["frame"])
+	var top_left: Vector2 = info["top_left"] as Vector2
+	var source: Rect2 = Rect2(frame * HERO_FRAME.x, _hero_sector * HERO_FRAME.y, HERO_FRAME.x, HERO_FRAME.y)
+	_hero_view.draw_texture_rect_region(HERO_SHEET, Rect2(top_left, Vector2(HERO_FRAME) * 2.0), source, Color(1, 1, 1, p * _open_t))
+
+
+func _draw_hero_talismans() -> void:
+	var info: Dictionary = _hero_frame_info()
+	var p: float = float(info["p"])
+	var alpha: float = p * _open_t
+	if alpha <= 0.0:
+		return
+	var frame: int = int(info["frame"])
+	var sheet_frame: int = _hero_sector * HERO_SHEET_COLS + frame
+	var feet_pos: Vector2 = (info["top_left"] as Vector2) + HERO_FEET_IN_FRAME * 2.0
+	var arm3: Array[Vector3] = GripRig.frame_arm3("player.png", sheet_frame)
+	if arm3.size() == 4:
+		_hero_talismans.draw_set_transform(feet_pos, 0.0, Vector2(2.0, 2.0))
+		var drawn: Array[Vector2] = ArmPainter.paint(_hero_talismans, Vector2.ZERO, arm3[0], arm3[1], arm3[2], arm3[3], alpha, _hero_arm_depth_ctx(frame))
+		var bracelet: String = _worn_bracelet_id()
+		if alpha > 0.6 and bracelet != "":
+			TalismanArt.draw_bracelet(_hero_talismans, bracelet, drawn[0], drawn[1], _time)
+		_hero_talismans.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if _inventory != null and alpha > 0.6:
+		TalismanArt.draw_worn(_hero_talismans, _hero_talismans, TalismanRules.worn_ids(_inventory.equipment), TalismanArt.frame_data(HERO_SHEET, sheet_frame), feet_pos, 2.0, _time, 0.6)
+
+
+func _worn_bracelet_id() -> String:
+	if _inventory == null:
+		return ""
+	for slot_name: String in _inventory.equipment:
+		var stack: Dictionary = _inventory.equipment[slot_name] as Dictionary
+		if TalismanRules.is_talisman(stack) and TalismanRules.type_of(stack) == "bracelet":
+			return String(stack["id"])
+	return ""
+
+
+func _hero_arm_depth_ctx(frame: int) -> Dictionary:
+	var dsrc: Dictionary = ArmPainter.depth_source(HERO_BLOOD)
+	var custom_hair: bool = _appearance == null or String(_appearance.hair_entry().get("folder", "default")) != ""
+	var hf_bytes: PackedByteArray = PackedByteArray()
+	if custom_hair and _hero_material != null and bool(_hero_material.get_shader_parameter("has_hair_front")):
+		var hsrc: Dictionary = ArmPainter.hair_source(_hero_material.get_shader_parameter("hair_front_tex") as Texture2D)
+		if bool(hsrc.get("valid", false)):
+			hf_bytes = hsrc["bytes"] as PackedByteArray
+	var ctx: Dictionary = {
+		"arm_style": _appearance.arm_style() if _appearance != null else "default",
+		"arm_tint": _appearance.arm_tint() if _appearance != null else Color.WHITE,
+		"arm_token": _appearance.arm_pose_token() if _appearance != null else 0.0,
+	}
+	if bool(dsrc.get("valid", false)):
+		ctx["valid"] = true
+		ctx["tex_id"] = HERO_BLOOD.get_instance_id() % 1000000
+		ctx["bytes"] = dsrc["bytes"]
+		ctx["custom_hair"] = custom_hair
+		ctx["hf_bytes"] = hf_bytes
+		ctx["w"] = dsrc["w"]
+		ctx["h"] = dsrc["h"]
+		ctx["cell_x"] = frame * HERO_FRAME.x
+		ctx["cell_y"] = _hero_sector * HERO_FRAME.y
+		ctx["cell_w"] = HERO_FRAME.x
+		ctx["cell_h"] = HERO_FRAME.y
+		ctx["foot_x"] = int(HERO_FEET_IN_FRAME.x)
+		ctx["foot_y"] = int(HERO_FEET_IN_FRAME.y)
+		ctx["skew"] = 0.0
+		ctx["dy"] = 0.0
+	return ctx
 
 
 func _draw_tag(text: String, at: Vector2, delay: float, _void_level: float) -> void:

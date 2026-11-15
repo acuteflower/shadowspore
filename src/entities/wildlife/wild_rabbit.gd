@@ -465,3 +465,10 @@ func _caught() -> void:
 	_hopping = false
 	_shadow.visible = false
 	create_tween().tween_property(_sprite,"modulate:a",0.0,0.25)
+
+## Mirror image in water and puddles (WaterReflections).
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_ENTER_TREE:
+		WaterReflections.watch(self, true)
+	elif what == NOTIFICATION_EXIT_TREE:
+		WaterReflections.unwatch(self)

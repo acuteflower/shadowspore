@@ -5,7 +5,21 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.9.1 Beta – „Sternengaben, Himmelsfall & Shadowspore Launcher“
+## 🚀 Aktuelle Version: V0.9.2 Beta – „Online-Relay, Launcher-Updater & Autosave-Schutz“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Abendgold über der Lichtung](docs/img/daylight_golden.png)
+
+### Highlights von V0.9.2 Beta:
+- 🌐 **Online-Koop-Relay ohne Port-Forwarding:** Hoste und betritt Koop-Welten jetzt direkt über das Online-Relay samt geprüfter Spieler-Identität und wählbarem Freundes-Beitrittsmodus.
+- 🛡️ **Autosave & Zugangs-Schutz:** Automatische Zwischenspeicherung für deinen Spielfortschritt sowie ein neues Sicherheits-Gate für Kontozugang und Spielintegrität.
+- 🚀 **Launcher-Auto-Updater & Profil-Avatare:** Automatische Update-Prüfung direkt im Shadowspore-Launcher, neue Avatare (**Lichtung** & **Leere**), frisches App-Icon und interaktive Weltkarte auf der Website.
+- ⚔️ **Sternenklinge & Welt-Politur:** Fix für **STERNENSTICH** (Astralsichel + fallende Sterne treffen nun zuverlässig) sowie zahlreiche Verbesserungen an Welt-Props, Wildtieren, Gegnern und Grafik-Presets.
+
+---
+
+## 🚀 Vorherige Version: V0.9.1 Beta – „Sternengaben, Himmelsfall & Shadowspore Launcher“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

@@ -4,6 +4,45 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.2 Beta] – 2026-11-15
+### 🌐 Online-Relay, Launcher-Updater & Autosave-Schutz: Portfreies Koop-Relay, Auto-Updates, Sicherheits-Gate & Sternenklingen-Fixes
+
+![Abendgold über der Lichtung](docs/img/daylight_golden.png)
+
+> *Ohne Port-Hürden direkt in gemeinsame Welten: Das neue Online-Relay verbindet Freunde nahtlos, während der Launcher sich selbst aktualisiert und das Autosave-System jeden Fortschritt behütet.*
+
+> [!IMPORTANT]
+> **Bereit für gemeinsames Online-Spielen!**
+> V0.9.2 Beta bringt das **portfreie Online-Koop-Relay** für problemlose Mehrspieler-Sitzungen über Freundes-Lobbys, rüstet den **Shadowspore Desktop-Launcher** mit einem integrierten **Auto-Updater**, neuen **Profil-Avataren** und Web-Weltkarten-Anbindung aus, ergänzt ein **Autosave-System** sowie **Zugangs- & Integritätsschutz** und behebt wichtige Fehler an **Sternenstich**, Welt-Props und Gegnern.
+
+---
+
+### 🌐 Online-Koop-Relay & Sicherheits-Schutz
+
+* **🟣 NEU – Online-Relay ohne Port-Forwarding:** Koop-Welten lassen sich jetzt direkt über das neue **Online-Relay** hosten und beitreten – komplett ohne manuelle Router-Portfreigabe, inklusive servergeprüfter Spieler-Identität, Freundes-Beitrittsmodus (*Offen* / *Freunde* / *Auf Anfrage* / *Geschlossen*) und sauberer Trennungs-Behandlung im laufenden Spiel.
+* **🟣 NEU – Autosave-System:** Regelmäßige automatische Sicherungen schützen deinen Welt- und Charakterfortschritt im Hintergrund.
+* **🟣 NEU – Zugangs- & Integritätsschutz:** Ein neues Sicherheits-Gate prüft Kontozugang und Spielintegrität beim Start sowie bei Online-Verbindungen.
+
+---
+
+### 🚀 Shadowspore Desktop-Launcher & Website-Ausbau
+
+* **🟣 NEU – Integrierter Auto-Updater:** Der Desktop-Launcher prüft automatisch auf neue Versionen und lädt Updates direkt nach.
+* **🟣 NEU – Profil-Avatare & Admin-Bereich:** Wähle im Launcher und Profil zwischen den neuen Avataren **Lichtung** und **Leere**; dazu gibt es eine neue Verwaltungs-Ansicht sowie eine erweiterte Web-Präsenz samt interaktiver Weltkarte.
+* **🔵 REWORK – Neues App-Icon:** Frisches, gestochen scharfes Shadowspore-Symbol für Launcher und Spiel.
+
+---
+
+### ⚔️ Spielwelt- & Kampf-Politur
+
+* **🟡 FIX – Sternenklinge („Sternenstich“):** Der Rechtsklick-Angriff **STERNENSTICH** erzeugt nun zuverlässig seine Sternenfall-Effekte und trifft entfernte Gegner mit Astralsichel und fallenden Sternen.
+* **🟡 FIX – Welt, Props & Tiere:** Zahlreiche Stabilitäts- und Verhaltens-Korrekturen an Hallgrat-Gebäuden, Wiesen-Sehenswürdigkeiten & Weltwundern, Wildtieren, Flussfauna, Gegner-Animationen sowie Grafik-Qualitätsstufen und dem Wetter-Timing.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Einfach den Launcher starten, Freunde einladen und gemeinsam losziehen – danke fürs Testen von V0.9.2 Beta!*
+
+---
+
 ## [V0.9.1 Beta] – 2026-11-15
 ### 🌟 Sternengaben, Himmelsfall & Shadowspore Launcher: Caelias Sternenaltar, Sternenklinge, Cloud-Profil & Desktop-Launcher
 

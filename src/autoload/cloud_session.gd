@@ -40,6 +40,8 @@ var display_name: String = ""
 var uid: String = ""
 var world_join_mode: String = "ask"
 var role: String = "player"
+var avatar_url: String = ""
+var active_lobby: Dictionary = {}
 var license_active: bool = false
 var license_edition: String = ""
 var license_expires_at: int = 0
@@ -219,6 +221,8 @@ func logout() -> void:
 	uid = ""
 	world_join_mode = "ask"
 	role = "player"
+	avatar_url = ""
+	active_lobby.clear()
 	license_active = false
 	license_edition = ""
 	license_expires_at = 0
@@ -328,6 +332,9 @@ func fetch_my_profile() -> Dictionary:
 	uid = String(data.get("uid", ""))
 	world_join_mode = String(data.get("world_join_mode", "ask"))
 	role = normalize_role(String(data.get("role", "player")))
+	avatar_url = String(data.get("avatar_url", ""))
+	var lobby_raw: Variant = data.get("active_lobby", {})
+	active_lobby = lobby_raw as Dictionary if lobby_raw is Dictionary else {}
 	license_active = bool(data.get("license_active", false))
 	license_edition = String(data.get("license_edition", ""))
 	license_expires_at = int(data.get("license_expires_at", 0))

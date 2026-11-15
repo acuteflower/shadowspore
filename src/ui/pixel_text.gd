@@ -57,6 +57,11 @@ const GLYPHS: Dictionary = {
 	"@": [".XX", "X.X", "XXX", "X..", ".XX"],
 	"_": ["...", "...", "...", "...", "XXX"],
 	"*": ["X.X", ".X.", "XXX", ".X.", "X.X"],
+	"#": ["X.X", "XXX", "X.X", "XXX", "X.X"],
+	"(": [".X.", "X..", "X..", "X..", ".X."],
+	")": [".X.", "..X", "..X", "..X", ".X."],
+	"<": ["..X", ".X.", "X..", ".X.", "..X"],
+	"=": ["...", "XXX", "...", "XXX", "..."],
 }
 
 
@@ -147,6 +152,12 @@ static func _mesh(text: String) -> Mesh:
 			if ACCENTS.has(character):
 				_pixel(vertices, indices, x, 0)
 				_pixel(vertices, indices, x + 2, 0)
+		elif character == "·":
+			_pixel(vertices, indices, x + 1, 4)
+		elif character in ["„", "“"]:
+			var y: int = 5 if character == "„" else 1
+			_pixel(vertices, indices, x, y)
+			_pixel(vertices, indices, x + 2, y)
 		x += ADVANCE
 	var mesh: ArrayMesh = ArrayMesh.new()
 	if not vertices.is_empty():

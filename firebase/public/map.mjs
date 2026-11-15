@@ -40,6 +40,7 @@ out vec4 fragColor;
 uniform vec2 u_res;
 uniform vec2 u_center;
 uniform float u_scale;
+uniform float u_px_step;
 uniform float u_world_tiles;
 uniform float u_time;
 uniform float u_mood;         // 0=night, 1=day, 2=bloodmoon
@@ -59,6 +60,41 @@ uniform sampler2D u_relief;
 uniform sampler2D u_relief_field;
 uniform sampler2D u_areas;
 uniform sampler2D u_paths;
+
+const vec3 VOID0 = vec3(0.018, 0.010, 0.036);
+const vec3 VOID1 = vec3(0.042, 0.024, 0.078);
+const vec3 VOID2 = vec3(0.076, 0.046, 0.138);
+const vec3 VOID3 = vec3(0.118, 0.072, 0.215);
+const vec3 VOID4 = vec3(0.175, 0.105, 0.315);
+const vec3 VIO5  = vec3(0.353, 0.212, 0.722);
+const vec3 VIO6  = vec3(0.541, 0.302, 1.000);
+const vec3 VIO7  = vec3(0.690, 0.420, 1.000);
+const vec3 VIO8  = vec3(0.925, 0.824, 1.000);
+const vec3 INK   = vec3(0.068, 0.044, 0.112);
+
+const vec3 LAKE_DEEP  = vec3(0.064, 0.130, 0.212);
+const vec3 LAKE_MID   = vec3(0.112, 0.268, 0.342);
+const vec3 LAKE_SHELF = vec3(0.205, 0.405, 0.438);
+const vec3 LAKE_LIGHT = vec3(0.502, 0.742, 0.706);
+
+const float BAYER[16] = float[16](
+   0.0,  8.0,  2.0, 10.0,
+  12.0,  4.0, 14.0,  6.0,
+   3.0, 11.0,  1.0,  9.0,
+  15.0,  7.0, 13.0,  5.0
+);
+
+// 5x5 hand-inked cartographer symbols per biome (from assets/shaders/world_map.gdshader)
+const uint GLYPHS[14] = uint[14](
+  146080u, 135620u,
+  32969156u, 163268u,
+  33073280u, 145860u,
+  14815374u, 18400814u,
+  4543812u, 18157905u,
+  17978692u, 476608u,
+  19285440u, 32986244u
+);
+const float DENSITY[7] = float[7](0.34, 0.50, 0.40, 0.40, 0.45, 0.40, 0.38);
 
 float invs(float lo, float hi, float x) {
   return 1.0 - smoothstep(lo, hi, x);
@@ -84,12 +120,18 @@ float vnoise(vec2 p) {
 float fbm(vec2 p) {
   float v = 0.0;
   float a = 0.5;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 4; i++) {
     v += a * vnoise(p);
     p = p * 2.03 + vec2(13.7, 7.1);
     a *= 0.5;
   }
-  return v;
+  return v / 0.9375;
+}
+
+float bayer(vec2 p) {
+  int x = int(mod(floor(p.x), 4.0));
+  int y = int(mod(floor(p.y), 4.0));
+  return BAYER[y * 4 + x] / 16.0;
 }
 
 vec3 biomeColor(int idx, int toneIdx) {
@@ -101,225 +143,411 @@ int areaRaw(vec2 t) {
   if (t.x < 0.0 || t.y < 0.0 || t.x >= u_world_tiles || t.y >= u_world_tiles) return -1;
   vec2 u = clamp(t / u_world_tiles, vec2(0.0005), vec2(0.9995));
   int raw = int(floor(texture(u_areas, u).r * 255.0 + 0.5));
-  return raw - 1; // -1 = unset/ocean, 0 = Die Lichtung, 1 = Hexenwald, 2 = Sonnenquarz-Oede
+  return raw - 1; // -1 = unset, 0 = Die Lichtung, 1 = Hexenwald, 2 = Sonnenquarz-Oede
 }
 
 int areaAt(vec2 t) {
   int a = areaRaw(t);
   if (a >= 0) return a;
-  int n0 = areaRaw(t + vec2( 3.0,  0.0)); if (n0 >= 0) return n0;
-  int n1 = areaRaw(t + vec2(-3.0,  0.0)); if (n1 >= 0) return n1;
-  int n2 = areaRaw(t + vec2( 0.0,  3.0)); if (n2 >= 0) return n2;
-  int n3 = areaRaw(t + vec2( 0.0, -3.0)); if (n3 >= 0) return n3;
-  int n4 = areaRaw(t + vec2( 6.0,  0.0)); if (n4 >= 0) return n4;
-  int n5 = areaRaw(t + vec2(-6.0,  0.0)); if (n5 >= 0) return n5;
-  int n6 = areaRaw(t + vec2( 0.0,  6.0)); if (n6 >= 0) return n6;
-  int n7 = areaRaw(t + vec2( 0.0, -6.0)); if (n7 >= 0) return n7;
+  int n0 = areaRaw(t + vec2( 3.5,  0.0)); if (n0 >= 0) return n0;
+  int n1 = areaRaw(t + vec2(-3.5,  0.0)); if (n1 >= 0) return n1;
+  int n2 = areaRaw(t + vec2( 0.0,  3.5)); if (n2 >= 0) return n2;
+  int n3 = areaRaw(t + vec2( 0.0, -3.5)); if (n3 >= 0) return n3;
+  int n4 = areaRaw(t + vec2( 7.0,  0.0)); if (n4 >= 0) return n4;
+  int n5 = areaRaw(t + vec2(-7.0,  0.0)); if (n5 >= 0) return n5;
+  int n6 = areaRaw(t + vec2( 0.0,  7.0)); if (n6 >= 0) return n6;
+  int n7 = areaRaw(t + vec2( 0.0, -7.0)); if (n7 >= 0) return n7;
   return 0;
 }
 
+// Organic multi-scale domain warp breaks up grid-stepped superregion borders (e.g. Sonnenquarz-Oede / Die Lichtung)
+vec2 areaWarpCoord(vec2 t) {
+  vec2 slow = vec2(
+    fbm(t * 0.015 + vec2(3.1, 8.4)) - 0.5,
+    fbm(t * 0.015 + vec2(17.9, 2.3)) - 0.5
+  ) * 24.0;
+  vec2 mid = vec2(
+    vnoise(t * 0.085 + vec2(5.2, 1.7)) - 0.5,
+    vnoise(t * 0.085 + vec2(9.4, 14.1)) - 0.5
+  ) * 7.0;
+  return t + slow + mid;
+}
+
+int areaWarped(vec2 t) {
+  return areaAt(areaWarpCoord(t));
+}
+
+int biomeForArea(int areaId) {
+  if (areaId == 1) return 5;
+  if (areaId == 2) return 6;
+  return 0;
+}
+
+float sampleCoast(vec2 t) {
+  vec2 u = t / u_world_tiles;
+  if (u.x < 0.0 || u.x > 1.0 || u.y < 0.0 || u.y > 1.0) return -24.0;
+  float sd = (texture(u_outer_sdf, u).r * 255.0 - 128.0) / 8.0;
+  return sd + (vnoise(t * 0.35) - 0.5) * 1.3 + (vnoise(t * 1.1) - 0.5) * 0.45;
+}
+
+float sampleHeight(vec2 t) {
+  vec2 u = clamp(t / u_world_tiles, vec2(0.0005), vec2(0.9995));
+  vec3 f = texture(u_relief_field, u).rgb;
+  return f.r + f.g + f.b;
+}
+
+bool glyphBit(uint g, ivec2 l) {
+  if (l.x < 0 || l.y < 0 || l.x > 4 || l.y > 4) return false;
+  return ((g >> uint(l.y * 5 + l.x)) & 1u) == 1u;
+}
+
+vec3 drawSymbols(vec3 col, vec2 w, vec2 p, float sc, float cDist) {
+  float lod = clamp(floor(log2(max(0.45, sc) / 0.45)), 0.0, 2.0);
+  float spacing = 28.0 / exp2(lod);
+  vec2 cell = floor(w / spacing);
+  float fade = smoothstep(0.42, 0.72, sc);
+  for (int oy = -1; oy <= 1; oy++) {
+    for (int ox = -1; ox <= 1; ox++) {
+      vec2 cg = cell + vec2(float(ox), float(oy));
+      float h = hash21(cg + lod * 31.0);
+      vec2 at = (cg + vec2(0.22) + 0.56 * vec2(hash21(cg + 5.0), hash21(cg + 9.0))) * spacing;
+      vec2 atUv = at / u_world_tiles;
+      if (atUv.x < 0.0 || atUv.x > 1.0 || atUv.y < 0.0 || atUv.y > 1.0) continue;
+      int ab = biomeForArea(areaWarped(at));
+      if (h > DENSITY[ab] * fade) continue;
+
+      vec2 sp = floor(((at - u_center) * sc + u_res * 0.5) / u_px_step);
+      ivec2 l = ivec2(p - sp) + ivec2(2);
+      if (l.x < -1 || l.y < -1 || l.x > 5 || l.y > 5) continue;
+
+      vec3 f = texture(u_relief_field, atUv).rgb;
+      float nearCliff = min(min(abs(f.r - 0.5), abs(f.g - 0.5)), abs(f.b - 0.5));
+      float lakeD = (128.0 - texture(u_lakes_sdf, atUv).r * 255.0) / 8.0;
+      if (cDist < 4.5 || nearCliff < 0.16 || lakeD > -2.0 || texture(u_water, atUv).r > 0.04 || texture(u_paths, atUv).r > 0.08) continue;
+
+      uint g = GLYPHS[ab * 2 + (hash21(cg + 3.0) > 0.5 ? 1 : 0)];
+      if (glyphBit(g, l)) return mix(col, biomeColor(ab, 2), 0.34);
+      if (glyphBit(g, l - ivec2(1, 1))) return mix(col, INK, 0.24);
+    }
+  }
+  return col;
+}
+
+vec3 voidSmoke(vec2 w, vec2 p, float depth, float isDay, float isBlood) {
+  vec2 q = w * 0.017;
+  vec2 flow = vec2(u_time * 0.008, -u_time * 0.005);
+  float a = fbm(q + flow + 2.2 * vec2(fbm(q * 0.6 - flow), fbm(q * 0.6 + 3.0 + flow)));
+  float t = a * 5.0 - 1.0 + (1.0 - depth) * 1.45 + (bayer(p) - 0.5) * 0.85;
+  int k = int(clamp(floor(t), 0.0, 4.0));
+  vec3 c = k == 0 ? VOID0 : (k == 1 ? VOID1 : (k == 2 ? VOID2 : (k == 3 ? VOID3 : VOID4)));
+  float b = fbm(q * 1.6 - flow * 1.8 + 9.0);
+  float ridge = 1.0 - smoothstep(0.0, 0.018, abs(b - 0.5));
+  if (ridge > 0.45 && bayer(p + 1.0) < 0.72) {
+    vec3 ridgeTint = mix(VIO5, vec3(0.75, 0.22, 0.42), isBlood);
+    c = mix(c, ridgeTint, 0.38 + 0.16 * (1.0 - depth));
+  }
+  c = mix(c, c * vec3(1.18, 1.15, 1.24) + vec3(0.015, 0.012, 0.03), isDay);
+  if (isBlood > 0.1) c = mix(c, c * vec3(1.35, 0.68, 0.80) + vec3(0.028, 0.004, 0.012), isBlood * 0.85);
+  return c;
+}
+
+vec3 drawLakeWaves(vec3 col, vec2 w, vec2 p, vec3 lightCol) {
+  float lod = clamp(floor(log2(max(0.35, u_scale) / 0.32)), 0.0, 2.0);
+  float spacing = 52.0 / exp2(lod);
+  vec2 cell = floor(w / spacing);
+  for (int oy = -1; oy <= 1; oy++) {
+    for (int ox = -1; ox <= 1; ox++) {
+      vec2 cg = cell + vec2(float(ox), float(oy));
+      float seed = hash21(cg + lod * 29.0 + 81.0);
+      if (seed < 0.52) continue;
+      vec2 at = (cg + vec2(0.24) + vec2(hash21(cg + 32.0), hash21(cg + 67.0)) * 0.52) * spacing;
+      vec2 local = p - floor(((at - u_center) * u_scale + u_res * 0.5) / u_px_step);
+      if (abs(local.x) > 3.0 || local.y < -1.0 || local.y > 2.0) continue;
+      vec2 atUv = at / u_world_tiles;
+      if (atUv.x < 0.0 || atUv.x > 1.0 || atUv.y < 0.0 || atUv.y > 1.0) continue;
+      float inset = (128.0 - texture(u_lakes_sdf, atUv).r * 255.0) / 8.0;
+      if (inset * u_scale < 5.5) continue;
+      bool crest = (local.y == 0.0 && local.x >= -3.0 && local.x <= -1.0) || (local.y == -1.0 && local.x >= 0.0 && local.x <= 2.0);
+      bool echo = local.y == 2.0 && local.x >= 0.0 && local.x <= 2.0;
+      float shimmer = 0.78 + 0.22 * sin(u_time * 0.75 + seed * 6.283);
+      if (crest) return mix(col, lightCol, 0.40 * shimmer);
+      if (echo) return mix(col, lightCol, 0.20 * shimmer);
+    }
+  }
+  return col;
+}
+
+vec3 lakeInk(vec2 w, vec2 p, float basin, float isDay, float isBlood) {
+  float depth = clamp((basin - 0.10) / 0.90, 0.0, 1.0);
+  float pigment = vnoise(w * 0.05 + 17.0) * 0.6 + vnoise(w * 0.018) * 0.4;
+  depth = clamp(depth + (pigment - 0.5) * 0.14, 0.0, 1.0);
+  float tone = floor(clamp(depth * 3.99 + (bayer(p) - 0.5) * 0.24, 0.0, 3.0));
+
+  vec3 lDeep  = mix(LAKE_DEEP,  vec3(0.10, 0.22, 0.34), isDay * 0.65);
+  vec3 lMid   = mix(LAKE_MID,   vec3(0.16, 0.38, 0.46), isDay * 0.65);
+  vec3 lShelf = mix(LAKE_SHELF, vec3(0.28, 0.54, 0.56), isDay * 0.65);
+  vec3 lLight = mix(LAKE_LIGHT, vec3(0.62, 0.85, 0.80), isDay * 0.65);
+
+  if (isBlood > 0.1) {
+    lDeep  = mix(lDeep,  vec3(0.12, 0.03, 0.09), isBlood * 0.85);
+    lMid   = mix(lMid,   vec3(0.26, 0.07, 0.16), isBlood * 0.85);
+    lShelf = mix(lShelf, vec3(0.42, 0.13, 0.25), isBlood * 0.82);
+    lLight = mix(lLight, vec3(0.84, 0.34, 0.48), isBlood * 0.82);
+  }
+
+  vec3 ink = lShelf;
+  if (tone >= 1.0) ink = lMid;
+  if (tone >= 2.0) ink = mix(lMid, lDeep, 0.52);
+  if (tone >= 3.0) ink = lDeep;
+
+  float dist = (128.0 - texture(u_lakes_sdf, w / u_world_tiles).r * 255.0) / 8.0;
+  float insetPx = max(dist, 0.0) * u_scale;
+  float e = max(1.0, 0.9 / max(0.35, u_scale));
+  vec2 grad = vec2(
+    texture(u_lakes_sdf, (w + vec2(e, 0.0)) / u_world_tiles).r - texture(u_lakes_sdf, (w - vec2(e, 0.0)) / u_world_tiles).r,
+    texture(u_lakes_sdf, (w + vec2(0.0, e)) / u_world_tiles).r - texture(u_lakes_sdf, (w - vec2(0.0, e)) / u_world_tiles).r
+  );
+  float light = 0.5 + 0.5 * dot(grad / max(length(grad), 0.0001), normalize(vec2(-0.6, -0.8)));
+  float shelfBand = 1.0 - smoothstep(0.4, 5.2, max(dist, 0.0));
+  ink = mix(ink, lShelf, shelfBand * 0.58);
+
+  // Sunlit top-left water lip vs shadowed bank
+  float rim = 1.0 - smoothstep(0.15, 1.35, insetPx);
+  ink = mix(ink, mix(INK, lLight, light), rim * 0.78);
+
+  // Delicate broken contour curve inside lakes
+  float contour = 1.0 - smoothstep(0.2, 0.75, abs(insetPx - 2.6));
+  float broken = smoothstep(0.30, 0.65, vnoise(w * 0.18 + 4.0));
+  ink = mix(ink, lLight, contour * broken * 0.22 * (1.0 - smoothstep(1.3, 2.8, u_scale)));
+
+  return drawLakeWaves(ink, w, p, lLight);
+}
+
 void main() {
+  float pxStep = max(1.0, u_px_step);
   vec2 px = gl_FragCoord.xy;
-  // Flip gl_FragCoord Y so screen pixel (0,0) is top-left matching 2D canvas
   vec2 screenPx = vec2(px.x, u_res.y - px.y);
-  vec2 tile = (screenPx - u_res * 0.5) / u_scale + u_center;
+  // Crisp art-pixel coordinate matching Shadowspore in-game cartography
+  vec2 p = floor(screenPx / pxStep);
+  vec2 artScreen = (p + 0.5) * pxStep;
+  vec2 tile = (artScreen - u_res * 0.5) / u_scale + u_center;
   vec2 uv = tile / u_world_tiles;
 
-  // Mood tint multipliers
   float isDay = smoothstep(0.3, 0.8, 1.0 - abs(u_mood - 1.0));
   float isBlood = smoothstep(1.3, 1.8, u_mood);
 
-  vec3 voidBase = mix(vec3(0.028, 0.018, 0.056), vec3(0.055, 0.042, 0.098), isDay);
-  voidBase = mix(voidBase, vec3(0.068, 0.016, 0.036), isBlood);
+  float c = sampleCoast(tile);
+  float ds = c * u_scale;
 
-  // Seamless Void Drift Nebula across entire viewport (no box seam)
-  vec2 voidWarp = vec2(u_time * 0.012, -u_time * 0.008);
-  float neb = fbm(tile * 0.009 + voidWarp);
-  float neb2 = fbm(tile * 0.022 - voidWarp * 1.4);
-
-  vec3 abyssCol = voidBase + vec3(0.055, 0.028, 0.115) * smoothstep(0.38, 0.86, neb) * (0.65 + 0.35 * neb2);
-  if (isBlood > 0.1) {
-    abyssCol += vec3(0.14, 0.018, 0.045) * isBlood * smoothstep(0.45, 0.85, neb2);
-  }
-
-  // Subtle sparse stars in Void
-  vec2 starCell = floor(tile * 0.14);
-  float starHash = hash21(starCell);
-  if (starHash > 0.996) {
-    vec2 frac = fract(tile * 0.14) - 0.5;
-    float sparkle = 0.5 + 0.5 * sin(u_time * (1.4 + starHash * 3.5) + starHash * 40.0);
-    float dotDist = length(frac);
-    if (dotDist < 0.14) {
-      vec3 starCol = mix(vec3(0.68, 0.58, 0.98), vec3(0.31, 0.89, 0.76), step(0.998, starHash));
-      abyssCol = mix(abyssCol, starCol, 0.45 * sparkle);
-    }
-  }
-
-  bool inBounds = uv.x >= 0.0 && uv.x <= 1.0 && uv.y >= 0.0 && uv.y <= 1.0;
-  float outerSdf = inBounds ? texture(u_outer_sdf, uv).r : 0.0;
-  float c = inBounds ? ((outerSdf * 255.0 - 128.0) / 8.0) : -16.0;
-
-  // Outside continent silhouette (using outer_sdf alone, so interior lakes remain land-side)
-  if (!inBounds || c < 0.0) {
+  // 1. OUTER VOID & COASTAL RIPPLES (No random dot speckles!)
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0 || c <= 0.0) {
     float outsideDist = max(0.0, -c);
-    float shoreFade = invs(0.0, 5.5, outsideDist);
-    float wave = 0.55 + 0.45 * sin(outsideDist * 1.5 - u_time * 1.6);
-    float tightRim = invs(0.0, 1.35, outsideDist);
-    vec3 rimCol = mix(vec3(0.48, 0.32, 0.92), vec3(0.31, 0.89, 0.76), tightRim * 0.55);
-    if (isBlood > 0.1) rimCol = mix(rimCol, vec3(0.92, 0.24, 0.36), isBlood * 0.85);
-    vec3 col = mix(abyssCol, rimCol, clamp(shoreFade * 0.22 * wave + tightRim * 0.46, 0.0, 1.0));
-    fragColor = vec4(col, 1.0);
+    float voidDepth = smoothstep(6.0, 90.0, outsideDist);
+    vec3 col = voidSmoke(tile, p, voidDepth, isDay, isBlood);
+
+    // Three gentle undulating cartographer ripples following the organic coast
+    float wavePhase = sin(outsideDist * 0.42 - u_time * 0.9) * 0.35;
+    float ripPx = -ds;
+    float rip1 = abs(fract((ripPx - 3.5 + wavePhase) / 9.0 + 0.5) - 0.5) * 9.0;
+    if (ripPx > 2.5 && ripPx < 25.0 && rip1 < 0.75 && mod(p.x + p.y, 3.0) < 2.0) {
+      vec3 ripTint = mix(VIO5, vec3(0.84, 0.24, 0.40), isBlood * 0.85);
+      col = mix(col, ripTint, 0.52 * (1.0 - (ripPx - 2.5) / 22.5));
+    }
+
+    // Soft coastal amethyst aura
+    float halo = invs(0.0, 6.5, outsideDist);
+    vec3 haloTint = mix(mix(VIO6, vec3(0.30, 0.86, 0.76), 0.28), vec3(0.92, 0.24, 0.38), isBlood * 0.85);
+    col = mix(col, haloTint, halo * 0.28);
+
+    // Subtle viewport edge vignette
+    vec2 edgeN = screenPx / u_res;
+    float vig = smoothstep(0.0, 0.28, min(min(edgeN.x, 1.0 - edgeN.x), min(edgeN.y, 1.0 - edgeN.y)));
+    col *= mix(0.66, 1.0, vig);
+
+    fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
     return;
   }
 
+  // 2. WARPED ORGANIC REGION LOOKUP + SMOOTH BIOME ECOTONE BLEND
+  vec2 aw = areaWarpCoord(tile);
+  int areaId = areaAt(aw);
+  int biomeIdx = biomeForArea(areaId);
+
+  // Blend slightly across warped territory frontier to remove harsh pixel staircases
+  int aN = areaAt(aw + vec2( 0.0, -5.0));
+  int aS = areaAt(aw + vec2( 0.0,  5.0));
+  int aW = areaAt(aw + vec2(-5.0,  0.0));
+  int aE = areaAt(aw + vec2( 5.0,  0.0));
+  float borderHits = float(aN != areaId) + float(aS != areaId) + float(aW != areaId) + float(aE != areaId);
+  int blendBiome = biomeIdx;
+  if (aN != areaId) blendBiome = biomeForArea(aN);
+  else if (aS != areaId) blendBiome = biomeForArea(aS);
+  else if (aW != areaId) blendBiome = biomeForArea(aW);
+  else if (aE != areaId) blendBiome = biomeForArea(aE);
+
+  float e = max(1.4, 1.2 / max(0.35, u_scale));
+  float h = sampleHeight(tile);
+  float lit = sampleHeight(tile + vec2(e)) - sampleHeight(tile - vec2(e));
+  float grain = (fbm(tile * 0.055) - 0.5) * 0.36 + (vnoise(tile * 0.52) - 0.5) * 0.12;
+  float v = 0.42 + 0.11 * h + lit * 0.58 + grain;
+  int tone = int(clamp(floor(v * 3.0 + (bayer(p) - 0.5) * 0.88), 0.0, 2.0));
+
+  vec3 col = biomeColor(biomeIdx, tone);
+  if (blendBiome != biomeIdx && bayer(p) < borderHits * 0.18) {
+    col = biomeColor(blendBiome, tone);
+  }
+
+  // 3. RAZOR-SHARP INKED CLIFF CONTOURS & DITHERED CAST SHADOWS
+  float pixStepW = pxStep / max(0.35, u_scale);
+  vec3 f  = texture(u_relief_field, uv).rgb;
+  vec3 fx = texture(u_relief_field, clamp((tile + vec2(pixStepW, 0.0)) / u_world_tiles, vec2(0.0005), vec2(0.9995))).rgb;
+  vec3 fy = texture(u_relief_field, clamp((tile + vec2(0.0, pixStepW)) / u_world_tiles, vec2(0.0005), vec2(0.9995))).rgb;
+  float best = 99.0;
+  float side = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float cVal = f[k] - 0.5 + (vnoise(tile * 0.42 + float(k) * 11.0) - 0.5) * 0.10;
+    float g = max(length(vec2(fx[k] - f[k], fy[k] - f[k])), 0.0045);
+    float d = abs(cVal) / g;
+    if (d < best) {
+      best = d;
+      side = cVal;
+    }
+  }
+  float band = 1.6 + 1.1 * u_scale;
+  if (side < 0.0 && best < band && bayer(p) < (1.0 - best / band) * 0.85) {
+    col = mix(col, biomeColor(biomeIdx, 0) * 0.72, 0.72);
+  } else if (side > 0.0 && best < 1.65) {
+    col = mix(col, biomeColor(biomeIdx, 2), 0.28);
+  }
+  if (best < 0.78) {
+    col = mix(INK, biomeColor(biomeIdx, 0), 0.24);
+  }
+
+  // Ramps, staircases & wall faces from baked relief
   vec4 rel = texture(u_relief, uv);
-  vec3 field = texture(u_relief_field, uv).rgb;
+  int kind = int(floor(rel.g * 255.0 + 0.5)) & 15;
+  if (kind == 1) {
+    col = mix(col * 0.74, INK, 0.24);
+  } else if (u_scale > 0.72 && kind >= 2 && kind <= 4 && mod(p.y + floor(p.x * 0.5), 3.0) < 2.0) {
+    col = mix(col, vec3(0.84, 0.74, 0.60), 0.70);
+  }
+
+  // Subtle etched 5x5 flora/quartz/pine cartographer symbols on flat plateaus
+  if (u_scale > 0.46 && best > 1.6) {
+    col = drawSymbols(col, tile, p, u_scale, c);
+  }
+
+  // 4. ANCIENT TRAILS & CARAVAN PATHS
+  float pathCov = texture(u_paths, uv).r;
+  if (pathCov > 0.05) {
+    vec3 roadCol = (biomeIdx == 6) ? vec3(0.88, 0.74, 0.50) : vec3(0.76, 0.66, 0.52);
+    if (isDay < 0.4) roadCol = mix(roadCol, roadCol * 0.84, 0.6);
+    float pMask = smoothstep(0.08, 0.65, pathCov);
+    col = mix(col, roadCol, pMask * 0.64);
+  }
+
+  // 5. FINE ENGRAVED TERRITORY STITCH BORDER
+  bool frontier =
+    areaWarped(tile + vec2(pixStepW, 0.0)) != areaId ||
+    areaWarped(tile + vec2(0.0, pixStepW)) != areaId;
+  if (frontier && c > 2.6 && mod(p.x + p.y, 4.0) < 2.0) {
+    vec3 dashCol = mix(VIO8, vec3(0.95, 0.80, 0.52), float(biomeIdx == 6) * 0.5);
+    col = mix(col, dashCol, 0.58);
+  }
+
+  // 6. CARTOGRAPHER LAKES & TRIBUTARY RIVERS
   vec3 waterInfo = texture(u_water, uv).rgb;
   float lakeSdf = texture(u_lakes_sdf, uv).r;
-  float pathCov = texture(u_paths, uv).r;
-
-  // Region -> Biome matches Godot world_map.gdshader:
-  // Area 0 (Die Lichtung) = one unified meadow green area (biome 0)
-  // Area 1 (Hexenwald)    = witch_forest (biome 5)
-  // Area 2 (Sonnenquarz)  = quartz_desert (biome 6)
-  int areaId = areaAt(tile);
-  int biomeIdx = 0;
-  if (areaId == 1) biomeIdx = 5;
-  else if (areaId == 2) biomeIdx = 6;
-
-  int level = int(clamp(floor(rel.r * 255.0 + 0.5), 0.0, 3.0));
-  int kindRaw = int(floor(rel.g * 255.0 + 0.5));
-  int kind = kindRaw & 15;
-
-  // Palette lookup
-  vec3 cDark = biomeColor(biomeIdx, 0);
-  vec3 cMid  = biomeColor(biomeIdx, 1);
-  vec3 cLite = biomeColor(biomeIdx, 2);
-
-  // Height shading + smooth plateau contours from relief_field
-  vec3 col = cDark;
-  if (level == 1) col = mix(cDark, cMid, 0.65);
-  else if (level == 2) col = mix(cMid, cLite, 0.45);
-  else if (level == 3) col = mix(cMid, cLite, 0.88);
-
-  // Smooth plateau contour line
-  float minField = min(min(abs(field.r - 0.5), abs(field.g - 0.5)), abs(field.b - 0.5));
-  float contour = invs(0.015, 0.12, minField);
-  col = mix(col, cDark * 0.56, contour * 0.36);
-
-  // Stepped wall faces (kind == 1)
-  if (kind == 1) {
-    col = mix(col * 0.64, cDark * 0.48, 0.36);
-  }
-
-  // Subtle territory border between Die Lichtung, Hexenwald, and Sonnenquarz-Oede
-  vec2 bWarp = vec2(vnoise(tile * 0.045) - 0.5, vnoise(tile * 0.045 + vec2(17.3, 9.1)) - 0.5) * 2.8;
-  vec2 bt = tile + bWarp;
-  int bSelf = areaAt(bt);
-  bool areaBorder =
-    areaAt(bt + vec2(3.0, 0.0)) != bSelf ||
-    areaAt(bt - vec2(3.0, 0.0)) != bSelf ||
-    areaAt(bt + vec2(0.0, 3.0)) != bSelf ||
-    areaAt(bt - vec2(0.0, 3.0)) != bSelf;
-  if (areaBorder && c > 3.2) {
-    vec3 borderCol = mix(vec3(0.54, 0.42, 0.92), vec3(0.45, 0.88, 0.54), float(bSelf == 0 || biomeIdx == 0));
-    col = mix(col, borderCol, 0.42);
-  }
-
-  // Coastal dark ink outline + inner rim highlight
-  float innerRim = invs(0.0, 2.0, c);
-  float innerGlow = invs(0.0, 6.0, c);
-  vec3 coastTone = mix(vec3(0.55, 0.36, 1.0), vec3(0.95, 0.30, 0.40), isBlood);
-  if (biomeIdx == 0 && isBlood < 0.2) {
-    coastTone = mix(coastTone, vec3(0.45, 0.88, 0.56), 0.35);
-  }
-  col = mix(col, coastTone, innerGlow * 0.20);
-  col = mix(col, vec3(0.05, 0.03, 0.10), innerRim * 0.82);
-
-  // Lakes & Rivers (from lakes_sdf + map_water)
-  float lakeInset = (128.0 - lakeSdf * 255.0) / 8.0; // >0 inside lake basin
+  float lakeInset = (128.0 - lakeSdf * 255.0) / 8.0;
   float riverCov = waterInfo.r;
   float lakeDepth = waterInfo.b;
-  bool inLake = (lakeInset > 0.0) || (lakeDepth > 0.12);
+  bool inLake = (lakeInset > 0.0) || (lakeDepth > 0.10);
+
   if (inLake) {
-    vec3 shallowCol = mix(vec3(0.16, 0.48, 0.66), vec3(0.30, 0.70, 0.82), isDay);
-    vec3 deepCol    = mix(vec3(0.07, 0.17, 0.36), vec3(0.11, 0.30, 0.50), isDay);
-    if (isBlood > 0.1) {
-      shallowCol = mix(shallowCol, vec3(0.42, 0.12, 0.24), isBlood * 0.75);
-      deepCol    = mix(deepCol, vec3(0.18, 0.04, 0.11), isBlood * 0.85);
+    float basinVal = max(lakeDepth, clamp(lakeInset / 10.0, 0.14, 1.0));
+    vec3 wCol = lakeInk(tile, p, basinVal, isDay, isBlood);
+    float lMask = max(smoothstep(-0.35, 0.45, lakeInset), smoothstep(0.08, 0.20, lakeDepth));
+    col = mix(col, wCol, lMask);
+  } else {
+    float neighbour = max(
+      max(texture(u_water, clamp((tile + vec2(e, 0.0)) / u_world_tiles, 0.0005, 0.9995)).r,
+          texture(u_water, clamp((tile - vec2(e, 0.0)) / u_world_tiles, 0.0005, 0.9995)).r),
+      max(texture(u_water, clamp((tile + vec2(0.0, e)) / u_world_tiles, 0.0005, 0.9995)).r,
+          texture(u_water, clamp((tile - vec2(0.0, e)) / u_world_tiles, 0.0005, 0.9995)).r)
+    );
+    float coverage = smoothstep(0.03, 0.60, riverCov);
+    float bank = smoothstep(0.04, 0.45, neighbour) * (1.0 - coverage);
+    col = mix(col, INK, bank * 0.48);
+    if (coverage > 0.02) {
+      vec3 rShallow = mix(LAKE_SHELF, vec3(0.28, 0.56, 0.58), isDay * 0.7);
+      vec3 rDeep    = mix(LAKE_DEEP,  vec3(0.11, 0.25, 0.38), isDay * 0.7);
+      if (isBlood > 0.1) {
+        rShallow = mix(rShallow, vec3(0.45, 0.14, 0.26), isBlood * 0.8);
+        rDeep    = mix(rDeep,    vec3(0.18, 0.04, 0.12), isBlood * 0.85);
+      }
+      vec3 rCol = mix(rShallow, rDeep, smoothstep(0.15, 0.88, waterInfo.g));
+      float rimLight = (1.0 - smoothstep(0.3, 0.92, riverCov)) * coverage;
+      rCol = mix(rCol, LAKE_LIGHT, rimLight * 0.34);
+      col = mix(col, rCol, coverage * 0.94);
     }
-    float depthMix = clamp(max(lakeDepth, lakeInset / 12.0), 0.0, 1.0);
-    vec3 wCol = mix(shallowCol, deepCol, depthMix);
-    float ripple = 0.5 + 0.5 * sin(tile.x * 0.32 + tile.y * 0.18 + u_time * 1.6);
-    wCol += vec3(0.04, 0.09, 0.12) * ripple * (1.0 - depthMix * 0.65);
-    float shoreRim = invs(0.0, 1.6, abs(lakeInset));
-    wCol = mix(wCol, vec3(0.06, 0.12, 0.24), shoreRim * 0.55);
-    float lakeMask = max(smoothstep(-0.35, 0.45, lakeInset), smoothstep(0.08, 0.22, lakeDepth));
-    col = mix(col, wCol, lakeMask);
-  } else if (riverCov > 0.05) {
-    vec3 rCol = mix(vec3(0.15, 0.44, 0.62), vec3(0.28, 0.68, 0.80), isDay);
-    if (isBlood > 0.1) rCol = mix(rCol, vec3(0.48, 0.14, 0.26), isBlood * 0.75);
-    float shimmer = 0.90 + 0.10 * sin(tile.y * 0.35 - u_time * 2.1 + tile.x * 0.18);
-    col = mix(col, rCol * shimmer, clamp(riverCov * 1.10, 0.0, 0.92));
   }
 
-  // Carved Trails & Caravan Roads
-  if (pathCov > 0.06 && !inLake) {
-    vec3 roadCol = (biomeIdx == 6) ? vec3(0.88, 0.74, 0.48) : vec3(0.79, 0.66, 0.46);
-    if (isDay < 0.4) roadCol *= 0.86;
-    col = mix(col, roadCol, clamp(pathCov * 0.88, 0.0, 0.9));
+  // 7. ILLUMINATED COASTLINE RIM & INNER INK BANK
+  if (ds < 1.25 * pxStep) {
+    vec3 rimCol = mix(VIO7, VIO8, 0.38);
+    if (isDay > 0.3) rimCol = mix(rimCol, vec3(0.76, 0.96, 0.88), 0.35);
+    if (isBlood > 0.2) rimCol = mix(rimCol, vec3(0.98, 0.34, 0.48), isBlood * 0.85);
+    col = rimCol;
+  } else if (ds < 2.8 * pxStep && bayer(p) < 0.68) {
+    col = mix(col, INK, 0.62);
   }
 
-  // Day/Night/Bloodmoon overall grading (preserve clean meadow green in night mode)
-  vec3 moodGrade = mix(vec3(0.90, 0.93, 1.03), vec3(1.12, 1.10, 1.00), isDay);
-  moodGrade = mix(moodGrade, vec3(1.12, 0.76, 0.84), isBlood);
+  // 8. MOOD GRADING & ACTIVE REGION FOCUS
+  vec3 moodGrade = mix(vec3(0.95, 0.97, 1.04), vec3(1.10, 1.08, 1.00), isDay);
+  moodGrade = mix(moodGrade, vec3(1.08, 0.72, 0.84), isBlood);
   col *= moodGrade;
 
-  // Active superregion focus boost
   if (u_active_super >= -0.2) {
     float sid = float(areaId);
-    if (abs(sid - u_active_super) < 0.3) {
-      col *= 1.15;
-    } else {
-      col *= 0.74;
-    }
+    if (abs(sid - u_active_super) < 0.3) col *= 1.12;
+    else col *= 0.68;
   }
 
-  // Interactive Exploration Fog Mode ("Laternen-Nebel")
+  // 9. LANTERN FOG MODE ("Laternen-Nebel")
   if (u_fog_mode > 0.5) {
     float vis = 0.0;
     for (int i = 0; i < 16; i++) {
       if (float(i) >= u_reveal_count) break;
-      float d = distance(tile, u_reveals[i]);
-      vis = max(vis, invs(46.0, 105.0, d));
+      vis = max(vis, invs(48.0, 110.0, distance(tile, u_reveals[i])));
     }
     if (u_cursor_tile.x >= 0.0) {
-      float cd = distance(tile, u_cursor_tile);
-      vis = max(vis, invs(22.0, 82.0, cd));
+      vis = max(vis, invs(24.0, 86.0, distance(tile, u_cursor_tile)));
     }
     float veil = 1.0 - vis;
     if (veil > 0.02) {
-      float mist = fbm(tile * 0.03 + vec2(u_time * 0.04, -u_time * 0.02));
-      float fogMask = smoothstep(0.05, 0.95, veil * (0.78 + 0.22 * mist));
-      vec3 fogTone = voidBase * 1.15 + vec3(0.07, 0.03, 0.14) * mist;
-      col = mix(col, fogTone, clamp(fogMask * 0.88, 0.0, 0.94));
+      vec3 fogTone = voidSmoke(tile, p, veil, isDay, isBlood);
+      if (bayer(p) < clamp(veil * 1.05, 0.0, 1.0)) {
+        col = mix(col, fogTone, 0.90);
+      }
     }
   }
 
-  // Subtle Warm Cursor Lantern Glow
+  // 10. WARM CURSOR LANTERN & WAYSTONE SHOCKWAVE
   if (u_cursor_tile.x >= 0.0) {
-    float curD = distance(tile, u_cursor_tile);
-    float lantern = invs(0.0, 56.0, curD);
-    col += vec3(0.14, 0.10, 0.20) * lantern * (1.0 - isDay * 0.65);
+    float lantern = invs(0.0, 58.0, distance(tile, u_cursor_tile));
+    col += vec3(0.11, 0.09, 0.16) * lantern * (1.0 - isDay * 0.6);
   }
-
-  // Waystone Awakening Shockwave Pulse
   if (u_pulse_tile.x >= 0.0 && u_pulse_age > 0.0 && u_pulse_age < 1.0) {
     float pd = distance(tile, u_pulse_tile);
     float rad = u_pulse_age * 240.0;
-    float wave = invs(0.0, 18.0, abs(pd - rad)) * (1.0 - u_pulse_age);
+    float wave = invs(0.0, 16.0, abs(pd - rad)) * (1.0 - u_pulse_age);
     col += vec3(0.31, 0.92, 0.84) * wave * 0.95;
   }
+
+  // Subtle viewport vignette
+  vec2 edgeN = screenPx / u_res;
+  float vig = smoothstep(0.0, 0.24, min(min(edgeN.x, 1.0 - edgeN.x), min(edgeN.y, 1.0 - edgeN.y)));
+  col *= mix(0.70, 1.0, vig);
 
   fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }`;
@@ -327,10 +555,7 @@ void main() {
 function hexToVec3(hex) {
   const clean = String(hex || '#5fb36b').replace('#', '');
   const n = parseInt(clean, 16);
-  const r = ((n >> 16) & 255) / 255;
-  const g = ((n >> 8) & 255) / 255;
-  const b = (n & 255) / 255;
-  return [r, g, b];
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
 function buildPaletteArray() {
@@ -341,17 +566,23 @@ function buildPaletteArray() {
   ];
   const out = [];
   for (const key of BIOMES_ORDER) {
+    if (key === 'meadow') {
+      // Curated Shadowspore docs/design_guide.md emerald meadow tones
+      out.push(...hexToVec3('#22483c'), ...hexToVec3('#387654'), ...hexToVec3('#6cb46a'));
+      continue;
+    }
+    if (key === 'witch_forest') {
+      out.push(...hexToVec3('#1b1d34'), ...hexToVec3('#34415e'), ...hexToVec3('#617496'));
+      continue;
+    }
+    if (key === 'quartz_desert') {
+      out.push(...hexToVec3('#422926'), ...hexToVec3('#97613e'), ...hexToVec3('#e2b36c'));
+      continue;
+    }
     const base = hexToVec3(BIOMES[key]?.color || '#5fb36b');
-    const isMeadow = key === 'meadow';
-    const c0 = isMeadow
-      ? lerp3(base, [0.06, 0.18, 0.09], 0.56)
-      : lerp3(base, [0.055, 0.036, 0.11], 0.70);
-    const c1 = isMeadow
-      ? lerp3(base, [0.14, 0.34, 0.18], 0.28)
-      : lerp3(base, [0.16, 0.12, 0.28], 0.44);
-    const c2 = isMeadow
-      ? lerp3(base, [0.82, 0.96, 0.78], 0.22)
-      : lerp3(base, [0.92, 0.89, 1.0], 0.20);
+    const c0 = lerp3(base, [0.055, 0.036, 0.11], 0.68);
+    const c1 = lerp3(base, [0.14, 0.11, 0.25], 0.36);
+    const c2 = lerp3(base, [0.92, 0.89, 1.0], 0.22);
     out.push(...c0, ...c1, ...c2);
   }
   return new Float32Array(out);
@@ -416,12 +647,12 @@ export class WorldMapEngine {
     this.playerCloudDay = null;
 
     this.layers = {
-      waystones: true,
+      waystones: false,
       wonders: true,
       arenas: true,
       hallgrat: true,
-      vistas: true,
-      orders: true,
+      vistas: false,
+      orders: false,
       custom: true,
       admin: true,
     };
@@ -670,6 +901,7 @@ export class WorldMapEngine {
       res: gl.getUniformLocation(prog, 'u_res'),
       center: gl.getUniformLocation(prog, 'u_center'),
       scale: gl.getUniformLocation(prog, 'u_scale'),
+      px_step: gl.getUniformLocation(prog, 'u_px_step'),
       world_tiles: gl.getUniformLocation(prog, 'u_world_tiles'),
       time: gl.getUniformLocation(prog, 'u_time'),
       mood: gl.getUniformLocation(prog, 'u_mood'),
@@ -1030,13 +1262,16 @@ export class WorldMapEngine {
     const zoom = this.scale;
     const items = [];
     for (const f of this.features) {
-      if (f.kind === 'waystone' && !this.layers.waystones) continue;
-      if (f.kind === 'wonder' && !this.layers.wonders) continue;
-      if (f.kind === 'arena' && !this.layers.arenas) continue;
-      if (f.kind === 'hallgrat' && !this.layers.hallgrat) continue;
-      if (f.kind === 'vista' && !this.layers.vistas) continue;
-      if ((f.kind === 'order' || f.kind === 'watermill' || f.kind === 'pier') && !this.layers.orders) continue;
-      if (zoom < (f.minZoom || 0) && this.selectedFeature?.id !== f.id && this.hoveredFeature?.id !== f.id) continue;
+      const focused = this.selectedFeature?.id === f.id || this.hoveredFeature?.id === f.id;
+      if (!focused) {
+        if (f.kind === 'waystone' && !this.layers.waystones) continue;
+        if (f.kind === 'wonder' && !this.layers.wonders) continue;
+        if (f.kind === 'arena' && !this.layers.arenas) continue;
+        if (f.kind === 'hallgrat' && !this.layers.hallgrat) continue;
+        if (f.kind === 'vista' && !this.layers.vistas) continue;
+        if ((f.kind === 'order' || f.kind === 'watermill' || f.kind === 'pier') && !this.layers.orders) continue;
+        if (zoom < (f.minZoom || 0)) continue;
+      }
       items.push(f);
     }
     if (this.layers.custom) {
@@ -1348,6 +1583,7 @@ export class WorldMapEngine {
       gl.uniform2f(this.uLoc.res, this.glCanvas.width, this.glCanvas.height);
       gl.uniform2f(this.uLoc.center, this.center.x, this.center.y);
       gl.uniform1f(this.uLoc.scale, this.scale * this.dpr);
+      gl.uniform1f(this.uLoc.px_step, Math.max(1.0, Math.round((this.dpr || 1) * 2.0)));
       gl.uniform1f(this.uLoc.world_tiles, WORLD_TILES);
       gl.uniform1f(this.uLoc.time, this.time);
       gl.uniform1f(this.uLoc.mood, this.mood === 'day' ? 1.0 : (this.mood === 'blood' ? 2.0 : 0.0));
@@ -1408,67 +1644,84 @@ export class WorldMapEngine {
       ctx.clearRect(0, 0, w, h);
     }
 
-    // 1. Subtle Leyline Web between Waystones when zoomed moderately or when Waystone hovered/selected
-    if (this.layers.waystones) {
-      const focusWaystone =
-        this.hoveredFeature?.kind === 'waystone'
-          ? this.hoveredFeature
-          : (this.selectedFeature?.kind === 'waystone' ? this.selectedFeature : null);
-      if (focusWaystone || this.scale > 0.55) {
-        ctx.save();
-        for (let i = 0; i < WAYSTONES.length; i++) {
-          const a = WAYSTONES[i];
-          const ap = this.worldToScreen(a.tile[0], a.tile[1]);
-          for (let j = i + 1; j < WAYSTONES.length; j++) {
-            const b = WAYSTONES[j];
-            const dist = Math.hypot(a.tile[0] - b.tile[0], a.tile[1] - b.tile[1]);
-            if (dist > 340) continue;
-            const hot = focusWaystone && (focusWaystone.id === a.id || focusWaystone.id === b.id);
-            if (!hot && !focusWaystone && !this.awakenedWaystones.has(a.id)) continue;
-            const bp = this.worldToScreen(b.tile[0], b.tile[1]);
-            ctx.beginPath();
-            ctx.moveTo(ap.x, ap.y);
-            ctx.lineTo(bp.x, bp.y);
-            ctx.strokeStyle = hot ? 'rgba(79, 227, 193, 0.52)' : 'rgba(139, 92, 255, 0.16)';
-            ctx.lineWidth = hot ? 1.8 : 1;
-            ctx.setLineDash([4, 6]);
-            ctx.lineDashOffset = -this.time * 12;
-            ctx.stroke();
-          }
+    // 1. Subtle Leyline Web only when Waystones layer is explicitly active or a Waystone is focused
+    const focusWaystone =
+      this.hoveredFeature?.kind === 'waystone'
+        ? this.hoveredFeature
+        : (this.selectedFeature?.kind === 'waystone' ? this.selectedFeature : null);
+    if (this.layers.waystones || focusWaystone) {
+      ctx.save();
+      for (let i = 0; i < WAYSTONES.length; i++) {
+        const a = WAYSTONES[i];
+        const ap = this.worldToScreen(a.tile[0], a.tile[1]);
+        for (let j = i + 1; j < WAYSTONES.length; j++) {
+          const b = WAYSTONES[j];
+          const dist = Math.hypot(a.tile[0] - b.tile[0], a.tile[1] - b.tile[1]);
+          if (dist > 340) continue;
+          const hot = focusWaystone && (focusWaystone.id === a.id || focusWaystone.id === b.id);
+          if (!hot && (!this.layers.waystones || !this.awakenedWaystones.has(a.id))) continue;
+          const bp = this.worldToScreen(b.tile[0], b.tile[1]);
+          ctx.beginPath();
+          ctx.moveTo(ap.x, ap.y);
+          ctx.lineTo(bp.x, bp.y);
+          ctx.strokeStyle = hot ? 'rgba(79, 227, 193, 0.56)' : 'rgba(139, 92, 255, 0.18)';
+          ctx.lineWidth = hot ? 1.8 : 1;
+          ctx.setLineDash([4, 6]);
+          ctx.lineDashOffset = -this.time * 12;
+          ctx.stroke();
         }
-        ctx.restore();
       }
+      ctx.restore();
     }
 
     // 2. Hallgrat Citadel District Bounding Silhouette when zoomed in
-    if (this.layers.hallgrat && this.scale >= 1.15) {
+    if (this.layers.hallgrat && this.scale >= 1.35) {
       const [bx0, by0, bx1, by1] = HALLGRAT.bounds;
       const p0 = this.worldToScreen(bx0, by0);
       const p1 = this.worldToScreen(bx1, by1);
       ctx.save();
-      ctx.strokeStyle = 'rgba(217, 200, 255, 0.34)';
+      ctx.strokeStyle = 'rgba(217, 200, 255, 0.30)';
       ctx.lineWidth = 1;
-      ctx.setLineDash([3, 3]);
+      ctx.setLineDash([3, 4]);
       ctx.strokeRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
       ctx.restore();
     }
 
-    // 3. Superregion Titles on Overview Zoom
-    if (this.scale <= 1.45) {
+    // 3. Superregion Watermark Titles on Overview Zoom
+    if (this.scale <= 1.55) {
       ctx.save();
-      ctx.font = '700 13px "Alegreya Sans", sans-serif';
       ctx.textAlign = 'center';
-      ctx.letterSpacing = '0.16em';
+      ctx.textBaseline = 'middle';
+      const titlePos = {
+        0: [492, 540],
+        1: [822, 856], // sit clearly above Schieferkessel Arena
+        2: [805, 192],
+      };
+      const tierTag = { 0: 'WIESENLANDE', 1: 'SCHATTENWALD', 2: 'SONNENÖDE' };
       for (const s of SUPERS) {
-        const sp = this.worldToScreen(s.center[0], s.center[1]);
-        if (sp.x < -80 || sp.y < -40 || sp.x > w + 80 || sp.y > h + 40) continue;
-        const alpha = Math.max(0.25, Math.min(0.88, (1.48 - this.scale) * 1.4));
+        const pt = titlePos[s.id] || s.center;
+        const sp = this.worldToScreen(pt[0], pt[1]);
+        if (sp.x < -100 || sp.y < -40 || sp.x > w + 100 || sp.y > h + 40) continue;
+        const alpha = Math.max(0.28, Math.min(0.92, (1.58 - this.scale) * 1.45));
         const text = s.name.toUpperCase();
+        ctx.font = '700 13px "Alegreya Sans", sans-serif';
+        ctx.letterSpacing = '0.20em';
         ctx.lineWidth = 4;
-        ctx.strokeStyle = `rgba(10, 7, 18, ${alpha * 0.92})`;
-        ctx.strokeText(text, sp.x, sp.y - 10);
-        ctx.fillStyle = this.activeSuper === s.id ? `rgba(242, 195, 107, ${alpha})` : `rgba(236, 228, 255, ${alpha * 0.9})`;
-        ctx.fillText(text, sp.x, sp.y - 10);
+        ctx.strokeStyle = `rgba(9, 6, 16, ${alpha * 0.92})`;
+        ctx.strokeText(text, sp.x, sp.y - 6);
+        ctx.fillStyle = this.activeSuper === s.id ? `rgba(242, 195, 107, ${alpha})` : `rgba(240, 232, 255, ${alpha * 0.92})`;
+        ctx.fillText(text, sp.x, sp.y - 6);
+
+        ctx.font = '700 8.5px "Alegreya Sans", sans-serif';
+        ctx.letterSpacing = '0.26em';
+        const sub = tierTag[s.id] || '';
+        if (sub) {
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = `rgba(9, 6, 16, ${alpha * 0.85})`;
+          ctx.strokeText(sub, sp.x, sp.y + 9);
+          ctx.fillStyle = this.activeSuper === s.id ? `rgba(242, 195, 107, ${alpha * 0.8})` : `rgba(182, 170, 224, ${alpha * 0.72})`;
+          ctx.fillText(sub, sp.x, sp.y + 9);
+        }
       }
       ctx.restore();
     }
@@ -1483,7 +1736,12 @@ export class WorldMapEngine {
       this.drawMarker(ctx, f, sp.x, sp.y, isSelected, isHovered);
     }
 
-    // 5. Pin-Placement Crosshair Preview
+    // 5. Delicate Atlas Compass Rose (Desktop margin above zoom bar)
+    if (w >= 720 && h >= 420) {
+      this.drawCompassRose(ctx, w - 34, h - 78);
+    }
+
+    // 6. Pin-Placement Crosshair Preview
     if (this.pinTool && this.cursorScreen.inside) {
       const { x, y } = this.cursorScreen;
       const pStyle = PIN_STYLES[this.pinTool] || { color: '#4fe3c1' };
@@ -1499,26 +1757,102 @@ export class WorldMapEngine {
     ctx.restore();
   }
 
+  drawCompassRose(ctx, cx, cy) {
+    ctx.save();
+    ctx.translate(Math.round(cx) + 0.5, Math.round(cy) + 0.5);
+    ctx.strokeStyle = 'rgba(139, 92, 255, 0.34)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, 14, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Cardinal pointers
+    ctx.fillStyle = 'rgba(242, 195, 107, 0.78)';
+    ctx.beginPath();
+    ctx.moveTo(0, -11);
+    ctx.lineTo(2.5, -2);
+    ctx.lineTo(-2.5, -2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(201, 190, 236, 0.48)';
+    ctx.beginPath();
+    ctx.moveTo(0, 11); ctx.lineTo(2, 2); ctx.lineTo(-2, 2); ctx.closePath();
+    ctx.moveTo(-11, 0); ctx.lineTo(-2, -2); ctx.lineTo(-2, 2); ctx.closePath();
+    ctx.moveTo(11, 0); ctx.lineTo(2, -2); ctx.lineTo(2, 2); ctx.closePath();
+    ctx.fill();
+
+    ctx.font = '700 8px "Alegreya Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = 'rgba(242, 195, 107, 0.88)';
+    ctx.fillText('N', 0, -16);
+    ctx.restore();
+  }
+
   drawMarker(ctx, f, x, y, selected, hovered) {
     const pulse = 0.78 + 0.22 * Math.sin(this.time * 2.8 + f.tile[0] * 0.03);
     const active = selected || hovered;
 
     if (f.kind === 'start') {
-      const r = active ? 8 : 6;
-      ctx.fillStyle = `rgba(242, 195, 107, ${0.22 * pulse})`;
+      const r = active ? 13 : 10;
+      const g = ctx.createRadialGradient(x, y, 1, x, y, r + 9);
+      g.addColorStop(0, `rgba(242, 195, 107, ${0.42 * pulse})`);
+      g.addColorStop(1, 'rgba(242, 195, 107, 0)');
+      ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(x, y, r + 6, 0, Math.PI * 2);
+      ctx.arc(x, y, r + 9, 0, Math.PI * 2);
       ctx.fill();
 
-      this.drawDiamond(ctx, x, y, r, '#f2c36b', '#120a22');
+      this.drawHearthBeacon(ctx, x, y, active);
       const label = this.playerCloudDay !== null ? `DEIN HOF · TAG ${this.playerCloudDay}` : 'GLIMMRAST';
-      this.drawTagLabel(ctx, label, x, y + 15, '#f7d98b', true);
+      // Put Glimmrast label slightly above beacon so it stays clear of Blumen-Amphitheater below
+      this.drawCartoPill(ctx, label, x, y - 19, '#f7d98b', 'rgba(242, 195, 107, 0.52)', active);
       return;
     }
 
     if (f.kind === 'hallgrat') {
-      this.drawSquareShield(ctx, x, y, active ? 7 : 5.5, '#d9c8ff', '#120a22');
-      this.drawTagLabel(ctx, 'HALLGRAT', x, y + 14, '#e6dcff', active || this.scale > 0.65);
+      this.drawHallgratCrest(ctx, x, y, active);
+      this.drawCartoPill(ctx, 'HALLGRAT', x, y + 18, '#e6dcff', 'rgba(182, 164, 240, 0.5)', active || this.scale > 0.52);
+      return;
+    }
+
+    if (f.kind === 'wonder') {
+      const g = ctx.createRadialGradient(x, y, 1, x, y, active ? 18 : 13);
+      g.addColorStop(0, `rgba(255, 216, 107, ${0.32 * pulse})`);
+      g.addColorStop(1, 'rgba(255, 216, 107, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, active ? 18 : 13, 0, Math.PI * 2);
+      ctx.fill();
+
+      this.drawStar(ctx, x, y, active ? 8 : 6, '#ffd86b', '#1b0f0a');
+      ctx.fillStyle = '#7bf5e2';
+      ctx.fillRect(Math.round(x - 1), Math.round(y - 1), 2, 2);
+
+      if (active || this.scale > 0.72) {
+        const shortName = f.name === 'KREIS DER SCHLAFENDEN WÄCHTER' && !active && this.scale < 1.1
+          ? 'SCHLAFENDE WÄCHTER'
+          : f.name;
+        this.drawCartoPill(ctx, shortName, x, y + 17, '#ffe08a', 'rgba(242, 195, 107, 0.42)', active);
+      }
+      return;
+    }
+
+    if (f.kind === 'arena') {
+      const g = ctx.createRadialGradient(x, y, 1, x, y, active ? 19 : 14);
+      g.addColorStop(0, `rgba(255, 107, 123, ${0.34 * pulse})`);
+      g.addColorStop(1, 'rgba(255, 107, 123, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, active ? 19 : 14, 0, Math.PI * 2);
+      ctx.fill();
+
+      this.drawArenaSigil(ctx, x, y, active);
+      if (active || this.scale > 0.58) {
+        const lbl = active ? f.name : `${f.boss?.toUpperCase() || f.name}`;
+        this.drawCartoPill(ctx, lbl, x, y + 18, '#ff9ea9', 'rgba(255, 107, 123, 0.48)', active);
+      }
       return;
     }
 
@@ -1526,38 +1860,14 @@ export class WorldMapEngine {
       const awake = this.awakenedWaystones.has(f.id);
       const col = awake ? '#4fe3c1' : '#8a7ea6';
       if (awake || active) {
-        ctx.fillStyle = awake ? `rgba(79, 227, 193, ${0.18 * pulse})` : 'rgba(139, 92, 255, 0.22)';
+        ctx.fillStyle = awake ? `rgba(79, 227, 193, ${0.20 * pulse})` : 'rgba(139, 92, 255, 0.22)';
         ctx.beginPath();
         ctx.arc(x, y, active ? 13 : 9, 0, Math.PI * 2);
         ctx.fill();
       }
       this.drawDiamond(ctx, x, y, active ? 6.5 : 4.5, col, '#120a22');
       if (active || this.scale > 1.12) {
-        this.drawTagLabel(ctx, f.name, x, y + 13, awake ? '#9af2dc' : '#cfc5e8', true);
-      }
-      return;
-    }
-
-    if (f.kind === 'wonder') {
-      ctx.fillStyle = `rgba(242, 195, 107, ${0.22 * pulse})`;
-      ctx.beginPath();
-      ctx.arc(x, y, active ? 14 : 10, 0, Math.PI * 2);
-      ctx.fill();
-      this.drawStar(ctx, x, y, active ? 7.5 : 5.5, '#ffd86b', '#201008');
-      if (active || this.scale > 0.9) {
-        this.drawTagLabel(ctx, f.name, x, y + 14, '#ffd86b', true);
-      }
-      return;
-    }
-
-    if (f.kind === 'arena') {
-      ctx.fillStyle = `rgba(255, 107, 123, ${0.20 * pulse})`;
-      ctx.beginPath();
-      ctx.arc(x, y, active ? 14 : 10, 0, Math.PI * 2);
-      ctx.fill();
-      this.drawTriangle(ctx, x, y, active ? 7 : 5, '#ff6b7b', '#1b070c');
-      if (active || this.scale > 0.85) {
-        this.drawTagLabel(ctx, f.boss?.toUpperCase() || f.name, x, y + 14, '#ff9aa5', true);
+        this.drawCartoPill(ctx, f.name, x, y + 15, awake ? '#9af2dc' : '#cfc5e8', 'rgba(79, 227, 193, 0.36)', active);
       }
       return;
     }
@@ -1565,24 +1875,118 @@ export class WorldMapEngine {
     if (f.kind === 'custom' || f.kind === 'admin') {
       const style = f.isAdmin ? PIN_STYLES.event : (PIN_STYLES[f.customKind] || PIN_STYLES.waymark);
       this.drawDiamond(ctx, x, y, active ? 7 : 5.5, style.color, '#0d0818');
-      this.drawTagLabel(ctx, f.name, x, y + 14, style.color, true);
+      this.drawCartoPill(ctx, f.name, x, y + 16, style.color, 'rgba(79, 227, 193, 0.4)', active);
       return;
     }
 
-    // Vistas / Order / Mills / Piers
-    const minorColor =
-      f.kind === 'vista'
-        ? '#9ac6ff'
-        : f.kind === 'order'
-        ? '#e57c6a'
-        : '#67d4c0';
-    ctx.fillStyle = '#0f091a';
-    ctx.fillRect(Math.round(x - 3.5), Math.round(y - 3.5), 7, 7);
-    ctx.fillStyle = active ? '#ffffff' : minorColor;
-    ctx.fillRect(Math.round(x - 2.5), Math.round(y - 2.5), 5, 5);
+    // Optional Vistas / Order / Mills / Piers (only shown if explicitly toggled on in Ebenen)
+    const minorColor = f.kind === 'vista' ? '#9ac6ff' : f.kind === 'order' ? '#e57c6a' : '#67d4c0';
+    this.drawDiamond(ctx, x, y, active ? 5.5 : 3.8, active ? '#ffffff' : minorColor, '#0f091a');
     if (active || this.scale > 1.85) {
-      this.drawTagLabel(ctx, f.name, x, y + 12, minorColor, true);
+      this.drawCartoPill(ctx, f.name, x, y + 14, minorColor, 'rgba(139, 92, 255, 0.3)', active);
     }
+  }
+
+  drawHearthBeacon(ctx, x, y, active) {
+    const px = Math.round(x);
+    const py = Math.round(y);
+    ctx.save();
+    ctx.strokeStyle = '#120a1c';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(px, py, active ? 7.5 : 6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#331d10';
+    ctx.beginPath();
+    ctx.arc(px, py, active ? 7 : 5.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner amber flame
+    ctx.fillStyle = '#ff9a42';
+    ctx.beginPath();
+    ctx.moveTo(px, py - (active ? 5 : 4));
+    ctx.lineTo(px + (active ? 4 : 3), py + 2);
+    ctx.lineTo(px - (active ? 4 : 3), py + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#fff0b0';
+    ctx.fillRect(px - 1, py - 1, 2, 3);
+    ctx.restore();
+  }
+
+  drawHallgratCrest(ctx, x, y, active) {
+    const px = Math.round(x);
+    const py = Math.round(y);
+    const s = active ? 1.25 : 1;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.scale(s, s);
+    // Dark outline base
+    ctx.fillStyle = '#120a22';
+    ctx.fillRect(-7, -6, 14, 12);
+    // Triple citadel towers in cool moonstone lavender
+    ctx.fillStyle = '#c4b3f5';
+    ctx.fillRect(-5, -3, 3, 7);
+    ctx.fillRect(-1.5, -5, 3, 9);
+    ctx.fillRect(2, -3, 3, 7);
+    ctx.fillRect(-5, 2, 10, 3);
+    // Glowing turquoise spire light
+    ctx.fillStyle = '#7bf5e2';
+    ctx.fillRect(-1, -1, 2, 3);
+    ctx.restore();
+  }
+
+  drawArenaSigil(ctx, x, y, active) {
+    const r = active ? 8 : 6.5;
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = (i * Math.PI) / 3 - Math.PI / 2;
+      const px = x + Math.cos(a) * r;
+      const py = y + Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#240b16';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ff6b7b';
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffd0d6';
+    ctx.beginPath();
+    ctx.arc(x, y, active ? 2.6 : 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawCartoPill(ctx, text, x, y, color, borderColor, emphasize = false) {
+    if (!text) return;
+    ctx.save();
+    ctx.font = emphasize
+      ? '700 10.5px "Alegreya Sans", sans-serif'
+      : '700 9.5px "Alegreya Sans", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const metrics = ctx.measureText(text);
+    const padX = emphasize ? 7 : 5.5;
+    const w = Math.ceil(metrics.width + padX * 2);
+    const h = emphasize ? 16 : 14;
+    const rx = Math.round(x - w * 0.5);
+    const ry = Math.round(y - h * 0.5);
+
+    ctx.fillStyle = emphasize ? 'rgba(14, 9, 25, 0.94)' : 'rgba(11, 7, 20, 0.80)';
+    ctx.fillRect(rx, ry, w, h);
+    ctx.strokeStyle = borderColor || 'rgba(139, 92, 255, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rx + 0.5, ry + 0.5, w - 1, h - 1);
+
+    ctx.fillStyle = emphasize ? '#ffffff' : color;
+    ctx.fillText(text, Math.round(x), Math.round(y) + 0.5);
+    ctx.restore();
   }
 
   drawDiamond(ctx, x, y, r, fill, stroke) {

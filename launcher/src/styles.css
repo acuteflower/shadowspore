@@ -210,9 +210,9 @@ canvas.px {
 .titlebar::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: 0 0 -10px 0;
   z-index: -1;
-  background: linear-gradient(180deg, rgba(10, 7, 18, 0.85), rgba(10, 7, 18, 0));
+  background: linear-gradient(180deg, rgba(10, 7, 18, 0.88), rgba(10, 7, 18, 0.42) 55%, rgba(10, 7, 18, 0));
   pointer-events: none;
 }
 .titlebar {
@@ -366,23 +366,33 @@ canvas.px {
 }
 
 /* ------------------------------------------------------------------ rail
-   A strip of bark down the left edge, lit along its inner seam. */
+   A strip of bark down the left edge, lit along its inner seam and gently tapered into the header night. */
 .rail {
   position: absolute;
   left: 0;
   top: var(--bar);
   bottom: 0;
   z-index: 10;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   width: var(--rail);
   padding: 14px 0 14px;
+}
+.rail::before {
+  content: "";
+  position: absolute;
+  inset: -12px 0 0 0;
+  z-index: -1;
+  pointer-events: none;
   background: linear-gradient(90deg, rgba(10, 7, 18, 0.92), rgba(18, 12, 30, 0.86));
   box-shadow:
     inset -2px 0 0 #2b1f4a,
     inset -4px 0 0 #120a22;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.5) 12px, #000 26px);
+  mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.5) 12px, #000 26px);
 }
 .rail-btn {
   position: relative;

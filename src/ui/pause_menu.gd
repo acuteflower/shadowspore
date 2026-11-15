@@ -24,6 +24,7 @@ const VALUE_X: float = 104.0 ## where a row's control starts, from the column's 
 const SLIDER_W: float = 86.0
 const ACCENT_WARM: Color = Color("ffd98a")
 const DANGER: Color = Color("e0556e")
+const SocialSidebarScript := preload("res://src/ui/pause_social_sidebar.gd")
 const TABS: Array[Dictionary] = [
 	{"id": "settings", "name": "EINSTELLUNGEN", "x": -118.0, "sealed": false},
 	{"id": "map", "name": "KARTE", "x": -56.0, "sealed": true},
@@ -76,13 +77,21 @@ var _coop_toast_t: float = 0.0
 var _saving_cloud: bool = false
 var _coop_last_fetch_msec: int = 0
 var _pending_invites: Dictionary = {} ## match_id -> {match_id, room_code, world_name, notif_id}
+var _sidebar: SocialSidebarScript = null
 
 
 func _ready() -> void:
 	visible = false
+	z_index = 25
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_vignette = VineStyle.make_vignette()
 	_name_text = String(GameSettings.get_value("player_name"))
+	_sidebar = SocialSidebarScript.new() as SocialSidebarScript
+	_sidebar.name = "SocialSidebar"
+	_sidebar.visible = false
+	_sidebar.request_host_relay.connect(_coop_start_host_relay)
+	_sidebar.request_join_match.connect(_on_sidebar_join_match)
+	add_child(_sidebar)
 	NetworkManager.session_changed.connect(_on_session_changed)
 	NetworkManager.peer_joined.connect(func(_id: int) -> void:
 		if _paused_here and not multiplayer.get_peers().is_empty():
@@ -124,6 +133,12 @@ func _process(delta: float) -> void:
 	for i: int in _footer.size():
 		_foot_lift[i] = lerpf(_foot_lift[i], 2.0 if i == _hover_foot else 0.0, ease_in)
 	_bloom_x = lerpf(_bloom_x, float(TABS[_tab]["x"]), 1.0 - exp(-12.0 * delta))
+	if _opening and not _test_tools:
+		_maybe_refresh_coop_cloud()
+		if _sidebar != null and _sidebar.is_typing():
+			_editing = false
+	if _sidebar != null:
+		_sidebar.advance(delta, _open_t, _test_tools or _quit_t >= 0.0)
 	if _quit_t >= 0.0:
 		_quit_t += delta
 		if _quit_t >= QUIT_DELAY:
@@ -166,10 +181,18 @@ func _set_open(open: bool, test_tools: bool = false) -> void:
 			_footer.clear()
 		else:
 			_refresh_footer()
+			_maybe_refresh_coop_cloud(true)
 		_build_items()
+		if _sidebar != null:
+			if _test_tools:
+				_sidebar.visible = false
+			else:
+				_sidebar.on_pause_opened(true)
 		_paused_here = multiplayer.get_peers().is_empty() ## alone: time stands still
 		get_tree().paused = _paused_here
 	else:
+		if _sidebar != null:
+			_sidebar.on_pause_closing()
 		if _paused_here:
 			get_tree().paused = false
 		if _dirty:
@@ -417,6 +440,8 @@ func _build_tab() -> void:
 
 
 func _on_session_changed() -> void:
+	if _sidebar != null:
+		_sidebar.mark_dirty()
 	if _opening and String(TABS[_tab]["id"]) == "coop" and not _editing:
 		_build_items()
 
@@ -441,13 +466,16 @@ static func _next_join_mode(mode: String) -> String:
 			return "private"
 
 
-func _maybe_refresh_coop_cloud() -> void:
+func _maybe_refresh_coop_cloud(force: bool = false) -> void:
 	if not CloudSession.is_logged_in():
 		return
 	var now: int = Time.get_ticks_msec()
-	if now - _coop_last_fetch_msec < 5000:
+	var cooldown: int = 1800 if force else 5000
+	if _coop_last_fetch_msec > 0 and now - _coop_last_fetch_msec < cooldown:
 		return
 	_coop_last_fetch_msec = now
+	if CloudSession.uid.is_empty():
+		CloudSession.fetch_my_profile()
 	CloudSession.refresh_friends()
 	CloudSession.fetch_notifications()
 
@@ -1572,6 +1600,25 @@ func _coop_request_friend_join(host_user_id: String) -> void:
 		_coop_join_invite(mid)
 
 
+func _on_sidebar_join_match(info: Dictionary) -> void:
+	var mid: String = String(info.get("match_id", ""))
+	if mid.is_empty():
+		return
+	_pending_invites[mid] = {
+		"match_id": mid,
+		"room_code": String(info.get("room_code", "")),
+		"world_name": String(info.get("world_name", "KOOP-WELT")),
+		"notif_id": String(info.get("notif_id", "")),
+	}
+	_coop_join_invite(mid)
+
+
+func _sidebar_footer_shift() -> float:
+	if _sidebar == null or _test_tools:
+		return 0.0
+	return _sidebar.occupied_width()
+
+
 func _coop_join_invite(match_id: String) -> void:
 	var info: Dictionary = _pending_invites.get(match_id, {}) as Dictionary
 	var nid: String = String(info.get("notif_id", ""))
@@ -1613,6 +1660,8 @@ func _read_save_info() -> Dictionary:
 
 
 func _on_auto_save_finished(ok: bool) -> void:
+	if not is_inside_tree():
+		return
 	if ok:
 		_save_info = _read_save_info()
 		_saved_flash = 1.6
@@ -1647,6 +1696,13 @@ func _begin_quit(to_menu: bool = false) -> void:
 # ---------- input ----------
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _opening and not _test_tools and _sidebar != null and _sidebar.is_typing():
+		var sb_key: InputEventKey = event as InputEventKey
+		if sb_key != null:
+			if sb_key.pressed:
+				_sidebar.handle_key_input(sb_key)
+			get_viewport().set_input_as_handled()
+			return
 	if _editing and _opening:
 		var typed: InputEventKey = event as InputEventKey
 		if typed != null:
@@ -1674,6 +1730,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var pad: InputEventJoypadButton = event as InputEventJoypadButton
 	if not _test_tools and key != null and key.pressed and not key.echo and key.physical_keycode in [KEY_Q, KEY_E]:
 		_step_tab(-1 if key.physical_keycode == KEY_Q else 1)
+	elif not _test_tools and _sidebar != null and key != null and key.pressed and not key.echo and key.physical_keycode == KEY_TAB:
+		_sidebar.toggle_expanded()
 	elif not _test_tools and pad != null and pad.pressed and pad.button_index in [JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER]:
 		_step_tab(-1 if pad.button_index == JOY_BUTTON_LEFT_SHOULDER else 1)
 	elif event.is_action_pressed("ui_down"):
@@ -1803,6 +1861,8 @@ func _gui_input(event: InputEvent) -> void:
 
 func _click(point: Vector2) -> void:
 	_editing = false
+	if _sidebar != null:
+		_sidebar.cancel_typing()
 	var tab: int = _tab_at(point)
 	if tab >= 0:
 		_select_tab(tab)
@@ -1865,11 +1925,12 @@ func _tab_at(point: Vector2) -> int:
 
 
 func _foot_anchor_y(x: float) -> float:
-	return FOOT_Y + 5.0 * pow((size.x - x) / FOOT_LEN, 1.3) + sin(x * 0.08) * 1.2
+	var right_edge: float = size.x - _sidebar_footer_shift()
+	return FOOT_Y + 5.0 * pow(maxf(right_edge - x, 0.0) / FOOT_LEN, 1.3) + sin(x * 0.08) * 1.2
 
 
 func _foot_rect(i: int) -> Rect2:
-	var x: float = size.x - float(_footer[i]["from_right"])
+	var x: float = size.x - _sidebar_footer_shift() - float(_footer[i]["from_right"])
 	var width: float = PixelText.width(String(_footer[i]["text"])) + 12.0
 	var drop: float = float(_footer[i]["len"]) * _back_out(_p(0.55 + i * 0.07, 0.3)) - _foot_lift[i]
 	return Rect2(roundf(x - width / 2.0 + sin(_time * 1.1 + i * 2.0) * 0.8), roundf(_foot_anchor_y(x) + drop), width, 13.0)
@@ -2168,15 +2229,17 @@ func _text(text: String, at: Vector2, color: Color, alpha: float) -> void:
 
 func _draw_footer(void_level: float) -> void:
 	var reach: float = _p(0.5, 0.45)
+	var right_edge: float = size.x - _sidebar_footer_shift()
+	var left_edge: float = maxf(right_edge - FOOT_LEN, 220.0)
 	var foot: Callable = func(x: float) -> float: return _foot_anchor_y(x)
-	VineStyle.branch(self, size.x, size.x - FOOT_LEN, foot, 5, void_level, 20.0, _time, reach)
-	VineStyle.foliage(self, size.x, size.x - FOOT_LEN, foot, 9, 410, void_level, 20.0, _time, reach)
+	VineStyle.branch(self, right_edge, left_edge, foot, 5, void_level, 20.0, _time, reach)
+	VineStyle.foliage(self, right_edge, left_edge, foot, 9, 410, void_level, 20.0, _time, reach)
 	for i: int in _footer.size():
 		var p: float = _p(0.55 + i * 0.07, 0.3)
 		if p <= 0.0:
 			continue
 		var id: String = String(_footer[i]["id"])
-		var x: float = size.x - float(_footer[i]["from_right"])
+		var x: float = right_edge - float(_footer[i]["from_right"])
 		var anchor: Vector2 = Vector2(x, _foot_anchor_y(x))
 		var rect: Rect2 = _foot_rect(i)
 		var taken: float = _taken(x)

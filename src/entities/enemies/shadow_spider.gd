@@ -177,7 +177,8 @@ func _physics_process(delta: float) -> void:
 				_set_state(State.CHASE if _target_valid() else State.IDLE)
 	if night != null:
 		velocity = night.limit(self, velocity, delta)
-	move_and_slide()
+	if velocity.length_squared() > 0.0001 or state == State.GRAPPLE_PULL:
+		move_and_slide()
 	if state == State.GRAPPLE_PULL and get_slide_collision_count() > 0:
 		_set_state(State.RECOVER)
 
@@ -400,8 +401,11 @@ func _sees_over_cliff(point: Vector2) -> bool:
 func _climb_link(from: Vector2, step: Vector2) -> Vector2:
 	if Terrain.relief == null or _climb_cd > 0.0:
 		return Vector2.INF
-	var probe: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(from + _body_shape.position, from + _body_shape.position + step.normalized() * (step.length() + 6.0), 1)
-	var hit: Dictionary = get_world_2d().direct_space_state.intersect_ray(probe)
+	_ray_query.from = from + _body_shape.position
+	_ray_query.to = from + _body_shape.position + step.normalized() * (step.length() + 6.0)
+	_ray_query.collision_mask = 1
+	_ray_query.exclude = []
+	var hit: Dictionary = get_world_2d().direct_space_state.intersect_ray(_ray_query)
 	var collider: Node = hit.get("collider") as Node
 	if collider == null or not collider.is_in_group("relief_walls"):
 		return Vector2.INF
@@ -427,8 +431,11 @@ func _can_climb(from: Vector2, to: Vector2, include_players: bool = false) -> bo
 		return false
 	# A real cliff must intersect this route. Excluding its separate bodies must
 	# then leave a clear corridor; props, players and void collision remain solid.
-	var ray: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(from + _body_shape.position, to + _body_shape.position, 1)
-	var hit: Dictionary = get_world_2d().direct_space_state.intersect_ray(ray)
+	_ray_query.from = from + _body_shape.position
+	_ray_query.to = to + _body_shape.position
+	_ray_query.collision_mask = 1
+	_ray_query.exclude = []
+	var hit: Dictionary = get_world_2d().direct_space_state.intersect_ray(_ray_query)
 	var collider: Node = hit.get("collider") as Node
 	if collider == null or not collider.is_in_group("relief_walls"):
 		return false
@@ -558,8 +565,11 @@ func _grapple() -> Dictionary:
 func _grapple_anchor() -> Vector2:
 	var reach: float = minf(global_position.distance_to(_target.global_position), float(_grapple()["hit_range"]))
 	var point: Vector2 = attack_origin + attack_dir * reach
-	var ray: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(attack_origin + Vector2(0, -4), point + Vector2(0, -4), 1)
-	var hit: Dictionary = get_world_2d().direct_space_state.intersect_ray(ray)
+	_ray_query.from = attack_origin + Vector2(0, -4)
+	_ray_query.to = point + Vector2(0, -4)
+	_ray_query.collision_mask = 1
+	_ray_query.exclude = []
+	var hit: Dictionary = get_world_2d().direct_space_state.intersect_ray(_ray_query)
 	return (hit["position"] as Vector2) - Vector2(0, -4) - attack_dir * 8.0 if not hit.is_empty() else point
 
 

@@ -19,6 +19,7 @@ var _light: NightLight
 var _fx: Node2D
 var _embers: Array[Dictionary] = []
 var _time: float = 0.0
+var _far_wait: float = 0.0
 var _impact_age: float = 0.0
 
 
@@ -127,6 +128,12 @@ func _apply_visual_state() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_impact_age += delta
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position):
+		_far_wait = 0.25
+		return
 	var warm: bool = state_mode == 0
 	if _glow != null and warm:
 		var pulse: float = 0.80 + 0.20 * sin(_time * 2.8)

@@ -265,6 +265,7 @@ var quests: QuestComponent ## the owner's quests (null on other peers)
 var tracked: TrackedQuests ## story quest + taken quest-board notices as one list for the HUD branch and the map (null on other peers)
 var wounded: bool = false ## at 10 % health or less (until 13 %): slow, limping, no sprint, a red border on the HUD, on every peer
 var _wound: float = 0.0 ## how much blood she has lost, 0..1, drives her look (eased towards the health)
+var _wound_sent: float = -1.0
 var _limp_dip: float = 0.0
 var _drip_timer: float = 2.0
 var _hud: Node ## the local HUD
@@ -567,7 +568,9 @@ func _physics_process(delta: float) -> void:
 		position += velocity * delta ## remote player: the synchronizer sends at 20 Hz, so carry on with the synced velocity until the next packet
 	attack.visible = not down and intro == null and not fainting and not stumbling and not climb.active() and carry_stone == 0
 	_wound = move_toward(_wound, _wound_target(), delta * 0.5)
-	(_sprite.material as ShaderMaterial).set_shader_parameter("wound", _wound)
+	if _wound != _wound_sent:
+		_wound_sent = _wound
+		(_sprite.material as ShaderMaterial).set_shader_parameter("wound", _wound)
 	attack.wound = _wound
 	attack.facing = facing
 	if intro == null and not fainting and not stumbling:
@@ -2508,6 +2511,7 @@ func _use_sheet(sheet: int) -> void:
 func sync_wound_visuals() -> void:
 	_update_wounded(health.current, health.max_health)
 	_wound = _wound_target()
+	_wound_sent = _wound
 	(_sprite.material as ShaderMaterial).set_shader_parameter("wound", _wound)
 	attack.wound = _wound
 

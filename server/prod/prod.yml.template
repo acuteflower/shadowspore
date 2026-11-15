@@ -1,0 +1,22 @@
+name: shadowspore-prod
+logger:
+  level: "INFO"
+
+session:
+  encryption_key: "__SESSION_ENCRYPTION_KEY__"
+  token_expiry_sec: 7200
+  refresh_encryption_key: "__REFRESH_ENCRYPTION_KEY__"
+  refresh_token_expiry_sec: 2592000
+
+socket:
+  server_key: "__SOCKET_SERVER_KEY__"
+  port: 7350
+
+console:
+  port: 7351
+  username: "shadowspore_ops"
+  password: "__CONSOLE_PASSWORD__"
+
+runtime:
+  path: "/nakama/data/modules"
+  http_key: "__RUNTIME_HTTP_KEY__"

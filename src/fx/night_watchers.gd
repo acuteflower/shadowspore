@@ -35,6 +35,8 @@ var _pairs: Array[Pair] = []
 var _time: float = 0.0
 var _next: float = 3.0
 var _town: TownManager
+var _interiors: Interiors
+var _mines: MineManager
 
 
 func _ready() -> void:
@@ -45,16 +47,20 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	var interiors: Interiors = get_parent().get_node_or_null("Interiors") as Interiors
-	var mines: MineManager = get_parent().get_node_or_null("Mines") as MineManager
-	var outside: bool = (interiors == null or not interiors.local_inside()) and (mines == null or not mines.local_inside())
+	if _interiors == null:
+		_interiors = get_parent().get_node_or_null("Interiors") as Interiors
+	if _mines == null:
+		_mines = get_parent().get_node_or_null("Mines") as MineManager
+	var outside: bool = (_interiors == null or not _interiors.local_inside()) and (_mines == null or not _mines.local_inside())
 	var camera: Camera2D = get_viewport().get_camera_2d()
-	var night: float = _night_here(camera)
 	if not outside or camera == null:
 		_pairs.clear()
 		visible = false
 		return
-	visible = true
+	var night: float = _night_here(camera)
+	if night < NIGHT_MIN and _pairs.is_empty():
+		visible = false
+		return
 	_time += delta
 	var middle: Vector2 = camera.get_screen_center_position()
 	_step_pairs(delta, middle, night)
@@ -63,7 +69,10 @@ func _process(delta: float) -> void:
 		_next = randf_range(SPAWN_EVERY.x, SPAWN_EVERY.y)
 		if night >= NIGHT_MIN and _pairs.size() < MAX_PAIRS:
 			_try_open(middle)
-	queue_redraw()
+	var has_pairs: bool = not _pairs.is_empty()
+	visible = has_pairs
+	if has_pairs:
+		queue_redraw()
 
 
 ## Opens as many pairs as fit right now (previews and tests; ordinary play lets them come one by one).

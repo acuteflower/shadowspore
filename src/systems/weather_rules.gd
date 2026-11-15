@@ -17,6 +17,13 @@ static var _cfg: Dictionary = {}
 static var _chains: Dictionary = {}
 static var _wet_cache: Dictionary = {}
 static var _storm_cache: Dictionary = {}
+static var _wet_last_seed: int = -999999
+static var _wet_last_q: int = -1
+static var _wet_last_val: float = 0.0
+static var _storm_last_seed: int = -999999
+static var _storm_last_day: int = -1
+static var _storm_last_val: bool = false
+static var _state_entries: Array[Dictionary] = []
 
 
 ## What the weather looks like: all values 0..1 except `dir` (radians). `id` = the dominant named state.
@@ -76,6 +83,9 @@ static func reset(table: Dictionary = {}) -> void:
 	_chains.clear()
 	_wet_cache.clear()
 	_storm_cache.clear()
+	_wet_last_q = -1
+	_storm_last_day = -1
+	_state_entries.clear()
 
 
 static func enabled() -> bool:
@@ -221,23 +231,58 @@ static func _segment_state(chain: Chain, i: int) -> State:
 	return _from_def(chain.ids[i], state_def(chain.ids[i]), chain.dirs[i])
 
 
-## The weather at a world time. A storm night overrides it (see `storm_night`).
-static func state_at(world_seed: int, e: float) -> State:
+## Fills `out` in-place with the weather at a world time (no heap State allocation on steady calls).
+static func state_into(world_seed: int, e: float, out: State) -> void:
 	e = maxf(e, 0.0)
 	var chain: Chain = _chain(world_seed)
 	_extend(chain, e + 0.001)
 	var i: int = _locate(chain, e)
-	var state: State = _segment_state(chain, i)
+	var cur_id: String = chain.ids[i]
+	var def_cur: Dictionary = state_def(cur_id)
+	var cur_cloud: float = float(def_cur.get("cloud", 0.0))
+	var cur_rain: float = float(def_cur.get("rain", 0.0))
+	var cur_wind: float = float(def_cur.get("wind", 0.25))
+	var cur_storm: float = float(def_cur.get("storm", 0.0))
+	var cur_fog: float = float(def_cur.get("fog", 0.0))
+	var cur_dir: float = chain.dirs[i]
 	var blend: float = float(cfg().get("blend", 0.035))
 	var t: float = e - chain.starts[i]
 	if i > 0 and t < blend:
-		state = _segment_state(chain, i - 1).mix(state, smoothstep(0.0, 1.0, t / blend))
+		var prev_id: String = chain.ids[i - 1]
+		var def_prev: Dictionary = state_def(prev_id)
+		var w: float = smoothstep(0.0, 1.0, t / blend)
+		cur_cloud = lerpf(float(def_prev.get("cloud", 0.0)), cur_cloud, w)
+		cur_rain = lerpf(float(def_prev.get("rain", 0.0)), cur_rain, w)
+		cur_wind = lerpf(float(def_prev.get("wind", 0.25)), cur_wind, w)
+		cur_storm = lerpf(float(def_prev.get("storm", 0.0)), cur_storm, w)
+		cur_fog = lerpf(float(def_prev.get("fog", 0.0)), cur_fog, w)
+		cur_dir = lerp_angle(chain.dirs[i - 1], cur_dir, w)
+		if w < 0.5:
+			cur_id = prev_id
 	var storm_w: float = storm_night(world_seed, e)
 	if storm_w > 0.0:
-		var storm: State = named("storm")
-		storm.dir = state.dir
-		state = state.mix(storm, storm_w)
-	return state
+		var def_storm: Dictionary = state_def("storm")
+		cur_cloud = lerpf(cur_cloud, float(def_storm.get("cloud", 0.0)), storm_w)
+		cur_rain = lerpf(cur_rain, float(def_storm.get("rain", 0.0)), storm_w)
+		cur_wind = lerpf(cur_wind, float(def_storm.get("wind", 0.25)), storm_w)
+		cur_storm = lerpf(cur_storm, float(def_storm.get("storm", 0.0)), storm_w)
+		cur_fog = lerpf(cur_fog, float(def_storm.get("fog", 0.0)), storm_w)
+		if storm_w >= 0.5:
+			cur_id = "storm"
+	out.cloud = cur_cloud
+	out.rain = cur_rain
+	out.wind = cur_wind
+	out.storm = cur_storm
+	out.fog = cur_fog
+	out.dir = cur_dir
+	out.id = cur_id
+
+
+## The weather at a world time. A storm night overrides it (see `storm_night`).
+static func state_at(world_seed: int, e: float) -> State:
+	var out: State = State.new()
+	state_into(world_seed, e, out)
+	return out
 
 
 static func drift_at(world_seed: int, e: float) -> Vector2:
@@ -251,13 +296,21 @@ static func drift_at(world_seed: int, e: float) -> Vector2:
 ## 0..1: how much a special "storm" night holds the weather at this time (the night belongs to the day that began at sunrise).
 static func storm_night(world_seed: int, e: float) -> float:
 	var day: int = floori(e)
-	var key: int = hash([world_seed, day])
 	var is_storm: bool
-	if _storm_cache.has(key):
-		is_storm = bool(_storm_cache[key])
+	if world_seed == _storm_last_seed and day == _storm_last_day:
+		is_storm = _storm_last_val
 	else:
-		is_storm = day >= 1 and NightRules.special_for(world_seed, day) == "storm"
-		_storm_cache[key] = is_storm
+		var seed_map: Dictionary = _storm_cache.get(world_seed, {}) as Dictionary
+		if seed_map.has(day):
+			is_storm = bool(seed_map[day])
+		else:
+			is_storm = day >= 1 and NightRules.special_for(world_seed, day) == "storm"
+			if not _storm_cache.has(world_seed):
+				_storm_cache[world_seed] = seed_map
+			seed_map[day] = is_storm
+		_storm_last_seed = world_seed
+		_storm_last_day = day
+		_storm_last_val = is_storm
 	if not is_storm:
 		return 0.0
 	var window: Dictionary = cfg().get("storm_night", {}) as Dictionary
@@ -266,28 +319,65 @@ static func storm_night(world_seed: int, e: float) -> float:
 	return smoothstep(float(window.get("from", 0.55)) - ramp, float(window.get("from", 0.55)) + ramp, f) * (1.0 - smoothstep(float(window.get("to", 0.95)) - ramp, float(window.get("to", 0.95)) + ramp, f))
 
 
+static func _wet_input_at(chain: Chain, world_seed: int, t: float, blend: float, states: Dictionary, storm_rain: float, storm_fog: float) -> float:
+	var i: int = _locate(chain, t)
+	var def_cur: Dictionary = states.get(chain.ids[i], {}) as Dictionary
+	var r: float = float(def_cur.get("rain", 0.0))
+	var f: float = float(def_cur.get("fog", 0.0))
+	var seg_t: float = t - chain.starts[i]
+	if i > 0 and seg_t < blend:
+		var def_prev: Dictionary = states.get(chain.ids[i - 1], {}) as Dictionary
+		var w: float = smoothstep(0.0, 1.0, seg_t / blend)
+		r = lerpf(float(def_prev.get("rain", 0.0)), r, w)
+		f = lerpf(float(def_prev.get("fog", 0.0)), f, w)
+	var storm_w: float = storm_night(world_seed, t)
+	if storm_w > 0.0:
+		r = lerpf(r, storm_rain, storm_w)
+		f = lerpf(f, storm_fog, storm_w)
+	return r + 0.35 * f
+
+
 ## The ground's wetness (0 dry .. 1 soaked) at a world time: rain soaks it, it dries over `dry_days` (a sum over the last stretch of weather,
 ## so it needs no history). Global: a rain cell on the screen is local, the soil is not.
 static func ground_wet(world_seed: int, e: float) -> float:
-	var key: int = hash([world_seed, roundi(e * 400.0)])
-	if _wet_cache.has(key):
-		return float(_wet_cache[key])
-	var g: Dictionary = cfg().get("ground", {}) as Dictionary
+	var q: int = roundi(e * 400.0)
+	if world_seed == _wet_last_seed and q == _wet_last_q:
+		return _wet_last_val
+	var seed_map: Dictionary = _wet_cache.get(world_seed, {}) as Dictionary
+	if seed_map.has(q):
+		_wet_last_seed = world_seed
+		_wet_last_q = q
+		_wet_last_val = float(seed_map[q])
+		return _wet_last_val
+	var c: Dictionary = cfg()
+	var g: Dictionary = c.get("ground", {}) as Dictionary
 	var steps: int = int(g.get("steps", 14))
 	var step_days: float = float(g.get("step_days", 0.1))
 	var dry: float = maxf(0.02, float(g.get("dry_days", 0.35)))
+	var blend: float = float(c.get("blend", 0.035))
+	var states: Dictionary = c.get("states", {}) as Dictionary
+	var def_storm: Dictionary = states.get("storm", {}) as Dictionary
+	var storm_rain: float = float(def_storm.get("rain", 0.0))
+	var storm_fog: float = float(def_storm.get("fog", 0.0))
+	var chain: Chain = _chain(world_seed)
+	if e >= 0.0:
+		_extend(chain, e + 0.001)
 	var sum: float = 0.0
 	for k: int in steps:
 		var t: float = e - float(k) * step_days
 		if t < 0.0:
 			break
-		var s: State = state_at(world_seed, t)
-		var wet_in: float = s.rain + 0.35 * s.fog
+		var wet_in: float = _wet_input_at(chain, world_seed, t, blend, states, storm_rain, storm_fog)
 		sum += wet_in * exp(-float(k) * step_days / dry) * step_days / dry
 	var value: float = clampf(sum * float(g.get("gain", 1.25)), 0.0, 1.0)
-	if _wet_cache.size() > 512:
-		_wet_cache.clear()
-	_wet_cache[key] = value
+	if seed_map.size() > 512:
+		seed_map.clear()
+	if not _wet_cache.has(world_seed):
+		_wet_cache[world_seed] = seed_map
+	seed_map[q] = value
+	_wet_last_seed = world_seed
+	_wet_last_q = q
+	_wet_last_val = value
 	return value
 
 
@@ -310,17 +400,33 @@ static func lightning(world_seed: int, slice: int, storm: float) -> Dictionary:
 		"double": rng.randf() < float(l.get("double", 0.35)), "bolt": rng.randf() < 0.72}
 
 
+static func _ensure_state_entries() -> void:
+	if not _state_entries.is_empty():
+		return
+	var states: Dictionary = cfg().get("states", {}) as Dictionary
+	for id: String in states:
+		var def: Dictionary = states[id] as Dictionary
+		_state_entries.append({
+			"id": id,
+			"cloud": float(def.get("cloud", 0.0)),
+			"rain": float(def.get("rain", 0.0)),
+			"storm": float(def.get("storm", 0.0)),
+			"wind": float(def.get("wind", 0.0)),
+			"fog": float(def.get("fog", 0.0)),
+		})
+
+
 ## A name for the display: the state whose numbers are closest.
 static func nearest_id(s: State) -> String:
+	_ensure_state_entries()
 	var best: String = "fair"
 	var best_d: float = 1e9
-	for id: String in (cfg().get("states", {}) as Dictionary):
-		var def: Dictionary = state_def(id)
-		var d: float = absf(float(def.get("cloud", 0.0)) - s.cloud) * 1.2 + absf(float(def.get("rain", 0.0)) - s.rain) * 2.0 + absf(float(def.get("storm", 0.0)) - s.storm) * 1.5 \
-			+ absf(float(def.get("wind", 0.0)) - s.wind) * 0.4 + absf(float(def.get("fog", 0.0)) - s.fog) * 1.0
+	for entry: Dictionary in _state_entries:
+		var d: float = absf(float(entry["cloud"]) - s.cloud) * 1.2 + absf(float(entry["rain"]) - s.rain) * 2.0 + absf(float(entry["storm"]) - s.storm) * 1.5 \
+			+ absf(float(entry["wind"]) - s.wind) * 0.4 + absf(float(entry["fog"]) - s.fog) * 1.0
 		if d < best_d:
 			best_d = d
-			best = id
+			best = String(entry["id"])
 	return best
 
 

@@ -10,6 +10,8 @@ const ZONES_PATH: String = "user://save_zones.json"
 const COOP_ZONES_PATH: String = "user://coop_save_zones.json"
 const VERSION: int = 1
 
+static var _io_mutex: Mutex = Mutex.new()
+
 
 static func is_zones_world(tree: SceneTree) -> bool:
 	return tree.get_first_node_in_group("zone_world") != null
@@ -17,18 +19,26 @@ static func is_zones_world(tree: SceneTree) -> bool:
 
 static func path_for(tree: SceneTree) -> String:
 	var zones: bool = is_zones_world(tree)
-	if tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer:
+	if NetworkManager.is_coop_session():
 		if not NetworkManager.active_save_path.is_empty():
 			return NetworkManager.active_save_path
 		return COOP_ZONES_PATH if zones else COOP_PATH
 	return ZONES_PATH if zones else PATH
 
 
+static func _local_saves_blocked() -> bool:
+	return not OS.is_debug_build() or CloudSession.strict_override
+
+
 static func exists(path: String = PATH) -> bool:
+	if _local_saves_blocked():
+		return false
 	return FileAccess.file_exists(path)
 
 
 static func delete(path: String = PATH) -> bool:
+	if _local_saves_blocked():
+		return false
 	if FileAccess.file_exists(path):
 		var err: Error = DirAccess.remove_absolute(path)
 		return err == OK
@@ -37,12 +47,15 @@ static func delete(path: String = PATH) -> bool:
 
 ## When and where the game was last saved: {saved_at, day, time}; empty without a save.
 static func info(path: String = PATH) -> Dictionary:
+	if _local_saves_blocked():
+		return {}
 	var data: Dictionary = _read(path)
 	return {} if data.is_empty() else {"saved_at": int(data.get("saved_at", 0)), "day": int(data.get("day", 0)), "time": float(data.get("time", 0.0))}
 
 
-static func export_player_data(player: Player) -> Dictionary:
-	player.inventory.stow_held() ## a stack on the cursor goes back into the bag first
+static func export_player_data(player: Player, stow_live: bool = false) -> Dictionary:
+	if stow_live:
+		player.inventory.stow_held() ## optional live stow for explicit close/save paths
 	var position: Vector2 = player.climb.save_position()
 	return {
 		"pos": [position.x, position.y],
@@ -51,9 +64,9 @@ static func export_player_data(player: Player) -> Dictionary:
 		"xp": player.progress.xp,
 		"claimed": player.progress.claimed, ## the level whose rewards were collected (Fortschritt window): health, stamina, armor, talisman slots follow it
 		"skill_tree": (player.get_node("SkillTreeComponent") as SkillTreeComponent).export_data(),
-		"slots": player.inventory.slots,
-		"equipment": player.inventory.equipment,
-		"raw_rolls": player.inventory.hidden, ## what the raw stones in the bag hide (Ilva's LÄUTERN)
+		"slots": player.inventory.slots.duplicate(true) if stow_live else player.inventory.export_slots(),
+		"equipment": player.inventory.equipment.duplicate(true),
+		"raw_rolls": player.inventory.hidden.duplicate(true), ## what the raw stones in the bag hide (Ilva's LÄUTERN)
 		"bandaged": player.bandaged,
 		"appearance": player.appearance.export_data() if player.appearance != null else {},
 		"quests": player.quests.export_data() if player.quests != null else {},
@@ -82,7 +95,7 @@ static func export_world_data(tree: SceneTree) -> Dictionary:
 	if mines != null:
 		data["mine"] = mines.export_state() ## opened chests, mended lifts, depth, kills; the mined rocks are in "things"
 	var town: TownManager = tree.get_first_node_in_group("town") as TownManager
-	if town != null and (town.founded or tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer):
+	if town != null and (town.founded or NetworkManager.is_coop_session()):
 		data["town"] = town.export_state() ## the pieces, the stock, the ways, the residents (docs/town.md)
 	var night: NightDirector = tree.get_first_node_in_group("night_director") as NightDirector
 	if night != null:
@@ -138,31 +151,87 @@ static func export_world_data(tree: SceneTree) -> Dictionary:
 	return data
 
 
-static func save(tree: SceneTree, path: String = "") -> bool:
+static func _write_json_file(target: String, payload_json: String) -> bool:
+	var pending: String = target + ".tmp"
+	var target_dir: String = target.get_base_dir()
+	_io_mutex.lock()
+	if not target_dir.is_empty():
+		DirAccess.make_dir_recursive_absolute(target_dir)
+	var file: FileAccess = FileAccess.open(pending, FileAccess.WRITE)
+	if file == null:
+		_io_mutex.unlock()
+		return false
+	file.store_string(payload_json)
+	file.flush()
+	var written: bool = file.get_error() == OK
+	file.close()
+	var saved_ok: bool = written and DirAccess.rename_absolute(pending, target) == OK
+	_io_mutex.unlock()
+	return saved_ok
+
+
+static func _touch_coop_if_needed(saved_ok: bool, is_coop: bool, world_id: String, day: int, time_val: float, guest_count: int) -> void:
+	if saved_ok and is_coop and not world_id.is_empty():
+		MultiplayerWorlds.touch_save(world_id, day, time_val, guest_count)
+
+
+static func save(tree: SceneTree, path: String = "", pre_world: Dictionary = {}, pre_player: Dictionary = {}) -> bool:
+	if _local_saves_blocked():
+		return false
 	if tree.get_first_node_in_group("sandbox") != null: ## the trials' test world is never saved
 		return false
 	var player: Player = _local_player(tree)
 	if player == null or not tree.root.multiplayer.is_server():
 		return false
 	var target: String = path if path != "" else path_for(tree)
-	var data: Dictionary = export_world_data(tree)
-	data["player"] = export_player_data(player)
-	var pending: String = target + ".tmp"
-	var target_dir: String = target.get_base_dir()
-	if not target_dir.is_empty():
-		DirAccess.make_dir_recursive_absolute(target_dir)
-	var file: FileAccess = FileAccess.open(pending, FileAccess.WRITE)
-	if file == null:
-		return false
-	file.store_string(JSON.stringify(data))
-	file.flush()
-	var written: bool = file.get_error() == OK
-	file.close()
-	var saved_ok: bool = written and DirAccess.rename_absolute(pending, target) == OK
-	if saved_ok and tree.root.multiplayer.multiplayer_peer is ENetMultiplayerPeer and not NetworkManager.active_world_id.is_empty():
-		var guest_count: int = maxi(tree.root.multiplayer.get_peers().size(), 0)
-		MultiplayerWorlds.touch_save(NetworkManager.active_world_id, TimeManager.day, TimeManager.time_of_day, guest_count)
+	var data: Dictionary = pre_world.duplicate() if not pre_world.is_empty() else export_world_data(tree)
+	data["player"] = pre_player if not pre_player.is_empty() else export_player_data(player)
+	var saved_ok: bool = _write_json_file(target, JSON.stringify(data))
+	var is_coop: bool = NetworkManager.is_coop_session()
+	var world_id: String = NetworkManager.active_world_id
+	var guest_count: int = maxi(tree.root.multiplayer.get_peers().size(), 0)
+	_touch_coop_if_needed(saved_ok, is_coop, world_id, TimeManager.day, TimeManager.time_of_day, guest_count)
 	return saved_ok
+
+
+static func save_async(tree: SceneTree, on_done: Callable = Callable(), path: String = "", pre_world: Dictionary = {}, pre_player: Dictionary = {}) -> bool:
+	if _local_saves_blocked() or tree == null:
+		if on_done.is_valid():
+			on_done.call(false)
+		return false
+	if tree.get_first_node_in_group("sandbox") != null:
+		if on_done.is_valid():
+			on_done.call(false)
+		return false
+	var player: Player = _local_player(tree)
+	if player == null or not tree.root.multiplayer.is_server():
+		if on_done.is_valid():
+			on_done.call(false)
+		return false
+	var target: String = path if path != "" else path_for(tree)
+	var data: Dictionary = pre_world.duplicate() if not pre_world.is_empty() else export_world_data(tree)
+	data["player"] = pre_player if not pre_player.is_empty() else export_player_data(player)
+	var json_text: String = JSON.stringify(data)
+	var is_coop: bool = NetworkManager.is_coop_session()
+	var world_id: String = NetworkManager.active_world_id
+	var day_val: int = TimeManager.day
+	var time_val: float = TimeManager.time_of_day
+	var guest_count: int = maxi(tree.root.multiplayer.get_peers().size(), 0)
+	Jobs.run(
+		func() -> bool:
+			return _write_json_file(target, json_text),
+		func(ok_v: Variant) -> void:
+			var saved_ok: bool = bool(ok_v)
+			_touch_coop_if_needed(saved_ok, is_coop, world_id, day_val, time_val, guest_count)
+			if on_done.is_valid():
+				on_done.call(saved_ok),
+		Jobs.Prio.LOW,
+		func() -> void:
+			if on_done.is_valid():
+				on_done.call(false),
+		"save_game_async"
+	)
+	return true
 
 
 static func compress_json(data: Dictionary) -> String:
@@ -184,7 +253,7 @@ static func decompress_json(encoded: String) -> Dictionary:
 	return parsed as Dictionary if parsed is Dictionary else {}
 
 
-static func import_player_data(player: Player, saved: Dictionary, apply_pos: bool = true) -> void:
+static func import_player_data(player: Player, saved: Dictionary, apply_pos: bool = true, load_quests: bool = true) -> void:
 	if apply_pos:
 		var pos: Array = saved.get("pos", [])
 		if pos.size() == 2:
@@ -205,10 +274,31 @@ static func import_player_data(player: Player, saved: Dictionary, apply_pos: boo
 	if player.appearance != null:
 		player.appearance.import_data(saved.get("appearance", {}) as Dictionary)
 	player.sync_wound_visuals()
-	if player.quests != null and saved.has("quests"):
-		player.quests.import_data(saved.quests as Dictionary)
-	if player.tracked != null and saved.has("board_local"):
-		player.tracked.import_data(saved.board_local as Dictionary)
+	if load_quests:
+		if player.quests != null and saved.has("quests"):
+			player.quests.import_data(saved.quests as Dictionary)
+		if player.tracked != null and saved.has("board_local"):
+			player.tracked.import_data(saved.board_local as Dictionary)
+
+
+static func sync_player_to_network(player: Player) -> void:
+	if player == null or not player.is_inside_tree():
+		return
+	var mp: MultiplayerAPI = player.multiplayer
+	if not mp.is_server():
+		return
+	var owner_id: int = player.get_multiplayer_authority()
+	player.inventory._commit()
+	player.progress.award(0, 0)
+	if owner_id != mp.get_unique_id():
+		player.progress._rpc_claimed.rpc_id(owner_id, player.progress.claimed, false)
+	var skills: SkillTreeComponent = player.get_node_or_null("SkillTreeComponent") as SkillTreeComponent
+	if skills != null:
+		skills._sync()
+	if player.appearance != null:
+		player.appearance._rpc_apply_all.rpc(player.appearance.export_data())
+	if player.health != null and owner_id != mp.get_unique_id():
+		player.health._set_value.rpc(player.health.current)
 
 
 static func import_world_data(tree: SceneTree, data: Dictionary, player: Player, resume: bool = true) -> bool:
@@ -293,6 +383,8 @@ static func import_world_data(tree: SceneTree, data: Dictionary, player: Player,
 
 
 static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -> bool:
+	if _local_saves_blocked():
+		return false
 	if tree.get_first_node_in_group("sandbox") != null:
 		return false
 	var data: Dictionary = _read(path if path != "" else path_for(tree))

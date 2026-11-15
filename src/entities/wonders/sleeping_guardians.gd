@@ -45,6 +45,7 @@ var _ground_fx: Node2D
 var _center_light: NightLight
 
 var _time: float = 0.0
+var _far_wait: float = 0.0
 var _awaken_age: float = 99.0
 var _regen_accum: float = 0.0
 var _mist_wisps: Array[Dictionary] = []
@@ -196,9 +197,10 @@ func play_awaken_fx(restored_head: bool) -> void:
 		if p != null and p.carry_stone != 0:
 			p.end_carry()
 	_awaken_age = 0.0
-	if ResourceLoader.exists(CHORD_WAV):
+	var chord_stream: AudioStream = DataRegistry.audio(CHORD_WAV)
+	if chord_stream != null:
 		var snd: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
-		snd.stream = load(CHORD_WAV) as AudioStream
+		snd.stream = chord_stream
 		snd.bus = "SFX"
 		snd.volume_db = -1.5
 		snd.max_distance = 680.0
@@ -261,6 +263,22 @@ func _refresh_visuals() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_awaken_age += delta
+	if _far_wait > 0.0 and carrier_peer == 0 and not awakened:
+		_far_wait -= delta
+		return
+	var far: bool = WorldProp.far_from_camera(self, global_position, 422500.0)
+	var player_inside: bool = false
+	if awakened:
+		for p: Player in Player.all:
+			if not is_instance_valid(p) or p.health == null or p.health.current <= 0.0:
+				continue
+			var q: Vector2 = p.global_position - global_position
+			if pow(q.x / (ring_rx + 18.0), 2.0) + pow(q.y / (ring_ry + 18.0), 2.0) <= 1.0:
+				player_inside = true
+				break
+	if far and carrier_peer == 0 and not player_inside:
+		_far_wait = 0.25
+		return
 
 	# Glow modulation on statues
 	for i: int in _statue_glows.size():
@@ -362,15 +380,17 @@ class GuardianBrazier extends Interactable:
 
 	func _ready() -> void:
 		var off: Vector2 = Vector2(0.0, -(40.0 - 24.0)) ## anchor (20, 40) in 40x48 cell
-		if ResourceLoader.exists(SleepingGuardians.BRAZIER_TEX):
+		var tex_brazier: Texture2D = DataRegistry.tex(SleepingGuardians.BRAZIER_TEX)
+		if tex_brazier != null:
 			_body = Sprite2D.new()
-			_body.texture = load(SleepingGuardians.BRAZIER_TEX) as Texture2D
+			_body.texture = tex_brazier
 			_body.hframes = 3
 			_body.offset = off
 			add_child(_body)
-		if ResourceLoader.exists(SleepingGuardians.BRAZIER_GLOW):
+		var tex_brazier_glow: Texture2D = DataRegistry.tex(SleepingGuardians.BRAZIER_GLOW)
+		if tex_brazier_glow != null:
 			_glow = Sprite2D.new()
-			_glow.texture = load(SleepingGuardians.BRAZIER_GLOW) as Texture2D
+			_glow.texture = tex_brazier_glow
 			_glow.hframes = 3
 			_glow.offset = off
 			_glow.material = Unlit.material()
@@ -432,16 +452,18 @@ class FallenHeadstone extends Interactable:
 
 	func _ready() -> void:
 		var off: Vector2 = Vector2(0.0, -(40.0 - 24.0))
-		if ResourceLoader.exists(SleepingGuardians.BRAZIER_TEX):
+		var tex_headstone: Texture2D = DataRegistry.tex(SleepingGuardians.BRAZIER_TEX)
+		if tex_headstone != null:
 			_body = Sprite2D.new()
-			_body.texture = load(SleepingGuardians.BRAZIER_TEX) as Texture2D
+			_body.texture = tex_headstone
 			_body.hframes = 3
 			_body.frame = 2
 			_body.offset = off
 			add_child(_body)
-		if ResourceLoader.exists(SleepingGuardians.BRAZIER_GLOW):
+		var tex_headstone_glow: Texture2D = DataRegistry.tex(SleepingGuardians.BRAZIER_GLOW)
+		if tex_headstone_glow != null:
 			_glow = Sprite2D.new()
-			_glow.texture = load(SleepingGuardians.BRAZIER_GLOW) as Texture2D
+			_glow.texture = tex_headstone_glow
 			_glow.hframes = 3
 			_glow.frame = 2
 			_glow.offset = off
@@ -457,11 +479,15 @@ class FallenHeadstone extends Interactable:
 			_glow.visible = vis
 
 	func _process(_delta: float) -> void:
-		if circle != null and circle.carrier_peer != 0:
+		var carrying: bool = circle != null and circle.carrier_peer != 0
+		var showing: bool = _prompt_node != null and _prompt_node.visible
+		if not carrying and not showing:
+			return
+		if carrying:
 			var cp: Player = circle.player_of(circle.carrier_peer)
 			if cp != null:
 				global_position = (cp.global_position + cp.facing.normalized() * 14.0).round()
-		if _prompt_node != null and _prompt_node.visible:
+		if showing:
 			var now: String = prompt()
 			if now != _shown_prompt:
 				_shown_prompt = now

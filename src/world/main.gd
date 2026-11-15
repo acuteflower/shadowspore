@@ -13,6 +13,20 @@ extends Node
 
 func _ready() -> void:
 	GameSettings.apply()
+	if not GameGuard.initialized:
+		await GameGuard.verify_startup_async()
+		if not is_inside_tree():
+			return
+	if not GameGuard.is_gameplay_allowed():
+		if not GameGuard.access_restored.is_connected(_continue_boot):
+			GameGuard.access_restored.connect(_continue_boot, CONNECT_ONE_SHOT)
+		return
+	_continue_boot()
+
+
+func _continue_boot() -> void:
+	if not is_inside_tree() or not GameGuard.is_gameplay_allowed():
+		return
 	var request: Dictionary = GameLauncher.take()
 	if request.is_empty():
 		request = GameLauncher.from_args(OS.get_cmdline_user_args())

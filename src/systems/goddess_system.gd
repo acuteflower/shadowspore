@@ -228,7 +228,7 @@ func can_rescue(player: Player) -> bool:
 	var world: Node = get_tree().get_first_node_in_group("world")
 	if world == null:
 		return false
-	var is_coop: bool = multiplayer.multiplayer_peer is ENetMultiplayerPeer
+	var is_coop: bool = NetworkManager.is_coop_session() and not multiplayer.get_peers().is_empty()
 	if not is_coop and world.is_in_group("story_world") and not bool(world.get("opening_over")):
 		return false
 	var interiors: Interiors = get_tree().get_first_node_in_group("interiors") as Interiors

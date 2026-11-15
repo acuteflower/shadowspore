@@ -493,7 +493,7 @@ func spawn_visitor(species: String, point: Vector2, to: Vector2, look: Vector2) 
 	var spec: Dictionary = DataRegistry.get_entry("wildlife", species)
 	if _count(species) >= int(spec["max_species_loaded"]) or _residents.get_child_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or not _spawn_safe(point, species):
 		return null
-	var animal: WoodlandMammal = (load(String(spec["scene"])) as PackedScene).instantiate() as WoodlandMammal
+	var animal: WoodlandMammal = DataRegistry.scene(String(spec["scene"])).instantiate() as WoodlandMammal
 	_serial += 1
 	animal.name = "Resident%d" % _serial
 	animal.species = species

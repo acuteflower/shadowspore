@@ -35,7 +35,7 @@ func _populate(cell: Vector2i) -> void:
 					break
 		if not safe:
 			continue
-		var bear: WildBear = load(String(spec["scene"])).instantiate() as WildBear
+		var bear: WildBear = DataRegistry.scene(String(spec["scene"])).instantiate() as WildBear
 		_serial += 1
 		bear.name = "Bear%d" % _serial
 		bear.appearance = rng.randi_range(0, 1) if i == 0 else 2

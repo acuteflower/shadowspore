@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "de.shadowspore.launcher",
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "npm run dev:tauri",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
     "frontendDist": "../dist"
@@ -15,9 +15,8 @@
         "title": "Shadowspore Launcher",
         "width": 1280,
         "height": 760,
-        "minWidth": 1040,
-        "minHeight": 640,
-        "resizable": true,
+        "resizable": false,
+        "maximizable": false,
         "center": true,
         "label": "main",
         "decorations": false,

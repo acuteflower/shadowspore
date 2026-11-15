@@ -4,7 +4,7 @@ extends Control
 ## branch; the tabs hang from it like wooden tags (Q / E or click; a bloom on the branch marks the
 ## open one). The town tag shows and manages the player's town (docs/town.md); the map tag is still sealed. The skill graph opens with F / Start or from the settings page. The page grows out of
 ## the dark: settings as sliders on vines and flower buds that open. Whatever tab is open, the
-## branch growing from the right edge carries "save", "save & quit" and "quit without saving".
+## branch growing from the right edge carries "main menu" and "quit game" (all progress auto-saves online).
 ## In singleplayer the game stands still while the menu is open. By night the void creeps in.
 
 const OPEN_SECONDS: float = 0.85
@@ -74,6 +74,8 @@ var _name_text: String = "" ## the player display name being typed
 var _coop_toast: String = "" ## feedback flash inside KOOP tab
 var _coop_toast_t: float = 0.0
 var _saving_cloud: bool = false
+var _coop_last_fetch_msec: int = 0
+var _pending_invites: Dictionary = {} ## match_id -> {match_id, room_code, world_name, notif_id}
 
 
 func _ready() -> void:
@@ -82,6 +84,16 @@ func _ready() -> void:
 	_vignette = VineStyle.make_vignette()
 	_name_text = String(GameSettings.get_value("player_name"))
 	NetworkManager.session_changed.connect(_on_session_changed)
+	NetworkManager.peer_joined.connect(func(_id: int) -> void:
+		if _paused_here and not multiplayer.get_peers().is_empty():
+			_paused_here = false
+			get_tree().paused = false
+		_on_session_changed()
+	)
+	CloudSession.friends_changed.connect(_on_session_changed)
+	CloudSession.notifications_changed.connect(_on_session_changed)
+	CloudSession.profile_loaded.connect(func(_p: Dictionary) -> void: _on_session_changed())
+	CloudSession.auto_save_finished.connect(_on_auto_save_finished)
 
 
 ## `player` is untyped on purpose (the player scene preloads the HUD).
@@ -121,7 +133,7 @@ func _process(delta: float) -> void:
 				_set_open(false)
 				GameLauncher.launch(get_tree(), {})
 				return
-			get_tree().quit()
+			CloudSession.graceful_quit()
 	queue_redraw()
 
 
@@ -172,14 +184,8 @@ func _can_save() -> bool:
 
 func _refresh_footer() -> void:
 	_footer.clear()
-	if _can_save():
-		_footer.append({"id": "menu", "text": "HAUPTMENÜ", "from_right": 284.0, "len": 9.0})
-		_footer.append({"id": "discard", "text": "OHNE SPEICHERN", "from_right": 208.0, "len": 11.0})
-		_footer.append({"id": "quit", "text": "SPEICHERN & ENDE", "from_right": 122.0, "len": 17.0})
-		_footer.append({"id": "save", "text": "SPEICHERN", "from_right": 46.0, "len": 11.0})
-	else:
-		_footer.append({"id": "menu", "text": "HAUPTMENÜ", "from_right": 152.0, "len": 13.0})
-		_footer.append({"id": "quit", "text": "SPIEL VERLASSEN", "from_right": 56.0, "len": 15.0})
+	_footer.append({"id": "menu", "text": "HAUPTMENÜ", "from_right": 156.0, "len": 11.0})
+	_footer.append({"id": "quit", "text": "SPIEL BEENDEN", "from_right": 56.0, "len": 15.0})
 
 
 func _select_tab(index: int) -> void:
@@ -415,32 +421,145 @@ func _on_session_changed() -> void:
 		_build_items()
 
 
+static func _join_mode_label(mode: String) -> String:
+	match mode:
+		"private":
+			return "PRIVAT"
+		"open":
+			return "OFFEN"
+		_:
+			return "AUF ANFRAGE"
+
+
+static func _next_join_mode(mode: String) -> String:
+	match mode:
+		"private":
+			return "ask"
+		"ask":
+			return "open"
+		_:
+			return "private"
+
+
+func _maybe_refresh_coop_cloud() -> void:
+	if not CloudSession.is_logged_in():
+		return
+	var now: int = Time.get_ticks_msec()
+	if now - _coop_last_fetch_msec < 5000:
+		return
+	_coop_last_fetch_msec = now
+	CloudSession.refresh_friends()
+	CloudSession.fetch_notifications()
+
+
+func _build_coop_notifications(col: int) -> void:
+	_pending_invites.clear()
+	var added_hdr: bool = false
+	for notif: Dictionary in CloudSession.notifications:
+		var code: int = int(notif.get("code", 0))
+		var content: Dictionary = notif.get("content", {}) as Dictionary
+		if (code == 101 or code == 103) and not String(content.get("match_id", "")).is_empty():
+			if not added_hdr:
+				_add(col, "heading", "EINLADUNGEN")
+				added_hdr = true
+			var mid: String = String(content.get("match_id", ""))
+			var hname: String = String(content.get("host_name", "FREUND")).to_upper()
+			var wname: String = String(content.get("world_name", "KOOP-WELT")).to_upper()
+			_pending_invites[mid] = {
+				"match_id": mid,
+				"room_code": String(content.get("room_code", "")),
+				"world_name": wname,
+				"notif_id": String(notif.get("id", "")),
+			}
+			var prefix: String = "EINLADUNG" if code == 101 else "FREIGABE"
+			_add(col, "info", "%s: %s" % [prefix, hname], "", {"text": wname})
+			_add(col, "button", "WELT BETRETEN", "", {"action": "coop_accept_invite:%s" % mid})
+		elif code == 102 and multiplayer.is_server():
+			if not added_hdr:
+				_add(col, "heading", "BEITRITTSANFRAGEN")
+				added_hdr = true
+			var req_uid: String = String(content.get("requester_user_id", ""))
+			var req_name: String = String(content.get("requester_name", "SPIELER")).to_upper()
+			_add(col, "info", "ANFRAGE", "", {"text": req_name})
+			_add(col, "button", "%s ANNEHMEN" % req_name, "", {"action": "coop_req_accept:%s" % req_uid})
+			_add(col, "button", "%s ABLEHNEN" % req_name, "", {"action": "coop_req_decline:%s" % req_uid, "risky": true})
+
+
 func _build_coop_page() -> void:
+	_maybe_refresh_coop_cloud()
+	var jmode: String = NetworkManager.active_join_mode if NetworkManager.is_multiplayer_session() else CloudSession.world_join_mode
 	if not NetworkManager.is_multiplayer_session():
-		_add(0, "heading", "EINZELSPIELER")
-		_add(0, "info", "KEINE KOOP-SITZUNG AKTIV", "", {"text": ""})
-		_add(0, "info", "FREUNDE & KOOP WERDEN", "", {"text": ""})
-		_add(0, "info", "ÜBER DEN LAUNCHER", "", {"text": ""})
-		_add(0, "info", "VERWALTET", "", {"text": ""})
-		_add(0, "button", "ZUM HAUPTMENÜ", "", {"action": "coop_to_menu"})
+		if CloudSession.is_logged_in():
+			_add(0, "heading", "ONLINE-KOOP (NAKAMA)")
+			_add(0, "info", "DEINE UID", "", {"text": CloudSession.uid if not CloudSession.uid.is_empty() else "---"})
+			_add(0, "button", "BEITRITT: %s" % _join_mode_label(jmode), "", {"action": "coop_cycle_join_mode"})
+			if get_tree().get_first_node_in_group("world") != null:
+				_add(0, "button", "WELT FÜR KOOP ÖFFNEN", "", {"action": "coop_host_relay"})
+			_build_coop_notifications(0)
+			if _coop_toast_t > 0.0 and not _coop_toast.is_empty():
+				_add(0, "info", _coop_toast, "", {"text": ""})
+			_add(0, "button", "AKTUALISIEREN", "", {"action": "coop_refresh_cloud"})
+			_add(0, "button", "ZUM HAUPTMENÜ", "", {"action": "coop_to_menu"})
+			_add(1, "heading", "FREUNDE")
+			var any_friend: bool = false
+			for fr: Dictionary in CloudSession.friends_cache:
+				if int(fr.get("state", 0)) != 0:
+					continue
+				any_friend = true
+				var dname: String = String(fr.get("display_name", fr.get("username", "FREUND"))).to_upper()
+				var is_online: bool = bool(fr.get("online", false))
+				var is_hosting: bool = bool(fr.get("coop_active", false))
+				if is_hosting:
+					var count_txt: String = "%d/%d · %s" % [int(fr.get("coop_players", 1)), int(fr.get("coop_max_players", 4)), _join_mode_label(String(fr.get("coop_join_mode", "ask")))]
+					_add(1, "info", dname, "", {"text": count_txt})
+					var f_mode: String = String(fr.get("coop_join_mode", "ask"))
+					var btn_txt: String = "BEITRETEN" if f_mode == "open" else ("ANFRAGEN" if f_mode == "ask" else "PRIVAT")
+					_add(1, "button", "%s · %s" % [dname, btn_txt], "", {"action": "coop_join_friend:%s" % String(fr.get("user_id", ""))})
+				else:
+					_add(1, "info", dname, "", {"text": "ONLINE" if is_online else "OFFLINE"})
+			if not any_friend:
+				_add(1, "info", "KEINE FREUNDE GELISTET", "", {"text": ""})
+		else:
+			_add(0, "heading", "EINZELSPIELER")
+			_add(0, "info", "KEINE KOOP-SITZUNG AKTIV", "", {"text": ""})
+			_add(0, "info", "FREUNDE & KOOP WERDEN", "", {"text": ""})
+			_add(0, "info", "ÜBER DEN LAUNCHER VERWALTET", "", {"text": ""})
+			_add(0, "button", "ZUM HAUPTMENÜ", "", {"action": "coop_to_menu"})
 		_add(1, "heading", "SPIELERNAME")
 		_add(1, "field", "NAME", "player_name", {"hint": "ELLIE"})
 		_add(1, "button", "NAME ÜBERNEHMEN", "", {"action": "coop_apply_name"})
 		return
 	var code: String = NetworkManager.active_room_code if not NetworkManager.active_room_code.is_empty() else "OFFEN"
 	_add(0, "heading", NetworkManager.active_world_name)
+	_add(0, "info", "TRANSPORT", "", {"text": "NAKAMA-RELAY" if NetworkManager.transport_mode == "relay" else "LAN / ENET"})
 	_add(0, "info", "JOIN-CODE", "", {"text": code})
 	_add(0, "button", "CODE KOPIEREN", "", {"action": "coop_copy_code"})
-	_add(0, "button", "EINLADUNG KOPIEREN", "", {"action": "coop_copy_invite"})
+	if NetworkManager.transport_mode != "relay":
+		_add(0, "button", "EINLADUNG KOPIEREN", "", {"action": "coop_copy_invite"})
 	if multiplayer.is_server():
-		_add(0, "button", "NEUEN CODE ERZEUGEN", "", {"action": "coop_new_code"})
-	_add(0, "heading", "HOST-ADRESSE")
-	var ips: PackedStringArray = NetworkManager.local_ips()
-	for i: int in mini(ips.size(), 2):
-		var label_str: String = "LAN-IP" if i == 0 else "WEITERE IP"
-		var addr_str: String = "%s:%d" % [ips[i], NetworkManager.active_port]
-		_add(0, "info", label_str, "", {"text": addr_str})
-	_add(0, "button", "IP KOPIEREN", "", {"action": "coop_copy_ip"})
+		if NetworkManager.transport_mode == "enet":
+			_add(0, "button", "NEUEN CODE ERZEUGEN", "", {"action": "coop_new_code"})
+		if CloudSession.is_logged_in():
+			_add(0, "button", "BEITRITT: %s" % _join_mode_label(jmode), "", {"action": "coop_cycle_join_mode"})
+			_build_coop_notifications(0)
+			_add(0, "heading", "FREUNDE EINLADEN")
+			var inv_count: int = 0
+			for fr: Dictionary in CloudSession.friends_cache:
+				if int(fr.get("state", 0)) != 0 or not bool(fr.get("online", false)):
+					continue
+				inv_count += 1
+				var fname: String = String(fr.get("display_name", fr.get("username", "FREUND"))).to_upper()
+				_add(0, "button", "EINLADEN: %s" % fname, "", {"action": "coop_invite:%s" % String(fr.get("user_id", ""))})
+			if inv_count == 0:
+				_add(0, "info", "KEINE FREUNDE ONLINE", "", {"text": ""})
+	if NetworkManager.transport_mode != "relay":
+		_add(0, "heading", "HOST-ADRESSE")
+		var ips: PackedStringArray = NetworkManager.local_ips()
+		for i: int in mini(ips.size(), 2):
+			var label_str: String = "LAN-IP" if i == 0 else "WEITERE IP"
+			var addr_str: String = "%s:%d" % [ips[i], NetworkManager.active_port]
+			_add(0, "info", label_str, "", {"text": addr_str})
+		_add(0, "button", "IP KOPIEREN", "", {"action": "coop_copy_ip"})
 	if _coop_toast_t > 0.0 and not _coop_toast.is_empty():
 		_add(0, "info", _coop_toast, "", {"text": ""})
 	var crew: Array[Dictionary] = NetworkManager.roster()
@@ -453,6 +572,7 @@ func _build_coop_page() -> void:
 		_add(1, "info", pname, "", {"text": role_txt})
 		if multiplayer.is_server() and not is_host:
 			_add(1, "button", "%s ENTFERNEN" % pname, "", {"action": "coop_kick:%d" % pid, "risky": true})
+	_add(1, "button", "WELT VERLASSEN" if multiplayer.get_peers().is_empty() else "KOOP VERLASSEN", "", {"action": "coop_to_menu", "risky": true})
 	_add(1, "heading", "DEIN NAME")
 	_add(1, "field", "NAME", "player_name", {"hint": "ELLIE"})
 	_add(1, "button", "NAME ÜBERNEHMEN", "", {"action": "coop_apply_name"})
@@ -825,7 +945,37 @@ func _run_action(action: String) -> void:
 		_build_items()
 		return
 	if action == "coop_to_menu":
-		_begin_quit(true)
+		_do_flush_and_quit(true)
+		return
+	if action == "coop_cycle_join_mode":
+		var curr_mode: String = NetworkManager.active_join_mode if NetworkManager.is_multiplayer_session() else CloudSession.world_join_mode
+		var next_mode: String = _next_join_mode(curr_mode)
+		_coop_set_join_mode(next_mode)
+		return
+	if action == "coop_refresh_cloud":
+		_coop_last_fetch_msec = 0
+		_coop_toast = "AKTUALISIERT"
+		_coop_toast_t = 1.6
+		_build_items()
+		return
+	if action == "coop_host_relay":
+		_coop_start_host_relay()
+		return
+	if action.begins_with("coop_invite:"):
+		_coop_send_invite(action.trim_prefix("coop_invite:"))
+		return
+	if action.begins_with("coop_join_friend:"):
+		_coop_request_friend_join(action.trim_prefix("coop_join_friend:"))
+		return
+	if action.begins_with("coop_accept_invite:"):
+		var mid: String = action.trim_prefix("coop_accept_invite:")
+		_coop_join_invite(mid)
+		return
+	if action.begins_with("coop_req_accept:"):
+		_coop_respond_join_req(action.trim_prefix("coop_req_accept:"), true)
+		return
+	if action.begins_with("coop_req_decline:"):
+		_coop_respond_join_req(action.trim_prefix("coop_req_decline:"), false)
 		return
 	if action.begins_with("coop_kick:"):
 		var target_id: int = action.trim_prefix("coop_kick:").to_int()
@@ -1323,8 +1473,15 @@ func _reset_and_restart() -> void:
 	_armed = ""
 	if not _can_save():
 		return
+	CloudSession.set_autosave_suppressed(true)
+	CloudSession.reset_autosave_state()
 	var path: String = SaveGame.path_for(get_tree())
-	SaveGame.delete(path)
+	if CloudSession.is_logged_in():
+		await CloudSession.wipe_cloud_save()
+		if not is_inside_tree():
+			return
+	if not CloudSession.is_strict_release():
+		SaveGame.delete(path)
 	_set_open(false)
 	if NetworkManager.is_multiplayer_session():
 		GameLauncher.launch(get_tree(), {
@@ -1335,9 +1492,10 @@ func _reset_and_restart() -> void:
 			"world_id": NetworkManager.active_world_id,
 			"world_name": NetworkManager.active_world_name,
 			"save_path": NetworkManager.active_save_path,
+			"skip_autosave": true,
 		})
 	else:
-		GameLauncher.launch(get_tree(), {"mode": "new"})
+		GameLauncher.launch(get_tree(), {"mode": "new", "skip_autosave": true})
 
 
 func _arm(action: String) -> void:
@@ -1348,26 +1506,105 @@ func _arm(action: String) -> void:
 func _footer_click(index: int) -> void:
 	var id: String = String(_footer[index]["id"])
 	match id:
-		"save":
-			_do_save(false)
 		"quit":
-			if not _can_save():
-				_begin_quit(false)
-			else:
-				_do_save(true, false)
+			_do_flush_and_quit(false)
 		"menu":
-			if not _can_save():
-				_begin_quit(true)
-			else:
-				_do_save(true, true)
-		"discard":
-			if _armed != id:
-				_arm(id)
-			else:
-				_begin_quit(false)
+			_do_flush_and_quit(true)
+
+
+func _coop_set_join_mode(next_mode: String) -> void:
+	var res: Dictionary = await CloudSession.set_world_join_mode(next_mode)
+	if not is_inside_tree():
+		return
+	_coop_toast = "MODUS: %s" % _join_mode_label(next_mode) if bool(res.get("ok", false)) else String(res.get("error", "FEHLER"))
+	_coop_toast_t = 2.4
+	_build_items()
+
+
+func _coop_start_host_relay() -> void:
+	if _saving_cloud:
+		return
+	if _can_save():
+		_saving_cloud = true
+		await CloudSession.flush_cloud_save_now(get_tree())
+		_saving_cloud = false
+		if not is_inside_tree():
+			return
+	_set_open(false)
+	GameLauncher.launch(get_tree(), {
+		"mode": "host_relay",
+		"world_name": "KOOP-WELT",
+		"join_mode": CloudSession.world_join_mode,
+	})
+
+
+func _coop_send_invite(target_user_id: String) -> void:
+	var res: Dictionary = await CloudSession.coop_invite_friend(target_user_id)
+	if not is_inside_tree():
+		return
+	_coop_toast = "EINLADUNG GESENDET" if bool(res.get("ok", false)) else String(res.get("error", "FEHLER"))
+	_coop_toast_t = 2.5
+	_build_items()
+
+
+func _coop_request_friend_join(host_user_id: String) -> void:
+	var res: Dictionary = await CloudSession.coop_request_join(host_user_id)
+	if not is_inside_tree():
+		return
+	if not bool(res.get("ok", false)):
+		_coop_toast = String(res.get("error", "BEITRITT FEHLGESCHLAGEN"))
+		_coop_toast_t = 2.6
+		_build_items()
+		return
+	if String(res.get("status", "")) == "requested":
+		_coop_toast = "ANFRAGE AN %s GESENDET" % String(res.get("host_name", "FREUND")).to_upper()
+		_coop_toast_t = 3.0
+		_build_items()
+		return
+	var mid: String = String(res.get("match_id", ""))
+	if not mid.is_empty():
+		_pending_invites[mid] = {
+			"match_id": mid,
+			"room_code": String(res.get("room_code", "")),
+			"world_name": String(res.get("world_name", "KOOP-WELT")),
+			"notif_id": "",
+		}
+		_coop_join_invite(mid)
+
+
+func _coop_join_invite(match_id: String) -> void:
+	var info: Dictionary = _pending_invites.get(match_id, {}) as Dictionary
+	var nid: String = String(info.get("notif_id", ""))
+	if not nid.is_empty():
+		CloudSession.delete_notification(nid)
+	if CloudSession.is_logged_in() and (_can_save() or NetworkManager.is_coop_session()):
+		await CloudSession.flush_cloud_save_now(get_tree())
+	if not is_inside_tree():
+		return
+	_set_open(false)
+	GameLauncher.launch(get_tree(), {
+		"mode": "join_relay",
+		"match_id": match_id,
+		"code": String(info.get("room_code", "")),
+		"world_name": String(info.get("world_name", "KOOP-WELT")),
+	})
+
+
+func _coop_respond_join_req(requester_user_id: String, accept: bool) -> void:
+	var res: Dictionary = await CloudSession.coop_respond_join_request(requester_user_id, accept)
+	if not is_inside_tree():
+		return
+	if bool(res.get("ok", false)):
+		_coop_toast = "ANFRAGE ANGENOMMEN" if accept else "ANFRAGE ABGELEHNT"
+	else:
+		_coop_toast = String(res.get("error", "FEHLER"))
+	_coop_toast_t = 2.4
+	_build_items()
 
 
 func _read_save_info() -> Dictionary:
+	if CloudSession.is_strict_release():
+		return CloudSession.cloud_save_info() if CloudSession.is_logged_in() else {}
 	if CloudSession.is_logged_in() and not NetworkManager.is_multiplayer_session():
 		var cloud_info: Dictionary = CloudSession.cloud_save_info()
 		if not cloud_info.is_empty():
@@ -1375,24 +1612,28 @@ func _read_save_info() -> Dictionary:
 	return SaveGame.info(SaveGame.path_for(get_tree()))
 
 
-func _do_save(then_quit: bool, to_menu: bool = false) -> void:
-	if _saving_cloud:
-		return
-	var local_ok: bool = SaveGame.save(get_tree())
-	if CloudSession.is_logged_in():
-		_saving_cloud = true
-		var cloud_ok: bool = await CloudSession.save_cloud_all(get_tree())
-		_saving_cloud = false
-		if not is_inside_tree():
-			return
-		local_ok = local_ok or cloud_ok
-	if local_ok:
+func _on_auto_save_finished(ok: bool) -> void:
+	if ok:
 		_save_info = _read_save_info()
-		_saved_flash = 2.0
-		if then_quit:
-			_begin_quit(to_menu)
-	else:
-		_failed_flash = 2.5
+		_saved_flash = 1.6
+
+
+func _do_flush_and_quit(to_menu: bool = false) -> void:
+	if _saving_cloud or _quit_t >= 0.0:
+		return
+	_saving_cloud = true
+	CloudSession.capture_live_snapshot(get_tree(), true)
+	var should_save: bool = _can_save() or (CloudSession.is_logged_in() and NetworkManager.is_coop_session())
+	if should_save:
+		var ok: bool = await CloudSession.flush_cloud_save_now(get_tree())
+		if not is_inside_tree():
+			_saving_cloud = false
+			return
+		if ok:
+			_save_info = _read_save_info()
+			_saved_flash = 1.6
+	_saving_cloud = false
+	_begin_quit(to_menu)
 
 
 func _begin_quit(to_menu: bool = false) -> void:
@@ -1879,7 +2120,8 @@ func _draw_row(item: Dictionary, p: float, void_level: float) -> void:
 	if bool(item.get("soon", false)):
 		var width: int = PixelText.width(String(item["label"]))
 		_text("BALD", Vector2(base + 14.0 + width + 5.0, rect.position.y + (rect.size.y - 7.0) / 2.0), Color(UiStyle.TEXT_DIM, 0.45), p)
-	if kind == "button" and bool(item.get("risky", false)) and not SaveGame.exists(SaveGame.path_for(get_tree())):
+	var missing_save: bool = (not CloudSession.has_cloud_save) if CloudSession.is_strict_release() else (not CloudSession.has_cloud_save and not SaveGame.exists(SaveGame.path_for(get_tree())))
+	if kind == "button" and String(item.get("action", "")) == "reset" and bool(item.get("risky", false)) and missing_save:
 		var plate_w: float = PixelText.width(String(item["label"])) + 12.0
 		_text("KEIN SPIELSTAND", Vector2(base + 14.0 + plate_w + 6.0, rect.position.y + 5.0), Color(UiStyle.TEXT_DIM, 0.5), p)
 
@@ -1943,51 +2185,33 @@ func _draw_footer(void_level: float) -> void:
 		var tone: Color = ACCENT_WARM.lerp(VineStyle.VOID_GLOW, taken)
 		var text: String = String(_footer[i]["text"])
 		var text_color: Color = UiStyle.TEXT
-		match id:
-			"save":
-				if _saved_flash > 0.0:
-					tone = Color("7fe3a8")
-					text = "GESPEICHERT"
-					text_color = Color("c8ffd8")
-				elif _failed_flash > 0.0:
-					tone = DANGER
-					text = "FEHLER"
-			"discard":
-				text_color = UiStyle.TEXT_DIM
-				if _armed == id:
-					tone = DANGER
-					text = "SICHER?"
-					text_color = DANGER.lightened(0.3)
-			"quit":
-				text_color = VineStyle.PETAL
-				if _failed_flash > 0.0:
-					tone = DANGER
+		if id == "quit":
+			text_color = VineStyle.PETAL
+			if _failed_flash > 0.0:
+				tone = DANGER
 		var hovered: bool = i == _hover_foot
 		var main: bool = id == "quit"
-		VineStyle.glow(self, rect.get_center(), 26.0 if (hovered or main) else 18.0, tone, (0.45 if main else 0.16) * p + (0.35 if hovered else 0.0) + (0.5 if (id == "save" and _saved_flash > 0.0) else 0.0))
+		VineStyle.glow(self, rect.get_center(), 26.0 if (hovered or main) else 18.0, tone, (0.45 if main else 0.16) * p + (0.35 if hovered else 0.0))
 		var width: float = PixelText.width(text) + 12.0
 		var drawn: Rect2 = Rect2(rect.get_center().x - width / 2.0, rect.position.y, width, rect.size.y)
 		_draw_plate(drawn, text, tone, text_color, p, taken)
-		if _saved_flash > 0.0 and id == "save": ## sparks leap off the plate
-			for k: int in 6:
-				var angle: float = k * TAU / 6.0 + _time * 2.0
-				var r: float = (1.0 - _saved_flash / 2.0) * 14.0 + 6.0
-				draw_rect(Rect2(roundf(drawn.get_center().x + cos(angle) * r * 1.6), roundf(drawn.get_center().y + sin(angle) * r * 0.8), 1, 1), Color(tone, minf(_saved_flash, 1.0)))
 	var info: String = _save_text()
 	var info_p: float = _p(0.7, 0.3)
-	_text(info, Vector2(_origin_x() + 64.0, FOOT_Y + 14.0), UiStyle.TEXT_DIM, info_p * 0.8)
+	_text(info, Vector2(_origin_x() + 64.0, FOOT_Y + 14.0), Color("96efc0") if _saved_flash > 0.0 else UiStyle.TEXT_DIM, info_p * (0.95 if _saved_flash > 0.0 else 0.8))
 	VineStyle.leaf(self, Vector2(_origin_x() + 58.0, FOOT_Y + 18.0), 1, -1, 3, Color(VineStyle.LEAF, info_p), Color(VineStyle.LEAF_LIGHT, info_p))
 
 
 func _save_text() -> String:
+	if _saving_cloud or CloudSession.is_save_in_flight():
+		return "ONLINE AUTO-SPEICHERUNG..."
 	if not _can_save():
-		return "NUR DER HOST SPEICHERT"
+		return "CHARAKTER AUTOMATISCH ONLINE GESICHERT" if CloudSession.is_logged_in() else "NUR DER HOST SPEICHERT"
 	if _save_info.is_empty():
-		return "NOCH NICHT GESPEICHERT"
+		return "AUTO-SPEICHERN AKTIV"
 	var minutes: int = maxi(int((Time.get_unix_time_from_system() - float(_save_info["saved_at"])) / 60.0), 0)
 	var ago: String = "GERADE EBEN" if minutes < 1 else ("VOR %d MIN" % minutes if minutes < 60 else "VOR %d STD" % (minutes / 60))
 	var clock: int = int(float(_save_info["time"]) * 1440.0)
-	return "GESPEICHERT: TAG %d, %02d:%02d - %s" % [int(_save_info["day"]) + 1, clock / 60, clock % 60, ago]
+	return "AUTO-GESPEICHERT: TAG %d, %02d:%02d - %s" % [int(_save_info["day"]) + 1, clock / 60, clock % 60, ago]
 
 
 ## Quitting: the room sinks into the void and says goodbye.

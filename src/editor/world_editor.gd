@@ -54,6 +54,7 @@ func start(level: WorldLevel) -> void:
 				_hidden_huds.append(child as CanvasLayer)
 				(child as CanvasLayer).hide()
 	camera = Camera2D.new()
+	camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	camera.position = _previous_camera.get_screen_center_position() if _previous_camera != null else Vector2(world._start) * 16.0
 	camera.zoom = _previous_camera.zoom if _previous_camera != null else Vector2.ONE
 	camera.position_smoothing_enabled = false

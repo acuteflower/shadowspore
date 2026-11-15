@@ -25,6 +25,7 @@ var unjammed: bool = false
 
 var _house: Sprite2D
 var _glow: Sprite2D
+var _far_wait: float = 0.0
 var _wheel: Sprite2D
 var _jam: Sprite2D
 var _light: NightLight
@@ -50,26 +51,30 @@ func _ready() -> void:
 
 func _build_visuals() -> void:
 	var house_off: Vector2 = Vector2(0.0, -(128.0 - 72.0)) ## anchor (80, 128) in 160x144
-	if ResourceLoader.exists(MILL_TEX):
+	var tex_mill: Texture2D = DataRegistry.tex(MILL_TEX)
+	if tex_mill != null:
 		_house = Sprite2D.new()
-		_house.texture = load(MILL_TEX) as Texture2D
+		_house.texture = tex_mill
 		_house.offset = house_off
 		add_child(_house)
-	if ResourceLoader.exists(MILL_GLOW):
+	var tex_mill_glow: Texture2D = DataRegistry.tex(MILL_GLOW)
+	if tex_mill_glow != null:
 		_glow = Sprite2D.new()
-		_glow.texture = load(MILL_GLOW) as Texture2D
+		_glow.texture = tex_mill_glow
 		_glow.offset = house_off
 		_glow.material = Unlit.material()
 		add_child(_glow)
-	if ResourceLoader.exists(WHEEL_TEX):
+	var tex_wheel: Texture2D = DataRegistry.tex(WHEEL_TEX)
+	if tex_wheel != null:
 		_wheel = Sprite2D.new()
-		_wheel.texture = load(WHEEL_TEX) as Texture2D
+		_wheel.texture = tex_wheel
 		_wheel.hframes = 6
 		_wheel.position = WHEEL_LOCAL
 		add_child(_wheel)
-	if ResourceLoader.exists(JAM_TEX):
+	var tex_jam: Texture2D = DataRegistry.tex(JAM_TEX)
+	if tex_jam != null:
 		_jam = Sprite2D.new()
-		_jam.texture = load(JAM_TEX) as Texture2D
+		_jam.texture = tex_jam
 		_jam.hframes = 2
 		_jam.position = WHEEL_LOCAL + Vector2(2.0, 22.0)
 		add_child(_jam)
@@ -97,9 +102,10 @@ func _build_visuals() -> void:
 	_light.glow_color = Color("ffc66d")
 	add_child(_light)
 
-	if ResourceLoader.exists(CREAK_WAV):
+	var creak_stream: AudioStream = DataRegistry.audio(CREAK_WAV)
+	if creak_stream != null:
 		_creak = AudioStreamPlayer2D.new()
-		_creak.stream = load(CREAK_WAV) as AudioStream
+		_creak.stream = creak_stream
 		_creak.bus = "SFX"
 		_creak.volume_db = -11.0
 		_creak.max_distance = 320.0
@@ -151,9 +157,10 @@ func set_unjammed_instant(val: bool) -> void:
 func play_unjam_fx() -> void:
 	unjammed = true
 	_apply_state()
-	if ResourceLoader.exists(UNJAM_WAV):
+	var unjam_stream: AudioStream = DataRegistry.audio(UNJAM_WAV)
+	if unjam_stream != null:
 		var snd: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
-		snd.stream = load(UNJAM_WAV) as AudioStream
+		snd.stream = unjam_stream
 		snd.bus = "SFX"
 		snd.volume_db = -3.0
 		snd.max_distance = 460.0
@@ -166,6 +173,12 @@ func play_unjam_fx() -> void:
 
 
 func _process(delta: float) -> void:
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position):
+		_far_wait = 0.25
+		return
 	var night: float = TimeManager.night_amount()
 	if _glow != null:
 		var target_a: float = lerpf(0.32 if unjammed else 0.10, 0.96 if unjammed else 0.45, night)

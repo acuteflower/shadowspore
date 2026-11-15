@@ -31,6 +31,7 @@ var _heard_by_local: bool = false
 var _sprite: Sprite2D
 var _glow: Sprite2D
 var _time: float = 0.0
+var _far_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -63,10 +64,18 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	_glow.modulate.a = lerpf(0.45, 1.0, TimeManager.night_amount()) * (0.8 + 0.2 * sin(_time * 1.3 + position.x))
+	if _far_wait > 0.0 and (door_open or _heard_by_local):
+		_far_wait -= delta
+		return
+	var far: bool = WorldProp.far_from_camera(self, global_position)
+	if not far:
+		_glow.modulate.a = lerpf(0.45, 1.0, TimeManager.night_amount()) * (0.8 + 0.2 * sin(_time * 1.3 + position.x))
 	var player: Player = _local_player()
 	if player != null and player.quests != null and player.quests.has_flag("wagon_seen"):
 		_heard_by_local = true
+	if far and (door_open or _heard_by_local or player == null):
+		_far_wait = 0.25
+		return
 	_sight_clock -= delta
 	if _sight_clock <= 0.0:
 		_sight_clock = 0.25
@@ -122,9 +131,9 @@ func prompt_position() -> Vector2:
 
 
 func _local_player() -> Player:
-	for node: Node in get_tree().get_nodes_in_group("players"):
-		if node is Player and node.is_multiplayer_authority():
-			return node as Player
+	for player: Player in Player.all:
+		if is_instance_valid(player) and player.is_multiplayer_authority():
+			return player
 	return null
 
 

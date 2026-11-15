@@ -194,6 +194,11 @@ func _rpc_apply_unlock(kind: String, id: String) -> void:
 	_apply_unlock(kind, id)
 
 
+@rpc("authority", "call_local", "reliable")
+func _rpc_apply_all(data: Dictionary) -> void:
+	import_data(data)
+
+
 func default_outfit_id() -> String:
 	var tbl: Dictionary = DataRegistry.table(TABLE_NAME)
 	return String(tbl.get("default_outfit", "default"))

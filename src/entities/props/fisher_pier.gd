@@ -17,6 +17,8 @@ var deck_rect: Rect2 = Rect2()
 
 var _body: Sprite2D
 var _glow: Sprite2D
+var _far_wait: float = 0.0
+var _last_night: float = -1.0
 var _light: NightLight
 var _boat_node: ReedRowboatSpot
 
@@ -57,16 +59,18 @@ func _ready() -> void:
 	height = 34.0
 	z_index = -3
 	var off: Vector2 = Vector2(0.0, -(52.0 - 48.0))
-	if ResourceLoader.exists(PIER_TEX):
+	var tex_pier: Texture2D = DataRegistry.tex(PIER_TEX)
+	if tex_pier != null:
 		_body = Sprite2D.new()
-		_body.texture = load(PIER_TEX) as Texture2D
+		_body.texture = tex_pier
 		_body.hframes = 4
 		_body.frame = dir_idx
 		_body.offset = off
 		add_child(_body)
-	if ResourceLoader.exists(PIER_GLOW):
+	var tex_pier_glow: Texture2D = DataRegistry.tex(PIER_GLOW)
+	if tex_pier_glow != null:
 		_glow = Sprite2D.new()
-		_glow.texture = load(PIER_GLOW) as Texture2D
+		_glow.texture = tex_pier_glow
 		_glow.hframes = 4
 		_glow.frame = dir_idx
 		_glow.offset = off
@@ -88,9 +92,18 @@ func _ready() -> void:
 	_boat_node.set_searched(boat_searched)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position):
+		_far_wait = 0.25
+		return
 	if _glow != null:
-		_glow.modulate.a = lerpf(0.26, 0.94, TimeManager.night_amount())
+		var night: float = TimeManager.night_amount()
+		if night != _last_night:
+			_last_night = night
+			_glow.modulate.a = lerpf(0.26, 0.94, night)
 
 
 func set_boat_searched(val: bool) -> void:
@@ -156,9 +169,10 @@ class ReedRowboatSpot extends Interactable:
 
 	func _ready() -> void:
 		z_index = 1 ## slightly above pier (-3) so it sorts cleanly in reeds
-		if ResourceLoader.exists(FisherPier.BOAT_TEX):
+		var tex_boat: Texture2D = DataRegistry.tex(FisherPier.BOAT_TEX)
+		if tex_boat != null:
 			_sprite = Sprite2D.new()
-			_sprite.texture = load(FisherPier.BOAT_TEX) as Texture2D
+			_sprite.texture = tex_boat
 			_sprite.hframes = 2
 			_sprite.offset = Vector2(0.0, -(28.0 - 24.0))
 			_sprite.frame = 1 if searched else 0

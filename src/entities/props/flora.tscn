@@ -20,5 +20,6 @@ script = ExtResource("2_hurt")
 [node name="Foliage" type="Area2D" parent="."]
 collision_layer = 0
 collision_mask = 2
+monitorable = false
 
 [node name="Shape" type="CollisionShape2D" parent="Foliage"]

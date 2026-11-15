@@ -90,7 +90,7 @@ func _populate(cell: Vector2i) -> void:
 	for i: int in count:
 		if _butterflies.get_child_count() >= bf_cap:
 			break
-		var animal: MeadowButterfly = load(String(spec["scene"])).instantiate() as MeadowButterfly
+		var animal: MeadowButterfly = DataRegistry.scene(String(spec["scene"])).instantiate() as MeadowButterfly
 		_serial += 1
 		animal.name = "Butterfly%d" % _serial
 		animal.home = center

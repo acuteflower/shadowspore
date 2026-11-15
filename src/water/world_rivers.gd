@@ -223,8 +223,8 @@ func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -
 	sprite.position = Vector2(cell) * 512.0
 	sprite.z_index = -7
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	var field_tex: Texture2D = load(String(record["field"])) as Texture2D
-	var bank_tex: Texture2D = load(String(record["bank"])) as Texture2D
+	var field_tex: Texture2D = DataRegistry.tex(String(record["field"]))
+	var bank_tex: Texture2D = DataRegistry.tex(String(record["bank"]))
 	sprite.texture = field_tex
 	var shader_material: ShaderMaterial = ShaderMaterial.new()
 	shader_material.shader = RIVER_WATER_SHADER
@@ -242,15 +242,13 @@ func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -
 		_water_materials.erase(shader_material))
 	parent.add_child(sprite)
 	parent.y_sort_enabled = true
-	var flow_img: Image = field_tex.get_image()
-	fauna.set_field_image(cell, flow_img)
 	var details: RiverDetails = RiverDetails.new()
 	details.name = "RiverDetails"
 	details.y_sort_enabled = true
 	parent.add_child(details)
-	if defer_details:
-		details.setup_base(self, cell, flow_img)
-	else:
+	if not defer_details:
+		var flow_img: Image = field_tex.get_image()
+		fauna.set_field_image(cell, flow_img)
 		details.setup(self, cell, flow_img)
 	# Night glow pass: unlit, additive, same field; strength follows the day cycle (RiverDetails.set_night).
 	var night_glow: Sprite2D = Sprite2D.new()
@@ -345,6 +343,8 @@ func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -
 		if anchors.size() < 8:
 			anchors.append(Vector4(sx, sy + 10.0, 18.0, 0.75))
 
+	if defer_details:
+		details.set_deferred_water(field_tex, shader_material, anchors.duplicate())
 	var count: int = anchors.size()
 	while anchors.size() < 8: anchors.append(Vector4.ZERO)
 	shader_material.set_shader_parameter("disturbances", anchors)

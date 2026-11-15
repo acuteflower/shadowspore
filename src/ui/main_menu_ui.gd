@@ -114,12 +114,16 @@ func _on_cloud_state_changed(_logged_in: bool = false) -> void:
 func _has_any_save() -> bool:
 	if CloudSession.is_logged_in():
 		return CloudSession.has_cloud_save
+	if CloudSession.is_strict_release():
+		return false
 	return SaveGame.exists()
 
 
 func _current_save_day() -> int:
 	if CloudSession.is_logged_in():
 		return CloudSession.cloud_save_day
+	if CloudSession.is_strict_release():
+		return -1
 	return int(SaveGame.info().get("day", -1)) if SaveGame.exists() else -1
 
 
@@ -475,11 +479,17 @@ func _press(row: Dictionary, at: Vector2) -> void:
 		return
 	match id:
 		"start":
+			if GameGuard.is_strict_mode() and not GameGuard.is_gameplay_allowed():
+				_set_status("LIZENZ ODER SERVER-VERBINDUNG FEHLT", true, 5.0)
+				return
 			chosen.emit("continue" if _has_any_save() else "new", {})
 		"continue":
+			if GameGuard.is_strict_mode() and not GameGuard.is_gameplay_allowed():
+				_set_status("LIZENZ ODER SERVER-VERBINDUNG FEHLT", true, 5.0)
+				return
 			chosen.emit("continue", {})
 		"new", "new_yes":
-			chosen.emit("new", {})
+			_start_new_adventure()
 		"new_adventure":
 			_open_page(Page.CONFIRM_NEW)
 		"settings":
@@ -489,6 +499,21 @@ func _press(row: Dictionary, at: Vector2) -> void:
 		"back":
 			GameSettings.save()
 			_open_page(Page.SETTINGS if page == Page.CONFIRM_NEW else Page.MAIN)
+
+
+func _start_new_adventure() -> void:
+	if GameGuard.is_strict_mode() and not GameGuard.is_gameplay_allowed():
+		_set_status("LIZENZ ODER SERVER-VERBINDUNG FEHLT", true, 5.0)
+		return
+	if CloudSession.is_logged_in():
+		_set_status("LOESCHE CLOUD-SPIELSTAND...", false, 3.0)
+		CloudSession.set_autosave_suppressed(true)
+		CloudSession.reset_autosave_state()
+		await CloudSession.wipe_cloud_save()
+		CloudSession.set_autosave_suppressed(false)
+		if not is_inside_tree():
+			return
+	chosen.emit("new", {})
 
 
 # ---------------------------------------------------------------------------------------------- drawing
@@ -803,7 +828,7 @@ func _draw_controls_grid(rect: Rect2, fade: float, void_level: float) -> void:
 func _draw_confirm_body(rect: Rect2, fade: float) -> void:
 	var outline: Color = Color(VineStyle.OUTLINE, fade)
 	var save_kind: String = "CLOUD-SPIELSTAND" if CloudSession.is_logged_in() else "SPIELSTAND"
-	var lines: PackedStringArray = ["DEIN AKTUELLER " + save_kind + " WIRD", "BEIM NÄCHSTEN SPEICHERN ÜBERSCHRIEBEN."]
+	var lines: PackedStringArray = ["DEIN AKTUELLER " + save_kind + " WIRD", "SOFORT GELÖSCHT UND NEU BEGONNEN."]
 	var y: float = rect.position.y + 38.0
 	for line: String in lines:
 		PixelText.draw(self, line, Vector2i(int(rect.position.x + (rect.size.x - float(PixelText.width(line))) * 0.5), int(y)), Color(UiStyle.TEXT, 0.9 * fade), outline)

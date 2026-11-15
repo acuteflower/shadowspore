@@ -31,6 +31,8 @@ const DEW: Color = Color("c8fff4")
 const ACTOR_SLOTS: int = 4
 
 static var _shared_quad: QuadMesh
+static var _quad_lock: Mutex = Mutex.new()
+static var _cleanup_registered: bool = false
 
 var radius: Vector2 = Vector2(40, 28) ## px, the plan's ellipse (the world level checks the ground under it)
 var atlas_image: Image
@@ -69,6 +71,33 @@ static func plan(rng: RandomNumberGenerator) -> Dictionary:
 		"leaves": rng.randi_range(1, 3), "height": rng.randf_range(0.7, 1.3), "chevron": rng.randf_range(0.3, 0.95), "void": rng.randf_range(0.0, 0.3),
 		"dew": rng.randf_range(0.1, 0.5), "flower_colors": colors, "flower_share": rng.randf_range(0.02, 0.13), "lucky": rng.randf() < 0.3,
 	}
+
+
+static func ensure_shared_quad() -> QuadMesh:
+	_quad_lock.lock()
+	if _shared_quad == null:
+		var quad: QuadMesh = QuadMesh.new()
+		quad.size = Vector2(CELL)
+		_shared_quad = quad
+	var quad_ref: QuadMesh = _shared_quad
+	_quad_lock.unlock()
+	return quad_ref
+
+
+static func register_cleanup_once() -> void:
+	if not _cleanup_registered:
+		_cleanup_registered = true
+		Jobs.register_cleanup(CloverField.clear_cache)
+
+
+static func clear_cache() -> void:
+	_quad_lock.lock()
+	_shared_quad = null
+	_quad_lock.unlock()
+
+
+func _ready() -> void:
+	register_cleanup_once()
 
 
 func setup(field: Dictionary, center: Vector2, world: Variant = null) -> void:
@@ -150,15 +179,12 @@ func _add_band(key: int, clumps: Array, textures: Array[ImageTexture]) -> void:
 		instance.texture = textures[layer]
 		instance.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		instance.material = _materials[layer]
-		if _shared_quad == null:
-			var quad: QuadMesh = QuadMesh.new()
-			quad.size = Vector2(CELL)
-			_shared_quad = quad
+		var shared_quad: QuadMesh = ensure_shared_quad()
 		instance.multimesh = MultiMesh.new()
 		instance.multimesh.transform_format = MultiMesh.TRANSFORM_2D
 		instance.multimesh.use_colors = true
 		instance.multimesh.use_custom_data = true
-		instance.multimesh.mesh = _shared_quad
+		instance.multimesh.mesh = shared_quad
 		instance.multimesh.instance_count = clumps.size()
 		var first_layer: int = _pieces.size() if layer == 0 else _pieces.size() - clumps.size()
 		for i: int in clumps.size():

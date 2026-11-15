@@ -11,6 +11,7 @@ var dialogue_id: String = ""
 var flag: String = ""
 var _glow: Sprite2D
 var _time: float = 0.0
+var _far_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -42,6 +43,12 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position):
+		_far_wait = 0.25
+		return
 	_glow.modulate.a = lerpf(0.45, 1.0, TimeManager.night_amount()) * (0.8 + 0.2 * sin(_time * 1.3 + position.x))
 
 

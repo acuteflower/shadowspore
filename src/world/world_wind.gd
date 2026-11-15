@@ -16,6 +16,7 @@ var _debris_timer: float = 0.5
 var _sand_timer: float = 0.18
 var _world: Variant ## dynamic to avoid the WorldLevel -> HUD/interior preload cycle
 var _previous: Dictionary = {}
+var _prune_wait: float = 0.5
 var _tick: float = 0.0
 var _air_timer: float = 2.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -107,46 +108,60 @@ func wind_gain() -> float:
 	return 1.0 + float(_config.get("gain_ramp", 1.8)) * ramp + float(_config.get("gain_storm", 0.5)) * storm
 
 
+func _contact_node(body: Node2D, delta: float, details: Array[Node]) -> bool:
+	if body == null:
+		return false
+	var id: int = body.get_instance_id()
+	var pos: Vector2 = body.global_position
+	var before: Vector2 = _previous.get(id, pos)
+	_previous[id] = pos
+	var dist2: float = before.distance_squared_to(pos)
+	# Teleports / room changes do not mow the land between destinations.
+	if dist2 < 0.64 or dist2 > 9216.0:
+		return false
+	var speed: float = sqrt(dist2) / maxf(delta, 0.01)
+	var force: float = clampf(speed / 100.0, 0.20, 1.4)
+	if not (body is Player):
+		force *= 0.65
+	var touched: bool = false
+	for node: MeadowDetails in details:
+		if node.stamp_segment(before, pos, force):
+			touched = true
+	var player: Player = body as Player
+	if touched and player != null and player.is_multiplayer_authority() and _rustle_wait <= 0.0 and not InputManager.ui_blocking and not player.story_lock:
+		_rustle_wait = 0.50 if player.stealth.sneaking else 0.32
+		_rustle.position = pos
+		_rustle.volume_db = -34.0 if player.stealth.sneaking else -28.0
+		_rustle.pitch_scale = _rng.randf_range(0.85, 1.15)
+		if not _rustle.playing:
+			_rustle.play()
+		if speed > 135.0:
+			_release_seed(pos)
+	return true
+
+
 func _contacts(delta: float) -> void:
-	var seen: Dictionary = {}
-	var actors: Array[Node] = []
-	actors.append_array(Player.all)
-	actors.append_array(get_tree().get_nodes_in_group("predators"))
-	actors.append_array(get_tree().get_nodes_in_group("wildlife"))
-	actors.append_array(get_tree().get_nodes_in_group("woodland_mammals"))
-	for node: Node in get_tree().get_nodes_in_group("corvids"):
-		if node is Node2D and float(node.get("_height")) < 2.0:
-			actors.append(node)
-	var moved_any: bool = false
 	var details: Array[Node] = get_tree().get_nodes_in_group("meadow_details")
-	for actor: Node in actors:
-		var body: Node2D = actor as Node2D
-		if body == null: continue
-		var id: int = body.get_instance_id()
-		seen[id] = true
-		var pos: Vector2 = body.global_position
-		var before: Vector2 = _previous.get(id,pos)
-		_previous[id] = pos
-		var distance: float = before.distance_to(pos)
-		# Teleports / room changes do not mow the land between destinations.
-		if distance < 0.8 or distance > 96.0: continue
-		moved_any = true
-		var speed: float = distance/maxf(delta,0.01)
-		var force: float = clampf(speed/100.0,0.20,1.4)
-		if not body is Player: force *= 0.65
-		var touched: bool = false
-		for node: MeadowDetails in details:
-			if node.stamp_segment(before,pos,force): touched = true
-		var player: Player = body as Player
-		if touched and player != null and player.is_multiplayer_authority() and _rustle_wait <= 0.0 and not InputManager.ui_blocking and not player.story_lock:
-			_rustle_wait = 0.50 if player.stealth.sneaking else 0.32
-			_rustle.position = pos
-			_rustle.volume_db = -34.0 if player.stealth.sneaking else -28.0
-			_rustle.pitch_scale = _rng.randf_range(0.85,1.15)
-			if not _rustle.playing: _rustle.play()
-			if speed > 135.0: _release_seed(pos)
-	for id: int in _previous.keys():
-		if not seen.has(id): _previous.erase(id)
+	var moved_any: bool = false
+	for player: Player in Player.all:
+		if _contact_node(player, delta, details):
+			moved_any = true
+	for group_name: String in ["predators", "wildlife", "woodland_mammals"]:
+		for actor: Node in get_tree().get_nodes_in_group(group_name):
+			if _contact_node(actor as Node2D, delta, details):
+				moved_any = true
+	for node: Node in get_tree().get_nodes_in_group("corvids"):
+		var body: Node2D = node as Node2D
+		if body != null and float(node.get("_height")) < 2.0 and _contact_node(body, delta, details):
+			moved_any = true
+	_prune_wait -= delta
+	if _prune_wait <= 0.0:
+		_prune_wait = 0.5
+		if not _previous.is_empty():
+			for id: int in _previous.keys():
+				var obj: Object = instance_from_id(id)
+				if obj == null or not (obj is Node2D) or not (obj as Node2D).is_inside_tree():
+					_previous.erase(id)
 	for node: MeadowDetails in details:
 		if moved_any or not node._bends.is_empty() or node._dirty:
 			node.advance_contacts(delta)
@@ -243,13 +258,13 @@ func _spawn_debris(delta: float, viewer: Player) -> void:
 
 ## Calm windborne golden sand wisps & rare faint crystal grains skimming low over Sonnenquarz-Öde dunes.
 func _spawn_desert_sand(delta: float, viewer: Player) -> void:
+	_sand_timer -= delta
+	if _sand_timer > 0.0:
+		return
 	if not _air_allowed(viewer) or rain > 0.35 or not _safe_for_trace(viewer):
 		return
 	var arid: float = BiomeBlend.arid_at(viewer.global_position)
 	if arid < 0.45 or gust < 0.18:
-		return
-	_sand_timer -= delta
-	if _sand_timer > 0.0:
 		return
 	var push: float = clampf(gust * arid, 0.25, 1.3)
 	_sand_timer = _rng.randf_range(0.28, 0.64) / push

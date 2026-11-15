@@ -18,6 +18,7 @@ var _bug: Node2D
 var _bug_t: float = -1.0
 var _bug_wait: float = 3.0
 var _alert: float = 0.0 ## 0..1 the lure flares (someone is close), on every peer for its own player
+var _offscreen_wait: float = 0.0
 
 
 func _setup_prop() -> void:
@@ -40,6 +41,20 @@ func _process(delta: float) -> void:
 	super(delta)
 	if not _on_screen and not multiplayer.is_server():
 		return
+	if not _on_screen and _snap_t < 0.0 and _cooldown.is_empty() and _tell.is_empty():
+		var off_range: float = float((_spec.get("snapper", {}) as Dictionary).get("range", 15.0)) + 24.0
+		var off_r2: float = off_range * off_range
+		var near_off: bool = false
+		var head_pos: Vector2 = _head()
+		for player: Player in Player.all:
+			if is_instance_valid(player) and player.global_position.distance_squared_to(head_pos) <= off_r2:
+				near_off = true
+				break
+		if not near_off:
+			if _offscreen_wait > 0.0:
+				_offscreen_wait -= delta
+				return
+			_offscreen_wait = 0.25
 	_light_check -= delta
 	if _light_check <= 0.0:
 		_light_check = 1.0
@@ -55,8 +70,9 @@ func _process(delta: float) -> void:
 		_pose_snap()
 	elif was_open != _open:
 		_pose_snap()
-	_update_alert(delta)
-	_update_bug(delta)
+	if _on_screen:
+		_update_alert(delta)
+		_update_bug(delta)
 	if multiplayer.is_server():
 		_sting(delta, snapper)
 
@@ -79,20 +95,34 @@ func _head() -> Vector2:
 
 ## Host: the sting. Someone who stays inside the range through the warning flare is bitten once per cooldown.
 func _sting(delta: float, snapper: Dictionary) -> void:
-	for id: Variant in _cooldown.keys():
-		_cooldown[id] = float(_cooldown[id]) - delta
-		if float(_cooldown[id]) <= 0.0:
-			_cooldown.erase(id)
+	if not _cooldown.is_empty():
+		for id: Variant in _cooldown.keys():
+			_cooldown[id] = float(_cooldown[id]) - delta
+			if float(_cooldown[id]) <= 0.0:
+				_cooldown.erase(id)
 	if not _open or _snap_t >= 0.0:
 		return
 	var range_px: float = float(snapper.get("range", 15.0))
+	var head_pos: Vector2 = _head()
+	var max_r2: float = range_px * range_px
+	var near_any: bool = false
+	for player: Player in Player.all:
+		if not is_instance_valid(player) or player.health.current <= 0.0 or not player.is_inside_tree():
+			continue
+		if player.global_position.distance_squared_to(head_pos) <= max_r2:
+			near_any = true
+			break
+	if not near_any:
+		if not _tell.is_empty():
+			_tell.clear()
+		return
 	var seen: Dictionary = {}
 	for player: Player in Player.all:
 		if not is_instance_valid(player) or player.health.current <= 0.0 or not player.is_inside_tree():
 			continue
 		var id: int = player.get_instance_id()
 		var reach: float = range_px * (0.5 if player.stealth.sneaking else 1.0)
-		if player.global_position.distance_to(_head()) > reach or _cooldown.has(id):
+		if player.global_position.distance_squared_to(head_pos) > reach * reach or _cooldown.has(id):
 			continue
 		seen[id] = true
 		_tell[id] = float(_tell.get(id, 0.0)) + delta
@@ -102,9 +132,10 @@ func _sting(delta: float, snapper: Dictionary) -> void:
 			player.health.take_damage(float(snapper.get("damage", 4.0)), global_position, 30.0, 0)
 			level._rpc_thing_fx.rpc(cell, "snap", player.global_position)
 			return
-	for id: Variant in _tell.keys():
-		if not seen.has(id):
-			_tell.erase(id)
+	if not _tell.is_empty():
+		for id: Variant in _tell.keys():
+			if not seen.has(id):
+				_tell.erase(id)
 
 
 ## Everyone (via the level): the jaws shut on something at `at`.

@@ -100,6 +100,8 @@ var _debris_entries: Array[Dictionary] = []
 var _vista_discovered: bool = false
 var _setup_sub: int = 0
 var _reserved_cache: Dictionary = {}
+var _obs_far_wait: float = 0.0
+var _obs_near: bool = true
 
 
 func _ready() -> void:
@@ -200,10 +202,35 @@ func _cleanup_owned_nodes() -> void:
 	_ysort_owned.clear()
 
 
+func _any_observer_near(delta: float) -> bool:
+	_obs_far_wait -= delta
+	if _obs_far_wait > 0.0:
+		return _obs_near
+	_obs_far_wait = 0.25
+	var center: Vector2 = _causeway_center
+	var vp: Viewport = get_viewport()
+	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+	if cam != null:
+		var cp: Vector2 = cam.get_screen_center_position()
+		if absf(cp.x - center.x) <= 1800.0 and absf(cp.y - center.y) <= 1300.0:
+			_obs_near = true
+			return true
+	for p: Player in Player.all:
+		if is_instance_valid(p) and absf(p.global_position.x - center.x) <= 1800.0 and absf(p.global_position.y - center.y) <= 1300.0:
+			_obs_near = true
+			return true
+	_obs_near = false
+	return false
+
+
 func _process(delta: float) -> void:
 	_time += delta
 	_surge_timer = maxf(0.0, _surge_timer - delta)
 	_harp_audio_cd = maxf(0.0, _harp_audio_cd - delta)
+	if _surge_timer <= 0.0 and not _any_observer_near(delta):
+		var far_tod: float = TimeManager.time_of_day if TimeManager != null else 0.35
+		_noon_pulsed_day = absf(far_tod - 0.50) < 0.022
+		return
 
 	var night: float = TimeManager.night_amount() if TimeManager != null else _night_amount
 	_night_amount = night

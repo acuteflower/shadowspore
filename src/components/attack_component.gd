@@ -77,6 +77,7 @@ var _flip_wait: float = 0.0
 var _swing_flip: bool = false ## during a swing: mirrored so that the working edge leads
 var _arm_sort: Node2D ## the arm sorts on its own: a near arm can hold a blade that points behind her
 var _arm_key: PackedFloat32Array = PackedFloat32Array() ## the arm pose last painted
+var _arm_key_buf: PackedFloat32Array = PackedFloat32Array()
 var _skin: ShaderMaterial ## the player's sprite shader, mirrored onto the arm and the item (mirror_material)
 var sheathed: bool = false ## set by the player while sneaking: the weapon fades out, and in again for a swing
 var aim_dir: Vector2 = Vector2.RIGHT ## direction of the current swing
@@ -1193,9 +1194,34 @@ func _update_pose(delta: float) -> void:
 	_sprint_k = move_toward(_sprint_k, 1.0 if carrying and not busy else 0.0, blend * 1.5 * delta)
 	_free_k = move_toward(_free_k, 1.0 if free_hand and not busy and not rod_pose.is_finite() else 0.0, (14.0 if busy or not free_hand else 6.0) * delta)
 	_hold_k = move_toward(_hold_k, 1.0 if _has_weapon and _weapon_alpha > 0.05 else 0.0, 5.0 * delta)
+	var weapon_shown: bool = _has_weapon or _weapon_alpha > 0.01 or busy or rod_pose.is_finite()
+	var hold_w: float = _free_k * _hold_k
+	if not weapon_shown and rig_arm3.size() == 4 and hold_w <= 0.001:
+		_shoulder3 = rig_arm3[0]
+		_elbow3 = rig_arm3[1]
+		_wrist3 = rig_arm3[2]
+		_fist3 = rig_arm3[3]
+		_emit_kind = 0
+		_prev_hand = GripRig.screen(_fist3)
+		_hand_vel = Vector2.ZERO
+		var has_depth_idle: bool = bool(depth_ctx.get("valid", false))
+		var arm_mid_idle: float = (_elbow3.y + _fist3.y) * 0.5
+		if has_depth_idle:
+			_arm_behind = false
+		elif arm_mid_idle < -0.6:
+			_arm_behind = true
+		elif arm_mid_idle > 0.0:
+			_arm_behind = false
+		_arm_sort.position = Vector2(0, (-HAND_SORT if _arm_behind else HAND_SORT) + 0.01)
+		_since_swing += delta
+		_weapon_alpha = 0.0
+		_weapon.modulate.a = 0.0
+		_weapon.visible = false
+		if _sync_arm_pose_key() or (_talismans != null and _talismans.worn_id("bracelet") != ""):
+			_arm.queue_redraw()
+		return
 	var hold: Array = _rest_hold()
 	var rest_dir: Vector3 = _rod_dir(forward, right) if rod_pose.is_finite() else GripRig.body_dir(forward, float(hold[1]), float(hold[2]))
-	var hold_w: float = _free_k * _hold_k
 	if rig_arm3.size() == 4:
 		_shoulder3 = rig_arm3[0]
 		var base_el: Vector3 = rig_arm3[1]
@@ -1276,9 +1302,7 @@ func _update_pose(delta: float) -> void:
 	_weapon_alpha = 1.0 if not hide and busy else move_toward(_weapon_alpha, 0.0 if hide else 1.0, 8.0 * delta)
 	_weapon.modulate.a = _weapon_alpha
 	_weapon.visible = _has_weapon and _weapon_alpha > 0.01
-	var arm_key: PackedFloat32Array = _arm_pose_key() ## the arm is painted again only when it moved (a worn bracelet shimmers: every frame)
-	if arm_key != _arm_key or (_talismans != null and _talismans.worn_id("bracelet") != ""):
-		_arm_key = arm_key
+	if _sync_arm_pose_key() or (_talismans != null and _talismans.worn_id("bracelet") != ""):
 		_arm.queue_redraw()
 
 
@@ -1495,21 +1519,40 @@ func _chop_dir(pitch: float, yaw: float) -> Vector3:
 
 
 ## The arm's pose to a quarter pixel: when it is the same as last frame, last frame's painting still stands.
+func _sync_arm_pose_key() -> bool:
+	var has_depth: bool = bool(depth_ctx.get("valid", false))
+	var needed: int = 19 if has_depth else 14
+	if _arm_key_buf.size() != needed:
+		_arm_key_buf.resize(needed)
+	_arm_key_buf[0] = roundf(_shoulder3.x * 4.0)
+	_arm_key_buf[1] = roundf(_shoulder3.y * 4.0)
+	_arm_key_buf[2] = roundf(_shoulder3.z * 4.0)
+	_arm_key_buf[3] = roundf(_elbow3.x * 4.0)
+	_arm_key_buf[4] = roundf(_elbow3.y * 4.0)
+	_arm_key_buf[5] = roundf(_elbow3.z * 4.0)
+	_arm_key_buf[6] = roundf(_wrist3.x * 4.0)
+	_arm_key_buf[7] = roundf(_wrist3.y * 4.0)
+	_arm_key_buf[8] = roundf(_wrist3.z * 4.0)
+	_arm_key_buf[9] = roundf(_fist3.x * 4.0)
+	_arm_key_buf[10] = roundf(_fist3.y * 4.0)
+	_arm_key_buf[11] = roundf(_fist3.z * 4.0)
+	_arm_key_buf[12] = _arm_sort.position.y
+	_arm_key_buf[13] = float(depth_ctx.get("arm_token", 0.0))
+	if has_depth:
+		_arm_key_buf[14] = float(int(depth_ctx.get("tex_id", 0)))
+		_arm_key_buf[15] = float(int(depth_ctx.get("cell_x", -1)))
+		_arm_key_buf[16] = float(int(depth_ctx.get("cell_y", -1)))
+		_arm_key_buf[17] = roundf(float(depth_ctx.get("dy", 0.0)) * 2.0)
+		_arm_key_buf[18] = roundf(float(depth_ctx.get("skew", 0.0)) * 40.0)
+	if _arm_key_buf == _arm_key:
+		return false
+	_arm_key = _arm_key_buf.duplicate()
+	return true
+
+
 func _arm_pose_key() -> PackedFloat32Array:
-	var key: PackedFloat32Array = PackedFloat32Array()
-	for p: Vector3 in [_shoulder3, _elbow3, _wrist3, _fist3]:
-		key.append(roundf(p.x * 4.0))
-		key.append(roundf(p.y * 4.0))
-		key.append(roundf(p.z * 4.0))
-	key.append(_arm_sort.position.y)
-	key.append(float(depth_ctx.get("arm_token", 0.0)))
-	if bool(depth_ctx.get("valid", false)):
-		key.append(float(int(depth_ctx.get("tex_id", 0))))
-		key.append(float(int(depth_ctx.get("cell_x", -1))))
-		key.append(float(int(depth_ctx.get("cell_y", -1))))
-		key.append(roundf(float(depth_ctx.get("dy", 0.0)) * 2.0))
-		key.append(roundf(float(depth_ctx.get("skew", 0.0)) * 40.0))
-	return key
+	_sync_arm_pose_key()
+	return _arm_key_buf.duplicate()
 
 
 ## Shows or hides the drawn arm and the held item together (the shadow step, swimming: those sheets carry both arms).

@@ -8,6 +8,12 @@ var _active: Dictionary = {}
 var _pending: Array[Vector2i] = []
 var _fields: Dictionary = {}
 var _serial: int = 0
+var _step_has_cell: bool = false
+var _step_cell: Vector2i
+var _step_kind_idx: int = 0
+var _step_rng: RandomNumberGenerator
+var _step_perch_state: Dictionary = {}
+var _step_settings: Dictionary = {}
 @onready var animals: Node2D = $Animals
 func _ready() -> void:
 	rivers = get_parent() as WorldRivers
@@ -23,11 +29,21 @@ func chunk_unloaded(cell: Vector2i) -> void:
 	_active.erase(cell)
 	_fields.erase(cell)
 	_pending.erase(cell)
+	if _step_has_cell and _step_cell == cell:
+		_step_has_cell = false
+		_step_perch_state.clear()
 	if multiplayer.is_server():
 		for animal: RiverAnimal in animals.get_children():
 			if Vector2i((animal.home / 512.0).floor()) == cell: animal.queue_free()
 func _process(_delta: float) -> void:
-	if not _pending.is_empty(): _populate(_pending.pop_front())
+	while not _pending.is_empty():
+		var cell: Vector2i = _pending[0]
+		if not _active.has(cell):
+			_pending.pop_front()
+			_step_has_cell = false
+			continue
+		if _populate_next_kind(cell):
+			return
 func count(kind: String) -> int:
 	var result: int = 0
 	for animal: RiverAnimal in animals.get_children():
@@ -39,7 +55,10 @@ func flow_at(point: Vector2) -> Vector2:
 		var key: String = "%d,%d" % [cell.x, cell.y]
 		var record: Dictionary = rivers._data["chunks"].get(key, {})
 		if record.is_empty(): return Vector2.RIGHT
-		_fields[cell] = (load(String(record["field"])) as Texture2D).get_image()
+		var field_tex: Texture2D = DataRegistry.tex(String(record["field"]))
+		if field_tex == null:
+			return Vector2.RIGHT
+		_fields[cell] = field_tex.get_image()
 	var local: Vector2i = Vector2i(point - Vector2(cell) * 512.0)
 	var pixel: Color = (_fields[cell] as Image).get_pixel(clampi(local.x, 0, 511), clampi(local.y, 0, 511))
 	return Vector2(pixel.b * 2 - 1, pixel.a * 2 - 1).limit_length()
@@ -135,77 +154,124 @@ func shore_target(home: Vector2, to_water: bool, rng: RandomNumberGenerator) -> 
 	return home
 func _populate(cell: Vector2i) -> void:
 	if not _active.has(cell): return
+	var chunk_key: String = "%d,%d" % [cell.x, cell.y]
+	if not (rivers._data.get("chunks", {}) as Dictionary).has(chunk_key):
+		return
 	var chunk_origin: Vector2 = Vector2(cell) * 512.0
 	if _arid(chunk_origin + Vector2(256.0, 256.0)) and _arid(chunk_origin) and _arid(chunk_origin + Vector2(512.0, 512.0)):
 		return
 	var settings: Dictionary = DataRegistry.table("river_animals")
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(settings["seed"])))
-	var cell_perches: Array[Node2D] = []
-	var perches_cached: bool = false
+	var perch_state: Dictionary = {}
+	for kind: String in enabled_kinds:
+		_populate_kind(cell, kind, settings, rng, perch_state)
+
+
+func _populate_next_kind(cell: Vector2i) -> bool:
+	if not _step_has_cell or _step_cell != cell:
+		var chunk_key: String = "%d,%d" % [cell.x, cell.y]
+		if not (rivers._data.get("chunks", {}) as Dictionary).has(chunk_key):
+			_pending.pop_front()
+			return false
+		var chunk_origin: Vector2 = Vector2(cell) * 512.0
+		if _arid(chunk_origin + Vector2(256.0, 256.0)) and _arid(chunk_origin) and _arid(chunk_origin + Vector2(512.0, 512.0)):
+			_pending.pop_front()
+			return false
+		_step_settings = DataRegistry.table("river_animals")
+		_step_rng = RandomNumberGenerator.new()
+		_step_rng.seed = hash(Vector3i(cell.x, cell.y, int(_step_settings["seed"])))
+		_step_perch_state.clear()
+		_step_cell = cell
+		_step_kind_idx = 0
+		_step_has_cell = true
+	while _step_kind_idx < enabled_kinds.size():
+		var kind: String = enabled_kinds[_step_kind_idx]
+		_step_kind_idx += 1
+		if _populate_kind(cell, kind, _step_settings, _step_rng, _step_perch_state):
+			if _step_kind_idx >= enabled_kinds.size():
+				_pending.pop_front()
+				_step_has_cell = false
+				_step_perch_state.clear()
+			return true
+	_pending.pop_front()
+	_step_has_cell = false
+	_step_perch_state.clear()
+	return false
+
+
+func _populate_kind(cell: Vector2i, kind: String, settings: Dictionary, rng: RandomNumberGenerator, perch_state: Dictionary) -> bool:
 	var max_total: int = Quality.scaled(int(settings["max_total"]), "wildlife", 1)
 	var total_now: int = animals.get_child_count()
-	for kind: String in enabled_kinds:
-		var spec: Dictionary = settings[kind]
-		var sp_now: int = count(kind)
-		var sp_cap: int = int(spec["cap"])
-		if sp_now >= sp_cap: continue
-		if rng.randf() > float(spec.get("chance", 1.0)): continue
-		var found: bool = false
-		var at: Vector2
-		for attempt: int in 200:
-			at = Vector2(cell) * 512.0 + Vector2(rng.randf_range(28, 484), rng.randf_range(28, 484))
-			if _arid(at): continue
-			var field: Vector2 = rivers.field_at(at)
-			var valid: bool = field.x < -6.0 and field.y < 0.7
-			if kind == "brook": valid = field.x < -8.0 and field.y > 0.45
-			if kind in ["frog", "dragonfly"]: valid = field.x > 1.0 and field.x < 8.0
-			if kind == "heron": valid = field.x > -6.0 and field.x < 10.0 and field.y < 0.45
-			if kind == "otter": valid = field.x > -14.0 and field.x < 8.0 and field.y < 0.72
-			if kind == "kingfisher": valid = field.x > 1.0 and field.x < 9.0
-			if kind == "duck": valid = field.x < -12.0 and field.y > 0.1 and field.y < 0.65 and rivers.field_at(at + Vector2(14, 0)).x < -9.0 and rivers.field_at(at - Vector2(14, 0)).x < -9.0
-			if valid:
-				found = true
+	var spec: Dictionary = settings[kind]
+	var sp_now: int = count(kind)
+	var sp_cap: int = int(spec["cap"])
+	if sp_now >= sp_cap:
+		return false
+	if rng.randf() > float(spec.get("chance", 1.0)):
+		return false
+	var found: bool = false
+	var at: Vector2
+	for attempt: int in 200:
+		at = Vector2(cell) * 512.0 + Vector2(rng.randf_range(28, 484), rng.randf_range(28, 484))
+		if _arid(at): continue
+		var field: Vector2 = rivers.field_at(at)
+		var valid: bool = field.x < -6.0 and field.y < 0.7
+		if kind == "brook": valid = field.x < -8.0 and field.y > 0.45
+		if kind in ["frog", "dragonfly"]: valid = field.x > 1.0 and field.x < 8.0
+		if kind == "heron": valid = field.x > -6.0 and field.x < 10.0 and field.y < 0.45
+		if kind == "otter": valid = field.x > -14.0 and field.x < 8.0 and field.y < 0.72
+		if kind == "kingfisher": valid = field.x > 1.0 and field.x < 9.0
+		if kind == "duck": valid = field.x < -12.0 and field.y > 0.1 and field.y < 0.65 and rivers.field_at(at + Vector2(14, 0)).x < -9.0 and rivers.field_at(at - Vector2(14, 0)).x < -9.0
+		if valid:
+			found = true
+			break
+	if not found:
+		return true
+	if kind == "dragonfly" or kind == "kingfisher":
+		if not perch_state.has("cached"):
+			var cell_perches: Array[Node2D] = []
+			for node: Node in get_tree().get_nodes_in_group("river_perches"):
+				var p_node: Node2D = node as Node2D
+				if p_node != null and Vector2i((p_node.global_position / 512.0).floor()) == cell:
+					cell_perches.append(p_node)
+			perch_state["cached"] = true
+			perch_state["perches"] = cell_perches
+		var cached_perches: Array[Node2D] = perch_state["perches"] as Array[Node2D]
+		var perch: Node2D
+		var perch_r2: float = float(spec["range"]) * float(spec["range"])
+		for candidate: Node2D in cached_perches:
+			if candidate.global_position.distance_squared_to(at) < perch_r2:
+				perch = candidate
 				break
-		if not found: continue
-		if kind == "dragonfly" or kind == "kingfisher":
-			if not perches_cached:
-				perches_cached = true
-				for node: Node in get_tree().get_nodes_in_group("river_perches"):
-					var p_node: Node2D = node as Node2D
-					if p_node != null and Vector2i((p_node.global_position / 512.0).floor()) == cell:
-						cell_perches.append(p_node)
-			var perch: Node2D
-			var perch_r2: float = float(spec["range"]) * float(spec["range"])
-			for candidate: Node2D in cell_perches:
-				if candidate.global_position.distance_squared_to(at) < perch_r2:
-					perch = candidate
-					break
-			if perch == null: continue
-			at = perch.global_position
-		var near_player: bool = false
-		var fear_r2: float = (float(spec["fear"]) + 20.0) * (float(spec["fear"]) + 20.0)
-		for player: Player in Player.all:
-			if at.distance_squared_to(player.global_position) < fear_r2: near_player = true
-		if near_player: continue
-		var family: bool = kind == "duck" and rng.randf() < 0.5 ## a hen with ducklings or a lone drake pair
-		var otter_pair: bool = kind == "otter" and rng.randf() < 0.65
-		var group: int = int(spec["group"]) if (kind != "duck" or family) else 2
-		if kind == "otter":
-			group = 2 if otter_pair else 1
-		for member: int in group:
-			if sp_now >= sp_cap or total_now >= max_total: break
-			var point: Vector2 = at + Vector2(member * 3.0, member * 2.0)
-			if kind in ["shoal", "strider"] and rivers.field_at(point).x > -2.0: continue
-			var animal: RiverAnimal = RIVER_ANIMAL_SCENE.instantiate() as RiverAnimal
-			_serial += 1
-			animal.name = "RiverAnimal%d" % _serial
-			animal.kind = kind
-			animal.member = member
-			animal.school = "%s_%s" % ["duckfamily" if family else kind, cell]
-			animal.home = at
-			animal.position = point
-			animal.facing = (-flow_at(point)).angle()
-			animals.add_child(animal)
-			sp_now += 1
-			total_now += 1
+		if perch == null:
+			return true
+		at = perch.global_position
+	var near_player: bool = false
+	var fear_r2: float = (float(spec["fear"]) + 20.0) * (float(spec["fear"]) + 20.0)
+	for player: Player in Player.all:
+		if at.distance_squared_to(player.global_position) < fear_r2: near_player = true
+	if near_player:
+		return true
+	var family: bool = kind == "duck" and rng.randf() < 0.5 ## a hen with ducklings or a lone drake pair
+	var otter_pair: bool = kind == "otter" and rng.randf() < 0.65
+	var group: int = int(spec["group"]) if (kind != "duck" or family) else 2
+	if kind == "otter":
+		group = 2 if otter_pair else 1
+	for member: int in group:
+		if sp_now >= sp_cap or total_now >= max_total: break
+		var point: Vector2 = at + Vector2(member * 3.0, member * 2.0)
+		if kind in ["shoal", "strider"] and rivers.field_at(point).x > -2.0: continue
+		var animal: RiverAnimal = RIVER_ANIMAL_SCENE.instantiate() as RiverAnimal
+		_serial += 1
+		animal.name = "RiverAnimal%d" % _serial
+		animal.kind = kind
+		animal.member = member
+		animal.school = "%s_%s" % ["duckfamily" if family else kind, cell]
+		animal.home = at
+		animal.position = point
+		animal.facing = (-flow_at(point)).angle()
+		animals.add_child(animal)
+		sp_now += 1
+		total_now += 1
+	return true

@@ -18,6 +18,7 @@ var _seen: PackedByteArray = PackedByteArray()
 var _count: int = 0
 var _timer: float = 0.0
 var _before: PackedByteArray = PackedByteArray() ## the table as it was before the developer's "whole map" reveal; empty = no reveal active
+var _export_cache: PackedByteArray = PackedByteArray()
 
 
 func _ready() -> void:
@@ -74,6 +75,7 @@ func _rpc_reveal(cells: PackedInt32Array) -> void:
 			_count += 1
 			added.append(index)
 	if not added.is_empty():
+		_export_cache = PackedByteArray()
 		revealed.emit(added)
 
 
@@ -101,7 +103,9 @@ func bytes() -> PackedByteArray:
 
 ## The table, compressed (network snapshot and save file).
 func export_data() -> PackedByteArray:
-	return _seen.compress(FileAccess.COMPRESSION_ZSTD)
+	if _export_cache.is_empty():
+		_export_cache = _seen.compress(FileAccess.COMPRESSION_ZSTD)
+	return _export_cache
 
 
 func import_data(data: PackedByteArray) -> void:
@@ -109,6 +113,7 @@ func import_data(data: PackedByteArray) -> void:
 	if raw.size() != GRID * GRID:
 		return
 	_seen = raw
+	_export_cache = PackedByteArray()
 	_count = 0
 	for value: int in _seen:
 		_count += value
@@ -168,6 +173,7 @@ func import_before(data: PackedByteArray) -> void:
 ## Host: replaces the whole table and tells everybody else.
 func _set_table(raw: PackedByteArray) -> void:
 	_seen = raw
+	_export_cache = PackedByteArray()
 	_count = 0
 	for value: int in _seen:
 		_count += value

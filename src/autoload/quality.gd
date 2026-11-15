@@ -33,7 +33,7 @@ const PRESETS: Array[Dictionary] = [
 		"pixel_res": true, ## render the world at 640x360 and scale it up (screen shaders cost 1/9 at 1080p)
 	},
 	{ # MITTEL
-		"rig_hz": 24.0, "rig_fast_hz": 45.0,
+		"rig_hz": 22.0, "rig_fast_hz": 38.0,
 		"lights": 12, "lights_small_min": 3,
 		"light_breath_hz": 20.0,
 		"fireflies": 0.7, "day_motes": 0.7, "particles": 0.75,
@@ -44,7 +44,7 @@ const PRESETS: Array[Dictionary] = [
 		"pixel_res": false,
 	},
 	{ # HOCH (= der bisherige Look)
-		"rig_hz": 30.0, "rig_fast_hz": 60.0,
+		"rig_hz": 24.0, "rig_fast_hz": 42.0,
 		"lights": 16, "lights_small_min": 4,
 		"light_breath_hz": 30.0,
 		"fireflies": 1.0, "day_motes": 1.0, "particles": 1.0,

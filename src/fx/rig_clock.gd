@@ -12,10 +12,14 @@ const MAX_STEP: float = 0.12 ## a frame hitch is advanced as at most this much (
 
 static var base_hz: float = 30.0 ## set by Quality (graphics level): rigs that keep the default rate follow it
 static var base_fast_hz: float = 60.0
+static var _frame_id: int = -1
+static var _seen_this_frame: int = 0
+static var _crowd_count: int = 0
 
 var hz: float = -1.0 ## < 0: follow `base_hz`
 var fast_hz: float = -1.0 ## < 0: follow `base_fast_hz`
 var _acc: float = 0.0
+var _seeded: bool = false
 
 
 func _init(rate: float = -1.0, fast_rate: float = -1.0) -> void:
@@ -24,7 +28,7 @@ func _init(rate: float = -1.0, fast_rate: float = -1.0) -> void:
 
 
 ## The delta to rebuild with now, or -1 when this frame is skipped.
-func step(rig: CanvasItem, delta: float, speed: float = 0.0) -> float:
+func step(rig: CanvasItem, delta: float, speed: float = 0.0, active: bool = true) -> float:
 	if delta <= 0.0:
 		return delta
 	var slow: float = hz if hz > 0.0 else base_hz
@@ -40,8 +44,19 @@ func step(rig: CanvasItem, delta: float, speed: float = 0.0) -> float:
 		var off_out: float = minf(_acc, MAX_STEP)
 		_acc = 0.0
 		return off_out
+	var fid: int = Engine.get_process_frames()
+	if fid != _frame_id:
+		_frame_id = fid
+		_crowd_count = _seen_this_frame
+		_seen_this_frame = 0
+	_seen_this_frame += 1
+	var rate: float = fast if speed > FAST_SPEED else (slow * 0.6 if (not active and speed < 8.0 and slow >= 12.0) else slow)
+	if rate >= 1.0 and _crowd_count > 4 and slow >= 12.0:
+		rate = maxf(10.0, rate * clampf(4.0 / float(_crowd_count), 0.5, 1.0))
+	if not _seeded and rate >= 1.0:
+		_seeded = true
+		_acc = (float(rig.get_instance_id() & 0xFF) / 256.0) / rate
 	_acc += delta
-	var rate: float = fast if speed > FAST_SPEED else slow
 	if _acc < 1.0 / rate - 0.0005:
 		return -1.0
 	var out: float = minf(_acc, MAX_STEP)

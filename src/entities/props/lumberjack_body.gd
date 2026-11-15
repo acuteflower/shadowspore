@@ -14,6 +14,7 @@ var _glow: Sprite2D
 var _axe: Sprite2D
 var _motes: CPUParticles2D
 var _time: float = 0.0
+var _far_wait: float = 0.0
 var _busy: bool = false
 
 
@@ -66,6 +67,12 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position):
+		_far_wait = 0.25
+		return
 	_glow.modulate.a = 0.7 + 0.3 * sin(_time * 1.7) * sin(_time * 0.6 + 1.0)
 
 
@@ -85,9 +92,9 @@ func prompt_position() -> Vector2:
 
 
 func _local_player() -> Player:
-	for node: Node in get_tree().get_nodes_in_group("players"):
-		if node is Player and node.is_multiplayer_authority():
-			return node as Player
+	for player: Player in Player.all:
+		if is_instance_valid(player) and player.is_multiplayer_authority():
+			return player
 	return null
 
 

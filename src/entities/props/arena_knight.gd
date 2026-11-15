@@ -142,6 +142,8 @@ func dissolve() -> void:
 
 
 func _process(delta: float) -> void:
+	if not shown and _dissolve < 0.0:
+		return
 	_time += delta
 	_flare = maxf(0.0, _flare - delta * 0.9)
 	var night: float = TimeManager.night_amount()

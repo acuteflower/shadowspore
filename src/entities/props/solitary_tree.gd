@@ -50,29 +50,33 @@ func _ready() -> void:
 
 func _build_visuals() -> void:
 	var off: Vector2 = Vector2(0.0, -(FEET_Y - float(FRAME_H) * 0.5))
-	if ResourceLoader.exists(TEX_PATH):
+	var tex_body: Texture2D = DataRegistry.tex(TEX_PATH)
+	if tex_body != null:
 		_body = Sprite2D.new()
-		_body.texture = load(TEX_PATH) as Texture2D
+		_body.texture = tex_body
 		_body.hframes = 2
 		_body.vframes = 1
 		_body.frame = variant
 		_body.offset = off
 		add_child(_body)
-	if ResourceLoader.exists(GLOW_PATH):
+	var tex_glow: Texture2D = DataRegistry.tex(GLOW_PATH)
+	if tex_glow != null:
 		_glow = Sprite2D.new()
-		_glow.texture = load(GLOW_PATH) as Texture2D
+		_glow.texture = tex_glow
 		_glow.hframes = 2
 		_glow.vframes = 1
 		_glow.frame = variant
 		_glow.offset = off
 		_glow.material = Unlit.material()
 		add_child(_glow)
-	if variant == 1 and ResourceLoader.exists(SWING_PATH):
-		_swing = Sprite2D.new()
-		_swing.texture = load(SWING_PATH) as Texture2D
-		_swing.position = Vector2(-42.0, -58.0)
-		_swing.offset = Vector2(0.0, 30.0) ## pivot at top rope knot (16, 2) inside 32x64 sprite
-		add_child(_swing)
+	if variant == 1:
+		var tex_swing: Texture2D = DataRegistry.tex(SWING_PATH)
+		if tex_swing != null:
+			_swing = Sprite2D.new()
+			_swing.texture = tex_swing
+			_swing.position = Vector2(-42.0, -58.0)
+			_swing.offset = Vector2(0.0, 30.0) ## pivot at top rope knot (16, 2) inside 32x64 sprite
+			add_child(_swing)
 	_light = NightLight.new()
 	_light.position = Vector2(28.0 if variant == 0 else -32.0, -10.0)
 	_light.radius = 64

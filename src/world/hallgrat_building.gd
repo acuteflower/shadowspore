@@ -127,6 +127,22 @@ func _ready() -> void:
 	_far_wait = fposmod(absf(_at.x * 0.017 + _at.y * 0.031), 0.35)
 
 
+func set_managed_sleep(sleep: bool) -> void:
+	if sleep:
+		if _glow != null and _glow.modulate.a != 0.0:
+			_glow.modulate.a = 0.0
+		if _sprite != null and _sprite.modulate.a != 1.0:
+			_sprite.modulate.a = 1.0
+			if _glow != null:
+				_glow.self_modulate.a = 1.0
+		set_process(false)
+	else:
+		if _glow == null and _sprite == null:
+			return
+		_far_wait = 0.0
+		set_process(true)
+
+
 func _process(delta: float) -> void:
 	if _glow == null and _sprite == null:
 		set_process(false)

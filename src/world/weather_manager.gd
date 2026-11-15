@@ -33,8 +33,25 @@ var local_rain: float = 0.0 ## rain on the camera's ground right now (a rain cel
 var desert_resonance: float = 0.0 ## 0..1 Singender Resonanzwind (translates rain regimes in quartz_desert)
 var desert_arcane_storm: float = 0.0 ## 0..1 Arkanes Quarzgewitter (translates storm regimes in quartz_desert, dry lightning)
 var focus: Vector2 = Vector2.ZERO
+var last_hex_at_focus: float = 0.0
+var last_arid_at_focus: float = 0.0
 
 var _target: WeatherRules.State = WeatherRules.State.new()
+var _base_target: WeatherRules.State = WeatherRules.State.new()
+var _probe_state: WeatherRules.State = WeatherRules.State.new()
+var _last_state_seed: int = -99999
+var _last_state_epoch: float = -1.0
+var _last_normal_weather: bool = false
+var _last_override_id: String = ""
+var _biome_focus: Vector2 = Vector2(INF, INF)
+var _biome_wait: float = 0.0
+var _boss_wait: float = 0.0
+var _boss_desert_share: float = 0.0
+var _boss_want_res: float = 0.0
+var _boss_want_arc: float = 0.0
+var _id_wait: float = 0.0
+var _wet_epoch: float = -1.0
+var _wet_rules_cached: float = 0.0
 var _seed_built: int = -99999
 var _texture_set: bool = false
 var _epoch: float = 0.0
@@ -111,15 +128,38 @@ func follow(is_indoors: bool, delta: float) -> void:
 	var opened: bool = opening == null or bool(opening)
 	_opened = opened
 	if override_id != "":
-		_target = WeatherRules.named(override_id)
-		_target.dir = WeatherRules.state_at(world_seed, _epoch).dir
+		if _last_override_id != override_id:
+			_base_target = WeatherRules.named(override_id)
+			_last_override_id = override_id
+		_last_normal_weather = false
+		WeatherRules.state_into(world_seed, _epoch, _target)
+		_base_target.dir = _target.dir
+		_copy_state(_base_target, _target)
 	elif not opened or not WeatherRules.enabled():
-		_target = WeatherRules.named("clear") ## the night of the opening: a clear sky
+		if _last_override_id != "__clear__":
+			_base_target = WeatherRules.named("clear") ## the night of the opening: a clear sky
+			_last_override_id = "__clear__"
+		_last_normal_weather = false
+		_copy_state(_base_target, _target)
 	else:
-		_target = WeatherRules.state_at(world_seed, _epoch)
+		_last_override_id = ""
+		if not _last_normal_weather or world_seed != _last_state_seed or absf(_epoch - _last_state_epoch) >= 0.0002 or delta <= 0.0:
+			WeatherRules.state_into(world_seed, _epoch, _base_target)
+			_last_state_seed = world_seed
+			_last_state_epoch = _epoch
+			_last_normal_weather = true
+		_copy_state(_base_target, _target)
 	var raw_rain: float = _target.rain
 	var raw_storm: float = _target.storm
-	_apply_region(_target)
+	_biome_wait -= delta
+	if _biome_wait <= 0.0 or focus.distance_squared_to(_biome_focus) >= 16.0 or delta <= 0.0:
+		_biome_wait = 0.10
+		_biome_focus = focus
+		last_hex_at_focus = BiomeBlend.amount_at(focus)
+		last_arid_at_focus = BiomeBlend.arid_at(focus)
+	var hex_here: float = last_hex_at_focus
+	var arid_here: float = last_arid_at_focus
+	_apply_region_cached(_target, hex_here, arid_here)
 	# the eye follows with a short lag: a time jump (F4, sleep) melts instead of snapping
 	var k: float = 1.0 - exp(-delta / 1.4)
 	cloud = lerpf(cloud, _target.cloud, k)
@@ -127,20 +167,29 @@ func follow(is_indoors: bool, delta: float) -> void:
 	wind = lerpf(wind, _target.wind, k)
 	storm = lerpf(storm, _target.storm, k)
 	fog = lerpf(fog, _target.fog, k)
-	var arid_here: float = BiomeBlend.arid_at(focus)
 	var arid_dry: float = 1.0 - smoothstep(0.18, 0.42, arid_here)
 	var desert_share: float = 0.0 if indoors else smoothstep(0.28, 0.65, arid_here)
 	var want_res: float = clampf(raw_rain * 1.35 + raw_storm * 0.35, 0.0, 1.0) * desert_share
 	var want_arc: float = clampf(raw_storm * 1.25, 0.0, 1.0) * desert_share
 	if not indoors:
-		for b_node: Node in get_tree().get_nodes_in_group("bosses"):
-			if b_node is Node2D and b_node.has_method("is_storm_stage") and bool(b_node.call("is_storm_stage")):
-				var bd: float = (b_node as Node2D).global_position.distance_to(focus)
-				if bd <= 680.0:
-					var falloff: float = 1.0 - smoothstep(420.0, 680.0, bd)
-					desert_share = maxf(desert_share, falloff)
-					want_res = maxf(want_res, 0.86 * falloff)
-					want_arc = maxf(want_arc, 0.94 * falloff)
+		_boss_wait -= delta
+		if _boss_wait <= 0.0 or delta <= 0.0:
+			_boss_wait = 0.15
+			_boss_desert_share = 0.0
+			_boss_want_res = 0.0
+			_boss_want_arc = 0.0
+			for b_node: Node in get_tree().get_nodes_in_group("bosses"):
+				if b_node is Node2D and b_node.has_method("is_storm_stage") and bool(b_node.call("is_storm_stage")):
+					var bd: float = (b_node as Node2D).global_position.distance_to(focus)
+					if bd <= 680.0:
+						var falloff: float = 1.0 - smoothstep(420.0, 680.0, bd)
+						_boss_desert_share = maxf(_boss_desert_share, falloff)
+						_boss_want_res = maxf(_boss_want_res, 0.86 * falloff)
+						_boss_want_arc = maxf(_boss_want_arc, 0.94 * falloff)
+		if _boss_desert_share > 0.0:
+			desert_share = maxf(desert_share, _boss_desert_share)
+			want_res = maxf(want_res, _boss_want_res)
+			want_arc = maxf(want_arc, _boss_want_arc)
 	desert_resonance = lerpf(desert_resonance, want_res, k) * (0.0 if desert_share <= 0.001 else 1.0)
 	desert_arcane_storm = lerpf(desert_arcane_storm, want_arc, k) * (0.0 if desert_share <= 0.001 else 1.0)
 	rain *= arid_dry
@@ -151,36 +200,50 @@ func follow(is_indoors: bool, delta: float) -> void:
 		_pending_thunder.clear()
 	dir = lerp_angle(dir, _target.dir, k)
 	drift = WeatherRules.drift_at(world_seed, _epoch)
-	_update_wetness(delta, world_seed)
-	var id: String = WeatherRules.nearest_id(_current_state())
-	if id != state_id:
-		state_id = id
-		state_changed.emit(id)
+	_update_wetness(delta, world_seed, arid_dry)
+	_id_wait -= delta
+	if _id_wait <= 0.0 or delta <= 0.0 or override_id != "":
+		_id_wait = 0.15
+		var id: String = WeatherRules.nearest_id(_current_state())
+		if id != state_id:
+			state_id = id
+			state_changed.emit(id)
 	_update_field()
 	_push_globals()
 	_push_wind()
 	_run_lightning(delta, world_seed)
 
 
+func _copy_state(src: WeatherRules.State, dst: WeatherRules.State) -> void:
+	dst.cloud = src.cloud
+	dst.rain = src.rain
+	dst.wind = src.wind
+	dst.storm = src.storm
+	dst.fog = src.fog
+	dst.dir = src.dir
+	dst.id = src.id
+
+
 func _current_state() -> WeatherRules.State:
-	var s: WeatherRules.State = WeatherRules.State.new()
-	s.cloud = cloud
-	s.rain = rain
-	s.wind = wind
-	s.storm = storm
-	s.fog = fog
-	s.dir = dir
-	return s
+	_probe_state.cloud = cloud
+	_probe_state.rain = rain
+	_probe_state.wind = wind
+	_probe_state.storm = storm
+	_probe_state.fog = fog
+	_probe_state.dir = dir
+	return _probe_state
 
 
 ## The Hexenwald keeps its own sky (overcast and misty); the Sonnenquarz-Öde is bone-dry and rainless.
 func _apply_region(s: WeatherRules.State) -> void:
-	var hex: float = BiomeBlend.amount_at(focus)
+	_apply_region_cached(s, BiomeBlend.amount_at(focus), BiomeBlend.arid_at(focus))
+
+
+func _apply_region_cached(s: WeatherRules.State, hex: float, arid: float) -> void:
 	if hex > 0.001:
 		var r: Dictionary = (_cfg.get("regions", {}) as Dictionary).get("hexenwald", {}) as Dictionary
 		s.cloud = lerpf(s.cloud, maxf(s.cloud, float(r.get("cloud_min", 0.58))), hex)
 		s.fog = lerpf(s.fog, maxf(s.fog, float(r.get("fog_min", 0.22))), hex)
-	var arid: float = BiomeBlend.arid_at(focus)
 	if arid > 0.05:
 		var dry: float = smoothstep(0.12, 0.42, arid)
 		var d: Dictionary = (_cfg.get("regions", {}) as Dictionary).get("quartz_desert", {}) as Dictionary
@@ -190,9 +253,14 @@ func _apply_region(s: WeatherRules.State) -> void:
 		s.cloud = lerpf(s.cloud, minf(s.cloud, float(d.get("cloud_max", 0.28))), smoothstep(0.22, 0.65, arid))
 
 
-func _update_wetness(delta: float, world_seed: int) -> void:
-	var arid_dry: float = 1.0 - smoothstep(0.18, 0.42, BiomeBlend.arid_at(focus))
-	var from_rules: float = WeatherRules.ground_wet(world_seed, _epoch) if override_id == "" and WeatherRules.enabled() and _opened else 0.0
+func _update_wetness(delta: float, world_seed: int, arid_dry_override: float = -1.0) -> void:
+	var arid_dry: float = arid_dry_override if arid_dry_override >= 0.0 else (1.0 - smoothstep(0.18, 0.42, BiomeBlend.arid_at(focus)))
+	var from_rules: float = 0.0
+	if override_id == "" and WeatherRules.enabled() and _opened:
+		if _wet_epoch < 0.0 or absf(_epoch - _wet_epoch) >= 0.001 or delta <= 0.0:
+			_wet_epoch = _epoch
+			_wet_rules_cached = WeatherRules.ground_wet(world_seed, _epoch)
+		from_rules = _wet_rules_cached
 	# a held state (dev/story) soaks and dries the ground by itself
 	_extra_wet = move_toward(_extra_wet, clampf(rain * 1.2 + fog * 0.3, 0.0, 1.0) if override_id != "" else 0.0, (0.05 if override_id != "" else 0.01) * delta)
 	var target: float = maxf(from_rules, _extra_wet) * arid_dry
@@ -357,9 +425,11 @@ func rain_at(pos: Vector2) -> float:
 
 ## How much of that rain actually reaches someone standing there: crowns shelter, rooms keep it out.
 func exposure_at(pos: Vector2) -> float:
+	if not field.ready_now or field.rain_regime <= 0.001:
+		return 0.0
 	if Interiors.slot_at(pos) >= 0:
 		return 0.0
-	return rain_at(pos) * (1.0 - 0.85 * canopy_at(pos))
+	return field.rain_at(pos) * (1.0 - 0.85 * canopy_at(pos))
 
 
 ## 0 open sky .. 1 dense crown above this world position (the daylight field's canopy map).

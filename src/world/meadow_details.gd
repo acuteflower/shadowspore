@@ -7,6 +7,7 @@ const COUNT: int = 34 ## 0-23 grass, flowers, ferns, straw; 24-25 shade moss (fo
 const MEADOW_COUNT: int = 26 ## what the meadow draws from (Hexenwald and desert kinds are chosen on purpose, see WorldLevel._detail_candidate)
 const WIND: Shader = preload("res://assets/shaders/meadow_details.gdshader")
 static var _atlas: ImageTexture
+static var _cleanup_registered: bool = false
 var _wind: ShaderMaterial
 var _field: Image
 var _contact_texture: ImageTexture
@@ -20,8 +21,17 @@ var _dirty: bool = false
 var _contact_timer: float = 0.0
 const CONTACT_UPDATE_INTERVAL: float = 0.12 ## Throttle texture upload to ~8 updates/sec max during active contacts
 
+static func _ensure_cleanup() -> void:
+	if not _cleanup_registered:
+		_cleanup_registered = true
+		Jobs.register_cleanup(MeadowDetails.clear_cache)
+
+static func clear_cache() -> void:
+	_atlas = null
+
 func setup(points: Array[Dictionary], origin: Vector2 = Vector2.ZERO) -> void:
 	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
+	_ensure_cleanup()
 	_origin = origin
 	position = origin
 	if _atlas == null:

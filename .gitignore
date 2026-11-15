@@ -2,5 +2,18 @@
 .godot/
 /android/
 
+# Build outputs & generated production secrets
+/build/
+/firebase/public/downloads/*.exe
+/firebase/public/updates/*.zip
+server/prod/.env
+server/prod/prod.yml
+firebase/.firebaserc
+.env.release
+custom_templates/
+*.pfx
+*.p12
+export_credentials.cfg
+
 # Python virtualenv for the tools/ scripts
 .venv/

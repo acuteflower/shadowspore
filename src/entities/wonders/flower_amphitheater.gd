@@ -183,9 +183,10 @@ func play_awaken_fx() -> void:
 
 
 func _play_hum() -> void:
-	if ResourceLoader.exists(HUM_WAV):
+	var hum_stream: AudioStream = DataRegistry.audio(HUM_WAV)
+	if hum_stream != null:
 		var snd: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
-		snd.stream = load(HUM_WAV) as AudioStream
+		snd.stream = hum_stream
 		snd.bus = "SFX"
 		snd.volume_db = -3.0
 		snd.max_distance = 620.0

@@ -17,6 +17,8 @@ var deck_rects: Array[Rect2] = [] ## world-space walkable stone deck rectangles
 
 var _glow_a: Sprite2D
 var _glow_b: Sprite2D
+var _far_wait: float = 0.0
+var _last_night: float = -1.0
 
 
 func setup(spec: Dictionary) -> void:
@@ -79,18 +81,20 @@ func _ready() -> void:
 
 func _spawn_abutment(local_pt: Vector2, frame_idx: int) -> Sprite2D:
 	var off: Vector2 = Vector2(0.0, -(56.0 - 48.0)) ## anchor (48, 56) inside 96x96
-	if ResourceLoader.exists(BRIDGE_TEX):
+	var tex_bridge: Texture2D = DataRegistry.tex(BRIDGE_TEX)
+	if tex_bridge != null:
 		var sp: Sprite2D = Sprite2D.new()
-		sp.texture = load(BRIDGE_TEX) as Texture2D
+		sp.texture = tex_bridge
 		sp.hframes = 4
 		sp.frame = frame_idx
 		sp.position = local_pt.round()
 		sp.offset = off
 		add_child(sp)
 	var gl: Sprite2D = null
-	if ResourceLoader.exists(BRIDGE_GLOW):
+	var tex_glow: Texture2D = DataRegistry.tex(BRIDGE_GLOW)
+	if tex_glow != null:
 		gl = Sprite2D.new()
-		gl.texture = load(BRIDGE_GLOW) as Texture2D
+		gl.texture = tex_glow
 		gl.hframes = 4
 		gl.frame = frame_idx
 		gl.position = local_pt.round()
@@ -133,8 +137,17 @@ func _build_parapet_colliders() -> void:
 	add_child(sb)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position):
+		_far_wait = 0.25
+		return
 	var night: float = TimeManager.night_amount()
+	if night == _last_night:
+		return
+	_last_night = night
 	var a: float = lerpf(0.24, 0.90, night)
 	if _glow_a != null:
 		_glow_a.modulate.a = a

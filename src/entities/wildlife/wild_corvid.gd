@@ -90,7 +90,7 @@ func _ready() -> void:
 		add_child(tag)
 		_ring = Sprite2D.new()
 		_ring.name = "Ring"
-		_ring.texture = load("res://assets/wildlife/pet_marks.png") as Texture2D
+		_ring.texture = _cached_tex("res://assets/wildlife/pet_marks.png")
 		_ring.hframes = 62
 		_ring.vframes = 48
 		_ring.centered = false

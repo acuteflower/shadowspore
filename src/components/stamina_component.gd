@@ -20,6 +20,15 @@ var infinite: bool = false:
 
 var _delay_left: float = 0.0
 var _pulse_left: float = 1.0
+var _effects_checked: bool = false
+var _effects: StatusEffects
+
+
+func _get_effects() -> StatusEffects:
+	if not _effects_checked:
+		_effects_checked = true
+		_effects = get_node_or_null("../Effects") as StatusEffects
+	return _effects
 
 
 func _ready() -> void:
@@ -45,7 +54,7 @@ func _process(delta: float) -> void:
 ## Multiplier on continuous stamina regeneration: desert midday heat slows regen by up to -30 %, ERFRISCHT boosts it by +15 %.
 func regen_scale() -> float:
 	var heat: float = heat_amount()
-	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	var effects: StatusEffects = _get_effects()
 	var cool_bonus: float = DesertHeat.REFRESHED_REGEN_BONUS if (effects != null and effects.has("refreshed")) else 0.0
 	var sleep_mod: float = 0.0
 	if effects != null:
@@ -61,18 +70,18 @@ func heat_amount() -> float:
 	var owner_node: Node = get_parent()
 	if owner_node is Player:
 		return clampf((owner_node as Player).heat_amount, 0.0, 1.0)
-	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	var effects: StatusEffects = _get_effects()
 	return clampf(effects.scale_of("sun_heat"), 0.0, 1.0) if (effects != null and effects.has("sun_heat")) else 0.0
 
 
 ## True while the owning player has ERFRISCHT (`refreshed`).
 func is_refreshed() -> bool:
-	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	var effects: StatusEffects = _get_effects()
 	return effects != null and effects.has("refreshed")
 
 
 func _glutatem_tier() -> int:
-	var effects: StatusEffects = get_node_or_null("../Effects") as StatusEffects
+	var effects: StatusEffects = _get_effects()
 	return int(effects.scale_of("glutatem")) if effects != null else 0
 
 

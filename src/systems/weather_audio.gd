@@ -14,13 +14,27 @@ var _filter: AudioEffectLowPassFilter
 var _cut: float = 20500.0
 var _manager: WeatherManager
 var _cfg: Dictionary = {}
-var levels: Dictionary = {} ## what is playing right now, 0..1 per bed (readable for tests)
+var _bed_db: Dictionary = {}
+var _canopy_wait: float = 0.0
+var _canopy_pos: Vector2 = Vector2(INF, INF)
+var _canopy_cached: float = 0.0
+var levels: Dictionary = {"rain_light": 0.0, "rain_mid": 0.0, "rain_heavy": 0.0, "rain_roof": 0.0, "wind_light": 0.0, "wind_strong": 0.0} ## what is playing right now, 0..1 per bed (readable for tests)
 
 
 func _ready() -> void:
 	name = "WeatherAudio"
 	process_mode = Node.PROCESS_MODE_PAUSABLE
 	_cfg = (WeatherRules.cfg().get("audio", {}) as Dictionary)
+	var rain_db: float = float(_cfg.get("rain_db", -14.0))
+	var wind_db: float = float(_cfg.get("wind_db", -16.0))
+	_bed_db = {
+		"rain_light": rain_db,
+		"rain_mid": rain_db,
+		"rain_heavy": rain_db + 1.0,
+		"rain_roof": float(_cfg.get("roof_db", -12.0)),
+		"wind_light": wind_db,
+		"wind_strong": wind_db + 2.0,
+	}
 	_ensure_bus()
 	for id: String in ["rain_light", "rain_mid", "rain_heavy", "rain_roof", "wind_light", "wind_strong"]:
 		_beds[id] = _make_bed(id)
@@ -69,35 +83,42 @@ func _process(delta: float) -> void:
 	if w == null:
 		return
 	var rain: float = clampf(w.local_rain, 0.0, 1.0)
-	var canopy: float = w.canopy_at(w.focus)
 	var indoors: bool = w.indoors
 	var outdoor_rain: float = 0.0 if indoors else rain
+	_canopy_wait -= delta
+	if indoors:
+		_canopy_cached = 0.0
+	elif _canopy_wait <= 0.0 or w.focus.distance_squared_to(_canopy_pos) >= 64.0:
+		_canopy_wait = 0.12
+		_canopy_pos = w.focus
+		_canopy_cached = w.canopy_at(w.focus)
+	var canopy: float = _canopy_cached
 	var light: float = (1.0 - smoothstep(0.12, 0.5, outdoor_rain)) * smoothstep(0.02, 0.12, outdoor_rain)
 	var mid: float = smoothstep(0.12, 0.5, outdoor_rain) * (1.0 - smoothstep(0.55, 0.9, outdoor_rain))
 	var heavy: float = smoothstep(0.55, 0.9, outdoor_rain)
 	var shelter: float = 1.0 - 0.35 * canopy ## under the crowns it is quieter and duller
 	var roof: float = clampf(w.rain * 1.2, 0.0, 1.0) * smoothstep(0.03, 0.12, w.rain) if indoors else 0.0
 	var wind_amount: float = clampf(w.wind * (0.35 if indoors else 1.0), 0.0, 1.0)
-	levels = {
-		"rain_light": light * shelter, "rain_mid": mid * shelter, "rain_heavy": heavy * shelter, "rain_roof": roof,
-		"wind_light": smoothstep(0.1, 0.5, wind_amount) * (1.0 - smoothstep(0.7, 1.0, wind_amount) * 0.6),
-		"wind_strong": smoothstep(0.55, 1.0, wind_amount),
-	}
-	var db: Dictionary = {"rain_light": float(_cfg.get("rain_db", -14.0)), "rain_mid": float(_cfg.get("rain_db", -14.0)), "rain_heavy": float(_cfg.get("rain_db", -14.0)) + 1.0,
-		"rain_roof": float(_cfg.get("roof_db", -12.0)), "wind_light": float(_cfg.get("wind_db", -16.0)), "wind_strong": float(_cfg.get("wind_db", -16.0)) + 2.0}
+	levels["rain_light"] = light * shelter
+	levels["rain_mid"] = mid * shelter
+	levels["rain_heavy"] = heavy * shelter
+	levels["rain_roof"] = roof
+	levels["wind_light"] = smoothstep(0.1, 0.5, wind_amount) * (1.0 - smoothstep(0.7, 1.0, wind_amount) * 0.6)
+	levels["wind_strong"] = smoothstep(0.55, 1.0, wind_amount)
 	for id: String in _beds:
 		var p: AudioStreamPlayer = _beds[id] as AudioStreamPlayer
 		var a: float = float(levels[id])
-		var want: float = float(db[id]) + linear_to_db(maxf(a, 0.0001)) if a > 0.01 else -80.0
+		var want: float = float(_bed_db[id]) + linear_to_db(maxf(a, 0.0001)) if a > 0.01 else -80.0
 		p.volume_db = move_toward(p.volume_db, want, 30.0 * delta)
 		if want > -79.0 and not p.playing:
 			p.play()
 		elif p.playing and p.volume_db <= -79.0:
 			p.stop()
 	var cut_target: float = 700.0 if indoors else lerpf(20500.0, 3000.0, canopy)
-	_cut = lerpf(_cut, cut_target, 1.0 - exp(-delta / 0.25))
-	if _filter != null:
-		_filter.cutoff_hz = clampf(_cut, 300.0, 20500.0)
+	if absf(cut_target - _cut) > 1.0:
+		_cut = lerpf(_cut, cut_target, 1.0 - exp(-delta / 0.25))
+		if _filter != null:
+			_filter.cutoff_hz = clampf(_cut, 300.0, 20500.0)
 
 
 func _on_thunder(far: float) -> void:

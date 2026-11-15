@@ -122,6 +122,7 @@ var _draw_cy: PackedFloat32Array = PackedFloat32Array()
 var _draw_d: PackedInt32Array = PackedInt32Array()
 var _draw_fade: PackedFloat32Array = PackedFloat32Array()
 var _draw_t: PackedFloat32Array = PackedFloat32Array()
+var _draw_rim: PackedInt32Array = PackedInt32Array()
 
 @onready var _back: Node2D = $Back
 @onready var _body: Sprite2D = $Body
@@ -189,7 +190,7 @@ func hit_flash() -> void:
 
 ## Call every frame on every peer.
 func update_rig(delta: float, velocity: Vector2, heading: float) -> void:
-	delta = _clock.step(self, delta, velocity.length()) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
+	delta = _clock.step(self, delta, velocity.length(), _pose != Pose.LOCOMOTION) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
 	if delta < 0.0:
 		return
 	_time += delta
@@ -230,15 +231,7 @@ func update_rig(delta: float, velocity: Vector2, heading: float) -> void:
 				leg.twitch = maxf(leg.twitch, randf_range(0.4, 0.9))
 			agitation = maxf(agitation, 0.2)
 	_was_moving = run_speed >= GAIT_MIN_SPEED
-	var on_screen: bool = true
-	var vp: Viewport = get_viewport()
-	if vp != null:
-		var vsize: Vector2 = vp.get_visible_rect().size
-		if vsize.x > 10.0 and vsize.y > 10.0:
-			var inv: Transform2D = vp.get_canvas_transform().affine_inverse()
-			var tl: Vector2 = inv * Vector2.ZERO
-			var br: Vector2 = inv * vsize
-			on_screen = Rect2(tl, br - tl).grow(110.0).has_point(origin)
+	var on_screen: bool = true if RigClock.OFFSCREEN_HZ <= 0.0 else RigClock.on_screen(self)
 	_was_on_screen = on_screen
 	if on_screen:
 		_update_body(t, velocity)
@@ -570,6 +563,8 @@ func _build_curve(leg: Leg, origin: Vector2) -> void:
 
 
 func _tint(color: Color) -> Color:
+	if _flash <= 0.001:
+		return color if _alpha >= 0.999 else Color(color, color.a * _alpha)
 	return Color(color.lerp(_flash_color, _flash), color.a * _alpha)
 
 
@@ -585,6 +580,8 @@ func _wisp(t: float) -> float:
 func _draw_layer(canvas: Node2D, front: bool) -> void:
 	var inverse: Transform2D = canvas.get_global_transform().affine_inverse()
 	var n_pts: int = 0
+	var n_rim: int = 0
+	var out_opaque: Color = Color(OUTLINE, _alpha)
 	for leg: Leg in _legs:
 		if leg.front != front or leg.points.size() <= 1:
 			continue
@@ -603,11 +600,13 @@ func _draw_layer(canvas: Node2D, front: bool) -> void:
 			var cy: float = roundf(p.y) - half_d
 			if cx == prev_cx and cy == prev_cy and diameter == prev_d:
 				continue
+			if diameter >= 3 and diameter == prev_d and i > 1 and i < count - 1 and absf(cx - prev_cx) + absf(cy - prev_cy) <= 1.0:
+				continue
 			prev_cx = cx
 			prev_cy = cy
 			prev_d = diameter
 			var fade: float = _wisp(t)
-			canvas.draw_rect(Rect2(cx - 1.0, cy - 1.0, diameter + 2, diameter + 2), Color(OUTLINE, _alpha * fade))
+			canvas.draw_rect(Rect2(cx - 1.0, cy - 1.0, diameter + 2, diameter + 2), out_opaque if fade >= 0.999 else Color(OUTLINE, _alpha * fade))
 			if n_pts >= _draw_cx.size():
 				var cap: int = n_pts + 64
 				_draw_cx.resize(cap)
@@ -615,11 +614,15 @@ func _draw_layer(canvas: Node2D, front: bool) -> void:
 				_draw_d.resize(cap)
 				_draw_fade.resize(cap)
 				_draw_t.resize(cap)
+				_draw_rim.resize(cap)
 			_draw_cx[n_pts] = cx
 			_draw_cy[n_pts] = cy
 			_draw_d[n_pts] = diameter
 			_draw_fade[n_pts] = fade
 			_draw_t[n_pts] = t
+			if diameter >= 2 and t > 0.05 and t < 0.9:
+				_draw_rim[n_rim] = n_pts
+				n_rim += 1
 			n_pts += 1
 	var shade0: Color = _tint(SHADE[0])
 	var shade1: Color = _tint(SHADE[1])
@@ -628,16 +631,18 @@ func _draw_layer(canvas: Node2D, front: bool) -> void:
 	for j: int in n_pts:
 		var t: float = _draw_t[j]
 		var col: Color = shade0 if t < 0.3 else (shade1 if t < 0.65 else shade2)
-		col.a *= _draw_fade[j]
+		var fade: float = _draw_fade[j]
+		if fade < 0.999:
+			col.a *= fade
 		var d: int = _draw_d[j]
 		canvas.draw_rect(Rect2(_draw_cx[j], _draw_cy[j], d, d), col)
-	for j: int in n_pts:
-		if _draw_d[j] >= 2:
-			var t: float = _draw_t[j]
-			if t > 0.05 and t < 0.9:
-				var col: Color = rim_tint
-				col.a *= _draw_fade[j]
-				canvas.draw_rect(Rect2(_draw_cx[j], _draw_cy[j], 1.0, 1.0), col)
+	for r: int in n_rim:
+		var j: int = _draw_rim[r]
+		var col: Color = rim_tint
+		var fade: float = _draw_fade[j]
+		if fade < 0.999:
+			col.a *= fade
+		canvas.draw_rect(Rect2(_draw_cx[j], _draw_cy[j], 1.0, 1.0), col)
 	if _pose in [Pose.WINDUP, Pose.STRIKE, Pose.THROW, Pose.PULL]:
 		for leg: Leg in _legs:
 			if leg.front != front or not leg.grabber or leg.points.size() <= 1:
@@ -662,18 +667,22 @@ func _halo(canvas: Node2D, point: Vector2, strength: float, color: Color) -> voi
 ## Small additive halos plus a flowing one-pixel vein down each limb; body emission is masked.
 func _draw_glow() -> void:
 	var layer: Node2D = _glow
+	var vg_tex: ImageTexture = VoidGlow.atlas_tex()
+	var px_rect: Rect2 = VoidGlow.pixel_rect()
 	var inverse: Transform2D = layer.get_global_transform().affine_inverse()
 	var angle: float = _body.frame * PI / 4.0
 	var fwd: Vector2 = Vector2(cos(angle), sin(angle) / SQUASH).normalized()
 	var right: Vector2 = fwd.orthogonal()
 	var center: Vector2 = _body.global_position
-	var eye_strength: float = 0.85 + 0.35 * _warning
+	var eye_strength: float = (0.85 + 0.35 * _warning) * _alpha
 	for spot: Vector3 in EYE_SPOTS:
-		_halo(layer, inverse * (center + _squash(fwd * spot.x + right * spot.y) * _body.scale), eye_strength * clampf(spot.z + 0.3, 0.4, 1.0), EYE)
+		var es: float = eye_strength * clampf(spot.z + 0.3, 0.4, 1.0)
+		VoidGlow.halo_tex(layer, vg_tex, inverse * (center + _squash(fwd * spot.x + right * spot.y) * _body.scale), EYE, es, 1.0)
 	var rate: float = 0.9 + _warning * 1.6
-	var pulse: float = 0.3 + 0.9 * VoidGlow.beat(_time, 0.0, rate) + 0.2 * _warning
+	var pulse: float = (0.3 + 0.9 * VoidGlow.beat(_time, 0.0, rate) + 0.2 * _warning) * _alpha
 	for spot: Vector3 in CORE_SPOTS:
-		_halo(layer, inverse * (center + _squash(fwd * spot.x + right * spot.y) * _body.scale), pulse * clampf(spot.z * 0.6, 0.35, 0.8), VEIN)
+		var cs: float = pulse * clampf(spot.z * 0.6, 0.35, 0.8)
+		VoidGlow.halo_tex(layer, vg_tex, inverse * (center + _squash(fwd * spot.x + right * spot.y) * _body.scale), VEIN, cs, 1.0 if cs > 0.6 * _alpha else 0.5)
 	var striking_pose: bool = _pose in [Pose.WINDUP, Pose.COIL, Pose.STRIKE, Pose.THROW, Pose.PULL]
 	for leg: Leg in _legs:
 		var pts: PackedVector2Array = leg.points
@@ -691,9 +700,9 @@ func _draw_glow() -> void:
 				continue
 			previous = point
 			var wave: float = VoidGlow.beat(_time, -t * 0.3 + leg.phase * 0.02, rate)
-			VoidGlow.pixel(layer, point, Color(VEIN_LIGHT, _alpha * (0.45 + wave * 0.55 + _warning * 0.15)))
-			if (i % 4) == 0:
-				VoidGlow.halo(layer, point, VEIN, _alpha * wave * 0.5, 0.45)
-		_halo(layer, inverse * pts[lcount >> 1], 0.45, VEIN)
+			layer.draw_texture_rect_region(vg_tex, Rect2(point, Vector2.ONE), px_rect, Color(VEIN_LIGHT, _alpha * (0.45 + wave * 0.55 + _warning * 0.15)))
+			if (i & 3) == 0:
+				VoidGlow.halo_tex(layer, vg_tex, point, VEIN, _alpha * wave * 0.5, 0.45)
+		VoidGlow.halo_tex(layer, vg_tex, inverse * pts[lcount >> 1], VEIN, 0.45 * _alpha, 0.5)
 		var striking: bool = leg.grabber and striking_pose
-		_halo(layer, inverse * pts[lcount - 1], 1.0 if striking else 0.6, WARNING if striking else GLOW)
+		VoidGlow.halo_tex(layer, vg_tex, inverse * pts[lcount - 1], WARNING if striking else GLOW, (1.0 if striking else 0.6) * _alpha, 1.0)

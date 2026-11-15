@@ -11,6 +11,13 @@ static var _day_quartz_shared: ShaderMaterial
 static var _tex_cache: Dictionary = {}
 
 
+## True when an active viewport camera exists and `at` is farther than `sqrt(radius_sq)` pixels from its center.
+static func far_from_camera(node: Node2D, at: Vector2, radius_sq: float = 270400.0) -> bool:
+	var vp: Viewport = node.get_viewport()
+	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+	return cam != null and at.distance_squared_to(cam.get_screen_center_position()) > radius_sq
+
+
 static func _tex(path: String) -> Texture2D:
 	if path.is_empty():
 		return null

@@ -813,3 +813,40 @@ func set_bed_frame(frame: int) -> void:
 	var glow: Sprite2D = _glows.get("bed") as Sprite2D
 	if glow != null:
 		glow.frame = frame
+
+
+func set_pocket_active(active: bool) -> void:
+	var target_mode: ProcessMode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
+	if visible == active and process_mode == target_mode:
+		return
+	if not active:
+		var paused: Array[PointLight2D] = []
+		_collect_enabled_lights(self, paused)
+		for light: PointLight2D in paused:
+			light.enabled = false
+		set_meta("_paused_lights", paused)
+		visible = false
+		process_mode = Node.PROCESS_MODE_DISABLED
+	else:
+		visible = true
+		process_mode = Node.PROCESS_MODE_INHERIT
+		if has_meta("_paused_lights"):
+			var paused: Array = get_meta("_paused_lights") as Array
+			for light_v: Variant in paused:
+				var light: PointLight2D = light_v as PointLight2D
+				if is_instance_valid(light) and light.visible:
+					light.enabled = true
+			remove_meta("_paused_lights")
+		var star_room: Node = get_node_or_null("StarHallRoom")
+		if star_room != null and star_room.has_method("_refresh_pylons"):
+			star_room.call("_refresh_pylons")
+
+
+static func _collect_enabled_lights(node: Node, out: Array[PointLight2D]) -> void:
+	for child: Node in node.get_children():
+		if child is PointLight2D:
+			var light: PointLight2D = child as PointLight2D
+			if light.enabled:
+				out.append(light)
+		if child.get_child_count() > 0:
+			_collect_enabled_lights(child, out)

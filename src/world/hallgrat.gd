@@ -17,6 +17,14 @@ var bell_at: Vector2 = Vector2.INF ## px: the moon tower's bell
 var people: HallgratPeople ## the town's residents (docs/hallgrat_bewohner_konzept.md)
 var _last_time: float = -1.0
 var _clear: Array[Vector2i] = []
+var _buckets_ready: bool = false
+var _buckets: Dictionary = {} ## Vector2i (512 px cell) -> Array[HallgratBuilding]
+var _active_buildings: Array[HallgratBuilding] = []
+var _town_bounds: Rect2 = Rect2()
+var _wake_clock: float = 0.0
+
+const WAKE_BUCKET: float = 512.0
+const WAKE_RADIUS_SQ: float = 720.0 * 720.0
 
 
 ## Builds the milestones and returns where they stand (px), so the world keeps generated props off them.
@@ -163,11 +171,91 @@ func show_plan(on: bool) -> void:
 
 
 ## The bell of the moon tower rings at dusk (three strokes), heard round the town: local, every peer by its own clock.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var now: float = TimeManager.time_of_day
 	if _last_time >= 0.0 and _last_time < DUSK_BELL and now >= DUSK_BELL and bell_at.is_finite():
 		ring_bell()
 	_last_time = now
+	if not _buckets_ready:
+		_index_buildings()
+	_wake_clock -= delta
+	if _wake_clock <= 0.0:
+		_wake_clock = 0.2
+		_update_building_activity()
+
+
+func _index_buildings() -> void:
+	_buckets_ready = true
+	_buckets.clear()
+	_active_buildings.clear()
+	var has_bounds: bool = false
+	var bounds: Rect2 = Rect2()
+	for group: Array[HallgratBuilding] in [buildings, deco, low_walls]:
+		for b: HallgratBuilding in group:
+			if not is_instance_valid(b):
+				continue
+			var pos: Vector2 = b.global_position
+			var cell: Vector2i = Vector2i(floori(pos.x / WAKE_BUCKET), floori(pos.y / WAKE_BUCKET))
+			if not _buckets.has(cell):
+				_buckets[cell] = [] as Array[HallgratBuilding]
+			(_buckets[cell] as Array[HallgratBuilding]).append(b)
+			if not has_bounds:
+				bounds = Rect2(pos, Vector2.ZERO)
+				has_bounds = true
+			else:
+				bounds = bounds.expand(pos)
+			b.set_managed_sleep(true)
+	_town_bounds = bounds.grow(768.0) if has_bounds else Rect2()
+	_update_building_activity()
+
+
+func _update_building_activity() -> void:
+	if not _town_bounds.has_area():
+		return
+	var focus: Array[Vector2] = []
+	var vp: Viewport = get_viewport()
+	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+	if cam != null:
+		var cp: Vector2 = cam.get_screen_center_position()
+		if _town_bounds.has_point(cp):
+			focus.append(cp)
+	for player: Player in Player.all:
+		if is_instance_valid(player) and player.is_multiplayer_authority():
+			var pp: Vector2 = player.global_position
+			if _town_bounds.has_point(pp):
+				focus.append(pp)
+	if focus.is_empty():
+		if not _active_buildings.is_empty():
+			for b: HallgratBuilding in _active_buildings:
+				if is_instance_valid(b):
+					b.set_managed_sleep(true)
+			_active_buildings.clear()
+		return
+	var wanted: Dictionary = {}
+	var seen_cells: Dictionary = {}
+	for fp: Vector2 in focus:
+		var min_c: Vector2i = Vector2i(floori((fp.x - 720.0) / WAKE_BUCKET), floori((fp.y - 720.0) / WAKE_BUCKET))
+		var max_c: Vector2i = Vector2i(floori((fp.x + 720.0) / WAKE_BUCKET), floori((fp.y + 720.0) / WAKE_BUCKET))
+		for cy: int in range(min_c.y, max_c.y + 1):
+			for cx: int in range(min_c.x, max_c.x + 1):
+				var c: Vector2i = Vector2i(cx, cy)
+				if seen_cells.has(c):
+					continue
+				seen_cells[c] = true
+				if not _buckets.has(c):
+					continue
+				for b: HallgratBuilding in _buckets[c] as Array[HallgratBuilding]:
+					if is_instance_valid(b) and b.global_position.distance_squared_to(fp) <= WAKE_RADIUS_SQ:
+						wanted[b] = true
+	for prev: HallgratBuilding in _active_buildings:
+		if is_instance_valid(prev) and not wanted.has(prev):
+			prev.set_managed_sleep(true)
+	var next_active: Array[HallgratBuilding] = []
+	for key: Variant in wanted.keys():
+		var b: HallgratBuilding = key as HallgratBuilding
+		b.set_managed_sleep(false)
+		next_active.append(b)
+	_active_buildings = next_active
 
 
 const DUSK_BELL: float = 0.79

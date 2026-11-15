@@ -118,6 +118,7 @@ func setup_step(deadline_usec: int = 0) -> bool:
 			seen.append(member)
 			member.set_group_rect(group_rect)
 	_setup_finalized = true
+	_sync_active_rooms()
 	return true
 
 
@@ -230,6 +231,8 @@ func _process(delta: float) -> void:
 		for player: Player in Player.all:
 			if player.is_multiplayer_authority():
 				_player = player
+	if _setup_finalized:
+		_sync_active_rooms()
 	if _player == null:
 		return
 	var slot: int = slot_at(_player.global_position)
@@ -312,6 +315,59 @@ func apply_view(player: Player) -> void:
 			camera.limit_bottom = 10000000
 	camera.reset_smoothing()
 	_view_key = _view_key_at(player.global_position)
+	if _setup_finalized:
+		_sync_active_rooms(player.global_position)
+
+
+func _room_at_or_near(pos: Vector2) -> Interior:
+	var direct: Interior = interior_at(pos)
+	if direct != null:
+		return direct
+	for room: Interior in _interiors.values():
+		if Rect2(room.global_position, room.size).grow(320.0).has_point(pos):
+			return room
+	return null
+
+
+func _add_connected_rooms(seed_room: Interior, wanted: Dictionary) -> void:
+	if seed_room == null or wanted.has(seed_room):
+		return
+	var queue: Array[Interior] = [seed_room]
+	wanted[seed_room] = true
+	var idx: int = 0
+	while idx < queue.size():
+		var cur: Interior = queue[idx]
+		idx += 1
+		for other: Interior in cur.neighbors:
+			if not wanted.has(other):
+				wanted[other] = true
+				queue.append(other)
+
+
+func _sync_active_rooms(extra_pos: Vector2 = Vector2.INF) -> void:
+	var any_pocket: bool = false
+	var wanted: Dictionary = {}
+	if extra_pos.is_finite() and extra_pos.x >= POCKET_X0 - 1400.0 and extra_pos.y >= POCKET_Y0 - 600.0:
+		any_pocket = true
+		_add_connected_rooms(_room_at_or_near(extra_pos), wanted)
+	for player: Player in Player.all:
+		if is_instance_valid(player):
+			var p: Vector2 = player.global_position
+			if p.x >= POCKET_X0 - 1400.0 and p.y >= POCKET_Y0 - 600.0:
+				any_pocket = true
+				_add_connected_rooms(_room_at_or_near(p), wanted)
+	var vp: Viewport = get_viewport()
+	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+	if cam != null:
+		var cp: Vector2 = cam.get_screen_center_position()
+		if cp.x >= POCKET_X0 - 1400.0 and cp.y >= POCKET_Y0 - 600.0:
+			any_pocket = true
+			_add_connected_rooms(_room_at_or_near(cp), wanted)
+	if not any_pocket and bool(get_meta("_all_rooms_paused", false)):
+		return
+	for room: Interior in _interiors.values():
+		room.set_pocket_active(wanted.has(room))
+	set_meta("_all_rooms_paused", not any_pocket and wanted.is_empty())
 
 
 # ---------- doors ----------

@@ -52,7 +52,7 @@ func _ready() -> void:
 		var sheet_path: String = String(_spec.sheet)
 		var tex: Texture2D = _tex_cache.get(sheet_path) as Texture2D
 		if tex == null:
-			tex = load(sheet_path) as Texture2D
+			tex = DataRegistry.tex(sheet_path)
 			_tex_cache[sheet_path] = tex
 		_sprite.texture = tex
 		_sprite.hframes = int(_spec.cols)
@@ -236,7 +236,7 @@ func _call() -> void:
 	var sfx_path: String = "res://assets/audio/wildlife/%s_%d.wav" % [String(_spec.sound), stream_idx]
 	var stream: AudioStream = _sfx_cache.get(sfx_path) as AudioStream
 	if stream == null:
-		stream = load(sfx_path) as AudioStream
+		stream = DataRegistry.audio(sfx_path)
 		_sfx_cache[sfx_path] = stream
 	_voice.stream = stream
 	_voice.pitch_scale = _rng.randf_range(0.92, 1.1) * (1.42 if kind == "duck" and member > 0 and school.begins_with("duckfamily") else 1.0)

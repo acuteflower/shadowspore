@@ -4,6 +4,7 @@ extends Node
 const DATA_DIR: String = "res://data/"
 
 var _tables: Dictionary = {}
+var _assets: Dictionary = {}
 
 
 func _ready() -> void:
@@ -23,3 +24,29 @@ func table(name: String) -> Dictionary:
 
 func get_entry(table: String, id: String) -> Dictionary:
 	return (_tables.get(table, {}) as Dictionary).get(id, {})
+
+
+func asset(path: String) -> Resource:
+	if path.is_empty():
+		return null
+	var cached: Variant = _assets.get(path)
+	if cached != null:
+		return cached as Resource
+	if not ResourceLoader.exists(path):
+		return null
+	var res: Resource = load(path)
+	if res != null:
+		_assets[path] = res
+	return res
+
+
+func tex(path: String) -> Texture2D:
+	return asset(path) as Texture2D
+
+
+func scene(path: String) -> PackedScene:
+	return asset(path) as PackedScene
+
+
+func audio(path: String) -> AudioStream:
+	return asset(path) as AudioStream

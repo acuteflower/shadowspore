@@ -14,6 +14,7 @@ const SHADERS: Array[String] = [
 	"res://assets/shaders/river_water.gdshader",
 	"res://assets/shaders/river_glow.gdshader",
 	"res://assets/shaders/river_flora.gdshader",
+	"res://assets/shaders/river_jelly.gdshader",
 	"res://assets/shaders/day_sprite.gdshader",
 	"res://assets/shaders/day_shafts.gdshader",
 	"res://assets/shaders/sun_glow.gdshader",

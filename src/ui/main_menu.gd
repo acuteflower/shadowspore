@@ -241,7 +241,7 @@ func _on_chosen(id: String, data: Dictionary) -> void:
 func _finish_leaving() -> void:
 	set_process(false)
 	if _leaving == "quit":
-		get_tree().quit()
+		CloudSession.graceful_quit()
 		return
 	var request: Dictionary = {"mode": _leaving}
 	request.merge(_leave_data)

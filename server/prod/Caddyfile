@@ -1,0 +1,41 @@
+s.shadowspore.com {
+    encode zstd gzip
+
+    # CORS fuer shadowspore.com (Website-Registrierung & Key-Einloesung)
+    @cors_origin header_regexp origin Origin ^https?://(shadowspore\.com|www\.shadowspore\.com|shadowspore\.web\.app|shadowspore\.firebaseapp\.com|localhost(:[0-9]+)?|127\.0\.0\.1(:[0-9]+)?)$
+    @cors_preflight {
+        method OPTIONS
+        header_regexp origin Origin ^https?://(shadowspore\.com|www\.shadowspore\.com|shadowspore\.web\.app|shadowspore\.firebaseapp\.com|localhost(:[0-9]+)?|127\.0\.0\.1(:[0-9]+)?)$
+    }
+
+    handle @cors_preflight {
+        header Access-Control-Allow-Origin "{http.request.header.Origin}"
+        header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        header Access-Control-Allow-Headers "Authorization, Content-Type, Accept"
+        header Access-Control-Max-Age "3600"
+        header Vary "Origin"
+        respond "" 204
+    }
+
+    handle {
+        # Security headers
+        header {
+            Strict-Transport-Security "max-age=31536000; includeSubDomains"
+            X-Content-Type-Options "nosniff"
+            Referrer-Policy "strict-origin-when-cross-origin"
+            Vary "Origin"
+        }
+
+        header @cors_origin Access-Control-Allow-Origin "{http.request.header.Origin}"
+        header @cors_origin Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+        header @cors_origin Access-Control-Allow-Headers "Authorization, Content-Type, Accept"
+
+        # Nakama Client HTTP API & Realtime WebSocket (/ws)
+        reverse_proxy nakama:7350 {
+            header_down -Access-Control-Allow-Origin
+            header_down -Access-Control-Allow-Methods
+            header_down -Access-Control-Allow-Headers
+            header_down -Access-Control-Allow-Credentials
+        }
+    }
+}

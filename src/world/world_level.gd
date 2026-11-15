@@ -10,8 +10,78 @@ extends TestLevel
 const SKY_CLEAVER_SCENE: PackedScene = preload("res://src/entities/enemies/sky_cleaver.tscn")
 const CHUNK: int = 32 ## tiles per chunk side
 const STREAM_BUDGET_USEC: int = 2000 ## cooperative CPU preparation per frame
-const STREAM_URGENT_USEC: int = 5000 ## ... while the chunk being built touches a player's own ring (it may come into view soon)
+const STREAM_URGENT_USEC: int = 3200 ## ... while the chunk being built touches a player's own ring (it may come into view soon)
 const STREAM_OWN_CHUNK_USEC: int = 4000 ## cooperative CPU preparation when the player stands in the building chunk
+const WORLD_EXTRA_WARM_PATHS: Array[String] = [
+	"res://src/entities/drops/item_drop.tscn",
+	"res://assets/props/broken_stone_bridge.png",
+	"res://assets/props/broken_stone_bridge_glow.png",
+	"res://assets/props/fisher_pier.png",
+	"res://assets/props/fisher_pier_glow.png",
+	"res://assets/props/reed_rowboat.png",
+	"res://assets/props/forest_shrine.png",
+	"res://assets/props/forest_shrine_glow.png",
+	"res://assets/props/old_watermill.png",
+	"res://assets/props/old_watermill_glow.png",
+	"res://assets/props/watermill_wheel.png",
+	"res://assets/props/watermill_jam.png",
+	"res://assets/props/order_watchtower.png",
+	"res://assets/props/order_watchtower_glow.png",
+	"res://assets/props/order_patrol_camp.png",
+	"res://assets/props/order_patrol_camp_glow.png",
+	"res://assets/props/order_banner.png",
+	"res://assets/props/order_boundary_stone.png",
+	"res://assets/props/order_boundary_stone_glow.png",
+	"res://assets/props/solitary_oak.png",
+	"res://assets/props/solitary_oak_glow.png",
+	"res://assets/props/oak_swing.png",
+	"res://assets/props/vista_spot.png",
+	"res://assets/props/vista_spot_glow.png",
+	"res://assets/props/bell_spire.png",
+	"res://assets/props/bell_spire_glow.png",
+	"res://assets/props/bell_stepping_stone.png",
+	"res://assets/props/bell_stepping_stone_glow.png",
+	"res://assets/props/amphitheater_podium.png",
+	"res://assets/props/amphitheater_podium_glow.png",
+	"res://assets/props/moonbell.png",
+	"res://assets/props/moonbell_glow.png",
+	"res://assets/props/mist_lily.png",
+	"res://assets/props/mist_lily_glow.png",
+	"res://assets/props/sleeping_guardian.png",
+	"res://assets/props/sleeping_guardian_glow.png",
+	"res://assets/props/guardian_brazier.png",
+	"res://assets/props/guardian_brazier_glow.png",
+	"res://assets/props/star_crater.png",
+	"res://assets/props/star_crater_glow.png",
+	"res://assets/props/quartz_arch.png",
+	"res://assets/props/quartz_arch_glow.png",
+	"res://assets/props/resonance_obelisk.png",
+	"res://assets/props/resonance_obelisk_glow.png",
+	"res://assets/props/light_conduit.png",
+	"res://assets/props/light_conduit_glow.png",
+	"res://assets/props/quartz_seal.png",
+	"res://assets/props/quartz_seal_glow.png",
+	"res://assets/props/waystone/statue_wave.png",
+	"res://assets/props/waystone/statue_wild.png",
+	"res://assets/props/waystone/statue_clean.png",
+	"res://assets/props/waystone/statue_dim.png",
+	"res://assets/props/waystone/statue_glow.png",
+	"res://assets/props/waystone/ground_wave.png",
+	"res://assets/props/waystone/ground_wild.png",
+	"res://assets/props/waystone/ground_clean.png",
+	"res://assets/props/waystone/ground_dim.png",
+	"res://assets/props/waystone/ground_glow.png",
+	"res://assets/props/waystone/crystals_wild.png",
+	"res://assets/props/waystone/crystals_lit.png",
+	"res://assets/audio/vistas/chime.wav",
+	"res://assets/audio/vistas/sit_stone.wav",
+	"res://assets/audio/meadow_wonders/mill_unjam.wav",
+	"res://assets/audio/meadow_wonders/mill_creak_loop.wav",
+	"res://assets/audio/meadow_wonders/order_stone.wav",
+	"res://assets/audio/meadow_wonders/bell_underwater.wav",
+	"res://assets/audio/meadow_wonders/amphitheater_hum.wav",
+	"res://assets/audio/meadow_wonders/guardian_chord.wav",
+]
 const LOAD_INIT_BUDGET_USEC: int = 5500 ## cooperative initialization budget during LoadingScreen
 const LOAD_STREAM_BUDGET_USEC: int = 6500 ## chunk preparation/commit budget while LoadingScreen is active
 const MAX_UNLOADS_PER_FRAME: int = 1 ## unloads are queued to avoid frame spikes from clearing multiple chunks at once
@@ -119,6 +189,36 @@ var _warm_stage: int = 0
 var _warm_paths: Array[String] = []
 var _warm_index: int = 0
 var _teardown_started: bool = false
+var _teardown_chunks: Array[ChunkTeardown] = []
+var _teardown_ticker: TeardownTicker = null
+var _exiting_tree: bool = false
+
+
+class TeardownTicker extends Node:
+	var owner_world: WorldLevel
+
+	func _process(_delta: float) -> void:
+		if owner_world == null or owner_world._teardown_chunks.is_empty():
+			set_process(false)
+			return
+		owner_world._step_chunk_teardown(Time.get_ticks_usec() + 1400)
+
+
+class ChunkTeardown:
+	var cell: Vector2i
+	var node: Node2D
+	var cells: Dictionary = {}
+	var cell_keys: Array = []
+	var cell_biome_idx: int = 0
+	var cell_sub_idx: int = 0
+	var glow_cells: Array[Vector2i] = []
+	var glow_idx: int = 0
+	var things: Array[WorldProp] = []
+	var thing_idx: int = 0
+	var fallen_logs: Array[FallenLog] = []
+	var log_idx: int = 0
+	var clover: Array[CloverField] = []
+	var clover_idx: int = 0
 
 
 func set_vista_focus(world_pos: Vector2, chunk_radius: int = 2) -> void:
@@ -700,6 +800,7 @@ func _init_step_stage0() -> void:
 	LightTexture.prewarm(PackedInt32Array([24, 26, 28, 34, 36, 40]))
 	_map = RegionMap.new(0, DataRegistry.table("world_map"))
 	_tiles = DataRegistry.table("grass_tiles")
+	add_to_group("story_world")
 	_props = Node2D.new()
 	_props.name = "Props"
 	_props.y_sort_enabled = true
@@ -1935,17 +2036,18 @@ func _collect_warm_paths() -> void:
 	]:
 		if not _warm_paths.has(extra_path):
 			_warm_paths.append(extra_path)
-	for table_name: String in ["wildlife", "river_animals"]:
+	for table_name: String in ["plants", "wildlife", "river_animals"]:
 		var tbl: Dictionary = DataRegistry.table(table_name)
 		for key: String in tbl:
 			var entry: Variant = tbl[key]
 			if not (entry is Dictionary):
 				continue
 			var d: Dictionary = entry as Dictionary
-			for field_name: String in ["texture", "sheet", "scene"]:
-				var asset_path: String = String(d.get(field_name, ""))
-				if asset_path.begins_with("res://") and not _warm_paths.has(asset_path):
-					_warm_paths.append(asset_path)
+			for val: Variant in d.values():
+				if val is String:
+					var asset_path: String = String(val)
+					if asset_path.begins_with("res://") and not _warm_paths.has(asset_path):
+						_warm_paths.append(asset_path)
 			if table_name == "wildlife" and d.has("call_count"):
 				for call_i: int in int(d.get("call_count", 0)):
 					var wav_path: String = "res://assets/audio/wildlife/%s_%d.wav" % [key, call_i]
@@ -1957,6 +2059,9 @@ func _collect_warm_paths() -> void:
 					var wav_path: String = "res://assets/audio/wildlife/%s_%d.wav" % [sound_stem, call_i]
 					if ResourceLoader.exists(wav_path) and not _warm_paths.has(wav_path):
 						_warm_paths.append(wav_path)
+	for world_extra_path: String in WORLD_EXTRA_WARM_PATHS:
+		if not _warm_paths.has(world_extra_path):
+			_warm_paths.append(world_extra_path)
 	if _rivers != null and _rivers._data.has("chunks"):
 		for chunk_key: String in (_rivers._data["chunks"] as Dictionary):
 			var rec: Dictionary = (_rivers._data["chunks"] as Dictionary)[chunk_key] as Dictionary
@@ -2023,6 +2128,7 @@ func loading_warmup_step() -> bool:
 		_warm_stage = 7
 		return false
 	if _warm_stage == 7:
+		SunbeamShaft.warm_textures()
 		var wind: WorldWind = get_node_or_null("WorldWind") as WorldWind
 		if wind != null:
 			wind._process(0.016)
@@ -2299,6 +2405,7 @@ func _biome_at(cell: Vector2i) -> String:
 func _load_chunk(c: Vector2i) -> void:
 	_finish_commit()
 	if _chunks.has(c): return
+	_flush_teardown_for(c)
 	var build: ChunkBuild
 	if _building != null and _building.cell == c:
 		build = _building
@@ -2383,7 +2490,7 @@ func _gen_done(_result: Variant, build: ChunkBuild) -> void:
 ## (main thread) The chunk was dropped while its job was running or waiting for delivery.
 func _gen_discard(_result: Variant, build: ChunkBuild) -> void:
 	build.job = null
-	_free_build_nodes(build)
+	_free_build_nodes(build, _exiting_tree)
 
 
 func _acquire_generator() -> PropGenerator:
@@ -2576,6 +2683,7 @@ func _prepare_thing(build: ChunkBuild, cell: Vector2i, kind: String, variant: in
 
 
 func _commit_chunk(build: ChunkBuild) -> void:
+	_flush_teardown_for(build.cell)
 	var chunk: Chunk = build.chunk
 	for biome: String in chunk.cells:
 		for cell: Vector2i in chunk.cells[biome]:
@@ -2618,6 +2726,8 @@ func _finish_commit(deadline: int = 0) -> void:
 				thing.scale = Vector2(float(spec.get("scale", 1.0)) * (-1.0 if bool(spec.get("flip", false)) else 1.0), float(spec.get("scale", 1.0)))
 		build.commit_stage = 1
 		build.commit_sub_index = 0
+		if deadline > 0 and Time.get_ticks_usec() >= deadline:
+			return
 
 	# Stage 1: Fallen Logs
 	if build.commit_stage == 1:
@@ -2681,10 +2791,10 @@ func _finish_commit(deadline: int = 0) -> void:
 			if build.river_details == null:
 				build.commit_stage = 9
 		if build.river_details != null:
-			while build.river_step < 4:
+			while build.river_step < 5:
 				if deadline > 0 and Time.get_ticks_usec() >= deadline:
 					return
-				build.river_details.setup_step(_rivers, build.cell, build.river_step)
+				build.river_details.commit_step(_rivers, build.cell, build.river_step)
 				build.river_step += 1
 			build.commit_stage = 9
 	if build.commit_stage == 9:
@@ -2696,14 +2806,28 @@ func _finish_commit(deadline: int = 0) -> void:
 		_wildlife.chunk_loaded(build.cell)
 
 
-## Frees a build that never became live (its things and logs are not in the tree; a committed node is queued).
-func _free_build(build: ChunkBuild) -> void:
+## Frees a build that never became live (its things and logs are not in the tree; a committed node is queued unless immediate_free).
+func _free_build(build: ChunkBuild, immediate_free: bool = false) -> void:
 	if build.job != null and Jobs.cancel(build.job):
 		return ## a worker is (or was) busy with it: the discard hook frees it once the worker has let go
-	_free_build_nodes(build)
+	_free_build_nodes(build, immediate_free)
 
 
-func _free_build_nodes(build: ChunkBuild) -> void:
+func _dispose_build_node(node: Node, immediate_free: bool, detach_parent: Node = null) -> void:
+	if not is_instance_valid(node):
+		return
+	var in_tree: bool = node.is_inside_tree()
+	if detach_parent != null and node.get_parent() == detach_parent:
+		detach_parent.remove_child(node)
+	elif immediate_free and node.get_parent() != null:
+		node.get_parent().remove_child(node)
+	if immediate_free or not in_tree:
+		node.free()
+	else:
+		node.queue_free()
+
+
+func _free_build_nodes(build: ChunkBuild, immediate_free: bool = false) -> void:
 	for clover_job: Jobs.Job in build.clover_jobs: ## a worker may still paint a field: let it finish before the node goes
 		Jobs.cancel(clover_job)
 		Jobs.wait(clover_job)
@@ -2711,53 +2835,43 @@ func _free_build_nodes(build: ChunkBuild) -> void:
 	for thing: WorldProp in build.chunk.things:
 		_things.erase(thing.cell)
 		_young.erase(thing.cell)
-		if thing.is_inside_tree():
-			_props.remove_child(thing)
-			thing.queue_free()
-		else:
-			thing.free()
+		_dispose_build_node(thing, immediate_free, _props)
 	for log_node: FallenLog in build.chunk.fallen_logs:
 		_unregister_harvest(log_node)
-		if log_node.is_inside_tree():
-			_props.remove_child(log_node)
-			log_node.queue_free()
-		else:
-			log_node.free()
+		_dispose_build_node(log_node, immediate_free, _props)
 	for field: CloverField in build.chunk.clover:
 		_unregister_harvest(field)
-		if field.is_inside_tree():
-			_props.remove_child(field)
-			field.queue_free()
-		else:
-			field.free()
-	if build.chunk.node.is_inside_tree(): build.chunk.node.queue_free()
-	else: build.chunk.node.free()
+		_dispose_build_node(field, immediate_free, _props)
+	_dispose_build_node(build.chunk.node, immediate_free)
 
 
-func _discard_chunk_build() -> void:
+func _discard_chunk_build(immediate_free: bool = false) -> void:
 	_finish_commit() ## a committed chunk becomes whole first, so an unload sees all of it
 	_unload_queue.clear()
+	_flush_all_teardowns(immediate_free)
 	if _building != null:
-		_free_build(_building)
+		_free_build(_building, immediate_free)
 		_building = null
 	for paused: ChunkBuild in _paused_builds.values():
-		_free_build(paused)
+		_free_build(paused, immediate_free)
 	_paused_builds.clear()
 	Jobs.drain() ## no worker may still read the relief or the edits when they change
 
 
 func _exit_tree() -> void:
+	_exiting_tree = true
+	_flush_all_teardowns(true)
 	if _init_job != null:
 		Jobs.cancel(_init_job)
 		Jobs.wait(_init_job)
 		_init_job = null
 	if _pending_commit != null: ## its props never entered the tree: free them here, not in `_finish_commit`
-		_free_build(_pending_commit)
+		_free_build(_pending_commit, true)
 		_pending_commit = null
 	if desert_observatory != null and is_instance_valid(desert_observatory) and desert_observatory.get_parent() == null:
 		desert_observatory.free()
 		desert_observatory = null
-	_discard_chunk_build()
+	_discard_chunk_build(true)
 
 
 ## Tiles inland from the coast (0 at the shore; the baked field has 8 steps per tile). Negative outside the land.
@@ -2872,24 +2986,28 @@ func _unload_chunk(c: Vector2i) -> void:
 	_flower_cache.erase(c)
 	_wildlife.chunk_unloaded(c)
 	var chunk: Chunk = _chunks[c]
-	for biome: String in chunk.cells:
-		for cell: Vector2i in chunk.cells[biome]:
-			(_layers[biome] as TileMapLayer).erase_cell(cell)
-	for cell: Vector2i in chunk.glow_cells:
-		_glow.erase_cell(cell)
+	_chunks.erase(c)
+	var td: ChunkTeardown = ChunkTeardown.new()
+	td.cell = c
+	td.cells = chunk.cells
+	td.cell_keys = chunk.cells.keys()
+	td.glow_cells = chunk.glow_cells
+	td.things = chunk.things
+	td.fallen_logs = chunk.fallen_logs
+	td.clover = chunk.clover
 	for thing: WorldProp in chunk.things:
 		_things.erase(thing.cell)
 		_young.erase(thing.cell)
-		_props.remove_child(thing)
-		thing.queue_free()
+		if is_instance_valid(thing):
+			thing.visible = false
 	for log_node: FallenLog in chunk.fallen_logs:
 		_unregister_harvest(log_node)
-		_props.remove_child(log_node)
-		log_node.queue_free()
+		if is_instance_valid(log_node):
+			log_node.visible = false
 	for field: CloverField in chunk.clover:
 		_unregister_harvest(field)
-		_props.remove_child(field)
-		field.queue_free()
+		if is_instance_valid(field):
+			field.visible = false
 	if desert_ruins != null:
 		desert_ruins.free_chunk(c)
 	if meadow_landmarks != null:
@@ -2898,9 +3016,151 @@ func _unload_chunk(c: Vector2i) -> void:
 		meadow_pois.free_chunk(c)
 	if meadow_wonders != null:
 		meadow_wonders.free_chunk(c)
-	remove_child(chunk.node)
-	chunk.node.queue_free()
-	_chunks.erase(c)
+	if chunk.node != null and is_instance_valid(chunk.node):
+		chunk.node.visible = false
+		if chunk.node.get_parent() == self:
+			remove_child(chunk.node)
+		td.node = chunk.node
+	_teardown_chunks.append(td)
+	_ensure_teardown_ticker()
+
+
+func _ensure_teardown_ticker() -> void:
+	if _teardown_chunks.is_empty():
+		return
+	if _teardown_ticker == null:
+		_teardown_ticker = TeardownTicker.new()
+		_teardown_ticker.name = "ChunkTeardown"
+		_teardown_ticker.owner_world = self
+		_teardown_ticker.process_priority = 10
+		add_child(_teardown_ticker)
+	_teardown_ticker.set_process(true)
+
+
+func _flush_teardown_for(c: Vector2i) -> void:
+	for i: int in _teardown_chunks.size():
+		if _teardown_chunks[i].cell == c:
+			var td: ChunkTeardown = _teardown_chunks[i]
+			_teardown_chunks.remove_at(i)
+			_drain_teardown(td, 0, 1000000, false)
+			if _teardown_chunks.is_empty() and _teardown_ticker != null:
+				_teardown_ticker.set_process(false)
+			return
+
+
+func _flush_all_teardowns(immediate_free: bool) -> void:
+	while not _teardown_chunks.is_empty():
+		var td: ChunkTeardown = _teardown_chunks.pop_back() as ChunkTeardown
+		_drain_teardown(td, 0, 1000000, immediate_free)
+	if _teardown_ticker != null:
+		_teardown_ticker.set_process(false)
+
+
+func _step_chunk_teardown(deadline_usec: int) -> void:
+	if _teardown_chunks.is_empty():
+		if _teardown_ticker != null:
+			_teardown_ticker.set_process(false)
+		return
+	## Pause freeing if a chunk just committed or pending_commit is active so we don't stack with its flush unless backed up
+	if _pending_commit != null and _teardown_chunks.size() <= 2:
+		return
+	var max_units: int = 16 * clampi(_teardown_chunks.size(), 1, 3)
+	var units_left: int = max_units
+	while not _teardown_chunks.is_empty() and units_left > 0:
+		var td: ChunkTeardown = _teardown_chunks[0]
+		units_left = _drain_teardown(td, deadline_usec, units_left, false)
+		if _is_teardown_done(td):
+			_teardown_chunks.pop_front()
+		else:
+			break
+	if _teardown_chunks.is_empty() and _teardown_ticker != null:
+		_teardown_ticker.set_process(false)
+
+
+func _is_teardown_done(td: ChunkTeardown) -> bool:
+	return (
+		td.node == null
+		and td.thing_idx >= td.things.size()
+		and td.log_idx >= td.fallen_logs.size()
+		and td.clover_idx >= td.clover.size()
+		and td.cell_biome_idx >= td.cell_keys.size()
+		and td.glow_idx >= td.glow_cells.size()
+	)
+
+
+func _drain_teardown(td: ChunkTeardown, deadline_usec: int, units_left: int, immediate_free: bool) -> int:
+	if td.node != null:
+		if is_instance_valid(td.node):
+			if immediate_free:
+				td.node.free()
+			else:
+				td.node.queue_free()
+		td.node = null
+		units_left -= 6
+		if deadline_usec > 0 and (units_left <= 0 or Time.get_ticks_usec() >= deadline_usec):
+			return 0
+	while td.thing_idx < td.things.size():
+		if deadline_usec > 0 and (units_left <= 0 or Time.get_ticks_usec() >= deadline_usec):
+			return 0
+		var thing: WorldProp = td.things[td.thing_idx]
+		td.thing_idx += 1
+		if is_instance_valid(thing):
+			if thing.get_parent() == _props:
+				_props.remove_child(thing)
+			if immediate_free:
+				thing.free()
+			else:
+				thing.queue_free()
+		units_left -= 1
+	while td.log_idx < td.fallen_logs.size():
+		if deadline_usec > 0 and (units_left <= 0 or Time.get_ticks_usec() >= deadline_usec):
+			return 0
+		var log_node: FallenLog = td.fallen_logs[td.log_idx]
+		td.log_idx += 1
+		if is_instance_valid(log_node):
+			if log_node.get_parent() == _props:
+				_props.remove_child(log_node)
+			if immediate_free:
+				log_node.free()
+			else:
+				log_node.queue_free()
+		units_left -= 1
+	while td.clover_idx < td.clover.size():
+		if deadline_usec > 0 and (units_left <= 0 or Time.get_ticks_usec() >= deadline_usec):
+			return 0
+		var field: CloverField = td.clover[td.clover_idx]
+		td.clover_idx += 1
+		if is_instance_valid(field):
+			if field.get_parent() == _props:
+				_props.remove_child(field)
+			if immediate_free:
+				field.free()
+			else:
+				field.queue_free()
+		units_left -= 4
+	while td.cell_biome_idx < td.cell_keys.size():
+		var biome: String = String(td.cell_keys[td.cell_biome_idx])
+		var layer: TileMapLayer = _layers[biome] as TileMapLayer
+		var arr: Array[Vector2i] = td.cells[biome] as Array[Vector2i]
+		while td.cell_sub_idx < arr.size():
+			if deadline_usec > 0 and (units_left <= 0 or Time.get_ticks_usec() >= deadline_usec):
+				return 0
+			var end_idx: int = mini(td.cell_sub_idx + 16, arr.size())
+			for j: int in range(td.cell_sub_idx, end_idx):
+				layer.erase_cell(arr[j])
+			td.cell_sub_idx = end_idx
+			units_left -= 1
+		td.cell_biome_idx += 1
+		td.cell_sub_idx = 0
+	while td.glow_idx < td.glow_cells.size():
+		if deadline_usec > 0 and (units_left <= 0 or Time.get_ticks_usec() >= deadline_usec):
+			return 0
+		var end_glow: int = mini(td.glow_idx + 16, td.glow_cells.size())
+		for j: int in range(td.glow_idx, end_glow):
+			_glow.erase_cell(td.glow_cells[j])
+		td.glow_idx = end_glow
+		units_left -= 1
+	return units_left
 
 
 # ---------------------------------------------------------------------------------- props
@@ -3092,6 +3352,8 @@ func _try_clover_field(build: ChunkBuild, rng: RandomNumberGenerator) -> bool:
 		ok = free >= 10
 	if not ok:
 		return false
+	CloverField.register_cleanup_once()
+	CloverField.ensure_shared_quad()
 	var node: CloverField = CloverField.new()
 	if Jobs.threaded: ## painting the atlas takes milliseconds: a worker does it while the chunk goes on
 		build.clover_jobs.append(Jobs.run(func() -> Variant:
@@ -3647,6 +3909,7 @@ func editor_apply(data: Dictionary, broadcast: bool = true) -> void:
 	var loaded: Array = _chunks.keys()
 	for c: Vector2i in _chunks.keys():
 		_unload_chunk(c)
+	_flush_all_teardowns(false)
 	for c: Vector2i in loaded:
 		_load_chunk(c)
 	_stream(true)

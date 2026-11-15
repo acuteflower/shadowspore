@@ -34,11 +34,46 @@ var _anim_rect: Rect2 = Rect2()
 var _jellies_shown: bool = false
 var _last_bends: PackedFloat32Array = PackedFloat32Array()
 var _last_pushes: PackedVector2Array = PackedVector2Array()
+var _deferred_field_tex: Texture2D
+var _water_material: ShaderMaterial
+var _water_anchors: PackedVector4Array = PackedVector4Array()
 
 func setup(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> void:
 	setup_base(rivers, cell, flow_image)
 	for step: int in 4:
 		setup_step(rivers, cell, step)
+
+
+func set_deferred_water(field_tex: Texture2D, water_mat: ShaderMaterial, extra_anchors: PackedVector4Array) -> void:
+	_deferred_field_tex = field_tex
+	_water_material = water_mat
+	_water_anchors = extra_anchors
+
+
+func commit_step(rivers: WorldRivers, cell: Vector2i, step: int) -> void:
+	if step == 0:
+		var flow_img: Image = _deferred_field_tex.get_image() if _deferred_field_tex != null else null
+		if flow_img != null and rivers.fauna != null:
+			rivers.fauna.set_field_image(cell, flow_img)
+		setup_base(rivers, cell, flow_img)
+		if _water_material != null and not disturbances.is_empty():
+			var combined: PackedVector4Array = PackedVector4Array()
+			for value: Array in disturbances:
+				combined.append(Vector4(float(value[0]), float(value[1]), float(value[2]), float(value[3])))
+			for anchor: Vector4 in _water_anchors:
+				if combined.size() >= 8:
+					break
+				combined.append(anchor)
+			var count: int = combined.size()
+			while combined.size() < 8:
+				combined.append(Vector4.ZERO)
+			_water_material.set_shader_parameter("disturbances", combined)
+			_water_material.set_shader_parameter("disturbance_count", count)
+		_deferred_field_tex = null
+		_water_material = null
+		_water_anchors.clear()
+		return
+	setup_step(rivers, cell, step - 1)
 
 
 func setup_base(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -> void:
@@ -54,7 +89,7 @@ func setup_base(rivers: WorldRivers, cell: Vector2i, flow_image: Image = null) -
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"])))
 	var spacing: int = int(_spec["spacing"])
 	if _shared_sheet == null:
-		_shared_sheet = load("res://assets/water/river_details.png") as Texture2D
+		_shared_sheet = DataRegistry.tex("res://assets/water/river_details.png")
 	var sheet: Texture2D = _shared_sheet
 	for y: int in range(16, 512, spacing):
 		for x: int in range(16, 512, spacing):
@@ -143,32 +178,32 @@ func _make_cuttable(sprite: Sprite2D) -> void:
 static func _bank_sheet(arid: bool) -> Texture2D:
 	if arid:
 		if _shared_oasis_bank_sheet == null:
-			_shared_oasis_bank_sheet = load("res://assets/water/oasis_bank_details.png") as Texture2D
+			_shared_oasis_bank_sheet = DataRegistry.tex("res://assets/water/oasis_bank_details.png")
 		return _shared_oasis_bank_sheet
 	if _shared_bank_sheet == null:
-		_shared_bank_sheet = load("res://assets/water/bank_details.png") as Texture2D
+		_shared_bank_sheet = DataRegistry.tex("res://assets/water/bank_details.png")
 	return _shared_bank_sheet
 
 static func _bank_glow_sheet(arid: bool) -> Texture2D:
 	if arid:
 		if _shared_oasis_bank_glow_sheet == null:
-			_shared_oasis_bank_glow_sheet = load("res://assets/water/oasis_bank_details_glow.png") as Texture2D
+			_shared_oasis_bank_glow_sheet = DataRegistry.tex("res://assets/water/oasis_bank_details_glow.png")
 		return _shared_oasis_bank_glow_sheet
 	if _shared_bank_glow_sheet == null:
-		_shared_bank_glow_sheet = load("res://assets/water/bank_details_glow.png") as Texture2D
+		_shared_bank_glow_sheet = DataRegistry.tex("res://assets/water/bank_details_glow.png")
 	return _shared_bank_glow_sheet
 
 static func _water_flora_sheets(arid: bool) -> Array[Texture2D]:
 	if arid:
 		if _shared_oasis_water_sheet == null:
-			_shared_oasis_water_sheet = load("res://assets/water/oasis_water_flora.png") as Texture2D
+			_shared_oasis_water_sheet = DataRegistry.tex("res://assets/water/oasis_water_flora.png")
 		if _shared_oasis_water_glow_sheet == null:
-			_shared_oasis_water_glow_sheet = load("res://assets/water/oasis_water_flora_glow.png") as Texture2D
+			_shared_oasis_water_glow_sheet = DataRegistry.tex("res://assets/water/oasis_water_flora_glow.png")
 		return [_shared_oasis_water_sheet, _shared_oasis_water_glow_sheet]
 	if _shared_water_sheet == null:
-		_shared_water_sheet = load("res://assets/water/water_flora.png") as Texture2D
+		_shared_water_sheet = DataRegistry.tex("res://assets/water/water_flora.png")
 	if _shared_water_glow_sheet == null:
-		_shared_water_glow_sheet = load("res://assets/water/water_flora_glow.png") as Texture2D
+		_shared_water_glow_sheet = DataRegistry.tex("res://assets/water/water_flora_glow.png")
 	return [_shared_water_sheet, _shared_water_glow_sheet]
 
 func _bank_props(rivers: WorldRivers, cell: Vector2i) -> void:
@@ -374,10 +409,10 @@ func _spawn_jellies(rivers: WorldRivers, cell: Vector2i) -> void:
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, int(_spec["seed"]) + 909))
 	if _shared_jelly_tex == null:
-		_shared_jelly_tex = load("res://assets/water/river_jelly.png") as Texture2D
+		_shared_jelly_tex = DataRegistry.tex("res://assets/water/river_jelly.png")
 	if _shared_jelly_mat == null:
 		_shared_jelly_mat = ShaderMaterial.new()
-		_shared_jelly_mat.shader = load("res://assets/shaders/river_jelly.gdshader") as Shader
+		_shared_jelly_mat.shader = DataRegistry.asset("res://assets/shaders/river_jelly.gdshader") as Shader
 	var texture: Texture2D = _shared_jelly_tex
 	var submerged: ShaderMaterial = _shared_jelly_mat
 	for attempt: int in 60:
@@ -458,7 +493,7 @@ func _drift_jellies(delta: float) -> void:
 
 func _flora_material() -> ShaderMaterial:
 	if _shared_flora_shader == null:
-		_shared_flora_shader = load("res://assets/shaders/river_flora.gdshader") as Shader
+		_shared_flora_shader = DataRegistry.asset("res://assets/shaders/river_flora.gdshader") as Shader
 	var mat: ShaderMaterial = ShaderMaterial.new()
 	mat.shader = _shared_flora_shader
 	return mat

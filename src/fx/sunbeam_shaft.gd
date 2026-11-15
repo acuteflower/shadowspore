@@ -17,6 +17,10 @@ var _on_screen: bool = false
 var _mote_data: Array[Vector4] = [] ## (local_x, local_y, phase, size)
 
 
+static func warm_textures() -> void:
+	_ensure_textures()
+
+
 static func _ensure_textures() -> void:
 	if _beam_tex != null and _pool_tex != null:
 		return

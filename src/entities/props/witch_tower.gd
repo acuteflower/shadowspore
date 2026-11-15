@@ -22,6 +22,7 @@ var _eye: Sprite2D
 var _cauldron: Sprite2D
 var _fx: Node2D
 var _time: float = 0.0
+var _far_wait: float = 0.0
 var _night: float = 0.0
 var _walk: float = -1.0 ## >= 0: the figure is crossing the window
 var _next_walk: float = 5.0
@@ -162,6 +163,12 @@ func _light(at: Vector2, radius: int, energy: float) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position, 490000.0):
+		_far_wait = 0.25
+		return
 	var beat: float = 0.5 + 0.5 * sin(_time * 1.7)
 	var strength: float = lerpf(0.4, 1.0, _night) * (0.86 + 0.14 * beat)
 	for glow: CanvasItem in _glows:

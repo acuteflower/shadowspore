@@ -75,7 +75,8 @@ func _process(delta: float) -> void:
 		_aim.name = "SpellAim"
 		_aim.spells = self
 		_player.add_child(_aim)
-	var rate: float = recharge_rate()
+	var any_cooling: bool = _left[0] > 0.0 or _left[1] > 0.0
+	var rate: float = recharge_rate() if any_cooling else 1.0
 	for p: int in 2:
 		if _left[p] > 0.0:
 			_left[p] = maxf(_left[p] - delta * rate, 0.0)

@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shadowspore_postgres_prod
+    environment:
+      POSTGRES_DB: nakama
+      POSTGRES_USER: nakama
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run generate-secrets.sh or generate-secrets.ps1 first}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nakama -d nakama"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  nakama:
+    image: registry.heroiclabs.com/heroiclabs/nakama:${NAKAMA_TAG:-3.24.2}
+    container_name: shadowspore_nakama_prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint:
+      - "/bin/sh"
+      - "-ecx"
+      - >
+        /nakama/nakama migrate up --database.address nakama:${POSTGRES_PASSWORD}@postgres:5432/nakama &&
+        exec /nakama/nakama --config /nakama/data/prod.yml --database.address nakama:${POSTGRES_PASSWORD}@postgres:5432/nakama
+    expose:
+      - "7349"
+      - "7350"
+      - "7351"
+    volumes:
+      - ./prod.yml:/nakama/data/prod.yml:ro
+      - ../nakama/modules:/nakama/data/modules:ro
+    healthcheck:
+      test: ["CMD", "/nakama/nakama", "healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: shadowspore_caddy_prod
+    depends_on:
+      nakama:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  pgdata_prod:
+  caddy_data:
+  caddy_config:

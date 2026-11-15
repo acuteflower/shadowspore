@@ -40,16 +40,18 @@ func _ready() -> void:
 
 func _build_visuals() -> void:
 	var off: Vector2 = Vector2(0.0, -(FEET_Y - float(FRAME_H) * 0.5))
-	if ResourceLoader.exists(TEX_PATH):
+	var tex_body: Texture2D = DataRegistry.tex(TEX_PATH)
+	if tex_body != null:
 		_body = Sprite2D.new()
-		_body.texture = load(TEX_PATH) as Texture2D
+		_body.texture = tex_body
 		_body.hframes = 3
 		_body.vframes = 2
 		_body.offset = off
 		add_child(_body)
-	if ResourceLoader.exists(GLOW_PATH):
+	var tex_glow: Texture2D = DataRegistry.tex(GLOW_PATH)
+	if tex_glow != null:
 		_glow = Sprite2D.new()
-		_glow.texture = load(GLOW_PATH) as Texture2D
+		_glow.texture = tex_glow
 		_glow.hframes = 3
 		_glow.vframes = 2
 		_glow.offset = off
@@ -128,9 +130,10 @@ func play_bless_fx() -> void:
 	motes.z_index = 6
 	add_child(motes)
 	get_tree().create_timer(2.4).timeout.connect(motes.queue_free)
-	if ResourceLoader.exists("res://assets/audio/vistas/chime.wav"):
+	var chime_stream: AudioStream = DataRegistry.audio("res://assets/audio/vistas/chime.wav")
+	if chime_stream != null:
 		var audio: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
-		audio.stream = load("res://assets/audio/vistas/chime.wav") as AudioStream
+		audio.stream = chime_stream
 		audio.volume_db = -4.5
 		audio.pitch_scale = 1.12
 		audio.max_distance = 260.0

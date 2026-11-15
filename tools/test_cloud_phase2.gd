@@ -13,6 +13,10 @@ func _fail(msg: String) -> void:
 
 
 func _run() -> void:
+	CloudSession.server_url = CloudSession.DEFAULT_DEV_URL
+	CloudSession.server_key = CloudSession.DEFAULT_DEV_SERVER_KEY
+	CloudSession.strict_override = false
+
 	# 1. Local compression round-trip
 	var sample_world: Dictionary = {"version": 1, "day": 7, "time": 0.42, "things": {"a": 1, "b": "hello"}}
 	var gz: String = SaveGame.compress_json(sample_world)
@@ -24,13 +28,16 @@ func _run() -> void:
 		_fail("decompress_json mismatch")
 		return
 
-	# 2. Live Nakama auth + UID assignment
-	var auth: Dictionary = await CloudSession.authenticate_email("phase2_test@shadowspore.local", "testpass1234", true, "Phase2Tester")
+	# 2. Live Nakama auth + licensed UID assignment
+	var auth: Dictionary = await _ensure_licensed_login("phase2_test@shadowspore.local", "testpass1234", "Phase2Tester")
 	if not bool(auth.get("ok", false)):
 		_fail("Nakama auth failed: %s" % String(auth.get("error", "")))
 		return
-	if CloudSession.uid.is_empty() or int(CloudSession.uid) < 100001:
+	if CloudSession.uid.is_empty() or int(CloudSession.uid) < 100000:
 		_fail("Invalid UID: %s" % CloudSession.uid)
+		return
+	if not CloudSession.license_active:
+		_fail("Expected active license on Account A, got error=%s" % CloudSession.license_error)
 		return
 
 	# 3. UID lookup
@@ -68,7 +75,7 @@ func _run() -> void:
 	# 6. Friend RPCs (Account A invites Account B by UID, B accepts, both verify, cleanup)
 	var uid_a: String = CloudSession.uid
 	var id_a: String = CloudSession.user_id
-	var auth_b: Dictionary = await CloudSession.authenticate_email("phase2_friend@shadowspore.local", "testpass1234", true, "Phase2Friend")
+	var auth_b: Dictionary = await _ensure_licensed_login("phase2_friend@shadowspore.local", "testpass1234", "Phase2Friend")
 	if not bool(auth_b.get("ok", false)):
 		_fail("Nakama friend auth failed: %s" % String(auth_b.get("error", "")))
 		return
@@ -144,26 +151,87 @@ func _run() -> void:
 	get_tree().quit(0)
 
 
-func _server_set_role(target_uid: String, new_role: String) -> bool:
+func _server_http_rpc(rpc_name: String, body_dict: Dictionary) -> Dictionary:
 	var req: HTTPRequest = HTTPRequest.new()
 	add_child(req)
-	var url: String = "%s/v2/rpc/admin_set_role?http_key=shadowspore_dev_http_key" % CloudSession.server_url.trim_suffix("/")
-	var body: String = JSON.stringify(JSON.stringify({"uid": target_uid, "role": new_role}))
+	var url: String = "%s/v2/rpc/%s?http_key=shadowspore_dev_http_key" % [CloudSession.server_url.trim_suffix("/"), rpc_name]
+	var body: String = JSON.stringify(JSON.stringify(body_dict))
 	var err: int = req.request(url, PackedStringArray(["Content-Type: application/json"]), HTTPClient.METHOD_POST, body)
 	if err != OK:
 		req.queue_free()
-		return false
+		return {}
 	var done: Array = await req.request_completed
 	req.queue_free()
 	var code: int = int(done[1])
 	if code < 200 or code >= 300:
-		return false
+		return {}
 	var raw_body: String = (done[3] as PackedByteArray).get_string_from_utf8()
 	var env: Variant = JSON.parse_string(raw_body)
 	if not (env is Dictionary):
-		return false
+		return {}
 	var payload_var: Variant = JSON.parse_string(String((env as Dictionary).get("payload", "{}")))
-	return payload_var is Dictionary and bool((payload_var as Dictionary).get("ok", false))
+	return payload_var as Dictionary if payload_var is Dictionary else {}
+
+
+func _server_set_role(target_uid: String, new_role: String) -> bool:
+	var res: Dictionary = await _server_http_rpc("admin_set_role", {"uid": target_uid, "role": new_role})
+	return bool(res.get("ok", false))
+
+
+func _issue_test_license_key() -> String:
+	var res: Dictionary = await _server_http_rpc("admin_issue_license_key", {
+		"count": 1,
+		"edition": "standard",
+		"role_grant": "player",
+		"note": "test_cloud_phase2",
+	})
+	var keys: Array = res.get("keys", []) as Array
+	if keys.is_empty():
+		return ""
+	var first: Dictionary = keys[0] as Dictionary
+	return String(first.get("key", ""))
+
+
+func _ensure_licensed_login(email: String, password: String, custom_username: String) -> Dictionary:
+	var login_res: Dictionary = await CloudSession.authenticate_email(email, password, false)
+	if bool(login_res.get("ok", false)):
+		if not CloudSession.license_active:
+			var redeem_key: String = await _issue_test_license_key()
+			if redeem_key.is_empty():
+				return {"ok": false, "error": "Konnte Test-Lizenzkey nicht erzeugen"}
+			await CloudSession.call_rpc("redeem_license_key", {"license_key": redeem_key})
+			await CloudSession.fetch_my_profile()
+		return {"ok": true}
+
+	var signup_key: String = await _issue_test_license_key()
+	if signup_key.is_empty():
+		return {"ok": false, "error": "Konnte Signup-Lizenzkey nicht erzeugen"}
+	var req: HTTPRequest = HTTPRequest.new()
+	add_child(req)
+	var url: String = "%s/v2/account/authenticate/email?create=true" % CloudSession.server_url.trim_suffix("/")
+	if not custom_username.is_empty():
+		url += "&username=" + custom_username.uri_encode()
+	var basic: String = Marshalls.utf8_to_base64(CloudSession.server_key + ":")
+	var headers: PackedStringArray = PackedStringArray([
+		"Content-Type: application/json",
+		"Authorization: Basic " + basic,
+	])
+	var body: String = JSON.stringify({
+		"email": email,
+		"password": password,
+		"vars": {"license_key": signup_key},
+	})
+	var err: int = req.request(url, headers, HTTPClient.METHOD_POST, body)
+	if err != OK:
+		req.queue_free()
+		return {"ok": false, "error": "HTTP request failed: %d" % err}
+	var done: Array = await req.request_completed
+	req.queue_free()
+	var code: int = int(done[1])
+	if code < 200 or code >= 300:
+		var msg: String = (done[3] as PackedByteArray).get_string_from_utf8()
+		return {"ok": false, "error": "HTTP %d: %s" % [code, msg]}
+	return await CloudSession.authenticate_email(email, password, false)
 
 
 static func _has_friend(items: Array[Dictionary], expected_user_id: String, expected_uid: String, expected_state: int) -> bool:

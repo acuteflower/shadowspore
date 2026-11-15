@@ -3,41 +3,57 @@ extends Node
 ## Supports room codes, world-scoped saves, host IP discovery, live player roster sync, and ping.
 
 const DEFAULT_PORT: int = 7777
+const RelayPeer: GDScript = preload("res://src/autoload/nakama_relay_peer.gd")
 const MAX_PLAYERS: int = 4
 const IDENTITY_PATH: String = "user://coop_identity.key"
 const IDENTITY_BYTES: int = 32
 const PROTOCOL_VERSION: int = 1
 const PING_INTERVAL: float = 2.5
+const HEARTBEAT_INTERVAL: float = 25.0
 
 signal peer_joined(id: int)
 signal peer_left(id: int)
+signal peer_identity_verified(id: int)
 signal session_changed()
 signal join_rejected(reason: String)
 
+var transport_mode: String = "offline" ## "offline" | "enet" | "relay"
 var active_world_id: String = ""
 var active_world_name: String = "KOOP-WELT"
 var active_room_code: String = ""
+var active_match_id: String = ""
+var active_join_mode: String = "ask"
 var active_save_path: String = ""
 var active_port: int = DEFAULT_PORT
 var active_max_players: int = MAX_PLAYERS
 var last_join_error: String = ""
 var last_ping_ms: int = 0
 
-var _guest_owners: Dictionary = {} ## ENet peer -> durable, host-only board owner
+var _guest_owners: Dictionary = {} ## peer -> durable, host-only board owner
 var _identity: PackedByteArray
 var _peer_nonces: Dictionary = {} ## server-side peer -> auth challenge nonce
 var _peer_names: Dictionary = {} ## server-side peer -> display name
 var _peer_slots: Dictionary = {} ## server-side peer -> color slot (0..3)
-var _roster: Array[Dictionary] = [] ## synced list of {"id": int, "name": String, "is_host": bool, "slot": int}
+var _peer_user_ids: Dictionary = {} ## peer -> verified Nakama user_id (if available)
+var _peer_uids: Dictionary = {} ## peer -> Nakama UID (if available)
+var _peer_roles: Dictionary = {} ## server-verified role per peer ("player", "tester", "moderator", "admin")
+var _peer_tickets: Dictionary = {} ## server-side peer -> pending ENet identity ticket
+var _pending_ticket: Dictionary = {} ## guest pre-fetched ticket {"ticket", "user_id", "uid", "display_name"}
+var _roster: Array[Dictionary] = [] ## synced list of {"id": int, "name": String, "is_host": bool, "slot": int, "uid": String}
 var _pending_join_code: String = ""
 var _last_join_address: String = ""
 var _last_join_port: int = DEFAULT_PORT
 var _client_saw_challenge: bool = false
 var _recent_recorded: bool = false
 var _ping_timer: float = 0.0
+var _heartbeat_timer: float = 0.0
+var _session_is_guest: bool = false
+var _handling_server_disconnect: bool = false
+var explicit_coop_hud: bool = false
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_left)
 	multiplayer.connection_failed.connect(_on_connection_failed)
@@ -55,6 +71,11 @@ func _process(delta: float) -> void:
 	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
 	if multiplayer.is_server():
+		if transport_mode == "relay" and CloudSession.is_logged_in():
+			_heartbeat_timer += delta
+			if _heartbeat_timer >= HEARTBEAT_INTERVAL:
+				_heartbeat_timer = 0.0
+				CloudSession.coop_heartbeat(active_world_name, 1 + multiplayer.get_peers().size())
 		return
 	_ping_timer += delta
 	if _ping_timer >= PING_INTERVAL:
@@ -100,8 +121,54 @@ static func primary_ip() -> String:
 	return local_ips()[0]
 
 
+func is_coop_session() -> bool:
+	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	return peer is ENetMultiplayerPeer or peer is RelayPeer
+
+
+func is_offline() -> bool:
+	return not is_coop_session()
+
+
+func is_relay_session() -> bool:
+	return multiplayer.multiplayer_peer is RelayPeer and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED
+
+
 func is_multiplayer_session() -> bool:
-	return multiplayer.multiplayer_peer is ENetMultiplayerPeer and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED
+	return is_coop_session() and multiplayer.multiplayer_peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED
+
+
+func peer_user_id(peer: int) -> String:
+	return String(_peer_user_ids.get(peer, ""))
+
+
+func peer_uid(peer: int) -> String:
+	return String(_peer_uids.get(peer, ""))
+
+
+func peer_ticket(peer: int) -> String:
+	return String(_peer_tickets.get(peer, ""))
+
+
+func peer_role(peer: int) -> String:
+	if peer == 1:
+		return CloudSession.role if CloudSession.is_logged_in() else "player"
+	return String(_peer_roles.get(peer, "player"))
+
+
+func is_peer_admin(peer: int) -> bool:
+	return peer_role(peer) == "admin"
+
+
+func set_pending_ticket(ticket_data: Dictionary) -> void:
+	_pending_ticket = ticket_data.duplicate()
+
+
+func set_active_join_mode(mode: String) -> void:
+	active_join_mode = mode
+	if multiplayer.is_server() and multiplayer.multiplayer_peer is RelayPeer:
+		(multiplayer.multiplayer_peer as RelayPeer).send_control_join_mode(mode)
+	session_changed.emit()
 
 
 func roster() -> Array[Dictionary]:
@@ -138,11 +205,16 @@ func guest_peer(owner: String) -> int:
 	return int(peer) if peer != null else 0
 
 
+func is_local_coop_guest() -> bool:
+	return _session_is_guest or (is_coop_session() and not multiplayer.is_server())
+
+
 func kick_peer(peer_id: int) -> void:
 	if not multiplayer.is_server() or peer_id <= 1:
 		return
 	var api: SceneMultiplayer = multiplayer as SceneMultiplayer
 	api.disconnect_peer(peer_id)
+	CloudSession.mark_save_dirty()
 
 
 func set_room_code(raw_code: String) -> String:
@@ -154,6 +226,8 @@ func set_room_code(raw_code: String) -> String:
 	active_room_code = next_code
 	if not active_world_id.is_empty():
 		MultiplayerWorlds.update_world(active_world_id, {"code": active_room_code})
+	if multiplayer.multiplayer_peer is RelayPeer:
+		(multiplayer.multiplayer_peer as RelayPeer).send_control_room_code(active_room_code)
 	_broadcast_session()
 	session_changed.emit()
 	return active_room_code
@@ -173,9 +247,28 @@ func refresh_local_name() -> void:
 
 
 func _on_peer_connected(id: int) -> void:
+	if multiplayer.is_server() and multiplayer.multiplayer_peer is RelayPeer:
+		var relay: RelayPeer = multiplayer.multiplayer_peer as RelayPeer
+		var meta: Dictionary = relay.get_peer_meta(id)
+		var n_user_id: String = String(meta.get("user_id", ""))
+		var n_uid: String = String(meta.get("uid", ""))
+		var disp: String = String(meta.get("display_name", meta.get("username", "SPIELER %d" % id)))
+		if not n_uid.is_empty():
+			_guest_owners[id] = "nakama:" + n_uid
+		elif not n_user_id.is_empty():
+			_guest_owners[id] = "nakama_id:" + n_user_id
+		if not n_user_id.is_empty():
+			_peer_user_ids[id] = n_user_id
+		if not n_uid.is_empty():
+			_peer_uids[id] = n_uid
+		_peer_roles[id] = CloudSession.normalize_role(String(meta.get("role", "player")))
+		_peer_names[id] = MultiplayerWorlds.sanitize_name(disp, "SPIELER %d" % id)
 	if multiplayer.is_server() and is_multiplayer_session():
 		_rebuild_roster()
 		_broadcast_session()
+		CloudSession.mark_save_dirty()
+		if transport_mode == "relay" and CloudSession.is_logged_in():
+			CloudSession.coop_heartbeat(active_world_name, 1 + multiplayer.get_peers().size())
 	peer_joined.emit(id)
 	session_changed.emit()
 
@@ -186,9 +279,16 @@ func _on_peer_left(id: int) -> void:
 	_peer_nonces.erase(id)
 	_peer_names.erase(id)
 	_peer_slots.erase(id)
+	_peer_user_ids.erase(id)
+	_peer_uids.erase(id)
+	_peer_roles.erase(id)
+	_peer_tickets.erase(id)
 	if multiplayer.is_server() and is_multiplayer_session():
 		_rebuild_roster()
 		_broadcast_session()
+		CloudSession.mark_save_dirty()
+		if transport_mode == "relay" and CloudSession.is_logged_in():
+			CloudSession.coop_heartbeat(active_world_name, 1 + multiplayer.get_peers().size())
 	session_changed.emit()
 
 
@@ -206,9 +306,39 @@ func _on_connection_failed() -> void:
 
 
 func _on_server_disconnected() -> void:
-	last_join_error = "VERBINDUNG ZUM HOST VERLOREN"
+	var was_guest: bool = is_local_coop_guest()
+	var relay_err: String = ""
+	if multiplayer.multiplayer_peer is RelayPeer:
+		relay_err = (multiplayer.multiplayer_peer as RelayPeer).last_error
+	last_join_error = relay_err if not relay_err.is_empty() else "VERBINDUNG ZUM HOST VERLOREN"
 	join_rejected.emit(last_join_error)
 	session_changed.emit()
+	_handle_unexpected_disconnect_in_world(was_guest, last_join_error)
+
+
+func _handle_unexpected_disconnect_in_world(was_guest: bool, reason: String) -> void:
+	if _handling_server_disconnect or not was_guest or GameLauncher.is_join_handshake_active() or GameLauncher.is_transitioning():
+		return
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.get_first_node_in_group("sandbox") != null:
+		return
+	var world: Node = tree.get_first_node_in_group("world")
+	if world == null or not is_instance_valid(world):
+		return
+	_handling_server_disconnect = true
+	CloudSession.capture_live_snapshot(tree, false, 0)
+	var saved_ok: bool = false
+	if CloudSession.is_logged_in() and not CloudSession.banned and not GameGuard.locked:
+		saved_ok = await CloudSession.flush_cloud_save_now(tree, CloudSession.QUIT_FLUSH_TIMEOUT_MSEC)
+	if not is_instance_valid(tree):
+		_handling_server_disconnect = false
+		return
+	var banner: String = reason if not reason.is_empty() else "VERBINDUNG ZUM HOST VERLOREN"
+	if saved_ok:
+		banner += " · CHARAKTER GESICHERT"
+	GameLauncher.menu_return = {"page": "main", "error": banner}
+	GameLauncher.launch(tree, {"skip_autosave": true})
+	_handling_server_disconnect = false
 
 
 func _local_identity() -> PackedByteArray:
@@ -282,6 +412,12 @@ func _authenticate(id: int, data: PackedByteArray) -> void:
 		_peer_nonces.erase(id)
 		_guest_owners[id] = owner
 		_peer_names[id] = MultiplayerWorlds.sanitize_name(String(msg.get("name", "SPIELER")), "SPIELER")
+		var n_uid: String = String(msg.get("nakama_uid", ""))
+		var n_user: String = String(msg.get("nakama_user_id", ""))
+		var n_ticket: String = String(msg.get("nakama_ticket", ""))
+		if not n_ticket.is_empty() and not n_user.is_empty():
+			_peer_tickets[id] = n_ticket
+			_verify_enet_identity(id, n_user, n_uid, n_ticket)
 	elif id == 1:
 		_client_saw_challenge = true
 		if int(msg.get("v", 0)) != PROTOCOL_VERSION:
@@ -301,10 +437,38 @@ func _authenticate(id: int, data: PackedByteArray) -> void:
 			"code_proof": proof,
 			"name": _local_player_name(),
 		}
+		if not _pending_ticket.is_empty():
+			reply["nakama_ticket"] = String(_pending_ticket.get("ticket", ""))
+			reply["nakama_user_id"] = String(_pending_ticket.get("user_id", ""))
+			reply["nakama_uid"] = String(_pending_ticket.get("uid", ""))
 		if api.send_auth(id, JSON.stringify(reply).to_utf8_buffer()) != OK:
 			api.disconnect_peer(id)
 			return
 	api.complete_auth(id)
+
+
+func _verify_enet_identity(peer_id: int, claimed_user_id: String, claimed_uid: String, ticket: String) -> void:
+	if not CloudSession.is_logged_in():
+		return
+	var res: Dictionary = await CloudSession.coop_verify_ticket(claimed_user_id, ticket)
+	if not bool(res.get("ok", false)) or not bool(res.get("valid", false)):
+		return
+	if not is_multiplayer_session() or not multiplayer.is_server():
+		return
+	if not _guest_owners.has(peer_id):
+		return
+	var verified_uid: String = String(res.get("uid", claimed_uid))
+	_peer_user_ids[peer_id] = claimed_user_id
+	_peer_uids[peer_id] = verified_uid
+	_peer_roles[peer_id] = CloudSession.normalize_role(String(res.get("role", "player")))
+	_guest_owners[peer_id] = "nakama:" + verified_uid if not verified_uid.is_empty() else ("nakama_id:" + claimed_user_id)
+	var dname: String = String(res.get("display_name", ""))
+	if not dname.is_empty():
+		_peer_names[peer_id] = MultiplayerWorlds.sanitize_name(dname, String(_peer_names.get(peer_id, "SPIELER")))
+	_rebuild_roster()
+	_broadcast_session()
+	peer_identity_verified.emit(peer_id)
+	session_changed.emit()
 
 
 func host_singleplayer() -> Error:
@@ -325,6 +489,8 @@ func host_multiplayer(
 	var clean_max: int = clampi(max_players, 2, MAX_PLAYERS)
 	var clean_port: int = clampi(port, 1024, 65535)
 	var clean_code: String = MultiplayerWorlds.normalize_code(code)
+	_clear_session()
+	transport_mode = "enet"
 	active_world_id = world_id
 	active_world_name = MultiplayerWorlds.sanitize_name(world_name, "KOOP-WELT")
 	active_room_code = clean_code
@@ -335,9 +501,52 @@ func host_multiplayer(
 	var err: Error = _host(clean_max - 1, "*", clean_port)
 	if err == OK:
 		_peer_names[1] = _local_player_name()
+		_peer_user_ids[1] = CloudSession.user_id
+		_peer_uids[1] = CloudSession.uid
 		_rebuild_roster()
 		session_changed.emit()
 	else:
+		_clear_session()
+	return err
+
+
+func host_relay(
+	match_id: String,
+	code: String = "",
+	max_players: int = MAX_PLAYERS,
+	world_name: String = "KOOP-WELT",
+	join_mode: String = "ask",
+	world_id: String = "",
+	save_path: String = ""
+) -> Error:
+	if match_id.is_empty() or not CloudSession.is_logged_in():
+		last_join_error = "NICHT EINGELOGGT ODER KEINE MATCH-ID"
+		return ERR_UNAUTHORIZED
+	if multiplayer.multiplayer_peer != null and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
+		multiplayer.multiplayer_peer.close()
+	_clear_session()
+	var clean_max: int = clampi(max_players, 2, MAX_PLAYERS)
+	transport_mode = "relay"
+	active_match_id = match_id
+	active_room_code = MultiplayerWorlds.normalize_code(code)
+	active_world_id = world_id
+	active_world_name = MultiplayerWorlds.sanitize_name(world_name, "KOOP-WELT")
+	active_join_mode = join_mode
+	active_save_path = save_path
+	active_max_players = clean_max
+	last_join_error = ""
+	var peer: RelayPeer = RelayPeer.new() as RelayPeer
+	var err: Error = peer.start_host(CloudSession.server_url, CloudSession.token, match_id, active_room_code)
+	if err == OK:
+		(multiplayer as SceneMultiplayer).auth_callback = Callable()
+		multiplayer.multiplayer_peer = peer
+		_peer_names[1] = _local_player_name()
+		_peer_user_ids[1] = CloudSession.user_id
+		_peer_uids[1] = CloudSession.uid
+		_rebuild_roster()
+		session_changed.emit()
+	else:
+		last_join_error = peer.last_error
 		_clear_session()
 	return err
 
@@ -347,6 +556,7 @@ func join(address: String, port: int = DEFAULT_PORT, code: String = "") -> Error
 	var clean_addr: String = String(parsed.get("address", "127.0.0.1"))
 	var clean_port: int = int(parsed.get("port", port))
 	_clear_session()
+	transport_mode = "enet"
 	_pending_join_code = MultiplayerWorlds.normalize_code(code)
 	_last_join_address = clean_addr
 	_last_join_port = clean_port
@@ -358,6 +568,7 @@ func join(address: String, port: int = DEFAULT_PORT, code: String = "") -> Error
 	var peer := ENetMultiplayerPeer.new()
 	var err: Error = peer.create_client(clean_addr, clean_port)
 	if err == OK:
+		_session_is_guest = true
 		_guest_owners.clear()
 		(multiplayer as SceneMultiplayer).auth_callback = _authenticate
 		multiplayer.multiplayer_peer = peer
@@ -367,7 +578,35 @@ func join(address: String, port: int = DEFAULT_PORT, code: String = "") -> Error
 	return err
 
 
-func leave() -> void:
+func join_relay(match_id: String, code: String = "", world_name: String = "KOOP-WELT") -> Error:
+	if match_id.is_empty() or not CloudSession.is_logged_in():
+		last_join_error = "NICHT EINGELOGGT ODER KEINE MATCH-ID"
+		return ERR_UNAUTHORIZED
+	if multiplayer.multiplayer_peer != null and not (multiplayer.multiplayer_peer is OfflineMultiplayerPeer):
+		multiplayer.multiplayer_peer.close()
+	_clear_session()
+	transport_mode = "relay"
+	active_match_id = match_id
+	active_room_code = MultiplayerWorlds.normalize_code(code)
+	active_world_name = MultiplayerWorlds.sanitize_name(world_name, "KOOP-WELT")
+	last_join_error = ""
+	var peer: RelayPeer = RelayPeer.new() as RelayPeer
+	var err: Error = peer.start_client(CloudSession.server_url, CloudSession.token, match_id, active_room_code)
+	if err == OK:
+		_session_is_guest = true
+		(multiplayer as SceneMultiplayer).auth_callback = Callable()
+		multiplayer.multiplayer_peer = peer
+		session_changed.emit()
+	else:
+		last_join_error = peer.last_error
+		_clear_session()
+	return err
+
+
+func leave(close_remote_relay: bool = true) -> void:
+	var closing_match_id: String = active_match_id
+	if close_remote_relay and transport_mode == "relay" and multiplayer.is_server() and CloudSession.is_logged_in():
+		CloudSession.coop_close_world(closing_match_id)
 	if multiplayer.multiplayer_peer != null:
 		multiplayer.multiplayer_peer.close()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
@@ -396,17 +635,28 @@ func _clear_session() -> void:
 	_peer_nonces.clear()
 	_peer_names.clear()
 	_peer_slots.clear()
+	_peer_user_ids.clear()
+	_peer_uids.clear()
+	_peer_roles.clear()
+	_peer_tickets.clear()
+	_pending_ticket.clear()
 	_roster.clear()
+	transport_mode = "offline"
 	active_world_id = ""
 	active_world_name = "KOOP-WELT"
 	active_room_code = ""
+	active_match_id = ""
+	active_join_mode = "ask"
 	active_save_path = ""
 	active_port = DEFAULT_PORT
 	active_max_players = MAX_PLAYERS
 	_pending_join_code = ""
 	_client_saw_challenge = false
 	_recent_recorded = false
+	_heartbeat_timer = 0.0
 	last_ping_ms = 0
+	explicit_coop_hud = false
+	_session_is_guest = false
 
 
 func _rebuild_roster() -> void:
@@ -434,6 +684,7 @@ func _rebuild_roster() -> void:
 			"name": pname,
 			"is_host": id == 1,
 			"slot": int(_peer_slots.get(id, 0)),
+			"uid": String(_peer_uids.get(id, "")),
 		})
 
 
@@ -441,17 +692,19 @@ func _broadcast_session() -> void:
 	if not multiplayer.is_server() or not is_multiplayer_session():
 		return
 	for p: int in multiplayer.get_peers():
-		_rpc_sync_session.rpc_id(p, active_world_name, active_room_code, active_port, active_max_players, _roster)
+		_rpc_sync_session.rpc_id(p, active_world_name, active_room_code, active_port, active_max_players, _roster, transport_mode, active_join_mode)
 
 
 @rpc("authority", "call_remote", "reliable")
-func _rpc_sync_session(world_name: String, room_code: String, host_port: int, max_players: int, synced_roster: Array) -> void:
+func _rpc_sync_session(world_name: String, room_code: String, host_port: int, max_players: int, synced_roster: Array, mode_name: String = "enet", join_mode_name: String = "ask") -> void:
 	if multiplayer.is_server():
 		return
 	active_world_name = MultiplayerWorlds.sanitize_name(world_name, "KOOP-WELT")
 	active_room_code = MultiplayerWorlds.normalize_code(room_code)
 	active_port = clampi(host_port, 1024, 65535)
 	active_max_players = clampi(max_players, 2, MAX_PLAYERS)
+	transport_mode = mode_name
+	active_join_mode = join_mode_name
 	_roster.clear()
 	for item: Variant in synced_roster:
 		if item is Dictionary:

@@ -34,6 +34,7 @@ var _fx_canvas: Node2D
 var _altar: BelfryAltar
 
 var _time: float = 0.0
+var _far_wait: float = 0.0
 var _toll_age: float = 99.0
 var _tolled_this_night: bool = false
 var _bird_flight: float = 0.0 ## 0 perched on spire roof, >0 darting gracefully across water
@@ -119,17 +120,19 @@ func _ready() -> void:
 	# Sunken Bell Spire (anchor 48, 136 inside 96x160)
 	var spire_local: Vector2 = spire_pos - position
 	var spire_off: Vector2 = Vector2(0.0, -(136.0 - 80.0))
-	if ResourceLoader.exists(SPIRE_TEX):
+	var spire_tex: Texture2D = DataRegistry.tex(SPIRE_TEX)
+	if spire_tex != null:
 		_spire_body = Sprite2D.new()
-		_spire_body.texture = load(SPIRE_TEX) as Texture2D
+		_spire_body.texture = spire_tex
 		_spire_body.hframes = 2
 		_spire_body.position = spire_local
 		_spire_body.offset = spire_off
 		_spire_body.z_index = 3 ## sorts cleanly as a tall spire
 		add_child(_spire_body)
-	if ResourceLoader.exists(SPIRE_GLOW):
+	var spire_glow_tex: Texture2D = DataRegistry.tex(SPIRE_GLOW)
+	if spire_glow_tex != null:
 		_spire_glow = Sprite2D.new()
-		_spire_glow.texture = load(SPIRE_GLOW) as Texture2D
+		_spire_glow.texture = spire_glow_tex
 		_spire_glow.hframes = 2
 		_spire_glow.position = spire_local
 		_spire_glow.offset = spire_off
@@ -217,24 +220,35 @@ func _refresh_visuals() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_toll_age += delta
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
 	var tod: float = TimeManager.time_of_day
 	if tod > 0.25 and tod < 0.85:
 		_tolled_this_night = false
 
 	# Keep stones risen if any player is currently standing out on the causeway so nobody is ever dropped mid-crossing!
+	var mid_pos: Vector2 = (shore_pos + spire_pos) * 0.5
+	var far: bool = WorldProp.far_from_camera(self, mid_pos, 422500.0)
 	var player_on_stones: bool = false
 	for p: Player in Player.all:
-		if is_instance_valid(p) and p.global_position.distance_to((shore_pos + spire_pos) * 0.5) < 92.0:
+		if is_instance_valid(p) and p.global_position.distance_squared_to(mid_pos) < 8464.0:
 			player_on_stones = true
 			break
 
 	var want_risen: bool = awakened or is_midnight_clear() or (stones_risen and player_on_stones)
 	if want_risen != stones_risen:
 		stones_risen = want_risen
-		if stones_risen and not _tolled_this_night:
+		if stones_risen and not _tolled_this_night and not far:
 			_tolled_this_night = true
 			_toll_bell()
+		elif stones_risen and not _tolled_this_night:
+			_tolled_this_night = true
 		_refresh_visuals()
+
+	if far:
+		_far_wait = 0.25
+		return
 
 	if _spire_glow != null:
 		var pulse: float = 0.85 + 0.15 * sin(_time * 2.4)

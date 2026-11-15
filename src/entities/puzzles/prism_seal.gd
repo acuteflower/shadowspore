@@ -40,6 +40,7 @@ var _obelisks: Array[DesertRuins.ResonanceObelisk] = []
 var _corner_glows: Array[Sprite2D] = []
 var _ring_fx: Node2D
 var _burst_t: float = -1.0
+var _far_wait: float = 0.0
 
 
 func setup(data: Dictionary, tuning: Dictionary) -> void:
@@ -284,6 +285,24 @@ func _process(delta: float) -> void:
 			_burst_t = -1.0
 		if _ring_fx != null:
 			_ring_fx.queue_redraw()
+	var timers_quiet: bool = _timers[0] <= 0.0 and _timers[1] <= 0.0 and _timers[2] <= 0.0
+	if _burst_t < 0.0 and timers_quiet:
+		if _far_wait > 0.0:
+			_far_wait -= delta
+			if _far_wait > 0.0:
+				return
+		var vp: Viewport = get_viewport()
+		var cam: Camera2D = vp.get_camera_2d() if vp != null else null
+		var max_d: float = 720.0 * 720.0
+		var near: bool = cam != null and global_position.distance_squared_to(cam.get_screen_center_position()) <= max_d
+		if not near:
+			for pl: Player in Player.all:
+				if is_instance_valid(pl) and pl.global_position.distance_squared_to(global_position) <= max_d:
+					near = true
+					break
+		if not near:
+			_far_wait = 0.25
+			return
 	if _done:
 		return
 	var changed: bool = false

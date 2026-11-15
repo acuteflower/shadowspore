@@ -101,6 +101,7 @@ func _enter() -> void:
 	_pos = _player_cam.get_screen_center_position()
 	_zoom = _player_cam.zoom.x
 	_cam = Camera2D.new()
+	_cam.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_cam.position_smoothing_enabled = false
 	_cam.global_position = _pos
 	_cam.zoom = Vector2(_zoom, _zoom)

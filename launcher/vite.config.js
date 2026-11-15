@@ -6,14 +6,17 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // The launcher reuses the game's own art (assets/, docs/img/) and CHANGELOG.md.
 const repoRoot = path.resolve(here, "..");
 
+const parsedDevPort = Number(process.env.SHADOWSPORE_DEV_PORT || 1420);
+const devPort = Number.isInteger(parsedDevPort) && parsedDevPort >= 1024 ? parsedDevPort : 1420;
+
 export default defineConfig({
   clearScreen: false,
   define: {
     __REPO_ROOT__: JSON.stringify(repoRoot.replace(/\\/g, "/")),
   },
   server: {
-    port: 1420,
-    strictPort: true,
+    port: devPort,
+    strictPort: false,
     fs: {
       allow: [repoRoot],
     },

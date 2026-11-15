@@ -396,8 +396,16 @@ func _try_hop(direction: Vector2, fleeing: bool, micro: bool = false) -> void:
 		return
 	var hop_dur: float = _rng.randf_range(0.28, 0.36) if micro else _range("flee_duration" if fleeing else "wander_duration")
 	var hop_h: float = 2.6 if micro else float(_spec["flee_height"] if fleeing else _spec["wander_height"])
-	_begin_hop.rpc(global_position, best, hop_dur, hop_h, 0.0)
+	if _can_rpc():
+		_begin_hop.rpc(global_position, best, hop_dur, hop_h, 0.0)
+	else:
+		_begin_hop(global_position, best, hop_dur, hop_h, 0.0)
 	_hops_left -= 1
+
+
+func _can_rpc() -> bool:
+	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	return is_inside_tree() and peer != null and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
 
 
 func _ground_safe(point: Vector2) -> bool:
@@ -430,7 +438,10 @@ func _advance_hop(delta: float) -> void:
 	if multiplayer.is_server():
 		var hit: KinematicCollision2D = move_and_collide(next - global_position)
 		if hit != null or _hop_time >= _hop_duration:
-			_land.rpc(global_position)
+			if _can_rpc():
+				_land.rpc(global_position)
+			else:
+				_land(global_position)
 			_pause_left = _range("flee_pause" if state == State.FLEE else "wander_pause")
 	else:
 		global_position = next

@@ -14,6 +14,15 @@ const FRAME_H: int = 80
 const BAND_H: int = 8
 
 static var _bands_cache: Dictionary = {}
+static var _sheet_images: Dictionary = {}
+
+
+static func _sheet_image(tex: Texture2D) -> Image:
+	if _sheet_images.has(tex):
+		return _sheet_images[tex] as Image
+	var img: Image = tex.get_image()
+	_sheet_images[tex] = img
+	return img
 
 const HARVEST_LAYER: int = 1 << 4 ## physics layer 5, the one weapons hit (data/harvest.json "fallen_log": the axe chops it)
 
@@ -43,8 +52,8 @@ static func _get_or_create_bands(idx: int) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var col: int = idx % 8
 	var row: int = (idx % FRAMES) / 8
-	var img: Image = (BONE_TEXTURE if idx >= FRAMES else TEXTURE).get_image()
-	var glow_img: Image = (BONE_GLOW if idx >= FRAMES else GLOW).get_image()
+	var img: Image = _sheet_image(BONE_TEXTURE if idx >= FRAMES else TEXTURE)
+	var glow_img: Image = _sheet_image(BONE_GLOW if idx >= FRAMES else GLOW)
 	for y: int in range(0, FRAME_H, BAND_H):
 		var h: int = mini(BAND_H, FRAME_H - y)
 		var has_pixels: bool = false

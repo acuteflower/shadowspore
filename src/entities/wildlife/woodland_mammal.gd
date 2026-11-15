@@ -1281,17 +1281,34 @@ func _step(direction: Vector2, action: Mood) -> void:
 	_issue(Mood.ALERT if fleeing else Mood.REST, 0.6)
 
 
+func _can_rpc() -> bool:
+	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	return is_inside_tree() and peer != null and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+
+
 func _issue(action: Mood, duration: float, direction: float = INF, elapsed: float = 0.0) -> void:
-	_command.rpc(action, duration, facing if is_inf(direction) else direction, global_position, global_position, elapsed, _gait_phase, false, _climb_height, _climb_height)
+	var dir_val: float = facing if is_inf(direction) else direction
+	if _can_rpc():
+		_command.rpc(action, duration, dir_val, global_position, global_position, elapsed, _gait_phase, false, _climb_height, _climb_height)
+	else:
+		_command(action, duration, dir_val, global_position, global_position, elapsed, _gait_phase, false, _climb_height, _climb_height)
 
 
 func _move_action(action: Mood, point: Vector2, duration: float) -> void:
-	_command.rpc(action, duration, (point - global_position).angle(), global_position, point, 0.0, _gait_phase, _moving and mood == action and action in [Mood.FLEE, Mood.RETURN, Mood.CHASE], 0.0, 0.0)
+	var dir_val: float = (point - global_position).angle()
+	var rolling: bool = _moving and mood == action and action in [Mood.FLEE, Mood.RETURN, Mood.CHASE]
+	if _can_rpc():
+		_command.rpc(action, duration, dir_val, global_position, point, 0.0, _gait_phase, rolling, 0.0, 0.0)
+	else:
+		_command(action, duration, dir_val, global_position, point, 0.0, _gait_phase, rolling, 0.0, 0.0)
 
 
 func _climb_action(action: Mood, point: Vector2, duration: float, from_h: float, to_h: float) -> void:
 	var heading: float = (point - global_position).angle() if point.distance_squared_to(global_position) > 0.5 else facing
-	_command.rpc(action, duration, heading, global_position, point, 0.0, _gait_phase, false, from_h, to_h)
+	if _can_rpc():
+		_command.rpc(action, duration, heading, global_position, point, 0.0, _gait_phase, false, from_h, to_h)
+	else:
+		_command(action, duration, heading, global_position, point, 0.0, _gait_phase, false, from_h, to_h)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -1385,7 +1402,10 @@ func _advance() -> void:
 				_step((home - global_position).normalized(), Mood.RETURN)
 				return
 		if hit != null or t >= 1.0:
-			_settle.rpc(global_position, mood, _climb_to)
+			if _can_rpc():
+				_settle.rpc(global_position, mood, _climb_to)
+			else:
+				_settle(global_position, mood, _climb_to)
 	else:
 		global_position = point
 		_gait_phase = _gait_start + _start.distance_to(global_position) / float(_spec["run_stride"] if mood in [Mood.FLEE, Mood.CHASE] else _spec["walk_stride"])

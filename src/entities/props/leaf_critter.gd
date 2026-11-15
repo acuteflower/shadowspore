@@ -189,7 +189,7 @@ static func sites_for(thing: WorldProp, species: String, original: bool = false)
 	if sprite == null or sprite.texture == null: return PackedVector2Array()
 	if species.is_empty(): return PackedVector2Array()
 	# Election always uses the intact base pose, even after harvesting or reloading.
-	var texture: Texture2D = load(String(thing.spec().texture)) as Texture2D if original else sprite.texture
+	var texture: Texture2D = DataRegistry.tex(String(thing.spec().texture)) if original else sprite.texture
 	var columns: int = int(thing.spec().columns) if original else sprite.hframes
 	var rows: int = int(thing.spec().rows) if original else sprite.vframes
 	var frame: int = thing.variant if original else sprite.frame

@@ -7,8 +7,12 @@ use base64::Engine;
 
 use crate::game::find_project_dir;
 
-/// Only links into the game's own GitHub repository may be opened.
-const LINK_PREFIX: &str = "https://github.com/acuteflower/shadowspore";
+/// Only links into the game's own GitHub repository or official domain may be opened.
+const ALLOWED_PREFIXES: &[&str] = &[
+    "https://github.com/acuteflower/shadowspore",
+    "https://shadowspore.com",
+    "https://s.shadowspore.com",
+];
 /// Largest picture the launcher will inline (data URLs live in memory).
 const MAX_IMAGE_BYTES: u64 = 12 * 1024 * 1024;
 
@@ -58,9 +62,11 @@ pub fn read_doc_image(rel: &str) -> Result<String, String> {
 /// Opens a link of the game's repository in the system browser.
 pub fn open_external(url: &str) -> Result<(), String> {
     let url = url.trim();
-    let allowed = url == LINK_PREFIX
-        || url.starts_with(&format!("{}/", LINK_PREFIX))
-        || url.starts_with(&format!("{}#", LINK_PREFIX));
+    let allowed = ALLOWED_PREFIXES.iter().any(|prefix| {
+        url == *prefix
+            || url.starts_with(&format!("{}/", prefix))
+            || url.starts_with(&format!("{}#", prefix))
+    });
     let safe_chars = url
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || "-._~:/?#[]@!$&'()*+,;=%".contains(c));

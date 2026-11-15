@@ -52,6 +52,8 @@ func _init_server_players() -> void:
 		return
 	multiplayer.peer_connected.connect(_spawn_player)
 	multiplayer.peer_disconnected.connect(_despawn_player)
+	if not NetworkManager.peer_identity_verified.is_connected(_on_peer_identity_verified):
+		NetworkManager.peer_identity_verified.connect(_on_peer_identity_verified)
 	_spawn_player(multiplayer.get_unique_id())
 
 
@@ -104,9 +106,16 @@ func _process(_delta: float) -> void:
 			_rpc_spawn_fisher.rpc_id(1, pos)
 
 
+func _allow_remote_debug_spawn() -> bool:
+	if not multiplayer.is_server():
+		return false
+	var sender: int = multiplayer.get_remote_sender_id()
+	return sender <= 1 or NetworkManager.is_peer_admin(sender)
+
+
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_spawn_fisher(pos: Vector2) -> void:
-	if multiplayer.is_server():
+	if _allow_remote_debug_spawn():
 		_spawn_fisher(pos)
 
 
@@ -150,7 +159,7 @@ func _spawn_fisher(pos: Vector2) -> LightFisher:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_spawn_listener(pos: Vector2) -> void:
-	if multiplayer.is_server():
+	if _allow_remote_debug_spawn():
 		_spawn_listener(pos)
 
 
@@ -175,7 +184,7 @@ func _clear_spot(pos: Vector2, radius: float) -> Vector2:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_spawn_crusher(pos: Vector2) -> void:
-	if multiplayer.is_server():
+	if _allow_remote_debug_spawn():
 		_spawn_crusher(pos)
 
 
@@ -262,7 +271,7 @@ func spawn_quartz_golem(at: Vector2, heading: float, variant: int = 0, start_dor
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_spawn_enemy(pos: Vector2) -> void:
-	if multiplayer.is_server():
+	if _allow_remote_debug_spawn():
 		_spawn_enemy(pos)
 
 
@@ -392,6 +401,35 @@ func _spawn_player(id: int) -> void:
 		var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
 		if town != null and town.board != null:
 			town.board.restore_guest(player)
+		var guest_user_id: String = NetworkManager.peer_user_id(id)
+		if CloudSession.is_logged_in() and not guest_user_id.is_empty():
+			_load_guest_cloud_character(id, player, guest_user_id)
+
+
+func _on_peer_identity_verified(peer_id: int) -> void:
+	if not multiplayer.is_server() or peer_id == multiplayer.get_unique_id():
+		return
+	var player: Player = _players.get_node_or_null(str(peer_id)) as Player
+	var guest_user_id: String = NetworkManager.peer_user_id(peer_id)
+	if player != null and CloudSession.is_logged_in() and not guest_user_id.is_empty():
+		_load_guest_cloud_character(peer_id, player, guest_user_id)
+
+
+func _load_guest_cloud_character(peer_id: int, player: Player, guest_user_id: String) -> void:
+	var res: Dictionary = await CloudSession.coop_get_peer_character(
+		guest_user_id,
+		NetworkManager.active_match_id,
+		NetworkManager.peer_ticket(peer_id)
+	)
+	if not is_instance_valid(player) or not player.is_inside_tree():
+		return
+	if not bool(res.get("ok", false)) or not bool(res.get("has_profile", false)):
+		return
+	var profile: Dictionary = res.get("profile", {}) as Dictionary
+	if profile.is_empty():
+		return
+	SaveGame.import_player_data(player, profile, false, false)
+	SaveGame.sync_player_to_network(player)
 
 
 func _despawn_player(id: int) -> void:

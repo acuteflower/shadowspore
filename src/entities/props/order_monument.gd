@@ -34,6 +34,7 @@ var _banner: Sprite2D
 var _banner_mat: ShaderMaterial
 var _light: NightLight
 var _time: float = 0.0
+var _far_wait: float = 0.0
 var _pulse: float = 99.0
 
 
@@ -95,18 +96,21 @@ func _build_visuals() -> void:
 		_body.frame = clampi(variant, 0, cols - 1)
 		_body.offset = off
 		add_child(_body)
-	if ResourceLoader.exists(glow_path):
+	var tex_glow: Texture2D = DataRegistry.tex(glow_path)
+	if tex_glow != null:
 		_glow = Sprite2D.new()
-		_glow.texture = load(glow_path) as Texture2D
+		_glow.texture = tex_glow
 		_glow.hframes = cols
 		_glow.frame = clampi(variant, 0, cols - 1)
 		_glow.offset = off
 		_glow.material = Unlit.material()
 		add_child(_glow)
 
-	if monument_kind == "patrol_camp" and ResourceLoader.exists(BANNER_TEX):
-		_banner = Sprite2D.new()
-		_banner.texture = load(BANNER_TEX) as Texture2D
+	if monument_kind == "patrol_camp":
+		var tex_banner: Texture2D = DataRegistry.tex(BANNER_TEX)
+		if tex_banner != null:
+			_banner = Sprite2D.new()
+			_banner.texture = tex_banner
 		_banner.position = banner_offset
 		_banner.offset = Vector2(0.0, -(58.0 - 32.0)) ## anchor at pole foot (16, 58) inside 32x64
 		_banner_mat = ShaderMaterial.new()
@@ -152,6 +156,12 @@ func _build_collider() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_pulse += delta
+	if _far_wait > 0.0:
+		_far_wait -= delta
+		return
+	if WorldProp.far_from_camera(self, global_position, 313600.0):
+		_far_wait = 0.25
+		return
 	var night: float = TimeManager.night_amount()
 	var answer: float = clampf(1.0 - _pulse / 2.6, 0.0, 1.0)
 	if _glow != null:
@@ -196,9 +206,10 @@ func interact(player: Player) -> void:
 	if player == null or player.is_busy():
 		return
 	_pulse = 0.0
-	if ResourceLoader.exists(ORDER_AUDIO):
+	var order_stream: AudioStream = DataRegistry.audio(ORDER_AUDIO)
+	if order_stream != null:
 		var snd: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
-		snd.stream = load(ORDER_AUDIO) as AudioStream
+		snd.stream = order_stream
 		snd.bus = "SFX"
 		snd.volume_db = -5.0
 		snd.max_distance = 420.0

@@ -22,6 +22,7 @@ var _glow: Sprite2D
 var _veins: Sprite2D
 var _light: NightLight
 var _time: float = 0.0
+var _far_wait: float = 0.0
 var _visit: float = 0.0
 var _hour_now: float = 0.0
 var _free: float = 0.0
@@ -127,6 +128,29 @@ func set_liberated(value: bool, instant: bool = false) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _far_wait > 0.0 and _hour_now == 0.0 and drain == 0.0:
+		_far_wait -= delta
+		return
+	var far: bool = WorldProp.far_from_camera(self, global_position, 562500.0)
+	if far and _hour_now == 0.0 and drain == 0.0 and _free == (1.0 if liberated else 0.0):
+		var near_far: bool = false
+		for hero: Player in Player.all:
+			if (hero.global_position - global_position).length_squared() < 422500.0:
+				near_far = true
+				break
+		if not near_far:
+			if multiplayer.is_server():
+				_visit -= 0.25 if _far_wait <= 0.0 and _time > 0.25 else delta
+				if _visit <= 0.0:
+					_visit = 3.0
+					for i: int in range(_birds.size() - 1, -1, -1):
+						if not is_instance_valid(_birds[i]):
+							_birds.remove_at(i)
+					for bird: WildCorvid in _birds:
+						bird.queue_free()
+					_birds.clear()
+			_far_wait = 0.25
+			return
 	_hour_now = move_toward(_hour_now, 0.0 if liberated else hour, delta * 0.7)
 	_free = move_toward(_free, 1.0 if liberated else 0.0, delta * 0.22)
 	for mat: ShaderMaterial in _materials:

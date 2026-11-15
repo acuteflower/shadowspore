@@ -61,7 +61,8 @@ func _on_peer_left(id: int) -> void:
 
 
 func _sync_visibility() -> void:
-	visible = NetworkManager.is_multiplayer_session()
+	var has_peers: bool = not multiplayer.get_peers().is_empty()
+	visible = NetworkManager.is_multiplayer_session() and (NetworkManager.transport_mode != "relay" or has_peers or NetworkManager.explicit_coop_hud)
 
 
 func _show_toast(msg: String, color: Color = Color("7fe3da")) -> void:
@@ -129,7 +130,7 @@ func _gui_input(event: InputEvent) -> void:
 			if mb.button_index == MOUSE_BUTTON_LEFT:
 				if _code_rect.has_point(mb.position):
 					_copy_code()
-				elif _ip_rect.has_point(mb.position):
+				elif _ip_rect.has_point(mb.position) and NetworkManager.transport_mode != "relay":
 					_copy_invite()
 				elif _toggle_rect.has_point(mb.position):
 					_expanded = not _expanded
@@ -139,7 +140,7 @@ func _gui_input(event: InputEvent) -> void:
 					_expanded = not _expanded
 					queue_redraw()
 				accept_event()
-			elif mb.button_index == MOUSE_BUTTON_RIGHT and _ip_rect.has_point(mb.position):
+			elif mb.button_index == MOUSE_BUTTON_RIGHT and _ip_rect.has_point(mb.position) and NetworkManager.transport_mode != "relay":
 				var ips: PackedStringArray = NetworkManager.local_ips()
 				if ips.size() > 1:
 					_ip_index = posmod(_ip_index + 1, ips.size())
@@ -204,16 +205,23 @@ func _draw() -> void:
 	_draw_icon(7, Vector2(px + PANEL_W - 14.0, y + 1.0), 10, 0.95 if _hover_zone == "code" else 0.65)
 	y += 13.0
 
-	# IP:Port row (click copies ip+code, right-click cycles adapter)
+	# IP:Port row (LAN/ENet) or Join-Mode row (Nakama Relay)
 	_ip_rect = Rect2(px + 2.0, y, PANEL_W - 4.0, 11.0)
-	if _hover_zone == "ip":
-		draw_rect(_ip_rect, Color("2a2548", 0.85))
-	var ip_disp: String = _current_ip()
-	var full_ip: String = ip_disp if NetworkManager.active_port == NetworkManager.DEFAULT_PORT else ("%s:%d" % [ip_disp, NetworkManager.active_port])
-	if PixelText.width(full_ip) > int(PANEL_W - 20.0):
-		full_ip = ip_disp
-	PixelText.draw(self, "IP:", Vector2i(int(px) + 5, int(y) + 2), Color("8a84ad"), Color(VineStyle.OUTLINE))
-	PixelText.draw(self, full_ip, Vector2i(int(px) + 18, int(y) + 2), Color("b9f3ee") if _hover_zone == "ip" else Color("c8c3df"), Color(VineStyle.OUTLINE))
+	if NetworkManager.transport_mode == "relay":
+		var jm: String = NetworkManager.active_join_mode
+		var jm_disp: String = "PRIVAT" if jm == "private" else ("OFFEN" if jm == "open" else "ANFRAGE")
+		var jm_col: Color = Color("ffb4a8") if jm == "private" else (Color("a6e68f") if jm == "open" else Color("7fe3da"))
+		PixelText.draw(self, "MODUS:", Vector2i(int(px) + 5, int(y) + 2), Color("8a84ad"), Color(VineStyle.OUTLINE))
+		PixelText.draw(self, jm_disp, Vector2i(int(px) + 39, int(y) + 2), jm_col, Color(VineStyle.OUTLINE))
+	else:
+		if _hover_zone == "ip":
+			draw_rect(_ip_rect, Color("2a2548", 0.85))
+		var ip_disp: String = _current_ip()
+		var full_ip: String = ip_disp if NetworkManager.active_port == NetworkManager.DEFAULT_PORT else ("%s:%d" % [ip_disp, NetworkManager.active_port])
+		if PixelText.width(full_ip) > int(PANEL_W - 20.0):
+			full_ip = ip_disp
+		PixelText.draw(self, "IP:", Vector2i(int(px) + 5, int(y) + 2), Color("8a84ad"), Color(VineStyle.OUTLINE))
+		PixelText.draw(self, full_ip, Vector2i(int(px) + 18, int(y) + 2), Color("b9f3ee") if _hover_zone == "ip" else Color("c8c3df"), Color(VineStyle.OUTLINE))
 	y += 12.0
 
 	# Player List (when expanded)

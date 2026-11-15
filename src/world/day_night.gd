@@ -112,7 +112,8 @@ func _update() -> void:
 		var dim: float = _weather.ambient_dim() ## the sky's own light falls under cloud: only the part above the night floor
 		var day_part: float = 1.0 - TimeManager.night_amount()
 		color = color * Color(lerpf(1.0, dim, day_part), lerpf(1.0, dim, day_part), lerpf(1.0, dim * 1.02, day_part), 1.0)
-	var gloom: float = 0.0 if (indoors or not has_cam) else BiomeBlend.amount_at(cam_pos) ## the Hexenwald: permanent dusk by day, a deeper night (docs/hexenwald_konzept.md, stage 3)
+	var cam_matches_weather: bool = has_cam and cam_pos.distance_squared_to(_weather.focus) < 4.0
+	var gloom: float = 0.0 if (indoors or not has_cam) else (_weather.last_hex_at_focus if cam_matches_weather else BiomeBlend.amount_at(cam_pos)) ## the Hexenwald: permanent dusk by day, a deeper night (docs/hexenwald_konzept.md, stage 3)
 	if gloom > 0.0:
 		color = color.lerp(TimeManager.NIGHT_COLOR, gloom) ## always night in the mood, whatever the clock says
 	var sun: float = 0.0 if indoors else TimeManager.sun_amount() * (1.0 - gloom) * sky_sun
@@ -153,7 +154,7 @@ func _update() -> void:
 	_ambience.follow(sun * (1.0 - 0.8 * _weather.local_rain), night, indoors, get_process_delta_time())
 	_sky.update(indoors, get_process_delta_time(), TimeManager.ambient_color() if not indoors else Color(1, 1, 1))
 	_music.night = clock_night
-	var arid_now: float = 0.0 if (indoors or not has_cam) else BiomeBlend.arid_at(cam_pos)
+	var arid_now: float = 0.0 if (indoors or not has_cam) else (_weather.last_arid_at_focus if cam_matches_weather else BiomeBlend.arid_at(cam_pos))
 	if not indoors:
 		_music.gloom = gloom
 		_music.arid = arid_now

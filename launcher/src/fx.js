@@ -1,21 +1,32 @@
-// Cosmetic motion: drifting spores and fireflies, a shadow that the cursor's light
-// pushes back (like the game's main menu), and the loading-screen walkers.
+// The night over the launcher, drawn like the game's main menu (menu_dark.gdshader):
+// real pixel darkness at a quarter of the window's resolution, ordered-dithered between
+// a few steps, creeping like smoke. Light sources hold pools open: the cursor and every
+// element with data-light="radius" (data-light-color="r,g,b"). Spores are single pixels.
 const prefersReduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const SPORE_COLORS = ["#9a6bff", "#c9a6ff", "#5ff0d0", "#8af7e2", "#ff6ad5", "#ffd38a"];
+const CELL = 4;
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const NIGHT = [7, 4, 15];
+const SPORES = [
+  [154, 107, 255],
+  [201, 166, 255],
+  [95, 240, 208],
+  [255, 211, 138],
+];
 
 export class Atmosphere {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
-    this.motes = [];
+    this.paused = false;
+    this.dim = 0.9; // the night starts closed and opens on boot
+    this.dimTarget = 0.36;
+    this.flare = 0; // 0..1: the play stone's light swells over the clearing
+    this.flareTarget = 0;
     this.mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999, seen: false };
     this.t = 0;
-    this.paused = false;
-    this.dim = 1; // 1 = full shadow at the edges, lower on content pages
-    this.dimTarget = 1;
-    this.resize = this.resize.bind(this);
-    window.addEventListener("resize", this.resize);
+    this.motes = [];
+    window.addEventListener("resize", () => this.resize());
     window.addEventListener("pointermove", (e) => {
       this.mouse.tx = e.clientX;
       this.mouse.ty = e.clientY;
@@ -27,109 +38,171 @@ export class Atmosphere {
     });
     document.addEventListener("pointerleave", () => (this.mouse.seen = false));
     this.resize();
-    for (let i = 0; i < 70; i++) this.motes.push(this.spawn(true));
+    for (let i = 0; i < 46; i++) this.motes.push(this.spawn(true));
     this.last = performance.now();
+    this.acc = 0;
     requestAnimationFrame((t) => this.frame(t));
   }
 
   resize() {
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.w = window.innerWidth;
-    this.h = window.innerHeight;
-    this.canvas.width = Math.round(this.w * dpr);
-    this.canvas.height = Math.round(this.h * dpr);
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // A hidden window can report 0 x 0 while it starts.
+    this.w = Math.max(1, window.innerWidth);
+    this.h = Math.max(1, window.innerHeight);
+    this.cw = Math.ceil(this.w / CELL);
+    this.ch = Math.ceil(this.h / CELL);
+    this.canvas.width = this.cw;
+    this.canvas.height = this.ch;
+    this.image = this.ctx.createImageData(this.cw, this.ch);
   }
 
   spawn(anywhere = false) {
-    const firefly = Math.random() < 0.28;
+    const firefly = Math.random() < 0.3;
     return {
-      x: Math.random() * this.w,
-      y: anywhere ? Math.random() * this.h : this.h + 10,
-      vx: (Math.random() - 0.5) * 6,
-      vy: -(4 + Math.random() * (firefly ? 6 : 14)),
-      size: firefly ? 2 : Math.random() < 0.7 ? 1 : 2,
-      color: firefly ? (Math.random() < 0.6 ? "#7ff5d6" : "#ffd58a") : SPORE_COLORS[(Math.random() * SPORE_COLORS.length) | 0],
-      phase: Math.random() * Math.PI * 2,
-      blink: firefly ? 0.6 + Math.random() * 1.4 : 0,
+      x: Math.random() * this.cw,
+      y: anywhere ? Math.random() * this.ch : this.ch + 2,
+      vx: (Math.random() - 0.5) * 1.4,
+      vy: -(0.6 + Math.random() * (firefly ? 1.2 : 2.6)),
+      color: firefly ? (Math.random() < 0.6 ? SPORES[2] : SPORES[3]) : SPORES[(Math.random() * 2) | 0],
+      phase: Math.random() * 6.28,
+      blink: firefly ? 0.7 + Math.random() * 1.3 : 0,
       firefly,
-      life: 0,
     };
   }
 
+  lights() {
+    const out = [];
+    const reduced = this.paused || prefersReduced();
+    if (this.mouse.seen && !reduced) out.push({ x: this.mouse.x, y: this.mouse.y, r: 150, s: 0.55, c: [150, 110, 255] });
+    for (const el of document.querySelectorAll("[data-light]")) {
+      if (!el.offsetParent) continue;
+      const b = el.getBoundingClientRect();
+      if (!b.width) continue;
+      const page = el.closest(".page");
+      if (page && !page.classList.contains("is-active")) continue;
+      let r = Number(el.dataset.light) || 160;
+      let s = 0.85;
+      if (el.id === "play-btn") {
+        // a closed stone (game running, nothing to start) only glows faintly
+        if (el.disabled && this.flare < 0.05) s *= 0.4;
+        r *= 1 + this.flare * 5;
+        s += this.flare * 0.4;
+      }
+      const c = (el.dataset.lightColor || "79,227,193").split(",").map(Number);
+      out.push({ x: b.left + b.width / 2, y: b.top + b.height / 2, r, s, c });
+    }
+    return out;
+  }
+
   frame(now) {
+    requestAnimationFrame((t) => this.frame(t));
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
-    const reduced = () => this.paused || prefersReduced();
-    if (!reduced()) this.t += dt;
-    const { ctx, w, h, mouse } = this;
-    mouse.x += (mouse.tx - mouse.x) * Math.min(1, dt * 6);
-    mouse.y += (mouse.ty - mouse.y) * Math.min(1, dt * 6);
-    this.dim += (this.dimTarget - this.dim) * Math.min(1, dt * 3);
-    ctx.clearRect(0, 0, w, h);
+    // 30 steps a second are plenty for a dithered night and spare the GPU.
+    this.acc += dt;
+    if (this.acc < 1 / 30) return;
+    const step = this.acc;
+    this.acc = 0;
+    const reduced = this.paused || prefersReduced();
+    if (!reduced) this.t += step;
+    const m = this.mouse;
+    m.x += (m.tx - m.x) * Math.min(1, step * 7);
+    m.y += (m.ty - m.y) * Math.min(1, step * 7);
+    this.dim += (this.dimTarget - this.dim) * Math.min(1, step * 2.2);
+    this.flare += (this.flareTarget - this.flare) * Math.min(1, step * 1.6);
 
-    if (!reduced()) {
-      ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < this.motes.length; i++) {
-        const m = this.motes[i];
-        m.life += dt;
-        const sway = Math.sin(this.t * 0.8 + m.phase) * 8;
-        m.x += (m.vx + sway * 0.4) * dt;
-        m.y += m.vy * dt;
-        // The cursor's light stirs the air a little.
-        if (mouse.seen) {
-          const dx = m.x - mouse.x;
-          const dy = m.y - mouse.y;
+    const { cw, ch, image } = this;
+    const data = image.data;
+    const lights = this.lights().map((l) => ({
+      x: l.x / CELL,
+      y: l.y / CELL,
+      inv: CELL / l.r,
+      s: l.s,
+      c: l.c,
+    }));
+    const t = this.t;
+    const base = this.dim;
+    const cx = cw * 0.46;
+    const cy = ch * 0.5;
+    const ex = 1 / (cw * 0.62);
+    const ey = 1 / (ch * 0.62);
+    for (let y = 0; y < ch; y++) {
+      const row = y * cw;
+      const by = (y & 3) * 4;
+      const dyE = (y - cy) * ey;
+      const smokeY = Math.sin(y * 0.071 - t * 0.21) * 2.1;
+      for (let x = 0; x < cw; x++) {
+        // light from every source, soft cubic fall-off
+        let lit = 0;
+        let lr = 0;
+        let lg = 0;
+        let lb = 0;
+        for (let i = 0; i < lights.length; i++) {
+          const L = lights[i];
+          const dx = (x - L.x) * L.inv;
+          const dy = (y - L.y) * L.inv * 1.25;
           const d2 = dx * dx + dy * dy;
-          if (d2 < 120 * 120) {
-            const f = (1 - Math.sqrt(d2) / 120) * 40 * dt;
-            m.x += (dx / 60) * f;
-            m.y += (dy / 60) * f;
-          }
+          if (d2 >= 1) continue;
+          const f = (1 - d2) * (1 - d2) * L.s;
+          lit += f;
+          lr += L.c[0] * f;
+          lg += L.c[1] * f;
+          lb += L.c[2] * f;
         }
-        if (m.y < -10 || m.x < -20 || m.x > w + 20) {
-          this.motes[i] = this.spawn();
-          continue;
+        // darkness: base, the rim of the window, drifting smoke
+        const dxE = (x - cx) * ex;
+        const edge = dxE * dxE + dyE * dyE;
+        const smoke = Math.sin(x * 0.052 + t * 0.17 + smokeY) * Math.sin(y * 0.043 - x * 0.021 + t * 0.11);
+        let dark = base + edge * 0.42 + smoke * 0.07 - lit;
+        if (dark < 0) dark = 0;
+        else if (dark > 0.96) dark = 0.96;
+        const level = dark * 5;
+        const k = level | 0;
+        const a = (k + (level - k > BAYER[by + (x & 3)] ? 1 : 0)) / 5;
+        const o = (row + x) * 4;
+        if (a > 0.01) {
+          data[o] = NIGHT[0];
+          data[o + 1] = NIGHT[1];
+          data[o + 2] = NIGHT[2];
+          data[o + 3] = a * 242;
+        } else if (lit > 0.05) {
+          // inside a pool of light: a faint tint of the light's colour, also dithered
+          const glow = Math.min(0.5, lit * 0.32) * 4;
+          const g = glow | 0;
+          const ga = (g + (glow - g > BAYER[by + (x & 3)] ? 1 : 0)) / 4;
+          data[o] = lr / lit;
+          data[o + 1] = lg / lit;
+          data[o + 2] = lb / lit;
+          data[o + 3] = ga * 44;
+        } else {
+          data[o + 3] = 0;
         }
-        let a = Math.min(1, m.life / 1.5) * Math.min(1, (m.y / h) * 3);
-        if (m.firefly) a *= 0.35 + 0.65 * Math.max(0, Math.sin(this.t * m.blink * 2 + m.phase));
-        else a *= 0.55;
-        const x = Math.round(m.x);
-        const y = Math.round(m.y);
-        ctx.globalAlpha = a * 0.22;
-        ctx.fillStyle = m.color;
-        ctx.fillRect(x - m.size, y - m.size, m.size * 3, m.size * 3);
-        ctx.globalAlpha = a;
-        ctx.fillRect(x, y, m.size, m.size);
       }
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
     }
 
-    // Shadow creeping in from the edges; the cursor holds a pool of light open.
-    const edge = ctx.createRadialGradient(w * 0.42, h * 0.45, Math.min(w, h) * 0.25, w * 0.5, h * 0.5, Math.max(w, h) * 0.78);
-    const breathe = 0.04 * Math.sin(this.t * 0.6);
-    edge.addColorStop(0, "rgba(6,3,12,0)");
-    edge.addColorStop(1, `rgba(6,3,12,${(0.62 + breathe) * this.dim})`);
-    ctx.fillStyle = edge;
-    ctx.fillRect(0, 0, w, h);
-    if (mouse.seen && !reduced()) {
-      ctx.globalCompositeOperation = "destination-out";
-      const r = 190;
-      const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, r);
-      g.addColorStop(0, "rgba(0,0,0,0.75)");
-      g.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = g;
-      ctx.fillRect(mouse.x - r, mouse.y - r, r * 2, r * 2);
-      ctx.globalCompositeOperation = "lighter";
-      const glow = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 120);
-      glow.addColorStop(0, "rgba(140,100,255,0.07)");
-      glow.addColorStop(1, "rgba(140,100,255,0)");
-      ctx.fillStyle = glow;
-      ctx.fillRect(mouse.x - 120, mouse.y - 120, 240, 240);
-      ctx.globalCompositeOperation = "source-over";
+    // spores: single pixels drifting up, fireflies blink
+    for (let i = 0; i < this.motes.length; i++) {
+      const mo = this.motes[i];
+      if (!reduced) {
+        mo.x += (mo.vx + Math.sin(t * 0.7 + mo.phase) * 0.5) * step;
+        mo.y += mo.vy * step;
+      }
+      if (mo.y < -2 || mo.x < -2 || mo.x > cw + 2) {
+        this.motes[i] = this.spawn();
+        continue;
+      }
+      let a = mo.firefly ? Math.max(0, Math.sin(t * mo.blink * 2 + mo.phase)) : 0.7;
+      a *= Math.min(1, (mo.y / ch) * 4);
+      if (a < 0.08) continue;
+      const px = mo.x | 0;
+      const py = mo.y | 0;
+      if (px < 0 || py < 0 || px >= cw || py >= ch) continue;
+      const o = (py * cw + px) * 4;
+      data[o] = mo.color[0];
+      data[o + 1] = mo.color[1];
+      data[o + 2] = mo.color[2];
+      data[o + 3] = 255 * a;
     }
-    requestAnimationFrame((t) => this.frame(t));
+    this.ctx.putImageData(image, 0, 0);
   }
 }
 

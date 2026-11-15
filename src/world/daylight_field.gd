@@ -50,7 +50,7 @@ func _exit_tree() -> void:
 		RenderingServer.global_shader_parameter_set("g_day_rect", Vector4.ZERO)
 
 func follow(indoors: bool, sun: float, gold: float) -> void:
-	strength = 0.0 if indoors else maxf(sun, gold * float(DataRegistry.table("daylight").get("golden_strength", 0.85)))
+	strength = 0.0 if indoors else maxf(sun, gold * float(_config.get("golden_strength", 0.85)))
 	golden = 0.0 if indoors else gold
 	if absf(strength - _sent_strength) > 0.0004:
 		_sent_strength = strength
@@ -144,10 +144,22 @@ func canopy_at(p: Vector2) -> float:
 	var uv: Vector2 = (p - region.position) / region.size * Vector2(SIZE) - Vector2(0.5, 0.5)
 	var base: Vector2i = Vector2i(uv.floor())
 	var f: Vector2 = uv - uv.floor()
-	var a: float = coverage.get_pixel(clampi(base.x, 0, SIZE.x - 1), clampi(base.y, 0, SIZE.y - 1)).r
-	var b: float = coverage.get_pixel(clampi(base.x + 1, 0, SIZE.x - 1), clampi(base.y, 0, SIZE.y - 1)).r
-	var c: float = coverage.get_pixel(clampi(base.x, 0, SIZE.x - 1), clampi(base.y + 1, 0, SIZE.y - 1)).r
-	var d: float = coverage.get_pixel(clampi(base.x + 1, 0, SIZE.x - 1), clampi(base.y + 1, 0, SIZE.y - 1)).r
+	var x0: int = clampi(base.x, 0, SIZE.x - 1)
+	var x1: int = clampi(base.x + 1, 0, SIZE.x - 1)
+	var y0: int = clampi(base.y, 0, SIZE.y - 1)
+	var y1: int = clampi(base.y + 1, 0, SIZE.y - 1)
+	if _buf.size() == SIZE.x * SIZE.y:
+		var r0: int = y0 * SIZE.x
+		var r1: int = y1 * SIZE.x
+		var a: float = float(_buf[r0 + x0])
+		var b: float = float(_buf[r0 + x1])
+		var c: float = float(_buf[r1 + x0])
+		var d: float = float(_buf[r1 + x1])
+		return lerpf(lerpf(a, b, f.x), lerpf(c, d, f.x), f.y) / 255.0
+	var a: float = coverage.get_pixel(x0, y0).r
+	var b: float = coverage.get_pixel(x1, y0).r
+	var c: float = coverage.get_pixel(x0, y1).r
+	var d: float = coverage.get_pixel(x1, y1).r
 	return lerpf(lerpf(a, b, f.x), lerpf(c, d, f.x), f.y)
 
 func light_at(p: Vector2) -> float:

@@ -15,6 +15,8 @@ var _pending: Array[Vector2i] = []
 var _maintenance: float = 0.0
 var _serial: int = 0
 var _spec: Dictionary
+var _spawn_shape: CircleShape2D
+var _spawn_query: PhysicsShapeQueryParameters2D
 
 @onready var _animals: Node2D = $Animals
 
@@ -125,19 +127,22 @@ func _can_spawn(at: Vector2) -> bool:
 	if not _valid_spawn.is_valid() or not bool(_valid_spawn.call(at)):
 		return false
 	# Do not materialize wildlife beside a player or inside a solid prop.
+	var alert_r: float = float(_spec["alert_range"])
+	var alert_r2: float = alert_r * alert_r
 	for player: Player in Player.all:
-		if player.global_position.distance_to(at) < float(_spec["alert_range"]):
+		if player.global_position.distance_squared_to(at) < alert_r2:
 			return false
 	for animal: Node in _animals.get_children():
-		if (animal as Node2D).global_position.distance_to(at) < 18.0:
+		if (animal as Node2D).global_position.distance_squared_to(at) < 324.0:
 			return false
-	var shape: CircleShape2D = CircleShape2D.new()
-	shape.radius = 7.0
-	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
-	query.shape = shape
-	query.transform = Transform2D(0.0, at)
-	query.collision_mask = 1
-	return _animals.get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty()
+	if _spawn_query == null:
+		_spawn_shape = CircleShape2D.new()
+		_spawn_shape.radius = 7.0
+		_spawn_query = PhysicsShapeQueryParameters2D.new()
+		_spawn_query.shape = _spawn_shape
+		_spawn_query.collision_mask = 1
+	_spawn_query.transform = Transform2D(0.0, at)
+	return _animals.get_world_2d().direct_space_state.intersect_shape(_spawn_query, 1).is_empty()
 
 
 func _collect_departed() -> void:

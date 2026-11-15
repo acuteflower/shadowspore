@@ -15,6 +15,32 @@ const _SRC_SPOT: Rect2 = Rect2(4.0, 0.0, 7.0, 7.0)
 const _SRC_PIXEL: Rect2 = Rect2(14.0, 1.0, 1.0, 1.0)
 
 static var _atlas: ImageTexture
+static var _beat_lut: PackedFloat32Array = _build_beat_lut()
+
+
+static func _build_beat_lut() -> PackedFloat32Array:
+	var lut := PackedFloat32Array()
+	lut.resize(512)
+	for i: int in 512:
+		var x: float = float(i) / 512.0
+		lut[i] = clampf(exp(-pow((x - 0.08) * 13.0, 2.0)) + 0.65 * exp(-pow((x - 0.3) * 13.0, 2.0)), 0.0, 1.0)
+	return lut
+
+
+static func atlas_tex() -> ImageTexture:
+	return _atlas_tex()
+
+
+static func pixel_rect() -> Rect2:
+	return _SRC_PIXEL
+
+
+static func vein_rect() -> Rect2:
+	return _SRC_VEIN
+
+
+static func spot_rect() -> Rect2:
+	return _SRC_SPOT
 
 
 static func _atlas_tex() -> ImageTexture:
@@ -56,7 +82,7 @@ static func rect(canvas: CanvasItem, region: Rect2, color: Color) -> void:
 ## A double heartbeat (lub-dub) in 0..1; `phase` offsets it, a vein passes `-distance * 0.012` so the pulse runs along it.
 static func beat(time: float, phase: float = 0.0, rate: float = 0.8) -> float:
 	var x: float = fposmod(time * rate + phase, 1.0)
-	return clampf(exp(-pow((x - 0.08) * 13.0, 2.0)) + 0.65 * exp(-pow((x - 0.3) * 13.0, 2.0)), 0.0, 1.0)
+	return _beat_lut[int(x * 512.0) & 511]
 
 
 ## The resting glow with the heartbeat on top: never fully dark, bright on the beat.
@@ -66,9 +92,12 @@ static func pulse(time: float, phase: float = 0.0, rate: float = 0.8, floor_valu
 
 ## A one pixel light. `bloom` up to 0.5 is a vein pixel (a faint 3x3 so a line stays a thin line); above it is an eye or a core: a stronger 3x3 plus 5x5 and 7x7 steps that scale with `bloom`.
 static func halo(canvas: CanvasItem, point: Vector2, color: Color, strength: float, bloom: float = 0.5) -> void:
+	halo_tex(canvas, _atlas_tex(), point, color, strength, bloom)
+
+
+static func halo_tex(canvas: CanvasItem, tex: ImageTexture, point: Vector2, color: Color, strength: float, bloom: float = 0.5) -> void:
 	if strength <= 0.01:
 		return
-	var tex: ImageTexture = _atlas_tex()
 	var ax: float = roundf(point.x)
 	var ay: float = roundf(point.y)
 	var s: float = clampf(strength * INTENSITY, 0.0, 1.5)

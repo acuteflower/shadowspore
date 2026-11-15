@@ -91,8 +91,18 @@ var _strand_depth: PackedFloat32Array = [0.0, 0.0, 0.0]
 var _arm_broken: bool = false
 var _debris: Array[Dictionary] = []
 var _impact_time: float = -10.0
+enum _PartKind { LEG, TORSO, BACK, LEFT_SHOULDER, HEAD, COLLAR, STRAND, ARM_ROCK, ELBOW_SPIKE, STUMP, CHUNK }
+
 var _ready_geo: bool = false
-var _parts: Array[Dictionary] = []
+var _p_count: int = 0
+var _p_depth: PackedFloat32Array = PackedFloat32Array()
+var _p_kind: PackedInt32Array = PackedInt32Array()
+var _p_idx: PackedInt32Array = PackedInt32Array()
+var _p_pos: PackedVector3Array = PackedVector3Array()
+var _p_rx: PackedFloat32Array = PackedFloat32Array()
+var _p_ry: PackedFloat32Array = PackedFloat32Array()
+var _p_order: PackedInt32Array = PackedInt32Array()
+var _drawn_shadow_alpha: float = -1.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _clock: RigClock = RigClock.new()
 static var _MASKS: Dictionary = {} ## shape key -> [ImageTexture, offset]: blob and oval masks shared by every crusher (kept referenced here)
@@ -111,6 +121,7 @@ const _WHITE_SRC: Rect2 = Rect2(1.0, 1.0, 1.0, 1.0)
 
 
 func _ready() -> void:
+	_ensure_atlas()
 	_rng.seed = hash(get_parent().name)
 	for i: int in STRANDS:
 		_strands.append(PackedVector2Array())
@@ -191,7 +202,7 @@ func _ik(root: Vector3, target: Vector3, upper: float, lower: float, pole: Vecto
 
 
 func update_rig(delta: float, velocity: Vector2, heading: float, aim: float) -> void:
-	delta = _clock.step(self, delta, velocity.length()) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
+	delta = _clock.step(self, delta, velocity.length(), _pose != Pose.IDLE) ## rebuilt and redrawn ~30 times a second, rarely off screen (RigClock)
 	if delta < 0.0:
 		return
 	_time += delta
@@ -241,7 +252,9 @@ func update_rig(delta: float, velocity: Vector2, heading: float, aim: float) -> 
 	_alpha = 1.0 - pow(smoothstep(0.72, 1.0, t), 1.5) if _pose == Pose.DEAD else 1.0
 	_body.queue_redraw()
 	_glow.queue_redraw()
-	queue_redraw()
+	if absf(_alpha - _drawn_shadow_alpha) > 0.004:
+		_drawn_shadow_alpha = _alpha
+		queue_redraw()
 
 
 func _set_fist(goal: Vector3, rate: float = 14.0, snap: bool = false) -> void:
@@ -479,6 +492,8 @@ func _break_arm() -> void:
 
 
 func _tint(color: Color, alpha: float = 1.0) -> Color:
+	if _flash <= 0.001:
+		return color if (_alpha >= 0.999 and alpha >= 0.999) else Color(color, _alpha * alpha)
 	return Color(color.lerp(Color.WHITE, _flash * 0.85), _alpha * alpha)
 
 
@@ -500,7 +515,6 @@ static func _flush_atlas() -> void:
 
 
 static func _wrect(canvas: Node2D, region: Rect2, color: Color) -> void:
-	_ensure_atlas()
 	canvas.draw_texture_rect_region(_ATLAS_TEX, region, _WHITE_SRC, color)
 
 
@@ -544,6 +558,10 @@ static func _draw_atlas_mask(canvas: Node2D, mask: Array, pos: Vector2, color: C
 
 ## Fills a convex-ish polygon in whole pixel rows, so the silhouette stays hard-edged and the draw never fails on degenerate input.
 func _fill(canvas: Node2D, points: PackedVector2Array, color: Color) -> void:
+	var n: int = points.size()
+	if n == 0:
+		return
+	var tex: ImageTexture = _ATLAS_TEX
 	var low: float = INF
 	var high: float = -INF
 	for point: Vector2 in points:
@@ -553,23 +571,24 @@ func _fill(canvas: Node2D, points: PackedVector2Array, color: Color) -> void:
 		var scan: float = float(y) + 0.5
 		var left: float = INF
 		var right: float = -INF
-		for k: int in points.size():
-			var a: Vector2 = points[k]
-			var b: Vector2 = points[(k + 1) % points.size()]
+		var a: Vector2 = points[n - 1]
+		for k: int in n:
+			var b: Vector2 = points[k]
 			if (a.y <= scan and b.y > scan) or (b.y <= scan and a.y > scan):
 				var x: float = a.x + (scan - a.y) / (b.y - a.y) * (b.x - a.x)
 				left = minf(left, x)
 				right = maxf(right, x)
+			a = b
 		if left <= right:
 			var from_x: float = roundf(left)
-			_wrect(canvas, Rect2(from_x, float(y), maxf(1.0, roundf(right) - from_x), 1.0), color)
+			canvas.draw_texture_rect_region(tex, Rect2(from_x, float(y), maxf(1.0, roundf(right) - from_x), 1.0), _WHITE_SRC, color)
 
 
 ## A blob is drawn from a packed white mask atlas tinted by `color`: all blobs, ovals and rects on `_body` stay in one texture batch.
 func _blob(canvas: Node2D, center: Vector2, rx: float, ry: float, seed_value: int, color: Color) -> void:
 	var base: Vector2 = center.floor()
 	var frac: Vector2i = Vector2i(((center - base) * 2.0).round())
-	var key: String = "b%d:%d:%d:%d:%d" % [roundi(rx * 2.0), roundi(ry * 2.0), seed_value, frac.x, frac.y]
+	var key: int = (1 << 60) | (clampi(roundi(rx * 2.0), 0, 1023)) | (clampi(roundi(ry * 2.0), 0, 1023) << 10) | ((seed_value & 0xFFFFF) << 20) | (((frac.x + 2) & 7) << 40) | (((frac.y + 2) & 7) << 43)
 	var mask: Array = _ATLAS_MASKS.get(key, [])
 	if mask.is_empty():
 		var local: Vector2 = Vector2(frac) * 0.5
@@ -584,7 +603,7 @@ func _blob(canvas: Node2D, center: Vector2, rx: float, ry: float, seed_value: in
 
 
 func _oval(canvas: Node2D, center: Vector2, radius: Vector2, color: Color) -> void:
-	var key: String = "o%d:%d" % [roundi(radius.x * 2.0), roundi(radius.y * 2.0)]
+	var key: int = clampi(roundi(radius.x * 2.0), 0, 1023) | (clampi(roundi(radius.y * 2.0), 0, 1023) << 10)
 	var mask: Array = _ATLAS_MASKS.get(key, [])
 	if mask.is_empty():
 		var rows: Array[Vector3i] = []
@@ -641,31 +660,37 @@ static func _mask(rows: Array[Vector3i]) -> Array:
 
 func _seg(canvas: Node2D, from: Vector2, to: Vector2, width_from: float, width_to: float, color: Color) -> void:
 	var count: int = maxi(1, ceili(from.distance_to(to) * 1.0))
+	var inv_count: float = 1.0 / float(count)
+	var tex: ImageTexture = _ATLAS_TEX
 	var prev_p: Vector2 = Vector2.INF
 	var prev_w: float = -1.0
 	for i: int in count + 1:
-		var k: float = float(i) / float(count)
+		var k: float = float(i) * inv_count
 		var width: float = maxf(1.0, roundf(lerpf(width_from, width_to, k)))
 		var p: Vector2 = from.lerp(to, k).round()
 		if p == prev_p and width == prev_w:
 			continue
+		if width >= 3.0 and width == prev_w and i < count and absf(p.x - prev_p.x) + absf(p.y - prev_p.y) <= 1.0:
+			continue
 		prev_p = p
 		prev_w = width
-		_wrect(canvas, Rect2(p - Vector2.ONE * floorf(width * 0.5), Vector2.ONE * width), color)
+		var half: float = floorf(width * 0.5)
+		canvas.draw_texture_rect_region(tex, Rect2(p.x - half, p.y - half, width, width), _WHITE_SRC, color)
 
 
 func _halo(canvas: Node2D, point: Vector2, color: Color, strength: float, bloom: float = 0.5) -> void:
-	VoidGlow.halo(canvas, point, color, strength * _alpha, bloom)
+	VoidGlow.halo_tex(canvas, VoidGlow.atlas_tex(), point, color, strength * _alpha, bloom)
 
 
 ## A basalt boulder like the world's rocks: dark body, mid face, lit cap, a chip of highlight and a cold rim.
 func _rock(canvas: Node2D, center: Vector2, r: float, seed_value: int) -> void:
+	var tex: ImageTexture = _ATLAS_TEX
 	_blob(canvas, center, r + 1.2, (r + 1.2) * 0.9, seed_value, _tint(OUTLINE))
 	_blob(canvas, center, r, r * 0.9, seed_value, _tint(ROCK0))
 	_blob(canvas, center + Vector2(-r * 0.12, -r * 0.16), r * 0.82, r * 0.72, seed_value + 1, _tint(ROCK1))
 	_blob(canvas, center + Vector2(-r * 0.3, -r * 0.38), r * 0.52, r * 0.4, seed_value + 2, _tint(ROCK2))
-	_wrect(canvas, Rect2((center + Vector2(-r * 0.5, -r * 0.62)).round(), Vector2(2, 1)), _tint(ROCK3))
-	_wrect(canvas, Rect2((center + Vector2(-r * 0.7, -r * 0.3)).round(), Vector2(1, 2)), _tint(RIM))
+	canvas.draw_texture_rect_region(tex, Rect2((center + Vector2(-r * 0.5, -r * 0.62)).round(), Vector2(2, 1)), _WHITE_SRC, _tint(ROCK3))
+	canvas.draw_texture_rect_region(tex, Rect2((center + Vector2(-r * 0.7, -r * 0.3)).round(), Vector2(1, 2)), _WHITE_SRC, _tint(RIM))
 
 
 ## A horn plate: outline, body, lit cap and a rim line.
@@ -673,7 +698,7 @@ func _plate(canvas: Node2D, center: Vector2, rx: float, ry: float, seed_value: i
 	_blob(canvas, center, rx + 1.2, ry + 1.2, seed_value, _tint(OUTLINE))
 	_blob(canvas, center, rx, ry, seed_value, _tint(MID))
 	_blob(canvas, center + Vector2(-rx * 0.2, -ry * 0.28), rx * 0.66, ry * 0.5, seed_value + 3, _tint(lit))
-	_wrect(canvas, Rect2((center + Vector2(-rx * 0.55, -ry * 0.62)).round(), Vector2(maxf(2.0, rx * 0.6), 1)), _tint(RIM))
+	canvas.draw_texture_rect_region(_ATLAS_TEX, Rect2((center + Vector2(-rx * 0.55, -ry * 0.62)).round(), Vector2(maxf(2.0, rx * 0.6), 1)), _WHITE_SRC, _tint(RIM))
 
 
 func _spike(canvas: Node2D, base: Vector2, tip: Vector2, width: float, color: Color) -> void:
@@ -685,49 +710,93 @@ func _spike(canvas: Node2D, base: Vector2, tip: Vector2, width: float, color: Co
 # --- the body, depth sorted ----------------------------------------------------------------------------------------
 
 
-func _add(depth: float, draw_part: Callable) -> void:
-	_parts.append({"d": depth, "f": draw_part})
-
-
-static func _cmp_part(a: Dictionary, b: Dictionary) -> bool:
-	return float(a.d) < float(b.d)
+func _add_part(depth: float, kind: int, idx: int = 0, pos: Vector3 = Vector3.ZERO, rx: float = 0.0, ry: float = 0.0) -> void:
+	var n: int = _p_count
+	if n >= _p_depth.size():
+		var cap: int = n + 32
+		_p_depth.resize(cap)
+		_p_kind.resize(cap)
+		_p_idx.resize(cap)
+		_p_pos.resize(cap)
+		_p_rx.resize(cap)
+		_p_ry.resize(cap)
+		_p_order.resize(cap)
+	_p_depth[n] = depth
+	_p_kind[n] = kind
+	_p_idx[n] = idx
+	_p_pos[n] = pos
+	_p_rx[n] = rx
+	_p_ry[n] = ry
+	_p_order[n] = n
+	_p_count = n + 1
 
 
 func _draw_main() -> void:
 	if not _ready_geo:
 		return
-	_parts.clear()
+	_p_count = 0
 	_collect()
-	_parts.sort_custom(_cmp_part)
-	for part: Dictionary in _parts:
-		(part.f as Callable).call()
+	for i: int in range(1, _p_count):
+		var key: int = _p_order[i]
+		var d: float = _p_depth[key]
+		var j: int = i - 1
+		while j >= 0 and _p_depth[_p_order[j]] > d:
+			_p_order[j + 1] = _p_order[j]
+			j -= 1
+		_p_order[j + 1] = key
+	for k: int in _p_count:
+		var idx: int = _p_order[k]
+		match _p_kind[idx]:
+			_PartKind.LEG:
+				_draw_leg(_p_idx[idx])
+			_PartKind.TORSO:
+				_draw_torso()
+			_PartKind.BACK:
+				_draw_back()
+			_PartKind.LEFT_SHOULDER:
+				_draw_left_shoulder()
+			_PartKind.HEAD:
+				_draw_head()
+			_PartKind.COLLAR:
+				_draw_collar(_p_pos[idx], _p_rx[idx], _p_ry[idx], _p_idx[idx])
+			_PartKind.STRAND:
+				_draw_strand(_p_idx[idx])
+			_PartKind.ARM_ROCK:
+				_draw_arm_rock(_p_pos[idx], _p_rx[idx], _p_idx[idx])
+			_PartKind.ELBOW_SPIKE:
+				_draw_elbow_spike()
+			_PartKind.STUMP:
+				_draw_stump()
+			_PartKind.CHUNK:
+				_draw_chunk(_debris[_p_idx[idx]])
 	_flush_atlas()
 
 
 func _collect() -> void:
 	for i: int in 2:
-		_add((_depth(_hips[i]) + _depth(_feet3[i])) * 0.5 - 0.1, _draw_leg.bind(i))
-	_add(0.0, _draw_torso)
-	_add(_depth(Vector3(-10.0, 0.0, 0.0)) - 0.3, _draw_back)
-	_add(_depth(_sh_l) + 0.2, _draw_left_shoulder)
-	_add(_depth(_head) + 0.6, _draw_head)
+		_add_part((_depth(_hips[i]) + _depth(_feet3[i])) * 0.5 - 0.1, _PartKind.LEG, i)
+	_add_part(0.0, _PartKind.TORSO)
+	_add_part(_depth(Vector3(-10.0, 0.0, 0.0)) - 0.3, _PartKind.BACK)
+	_add_part(_depth(_sh_l) + 0.2, _PartKind.LEFT_SHOULDER)
+	_add_part(_depth(_head) + 0.6, _PartKind.HEAD)
 	for n: int in 5:
 		var phi: float = (float(n) - 2.0) * 0.62
 		var pos: Vector3 = Vector3(_chest.x + 11.0 * cos(phi), 13.0 * sin(phi), _chest.z + 4.0 - absf(phi) * 2.5)
-		_add(_depth(pos) + 0.8, _draw_collar.bind(pos, 5.4, 6.8, n))
+		_add_part(_depth(pos) + 0.8, _PartKind.COLLAR, n, pos, 5.4, 6.8)
 	for n: int in 3:
 		var phi: float = (float(n) - 1.0) * 0.8
 		var pos: Vector3 = Vector3(_chest.x + 13.0 * cos(phi), 16.0 * sin(phi), _chest.z - 5.0)
-		_add(_depth(pos) + 0.7, _draw_collar.bind(pos, 7.0, 7.0, n + 7))
+		_add_part(_depth(pos) + 0.7, _PartKind.COLLAR, n + 7, pos, 7.0, 7.0)
 	for i: int in STRANDS:
-		_add(_strand_depth[i], _draw_strand.bind(i))
+		_add_part(_strand_depth[i], _PartKind.STRAND, i)
 	if not _arm_broken:
 		_collect_arm()
 	else:
-		_add(_depth(_sh_r) + 0.1, _draw_stump)
-		for chunk: Dictionary in _debris:
+		_add_part(_depth(_sh_r) + 0.1, _PartKind.STUMP)
+		for chunk_idx: int in _debris.size():
+			var chunk: Dictionary = _debris[chunk_idx]
 			var spot: Vector2 = _debris_spot(chunk)
-			_add(_depth(_frame(Vector2(chunk.ground))) + 0.2 + spot.y * 0.0, _draw_chunk.bind(chunk))
+			_add_part(_depth(_frame(Vector2(chunk.ground))) + 0.2 + spot.y * 0.0, _PartKind.CHUNK, chunk_idx)
 
 
 func _collect_arm() -> void:
@@ -738,7 +807,7 @@ func _collect_arm() -> void:
 	for n: int in 6:
 		var k: float = float(n + 1) / 6.0
 		_add_arm_rock(_elbow.lerp(_fist, k), lerpf(8.2, 9.6, k) - float(n % 2) * 0.7, 10 + n)
-	_add(_depth(_elbow) + 0.5, _draw_elbow_spike)
+	_add_part(_depth(_elbow) + 0.5, _PartKind.ELBOW_SPIKE)
 	for n: int in 3:
 		var knuckle: Vector3 = _fist + Vector3(6.5, (float(n) - 1.0) * 5.5, 1.0 - absf(float(n) - 1.0) * 1.5)
 		_add_arm_rock(knuckle, 5.0, 20 + n, 0.55)
@@ -746,7 +815,7 @@ func _collect_arm() -> void:
 
 
 func _add_arm_rock(pos: Vector3, radius: float, seed_value: int, bias: float = 0.3) -> void:
-	_add(_depth(pos) + bias, _draw_arm_rock.bind(pos, radius, seed_value))
+	_add_part(_depth(pos) + bias, _PartKind.ARM_ROCK, seed_value, pos, radius)
 
 
 func _draw_arm_rock(pos: Vector3, radius: float, seed_value: int) -> void:
@@ -943,13 +1012,15 @@ func _vein(path: Array[Vector3], strength: float, start: float = 0.0, on_torso: 
 func _draw_glow() -> void:
 	if not _ready_geo:
 		return
-	var heart: float = VoidGlow.beat(_time, 0.0, _rate())
+	var rate: float = _rate()
+	var heart: float = VoidGlow.beat(_time, 0.0, rate)
 	var strength: float = 0.55 + 0.5 * heart + _exposed * 0.3 + _charge * 0.25
 	var back: float = _back_visibility()
 	var core3: Vector3 = Vector3(-10.0 + _lean * 0.5, 0.0, 35.0 - _sag)
 	var core: Vector2 = _p(core3)
+	var chest_pos: Vector2 = _p(_chest)
 	# The whole chest swells with violet light on the beat and while it charges.
-	_oval(_glow, _p(_chest), Vector2(19, 16), Color(VEIN, _alpha * (0.008 + 0.014 * heart + 0.035 * _charge)))
+	_oval(_glow, chest_pos, Vector2(19, 16), Color(VEIN, _alpha * (0.008 + 0.014 * heart + 0.035 * _charge)))
 	if back > 0.04:
 		var length: float = 5.0 + _exposed * 4.0
 		VoidGlow.rect(_glow, Rect2((core + Vector2(-4, -length - 2)).round(), Vector2(9, length * 2.0 + 5.0)), Color(VEIN, _alpha * back * 0.1 * strength))
@@ -975,31 +1046,38 @@ func _draw_glow() -> void:
 			var to: Vector3 = arm[n + 1]
 			var steps: int = maxi(2, ceili(_p(from).distance_to(_p(to)) / 2.5))
 			for k: int in steps:
-				var point: Vector3 = from.lerp(to, float(k) / float(steps))
 				travelled += 2.5
+				var draw_main: bool = (k & 1) == 0
+				var draw_branch: bool = (k % 5) == 2
+				if not draw_main and not draw_branch:
+					continue
+				var point: Vector3 = from.lerp(to, float(k) / float(steps))
 				var screen: Vector2 = _p(point)
 				if not _hidden(screen, _depth(point)):
-					var wave: float = VoidGlow.beat(_time, -travelled * 0.012, _rate())
-					if k % 2 == 0:
+					var wave: float = VoidGlow.beat(_time, -travelled * 0.012, rate)
+					if draw_main:
 						_halo(_glow, screen, VEIN_LIGHT if k % 4 == 0 else VEIN, (0.3 + 0.7 * wave) * (0.9 + _charge * 0.3), 0.2)
-					if k % 5 == 2:
+					if draw_branch:
 						for branch: float in [-1.0, 1.0]:
 							_halo(_glow, screen + Vector2(branch * 3.0, branch * 2.0 - 1.0), VEIN, (0.25 + 0.6 * wave) * 0.7, 0.0)
 		var fist: Vector2 = _p(_fist)
+		var elbow_pos: Vector2 = _p(_elbow)
 		var punch: float = 0.5 + 0.5 * heart + _charge * 0.4
 		for n: int in 3:
 			_halo(_glow, fist + Vector2(-5 + n * 5, -4 + (n % 2) * 5), VEIN_LIGHT, punch, 0.8)
 		_halo(_glow, fist + Vector2(1, -2), CORE, punch * 1.1, 1.2)
-		_halo(_glow, _p(_elbow) + Vector2(1, -2), VEIN_LIGHT, punch * 0.9, 0.8)
+		_halo(_glow, elbow_pos + Vector2(1, -2), VEIN_LIGHT, punch * 0.9, 0.8)
 		for spike: Vector2 in [Vector2(2, -8), Vector2(-7, -4)]:
-			_halo(_glow, _p(_elbow) + spike, CORE, 0.5 + 0.4 * heart, 0.6)
+			_halo(_glow, elbow_pos + spike, CORE, 0.5 + 0.4 * heart, 0.6)
 	# Seams under the collar plates, shoulder and back spikes, horn tips: the armour glows through its joints.
 	for n: int in 5:
 		var phi: float = (float(n) - 2.0) * 0.62
 		var pos: Vector3 = Vector3(_chest.x + 11.0 * cos(phi), 13.0 * sin(phi), _chest.z + 4.0 - absf(phi) * 2.5)
 		var seen: float = smoothstep(-2.0, 4.0, _depth(pos))
-		for k: int in 5:
-			_halo(_glow, _p(pos) + Vector2(-2 + k, 5 + (1 if k % 2 == 0 else 0)), VEIN_LIGHT, seen * VoidGlow.pulse(_time, -float(n) * 0.04, _rate(), 0.3), 0.3)
+		var seam_s: float = seen * VoidGlow.pulse(_time, -float(n) * 0.04, rate, 0.3)
+		var seam_p: Vector2 = _p(pos)
+		for k: int in range(0, 5, 2):
+			_halo(_glow, seam_p + Vector2(-2 + k, 5 + (1 if k % 2 == 0 else 0)), VEIN_LIGHT, seam_s, 0.3)
 	var tips: Array[Vector3] = [_sh_l + Vector3(0, -2, 10), _sh_l + Vector3(0, 4, 6), Vector3(-10.0 + _lean * 0.5, -13.0, z + 17.0), Vector3(-10.0 + _lean * 0.5, 13.0, z + 17.0)]
 	for tip: Vector3 in tips:
 		_halo(_glow, _p(tip), VEIN_LIGHT, smoothstep(-6.0, 2.0, _depth(tip)) * (0.55 + 0.45 * heart), 0.7)
@@ -1022,7 +1100,7 @@ func _draw_glow() -> void:
 		if pts.is_empty():
 			continue
 		for n: int in range(2, pts.size() - 1, 2):
-			var wave: float = VoidGlow.beat(_time, -float(n) * 0.014 - float(i) * 0.05, _rate())
+			var wave: float = VoidGlow.beat(_time, -float(n) * 0.014 - float(i) * 0.05, rate)
 			_halo(_glow, pts[n], VEIN_LIGHT if n % 4 == 0 else VEIN, 0.35 + 0.65 * wave + _charge * 0.2, 0.4)
 		_halo(_glow, pts[pts.size() - 1], CORE, 0.8 + _charge * 0.4, 1.0)
 	_draw_cracks()
@@ -1031,17 +1109,23 @@ func _draw_glow() -> void:
 
 func _gseg(canvas: Node2D, from: Vector2, to: Vector2, width_from: float, width_to: float, color: Color) -> void:
 	var count: int = maxi(1, ceili(from.distance_to(to)))
+	var inv_count: float = 1.0 / float(count)
+	var tex: ImageTexture = VoidGlow.atlas_tex()
+	var px_rect: Rect2 = VoidGlow.pixel_rect()
 	var prev_p: Vector2 = Vector2.INF
 	var prev_w: float = -1.0
 	for i: int in count + 1:
-		var k: float = float(i) / float(count)
+		var k: float = float(i) * inv_count
 		var width: float = maxf(1.0, roundf(lerpf(width_from, width_to, k)))
 		var p: Vector2 = from.lerp(to, k).round()
 		if p == prev_p and width == prev_w:
 			continue
+		if width >= 3.0 and width == prev_w and i < count and absf(p.x - prev_p.x) + absf(p.y - prev_p.y) <= 1.0:
+			continue
 		prev_p = p
 		prev_w = width
-		VoidGlow.rect(canvas, Rect2(p - Vector2.ONE * floorf(width * 0.5), Vector2.ONE * width), color)
+		var half: float = floorf(width * 0.5)
+		canvas.draw_texture_rect_region(tex, Rect2(p.x - half, p.y - half, width, width), px_rect, color)
 
 
 ## After the slam: jagged violet cracks run out of the fist across the ground and fade.

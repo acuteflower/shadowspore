@@ -190,9 +190,14 @@ func _rebuild() -> void:
 	reach = reach.merge(Rect2(view.position, view.size + Vector2(0.0, 24.0)))
 	var middle: Vector2 = view.get_center()
 	var found: Array[Node2D] = WaterReflections.things_in(reach)
-	found.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.global_position.distance_squared_to(middle) < b.global_position.distance_squared_to(middle))
+	var order: Array[Array] = []
+	order.resize(found.size())
+	for i: int in found.size():
+		order[i] = [found[i].global_position.distance_squared_to(middle), i]
+	order.sort()
 	var budget: int = Quality.scaled(MAX_ITEMS, "shadow_items", 40) ## graphics level
-	for thing: Node2D in found:
+	for entry: Array in order:
+		var thing: Node2D = found[int(entry[1])]
 		var cost: int = _sprites_of(thing).size()
 		if cost == 0 or cost > budget:
 			continue

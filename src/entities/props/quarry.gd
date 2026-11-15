@@ -112,16 +112,15 @@ func _process(delta: float) -> void:
 
 ## The step "find the knight" is done when he is in sight: near enough, on her screen and no wall or tree between (his own props do not count).
 func _check_sight() -> void:
-	for node: Node in get_tree().get_nodes_in_group("players"):
-		var player: Player = node as Player
-		if player == null or not player.is_multiplayer_authority() or player.quests == null:
+	for player: Player in Player.all:
+		if not is_instance_valid(player) or not player.is_multiplayer_authority() or player.quests == null:
 			continue
 		if player.quests.active_step_id("find_help") != "find_knight":
 			continue
 		var from: Vector2 = player.global_position + Vector2(0, -14)
 		var to: Vector2 = knight.global_position + Vector2(0, -22)
 		var d: Vector2 = to - from
-		if d.length() > SIGHT or absf(d.x) > 300.0 or absf(d.y) > 165.0:
+		if d.length_squared() > SIGHT * SIGHT or absf(d.x) > 300.0 or absf(d.y) > 165.0:
 			continue
 		var query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(from, to, 1, colliders())
 		if get_world_2d().direct_space_state.intersect_ray(query).is_empty():

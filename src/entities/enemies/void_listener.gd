@@ -7,6 +7,7 @@ enum State { LISTEN, NOTICE, HUNT, SEARCH, WAVE_WINDUP, WAVE_RELEASE, SCREAM_WIN
 const HURTBOX_MASK: int = 1 << 5
 const DEATH_SECONDS: float = 1.05
 const ZONE_PAD: float = 4.0
+const _STEER_TURNS: Array[float] = [0.0, 0.5, -0.5, 1.0, -1.0, 1.55]
 
 var enemy_id: String = "void_listener"
 var health_scale: float = 1.0 ## see ShadowSpider
@@ -23,6 +24,10 @@ var _target: Player
 var _known: Vector2
 var _memory: float = 0.0
 var _positions: Dictionary = {}
+var _steer_ticks: int = 0
+var _steer_in: Vector2
+var _steer_out: Vector2
+var _steer_pos: Vector2
 var _state_time: float = 0.0
 var _previous: State = State.LISTEN
 var _sense_left: float = 0.0
@@ -41,6 +46,7 @@ var _world: Node
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _zone_drawn: bool = false
 var _scream_drawn: bool = false
+static var _ray_query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.new()
 
 @onready var _rig: ListenerRig = $Rig
 @onready var _health: HealthComponent = $HealthComponent
@@ -166,7 +172,8 @@ func _physics_process(delta: float) -> void:
 				_set_state(State.HUNT if _memory > 0.0 else State.SEARCH)
 	if night != null:
 		velocity = night.limit(self, velocity, delta)
-	move_and_slide()
+	if velocity.length_squared() > 0.0001:
+		move_and_slide()
 
 
 func _floor_available(point: Vector2) -> bool:
@@ -180,8 +187,10 @@ func _same_floor(from: Vector2, to: Vector2) -> bool:
 
 
 func _line_clear(from: Vector2, to: Vector2) -> bool:
-	var ray: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D.create(from + Vector2(0, -4), to + Vector2(0, -4), 1)
-	return get_world_2d().direct_space_state.intersect_ray(ray).is_empty()
+	_ray_query.from = from + Vector2(0, -4)
+	_ray_query.to = to + Vector2(0, -4)
+	_ray_query.collision_mask = 1
+	return get_world_2d().direct_space_state.intersect_ray(_ray_query).is_empty()
 
 
 func _sense() -> void:
@@ -201,12 +210,18 @@ func _sense() -> void:
 			radius = float(_def["hearing_sneak"] if player.stealth.sneaking else (_def["hearing_sprint"] if player.sprinting else _def["hearing_walk"])) * hear
 		if player.attack.is_swinging():
 			radius = maxf(radius, float(_def["hearing_attack"]) * player.attack.noise_scale() * hear)
-		var distance: float = global_position.distance_to(point)
+		var delta_vec: Vector2 = point - global_position
+		var dist_sq: float = delta_vec.length_squared()
+		var sight_cap: float = float(_def["sight_range"]) * (player.stealth.detection_multiplier() * hear if player != _target else 1.0)
+		var max_r: float = maxf(radius, sight_cap)
+		if dist_sq > max_r * max_r:
+			continue
+		var distance: float = sqrt(dist_sq)
 		var clear: bool = _line_clear(global_position, point)
 		if not clear:
 			radius *= float(_def["sound_occlusion"])
-		var forward: bool = Vector2.from_angle(heading).dot((point - global_position).normalized()) > (0.0 if player == _target else 0.35)
-		var visible: bool = clear and forward and distance < float(_def["sight_range"]) * (player.stealth.detection_multiplier() * hear if player != _target else 1.0)
+		var forward: bool = true if distance <= 0.001 else Vector2.from_angle(heading).dot(delta_vec / distance) > (0.0 if player == _target else 0.35)
+		var visible: bool = clear and forward and distance < sight_cap
 		if distance > radius and not visible:
 			continue
 		var strength: float = maxf(radius - distance, float(_def["sight_range"]) - distance if visible else -INF)
@@ -243,10 +258,18 @@ func _idle(delta: float) -> void:
 func _safe_direction(direction: Vector2) -> Vector2:
 	if direction == Vector2.ZERO:
 		return direction
-	for turn: float in [0.0, 0.5 * _orbit, -0.5 * _orbit, 1.0 * _orbit, -1.0 * _orbit, 1.55 * _orbit]:
-		var dir: Vector2 = direction.rotated(turn)
+	if _steer_ticks > 0 and _steer_in.dot(direction) >= 0.94 and global_position.distance_squared_to(_steer_pos) < 256.0:
+		_steer_ticks -= 1
+		return _steer_out
+	for mult: float in _STEER_TURNS:
+		var dir: Vector2 = direction if mult == 0.0 else direction.rotated(mult * _orbit)
 		if _navigation.segment_clear(global_position, global_position + dir * 22.0) and not test_move(global_transform, dir * 18.0):
+			_steer_in = direction
+			_steer_out = dir
+			_steer_pos = global_position
+			_steer_ticks = 2
 			return dir
+	_steer_ticks = 0
 	return Vector2.ZERO
 
 

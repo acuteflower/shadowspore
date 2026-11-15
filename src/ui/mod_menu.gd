@@ -107,7 +107,8 @@ func _can_open() -> bool:
 
 
 func _can_use() -> bool:
-	return CloudSession.is_admin() and multiplayer.is_server() and is_instance_valid(_player) and _player.health.current > 0.0 \
+	return GameGuard.is_gameplay_allowed() and CloudSession.is_admin() and multiplayer.is_server() \
+		and is_instance_valid(_player) and _player.health.current > 0.0 \
 		and _player.intro == null and not _player.story_lock
 
 

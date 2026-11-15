@@ -355,6 +355,51 @@ func _stream_levels(delta: float) -> void:
 
 ## A layout is one synchronous generation (deterministic, cached for good), so its cost is only moved earlier: level 1 is made when a player comes near
 ## the gate, the next level when she comes near the stairs down of the level she is in. Half a second apart, from the local player only.
+var _pending_layouts: Dictionary = {} ## level -> {"job": Jobs.Job, "seed": int}
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_EXIT_TREE:
+		for entry_v: Variant in _pending_layouts.values():
+			var entry: Dictionary = entry_v as Dictionary
+			var job: Jobs.Job = entry.get("job") as Jobs.Job
+			if job != null:
+				Jobs.cancel(job)
+				Jobs.wait(job)
+		_pending_layouts.clear()
+
+
+func _prefetch_layout(level: int) -> void:
+	if _layouts.has(level) or level < 1 or level > MAX_LEVELS:
+		return
+	var req_seed: int = world_seed
+	var existing: Dictionary = _pending_layouts.get(level, {}) as Dictionary
+	if not existing.is_empty():
+		if int(existing.get("seed", -1)) == req_seed:
+			return
+		var old_job: Jobs.Job = existing.get("job") as Jobs.Job
+		if old_job != null:
+			Jobs.cancel(old_job)
+	var work: Callable = func() -> MineLayout:
+		return MineGenerator.new().generate(req_seed, level)
+	var on_done: Callable = func(result: Variant) -> void:
+		var cur: Dictionary = _pending_layouts.get(level, {}) as Dictionary
+		if int(cur.get("seed", -1)) == req_seed:
+			_pending_layouts.erase(level)
+		if is_instance_valid(self) and world_seed == req_seed and result is MineLayout and not _layouts.has(level):
+			_layouts[level] = result
+	var on_discard: Callable = func() -> void:
+		var cur: Dictionary = _pending_layouts.get(level, {}) as Dictionary
+		if int(cur.get("seed", -1)) == req_seed:
+			_pending_layouts.erase(level)
+	var job: Jobs.Job = Jobs.run(work, on_done, Jobs.Prio.HIGH, on_discard)
+	if job == null:
+		if not _layouts.has(level):
+			layout(level)
+	elif job.state != Jobs.State.DELIVERED:
+		_pending_layouts[level] = {"job": job, "seed": req_seed}
+
+
 func _prefetch_near_player() -> void:
 	var player: Player = _local()
 	if player == null:
@@ -362,14 +407,14 @@ func _prefetch_near_player() -> void:
 	var at: Vector2 = player.global_position
 	for gate: Node in get_tree().get_nodes_in_group("mine_gates"):
 		if (gate as Node2D).global_position.distance_to(at) < PREFETCH_RANGE:
-			layout(1)
+			_prefetch_layout(1)
 			break
 	var level: int = level_at(at)
 	if level > 0 and level < MAX_LEVELS:
 		var l: MineLayout = layout(level)
 		var stairs: Vector2 = origin(level) + l.tile_center(l.exit_stairs) ## the stairs down of this level
 		if stairs.distance_to(at) < PREFETCH_RANGE:
-			layout(level + 1)
+			_prefetch_layout(level + 1)
 
 
 ## The camera stays on the level while a player is in it; outside it is free again (the interiors do the same for their rooms).

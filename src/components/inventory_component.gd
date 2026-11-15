@@ -364,7 +364,7 @@ func _commit() -> void:
 		box.touch() ## the box's owner syncs it to every peer
 	var owner_id: int = get_multiplayer_authority()
 	if owner_id != multiplayer.get_unique_id():
-		_rpc_state.rpc_id(owner_id, {"slots": slots, "equipment": equipment, "held": held})
+		_rpc_state.rpc_id(owner_id, {"slots": slots, "equipment": equipment, "held": held, "hidden": hidden})
 
 
 func _apply(op: String, args: Array) -> void:
@@ -882,10 +882,23 @@ func _stow() -> bool:
 	return true
 
 
-## Host: puts the cursor stack away and tells the owner (the window closing, a save).
+## Host: puts the cursor stack away and tells the owner (the window closing).
 func stow_held() -> void:
 	if multiplayer.is_server() and _stow():
 		_commit()
+
+
+## Non-mutating snapshot of `slots` with any held cursor stack placed into the copy
+## so autosave snapshots capture the full bag without pulling items off the cursor.
+func export_slots() -> Array:
+	var out: Array = slots.duplicate(true)
+	if held.is_empty():
+		return out
+	var live_slots: Array = slots
+	slots = out
+	add_item(String(held["id"]), int(held["count"]), Items.extras(held))
+	slots = live_slots
+	return out
 
 
 func _move(from: int, to: int) -> bool:
@@ -979,4 +992,6 @@ func _rpc_state(state: Dictionary) -> void:
 	slots = state["slots"]
 	equipment = state["equipment"]
 	held = state.get("held", {})
+	if state.has("hidden") and state["hidden"] is Dictionary:
+		hidden = (state["hidden"] as Dictionary).duplicate(true)
 	changed.emit()

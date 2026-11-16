@@ -4,16 +4,37 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.5 Beta] – 2026-11-16
+### 🌐 Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz: Große Welt-Snapshots, Gast-Synchronisation & Update-Wächter
+
+![Hallgrat im Nachtlicht mit Laternen und Stadtmauer](docs/img/hallgrat_deko_night.png)
+
+> *Auch riesige Welten lassen sich jetzt reibungslos gemeinsam betreten: Das Online-Relay teilt große Welt-Snapshots automatisch auf, synchronisiert alle Systeme beim Beitritt bis ins Detail und schützt laufende Lobbys vor veralteten Versionen.*
+
+> [!IMPORTANT]
+> **Große Welten im Online-Koop ohne Hürden!**
+> V0.9.5 Beta rüstet das Online-Relay für ausgewachsene Spielstände auf: Große Welt- und Stadt-Pakete werden automatisch in sichere Teilpakete zerlegt und verlustfrei zusammengesetzt, nachrückende Gäste erhalten den vollständigen Zustand aller Systeme, und ein neuer **Versionsschutz** sowie klare Trennungs-Meldungen sorgen für geordnete Mehrspieler-Runden.
+
+---
+
+### 🌐 Online-Relay-Chunking & Nahtloser Koop-Beitritt
+
+* **🟣 NEU – Automatische Paket-Aufteilung im Relay:** Große Welt-Snapshots (auch über `150 KB`) werden beim Übertragen übers Online-Relay automatisch in kompakte Teilpakete aufgeteilt und beim Empfänger bytegenau wieder zusammengesetzt – kein Abbruch mehr bei weit fortgeschrittenen Welten.
+* **🟣 NEU – Vollständige Gast-Synchronisation beim Beitritt:** Nachrückende Mitspieler übernehmen sauber ihren Charakterzustand und erhalten den aktuellen Stand von Stadtbau, Schatztruhen, Wegsteinen, Weltkarten-Entdeckung, Haustieren, Sternensaal, Wiesen-Details sowie Boss-Arenen (Aurelith & Hexenkönigin).
+* **🟣 NEU – Versionsschutz & Lobby-Kontrolle:** Der laufende Versions-Abgleich erkennt veraltete Spielversionen sofort, und erzwungene Trennungen (z. B. durch Kick, geschlossene Lobby oder Host-Abbruch) führen sauber mit klarer Rückmeldung zurück ins Hauptmenü.
+
+---
+
+### 🛠️ Stabilitäts- & Welt-Feinschliff
+
+* **🟡 FIX – Komponenten & Welt-Übergänge:** Verbesserte Synchronisation und Stabilität an Aussehen, Inventar, Fortschritt, Skillbaum, Zaubern, Ausruhen, Klettern, Innenräumen, Flussfauna sowie der Welt- & Quest-Anzeige im Mehrspieler.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Bereit für lange gemeinsame Abende in großen Welten – viel Spaß mit V0.9.5 Beta!*
+
+---
+
 ## [V0.9.4 Beta] – 2026-11-16
-<<<<<<< HEAD
-### 🛠️ Cloud-Save-Hotfix, Coercion-Schutz & Relay-Stabilität
-
-> *Behebt den stummen Release-Absturz nach „Spiel fortsetzen“ sowie fehlerhafte RPC-Spams bei Verbindungsaufbau oder -verlust.*
-
-* **🟣 FIX – Cloud-Save-Crash bei „Spiel fortsetzen“ behoben:** Leere Lua-Tables in gespeicherten Cloud-Profilen (`[]` statt `{}`) werden beim Laden in allen Save- und Welt-Importern sicher umgewandelt – kein Release-Absturz (`0xc0000005`) mehr bei abgeschlossenen oder leeren Quest-/Inventar-/Weltfeldern.
-* **🟣 FIX – Saubere RPC- & Relay-Absicherung:** Snapshot-, Zeit- und Wildtier-RPCs warten sauber auf eine aktive `CONNECTION_CONNECTED`-Verbindung; ein abgebrochener Host-Relay fällt automatisch auf `OfflineMultiplayerPeer` zurück.
-* **🟣 FIX – Base64- & Karten-Schutz:** Leere `map`-Daten und ungültige Base64-Payloads werden ohne Dekompressions- oder Engine-Fehler abgefangen.
-=======
 ### 🛡️ Cloud-Save-Härtung & Relay-Stabilität: Sichere Spielstand-Wiederherstellung, Relay-Schutz & Wildtier-Fixes
 
 ![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
@@ -41,7 +62,6 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 > ✦ ──────────────── ❖ ──────────────── ✦
 > *Ein ruhiges, wichtiges Fundament-Update für sichere Spielstände und stabile Online-Abenteuer – viel Spaß mit V0.9.4 Beta!*
->>>>>>> 4c300e4b4949e9ecf40877e387dee9d4c74c69f8
 
 ---
 

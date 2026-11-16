@@ -5,7 +5,21 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.9.4 Beta – „Cloud-Save-Härtung & Relay-Stabilität“
+## 🚀 Aktuelle Version: V0.9.5 Beta – „Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Hallgrat im Nachtlicht mit Laternen und Stadtmauer](docs/img/hallgrat_deko_night.png)
+
+### Highlights von V0.9.5 Beta:
+- 🌐 **Relay-Paket-Chunking für große Welten:** Auch große Welt-Snapshots (über `150 KB`) werden im Online-Relay automatisch aufgeteilt und verlustfrei beim Empfänger zusammengesetzt.
+- 🤝 **Vollständige Gast-Synchronisation:** Nachrückende Mitspieler erhalten sauber den aktuellen Stand von Stadtbau, Schatztruhen, Wegsteinen, Weltkarte, Haustieren, Sternensaal und Boss-Arenen.
+- 🛡️ **Versionsschutz & klare Lobby-Meldungen:** Laufende Sessions erkennen veraltete Spielversionen sofort, und Kicks oder Lobby-Schließungen führen mit klarer Begründung sauber zurück ins Hauptmenü.
+- 🛠️ **Mehrspieler-Feinschliff:** Verbesserte Synchronisation und Stabilität für Charakter-Komponenten, Innenräume, Flussfauna und Quest-Anzeige.
+
+---
+
+## 🚀 Vorherige Version: V0.9.4 Beta – „Cloud-Save-Härtung & Relay-Stabilität“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

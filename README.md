@@ -5,7 +5,20 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.9.3 Beta – „Freundes-Sidebar im Pausenmenü & Nachtlichtung-Look“
+## 🚀 Aktuelle Version: V0.9.4 Beta – „Cloud-Save-Härtung & Relay-Stabilität“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
+
+### Highlights von V0.9.4 Beta:
+- 🛡️ **Cloud-Save-Härtung:** Saubere Typ-Wiederherstellung beim Laden von Cloud-Spielständen über alle Welt-, Stadt-, Inventar-, Quest-, Haustier- und Fortschrittssysteme hinweg sowie sicherer Schutz gegen beschädigte Speicherpakete.
+- 🌐 **Online-Relay-Stabilität:** Geschützte Netzwerk-Synchronisation während des Verbindungsaufbaus und kontrollierte Host-Erholung bei unerwarteten Relay-Abbrüchen.
+- 🦋 **Wildtier- & Navigations-Politur:** Kleinere Stabilitätsfixes bei Wildtieren und Gegner-Navigation sowie aktualisierte Update- und Website-Daten.
+
+---
+
+## 🚀 Vorherige Version: V0.9.3 Beta – „Freundes-Sidebar im Pausenmenü & Nachtlichtung-Look“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

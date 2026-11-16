@@ -4,6 +4,37 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.4 Beta] – 2026-11-16
+### 🛡️ Cloud-Save-Härtung & Relay-Stabilität: Sichere Spielstand-Wiederherstellung, Relay-Schutz & Wildtier-Fixes
+
+![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
+
+> *Ein gezieltes Stabilitäts-Update unter der Haube: Cloud-Spielstände werden über alle Weltsysteme hinweg fehlerfrei wiederhergestellt und das Online-Relay fängt Verbindungsabbrüche sicher ab.*
+
+> [!IMPORTANT]
+> **Maximale Verlässlichkeit für Cloud-Welten & Online-Koop!**
+> V0.9.4 Beta räumt tiefgreifend bei der **Wiederherstellung von Cloud-Spielständen** und beim **Online-Relay** auf: Jeder Welt-, Charakter- und Stadtzustand wird beim Laden aus der Cloud sauber konvertiert, fehlerhafte Pakete werden sicher abgefangen, und bei Verbindungsabbrüchen fällt der Host kontrolliert zurück, ohne den Spielstand zu gefährden.
+
+---
+
+### 🛡️ Cloud-Save-Stabilität & Kompressions-Schutz
+
+* **🟡 FIX – Sichere Wiederherstellung aller Weltsysteme:** Beim Laden von Cloud-Spielständen werden Zahlen-, Listen- und Tabellendaten über sämtliche Systeme hinweg sauber umgewandelt – darunter Inventar, Quests, Skillbaum, Aussehen, Haustiere, Boss-Relikte, Sternensaal, Schatztruhen, Weltkarten-Entdeckung, Aussichtspunkte, Wegsteine, Dorfbrett, Karawane, Ackerbau, Stadtbau, Mine, Wüste, Wiesen-Sehenswürdigkeiten & Weltwunder, Wetter und Tageszeit.
+* **🟡 FIX – Fehlerhafte Speicherdaten abfangen:** Beschädigte oder ungültig komprimierte Spielstand-Pakete werden sauber abgewiesen, statt Abstürze auszulösen.
+
+---
+
+### 🌐 Online-Relay- & Welt-Stabilität
+
+* **🟡 FIX – Sicherer Relay-Verbindungsaufbau:** Netzwerk-Synchronisationen greifen erst dann, wenn die Verbindung vollständig steht; während des Verbindungsaufbaus oder bei leeren Server-Tabellen bleiben alle Welt-Importe absturzfrei.
+* **🟡 FIX – Saubere Host-Erholung bei Abbruch:** Bricht das Online-Relay unerwartet ab, wechselt der Host kontrolliert in den sicheren Offline-Zustand zurück, sodass die Welt weiterläuft.
+* **🟡 FIX – Wildtiere & Navigation:** Kleinere Stabilitäts-Korrekturen bei Wildtieren (Schmetterlinge, Kleintiere, Vögel, Kaninchen, Waldsäuger) und Gegner-Navigation sowie aktualisierte Website- & Update-Daten.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Ein ruhiges, wichtiges Fundament-Update für sichere Spielstände und stabile Online-Abenteuer – viel Spaß mit V0.9.4 Beta!*
+
+---
+
 ## [V0.9.3 Beta] – 2026-11-15
 ### 🤝 Freundes-Sidebar im Pausenmenü & Nachtlichtung-Look: Einklappbare Koop-Seitenleiste, Profil-Avatare & UI-Politur
 

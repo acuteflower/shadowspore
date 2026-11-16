@@ -104,7 +104,7 @@ func request_outfit(id: String) -> void:
 		set_outfit(id)
 	elif multiplayer.is_server():
 		set_outfit(id)
-	else:
+	elif NetworkManager.rpc_ready(self):
 		_rpc_set_outfit.rpc_id(1, id)
 
 
@@ -117,7 +117,7 @@ func request_hair(id: String) -> void:
 		set_hair(id)
 	elif multiplayer.is_server():
 		set_hair(id)
-	else:
+	elif NetworkManager.rpc_ready(self):
 		_rpc_set_hair.rpc_id(1, id)
 
 
@@ -129,7 +129,7 @@ func unlock_cosmetic(kind: String, id: String) -> bool:
 		return false
 	if _has_unlock(kind, id):
 		return false
-	if multiplayer.multiplayer_peer == null:
+	if not NetworkManager.rpc_ready(self):
 		return _apply_unlock(kind, id)
 	_rpc_apply_unlock.rpc(kind, id)
 	return true
@@ -164,7 +164,10 @@ func _rpc_set_outfit(id: String) -> void:
 	if sender != 0 and parent_node != null and sender != parent_node.get_multiplayer_authority():
 		return
 	if is_valid_outfit(id):
-		_rpc_apply_outfit.rpc(id)
+		if NetworkManager.rpc_ready(self):
+			_rpc_apply_outfit.rpc(id)
+		else:
+			set_outfit(id)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -181,7 +184,10 @@ func _rpc_set_hair(id: String) -> void:
 	if sender != 0 and parent_node != null and sender != parent_node.get_multiplayer_authority():
 		return
 	if is_valid_hair(id):
-		_rpc_apply_hair.rpc(id)
+		if NetworkManager.rpc_ready(self):
+			_rpc_apply_hair.rpc(id)
+		else:
+			set_hair(id)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -414,22 +420,22 @@ func export_data() -> Dictionary:
 
 func import_data(data: Dictionary) -> void:
 	unlocked_hair_styles.clear()
-	for item: Variant in data.get("unlocked_hair_styles", []) as Array:
+	for item: Variant in SaveGame.as_array(data.get("unlocked_hair_styles")):
 		var s: String = String(item)
 		if _hair_styles_table().has(s) and not unlocked_hair_styles.has(s):
 			unlocked_hair_styles.append(s)
 	unlocked_hair_colors.clear()
-	for item: Variant in data.get("unlocked_hair_colors", []) as Array:
+	for item: Variant in SaveGame.as_array(data.get("unlocked_hair_colors")):
 		var c: String = String(item)
 		if _hair_colors_table().has(c) and not unlocked_hair_colors.has(c):
 			unlocked_hair_colors.append(c)
 	unlocked_outfits.clear()
-	for item: Variant in data.get("unlocked_outfits", []) as Array:
+	for item: Variant in SaveGame.as_array(data.get("unlocked_outfits")):
 		var o: String = String(item)
 		if (_outfits_table().has(o) or _outfit_styles_table().has(o)) and not unlocked_outfits.has(o):
 			unlocked_outfits.append(o)
 	unlocked_outfit_colors.clear()
-	for item: Variant in data.get("unlocked_outfit_colors", []) as Array:
+	for item: Variant in SaveGame.as_array(data.get("unlocked_outfit_colors")):
 		var oc: String = String(item)
 		if _outfit_colors_table().has(oc) and not unlocked_outfit_colors.has(oc):
 			unlocked_outfit_colors.append(oc)

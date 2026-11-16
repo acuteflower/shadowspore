@@ -5,8 +5,8 @@ extends Node
 ## No navigation bake to go stale when the world streams or a tree is felled.
 
 const NEIGHBORS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(-1, -1), Vector2i(1, -1)]
-const SHARED_USEC: int = 1600 ## all searching creatures together get at most this much A* time per physics frame
-const MIN_SHARE_USEC: int = 150 ## every searcher still gets a little, so nobody starves at the end of the tree order
+const SHARED_USEC: int = 2400 ## all searching creatures together get at most this much A* time per physics frame
+const MIN_SHARE_USEC: int = 250 ## every searcher still gets a little, so nobody starves at the end of the tree order
 static var _frame: int = -1
 static var _frame_used: int = 0
 static var _searchers: int = 0 ## searchers seen in the current physics frame

@@ -81,9 +81,9 @@ func export_state() -> Array:
 	return _awakened_seals.keys()
 
 
-func import_state(saved: Array) -> void:
+func import_state(saved: Variant) -> void:
 	_awakened_seals.clear()
-	for entry: Variant in saved:
+	for entry: Variant in SaveGame.as_array(saved):
 		_awakened_seals[String(entry)] = true
 	for nodes_v: Variant in _live_chunks.values():
 		for n: Node in nodes_v as Array:

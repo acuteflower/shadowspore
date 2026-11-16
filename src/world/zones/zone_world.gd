@@ -1001,16 +1001,18 @@ func export_things() -> Dictionary:
 
 func import_things(saved: Dictionary) -> void:
 	_thing_states.clear()
-	for key: String in saved:
-		if key.begins_with("s:") or key.begins_with("r:") or key.begins_with("h:"):
+	for key_v: Variant in saved:
+		var key: String = String(key_v)
+		if key.begins_with("s:") or key.begins_with("r:") or key.begins_with("h:") or not (saved[key_v] is Dictionary):
 			continue
 		var parts: PackedStringArray = key.split(",")
 		if parts.size() < 2:
 			continue
+		var raw_entry: Dictionary = saved[key_v] as Dictionary
 		var state: Dictionary = {}
-		for field: String in (saved[key] as Dictionary):
-			var v: Variant = (saved[key] as Dictionary)[field]
-			state[field] = int(v) if v is float else v
+		for field: Variant in raw_entry:
+			var v: Variant = raw_entry[field]
+			state[String(field)] = int(v) if v is float else v
 		_thing_states[Vector2i(int(parts[0]), int(parts[1]))] = state
 	for cell: Vector2i in _things:
 		var thing: WorldProp = _things[cell] as WorldProp
@@ -1040,11 +1042,11 @@ func export_zone_state() -> Dictionary:
 func import_zone_state(data: Dictionary) -> void:
 	opening_over = bool(data.get("opening_over", false))
 	_discovered = {"start_path": true}
-	for z_v: Variant in data.get("discovered", []) as Array:
+	for z_v: Variant in SaveGame.as_array(data.get("discovered")):
 		var zid: String = String(z_v)
 		if not zid.is_empty():
 			_discovered[zid] = true
-	var pz: Dictionary = data.get("player_zones", {}) as Dictionary
+	var pz: Dictionary = SaveGame.as_dict(data.get("player_zones"))
 	for k: Variant in pz:
 		var zid: String = String(pz[k])
 		if not zid.is_empty():

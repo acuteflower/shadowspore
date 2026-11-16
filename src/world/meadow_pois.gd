@@ -480,14 +480,14 @@ func import_state(saved: Variant) -> void:
 	_searched_boats.clear()
 	if saved is Dictionary:
 		var d: Dictionary = saved as Dictionary
-		for oid: Variant in d.get("order", []) as Array:
+		for oid: Variant in SaveGame.as_array(d.get("order")):
 			_discovered_order[String(oid)] = true
-		for mid: Variant in d.get("mills", []) as Array:
+		for mid: Variant in SaveGame.as_array(d.get("mills")):
 			_unjammed_mills[String(mid)] = true
-		for bid: Variant in d.get("boats", []) as Array:
+		for bid: Variant in SaveGame.as_array(d.get("boats")):
 			_searched_boats[String(bid)] = true
 	_refresh_live_nodes()
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and not multiplayer.get_peers().is_empty() and NetworkManager.rpc_ready(self):
 		_rpc_snapshot.rpc(
 			PackedStringArray(_discovered_order.keys()),
 			PackedStringArray(_unjammed_mills.keys()),

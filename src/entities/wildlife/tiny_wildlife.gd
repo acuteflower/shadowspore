@@ -115,7 +115,7 @@ func _physics_process(delta: float) -> void:
 			if tree == null or int(tree.state.get("f", 0)) != 0 or tree.is_queued_for_deletion():
 				var ground: Vector2 = global_position + Vector2(12 if tree_offset.x >= 0 else -12, 6)
 				if _population.can_crawl(global_position + Vector2(ground.x - global_position.x, 6), ground):
-					_act.rpc(State.REST, ground, ground, 3.0, "", Vector2.ZERO, 0.0)
+					_dispatch_act(State.REST, ground, ground, 3.0, "", Vector2.ZERO)
 				else:
 					queue_free()
 				return
@@ -179,8 +179,9 @@ func _physics_process(delta: float) -> void:
 			if state == State.FLY and _hang_target != null and is_instance_valid(_hang_target):
 				var half: float = float((_hang_target.spec()["crown_half_width"] as Array)[_hang_target.variant])
 				var hang: Vector2 = Vector2(clampf(global_position.x - _hang_target.global_position.x, -half * 0.5, half * 0.5), -_bat_hang_height(_hang_target))
-				_act.rpc(State.REST, global_position, global_position, _range("rest_seconds"), String(_hang_target.get_path()), hang, 0.0)
+				var target_tree_path: String = String(_hang_target.get_path())
 				_hang_target = null
+				_dispatch_act(State.REST, global_position, global_position, _range("rest_seconds"), target_tree_path, hang)
 			else:
 				_bat_fly()
 			return
@@ -248,7 +249,7 @@ func _hop(danger: Vector2 = Vector2.INF) -> void:
 	for angle: float in [0.0, 0.5, -0.5, 1.1, -1.1]:
 		var end: Vector2 = (at + dir.rotated(angle + _rng.randf_range(-0.3, 0.3)) * _range("hop_distance")).round()
 		if (danger.is_finite() or end.distance_to(home) <= float(_spec["home_radius"])) and _population.can_crawl(at, end, species):
-			_act.rpc(State.MOVE, at, end, _range("hop_seconds"), "", Vector2.ZERO, 0.0)
+			_dispatch_act(State.MOVE, at, end, _range("hop_seconds"), "", Vector2.ZERO)
 			return
 	_bout = 0
 	_choose(State.REST, _range("rest_seconds"))
@@ -305,13 +306,13 @@ func _bat_fly() -> void:
 				end = tree.global_position + Vector2(_rng.randf_range(-6.0, 6.0), 0.0)
 				target_h = _bat_hang_height(tree)
 	var seconds: float = clampf(at.distance_to(end) / float(_spec["flight_speed"]), 1.2, 6.0)
-	_act.rpc(State.FLY, at, end, seconds, "", Vector2(0, -target_h), 0.0)
+	_dispatch_act(State.FLY, at, end, seconds, "", Vector2(0, -target_h))
 
 
 
 func _choose(next: State, seconds: float) -> void:
 	var at: Vector2 = global_position if tree_path.is_empty() else tree_offset
-	_act.rpc(next, at, at, seconds, tree_path, tree_offset, 0.0)
+	_dispatch_act(next, at, at, seconds, tree_path, tree_offset)
 
 
 func _crawl() -> void:
@@ -324,7 +325,7 @@ func _crawl() -> void:
 	elif end.distance_to(home) > float(_spec["home_radius"]) or not _population.can_crawl(at, end, species):
 		_choose(State.REST, _range("rest_seconds"))
 		return
-	_act.rpc(State.MOVE, at, end, maxf(1, at.distance_to(end) / float(_spec["crawl_speed"])), tree_path, tree_offset, 0.0)
+	_dispatch_act(State.MOVE, at, end, maxf(1, at.distance_to(end) / float(_spec["crawl_speed"])), tree_path, tree_offset)
 
 
 func _fly(danger: Vector2 = Vector2.INF) -> void:
@@ -340,7 +341,14 @@ func _fly(danger: Vector2 = Vector2.INF) -> void:
 		for point: Vector2 in choices:
 			if point.distance_to(danger) > end.distance_to(danger):
 				end = point
-	_act.rpc(State.FLY if species == "ladybug" else State.MOVE, global_position, end, maxf(0.65, global_position.distance_to(end) / float(_spec["flight_speed"])), "", Vector2.ZERO, 0.0)
+	_dispatch_act(State.FLY if species == "ladybug" else State.MOVE, global_position, end, maxf(0.65, global_position.distance_to(end) / float(_spec["flight_speed"])), "", Vector2.ZERO)
+
+
+func _dispatch_act(next: int, start: Vector2, end: Vector2, seconds: float, tree: String, offset: Vector2) -> void:
+	if NetworkManager.rpc_ready(self):
+		_act.rpc(next, start, end, seconds, tree, offset, 0.0)
+	else:
+		_act(next, start, end, seconds, tree, offset, 0.0)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -501,7 +509,7 @@ func _crawl_scarab() -> void:
 		var dist: float = _rng.randf_range(8.0, 18.0)
 		var end: Vector2 = (at + dir.rotated(angle) * dist).round()
 		if end.distance_to(home) <= float(_spec["home_radius"]) and _population.can_crawl(at, end, "scarab"):
-			_act.rpc(State.MOVE, at, end, maxf(1.2, at.distance_to(end) / float(_spec["crawl_speed"])), "", Vector2.ZERO, 0.0)
+			_dispatch_act(State.MOVE, at, end, maxf(1.2, at.distance_to(end) / float(_spec["crawl_speed"])), "", Vector2.ZERO)
 			return
 	_choose(State.REST, _range("rest_seconds"))
 

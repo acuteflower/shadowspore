@@ -8,6 +8,7 @@ const OP_PACKET_RELIABLE: int = 1
 const OP_PACKET_UNRELIABLE: int = 2
 const OP_CONTROL: int = 10
 const MAX_PACKET_SIZE: int = 1048576
+const MAX_INCOMING_QUEUE: int = 8192
 const WS_BUFFER_BYTES: int = 2097152
 
 signal join_mode_changed(new_mode: String)
@@ -103,8 +104,10 @@ func _get_packet_script() -> PackedByteArray:
 
 
 func _put_packet_script(p_buffer: PackedByteArray) -> Error:
-	if _status != MultiplayerPeer.CONNECTION_CONNECTED or _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+	if _status != MultiplayerPeer.CONNECTION_CONNECTED or _ws == null or _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
 		return ERR_UNCONFIGURED
+	if p_buffer.size() > MAX_PACKET_SIZE:
+		return ERR_INVALID_PARAMETER
 	var frame := PackedByteArray()
 	frame.resize(5 + p_buffer.size())
 	frame.encode_s32(0, _target_peer)
@@ -245,6 +248,8 @@ func _next_cid() -> String:
 
 
 func _send_json(obj: Dictionary) -> Error:
+	if _ws == null or _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return ERR_UNCONFIGURED
 	return _ws.send_text(JSON.stringify(obj))
 
 
@@ -278,19 +283,23 @@ func _handle_ws_text(text: String) -> void:
 		return
 	var env: Dictionary = parsed as Dictionary
 	if env.has("error"):
-		var err_dict: Dictionary = env.get("error", {}) as Dictionary
+		var err_dict: Dictionary = SaveGame.as_dict(env.get("error"))
 		last_error = String(err_dict.get("message", "RELAY FEHLER"))
 		_close()
 		return
 	if not env.has("match_data"):
 		return
-	var md: Dictionary = env.get("match_data", {}) as Dictionary
+	var md: Dictionary = SaveGame.as_dict(env.get("match_data"))
+	if md.is_empty():
+		return
 	var op: int = int(md.get("op_code", 0))
 	var raw: PackedByteArray = Marshalls.base64_to_raw(String(md.get("data", "")))
 	if op == OP_CONTROL:
 		_handle_control(raw.get_string_from_utf8())
 	elif op == OP_PACKET_RELIABLE or op == OP_PACKET_UNRELIABLE:
-		if raw.size() < 6:
+		if raw.size() < 6 or raw.size() > MAX_PACKET_SIZE + 5:
+			return
+		if _incoming.size() >= MAX_INCOMING_QUEUE:
 			return
 		var sender_peer: int = raw.decode_s32(0)
 		var ch: int = int(raw[4])
@@ -319,7 +328,7 @@ func _handle_control(json_text: String) -> void:
 				return
 			_unique_id = assigned
 			var initial_remote: Array[int] = []
-			for raw_p: Variant in (ctrl.get("peers", []) as Array):
+			for raw_p: Variant in SaveGame.as_array(ctrl.get("peers")):
 				if raw_p is Dictionary:
 					var pd: Dictionary = raw_p as Dictionary
 					var pid: int = int(pd.get("peer_id", 0))
@@ -331,7 +340,7 @@ func _handle_control(json_text: String) -> void:
 			for pid: int in initial_remote:
 				peer_connected.emit(pid)
 		"peer_joined":
-			var pd: Dictionary = ctrl.get("peer", {}) as Dictionary
+			var pd: Dictionary = SaveGame.as_dict(ctrl.get("peer"))
 			var pid: int = int(pd.get("peer_id", 0))
 			if pid > 0 and pid != _unique_id:
 				var already: bool = _peers.has(pid)

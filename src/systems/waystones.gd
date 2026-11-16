@@ -154,7 +154,7 @@ func export_state() -> Dictionary:
 
 func import_state(data: Dictionary) -> void:
 	var ids: PackedStringArray = PackedStringArray()
-	for id: Variant in data.get("awake", []) as Array:
+	for id: Variant in SaveGame.as_array(data.get("awake")):
 		ids.append(String(id))
 	_apply_awake(ids)
 	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():

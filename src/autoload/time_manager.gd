@@ -151,8 +151,11 @@ func set_time(time: float) -> void:
 		var before: float = time_of_day
 		time_of_day = time
 		var advanced: bool = _check_day(before)
-		_rpc_time_jump.rpc(time_of_day, day, locked, advanced)
-	else:
+		if NetworkManager.rpc_ready(self):
+			_rpc_time_jump.rpc(time_of_day, day, locked, advanced)
+		elif advanced:
+			day_started.emit(day)
+	elif NetworkManager.rpc_ready(self):
 		_request_time.rpc_id(1, time)
 
 
@@ -176,11 +179,13 @@ func _process(delta: float) -> void:
 		before = time_of_day
 		time_of_day = fposmod(time_of_day + DEBUG_STEP, 1.0)
 		_check_day(before)
-		_sync_time.rpc(time_of_day, day, locked)
+		if NetworkManager.rpc_ready(self):
+			_sync_time.rpc(time_of_day, day, locked)
 	_sync_timer += delta
 	if _sync_timer >= SYNC_INTERVAL:
 		_sync_timer = 0.0
-		_sync_time.rpc(time_of_day, day, locked)
+		if NetworkManager.rpc_ready(self):
+			_sync_time.rpc(time_of_day, day, locked)
 
 
 ## Counts a new day when the clock moved forward past sunrise.
@@ -246,7 +251,7 @@ func import_sleep_state(data: Dictionary) -> void:
 
 
 func _broadcast_sleep_state() -> void:
-	if multiplayer.is_server() and multiplayer.multiplayer_peer != null:
+	if multiplayer.is_server() and NetworkManager.rpc_ready(self):
 		_sync_sleep_state.rpc(sleep_fatigue, nights_awake, slept_night_id)
 
 
@@ -279,7 +284,7 @@ func lock_at(time: float) -> void:
 	locked = true
 	time_of_day = fposmod(time, 1.0)
 	day = 0
-	if multiplayer.is_server() and multiplayer.multiplayer_peer != null:
+	if multiplayer.is_server() and NetworkManager.rpc_ready(self):
 		_sync_time.rpc(time_of_day, day, locked)
 
 

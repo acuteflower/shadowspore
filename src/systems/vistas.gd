@@ -127,7 +127,7 @@ func import_state(saved: Variant) -> void:
 				_seen[String(key)] = true
 	for id: String in _points:
 		(_points[id] as VistaPoint).set_discovered_visual(_seen.has(id))
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and not multiplayer.get_peers().is_empty() and NetworkManager.rpc_ready(self):
 		_rpc_snapshot.rpc(PackedStringArray(_seen.keys()))
 
 

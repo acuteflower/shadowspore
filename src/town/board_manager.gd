@@ -124,10 +124,12 @@ func _expire_entry(offer: Dictionary, entry: Dictionary, owner: String, message:
 	var player: Player = _player_of(peer)
 	var have: int = have_of(offer, player)
 	if player == null and String(offer.k) == BoardRules.FETCH:
-		var saved: Dictionary = _guest_players.get(owner, {})
-		for stack: Dictionary in saved.get("slots", []) as Array:
-			if String(stack.get("id", "")) == String(offer.t):
-				have += int(stack.count)
+		var saved: Dictionary = SaveGame.as_dict(_guest_players.get(owner))
+		for raw_stack: Variant in SaveGame.as_array(saved.get("slots")):
+			if raw_stack is Dictionary:
+				var stack: Dictionary = raw_stack as Dictionary
+				if String(stack.get("id", "")) == String(offer.t):
+					have += int(stack.get("count", 0))
 	_archive_entry(offer, entry, owner, "expired", TimeManager.day, have)
 	(taken[str(offer.id)] as Dictionary).erase(owner)
 	_reply(peer, message, false)
@@ -838,39 +840,46 @@ func _rpc_state(data: Dictionary) -> void:
 func _apply(data: Dictionary) -> void:
 	world_id = String(data.get("world", world_id))
 	offers.clear()
-	for raw: Variant in data.get("offers", []) as Array:
-		offers.append(_clean(raw as Dictionary))
-	taken = (data.get("taken", {}) as Dictionary).duplicate(true)
-	_archive = (data.get("archive", {}) as Dictionary).duplicate(true)
+	for raw: Variant in SaveGame.as_array(data.get("offers")):
+		if raw is Dictionary:
+			offers.append(_clean(raw as Dictionary))
+	taken = SaveGame.as_dict(data.get("taken")).duplicate(true)
+	_archive = SaveGame.as_dict(data.get("archive")).duplicate(true)
 	if not data.has("archive"):
 		for offer: Dictionary in offers:
-			var sheet: Dictionary = taken.get(str(offer.id), {})
-			for owner: String in sheet:
-				var entry: Dictionary = sheet[owner]
+			var sheet: Dictionary = SaveGame.as_dict(taken.get(str(offer.id)))
+			for owner: Variant in sheet:
+				if not (sheet[owner] is Dictionary):
+					continue
+				var entry: Dictionary = sheet[owner] as Dictionary
 				if String(offer.k) != BoardRules.STORY and bool(entry.get("done", false)):
-					_archive_entry(offer, entry, owner, "finished", -1)
+					_archive_entry(offer, entry, String(owner), "finished", -1)
 	if multiplayer.is_server() and data.has("guest_players"):
-		_guest_players = (data.guest_players as Dictionary).duplicate(true)
+		_guest_players = SaveGame.as_dict(data.get("guest_players")).duplicate(true)
 	next_id = int(data.get("next_id", 1))
 	occasion_last.clear()
-	for key: String in (data.get("occ", {}) as Dictionary):
-		occasion_last[key] = int((data.occ as Dictionary)[key])
+	var occ_dict: Dictionary = SaveGame.as_dict(data.get("occ"))
+	for key: Variant in occ_dict:
+		occasion_last[String(key)] = int(occ_dict[key])
 	_story_posted.clear()
-	for sid: Variant in data.get("story", []) as Array:
+	for sid: Variant in SaveGame.as_array(data.get("story")):
 		_story_posted[String(sid)] = true
-	_apply_honor(data.get("honor", {}) as Dictionary)
+	_apply_honor(SaveGame.as_dict(data.get("honor")))
 
 
 ## The honour board as it was written to the save: counters are ints again, every set is complete.
 func _apply_honor(raw: Dictionary) -> void:
-	honor = {"town": _clean_stats(raw.get("town", {}) as Dictionary), "peers": {}, "titles": {}, "fallen": []}
-	for key: String in (raw.get("peers", {}) as Dictionary):
-		(honor.peers as Dictionary)[key] = _clean_stats((raw.peers as Dictionary)[key] as Dictionary)
-	for key: String in (raw.get("titles", {}) as Dictionary):
-		(honor.titles as Dictionary)[key] = String((raw.titles as Dictionary)[key])
-	for item: Variant in raw.get("fallen", []) as Array:
-		var rec: Dictionary = item as Dictionary
-		(honor.fallen as Array).append({"name": String(rec.get("name", "")), "species": String(rec.get("species", "")), "day": int(rec.get("day", 0)), "nights": int(rec.get("nights", 1))})
+	honor = {"town": _clean_stats(SaveGame.as_dict(raw.get("town"))), "peers": {}, "titles": {}, "fallen": []}
+	var peers_dict: Dictionary = SaveGame.as_dict(raw.get("peers"))
+	for key: Variant in peers_dict:
+		(honor.peers as Dictionary)[String(key)] = _clean_stats(SaveGame.as_dict(peers_dict[key]))
+	var titles_dict: Dictionary = SaveGame.as_dict(raw.get("titles"))
+	for key: Variant in titles_dict:
+		(honor.titles as Dictionary)[String(key)] = String(titles_dict[key])
+	for item: Variant in SaveGame.as_array(raw.get("fallen")):
+		if item is Dictionary:
+			var rec: Dictionary = item as Dictionary
+			(honor.fallen as Array).append({"name": String(rec.get("name", "")), "species": String(rec.get("species", "")), "day": int(rec.get("day", 0)), "nights": int(rec.get("nights", 1))})
 
 
 func _clean_stats(raw: Dictionary) -> Dictionary:
@@ -879,8 +888,9 @@ func _clean_stats(raw: Dictionary) -> Dictionary:
 		return {}
 	for key: String in ["done", "fetch", "kills", "rush", "bounty"]:
 		stats[key] = int(raw.get(key, 0))
-	for giver: String in (raw.get("givers", {}) as Dictionary):
-		(stats.givers as Dictionary)[giver] = int((raw.givers as Dictionary)[giver])
+	var givers_dict: Dictionary = SaveGame.as_dict(raw.get("givers"))
+	for giver: Variant in givers_dict:
+		(stats.givers as Dictionary)[String(giver)] = int(givers_dict[giver])
 	return stats
 
 
@@ -891,7 +901,7 @@ func _clean(raw: Dictionary) -> Dictionary:
 		offer[key] = int(offer.get(key, 0))
 	for key: String in ["k", "g", "tx", "t", "txt", "ti", "q"]:
 		offer[key] = String(offer.get(key, ""))
-	offer["b"] = offer.get("b", {}) as Dictionary
+	offer["b"] = SaveGame.as_dict(offer.get("b"))
 	if offer.has("u"):
 		offer["u"] = bool(offer.u)
 	if offer.has("ut"):

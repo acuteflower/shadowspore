@@ -368,8 +368,10 @@ static func start(main: Node, request: Dictionary) -> void:
 		NetworkManager.join_rejected.connect(on_rejected)
 		var deadline: int = Time.get_ticks_msec() + 18000
 		while level.get_node_or_null("Players/%s" % main.multiplayer.get_unique_id()) == null:
-			main.multiplayer.multiplayer_peer.poll()
-			var disconn: bool = main.multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED
+			var join_peer: MultiplayerPeer = main.multiplayer.multiplayer_peer
+			if join_peer != null:
+				join_peer.poll()
+			var disconn: bool = join_peer == null or join_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED
 			if not rejected[0].is_empty() or disconn or Time.get_ticks_msec() >= deadline:
 				_join_handshake_active = false
 				if NetworkManager.join_rejected.is_connected(on_rejected):

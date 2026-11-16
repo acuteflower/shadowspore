@@ -705,12 +705,12 @@ func _snapshot_dict() -> Dictionary:
 
 @rpc("authority", "reliable")
 func _rpc_snapshot(snapshot: Dictionary) -> void:
-	_introduced = (snapshot.get("introduced", {}) as Dictionary).duplicate()
-	_light_step = (snapshot.get("light_step", {}) as Dictionary).duplicate()
-	_return_statue = (snapshot.get("return_statue", {}) as Dictionary).duplicate()
-	_shards_collected = (snapshot.get("shards_collected", {}) as Dictionary).duplicate()
-	_milestones_claimed = (snapshot.get("milestones_claimed", {}) as Dictionary).duplicate(true)
-	_altar_greeted = (snapshot.get("altar_greeted", {}) as Dictionary).duplicate()
+	_introduced = SaveGame.as_dict(snapshot.get("introduced")).duplicate()
+	_light_step = SaveGame.as_dict(snapshot.get("light_step")).duplicate()
+	_return_statue = SaveGame.as_dict(snapshot.get("return_statue")).duplicate()
+	_shards_collected = SaveGame.as_dict(snapshot.get("shards_collected")).duplicate()
+	_milestones_claimed = SaveGame.as_dict(snapshot.get("milestones_claimed")).duplicate(true)
+	_altar_greeted = SaveGame.as_dict(snapshot.get("altar_greeted")).duplicate()
 	_sync_and_hook_players()
 
 
@@ -721,12 +721,12 @@ func export_state() -> Dictionary:
 
 
 func import_state(data: Dictionary) -> void:
-	_introduced = (data.get("introduced", {}) as Dictionary).duplicate()
-	_light_step = (data.get("light_step", {}) as Dictionary).duplicate()
-	_return_statue = (data.get("return_statue", {}) as Dictionary).duplicate()
-	_shards_collected = (data.get("shards_collected", {}) as Dictionary).duplicate()
-	_milestones_claimed = (data.get("milestones_claimed", {}) as Dictionary).duplicate(true)
-	_altar_greeted = (data.get("altar_greeted", {}) as Dictionary).duplicate()
+	_introduced = SaveGame.as_dict(data.get("introduced")).duplicate()
+	_light_step = SaveGame.as_dict(data.get("light_step")).duplicate()
+	_return_statue = SaveGame.as_dict(data.get("return_statue")).duplicate()
+	_shards_collected = SaveGame.as_dict(data.get("shards_collected")).duplicate()
+	_milestones_claimed = SaveGame.as_dict(data.get("milestones_claimed")).duplicate(true)
+	_altar_greeted = SaveGame.as_dict(data.get("altar_greeted")).duplicate()
 	_sync_and_hook_players()
 	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
 		_rpc_snapshot.rpc(_snapshot_dict())

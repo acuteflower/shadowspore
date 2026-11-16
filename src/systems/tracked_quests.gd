@@ -474,7 +474,7 @@ func export_data() -> Dictionary:
 
 func import_data(data: Dictionary) -> void:
 	seen.clear()
-	for id: Variant in data.get("seen", []) as Array:
+	for id: Variant in SaveGame.as_array(data.get("seen")):
 		seen[int(id)] = true
 	_focus = String(data.get("focus", ""))
 	_focus_cleared = bool(data.get("focus_cleared", false))

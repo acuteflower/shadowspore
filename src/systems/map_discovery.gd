@@ -109,6 +109,8 @@ func export_data() -> PackedByteArray:
 
 
 func import_data(data: PackedByteArray) -> void:
+	if data.is_empty():
+		return
 	var raw: PackedByteArray = data.decompress(GRID * GRID, FileAccess.COMPRESSION_ZSTD)
 	if raw.size() != GRID * GRID:
 		return

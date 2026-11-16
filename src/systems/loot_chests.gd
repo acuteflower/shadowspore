@@ -404,20 +404,22 @@ func export_state() -> Dictionary:
 
 func import_state(data: Dictionary) -> void:
 	var ids: PackedStringArray = PackedStringArray()
-	for id: Variant in data.get("opened", []) as Array:
+	for id: Variant in SaveGame.as_array(data.get("opened")):
 		ids.append(String(id))
 		_opened[String(id)] = true
 		_show_opened(String(id))
-	var extras: Dictionary = data.get("extra", {}) as Dictionary
+	var extras: Dictionary = SaveGame.as_dict(data.get("extra"))
 	for key: Variant in extras:
-		_extra[String(key)] = extras[key] as Array
-	var bosses: Dictionary = data.get("boss", {}) as Dictionary
+		_extra[String(key)] = SaveGame.as_array(extras[key])
+	var bosses: Dictionary = SaveGame.as_dict(data.get("boss"))
 	for key: Variant in bosses:
+		if not (bosses[key] is Dictionary):
+			continue
 		var entry: Dictionary = bosses[key] as Dictionary
-		var at: Array = entry.get("at", [0, 0]) as Array
+		var at: Array = SaveGame.as_array(entry.get("at"))
 		var bid: String = String(key)
-		var where: Vector2 = Vector2(float(at[0]), float(at[1]))
-		_payload[bid] = entry.get("load", {}) as Dictionary
+		var where: Vector2 = Vector2(float(at[0]), float(at[1])) if at.size() >= 2 else Vector2.ZERO
+		_payload[bid] = SaveGame.as_dict(entry.get("load"))
 		_spawned[bid] = [String(entry.get("tier", "legendary")), where, false]
 		place(bid, String(entry.get("tier", "legendary")), where)
 	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():

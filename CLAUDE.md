@@ -6,6 +6,8 @@ The game's name is **Shadowspore** (formerly "Voidbloom"). The plant kind `voidb
 
 **Design:** how characters, items and map objects should look, work and be collected is in `docs/design_guide.md` (palettes, scale, pipelines, checklists). Read it before adding any.
 
+**Story:** the master storyline (prologue, chapters 1-6, epilogue, lore bible, five seals, side quests, planned revisions of existing content) is `docs/storyboard.md` (concept, 2026-11-16). Read it before writing quests or dialogue.
+
 ## Hard rules
 - **Strict static typing** everywhere (`untyped_declaration` is an error in project.godot).
 - **Multiplayer-first, host-authoritative.** Singleplayer = local ENet host with 1 player (`NetworkManager.host_singleplayer()`). State changes go through `@rpc` and run on the server (`if not multiplayer.is_server(): return`). Dynamic entities via `MultiplayerSpawner`, sync via `MultiplayerSynchronizer`.

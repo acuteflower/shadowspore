@@ -204,26 +204,25 @@ func import_data(data: Dictionary) -> void:
 		return
 	_discovered.clear()
 	_learned.clear()
-	var incoming: Variant = data.get("discovered", [])
-	if incoming is Array:
-		incoming = (incoming as Array).map(func(value: Variant) -> Variant: return RENAMED.get(value, value)) ## older saves
+	var incoming: Array = SaveGame.as_array(data.get("discovered"))
+	if not incoming.is_empty():
+		incoming = incoming.map(func(value: Variant) -> Variant: return RENAMED.get(value, value)) ## older saves
 		for _pass: int in definitions().size():
 			for value: Variant in incoming:
 				if value is String and can_explore(String(value)):
 					_discovered.append(String(value))
-	var bought: Variant = data.get("learned", [])
-	if bought is Array:
-		for _pass: int in definitions().size():
-			for value: Variant in bought:
-				if value is String and can_learn(String(value)):
-					_learned.append(String(value))
+	var bought: Array = SaveGame.as_array(data.get("learned"))
+	for _pass: int in definitions().size():
+		for value: Variant in bought:
+			if value is String and can_learn(String(value)):
+				_learned.append(String(value))
 	changed.emit()
 	_sync()
 
 
 func _sync(new_id: String = "") -> void:
 	var owner_id: int = get_multiplayer_authority()
-	if owner_id != multiplayer.get_unique_id():
+	if owner_id != multiplayer.get_unique_id() and NetworkManager.rpc_ready(self):
 		_state.rpc_id(owner_id, _discovered, _learned, new_id)
 
 

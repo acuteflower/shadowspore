@@ -648,15 +648,17 @@ func export_state() -> Dictionary:
 
 func import_state(data: Dictionary) -> void:
 	first_day = int(data.get("first", -1))
-	var v: Dictionary = data.get("visit", {}) as Dictionary
+	var v: Dictionary = SaveGame.as_dict(data.get("visit"))
 	visit = {}
 	if not v.is_empty():
 		var sold: Dictionary = {}
-		for item: String in v.get("sold", {}) as Dictionary:
-			sold[item] = int((v.sold as Dictionary)[item])
+		var raw_sold: Dictionary = SaveGame.as_dict(v.get("sold"))
+		for item: Variant in raw_sold:
+			sold[String(item)] = int(raw_sold[item])
 		var took: Dictionary = {}
-		for item: String in v.get("took", {}) as Dictionary:
-			took[item] = int((v.took as Dictionary)[item])
+		var raw_took: Dictionary = SaveGame.as_dict(v.get("took"))
+		for item: Variant in raw_took:
+			took[String(item)] = int(raw_took[item])
 		visit = {
 			"i": int(v.get("i", 0)),
 			"a": float(v.get("a", 0.0)),
@@ -668,7 +670,7 @@ func import_state(data: Dictionary) -> void:
 			"took": took,
 		}
 	preorders.clear()
-	for raw: Variant in data.get("pre", []) as Array:
+	for raw: Variant in SaveGame.as_array(data.get("pre")):
 		if not (raw is Dictionary):
 			continue
 		var p: Dictionary = raw as Dictionary
@@ -681,7 +683,7 @@ func import_state(data: Dictionary) -> void:
 			"ready": bool(p.get("ready", false)),
 		})
 	_next_preorder_id = maxi(1, int(data.get("next_pre", preorders.size() + 1)))
-	var f: Dictionary = data.get("force", {}) as Dictionary
+	var f: Dictionary = SaveGame.as_dict(data.get("force"))
 	force = {"i": int(f.i), "a": float(f.a), "l": float(f.l)} if f.has("i") else {}
 	_forced_count = int(data.get("forced", 0))
 	skip_until = float(data.get("skip", -1.0))

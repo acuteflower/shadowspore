@@ -359,7 +359,7 @@ func import_state(saved: Variant) -> void:
 			if n_v is ForestShrine:
 				var fs: ForestShrine = n_v as ForestShrine
 				fs.set_blessed_instant(_blessed_shrines.has(fs.shrine_id))
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and not multiplayer.get_peers().is_empty() and NetworkManager.rpc_ready(self):
 		_rpc_snapshot.rpc(PackedStringArray(_blessed_shrines.keys()))
 
 

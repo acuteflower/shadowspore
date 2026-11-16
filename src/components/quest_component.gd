@@ -287,13 +287,16 @@ func export_data() -> Dictionary:
 func import_data(data: Dictionary) -> void:
 	_closest.clear()
 	_task_signature = ""
-	_flags = (data.get("flags", {}) as Dictionary).duplicate()
+	_flags = SaveGame.as_dict(data.get("flags")).duplicate()
 	_active.clear()
-	for quest_id: String in (data.get("active", {}) as Dictionary):
-		if _quests.has(quest_id):
-			var index: int = int((data.active as Dictionary)[quest_id])
-			var name_saved: String = String((data.get("active_steps", {}) as Dictionary).get(quest_id, ""))
-			var steps: Array = (_quests[quest_id] as Dictionary).steps
+	var active_dict: Dictionary = SaveGame.as_dict(data.get("active"))
+	var active_steps: Dictionary = SaveGame.as_dict(data.get("active_steps"))
+	for quest_id: Variant in active_dict:
+		var qid: String = String(quest_id)
+		if _quests.has(qid):
+			var index: int = int(active_dict[quest_id])
+			var name_saved: String = String(active_steps.get(qid, ""))
+			var steps: Array = (_quests[qid] as Dictionary).steps
 			## Older versions used find_knight on both sides of the ambush.
 			if quest_id == "find_help" and name_saved == "find_knight" and not has_flag("woke_up") and not has_flag("left_hut") and index < 10:
 				name_saved = "find_fallen_knight"
@@ -304,7 +307,7 @@ func import_data(data: Dictionary) -> void:
 				index = 3 ## old crossroad/sign saves resume at the new fund section
 			_active[quest_id] = clampi(index, 0, steps.size() - 1)
 	_done.clear()
-	for quest_id: Variant in data.get("done", []) as Array:
+	for quest_id: Variant in SaveGame.as_array(data.get("done")):
 		_done.append(String(quest_id))
 	_migrate_town_start(data)
 	_migrate_plaza()
@@ -329,7 +332,7 @@ func _migrate_plaza() -> void:
 ## quest (WorldLevel.resume_story starts the follow-up of every finished quest); the later two mean Gustav already lives in the town: the rescue counts as done and the workshop
 ## quest waits at the pickaxe (or is done when it was made).
 func _migrate_town_start(data: Dictionary) -> void:
-	var old_step: String = String((data.get("active_steps", {}) as Dictionary).get("town_start", ""))
+	var old_step: String = String(SaveGame.as_dict(data.get("active_steps")).get("town_start", ""))
 	if not _active.has("town_start") or not old_step in ["build_workshop", "meet_stranger", "gustav_hello"]:
 		return
 	_active.erase("town_start")

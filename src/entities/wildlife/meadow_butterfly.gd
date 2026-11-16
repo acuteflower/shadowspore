@@ -61,13 +61,13 @@ func _physics_process(delta: float) -> void:
 		var tangent: Vector2 = _end - _start + _bend * (4.0 * (1.0 - 2.0 * p))
 		_facing = tangent.angle()
 		if multiplayer.is_server() and t >= 1.0:
-			_act.rpc(State.REST if TimeManager.night_amount() > 0.6 or WeatherManager.sky_wet() else State.FEED, _range("feed_seconds"), _end, _end, Vector2.ZERO, 4.0, 0.0)
+			_dispatch_act(State.REST if TimeManager.night_amount() > 0.6 or WeatherManager.sky_wet() else State.FEED, _range("feed_seconds"), _end, _end, Vector2.ZERO, 4.0)
 	elif multiplayer.is_server():
 		if state == State.REST and TimeManager.night_amount() < 0.5 and not WeatherManager.sky_wet():
-			_act.rpc(State.FEED, _range("feed_seconds"), global_position, global_position, Vector2.ZERO, 4.0, 0.0)
+			_dispatch_act(State.FEED, _range("feed_seconds"), global_position, global_position, Vector2.ZERO, 4.0)
 		elif _elapsed >= _duration:
 			if TimeManager.night_amount() > 0.6 or WeatherManager.sky_wet(): ## rain: wings folded under a leaf
-				_act.rpc(State.REST, _range("rest_seconds"), global_position, global_position, Vector2.ZERO, 4.0, 0.0)
+				_dispatch_act(State.REST, _range("rest_seconds"), global_position, global_position, Vector2.ZERO, 4.0)
 			else:
 				_visit(false)
 
@@ -110,7 +110,14 @@ func _visit(scatter: bool, danger: Vector2 = Vector2.ZERO) -> void:
 				goal = point
 	var direction: Vector2 = goal - global_position
 	var bend: Vector2 = direction.orthogonal().normalized() * _rng.randf_range(-12.0, 12.0)
-	_act.rpc(State.FLY, 0.8 if scatter else _range("flight_seconds"), global_position, goal, bend, 12.0 if scatter else _range("flight_height"), 0.0)
+	_dispatch_act(State.FLY, 0.8 if scatter else _range("flight_seconds"), global_position, goal, bend, 12.0 if scatter else _range("flight_height"))
+
+
+func _dispatch_act(next: int, duration: float, start: Vector2, end: Vector2, bend: Vector2, height: float) -> void:
+	if NetworkManager.rpc_ready(self):
+		_act.rpc(next, duration, start, end, bend, height, 0.0)
+	else:
+		_act(next, duration, start, end, bend, height, 0.0)
 
 
 @rpc("authority", "call_local", "reliable")

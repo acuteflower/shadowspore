@@ -832,19 +832,21 @@ func export_state() -> Dictionary:
 func import_state(data: Dictionary) -> void:
 	if not multiplayer.is_server():
 		return
-	_bonds = (data.get("bonds", {}) as Dictionary).duplicate(true)
-	_pets = (data.get("birds", {}) as Dictionary).duplicate(true)
+	_bonds = SaveGame.as_dict(data.get("bonds")).duplicate(true)
+	_pets = SaveGame.as_dict(data.get("birds")).duplicate(true)
 	_cooldown.clear()
 	_comp.clear()
-	var stored: Dictionary = data.get("hoards", {}) as Dictionary
-	for key: String in stored:
-		hoard(key).import_slots(stored[key] as Array)
-	var saved: Dictionary = data.get("comp", {}) as Dictionary
-	for peer_text: String in saved:
+	var stored: Dictionary = SaveGame.as_dict(data.get("hoards"))
+	for key: Variant in stored:
+		hoard(String(key)).import_slots(SaveGame.as_array(stored[key]))
+	var saved: Dictionary = SaveGame.as_dict(data.get("comp"))
+	for peer_text: Variant in saved:
+		if not (saved[peer_text] is Dictionary):
+			continue
 		var d: Dictionary = (saved[peer_text] as Dictionary).duplicate(true)
 		if _pets.has(String(d.get("k", ""))):
 			d["cd"] = 0
-			_comp[peer_text.to_int()] = d
+			_comp[String(peer_text).to_int()] = d
 	for key: String in _pets:
 		pet_changed.emit(key)
 	companion_changed.emit()

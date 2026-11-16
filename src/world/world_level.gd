@@ -3493,21 +3493,24 @@ func import_things(saved: Dictionary) -> void:
 	if sowing != null:
 		sowing.import_saved(saved)
 	var saved_seals: Array = []
-	for key_r: String in saved:
-		if key_r.begins_with("r:"):
-			saved_seals.append(key_r.substr(2))
+	for key_r: Variant in saved:
+		var key_str: String = String(key_r)
+		if key_str.begins_with("r:"):
+			saved_seals.append(key_str.substr(2))
 	if desert_ruins != null:
 		desert_ruins.import_state(saved_seals)
-	for key: String in saved:
-		if key.begins_with("s:") or key.begins_with("r:"):
+	for key_v: Variant in saved:
+		var key: String = String(key_v)
+		if key.begins_with("s:") or key.begins_with("r:") or not (saved[key_v] is Dictionary):
 			continue
+		var raw_entry: Dictionary = saved[key_v] as Dictionary
 		var state: Dictionary = {}
-		for field: String in (saved[key] as Dictionary):
-			var value: Variant = (saved[key] as Dictionary)[field]
-			state[field] = int(value) if value is float else value ## JSON has only floats
+		for field: Variant in raw_entry:
+			var value: Variant = raw_entry[field]
+			state[String(field)] = int(value) if value is float else value ## JSON has only floats
 		if state.has("pts"): ## cut spots of a clover field: JSON turned the Vector2s into strings "(x, y)"
 			var pts: Array = []
-			for point: Variant in (state["pts"] as Array):
+			for point: Variant in SaveGame.as_array(state["pts"]):
 				var v: Variant = str_to_var("Vector2" + String(point)) if point is String else point
 				if v is Vector2:
 					pts.append(v)
@@ -3516,7 +3519,8 @@ func import_things(saved: Dictionary) -> void:
 			_harvest_states[key.trim_prefix("h:")] = state
 			continue
 		var parts: PackedStringArray = key.split(",")
-		_thing_states[Vector2i(int(parts[0]), int(parts[1]))] = state
+		if parts.size() >= 2:
+			_thing_states[Vector2i(int(parts[0]), int(parts[1]))] = state
 	for cell: Vector2i in _things:
 		(_things[cell] as WorldProp).apply_state(thing_state(cell), "")
 	for key: String in _harvest_nodes:
@@ -3913,7 +3917,7 @@ func editor_apply(data: Dictionary, broadcast: bool = true) -> void:
 	for c: Vector2i in loaded:
 		_load_chunk(c)
 	_stream(true)
-	if broadcast and multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if broadcast and multiplayer.is_server() and not multiplayer.get_peers().is_empty() and NetworkManager.rpc_ready(self):
 		_rpc_editor_snapshot.rpc(edits.data())
 
 func editor_prop(cell: Vector2i) -> Dictionary:

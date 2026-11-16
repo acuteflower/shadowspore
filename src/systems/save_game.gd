@@ -9,8 +9,19 @@ const COOP_PATH: String = "user://coop_save.json"
 const ZONES_PATH: String = "user://save_zones.json"
 const COOP_ZONES_PATH: String = "user://coop_save_zones.json"
 const VERSION: int = 1
+const MAX_CLOUD_WORLD_BYTES: int = 16777216
 
 static var _io_mutex: Mutex = Mutex.new()
+
+
+## Coerces JSON/Nakama-decoded Variant values safely (Nakama Lua serializes `{}` as `[]`).
+static func as_dict(raw: Variant) -> Dictionary:
+	return raw as Dictionary if raw is Dictionary else {}
+
+
+## Coerces JSON-decoded Variant values safely to Array.
+static func as_array(raw: Variant) -> Array:
+	return raw as Array if raw is Array else []
 
 
 static func is_zones_world(tree: SceneTree) -> bool:
@@ -106,7 +117,7 @@ static func export_world_data(tree: SceneTree) -> Dictionary:
 	var goddess: GoddessSystem = GoddessSystem.of(tree)
 	if goddess != null:
 		var g_state: Dictionary = goddess.export_state()
-		if not (g_state.get("introduced", {}) as Dictionary).is_empty() or not (g_state.get("light_step", {}) as Dictionary).is_empty():
+		if not as_dict(g_state.get("introduced")).is_empty() or not as_dict(g_state.get("light_step")).is_empty():
 			data["goddess"] = g_state
 	var rings: Dictionary = {}
 	for node: Node in tree.get_nodes_in_group("ward_rings"):
@@ -129,7 +140,7 @@ static func export_world_data(tree: SceneTree) -> Dictionary:
 	if puzzles != null and not puzzles.is_blank():
 		data["puzzles"] = puzzles.export_state() ## the solved trials of the Wächterin (docs/raetsel_konzept.md)
 	var pets: PetRegistry = PetRegistry.of(tree)
-	if pets != null and not (pets.export_state()["bonds"] as Dictionary).is_empty():  ## (the birds' records only exist with a bond)
+	if pets != null and not as_dict(pets.export_state().get("bonds")).is_empty():  ## (the birds' records only exist with a bond)
 		data["pets"] = pets.export_state() ## the bonds with wild birds (docs/pet_konzept.md)
 	var vistas: Vistas = Vistas.of(tree)
 	if vistas != null and vistas.discovered_count() > 0:
@@ -152,7 +163,10 @@ static func export_world_data(tree: SceneTree) -> Dictionary:
 
 
 static func _write_json_file(target: String, payload_json: String) -> bool:
+	if target.is_empty() or payload_json.is_empty():
+		return false
 	var pending: String = target + ".tmp"
+	var backup: String = target + ".bak"
 	var target_dir: String = target.get_base_dir()
 	_io_mutex.lock()
 	if not target_dir.is_empty():
@@ -165,6 +179,14 @@ static func _write_json_file(target: String, payload_json: String) -> bool:
 	file.flush()
 	var written: bool = file.get_error() == OK
 	file.close()
+	if written and FileAccess.file_exists(target):
+		var prev_raw: String = FileAccess.get_file_as_string(target)
+		if not prev_raw.is_empty():
+			var bak_file: FileAccess = FileAccess.open(backup, FileAccess.WRITE)
+			if bak_file != null:
+				bak_file.store_string(prev_raw)
+				bak_file.flush()
+				bak_file.close()
 	var saved_ok: bool = written and DirAccess.rename_absolute(pending, target) == OK
 	_io_mutex.unlock()
 	return saved_ok
@@ -236,6 +258,8 @@ static func save_async(tree: SceneTree, on_done: Callable = Callable(), path: St
 
 static func compress_json(data: Dictionary) -> String:
 	var raw: PackedByteArray = JSON.stringify(data).to_utf8_buffer()
+	if raw.is_empty():
+		return ""
 	var compressed: PackedByteArray = raw.compress(FileAccess.COMPRESSION_GZIP)
 	return Marshalls.raw_to_base64(compressed)
 
@@ -246,7 +270,7 @@ static func decompress_json(encoded: String) -> Dictionary:
 	var compressed: PackedByteArray = Marshalls.base64_to_raw(encoded)
 	if compressed.is_empty():
 		return {}
-	var raw: PackedByteArray = compressed.decompress_dynamic(-1, FileAccess.COMPRESSION_GZIP)
+	var raw: PackedByteArray = compressed.decompress_dynamic(MAX_CLOUD_WORLD_BYTES, FileAccess.COMPRESSION_GZIP)
 	if raw.is_empty():
 		return {}
 	var parsed: Variant = JSON.parse_string(raw.get_string_from_utf8())
@@ -255,30 +279,33 @@ static func decompress_json(encoded: String) -> Dictionary:
 
 static func import_player_data(player: Player, saved: Dictionary, apply_pos: bool = true, load_quests: bool = true) -> void:
 	if apply_pos:
-		var pos: Array = saved.get("pos", [])
-		if pos.size() == 2:
-			player.position = Vector2(float(pos[0]), float(pos[1]))
-			(player.get_node("Camera2D") as Camera2D).reset_smoothing()
+		var pos: Array = as_array(saved.get("pos"))
+		if pos.size() == 2 and (pos[0] is float or pos[0] is int) and (pos[1] is float or pos[1] is int):
+			var px: float = float(pos[0])
+			var py: float = float(pos[1])
+			if is_finite(px) and is_finite(py):
+				player.position = Vector2(px, py)
+				(player.get_node("Camera2D") as Camera2D).reset_smoothing()
 	player.progress.xp = int(saved.get("xp", 0))
 	player.progress.restore_claimed(int(saved.get("claimed", 1))) ## before the health: the maximum depends on it
 	var health: float = float(saved.get("health", player.health.max_health))
-	player.health.current = health if health > 0.0 else player.health.max_health
+	player.health.current = health if is_finite(health) and health > 0.0 else player.health.max_health
 	player.sync_wound_visuals()
 	player.progress.copper = int(saved.get("copper", 0))
 	player.progress.xp = int(saved.get("xp", 0))
 	player.progress.award(0, 0)
-	(player.get_node("SkillTreeComponent") as SkillTreeComponent).import_data(saved.get("skill_tree", {}) as Dictionary)
+	(player.get_node("SkillTreeComponent") as SkillTreeComponent).import_data(as_dict(saved.get("skill_tree")))
 	_restore_stacks(player.inventory, saved)
-	player.inventory.import_hidden(saved.get("raw_rolls", {}) as Dictionary)
+	player.inventory.import_hidden(as_dict(saved.get("raw_rolls")))
 	player.set_bandaged(bool(saved.get("bandaged", false)))
 	if player.appearance != null:
-		player.appearance.import_data(saved.get("appearance", {}) as Dictionary)
+		player.appearance.import_data(as_dict(saved.get("appearance")))
 	player.sync_wound_visuals()
 	if load_quests:
 		if player.quests != null and saved.has("quests"):
-			player.quests.import_data(saved.quests as Dictionary)
+			player.quests.import_data(as_dict(saved.get("quests")))
 		if player.tracked != null and saved.has("board_local"):
-			player.tracked.import_data(saved.board_local as Dictionary)
+			player.tracked.import_data(as_dict(saved.get("board_local")))
 
 
 static func sync_player_to_network(player: Player) -> void:
@@ -290,14 +317,15 @@ static func sync_player_to_network(player: Player) -> void:
 	var owner_id: int = player.get_multiplayer_authority()
 	player.inventory._commit()
 	player.progress.award(0, 0)
-	if owner_id != mp.get_unique_id():
+	var can_rpc: bool = NetworkManager.rpc_ready(player)
+	if owner_id != mp.get_unique_id() and can_rpc:
 		player.progress._rpc_claimed.rpc_id(owner_id, player.progress.claimed, false)
 	var skills: SkillTreeComponent = player.get_node_or_null("SkillTreeComponent") as SkillTreeComponent
 	if skills != null:
 		skills._sync()
-	if player.appearance != null:
+	if player.appearance != null and can_rpc:
 		player.appearance._rpc_apply_all.rpc(player.appearance.export_data())
-	if player.health != null and owner_id != mp.get_unique_id():
+	if player.health != null and owner_id != mp.get_unique_id() and can_rpc:
 		player.health._set_value.rpc(player.health.current)
 
 
@@ -307,74 +335,77 @@ static func import_world_data(tree: SceneTree, data: Dictionary, player: Player,
 	var world_node: Node = tree.get_first_node_in_group("world")
 	var quest_flags: Dictionary = {}
 	if player.quests != null:
-		quest_flags = player.quests.export_data().get("flags", {}) as Dictionary
+		quest_flags = as_dict(player.quests.export_data().get("flags"))
 	var opening_done: bool = bool(data.get("opening_over", false)) or bool(quest_flags.get("woke_up", false))
 	if opening_done and world_node != null and world_node.has_method("finish_opening"):
 		world_node.call("finish_opening") ## sets opening_over and unlocks the clock
 	if not TimeManager.locked: ## the opening holds the clock at midnight
 		TimeManager.time_of_day = float(data.get("time", TimeManager.time_of_day))
 		TimeManager.day = int(data.get("day", 0))
-	TimeManager.import_sleep_state(data.get("sleep", {}) as Dictionary)
+	TimeManager.import_sleep_state(as_dict(data.get("sleep")))
 	var world: Node = tree.get_first_node_in_group("world")
 	if world != null and world.has_method("import_zone_state") and data.has("zone_world"):
-		world.call("import_zone_state", data.get("zone_world", {}))
+		world.call("import_zone_state", as_dict(data.get("zone_world")))
 	if world != null and world.has_method("import_things"):
-		world.call("import_things", data.get("things", {}))
+		world.call("import_things", as_dict(data.get("things")))
 	if world != null and world.has_method("import_story"):
-		world.call("import_story", data.get("story", {}))
+		world.call("import_story", as_dict(data.get("story")))
 	var mines: MineManager = tree.get_first_node_in_group("mines") as MineManager
 	if mines != null:
-		mines.import_state(data.get("mine", {}) as Dictionary)
+		mines.import_state(as_dict(data.get("mine")))
 	var town: TownManager = tree.get_first_node_in_group("town") as TownManager
 	if town != null and data.has("town"):
-		town.import_state(data.town as Dictionary)
+		town.import_state(as_dict(data.get("town")))
 	var night: NightDirector = tree.get_first_node_in_group("night_director") as NightDirector
 	if night != null and data.has("night"):
-		night.import_state(data.night as Dictionary)
+		night.import_state(as_dict(data.get("night")))
 	var waystones: Waystones = Waystones.of(tree)
 	if waystones != null and data.has("waystones"):
-		waystones.import_state(data.waystones as Dictionary)
+		waystones.import_state(as_dict(data.get("waystones")))
 	var goddess: GoddessSystem = GoddessSystem.of(tree)
 	if goddess != null and data.has("goddess"):
-		goddess.import_state(data.goddess as Dictionary)
-	for ring_id: Variant in (data.get("ward_rings", {}) as Dictionary):
+		goddess.import_state(as_dict(data.get("goddess")))
+	var ward_rings: Dictionary = as_dict(data.get("ward_rings"))
+	for ring_id: Variant in ward_rings:
 		var ring: WardRing = WardRing.by_id(tree, String(ring_id))
 		if ring != null:
-			ring.import_state(bool((data.ward_rings as Dictionary)[ring_id]))
+			ring.import_state(bool(ward_rings[ring_id]))
 	var witch: WitchArena = tree.get_first_node_in_group("witch_arena") as WitchArena
 	if witch != null and data.has("witch"):
-		witch.import_state(data.witch as Dictionary)
+		witch.import_state(as_dict(data.get("witch")))
 	var aurelith: AurelithArena = tree.get_first_node_in_group("aurelith_arena") as AurelithArena
 	if aurelith != null and data.has("aurelith"):
-		aurelith.import_state(data.aurelith as Dictionary)
+		aurelith.import_state(as_dict(data.get("aurelith")))
 	var relics: BossRelics = BossRelics.of(tree)
 	if relics != null and data.has("relics"):
-		relics.import_state(data.relics as Dictionary)
+		relics.import_state(as_dict(data.get("relics")))
 	var chests: LootChests = LootChests.of(tree)
 	if chests != null and data.has("chests"):
-		chests.import_state(data.chests as Dictionary)
+		chests.import_state(as_dict(data.get("chests")))
 	var puzzles: Puzzles = Puzzles.of(tree)
 	if puzzles != null and data.has("puzzles"):
-		puzzles.import_state(data.puzzles as Dictionary)
+		puzzles.import_state(as_dict(data.get("puzzles")))
 	var pets: PetRegistry = PetRegistry.of(tree)
 	if pets != null and data.has("pets"):
-		pets.import_state(data.pets as Dictionary)
+		pets.import_state(as_dict(data.get("pets")))
 	var vistas: Vistas = Vistas.of(tree)
 	if vistas != null and data.has("vistas"):
-		vistas.import_state(data.vistas)
+		vistas.import_state(data.get("vistas"))
 	var m_landmarks: MeadowLandmarks = MeadowLandmarks.of(tree)
 	if m_landmarks != null and data.has("meadow_landmarks"):
-		m_landmarks.import_state(data.meadow_landmarks)
+		m_landmarks.import_state(data.get("meadow_landmarks"))
 	var m_pois: MeadowPois = MeadowPois.of(tree)
 	if m_pois != null and data.has("meadow_pois"):
-		m_pois.import_state(data.meadow_pois)
+		m_pois.import_state(data.get("meadow_pois"))
 	var m_wonders: MeadowWonders = MeadowWonders.of(tree)
 	if m_wonders != null and data.has("meadow_wonders"):
-		m_wonders.import_state(data.meadow_wonders)
+		m_wonders.import_state(data.get("meadow_wonders"))
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null and data.has("map"):
-		discovery.import_saved(Marshalls.base64_to_raw(String(data["map"])))
-		discovery.import_before(Marshalls.base64_to_raw(String(data.get("map_before", "")))) ## empty = no whole-map reveal active
+		var map_b64: Variant = data.get("map")
+		var map_before_b64: Variant = data.get("map_before")
+		discovery.import_saved(Marshalls.base64_to_raw(map_b64 as String if map_b64 is String else ""))
+		discovery.import_before(Marshalls.base64_to_raw(map_before_b64 as String if map_before_b64 is String else "")) ## empty = no whole-map reveal active
 	if resume and world != null and world.has_method("resume_story"):
 		world.call_deferred("resume_story", player) ## a save that stopped in the middle of the wake-up plays it again
 	if TimeManager.nights_awake >= 1 and world != null and world.has_method("apply_tiredness_to_players"):
@@ -391,18 +422,18 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 	var player: Player = _local_player(tree)
 	if data.is_empty() or player == null:
 		return false
-	var saved: Dictionary = data.get("player", {}) as Dictionary
+	var saved: Dictionary = as_dict(data.get("player"))
 	import_player_data(player, saved, true)
 	return import_world_data(tree, data, player, resume)
 
 
 static func _restore_stacks(inventory: InventoryComponent, saved: Dictionary) -> void:
-	var slots: Array = saved.get("slots", [])
+	var slots: Array = as_array(saved.get("slots"))
 	for i: int in mini(slots.size(), inventory.slots.size()):
 		inventory.slots[i] = _stack(slots[i])
-	var equipment: Dictionary = saved.get("equipment", {})
+	var equipment: Dictionary = as_dict(saved.get("equipment"))
 	for slot_name: String in inventory.equipment:
-		inventory.equipment[slot_name] = _stack(equipment.get(slot_name, {}))
+		inventory.equipment[slot_name] = _stack(equipment.get(slot_name))
 	inventory.changed.emit()
 
 
@@ -425,18 +456,20 @@ static func restore_guest_economy(player: Player, saved: Dictionary) -> void:
 	player.progress.apply_stats(false)
 	player.progress.changed.emit()
 	var skills: SkillTreeComponent = player.get_node("SkillTreeComponent") as SkillTreeComponent
-	skills.import_data(saved.get("skill_tree", {}) as Dictionary)
+	skills.import_data(as_dict(saved.get("skill_tree")))
 	if player.appearance != null:
-		player.appearance.import_data(saved.get("appearance", {}) as Dictionary)
-	player.inventory.held = _stack(saved.get("held", {}))
+		player.appearance.import_data(as_dict(saved.get("appearance")))
+	player.inventory.held = _stack(saved.get("held"))
 	_restore_stacks(player.inventory, saved)
-	player.inventory.import_hidden(saved.get("raw_rolls", {}) as Dictionary)
+	player.inventory.import_hidden(as_dict(saved.get("raw_rolls")))
 
 
 ## JSON turns counts into floats: back to a clean stack.
 static func _stack(raw: Variant) -> Dictionary:
+	if not (raw is Dictionary):
+		return {}
 	var stack: Dictionary = raw as Dictionary
-	if stack == null or stack.is_empty():
+	if stack.is_empty():
 		return {}
 	var clean: Dictionary = stack.duplicate()
 	clean["count"] = int(stack.get("count", 1))
@@ -454,7 +487,9 @@ static func _local_player(tree: SceneTree) -> Player:
 
 
 static func _read(path: String = PATH) -> Dictionary:
-	if not FileAccess.file_exists(path):
-		return {}
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	return parsed as Dictionary if parsed is Dictionary else {}
+	for candidate: String in [path, path + ".bak"]:
+		if FileAccess.file_exists(candidate):
+			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(candidate))
+			if parsed is Dictionary and not (parsed as Dictionary).is_empty():
+				return parsed as Dictionary
+	return {}

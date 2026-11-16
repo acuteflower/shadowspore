@@ -88,7 +88,7 @@ func force(id: String, seconds: float = 0.0) -> void:
 		return
 	if id != "" and WeatherRules.state_def(id).is_empty():
 		return
-	if multiplayer.multiplayer_peer != null and multiplayer.get_peers().size() > 0:
+	if NetworkManager.rpc_ready(self) and multiplayer.get_peers().size() > 0:
 		_rpc_force.rpc(id, seconds)
 	else:
 		_rpc_force(id, seconds)

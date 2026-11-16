@@ -247,7 +247,7 @@ func _woodpecker_life() -> void:
 
 func _trunk_hop_up(next_height: float) -> void:
 	_trunk_hops_done += 1
-	_act.rpc(State.HOP, 0.26, facing, global_position, global_position, Vector2.ZERO, _height, next_height, next_height, _perch_path, 0.0)
+	_dispatch_act(State.HOP, 0.26, facing, global_position, global_position, Vector2.ZERO, _height, next_height, next_height, _perch_path)
 
 
 func _jay_life() -> void:
@@ -446,7 +446,7 @@ func _desert_falcon_life() -> void:
 			return
 		if _height > 2.0:
 			var descend: Vector2 = home
-			_act.rpc(State.FLY, 2.2, (descend - global_position).angle(), global_position, descend, Vector2.ZERO, _height, 0.0, maxf(_height, 42.0), "", 0.0)
+			_dispatch_act(State.FLY, 2.2, (descend - global_position).angle(), global_position, descend, Vector2.ZERO, _height, 0.0, maxf(_height, 42.0), "")
 			return
 		_set_mood(State.ROOST, _range("roost_seconds"))
 		return
@@ -467,7 +467,7 @@ func _desert_falcon_life() -> void:
 		var soar_h: float = _height if _height > 54.0 else _range("soar_height")
 		var dur: float = maxf(2.0, (chord.length() + sagitta.length()) / (float(_spec["flight_speed"]) * 0.62))
 		_soar_angle = next_ang
-		_act.rpc(State.FLY, dur, chord.angle(), global_position, goal, sagitta, _height, soar_h, maxf(_height, soar_h) + 3.0, "", 0.0)
+		_dispatch_act(State.FLY, dur, chord.angle(), global_position, goal, sagitta, _height, soar_h, maxf(_height, soar_h) + 3.0, "")
 		return
 	# Descending from thermal soar to a cactus/palm/monolith perch (or desert ridge)
 	if _perch_path.is_empty() and _height > 20.0:
@@ -508,4 +508,4 @@ func _start_thermal_soar() -> void:
 	var soar_h: float = _range("soar_height")
 	var dur: float = maxf(2.3, global_position.distance_to(goal) / (float(_spec["flight_speed"]) * 0.72))
 	_soar_angle = first_ang
-	_act.rpc(State.FLY, dur, (goal - global_position).angle(), global_position, goal, (goal - global_position).orthogonal().normalized() * (_soar_dir * 26.0), _height, soar_h, soar_h + 6.0, "", 0.0)
+	_dispatch_act(State.FLY, dur, (goal - global_position).angle(), global_position, goal, (goal - global_position).orthogonal().normalized() * (_soar_dir * 26.0), _height, soar_h, soar_h + 6.0, "")

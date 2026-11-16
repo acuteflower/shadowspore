@@ -342,17 +342,22 @@ func export_state() -> Dictionary:
 
 func import_state(data: Dictionary) -> void:
 	fields.clear()
-	for key: String in data:
+	for key: Variant in data:
+		if not (data[key] is Dictionary):
+			continue
 		var cells: Dictionary = data[key] as Dictionary
 		var table: Dictionary = {}
-		for cell_key: String in cells:
+		for cell_key: Variant in cells:
+			if not (cells[cell_key] is Dictionary):
+				continue
 			var raw: Dictionary = cells[cell_key] as Dictionary
 			var state: Dictionary = {}
-			for field_key: String in raw:
-				if field_key == "c":
-					state[field_key] = String(raw[field_key])
+			for field_key: Variant in raw:
+				var fk: String = String(field_key)
+				if fk == "c":
+					state[fk] = String(raw[field_key])
 				else:
-					state[field_key] = int(raw[field_key])
+					state[fk] = int(raw[field_key])
 			if not state.is_empty():
 				table[int(cell_key)] = state
 		if not table.is_empty():

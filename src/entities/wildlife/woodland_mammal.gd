@@ -1282,8 +1282,7 @@ func _step(direction: Vector2, action: Mood) -> void:
 
 
 func _can_rpc() -> bool:
-	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
-	return is_inside_tree() and peer != null and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+	return NetworkManager.rpc_ready(self)
 
 
 func _issue(action: Mood, duration: float, direction: float = INF, elapsed: float = 0.0) -> void:

@@ -103,9 +103,12 @@ func import_state(data: Dictionary) -> void:
 		for drop: Node in child.get_children():
 			if drop is ItemDrop and (drop as ItemDrop).story_id.begins_with(PREFIX):
 				drop.queue_free() ## the saved game is the truth
-	_kills = (data.get("kills", {}) as Dictionary).duplicate(true)
+	_kills = SaveGame.as_dict(data.get("kills")).duplicate(true)
 	_owed.clear()
-	for entry: Variant in data.get("owed", []) as Array:
+	for entry: Variant in SaveGame.as_array(data.get("owed")):
+		if not (entry is Dictionary):
+			continue
 		var owed: Dictionary = entry as Dictionary
-		var at: Array = owed.get("at", [0.0, 0.0]) as Array
-		_spawn(int(owed["owner"]), String(owed["item"]), Vector2(float(at[0]), float(at[1])), Vector2.ZERO)
+		var at: Array = SaveGame.as_array(owed.get("at"))
+		var pos: Vector2 = Vector2(float(at[0]), float(at[1])) if at.size() >= 2 else Vector2.ZERO
+		_spawn(int(owed.get("owner", 1)), String(owed.get("item", "")), pos, Vector2.ZERO)

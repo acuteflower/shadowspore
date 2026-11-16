@@ -321,7 +321,7 @@ func export_state() -> bool:
 
 
 func import_state(on: bool) -> void:
-	if multiplayer.is_server():
+	if multiplayer.is_server() and NetworkManager.rpc_ready(self):
 		_rpc_state.rpc(on, false)
 	else:
 		_rpc_state(on, false)

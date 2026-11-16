@@ -65,9 +65,14 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	if is_coop_session() and (peer == null or peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED):
+		if not is_local_coop_guest() and not GameLauncher.is_transitioning():
+			last_join_error = (peer as RelayPeer).last_error if peer is RelayPeer else ""
+			leave(false)
+			return
 	if not is_multiplayer_session():
 		return
-	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
 	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return
 	if multiplayer.is_server():
@@ -80,7 +85,8 @@ func _process(delta: float) -> void:
 	_ping_timer += delta
 	if _ping_timer >= PING_INTERVAL:
 		_ping_timer = 0.0
-		_rpc_ping.rpc_id(1, Time.get_ticks_msec())
+		if rpc_ready(self):
+			_rpc_ping.rpc_id(1, Time.get_ticks_msec())
 
 
 static func local_ips() -> PackedStringArray:
@@ -119,6 +125,14 @@ static func _is_private_172(addr: String) -> bool:
 
 static func primary_ip() -> String:
 	return local_ips()[0]
+
+
+## True when `node` is in the scene tree and has a connected MultiplayerPeer ready for RPCs.
+static func rpc_ready(node: Node) -> bool:
+	if node == null or not node.is_inside_tree():
+		return false
+	var peer: MultiplayerPeer = node.multiplayer.multiplayer_peer
+	return peer != null and peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
 
 
 func is_coop_session() -> bool:
@@ -242,7 +256,7 @@ func refresh_local_name() -> void:
 		_rebuild_roster()
 		_broadcast_session()
 		session_changed.emit()
-	elif multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+	elif rpc_ready(self):
 		_rpc_update_name.rpc_id(1, next_name)
 
 
@@ -689,7 +703,7 @@ func _rebuild_roster() -> void:
 
 
 func _broadcast_session() -> void:
-	if not multiplayer.is_server() or not is_multiplayer_session():
+	if not multiplayer.is_server() or not is_multiplayer_session() or not rpc_ready(self):
 		return
 	for p: int in multiplayer.get_peers():
 		_rpc_sync_session.rpc_id(p, active_world_name, active_room_code, active_port, active_max_players, _roster, transport_mode, active_join_mode)
@@ -730,10 +744,10 @@ func _rpc_update_name(raw_name: String) -> void:
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
 func _rpc_ping(client_msec: int) -> void:
-	if not multiplayer.is_server():
+	if not multiplayer.is_server() or not rpc_ready(self):
 		return
 	var sender: int = multiplayer.get_remote_sender_id()
-	if sender > 1:
+	if sender > 1 and multiplayer.get_peers().has(sender):
 		_rpc_pong.rpc_id(sender, client_msec)
 
 

@@ -227,12 +227,15 @@ func export() -> Dictionary:
 
 func import_saved(saved: Dictionary) -> void:
 	sown.clear()
-	for key: String in saved:
-		if not key.begins_with("s:"):
+	for key_v: Variant in saved:
+		var key: String = String(key_v)
+		if not key.begins_with("s:") or not (saved[key_v] is Dictionary):
 			continue
 		var parts: PackedStringArray = key.trim_prefix("s:").split(",")
-		var entry: Dictionary = saved[key] as Dictionary
-		sown[Vector2i(int(parts[0]), int(parts[1]))] = {"k": String(entry.k), "v": int(entry.v), "d": int(entry.d), "e": int(entry.get("e", 0))}
+		if parts.size() < 2:
+			continue
+		var entry: Dictionary = saved[key_v] as Dictionary
+		sown[Vector2i(int(parts[0]), int(parts[1]))] = {"k": String(entry.get("k", "")), "v": int(entry.get("v", 0)), "d": int(entry.get("d", 0)), "e": int(entry.get("e", 0))}
 	for cell: Vector2i in sown:
 		_spawn(cell, false)
 

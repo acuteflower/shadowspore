@@ -256,7 +256,7 @@ func fly_to(goal: Vector2) -> bool:
 	var cruise: float = maxf(float(_spec["flight_height"]), _height + float(_spec["flight_clearance"]))
 	cruise = maxf(cruise, _calculate_flight_clearance(global_position, goal, bend))
 	var duration: float = maxf(float(_spec["flight_seconds_min"]), (dist + bend.length() * 0.7) / float(_spec["flight_speed"]))
-	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, 0.0, cruise, "", 0.0)
+	_dispatch_act(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, 0.0, cruise, "")
 	return true
 
 
@@ -579,7 +579,7 @@ func _fly_to_spot(destination: Dictionary) -> bool:
 	var cruise: float = maxf(float(_spec["flight_height"]), maxf(_height, float(destination["height"])) + float(_spec["flight_clearance"]))
 	cruise = maxf(cruise, _calculate_flight_clearance(global_position, goal, bend))
 	var duration: float = maxf(float(_spec["flight_seconds_min"]), (dist + bend.length() * 0.7) / float(_spec["flight_speed"]))
-	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, float(destination["height"]), cruise, String(destination["path"]), 0.0)
+	_dispatch_act(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, float(destination["height"]), cruise, String(destination["path"]))
 	return true
 
 
@@ -668,7 +668,7 @@ func _walk(direction: Vector2) -> void:
 	for angle: float in [0.0, 0.6, -0.6, 1.2, -1.2]:
 		var step: Vector2 = direction.rotated(angle) * distance
 		if not test_move(global_transform, step) and _can_land(global_position + step):
-			_act.rpc(State.WALK, maxf(0.35, distance / float(_spec["walk_speed"])), step.angle(), global_position, global_position + step, Vector2.ZERO, 0.0, 0.0, 0.0, "", 0.0)
+			_dispatch_act(State.WALK, maxf(0.35, distance / float(_spec["walk_speed"])), step.angle(), global_position, global_position + step, Vector2.ZERO, 0.0, 0.0, 0.0, "")
 			return
 	_set_mood(State.IDLE, 0.5)
 
@@ -682,7 +682,7 @@ func _hop_step(direction: Vector2, custom_distance: float = -1.0) -> void:
 		var step: Vector2 = direction.rotated(angle) * distance
 		if not test_move(global_transform, step) and _can_land(global_position + step):
 			var duration: float = clampf(distance / (float(_spec["walk_speed"]) * 1.45), 0.24, 0.42)
-			_act.rpc(State.HOP, duration, step.angle(), global_position, global_position + step, Vector2.ZERO, 0.0, 0.0, 0.0, "", 0.0)
+			_dispatch_act(State.HOP, duration, step.angle(), global_position, global_position + step, Vector2.ZERO, 0.0, 0.0, 0.0, "")
 			return
 	_set_mood(State.IDLE, 0.4)
 
@@ -739,7 +739,7 @@ func _take_wing(panic: bool, broadcast: bool = true, ground_only: bool = false, 
 	bend = _calculate_route_bend(global_position, goal, bend)
 	cruise = maxf(cruise, _calculate_flight_clearance(global_position, goal, bend))
 	duration = maxf(float(_spec["flight_seconds_min"]), (global_position.distance_to(goal) + bend.length() * 0.7) / float(_spec["flight_speed"]))
-	_act.rpc(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, float(destination["height"]), cruise, String(destination["path"]), 0.0)
+	_dispatch_act(State.FLY, duration, (goal - global_position).angle(), global_position, goal, bend, _height, float(destination["height"]), cruise, String(destination["path"]))
 	_caution_left = float(_spec["calm_seconds"]) if panic else 0.0
 	if panic and broadcast:
 		_request_call(true)
@@ -766,7 +766,12 @@ func _request_call(alarm: bool) -> void:
 	_call_left = _range("call_seconds") * (3.0 if _rest_time() else 1.0)
 	if _population.has_method("authorize_call") and not bool(_population.call("authorize_call", flock_id)):
 		return
-	_play_call.rpc(_rng.randi_range(0, 1), _rng.randf_range(0.94, 1.04))
+	var call_idx: int = _rng.randi_range(0, 1)
+	var call_pitch: float = _rng.randf_range(0.94, 1.04)
+	if NetworkManager.rpc_ready(self):
+		_play_call.rpc(call_idx, call_pitch)
+	else:
+		_play_call(call_idx, call_pitch)
 	if alarm:
 		for node: Node in get_tree().get_nodes_in_group("woodland_mammals"):
 			if node.has_method("hear_external_alarm"):
@@ -798,7 +803,21 @@ func _play_call(index: int, pitch: float) -> void:
 
 
 func _set_mood(mood: State, duration: float) -> void:
-	_act.rpc(mood, duration, facing, global_position, global_position, Vector2.ZERO, _height, _height, _height, _perch_path, 0.0)
+	_dispatch_act(mood, duration, facing, global_position, global_position, Vector2.ZERO, _height, _height, _height, _perch_path)
+
+
+func _dispatch_act(mood: int, duration: float, direction: float, start: Vector2, end: Vector2, bend: Vector2, from_height: float, to_height: float, cruise: float, perch: String) -> void:
+	if NetworkManager.rpc_ready(self):
+		_act.rpc(mood, duration, direction, start, end, bend, from_height, to_height, cruise, perch, 0.0)
+	else:
+		_act(mood, duration, direction, start, end, bend, from_height, to_height, cruise, perch, 0.0)
+
+
+func _dispatch_finish(at: Vector2, height: float, perch: String) -> void:
+	if NetworkManager.rpc_ready(self):
+		_finish.rpc(at, height, perch)
+	else:
+		_finish(at, height, perch)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -843,7 +862,7 @@ func _advance() -> void:
 		if not _perch_path.is_empty():
 			global_position = next
 		elif multiplayer.is_server() and move_and_collide(next - global_position) != null:
-			_finish.rpc(global_position, 0.0, "")
+			_dispatch_finish(global_position, 0.0, "")
 			return
 		elif not multiplayer.is_server():
 			global_position = next
@@ -856,7 +875,7 @@ func _advance() -> void:
 				if not soaring_waypoint and ((_perch_path.is_empty() and (_height_to > 0.0 or not _can_land(_end))) or (not _perch_path.is_empty() and not valid_perch)):
 					_reroute()
 					return
-			_finish.rpc(global_position, _height_to, _perch_path)
+			_dispatch_finish(global_position, _height_to, _perch_path)
 		else:
 			_moving = false
 
@@ -867,7 +886,7 @@ func _reroute() -> void:
 	if not _take_wing(true, false, true):
 		# A temporarily occupied landing sends the bird around for another approach, never into a hover.
 		var direction: Vector2 = Vector2.from_angle(facing + PI * 0.6)
-		_act.rpc(State.FLY, 0.9, direction.angle(), global_position, global_position + direction * 55.0, direction.orthogonal() * 22.0, _height, maxf(_height, 24.0), maxf(_height, 36.0), "", 0.0)
+		_dispatch_act(State.FLY, 0.9, direction.angle(), global_position, global_position + direction * 55.0, direction.orthogonal() * 22.0, _height, maxf(_height, 24.0), maxf(_height, 36.0), "")
 
 
 @rpc("authority", "call_local", "reliable")

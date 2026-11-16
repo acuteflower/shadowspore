@@ -163,13 +163,15 @@ func export_state() -> Dictionary:
 
 func import_state(data: Dictionary) -> void:
 	_memory.clear()
-	var memory: Dictionary = data.get("memory", {}) as Dictionary
+	var memory: Dictionary = SaveGame.as_dict(data.get("memory"))
 	for sector: Variant in memory:
+		if not (memory[sector] is Dictionary):
+			continue
 		var rec: Dictionary = memory[sector] as Dictionary
 		_memory[int(String(sector))] = {"b": float(rec.get("b", 0.0)), "d": float(rec.get("d", 0.0))}
 	_stage_seen = String(data.get("stage_seen", ""))
-	_report = (data.get("report", {}) as Dictionary).duplicate(true)
-	marked = (data.get("marked", {}) as Dictionary).duplicate(true)
+	_report = SaveGame.as_dict(data.get("report")).duplicate(true)
+	marked = SaveGame.as_dict(data.get("marked")).duplicate(true)
 	if not marked.is_empty():
 		marked["nights"] = int(marked.get("nights", 1))
 		marked["day"] = int(marked.get("day", 0))

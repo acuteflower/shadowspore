@@ -514,7 +514,7 @@ func import_state(saved: Variant) -> void:
 		if _guardians_awake:
 			_guardians_lit_step = SleepingGuardians.GUARDIAN_COUNT
 	_refresh_live_nodes()
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and not multiplayer.get_peers().is_empty() and NetworkManager.rpc_ready(self):
 		_rpc_snapshot.rpc(
 			_bell_awake,
 			_guardians_awake,

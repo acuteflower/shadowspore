@@ -31,7 +31,9 @@ func _ready() -> void:
 	add_child(MineAtmosphere.new())
 	add_child(MineEncounterDirector.new())
 	if multiplayer.is_server():
-		multiplayer.peer_connected.connect(func(id: int) -> void: _rpc_snapshot.rpc_id(id, state))
+		multiplayer.peer_connected.connect(func(id: int) -> void:
+			if NetworkManager.rpc_ready(self):
+				_rpc_snapshot.rpc_id(id, state))
 
 
 func _exit_tree() -> void:
@@ -265,7 +267,7 @@ func _rpc_depth(level: int) -> void:
 
 func _host_depth(level: int) -> void:
 	if level > deepest() and level <= MAX_LEVELS:
-		_rpc_set.rpc("deepest", level)
+		set_state("deepest", level)
 
 
 ## Local player mended the lift.
@@ -292,7 +294,7 @@ func _host_station(level: int, peer: int) -> void:
 	var l: MineLayout = layout(level)
 	if player == null or player.health.current <= 0.0 or player.global_position.distance_to(origin(level) + l.tile_center(l.station_winch)) > 96.0:
 		return
-	_rpc_set.rpc("station:%d" % level, 1)
+	set_state("station:%d" % level, 1)
 
 
 func local_player() -> Player:
@@ -461,8 +463,12 @@ func _rpc_snapshot(data: Dictionary) -> void:
 
 ## Host: sets an entry of the table for everyone (0 removes it).
 func set_state(key: String, value: int) -> void:
-	if multiplayer.is_server():
+	if not multiplayer.is_server():
+		return
+	if NetworkManager.rpc_ready(self):
 		_rpc_set.rpc(key, value)
+	else:
+		_rpc_set(key, value)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -481,7 +487,7 @@ func _rpc_set(key: String, value: int) -> void:
 func request_chest(key: String) -> void:
 	if multiplayer.is_server():
 		_host_chest(key, multiplayer.get_unique_id())
-	else:
+	elif NetworkManager.rpc_ready(self):
 		_rpc_chest.rpc_id(1, key)
 
 
@@ -510,4 +516,4 @@ func _host_chest(key: String, peer: int) -> void:
 	var scale: float = 1.0 + float(loot.get("per_level", 0.15)) * float(level - 1)
 	player.progress.award(int(float(randi_range(int(span[0]), int(span[1]))) * scale), int(loot.get("xp", 6)))
 	(load("res://src/components/drop_component.gd") as GDScript).call("spawn_drops", get_tree(), loot.get("items", []) as Array, chest.global_position + Vector2(0, 6)) ## by path at run time: a direct reference would make this script load DropComponent (and its scenes) before the rest of the game is ready
-	_rpc_set.rpc(key, 1)
+	set_state(key, 1)

@@ -137,8 +137,9 @@ func import_data(data: Dictionary) -> void:
 			child.get_parent().remove_child(child)
 			child.queue_free()
 	states = data.duplicate(true)
-	for key: String in states:
-		if not bool((states[key] as Dictionary).get("claimed", false)): _spawn_sword(int(key))
+	for key: Variant in states:
+		if states[key] is Dictionary and not bool((states[key] as Dictionary).get("claimed", false)):
+			_spawn_sword(int(key))
 	_snapshot.rpc(states)
 
 

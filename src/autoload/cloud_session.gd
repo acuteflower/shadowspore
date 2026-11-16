@@ -270,7 +270,7 @@ func authenticate_email(email: String, password: String, create: bool = false, c
 	if not bool(res.get("ok", false)):
 		last_error = String(res.get("error", "Login fehlgeschlagen"))
 		return res
-	var data: Dictionary = res.get("data", {}) as Dictionary
+	var data: Dictionary = SaveGame.as_dict(res.get("data"))
 	_apply_session_tokens(String(data.get("token", "")), String(data.get("refresh_token", "")))
 	var profile: Dictionary = await fetch_my_profile()
 	if profile.is_empty():
@@ -315,7 +315,7 @@ func refresh_session() -> bool:
 	if not bool(res.get("ok", false)):
 		last_error = String(res.get("error", "Session abgelaufen"))
 		return false
-	var data: Dictionary = res.get("data", {}) as Dictionary
+	var data: Dictionary = SaveGame.as_dict(res.get("data"))
 	_apply_session_tokens(String(data.get("token", "")), String(data.get("refresh_token", "")))
 	_save_session()
 	return is_logged_in()
@@ -333,8 +333,7 @@ func fetch_my_profile() -> Dictionary:
 	world_join_mode = String(data.get("world_join_mode", "ask"))
 	role = normalize_role(String(data.get("role", "player")))
 	avatar_url = String(data.get("avatar_url", ""))
-	var lobby_raw: Variant = data.get("active_lobby", {})
-	active_lobby = lobby_raw as Dictionary if lobby_raw is Dictionary else {}
+	active_lobby = SaveGame.as_dict(data.get("active_lobby"))
 	license_active = bool(data.get("license_active", false))
 	license_edition = String(data.get("license_edition", ""))
 	license_expires_at = int(data.get("license_expires_at", 0))
@@ -459,9 +458,9 @@ func call_rpc(rpc_id: String, payload: Dictionary = {}) -> Dictionary:
 	if not bool(res.get("ok", false)):
 		last_error = String(res.get("error", "RPC fehlgeschlagen"))
 		return {}
-	var raw_payload: String = String((res.get("data", {}) as Dictionary).get("payload", "{}"))
+	var raw_payload: String = String(SaveGame.as_dict(res.get("data")).get("payload", "{}"))
 	var parsed: Variant = JSON.parse_string(raw_payload)
-	return parsed as Dictionary if parsed is Dictionary else {}
+	return SaveGame.as_dict(parsed)
 
 
 func write_storage(collection: String, key: String, value: Dictionary, permission_read: int = 1, permission_write: int = 1) -> bool:
@@ -504,12 +503,12 @@ func read_storage(collection: String, key: String, target_user_id: String = "") 
 	if not bool(res.get("ok", false)):
 		last_error = String(res.get("error", "Storage-Lesefehler"))
 		return {}
-	var objects: Array = (res.get("data", {}) as Dictionary).get("objects", []) as Array
-	if objects.is_empty():
+	var objects: Array = SaveGame.as_array(SaveGame.as_dict(res.get("data")).get("objects"))
+	if objects.is_empty() or not (objects[0] is Dictionary):
 		return {}
 	var first: Dictionary = objects[0] as Dictionary
 	var parsed: Variant = JSON.parse_string(String(first.get("value", "{}")))
-	return parsed as Dictionary if parsed is Dictionary else {}
+	return SaveGame.as_dict(parsed)
 
 
 func save_player_profile(player_data: Dictionary) -> bool:
@@ -525,7 +524,7 @@ func save_world_state(world_data: Dictionary) -> bool:
 	var day_val: int = int(world_data.get("day", 0))
 	var time_val: float = float(world_data.get("time", 0.0))
 	var saved_val: int = int(world_data.get("saved_at", int(Time.get_unix_time_from_system())))
-	var player_data: Dictionary = world_data.get("player", {}) as Dictionary
+	var player_data: Dictionary = SaveGame.as_dict(world_data.get("player"))
 	var wrapped: Dictionary = {
 		"version": SaveGame.VERSION,
 		"day": day_val,
@@ -605,12 +604,12 @@ func load_cloud_into(tree: SceneTree, resume: bool = true) -> bool:
 	if player == null:
 		return false
 	var pdata: Dictionary = await load_player_profile()
-	if not pdata.is_empty():
-		_remember_solo_preserve(pdata)
-		SaveGame.import_player_data(player, pdata, true, true)
 	var wdata: Dictionary = await load_world_state()
 	if wdata.is_empty():
 		return false
+	if not pdata.is_empty():
+		_remember_solo_preserve(pdata)
+		SaveGame.import_player_data(player, pdata, true, true)
 	return SaveGame.import_world_data(tree, wdata, player, resume)
 
 
@@ -1041,7 +1040,7 @@ func fetch_notifications() -> Array[Dictionary]:
 	var res: Dictionary = await _request_json(HTTPClient.METHOD_GET, "/v2/notification?limit=20", "", true)
 	if not bool(res.get("ok", false)):
 		return notifications
-	var raw_list: Array = (res.get("data", {}) as Dictionary).get("notifications", []) as Array
+	var raw_list: Array = SaveGame.as_array(SaveGame.as_dict(res.get("data")).get("notifications"))
 	var out: Array[Dictionary] = []
 	for item: Variant in raw_list:
 		if not (item is Dictionary):
@@ -1077,7 +1076,7 @@ func delete_notification(notif_id: String) -> void:
 func dismiss_local_notifications_for_requester(requester_user_id: String) -> void:
 	var kept: Array[Dictionary] = []
 	for n: Dictionary in notifications:
-		var c: Dictionary = n.get("content", {}) as Dictionary
+		var c: Dictionary = SaveGame.as_dict(n.get("content"))
 		if int(n.get("code", 0)) == 102 and String(c.get("requester_user_id", "")) == requester_user_id:
 			var nid: String = String(n.get("id", ""))
 			if not nid.is_empty():
@@ -1123,7 +1122,10 @@ func _request_json(method: HTTPClient.Method, path: String, body: String, use_be
 		hc.poll()
 		if Time.get_ticks_msec() > deadline_ms:
 			return {"ok": false, "error": "Timeout beim Verbinden mit Nakama"}
-		await get_tree().process_frame
+		var tree_conn: SceneTree = get_tree()
+		if tree_conn == null:
+			return {"ok": false, "error": "Szene geschlossen"}
+		await tree_conn.process_frame
 
 	if hc.get_status() != HTTPClient.STATUS_CONNECTED:
 		return {"ok": false, "error": "Nakama nicht erreichbar (Status %d)" % hc.get_status()}
@@ -1146,7 +1148,10 @@ func _request_json(method: HTTPClient.Method, path: String, body: String, use_be
 		hc.poll()
 		if Time.get_ticks_msec() > deadline_ms:
 			return {"ok": false, "error": "Timeout bei Anfrage an Nakama"}
-		await get_tree().process_frame
+		var tree_req: SceneTree = get_tree()
+		if tree_req == null:
+			return {"ok": false, "error": "Szene geschlossen"}
+		await tree_req.process_frame
 
 	if not hc.has_response():
 		return {"ok": false, "error": "Keine Antwort von Nakama (Status %d)" % hc.get_status()}
@@ -1157,8 +1162,13 @@ func _request_json(method: HTTPClient.Method, path: String, body: String, use_be
 		hc.poll()
 		var chunk: PackedByteArray = hc.read_response_body_chunk()
 		if chunk.is_empty():
-			await get_tree().process_frame
+			var tree_body: SceneTree = get_tree()
+			if tree_body == null:
+				return {"ok": false, "error": "Szene geschlossen"}
+			await tree_body.process_frame
 		else:
+			if chunks.size() + chunk.size() > SaveGame.MAX_CLOUD_WORLD_BYTES:
+				return {"ok": false, "error": "Antwort zu gross"}
 			chunks.append_array(chunk)
 		if Time.get_ticks_msec() > deadline_ms:
 			return {"ok": false, "error": "Timeout beim Lesen der Antwort"}
@@ -1258,8 +1268,8 @@ func _poll_notif_ws(delta: float) -> void:
 func _handle_ws_envelope(env: Dictionary) -> void:
 	if not env.has("notifications"):
 		return
-	var container: Dictionary = env.get("notifications", {}) as Dictionary
-	var raw_items: Array = container.get("notifications", []) as Array
+	var container: Dictionary = SaveGame.as_dict(env.get("notifications"))
+	var raw_items: Array = SaveGame.as_array(container.get("notifications"))
 	var changed: bool = false
 	for item: Variant in raw_items:
 		if not (item is Dictionary):

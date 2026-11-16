@@ -207,12 +207,12 @@ func is_blank() -> bool:
 
 
 func import_state(data: Dictionary) -> void:
-	var progress: Dictionary = data.get("progress", {}) as Dictionary
+	var progress: Dictionary = SaveGame.as_dict(data.get("progress"))
 	for id: Variant in progress:
 		var node: WorldTrial = _trials.get(String(id)) as WorldTrial
-		if node != null:
+		if node != null and progress[id] is Dictionary:
 			node.import_progress(progress[id] as Dictionary)
-	for id: Variant in data.get("solved", []) as Array:
+	for id: Variant in SaveGame.as_array(data.get("solved")):
 		_mark_solved(String(id))
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and not multiplayer.get_peers().is_empty() and NetworkManager.rpc_ready(self):
 		_rpc_snapshot.rpc(PackedStringArray(_solved.keys()), _progress())

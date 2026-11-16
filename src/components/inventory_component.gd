@@ -279,7 +279,7 @@ func import_hidden(saved: Dictionary) -> void:
 	hidden.clear()
 	for id: Variant in saved:
 		var rolls: Array = []
-		for r: Variant in saved[id] as Array:
+		for r: Variant in SaveGame.as_array(saved[id]):
 			if not DataRegistry.get_entry("items", String(r)).is_empty():
 				rolls.append(String(r))
 		hidden[String(id)] = rolls

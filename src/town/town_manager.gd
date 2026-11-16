@@ -3174,23 +3174,25 @@ func import_state(data: Dictionary) -> void:
 	founded = bool(data.get("founded", false))
 	fear_on = bool(data.get("fear", false))
 	brewed.clear()
-	var counts: Dictionary = data.get("brewed", {}) as Dictionary
-	for brew_key: String in counts:
-		brewed[brew_key] = int(counts[brew_key])
+	var counts: Dictionary = SaveGame.as_dict(data.get("brewed"))
+	for brew_key: Variant in counts:
+		brewed[String(brew_key)] = int(counts[brew_key])
 	alchemy_gift = bool(data.get("alchemy_gift", false))
 	name_index = int(data.get("name", 0))
-	var look: Array = data.get("look", [0, 0]) as Array
+	var look: Array = SaveGame.as_array(data.get("look"))
 	look_color = int(look[0]) if look.size() > 1 else 0
 	look_emblem = int(look[1]) if look.size() > 1 else 0
-	var middle: Array = data.get("center", [0, 0]) as Array
-	center = Vector2(float(middle[0]), float(middle[1]))
+	var middle: Array = SaveGame.as_array(data.get("center"))
+	center = Vector2(float(middle[0]), float(middle[1])) if middle.size() >= 2 else Vector2.ZERO
 	founded_day = int(data.get("day", 0))
 	next_id = int(data.get("next_id", 1))
-	var saved: Dictionary = data.get("structures", {}) as Dictionary
-	for key: String in saved:
+	var saved: Dictionary = SaveGame.as_dict(data.get("structures"))
+	for key: Variant in saved:
+		if not (saved[key] is Dictionary):
+			continue
 		var entry: Dictionary = saved[key] as Dictionary
 		var sid: int = int(key)
-		structures[sid] = {"p": String(entry.p), "x": float(entry.x), "y": float(entry.y), "f": int(entry.get("f", 0)), "g": int(entry.get("g", PROGRESS_FULL)), "b": int(entry.get("b", founded_day))}
+		structures[sid] = {"p": String(entry.get("p", "")), "x": float(entry.get("x", 0.0)), "y": float(entry.get("y", 0.0)), "f": int(entry.get("f", 0)), "g": int(entry.get("g", PROGRESS_FULL)), "b": int(entry.get("b", founded_day))}
 		var dest: Dictionary = structures[sid] as Dictionary
 		if int(entry.get("lv", 1)) > 1:
 			dest["lv"] = int(entry.lv)
@@ -3203,32 +3205,36 @@ func import_state(data: Dictionary) -> void:
 		elif dest.has("ug"):
 			_progress[sid] = float(dest.ug)
 	if data.has("stock_slots"):
-		box.import_slots(data.get("stock_slots", []) as Array)
+		box.import_slots(SaveGame.as_array(data.get("stock_slots")))
 	else: ## an older save: item -> count
-		var items: Dictionary = data.get("stock", {}) as Dictionary
-		for item: String in items:
-			box.add_item(item, int(items[item]))
+		var items: Dictionary = SaveGame.as_dict(data.get("stock"))
+		for item: Variant in items:
+			box.add_item(String(item), int(items[item]))
 	_refresh_stock()
-	for cell: Variant in data.get("cleared", []) as Array:
-		cleared[Vector2i(int((cell as Array)[0]), int((cell as Array)[1]))] = true
-	for way: Variant in data.get("paths", []) as Array:
-		var entry: Dictionary = way as Dictionary
-		paths.append({"s": int(entry.s), "p": (entry.p as Array).duplicate(true), "d": int(entry.get("d", 1)), "e": int(entry.get("e", 0))})
-	for entry: Variant in data.get("orders", []) as Array:
-		var e: Dictionary = entry as Dictionary
-		orders.append(_clean_order(e))
-	var people: Dictionary = data.get("residents", {}) as Dictionary
-	for sid: String in people:
+	for cell: Variant in SaveGame.as_array(data.get("cleared")):
+		if cell is Array and (cell as Array).size() >= 2:
+			cleared[Vector2i(int((cell as Array)[0]), int((cell as Array)[1]))] = true
+	for way: Variant in SaveGame.as_array(data.get("paths")):
+		if way is Dictionary:
+			var entry: Dictionary = way as Dictionary
+			paths.append({"s": int(entry.get("s", 0)), "p": SaveGame.as_array(entry.get("p")).duplicate(true), "d": int(entry.get("d", 1)), "e": int(entry.get("e", 0))})
+	for entry: Variant in SaveGame.as_array(data.get("orders")):
+		if entry is Dictionary:
+			orders.append(_clean_order(entry as Dictionary))
+	var people: Dictionary = SaveGame.as_dict(data.get("residents"))
+	for sid: Variant in people:
+		if not (people[sid] is Dictionary):
+			continue
 		var entry: Dictionary = people[sid] as Dictionary
-		residents[sid] = {"trust": int(entry.get("trust", 0)), "talked": int(entry.get("talked", -1)), "gifted": int(entry.get("gifted", -1))}
-	for what: Variant in data.get("unlocks", []) as Array:
+		residents[String(sid)] = {"trust": int(entry.get("trust", 0)), "talked": int(entry.get("talked", -1)), "gifted": int(entry.get("gifted", -1))}
+	for what: Variant in SaveGame.as_array(data.get("unlocks")):
 		unlocks[String(what)] = true
 	if farm != null:
-		farm.import_state(data.get("farm", {}) as Dictionary)
+		farm.import_state(SaveGame.as_dict(data.get("farm")))
 	if board != null:
-		board.import_state(data.get("board", {}) as Dictionary)
+		board.import_state(SaveGame.as_dict(data.get("board")))
 	if caravan != null:
-		caravan.import_state(data.get("caravan", {}) as Dictionary)
+		caravan.import_state(SaveGame.as_dict(data.get("caravan")))
 	_apply_all()
 
 

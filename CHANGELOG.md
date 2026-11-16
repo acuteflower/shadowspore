@@ -5,6 +5,7 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 ---
 
 ## [V0.9.4 Beta] – 2026-11-16
+<<<<<<< HEAD
 ### 🛠️ Cloud-Save-Hotfix, Coercion-Schutz & Relay-Stabilität
 
 > *Behebt den stummen Release-Absturz nach „Spiel fortsetzen“ sowie fehlerhafte RPC-Spams bei Verbindungsaufbau oder -verlust.*
@@ -12,6 +13,35 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 * **🟣 FIX – Cloud-Save-Crash bei „Spiel fortsetzen“ behoben:** Leere Lua-Tables in gespeicherten Cloud-Profilen (`[]` statt `{}`) werden beim Laden in allen Save- und Welt-Importern sicher umgewandelt – kein Release-Absturz (`0xc0000005`) mehr bei abgeschlossenen oder leeren Quest-/Inventar-/Weltfeldern.
 * **🟣 FIX – Saubere RPC- & Relay-Absicherung:** Snapshot-, Zeit- und Wildtier-RPCs warten sauber auf eine aktive `CONNECTION_CONNECTED`-Verbindung; ein abgebrochener Host-Relay fällt automatisch auf `OfflineMultiplayerPeer` zurück.
 * **🟣 FIX – Base64- & Karten-Schutz:** Leere `map`-Daten und ungültige Base64-Payloads werden ohne Dekompressions- oder Engine-Fehler abgefangen.
+=======
+### 🛡️ Cloud-Save-Härtung & Relay-Stabilität: Sichere Spielstand-Wiederherstellung, Relay-Schutz & Wildtier-Fixes
+
+![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
+
+> *Ein gezieltes Stabilitäts-Update unter der Haube: Cloud-Spielstände werden über alle Weltsysteme hinweg fehlerfrei wiederhergestellt und das Online-Relay fängt Verbindungsabbrüche sicher ab.*
+
+> [!IMPORTANT]
+> **Maximale Verlässlichkeit für Cloud-Welten & Online-Koop!**
+> V0.9.4 Beta räumt tiefgreifend bei der **Wiederherstellung von Cloud-Spielständen** und beim **Online-Relay** auf: Jeder Welt-, Charakter- und Stadtzustand wird beim Laden aus der Cloud sauber konvertiert, fehlerhafte Pakete werden sicher abgefangen, und bei Verbindungsabbrüchen fällt der Host kontrolliert zurück, ohne den Spielstand zu gefährden.
+
+---
+
+### 🛡️ Cloud-Save-Stabilität & Kompressions-Schutz
+
+* **🟡 FIX – Sichere Wiederherstellung aller Weltsysteme:** Beim Laden von Cloud-Spielständen werden Zahlen-, Listen- und Tabellendaten über sämtliche Systeme hinweg sauber umgewandelt – darunter Inventar, Quests, Skillbaum, Aussehen, Haustiere, Boss-Relikte, Sternensaal, Schatztruhen, Weltkarten-Entdeckung, Aussichtspunkte, Wegsteine, Dorfbrett, Karawane, Ackerbau, Stadtbau, Mine, Wüste, Wiesen-Sehenswürdigkeiten & Weltwunder, Wetter und Tageszeit.
+* **🟡 FIX – Fehlerhafte Speicherdaten abfangen:** Beschädigte oder ungültig komprimierte Spielstand-Pakete werden sauber abgewiesen, statt Abstürze auszulösen.
+
+---
+
+### 🌐 Online-Relay- & Welt-Stabilität
+
+* **🟡 FIX – Sicherer Relay-Verbindungsaufbau:** Netzwerk-Synchronisationen greifen erst dann, wenn die Verbindung vollständig steht; während des Verbindungsaufbaus oder bei leeren Server-Tabellen bleiben alle Welt-Importe absturzfrei.
+* **🟡 FIX – Saubere Host-Erholung bei Abbruch:** Bricht das Online-Relay unerwartet ab, wechselt der Host kontrolliert in den sicheren Offline-Zustand zurück, sodass die Welt weiterläuft.
+* **🟡 FIX – Wildtiere & Navigation:** Kleinere Stabilitäts-Korrekturen bei Wildtieren (Schmetterlinge, Kleintiere, Vögel, Kaninchen, Waldsäuger) und Gegner-Navigation sowie aktualisierte Website- & Update-Daten.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Ein ruhiges, wichtiges Fundament-Update für sichere Spielstände und stabile Online-Abenteuer – viel Spaß mit V0.9.4 Beta!*
+>>>>>>> 4c300e4b4949e9ecf40877e387dee9d4c74c69f8
 
 ---
 

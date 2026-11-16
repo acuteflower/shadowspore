@@ -943,7 +943,8 @@ func _host_found() -> void:
 	structures[0] = {"p": "house", "x": center.x, "y": center.y, "f": 0, "g": PROGRESS_FULL, "b": TimeManager.day}
 	_circles_dirty = true
 	_apply_all()
-	_rpc_snapshot.rpc(export_state(true))
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_rpc_snapshot.rpc(export_state(true))
 	town_founded.emit()
 
 

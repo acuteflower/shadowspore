@@ -95,11 +95,22 @@ func _inspect(id: int) -> void:
 	if not states.has(key):
 		states[key] = {"inspected": true, "claimed": false}
 		_spawn_sword(id)
-		_clink.rpc()
-	_snapshot.rpc(states)
-	_owner_flag.rpc_id(id, "knight_inspected")
-	if bool((states[key] as Dictionary).get("claimed", false)):
-		_owner_flag.rpc_id(id, "knight_sword_taken")
+		if NetworkManager.rpc_ready(self):
+			_clink.rpc()
+		else:
+			_clink()
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_snapshot.rpc(states)
+	else:
+		_snapshot(states)
+	if NetworkManager.rpc_ready(self):
+		_owner_flag.rpc_id(id, "knight_inspected")
+		if bool((states[key] as Dictionary).get("claimed", false)):
+			_owner_flag.rpc_id(id, "knight_sword_taken")
+	elif id == multiplayer.get_unique_id():
+		_owner_flag("knight_inspected")
+		if bool((states[key] as Dictionary).get("claimed", false)):
+			_owner_flag("knight_sword_taken")
 
 func _spawn_sword(id: int) -> void:
 	var parent: Node = _world.get_node("Drops")
@@ -116,8 +127,14 @@ func _spawn_sword(id: int) -> void:
 func sword_taken(id: int) -> void:
 	if not multiplayer.is_server() or not states.has(str(id)): return
 	(states[str(id)] as Dictionary)["claimed"] = true
-	_snapshot.rpc(states)
-	_owner_flag.rpc_id(id, "knight_sword_taken")
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_snapshot.rpc(states)
+	else:
+		_snapshot(states)
+	if NetworkManager.rpc_ready(self):
+		_owner_flag.rpc_id(id, "knight_sword_taken")
+	elif id == multiplayer.get_unique_id():
+		_owner_flag("knight_sword_taken")
 
 @rpc("authority", "call_local", "reliable")
 func _snapshot(data: Dictionary) -> void:
@@ -140,7 +157,8 @@ func import_data(data: Dictionary) -> void:
 	for key: Variant in states:
 		if states[key] is Dictionary and not bool((states[key] as Dictionary).get("claimed", false)):
 			_spawn_sword(int(key))
-	_snapshot.rpc(states)
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_snapshot.rpc(states)
 
 
 @rpc("authority", "call_local", "reliable")

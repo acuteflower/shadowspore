@@ -9,8 +9,8 @@ local OP_CONTROL = 10
 local PROFILE_COLLECTION = "public_profile"
 local PROFILE_KEY = "info"
 local EMPTY_MATCH_TICKS_LIMIT = 300 -- 5 ticks/sec -> 60s grace before empty match auto-closes
-local MAX_PACKET_BYTES = 262144
-local MAX_PACKETS_PER_SEC = 1500
+local MAX_PACKET_BYTES = 1048576
+local MAX_PACKETS_PER_SEC = 3000
 
 local function decode_i32_le(data)
     local b1, b2, b3, b4 = string.byte(data, 1, 4)

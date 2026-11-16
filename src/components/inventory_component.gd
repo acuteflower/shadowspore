@@ -27,7 +27,7 @@ func _ready() -> void:
 	if multiplayer.is_server():
 		_give_loadout() ## no push yet: the owner's node may not exist; it asks for the state itself
 		changed.emit()
-	elif is_multiplayer_authority():
+	elif is_multiplayer_authority() and NetworkManager.rpc_ready(self):
 		_rpc_request_state.rpc_id(1) ## the host may spawn us before our node existed, so ask
 
 
@@ -52,8 +52,10 @@ func select(index: int) -> void:
 	selected = index
 	if multiplayer.is_server():
 		_commit()
-	else:
+	elif NetworkManager.rpc_ready(self):
 		_rpc_request.rpc_id(1, "select", [index, 0])
+		changed.emit()
+	else:
 		changed.emit()
 
 
@@ -87,7 +89,7 @@ func close_box() -> void:
 func request(op: String, args: Array) -> void:
 	if multiplayer.is_server():
 		_apply(op, args)
-	else:
+	elif NetworkManager.rpc_ready(self):
 		_rpc_request.rpc_id(1, op, args)
 
 
@@ -363,7 +365,7 @@ func _commit() -> void:
 	if box != null and multiplayer.is_server():
 		box.touch() ## the box's owner syncs it to every peer
 	var owner_id: int = get_multiplayer_authority()
-	if owner_id != multiplayer.get_unique_id():
+	if owner_id != multiplayer.get_unique_id() and NetworkManager.rpc_ready(self):
 		_rpc_state.rpc_id(owner_id, {"slots": slots, "equipment": equipment, "held": held, "hidden": hidden})
 
 

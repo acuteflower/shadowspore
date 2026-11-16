@@ -1699,6 +1699,22 @@ local function rpc_game_heartbeat(context, payload)
         })
     end
 
+    if not is_debug then
+        local sess_sha = tostring(sess.exe_sha256 or "")
+        local hash_ok, hash_err = verify_exe_hash_allowed(sess_sha)
+        if not hash_ok then
+            pcall(record_security_event, context.user_id, "EXE_HASH_OUTDATED_MIDGAME",
+                sess_sha:sub(1, 16) .. " nonce=" .. nonce:sub(1, 16), "warn")
+            invalidate_user_online_state(context.user_id)
+            return nk.json_encode({
+                ok = false,
+                kick = true,
+                code = "BUILD_OUTDATED",
+                error = hash_err
+            })
+        end
+    end
+
     local prev_server = tonumber(sess.last_heartbeat_at or now) or now
     local prev_uptime = tonumber(sess.client_uptime_sec or 0) or 0
     local client_uptime = tonumber(req.client_uptime_sec or prev_uptime) or prev_uptime

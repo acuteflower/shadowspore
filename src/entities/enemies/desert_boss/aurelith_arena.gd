@@ -137,6 +137,8 @@ func setup(p_world: WorldLevel) -> Dictionary:
 
 func _ready() -> void:
 	if multiplayer != null and multiplayer.has_multiplayer_peer() and not multiplayer.is_server():
+		if not multiplayer.connected_to_server.is_connected(_ask_host):
+			multiplayer.connected_to_server.connect(_ask_host)
 		_ask_host.call_deferred()
 
 
@@ -1522,7 +1524,8 @@ func _rpc_stage(next: int, seal: bool, p_killed: int, slot_mask: int) -> void:
 
 
 func _ask_host() -> void:
-	_ask_state.rpc_id(1)
+	if not multiplayer.is_server() and NetworkManager.rpc_ready(self):
+		_ask_state.rpc_id(1)
 
 
 @rpc("any_peer", "call_remote", "reliable")

@@ -422,7 +422,7 @@ func import_state(data: Dictionary) -> void:
 		_payload[bid] = SaveGame.as_dict(entry.get("load"))
 		_spawned[bid] = [String(entry.get("tier", "legendary")), where, false]
 		place(bid, String(entry.get("tier", "legendary")), where)
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
 		_rpc_snapshot.rpc(_spawned_list(), ids)
 
 

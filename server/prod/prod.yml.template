@@ -11,6 +11,7 @@ session:
 socket:
   server_key: "__SOCKET_SERVER_KEY__"
   port: 7350
+  max_message_size_bytes: 1048576
 
 console:
   port: 7351

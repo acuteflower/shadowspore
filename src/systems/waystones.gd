@@ -157,5 +157,5 @@ func import_state(data: Dictionary) -> void:
 	for id: Variant in SaveGame.as_array(data.get("awake")):
 		ids.append(String(id))
 	_apply_awake(ids)
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
 		_rpc_snapshot.rpc(ids)

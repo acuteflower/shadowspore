@@ -183,6 +183,7 @@ if (-not $SkipGame) {
         $authObj = [ordered]@{
             server_url = "https://s.shadowspore.com"
             server_key = $effectiveServerKey
+            version    = $Version
         }
         [System.IO.File]::WriteAllText($buildAuthPath, ($authObj | ConvertTo-Json -Depth 2) + "`n", [System.Text.UTF8Encoding]::new($false))
 

@@ -66,7 +66,8 @@ func _ready() -> void:
 		_player.inventory.socketed.connect(_on_socketed)
 		_host_refresh.call_deferred()
 	else:
-		_rpc_request_state.rpc_id(SENDER_HOST)
+		if NetworkManager.rpc_ready(self):
+			_rpc_request_state.rpc_id(SENDER_HOST)
 
 
 func _process(delta: float) -> void:

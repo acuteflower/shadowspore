@@ -58,7 +58,7 @@ func _ready() -> void:
 		_sprite.hframes = int(_spec.cols)
 		_sprite.vframes = int(_spec.builds) * 8
 		_sprite.offset = -Vector2(float(_spec.feet[0]), float(_spec.feet[1]))
-	if not multiplayer.is_server(): _request.rpc_id(1)
+	if not multiplayer.is_server() and NetworkManager.rpc_ready(self): _request.rpc_id(1)
 
 func _physics_process(delta: float) -> void:
 	_elapsed += delta

@@ -264,8 +264,23 @@ static func compress_json(data: Dictionary) -> String:
 	return Marshalls.raw_to_base64(compressed)
 
 
+static func _is_valid_base64(encoded: String) -> bool:
+	var n: int = encoded.length()
+	if n == 0 or (n % 4) != 0:
+		return false
+	for i: int in n:
+		var c: int = encoded.unicode_at(i)
+		var ok_char: bool = (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 43 or c == 47
+		if ok_char:
+			continue
+		if c == 61 and i >= n - 2 and (i == n - 1 or encoded.unicode_at(n - 1) == 61):
+			continue
+		return false
+	return true
+
+
 static func decompress_json(encoded: String) -> Dictionary:
-	if encoded.is_empty():
+	if not _is_valid_base64(encoded):
 		return {}
 	var compressed: PackedByteArray = Marshalls.base64_to_raw(encoded)
 	if compressed.is_empty():

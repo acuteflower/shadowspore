@@ -29,7 +29,7 @@ func _continue_boot() -> void:
 		return
 	var request: Dictionary = GameLauncher.take()
 	if request.is_empty():
-		request = GameLauncher.from_args(OS.get_cmdline_user_args())
+		request = GameLauncher.take_boot_args()
 	if request.is_empty():
 		add_child(MainMenu.new())
 		return

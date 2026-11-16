@@ -29,6 +29,7 @@ var _last_ticks_msec: int = 0
 var _heartbeat_timer: float = HEARTBEAT_INTERVAL_SEC
 var _grace_retry_timer: float = GRACE_RETRY_INTERVAL_SEC
 var _heartbeat_in_flight: bool = false
+var _version_check_in_flight: bool = false
 var _paused_by_guard: bool = false
 var _ui_blocked_by_guard: bool = false
 var _grace_emit_accum: float = 0.0
@@ -172,7 +173,7 @@ func _leave_world_if_needed() -> void:
 	NetworkManager.leave()
 	var world: Node = tree.get_first_node_in_group("world")
 	if world != null or tree.get_first_node_in_group("sandbox") != null:
-		GameLauncher.launch(tree, {})
+		GameLauncher.launch(tree, {"to_menu": true, "skip_autosave": true})
 
 
 func _process(delta: float) -> void:
@@ -248,6 +249,81 @@ func _send_heartbeat_now(explicit_flag: String) -> void:
 	var debug_sess: bool = OS.is_debug_build() and session_nonce.begins_with("DEV-")
 	var res: Dictionary = await CloudSession.send_game_heartbeat(session_nonce, uptime_sec, tamper_flag, debug_sess)
 	_heartbeat_in_flight = false
+	if String(res.get("code", "")) == "BUILD_OUTDATED":
+		await _kick_outdated_with_save(String(res.get("error", "Veraltete Shadowspore.exe. Bitte Launcher-Update ausfuehren.")))
+		return
+	handle_heartbeat_result(res)
+	if bool(res.get("ok", false)) and not locked and is_strict_mode() and not OS.is_debug_build():
+		_check_live_manifest_version()
+
+
+func _check_live_manifest_version() -> void:
+	if _version_check_in_flight or locked or not CloudSession.is_logged_in():
+		return
+	var local_ver: String = CloudSession.local_game_version()
+	if local_ver.is_empty():
+		return
+	_version_check_in_flight = true
+	var manifest: Dictionary = await CloudSession.fetch_update_manifest()
+	_version_check_in_flight = false
+	if locked or manifest.is_empty():
+		return
+	var remote_ver: String = String(manifest.get("version", "")).strip_edges()
+	if not is_version_newer(remote_ver, local_ver):
+		return
+	var remote_sha: String = String(manifest.get("exe_sha256", "")).strip_edges().to_lower()
+	var self_sha: String = compute_self_exe_sha256()
+	if not remote_sha.is_empty() and not self_sha.is_empty() and remote_sha == self_sha:
+		return
+	await _kick_outdated_with_save("Neue Version v%s verfuegbar. Bitte Launcher-Update ausfuehren." % remote_ver)
+
+
+func _kick_outdated_with_save(reason: String) -> void:
+	if locked:
+		return
+	var tree: SceneTree = get_tree()
+	if tree != null and CloudSession.is_logged_in() and not CloudSession.banned and CloudSession._in_playable_world(tree):
+		await CloudSession.flush_cloud_save_now(tree, CloudSession.QUIT_FLUSH_TIMEOUT_MSEC)
+	handle_heartbeat_result({
+		"ok": false,
+		"kick": true,
+		"code": "BUILD_OUTDATED",
+		"error": reason,
+	})
+
+
+static func is_version_newer(remote_ver: String, local_ver: String) -> bool:
+	var r_parts: PackedInt32Array = _parse_semver(remote_ver)
+	var l_parts: PackedInt32Array = _parse_semver(local_ver)
+	if r_parts.is_empty() or l_parts.is_empty():
+		return false
+	var count: int = maxi(r_parts.size(), l_parts.size())
+	for i: int in count:
+		var rv: int = r_parts[i] if i < r_parts.size() else 0
+		var lv: int = l_parts[i] if i < l_parts.size() else 0
+		if rv != lv:
+			return rv > lv
+	return false
+
+
+static func _parse_semver(raw: String) -> PackedInt32Array:
+	var clean: String = raw.strip_edges()
+	if clean.begins_with("v") or clean.begins_with("V"):
+		clean = clean.substr(1)
+	var dash_idx: int = clean.find("-")
+	if dash_idx >= 0:
+		clean = clean.substr(0, dash_idx)
+	if clean.is_empty():
+		return PackedInt32Array()
+	var out := PackedInt32Array()
+	for seg: String in clean.split("."):
+		if not seg.is_valid_int():
+			return PackedInt32Array()
+		out.append(seg.to_int())
+	return out
+
+
+func handle_heartbeat_result(res: Dictionary) -> void:
 	if locked:
 		return
 	if bool(res.get("ok", false)):
@@ -255,7 +331,9 @@ func _send_heartbeat_now(explicit_flag: String) -> void:
 			_exit_reconnect_grace()
 		return
 	if bool(res.get("kick", false)):
-		_block("SITZUNG BEENDET",
+		var code: String = String(res.get("code", ""))
+		var title: String = "NEUE VERSION ERFORDERLICH" if code == "BUILD_OUTDATED" else "SITZUNG BEENDET"
+		_block(title,
 			String(res.get("error", "Deine Online-Sitzung wurde beendet.")),
 			false)
 		return

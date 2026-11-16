@@ -41,6 +41,8 @@ var _peer_tickets: Dictionary = {} ## server-side peer -> pending ENet identity 
 var _pending_ticket: Dictionary = {} ## guest pre-fetched ticket {"ticket", "user_id", "uid", "display_name"}
 var _roster: Array[Dictionary] = [] ## synced list of {"id": int, "name": String, "is_host": bool, "slot": int, "uid": String}
 var _pending_join_code: String = ""
+var _pending_enet_addr: String = ""
+var _pending_enet_port: int = DEFAULT_PORT
 var _last_join_address: String = ""
 var _last_join_port: int = DEFAULT_PORT
 var _client_saw_challenge: bool = false
@@ -50,6 +52,77 @@ var _heartbeat_timer: float = 0.0
 var _session_is_guest: bool = false
 var _handling_server_disconnect: bool = false
 var explicit_coop_hud: bool = false
+
+
+## Client placeholder peer while WorldLevel runs stepped init: keeps `multiplayer.is_server() == false`
+## and `rpc_ready == false` without opening sockets before child nodes exist.
+class _PendingClientPeer extends MultiplayerPeerExtension:
+	var _status: MultiplayerPeer.ConnectionStatus = MultiplayerPeer.CONNECTION_CONNECTING
+	var _transfer_channel: int = 0
+	var _transfer_mode: MultiplayerPeer.TransferMode = MultiplayerPeer.TRANSFER_MODE_RELIABLE
+
+	func _get_packet_script() -> PackedByteArray:
+		return PackedByteArray()
+
+	func _put_packet_script(_p_buffer: PackedByteArray) -> Error:
+		return ERR_UNCONFIGURED
+
+	func _get_available_packet_count() -> int:
+		return 0
+
+	func _get_max_packet_size() -> int:
+		return 1024
+
+	func _get_packet_channel() -> int:
+		return 0
+
+	func _get_packet_mode() -> TransferMode:
+		return _transfer_mode
+
+	func _set_transfer_channel(p_channel: int) -> void:
+		_transfer_channel = clampi(p_channel, 0, 255)
+
+	func _get_transfer_channel() -> int:
+		return _transfer_channel
+
+	func _set_transfer_mode(p_mode: TransferMode) -> void:
+		_transfer_mode = p_mode
+
+	func _get_transfer_mode() -> TransferMode:
+		return _transfer_mode
+
+	func _set_target_peer(_p_peer: int) -> void:
+		pass
+
+	func _get_packet_peer() -> int:
+		return 0
+
+	func _is_server() -> bool:
+		return false
+
+	func _poll() -> void:
+		pass
+
+	func _close() -> void:
+		_status = MultiplayerPeer.CONNECTION_DISCONNECTED
+
+	func _disconnect_peer(_p_peer: int, _p_force: bool) -> void:
+		pass
+
+	func _get_unique_id() -> int:
+		return 0
+
+	func _set_refuse_new_connections(_p_enable: bool) -> void:
+		pass
+
+	func _is_refusing_new_connections() -> bool:
+		return false
+
+	func _is_server_relay_supported() -> bool:
+		return true
+
+	func _get_connection_status() -> ConnectionStatus:
+		return _status
 
 
 func _ready() -> void:
@@ -67,10 +140,21 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
 	if is_coop_session() and (peer == null or peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED):
-		if not is_local_coop_guest() and not GameLauncher.is_transitioning():
-			last_join_error = (peer as RelayPeer).last_error if peer is RelayPeer else ""
-			leave(false)
+		if _handling_server_disconnect or GameLauncher.is_join_handshake_active() or GameLauncher.is_transitioning():
 			return
+		var relay_peer: RelayPeer = peer as RelayPeer
+		var forced_reason: String = relay_peer.forced_disconnect_reason if relay_peer != null else ""
+		var err_reason: String = relay_peer.last_error if relay_peer != null and not relay_peer.last_error.is_empty() else last_join_error
+		var allow_save: bool = forced_reason != "DEIN KONTO WURDE GESPERRT"
+		if is_local_coop_guest():
+			_force_return_to_menu(err_reason, false, allow_save)
+			return
+		if not forced_reason.is_empty():
+			_force_return_to_menu(forced_reason, true, allow_save)
+			return
+		last_join_error = err_reason
+		leave(false)
+		return
 	if not is_multiplayer_session():
 		return
 	if peer == null or peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
@@ -137,7 +221,7 @@ static func rpc_ready(node: Node) -> bool:
 
 func is_coop_session() -> bool:
 	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
-	return peer is ENetMultiplayerPeer or peer is RelayPeer
+	return peer is ENetMultiplayerPeer or peer is RelayPeer or peer is _PendingClientPeer
 
 
 func is_offline() -> bool:
@@ -321,17 +405,18 @@ func _on_connection_failed() -> void:
 
 func _on_server_disconnected() -> void:
 	var was_guest: bool = is_local_coop_guest()
-	var relay_err: String = ""
-	if multiplayer.multiplayer_peer is RelayPeer:
-		relay_err = (multiplayer.multiplayer_peer as RelayPeer).last_error
+	var relay_peer: RelayPeer = multiplayer.multiplayer_peer as RelayPeer
+	var relay_err: String = relay_peer.last_error if relay_peer != null else ""
+	var forced_reason: String = relay_peer.forced_disconnect_reason if relay_peer != null else ""
 	last_join_error = relay_err if not relay_err.is_empty() else "VERBINDUNG ZUM HOST VERLOREN"
 	join_rejected.emit(last_join_error)
 	session_changed.emit()
-	_handle_unexpected_disconnect_in_world(was_guest, last_join_error)
+	if was_guest:
+		_force_return_to_menu(last_join_error, false, forced_reason != "DEIN KONTO WURDE GESPERRT")
 
 
-func _handle_unexpected_disconnect_in_world(was_guest: bool, reason: String) -> void:
-	if _handling_server_disconnect or not was_guest or GameLauncher.is_join_handshake_active() or GameLauncher.is_transitioning():
+func _force_return_to_menu(reason: String, include_world_save: bool, allow_cloud_save: bool) -> void:
+	if _handling_server_disconnect or GameLauncher.is_join_handshake_active() or GameLauncher.is_transitioning():
 		return
 	var tree: SceneTree = get_tree()
 	if tree == null or tree.get_first_node_in_group("sandbox") != null:
@@ -340,18 +425,20 @@ func _handle_unexpected_disconnect_in_world(was_guest: bool, reason: String) -> 
 	if world == null or not is_instance_valid(world):
 		return
 	_handling_server_disconnect = true
-	CloudSession.capture_live_snapshot(tree, false, 0)
 	var saved_ok: bool = false
-	if CloudSession.is_logged_in() and not CloudSession.banned and not GameGuard.locked:
-		saved_ok = await CloudSession.flush_cloud_save_now(tree, CloudSession.QUIT_FLUSH_TIMEOUT_MSEC)
+	if allow_cloud_save and CloudSession.is_logged_in() and not CloudSession.banned and not GameGuard.locked:
+		var force_srv: int = 1 if include_world_save else 0
+		if CloudSession.capture_live_snapshot(tree, include_world_save, force_srv):
+			saved_ok = await CloudSession.flush_cloud_save_now(tree, CloudSession.QUIT_FLUSH_TIMEOUT_MSEC)
 	if not is_instance_valid(tree):
 		_handling_server_disconnect = false
 		return
+	leave(false)
 	var banner: String = reason if not reason.is_empty() else "VERBINDUNG ZUM HOST VERLOREN"
 	if saved_ok:
-		banner += " · CHARAKTER GESICHERT"
+		banner += " · WELT GESICHERT" if include_world_save else " · CHARAKTER GESICHERT"
 	GameLauncher.menu_return = {"page": "main", "error": banner}
-	GameLauncher.launch(tree, {"skip_autosave": true})
+	GameLauncher.launch(tree, {"to_menu": true, "skip_autosave": true})
 	_handling_server_disconnect = false
 
 
@@ -565,13 +652,15 @@ func host_relay(
 	return err
 
 
-func join(address: String, port: int = DEFAULT_PORT, code: String = "") -> Error:
+func join(address: String, port: int = DEFAULT_PORT, code: String = "", defer_connect: bool = false) -> Error:
 	var parsed: Dictionary = MultiplayerWorlds.parse_address_port(address, port)
 	var clean_addr: String = String(parsed.get("address", "127.0.0.1"))
 	var clean_port: int = int(parsed.get("port", port))
 	_clear_session()
 	transport_mode = "enet"
 	_pending_join_code = MultiplayerWorlds.normalize_code(code)
+	_pending_enet_addr = clean_addr
+	_pending_enet_port = clean_port
 	_last_join_address = clean_addr
 	_last_join_port = clean_port
 	active_room_code = _pending_join_code
@@ -579,6 +668,13 @@ func join(address: String, port: int = DEFAULT_PORT, code: String = "") -> Error
 	_client_saw_challenge = false
 	_recent_recorded = false
 	last_join_error = ""
+	if defer_connect:
+		_session_is_guest = true
+		_guest_owners.clear()
+		(multiplayer as SceneMultiplayer).auth_callback = _authenticate
+		multiplayer.multiplayer_peer = _PendingClientPeer.new()
+		session_changed.emit()
+		return OK
 	var peer := ENetMultiplayerPeer.new()
 	var err: Error = peer.create_client(clean_addr, clean_port)
 	if err == OK:
@@ -592,7 +688,7 @@ func join(address: String, port: int = DEFAULT_PORT, code: String = "") -> Error
 	return err
 
 
-func join_relay(match_id: String, code: String = "", world_name: String = "KOOP-WELT") -> Error:
+func join_relay(match_id: String, code: String = "", world_name: String = "KOOP-WELT", defer_connect: bool = false) -> Error:
 	if match_id.is_empty() or not CloudSession.is_logged_in():
 		last_join_error = "NICHT EINGELOGGT ODER KEINE MATCH-ID"
 		return ERR_UNAUTHORIZED
@@ -605,7 +701,7 @@ func join_relay(match_id: String, code: String = "", world_name: String = "KOOP-
 	active_world_name = MultiplayerWorlds.sanitize_name(world_name, "KOOP-WELT")
 	last_join_error = ""
 	var peer: RelayPeer = RelayPeer.new() as RelayPeer
-	var err: Error = peer.start_client(CloudSession.server_url, CloudSession.token, match_id, active_room_code)
+	var err: Error = peer.start_client(CloudSession.server_url, CloudSession.token, match_id, active_room_code, defer_connect)
 	if err == OK:
 		_session_is_guest = true
 		(multiplayer as SceneMultiplayer).auth_callback = Callable()
@@ -615,6 +711,27 @@ func join_relay(match_id: String, code: String = "", world_name: String = "KOOP-
 		last_join_error = peer.last_error
 		_clear_session()
 	return err
+
+
+func connect_pending_guest() -> Error:
+	var peer: MultiplayerPeer = multiplayer.multiplayer_peer
+	if peer is RelayPeer:
+		var relay: RelayPeer = peer as RelayPeer
+		var rerr: Error = relay.begin_connect()
+		if rerr != OK:
+			last_join_error = relay.last_error if not relay.last_error.is_empty() else "RELAY-VERBINDUNG FEHLGESCHLAGEN"
+		return rerr
+	if peer is _PendingClientPeer:
+		var enet := ENetMultiplayerPeer.new()
+		var err: Error = enet.create_client(_pending_enet_addr, _pending_enet_port)
+		if err == OK:
+			(multiplayer as SceneMultiplayer).auth_callback = _authenticate
+			multiplayer.multiplayer_peer = enet
+			session_changed.emit()
+		else:
+			last_join_error = "UNGÜLTIGE ADRESSE ODER PORT"
+		return err
+	return OK
 
 
 func leave(close_remote_relay: bool = true) -> void:
@@ -665,6 +782,8 @@ func _clear_session() -> void:
 	active_port = DEFAULT_PORT
 	active_max_players = MAX_PLAYERS
 	_pending_join_code = ""
+	_pending_enet_addr = ""
+	_pending_enet_port = DEFAULT_PORT
 	_client_saw_challenge = false
 	_recent_recorded = false
 	_heartbeat_timer = 0.0

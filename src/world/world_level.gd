@@ -2177,6 +2177,8 @@ var _unload_queue: Array[Vector2i] = [] ## chunks waiting to be unloaded gradual
 
 func _process(delta: float) -> void:
 	super(delta)
+	if loading_in_steps or _rivers == null:
+		return
 	_stream(false)
 	_wood_clock -= delta
 	if _wood_clock <= 0.0:
@@ -2808,6 +2810,8 @@ func _finish_commit(deadline: int = 0) -> void:
 
 ## Frees a build that never became live (its things and logs are not in the tree; a committed node is queued unless immediate_free).
 func _free_build(build: ChunkBuild, immediate_free: bool = false) -> void:
+	if build == null:
+		return
 	if build.job != null and Jobs.cancel(build.job):
 		return ## a worker is (or was) busy with it: the discard hook frees it once the worker has let go
 	_free_build_nodes(build, immediate_free)
@@ -3906,17 +3910,19 @@ func editor_apply(data: Dictionary, broadcast: bool = true) -> void:
 	_discard_chunk_build()
 	var terrain_changed: bool = edits.terrain != data.get("terrain", {})
 	edits.assign(data)
-	if terrain_changed:
+	if terrain_changed and _relief != null:
 		_relief.editor_apply(edits.terrain)
-		_generator._cache.clear()
+		if _generator != null:
+			_generator._cache.clear()
 	_flower_cache.clear()
-	var loaded: Array = _chunks.keys()
-	for c: Vector2i in _chunks.keys():
-		_unload_chunk(c)
-	_flush_all_teardowns(false)
-	for c: Vector2i in loaded:
-		_load_chunk(c)
-	_stream(true)
+	if _rivers != null and _generator != null and is_inside_tree():
+		var loaded: Array = _chunks.keys()
+		for c: Vector2i in _chunks.keys():
+			_unload_chunk(c)
+		_flush_all_teardowns(false)
+		for c: Vector2i in loaded:
+			_load_chunk(c)
+		_stream(true)
 	if broadcast and multiplayer.is_server() and not multiplayer.get_peers().is_empty() and NetworkManager.rpc_ready(self):
 		_rpc_editor_snapshot.rpc(edits.data())
 

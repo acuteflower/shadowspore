@@ -13,7 +13,7 @@ var _learned: Array[String] = []
 
 
 func _ready() -> void:
-	if not multiplayer.is_server() and is_multiplayer_authority():
+	if not multiplayer.is_server() and is_multiplayer_authority() and NetworkManager.rpc_ready(self):
 		_request_state.rpc_id(1)
 
 

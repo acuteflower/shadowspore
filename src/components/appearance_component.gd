@@ -170,8 +170,11 @@ func _rpc_set_outfit(id: String) -> void:
 			set_outfit(id)
 
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func _rpc_apply_outfit(id: String) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != 1:
+		return
 	set_outfit(id)
 
 
@@ -190,18 +193,27 @@ func _rpc_set_hair(id: String) -> void:
 			set_hair(id)
 
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func _rpc_apply_hair(id: String) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != 1:
+		return
 	set_hair(id)
 
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func _rpc_apply_unlock(kind: String, id: String) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != 1:
+		return
 	_apply_unlock(kind, id)
 
 
-@rpc("authority", "call_local", "reliable")
+@rpc("any_peer", "call_local", "reliable")
 func _rpc_apply_all(data: Dictionary) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != 1:
+		return
 	import_data(data)
 
 

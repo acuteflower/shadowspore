@@ -542,7 +542,7 @@ static func quest_location(entry: Dictionary) -> Vector2:
 	if area != Vector3.INF:
 		return Vector2(area.x, area.y)
 	var target: Vector2 = entry.get("target", Vector2.INF) as Vector2
-	return target if target.x < Interiors.POCKET_X0 else Vector2.INF
+	return Interiors.to_world(target) ## a goal inside a room is shown at its door
 
 
 func open_quest_preview(entry: Dictionary) -> void:
@@ -904,9 +904,12 @@ func _draw_town(fade: float) -> void:
 
 ## The goal of the current quest: a golden bloom with rings that open outwards, a stem and its name; off screen a chevron at the edge points to it.
 func _draw_quest(now: Dictionary, fade: float) -> void:
-	if now.is_empty() or (now.target as Vector2) == Vector2.INF or (now.target as Vector2).x >= Interiors.POCKET_X0:
+	if now.is_empty():
 		return
-	var at: Vector2 = _to_screen((now.target as Vector2) / 16.0)
+	var goal: Vector2 = Interiors.to_world(now.target as Vector2) ## a goal inside a room is shown at its door
+	if goal == Vector2.INF:
+		return
+	var at: Vector2 = _to_screen(goal / 16.0)
 	if float(now.get("search", 0.0)) > 0.0:
 		_draw_search(at, float(now.search) * _scale, fade)
 	if not _on_screen(at, 4.0):
@@ -934,8 +937,8 @@ func _draw_board_mark(entry: Dictionary, fade: float) -> void:
 	var area: Vector3 = entry.get("area", Vector3.INF) as Vector3
 	if area != Vector3.INF:
 		_draw_notice_area(area, String(entry.area_name), bool(entry.get("urgent", false)), String(entry.kind) == BoardRules.KILL, fade, bool(entry.get("bounty", false)))
-	var goal: Vector2 = entry.target as Vector2
-	if goal == Vector2.INF or goal.x >= Interiors.POCKET_X0:
+	var goal: Vector2 = Interiors.to_world(entry.target as Vector2)
+	if goal == Vector2.INF:
 		return
 	var at: Vector2 = _to_screen(goal / 16.0)
 	var tone: Color = Color("78f4e6")

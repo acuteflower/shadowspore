@@ -139,7 +139,7 @@ func apply_return_state(ret: Dictionary) -> void:
 		return
 	var err_msg: String = String(ret.get("error", ""))
 	if not err_msg.is_empty():
-		_set_status(err_msg, true, 6.0)
+		_set_status(err_msg, true, 12.0)
 
 
 func _exit_tree() -> void:
@@ -630,7 +630,10 @@ func _draw_main(_void_level: float) -> void:
 		draw_rect(Rect2(MENU_X, hint_y - 5.0, 18.0, 1.0), Color(IDLE_INK, 0.5))
 		PixelText.draw(self, shown, Vector2i(int(MENU_X), int(hint_y)), Color(IDLE_INK, 0.9), Color(VineStyle.OUTLINE, 0.9))
 		if not status.is_empty():
-			PixelText.draw(self, status, Vector2i(int(MENU_X), int(hint_y + 11.0)), Color(DANGER if _status_is_error else Color("7fe3da")), Color(VineStyle.OUTLINE))
+			var sy: int = int(hint_y + 11.0)
+			var sw: float = float(PixelText.width(status)) + 6.0
+			draw_rect(Rect2(MENU_X - 3.0, float(sy - 2), sw, 11.0), Color("161226", 0.9))
+			PixelText.draw(self, status, Vector2i(int(MENU_X), sy), Color(DANGER if _status_is_error else Color("7fe3da")), Color(VineStyle.OUTLINE))
 	if intro > 0.6 and CloudSession.is_logged_in():
 		var ba: float = smoothstep(0.6, 1.5, intro)
 		var uname: String = CloudSession.username.to_upper()

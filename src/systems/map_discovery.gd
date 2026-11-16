@@ -125,7 +125,7 @@ func import_data(data: PackedByteArray) -> void:
 ## Loading a save: the host's table replaces everything, peers get it too.
 func import_saved(data: PackedByteArray) -> void:
 	import_data(data)
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
 		_rpc_snapshot.rpc(export_data())
 
 

@@ -4,6 +4,17 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.4 Beta] – 2026-11-16
+### 🛠️ Cloud-Save-Hotfix, Coercion-Schutz & Relay-Stabilität
+
+> *Behebt den stummen Release-Absturz nach „Spiel fortsetzen“ sowie fehlerhafte RPC-Spams bei Verbindungsaufbau oder -verlust.*
+
+* **🟣 FIX – Cloud-Save-Crash bei „Spiel fortsetzen“ behoben:** Leere Lua-Tables in gespeicherten Cloud-Profilen (`[]` statt `{}`) werden beim Laden in allen Save- und Welt-Importern sicher umgewandelt – kein Release-Absturz (`0xc0000005`) mehr bei abgeschlossenen oder leeren Quest-/Inventar-/Weltfeldern.
+* **🟣 FIX – Saubere RPC- & Relay-Absicherung:** Snapshot-, Zeit- und Wildtier-RPCs warten sauber auf eine aktive `CONNECTION_CONNECTED`-Verbindung; ein abgebrochener Host-Relay fällt automatisch auf `OfflineMultiplayerPeer` zurück.
+* **🟣 FIX – Base64- & Karten-Schutz:** Leere `map`-Daten und ungültige Base64-Payloads werden ohne Dekompressions- oder Engine-Fehler abgefangen.
+
+---
+
 ## [V0.9.3 Beta] – 2026-11-15
 ### 🤝 Freundes-Sidebar im Pausenmenü & Nachtlichtung-Look: Einklappbare Koop-Seitenleiste, Profil-Avatare & UI-Politur
 

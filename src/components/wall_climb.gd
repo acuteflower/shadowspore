@@ -33,7 +33,7 @@ func _ready() -> void:
 	_player = get_parent() as Player
 	_shape = _player.get_node("CollisionShape2D") as CollisionShape2D
 	_skills = _player.get_node("SkillTreeComponent") as SkillTreeComponent
-	if not multiplayer.is_server():
+	if not multiplayer.is_server() and NetworkManager.rpc_ready(self):
 		_request_snapshot.rpc_id(1)
 
 

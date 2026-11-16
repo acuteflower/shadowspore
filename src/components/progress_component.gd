@@ -19,7 +19,7 @@ var _synced: bool = false
 
 
 func _ready() -> void:
-	if not multiplayer.is_server():
+	if not multiplayer.is_server() and NetworkManager.rpc_ready(self):
 		_rpc_request_claimed.rpc_id(1) ## health, stamina and armor of every player depend on it
 		if is_multiplayer_authority():
 			_rpc_request_state.rpc_id(1) ## the host may spawn us before our node existed, so ask
@@ -35,7 +35,7 @@ func claimable() -> int:
 func request_claim(up_to: int) -> void:
 	if multiplayer.is_server():
 		_host_claim(up_to)
-	elif is_multiplayer_authority():
+	elif is_multiplayer_authority() and NetworkManager.rpc_ready(self):
 		_rpc_claim.rpc_id(1, up_to)
 
 
@@ -107,7 +107,8 @@ func award(copper_amount: int, xp_amount: int) -> void:
 		leveled.emit(level)
 	var owner_id: int = get_multiplayer_authority()
 	if owner_id != multiplayer.get_unique_id():
-		_rpc_state.rpc_id(owner_id, {"copper": copper, "xp": xp})
+		if NetworkManager.rpc_ready(self):
+			_rpc_state.rpc_id(owner_id, {"copper": copper, "xp": xp})
 	elif copper_amount > 0:
 		Sfx.ui(self, "coin_pickup", -4.0) ## the coins of a kill, in her own purse
 

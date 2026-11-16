@@ -425,7 +425,7 @@ func _load_guest_cloud_character(peer_id: int, player: Player, guest_user_id: St
 		return
 	if not bool(res.get("ok", false)) or not bool(res.get("has_profile", false)):
 		return
-	var profile: Dictionary = res.get("profile", {}) as Dictionary
+	var profile: Dictionary = SaveGame.as_dict(res.get("profile"))
 	if profile.is_empty():
 		return
 	SaveGame.import_player_data(player, profile, false, false)

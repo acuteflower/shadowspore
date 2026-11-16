@@ -220,7 +220,7 @@ func _draw() -> void:
 		PixelText.draw(self, _title, Vector2i(right - PixelText.width(_title), 16), title_color, Color(VineStyle.OUTLINE, text_alpha))
 		var target: Vector2 = _target_actor.global_position if is_instance_valid(_target_actor) and _target_actor.is_inside_tree() else _target
 		if target != Vector2.INF and _player != null:
-			var meters: String = "%d M" % roundi(_player.global_position.distance_to(target) / 16.0)
+			var meters: String = "%d M" % roundi(Interiors.travel_distance(_player.global_position, target) / 16.0)
 			if _search > 0.0:
 				meters = "SUCHKREIS %d M" % roundi(_search)
 			PixelText.draw(self, meters, Vector2i(right - PixelText.width(meters), 26), Color(UiStyle.ACCENT, text_alpha * 0.9), Color(VineStyle.OUTLINE, text_alpha))
@@ -266,7 +266,7 @@ func _draw_board_notice(top_y: float, right: int, branch_alpha: float, void_leve
 	var count: int = int(_board_notice.get("count", 1))
 	var line1: String = "NEUE HAUPTQUEST" if count <= 1 else "%d NEUE HAUPTQUESTS" % count
 	var board_pos: Vector2 = _board_notice.get("target", Vector2.INF) as Vector2
-	var dist_txt: String = ("%d M" % roundi(_player.global_position.distance_to(board_pos) / 16.0)) if (board_pos != Vector2.INF and _player != null) else ""
+	var dist_txt: String = ("%d M" % roundi(Interiors.travel_distance(_player.global_position, board_pos) / 16.0)) if (board_pos != Vector2.INF and _player != null) else ""
 	var row_texts: Array[Dictionary] = [{"text": line1, "color": VineStyle.WARM_GLOW}]
 	var card_h: int = 26
 	if not _has_quest:

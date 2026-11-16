@@ -471,7 +471,7 @@ func cool_down(seconds: float = DesertHeat.OASIS_REFRESH_SECONDS) -> void:
 		if effects != null:
 			effects.clear("sun_heat")
 			effects.apply("refreshed", seconds)
-		if multiplayer.has_multiplayer_peer() and not multiplayer.get_peers().is_empty():
+		if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
 			_rpc_reset_heat.rpc()
 
 
@@ -1574,7 +1574,7 @@ func _stop_standby() -> void:
 
 
 func _cancel_standby() -> void:
-	if _standby_clip >= 0 and is_multiplayer_authority() and multiplayer.has_multiplayer_peer() and not multiplayer.get_peers().is_empty():
+	if _standby_clip >= 0 and is_multiplayer_authority() and NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
 		_stop_standby.rpc()
 	else:
 		_stop_standby()
@@ -1609,7 +1609,7 @@ func _update_standby(delta: float, moving: bool) -> void:
 		clip = _standby_rng.randi_range(0, pool_n - 1) if prev_normal < 0 else _standby_rng.randi_range(0, pool_n - 2)
 		if prev_normal >= 0 and clip >= prev_normal:
 			clip += 1 ## each next gesture differs from the previous one
-	if multiplayer.has_multiplayer_peer() and not multiplayer.get_peers().is_empty():
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
 		_start_standby.rpc(clip)
 	else:
 		_start_standby(clip)

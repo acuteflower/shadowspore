@@ -30,7 +30,6 @@ static func clear_cache() -> void:
 	_atlas = null
 
 func setup(points: Array[Dictionary], origin: Vector2 = Vector2.ZERO) -> void:
-	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_ensure_cleanup()
 	_origin = origin
 	position = origin
@@ -50,6 +49,7 @@ func setup(points: Array[Dictionary], origin: Vector2 = Vector2.ZERO) -> void:
 	var quad: QuadMesh = QuadMesh.new()
 	quad.size = Vector2(SIZE)
 	multimesh = MultiMesh.new()
+	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	multimesh.transform_format = MultiMesh.TRANSFORM_2D
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true

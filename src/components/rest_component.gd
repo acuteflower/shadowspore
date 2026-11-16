@@ -33,7 +33,7 @@ func _ready() -> void:
 	_player.health.damaged.connect(func(_amount: float, _from: Vector2, _knockback: float) -> void:
 		if multiplayer.is_server() and state != State.FREE: _finish.rpc())
 
-	if not multiplayer.is_server():
+	if not multiplayer.is_server() and NetworkManager.rpc_ready(self):
 		_request_snapshot.rpc_id(1)
 
 

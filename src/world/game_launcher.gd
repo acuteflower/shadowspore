@@ -19,6 +19,14 @@ static var _transition_layer: CanvasLayer = null
 static var _transition_screen: LoadingScreen = null
 static var _transitioning: bool = false
 static var _join_handshake_active: bool = false
+static var _boot_args_consumed: bool = false
+
+
+static func take_boot_args() -> Dictionary:
+	if _boot_args_consumed:
+		return {}
+	_boot_args_consumed = true
+	return from_args(OS.get_cmdline_user_args())
 
 
 static func is_transitioning() -> bool:
@@ -99,6 +107,7 @@ static func take() -> Dictionary:
 
 ## Leaves the menu (or a running game) for a fresh main scene that starts `request`. Puts the autoload state back the way a first start finds it.
 static func launch(tree: SceneTree, request: Dictionary) -> void:
+	_boot_args_consumed = true
 	if not bool(request.get("skip_autosave", false)):
 		CloudSession.capture_live_snapshot(tree, tree.root.multiplayer.is_server())
 	Engine.time_scale = 1.0
@@ -108,7 +117,8 @@ static func launch(tree: SceneTree, request: Dictionary) -> void:
 	InputManager.journal_open = false
 	InputManager.skills_open = false
 	InputManager.progress_open = false
-	if request.is_empty():
+	var to_menu: bool = request.is_empty() or bool(request.get("to_menu", false))
+	if to_menu:
 		pending = {}
 		tree.paused = false
 		InputManager.ui_blocking = false
@@ -166,7 +176,7 @@ static func _transition_to_main(tree: SceneTree, request: Dictionary) -> void:
 		tree.change_scene_to_file.call_deferred(MAIN)
 		return
 	var mode: String = String(request.get("mode", "continue"))
-	var keep: bool = NetworkManager.is_coop_session() and tree.root.multiplayer.is_server() and tree.root.multiplayer.get_peers().is_empty() and String(request.get("world_id", "")) == NetworkManager.active_world_id
+	var keep: bool = NetworkManager.is_multiplayer_session() and tree.root.multiplayer.is_server() and tree.root.multiplayer.get_peers().is_empty() and String(request.get("world_id", "")) == NetworkManager.active_world_id
 	if mode in ["join", "host", "host_relay", "join_relay", "continue", "new"] or not keep:
 		NetworkManager.leave()
 	_transitioning = false
@@ -175,6 +185,13 @@ static func _transition_to_main(tree: SceneTree, request: Dictionary) -> void:
 
 static func _alive(node: Node) -> bool:
 	return is_instance_valid(node) and node.is_inside_tree()
+
+
+static func peer_ready_spawned(level: Node, main: Node, peer_connected_ok: bool) -> bool:
+	if not peer_connected_ok or not is_instance_valid(level) or not _alive(main):
+		return false
+	var uid: int = main.multiplayer.get_unique_id()
+	return uid > 0 and level.get_node_or_null("Players/%s" % uid) != null
 
 
 ## Builds the world under `main` and starts what `request` asks for (what main.gd did on its own before the menu existed).
@@ -307,8 +324,10 @@ static func start(main: Node, request: Dictionary) -> void:
 							return
 						if bool(ticket_res.get("ok", false)):
 							NetworkManager.set_pending_ticket(ticket_res)
-					err = NetworkManager.join(join_addr, join_port, join_code)
-					if err != OK:
+					err = NetworkManager.join(join_addr, join_port, join_code, true)
+					if err == OK:
+						CloudSession.reset_autosave_state()
+					else:
 						var msg: String = NetworkManager.last_join_error if not NetworkManager.last_join_error.is_empty() else "VERBINDUNG FEHLGESCHLAGEN"
 						menu_return = {"page": "join", "address": join_addr, "port": join_port, "code": join_code, "error": msg}
 			"join_relay":
@@ -333,8 +352,9 @@ static func start(main: Node, request: Dictionary) -> void:
 							target_mid = String(req_res.get("match_id", ""))
 							target_wname = String(req_res.get("world_name", target_wname))
 					if err == OK:
-						err = NetworkManager.join_relay(target_mid, target_code, target_wname)
+						err = NetworkManager.join_relay(target_mid, target_code, target_wname, true)
 						if err == OK:
+							CloudSession.reset_autosave_state()
 							NetworkManager.explicit_coop_hud = true
 						else:
 							var msg: String = NetworkManager.last_join_error if not NetworkManager.last_join_error.is_empty() else "RELAY-BEITRITT FEHLGESCHLAGEN"
@@ -366,11 +386,29 @@ static func start(main: Node, request: Dictionary) -> void:
 		var on_rejected: Callable = func(reason: String) -> void:
 			rejected[0] = reason
 		NetworkManager.join_rejected.connect(on_rejected)
+		var conn_err: Error = NetworkManager.connect_pending_guest()
+		if conn_err != OK:
+			_join_handshake_active = false
+			if NetworkManager.join_rejected.is_connected(on_rejected):
+				NetworkManager.join_rejected.disconnect(on_rejected)
+			var conn_reason: String = NetworkManager.last_join_error if not NetworkManager.last_join_error.is_empty() else "VERBINDUNG FEHLGESCHLAGEN"
+			menu_return = {
+				"page": "join",
+				"address": String(request.get("address", "")),
+				"port": int(request.get("port", NetworkManager.DEFAULT_PORT)),
+				"code": String(request.get("code", "")),
+				"error": conn_reason,
+			}
+			_loading_failed(main, screen, conn_reason)
+			return
 		var deadline: int = Time.get_ticks_msec() + 18000
-		while level.get_node_or_null("Players/%s" % main.multiplayer.get_unique_id()) == null:
+		while true:
 			var join_peer: MultiplayerPeer = main.multiplayer.multiplayer_peer
 			if join_peer != null:
 				join_peer.poll()
+			var peer_connected_ok: bool = join_peer != null and join_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+			if peer_ready_spawned(level, main, peer_connected_ok):
+				break
 			var disconn: bool = join_peer == null or join_peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED
 			if not rejected[0].is_empty() or disconn or Time.get_ticks_msec() >= deadline:
 				_join_handshake_active = false

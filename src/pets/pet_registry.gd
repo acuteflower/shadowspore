@@ -38,7 +38,20 @@ func _ready() -> void:
 	set_process(true)
 	if multiplayer.is_server():
 		TimeManager.day_started.connect(_on_day)
+		if not multiplayer.peer_connected.is_connected(_on_peer_connected):
+			multiplayer.peer_connected.connect(_on_peer_connected)
 	else:
+		if not multiplayer.connected_to_server.is_connected(_sync_on_connect):
+			multiplayer.connected_to_server.connect(_sync_on_connect)
+		_sync_on_connect()
+
+
+func _on_peer_connected(peer: int) -> void:
+	_send_bonds_to(peer)
+
+
+func _sync_on_connect() -> void:
+	if not multiplayer.is_server() and NetworkManager.rpc_ready(self):
 		_request_bonds.rpc_id(1)
 
 
@@ -126,7 +139,12 @@ func _rpc_bond(pet_key: String, peer: int, bp: float, day: int, fed: int, total:
 func _request_bonds() -> void:
 	if not multiplayer.is_server():
 		return
-	var peer: int = multiplayer.get_remote_sender_id()
+	_send_bonds_to(multiplayer.get_remote_sender_id())
+
+
+func _send_bonds_to(peer: int) -> void:
+	if not multiplayer.is_server() or not NetworkManager.rpc_ready(self):
+		return
 	var mine: Dictionary = {}
 	for key: String in _bonds:
 		var data: Variant = (_bonds[key] as Dictionary).get(str(peer))

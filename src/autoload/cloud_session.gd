@@ -29,6 +29,7 @@ signal ipc_command_received(cmd: Dictionary)
 
 var server_url: String = DEFAULT_URL
 var server_key: String = DEFAULT_SERVER_KEY
+var bundled_version: String = ""
 var token: String = ""
 var refresh_token: String = ""
 var user_id: String = ""
@@ -127,6 +128,7 @@ func _ready() -> void:
 func _load_bundled_release_auth() -> void:
 	server_url = DEFAULT_URL
 	server_key = DEFAULT_SERVER_KEY
+	bundled_version = ""
 	if not FileAccess.file_exists(BUILD_AUTH_PATH):
 		return
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(BUILD_AUTH_PATH))
@@ -134,10 +136,34 @@ func _load_bundled_release_auth() -> void:
 		var cfg: Dictionary = parsed as Dictionary
 		var bundled_url: String = String(cfg.get("server_url", "")).strip_edges()
 		var bundled_key: String = String(cfg.get("server_key", "")).strip_edges()
+		var bundled_ver: String = String(cfg.get("version", "")).strip_edges()
 		if not bundled_url.is_empty():
 			server_url = bundled_url
 		if not bundled_key.is_empty():
 			server_key = bundled_key
+		if not bundled_ver.is_empty():
+			bundled_version = bundled_ver
+
+
+func local_game_version() -> String:
+	if not bundled_version.is_empty():
+		return bundled_version
+	var exe_dir: String = OS.get_executable_path().get_base_dir()
+	if not exe_dir.is_empty():
+		var vpath: String = exe_dir.path_join("version.txt")
+		if FileAccess.file_exists(vpath):
+			var txt: String = FileAccess.get_file_as_string(vpath).strip_edges()
+			if not txt.is_empty():
+				return txt
+	return ""
+
+
+func fetch_update_manifest() -> Dictionary:
+	var path: String = "/updates/manifest.json?_=%d" % Time.get_unix_time_from_system()
+	var res: Dictionary = await _request_json_at("https://shadowspore.com", HTTPClient.METHOD_GET, path, "", "none", 3500)
+	if not bool(res.get("ok", false)):
+		return {}
+	return SaveGame.as_dict(res.get("data"))
 
 
 ## True in exported Release builds (or when `--strict-guard` / test override is enabled).
@@ -1105,7 +1131,11 @@ func _apply_session_tokens(new_token: String, new_refresh: String) -> void:
 
 
 func _request_json(method: HTTPClient.Method, path: String, body: String, use_bearer: bool) -> Dictionary:
-	var parsed_url: Dictionary = _parse_http_url(server_url)
+	return await _request_json_at(server_url, method, path, body, "bearer" if use_bearer else "basic")
+
+
+func _request_json_at(base_http_url: String, method: HTTPClient.Method, path: String, body: String, auth_mode: String, custom_timeout_ms: int = 0) -> Dictionary:
+	var parsed_url: Dictionary = _parse_http_url(base_http_url)
 	var host: String = String(parsed_url.get("host", "127.0.0.1"))
 	var port: int = int(parsed_url.get("port", 7350))
 	var use_tls: bool = bool(parsed_url.get("tls", false))
@@ -1116,27 +1146,29 @@ func _request_json(method: HTTPClient.Method, path: String, body: String, use_be
 	if err != OK:
 		return {"ok": false, "error": "Verbindungsfehler (%d)" % err}
 
-	var timeout_ms: int = mini(10000, _http_timeout_override_msec) if _http_timeout_override_msec > 0 else 10000
+	var default_ms: int = mini(10000, _http_timeout_override_msec) if _http_timeout_override_msec > 0 else 10000
+	var timeout_ms: int = custom_timeout_ms if custom_timeout_ms > 0 else default_ms
 	var deadline_ms: int = Time.get_ticks_msec() + timeout_ms
 	while hc.get_status() in [HTTPClient.STATUS_CONNECTING, HTTPClient.STATUS_RESOLVING]:
 		hc.poll()
 		if Time.get_ticks_msec() > deadline_ms:
-			return {"ok": false, "error": "Timeout beim Verbinden mit Nakama"}
+			return {"ok": false, "error": "Timeout beim Verbinden"}
 		var tree_conn: SceneTree = get_tree()
 		if tree_conn == null:
 			return {"ok": false, "error": "Szene geschlossen"}
 		await tree_conn.process_frame
 
 	if hc.get_status() != HTTPClient.STATUS_CONNECTED:
-		return {"ok": false, "error": "Nakama nicht erreichbar (Status %d)" % hc.get_status()}
+		return {"ok": false, "error": "Server nicht erreichbar (Status %d)" % hc.get_status()}
 
 	var headers: PackedStringArray = PackedStringArray([
-		"Content-Type: application/json",
 		"Accept-Encoding: identity",
 	])
-	if use_bearer:
+	if method == HTTPClient.METHOD_POST or method == HTTPClient.METHOD_PUT:
+		headers.append("Content-Type: application/json")
+	if auth_mode == "bearer":
 		headers.append("Authorization: Bearer " + token)
-	else:
+	elif auth_mode == "basic":
 		var basic: String = Marshalls.utf8_to_base64(server_key + ":")
 		headers.append("Authorization: Basic " + basic)
 

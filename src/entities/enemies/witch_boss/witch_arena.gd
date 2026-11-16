@@ -68,6 +68,8 @@ func setup(p_world: WorldLevel) -> void:
 	_hologram.position = _tree_at + HOLOGRAM_AT
 	world.add_child.call_deferred(_hologram)
 	if not multiplayer.is_server():
+		if not multiplayer.connected_to_server.is_connected(_ask_host):
+			multiplayer.connected_to_server.connect(_ask_host)
 		_ask_host.call_deferred()
 
 
@@ -349,7 +351,8 @@ func _rpc_bark(id: String) -> void:
 
 
 func _ask_host() -> void:
-	_ask_state.rpc_id(1)
+	if not multiplayer.is_server() and NetworkManager.rpc_ready(self):
+		_ask_state.rpc_id(1)
 
 
 @rpc("any_peer", "call_remote", "reliable")

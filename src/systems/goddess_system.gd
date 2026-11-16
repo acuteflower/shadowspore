@@ -728,7 +728,7 @@ func import_state(data: Dictionary) -> void:
 	_milestones_claimed = SaveGame.as_dict(data.get("milestones_claimed")).duplicate(true)
 	_altar_greeted = SaveGame.as_dict(data.get("altar_greeted")).duplicate()
 	_sync_and_hook_players()
-	if multiplayer.is_server() and not multiplayer.get_peers().is_empty():
+	if multiplayer.is_server() and NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
 		_rpc_snapshot.rpc(_snapshot_dict())
 	for p: Player in Player.all:
 		if is_instance_valid(p) and p.progress != null:

@@ -146,6 +146,31 @@ static func outer(tree: SceneTree, pos: Vector2) -> Vector2:
 	return manager.world_position(pos) if manager != null else pos
 
 
+## True for a point in a pocket room or the mine (far outside the world).
+static func is_pocket(pos: Vector2) -> bool:
+	return slot_at(pos) >= 0 or MineManager.in_mine(pos)
+
+
+## `outer` without a tree at hand (static callers such as map helpers); Vector2.INF when a pocket point has no known door.
+static func to_world(pos: Vector2) -> Vector2:
+	if pos == Vector2.INF or not is_pocket(pos):
+		return pos
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var mapped: Vector2 = outer(tree, pos) if tree != null else pos
+	return Vector2.INF if is_pocket(mapped) or mapped == Vector2.ZERO else mapped
+
+
+## Distance in px as the player would walk it: inside the same room straight, otherwise between the doors / world points.
+static func travel_distance(a: Vector2, b: Vector2) -> float:
+	if is_pocket(a) == is_pocket(b) and a.distance_to(b) < SLOT:
+		return a.distance_to(b)
+	var wa: Vector2 = to_world(a)
+	var wb: Vector2 = to_world(b)
+	if wa == Vector2.INF or wb == Vector2.INF:
+		return a.distance_to(b)
+	return wa.distance_to(wb)
+
+
 func interior_at(pos: Vector2) -> Interior:
 	var found: Interior = null
 	for room: Interior in _interiors.values():

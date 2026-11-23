@@ -5,7 +5,21 @@ Es kombiniert Base-Building, Dorfaufbau, Landwirtschaft, Survival bei Nacht und 
 
 ---
 
-## 🚀 Aktuelle Version: V0.9.5 Beta – „Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz“
+## 🚀 Aktuelle Version: V0.10-1 Beta – „Shadowspore 2.0: Movement 2.0, Lebendige Natur, Wasser 2.0 & Abgrund-Finisher“
+
+> Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
+
+![Wasser 2.0 im Abendgold mit Uferflora und Spiegelungen](docs/img/water_v2_polish/golden_hour.png)
+
+### Highlights von V0.10-1 Beta:
+- 🏃 **Movement 2.0:** Taktiler Sprint-Antritt, Corner-Smoothing, 180°-Pivot, Hang- & Straßen-Physik, ausdauerschonender **Reisetritt** (`0` Ausdauer auf Straßen), **Vault** über Stämme/Zäune, **Ledge Hop**, Kampf-Fußarbeit, **LivingCamera 2.0** & 20-Hz-Koop-Glättung.
+- 🕷️ **Schattenspinne 2.0 & Finisher „Abgrund-Pfähler“:** Überarbeitete Spinnen-KI mit Sichtkegel, Erschütterungs-Sinnen, Haltungs-System, Backstep, Gift-Sprungangriff & `3` Varianten plus der erste 3-stufige Schwert-Finisher.
+- 🌳 **Lebendige Natur 2.0:** **Taleeiche**, **Silberbirke** & **Wildapfel** (Stockausschlag, Wurzel-Sitzplätze, Schüttel-Ernte), mehrstufige **lebende Felsen**, reaktives **lebendes Gras** sowie **Sanktuar-Flora** mit über `30` neuen Zutaten & Rezepten.
+- 🌊 **Wasser 2.0:** Küstenschelf mit Brandung, Strandpfützen, Gezeitentümpel, Schilf-Bachufer, Sturm-Schaumkronen, Nacht-Biolumineszenz & Wasserbrücken.
+
+---
+
+## 🚀 Vorherige Version: V0.9.5 Beta – „Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz“
 
 > Vollständige Versionshistorie, Studio-Log und alle Detailwerte: siehe **[`CHANGELOG.md`](CHANGELOG.md)**.
 

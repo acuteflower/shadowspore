@@ -4,6 +4,67 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.10-1 Beta] – 2026-11-23
+### 🌿 Shadowspore 2.0: Movement 2.0, Lebendige Natur, Wasser 2.0 & Abgrund-Finisher
+
+![Wasser 2.0 im Abendgold mit Uferflora und Spiegelungen](docs/img/water_v2_polish/golden_hour.png)
+
+> *Mit V0.10-1 Beta beginnt die Ära von Shadowspore 2.0: Ellie bewegt sich geschmeidiger als je zuvor, Wälder und Gewässer atmen echtes Leben, und im Kampf gegen die neuen Schattenspinnen entscheidet der erste echte Finisher über Sieg oder Untergang.*
+
+> [!IMPORTANT]
+> **Der Startschuss für Shadowspore 2.0!**
+> V0.10-1 Beta baut das Fundament von Bewegung, Natur und Kampf grundlegend um: **Movement 2.0** mit Sprint-Antritt, Kurven-Abgleiten, Übersteigen (`Vault`), Kanten-Absprung und dem ausdauerschonenden **Reisetritt**; **Schattenspinne 2.0** samt Haltungssystem und dem ersten 3-Phasen-**Finisher („Abgrund-Pfähler“)**; **Lebendige Natur 2.0** mit Taleichen, Silberbirken, Wildäpfeln, mehrstufigen Felsen, reaktivem Gras und über `30` neuen Kräutern & Rezepten; sowie **Wasser 2.0** mit Küstenbrandung, Gezeitentümpeln und Biolumineszenz.
+
+<details>
+<summary><b>📋 Alle Groß-Systeme von V0.10-1 Beta auf einen Blick</b></summary>
+
+1. **🏃 Movement 2.0 (`T1–T12` & `V1–V12`):** Taktiler Sprint-Antritt, Brems-Ausfedern, 180°-Sprint-Pivot, Corner-Smoothing, Hang- & Straßen-Physik, **Reisetritt** (0 Ausdauer auf Straßen), **Vault** über Stämme/Zäune, **Ledge Hop** an Klippen, `130 ms`-Eingabepuffer, adaptive **LivingCamera 2.0**, 20-Hz-Koop-Glättung & biom-echte Schritt-Effekte.
+2. **🕷️ Schattenspinne 2.0 & Finisher „Abgrund-Pfähler“:** Sichtkegel & Erschütterungs-Sinne, Haltungs- & Schwachstellen-System, Backstep, Gift-Sprungangriff, `3` Spinnenvarianten (*Gewöhnlich*, *Späher*, *Dornen*) und der erste 3-Beat-Schwert-Finisher.
+3. **🌳 Lebendige Natur 2.0:** **Taleeiche**, **Silberbirke** und **Wildapfel** (Stockausschlag, Wurzel-Sitzplätze, Schüttel-Ernte), mehrstufig abbaubare **lebende Felsen** & antike Ruinensteine, reaktives **lebendes Gras** sowie **Sanktuar-Flora** mit über `30` neuen Items & Rezepten.
+4. **🌊 Wasser 2.0:** Küstenschelf, Brandung, Strandpfützen, Gezeitentümpel, Schilf-Bachufer, Sturm-Schaumkronen, Nacht-Biolumineszenz & Wasserbrücken.
+
+</details>
+
+---
+
+### 🏃 Movement 2.0 – Geschmeidige Steuerung & Lebendige Animation
+
+* **🟣 NEU – Taktiler Antritt, Pivot & Kurven-Abgleiten:** Sofortiger Sprint-Antritt (`1,22×` Schwung), federndes Abstoppen, knackige 180°-Kehrtwenden mit Stiefel-Stemmen sowie automatisches **Corner-Smoothing** an Baumstämmen, Felsen, Türrahmen und Zäunen.
+* **🟣 NEU – Der „Reisetritt“ (Wanderfluss):** Außerhalb von Kampf und Nachtgefahr verbraucht Sprinten auf gebauten Straßen **0 Ausdauer** (`+8 %` Tempo) und in der Wildnis **`-65 %` Ausdauer**. Bergauf (`0,88×`) und Bergab (`1,08×`) reagieren nun spürbar auf das Gelände.
+* **🟣 NEU – Übersteigen (`Vault`) & Kanten-Absprung (`Ledge Hop`):** Im Sprint per `E` geschmeidig über gefallene Baumstämme und Zäune setzen oder an sicheren Geländekanten hinunterspringen (`HINUNTERSPRINGEN`) – inklusive handgeformter 8-Richtungs-Übergangsposen für alle Frisuren und Outfits.
+* **🟣 NEU – Kinetik-Schritt, Kampf-Beinarbeit & Kamera 2.0:** `Schattenschritt` und `Lichtschritt` queren flache Rinnen und gleiten an flachen Wänden ab; im Kampf greifen eigene Strafe- & Backpedal-Schritte; die neue **LivingCamera 2.0** verbindet ruhiges Zielen mit dynamischem Lauf-Vorlauf, während Mitspieler dank **20-Hz-Interpolation** selbst bei schnellen Manövern flüssig bleiben.
+* **🟣 NEU – Biom-Schrittpoesie & Shadowspore-Signatur:** Morgentau auf Wiesen, feuchte Abdrücke nach Regen, Sporen im Hexenwald, Quarzfunken in der Wüste sowie feine Sporen-Splitter und ein kurzes Glühen am Sonnenquarz-Halsband beim Schritt-Ende.
+
+---
+
+### 🕷️ Schattenspinne 2.0 & Erster Finisher („Abgrund-Pfähler“)
+
+* **🔵 REWORK – Schattenspinne 2.0:** Vollständig erneuerte KI mit `124°`-Sichtfeld, Erschütterungs-Wahrnehmung (Schleichen vs. Sprinten), **Haltungs-System** (Frontschutz vs. Flanken- & Rückentreffer), taktischem **Backstep**, **Gift-Sprungangriff**, Einspinnen sowie den `3` Varianten *Gewöhnlich*, *Späher* (kleiner & schneller) und *Dornen* (größer & dornig).
+* **🟣 NEU – Finisher-System (`Abgrund-Pfähler`):** Schwere Schwerttreffer gegen überwältigte oder tödlich geschwächte Gegner starten den ersten 3-stufigen Finisher (Einstoßen, tiefes Nachdrücken durch den geborstenen Panzer, Herausreißen mit Kamerazoom & Schutzfenster).
+
+---
+
+### 🌳 Lebendige Natur 2.0 – Bäume, Felsen, Gras & Sanktuar-Flora
+
+![Lebendige Natur 2.0: Sanktuar-Flora, Eichen und Wiesenpfade](docs/img/flora_showcase_v1/01_sq2_sanctuary_flora_overview.png)
+![Wildapfel-Lichtung im Mittagslicht](docs/img/wild_apple_glade_v1/30_sq4s_apple_meadow_noon.png)
+
+* **🟣 NEU – Lebende Bäume (`Taleeiche`, `Silberbirke`, `Wildapfel`):** Mehrstufiges Wachstum, begehbare Wurzel-Sitzplätze, **Stockausschlag** aus gefällten Stümpfen, Schüttel- & Rindenernte sowie umstürzende Stämme, die das Gras darunter sichtbar plattdrücken.
+* **🟣 NEU – Lebende Felsen & Antike Ruinen:** Mehrstufig abbaubare Felsen (Abplatzen bis zum begehbaren Schutt samt späterer Erholung) und einzeln aufsammelbare Feldsteine.
+* **🟣 NEU – Lebendes Gras:** Feine 6-px-Grasbänder, die sich unter Ellies Schritten und Angriffen organisch teilen.
+* **🟣 NEU – Sanktuar-Flora, 30+ neue Funde & Rezepte:** Zahlreiche neue Wildkräuter, Baumschätze und Handwerkszutaten – darunter *Glimmtal-Wildapfel*, *Klarer Birkensaft*, *Funken-Chaga*, *Eichen-Wundharz*, *Silbermistel*, *Pflaster-Wegerich*, *Sternen-Morgentau* und neue Heil-/Handwerksrezepte (*Wegerich-Wundwickel*, *Holunder-Hagebutten-Sud*, *Feines Nesseltuch*, *Efeu-Bindegarn*). *(Das veraltete frühere Kochsystem wurde im Zuge der Neuausrichtung entfernt.)*
+
+---
+
+### 🌊 Wasser 2.0 – Küsten, Gezeitentümpel & Biolumineszenz
+
+* **🔵 REWORK – Wasser 2.0:** Grundlegende optische und räumliche Überarbeitung aller Gewässer: Ozeanschelf mit Brandung, Strandpfützen und Küstendünen mit Strandhafer, lebendige Gezeitentümpel, schilfgesäumte Bachufer, weiße Sturm-Schaumkronen, nächtliche Biolumineszenz und neue Wasserbrücken.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Willkommen in Shadowspore 2.0! Probiert Movement 2.0, schüttelt einen Wildapfelbaum und stellt euch den neuen Schattenspinnen – viel Spaß mit V0.10-1 Beta!*
+
+---
+
 ## [V0.9.5 Beta] – 2026-11-16
 ### 🌐 Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz: Große Welt-Snapshots, Gast-Synchronisation & Update-Wächter
 

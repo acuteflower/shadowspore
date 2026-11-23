@@ -6,6 +6,10 @@ signal sneaking_changed(sneaking: bool)
 
 @export var sneak_detection_multiplier: float = 0.5 ## 0.5 = enemies see half as far while sneaking
 
+var surface_noise_mult: float = 1.0 ## Movement 2.0 (T12): moss/grass dampens footsteps, stone/puddle amplifies them
+var shadow_cover: float = 0.0 ## Movement 2.0 (V9): 0..1 canopy/tall-grass/night shadow cover while sneaking
+var impulse_bonus: float = 0.0 ## brief acoustic spike on hard sprint-pivots or ledge landings, decays quickly
+
 var sneaking: bool = false:
 	set(value):
 		if value == sneaking:
@@ -15,13 +19,16 @@ var sneaking: bool = false:
 
 
 func detection_multiplier() -> float:
-	return sneak_detection_multiplier if sneaking else 1.0
+	if not sneaking:
+		return 1.0
+	var shade_bonus: float = lerpf(1.0, float(MovementRules.section("impulse").get("shadow_stealth_bonus", 0.76)), clampf(shadow_cover, 0.0, 1.0))
+	return sneak_detection_multiplier * shade_bonus
 
 
-## Talismans (Schweigtropfen): shadow creatures notice her only from this fraction of their usual distance (sight and hearing). 1 without them.
+## Talismans (Schweigtropfen), weather cover, and Movement 2.0 surface acoustics (`surface_noise_mult` + brief `impulse_bonus`).
 func alarm_scale() -> float:
 	var talismans: TalismanComponent = get_node_or_null("../TalismanComponent") as TalismanComponent
 	var base: float = talismans.alarm_scale() if talismans != null else 1.0
 	var owner_node: Node2D = get_parent() as Node2D
 	var weather: float = WeatherManager.current.alarm_factor_at(owner_node.global_position) if WeatherManager.current != null and owner_node != null else 1.0
-	return base * weather ## rain and thunder swallow footsteps and cover her outline (docs/wetter_konzept.md 9)
+	return base * weather * clampf(surface_noise_mult + impulse_bonus, 0.65, 1.45)

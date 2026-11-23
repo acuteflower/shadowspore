@@ -11,7 +11,18 @@ var _ages: PackedFloat32Array = []
 var _strengths: PackedFloat32Array = []
 
 
-func add(world_pos: Vector2, strength: float = 0.45) -> void:
+func add(world_pos: Vector2, strength: float = 0.45, dir: Vector2 = Vector2.ZERO) -> void:
+	for patch: Node in Terrain.patches:
+		if patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", world_pos)):
+			return
+	for patch: Node in Terrain.patches:
+		if patch.has_method("add_water_impulse") and patch.has_method("water_field_at"):
+			var wf: Dictionary = patch.call("water_field_at", world_pos) as Dictionary
+			if bool(wf.get("in_bounds", false)):
+				var reg: int = int(wf.get("regime", 0))
+				if bool(wf.get("water", false)) or (reg != 5 and float(wf.get("sdf_px", INF)) <= 18.0):
+					patch.call("add_water_impulse", world_pos, strength, 8.0, dir)
+					return
 	if _positions.size() >= int(DataRegistry.table("river_life")["ripple_cap"]):
 		_positions.remove_at(0)
 		_ages.remove_at(0)
@@ -51,6 +62,13 @@ func _draw() -> void:
 
 func _wet_at(point: Vector2) -> bool:
 	for patch: Node in Terrain.patches:
+		if patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", point)):
+			return false
+	for patch: Node in Terrain.patches:
 		if patch is WorldRivers:
 			return (patch as WorldRivers).field_at(point).x <= 0.0
+		if patch.has_method("water_field_at"):
+			var wf: Dictionary = patch.call("water_field_at", point) as Dictionary
+			if bool(wf.get("in_bounds", false)):
+				return bool(wf.get("water", false))
 	return true

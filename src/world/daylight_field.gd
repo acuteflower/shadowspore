@@ -104,30 +104,41 @@ func rebuild(view: Rect2) -> void:
 	for node: Node in candidates:
 		var tree: Node2D = node as Node2D
 		if tree == null or not pad_region.has_point(tree.global_position): continue
-		var shape: Vector4 = tree.call("day_canopy")
-		if shape.z <= 0.0: continue
-		var center: Vector2 = Vector2(shape.x, shape.y)
-		var radius: Vector2 = Vector2(shape.z, shape.w)
-		var bounds: Rect2i = Rect2i(((center - radius - region.position) / step).floor(), (radius * 2.0 / step).ceil() + Vector2(2, 2))
-		bounds = bounds.intersection(Rect2i(Vector2i.ZERO, SIZE))
-		var inv_rx: float = 1.0 / radius.x
-		var inv_ry: float = 1.0 / radius.y
-		for y: int in range(bounds.position.y, bounds.end.y):
-			var py: float = (region.position.y + (float(y) + 0.5) * step.y - center.y) * inv_ry
-			var row_off: int = y * SIZE.x
-			for x: int in range(bounds.position.x, bounds.end.x):
-				var px: float = (region.position.x + (float(x) + 0.5) * step.x - center.x) * inv_rx
-				var d2: float = px * px + py * py
-				if d2 >= 1.0:
-					continue
-				var cover: int = int(roundf((1.0 - smoothstep(0.55, 1.0, sqrt(d2))) * 224.4))
-				var idx: int = row_off + x
-				if cover > _buf[idx]:
-					_buf[idx] = cover
+		var lobes: PackedVector4Array = PackedVector4Array()
+		if tree.has_method("day_canopy_lobes"):
+			lobes = tree.call("day_canopy_lobes") as PackedVector4Array
+		else:
+			var single_shape: Vector4 = tree.call("day_canopy")
+			if single_shape.z > 0.0:
+				lobes.append(single_shape)
+		if lobes.is_empty(): continue
+		var first_lobe: Vector4 = lobes[0]
+		for shape: Vector4 in lobes:
+			if shape.z <= 0.0 or shape.w <= 0.0: continue
+			var center: Vector2 = Vector2(shape.x, shape.y)
+			var radius: Vector2 = Vector2(shape.z, shape.w)
+			var bounds: Rect2i = Rect2i(((center - radius - region.position) / step).floor(), (radius * 2.0 / step).ceil() + Vector2(2, 2))
+			bounds = bounds.intersection(Rect2i(Vector2i.ZERO, SIZE))
+			var inv_rx: float = 1.0 / radius.x
+			var inv_ry: float = 1.0 / radius.y
+			for y: int in range(bounds.position.y, bounds.end.y):
+				var py: float = (region.position.y + (float(y) + 0.5) * step.y - center.y) * inv_ry
+				var row_off: int = y * SIZE.x
+				for x: int in range(bounds.position.x, bounds.end.x):
+					var px: float = (region.position.x + (float(x) + 0.5) * step.x - center.x) * inv_rx
+					var d2: float = px * px + py * py
+					if d2 >= 1.0:
+						continue
+					var cover: int = int(roundf((1.0 - smoothstep(0.50, 1.0, sqrt(d2))) * 224.4))
+					var idx: int = row_off + x
+					if cover > _buf[idx]:
+						_buf[idx] = cover
 		# Stable selection from world position; no random changes as the camera moves.
+		var ray_c: Vector2 = Vector2(first_lobe.x, first_lobe.y)
+		var ray_r: Vector2 = Vector2(first_lobe.z, first_lobe.w)
 		var eligible: bool = posmod(int(tree.global_position.x) * 7 + int(tree.global_position.y) * 13, 5) == 0
-		if rays.size() < shaft_limit and eligible and rays_view.has_point(center):
-			rays.append(Vector4(center.x - radius.x * 0.3, center.y - radius.y * 0.6, minf(110.0, radius.x * 2.4), maxf(5.0, radius.x * 0.16)))
+		if rays.size() < shaft_limit and eligible and rays_view.has_point(ray_c):
+			rays.append(Vector4(ray_c.x - ray_r.x * 0.3, ray_c.y - ray_r.y * 0.6, minf(110.0, ray_r.x * 2.4), maxf(5.0, ray_r.x * 0.16)))
 	coverage.set_data(SIZE.x, SIZE.y, false, Image.FORMAT_R8, _buf)
 	var count: int = rays.size()
 	while rays.size() < 4: rays.append(Vector4.ZERO)

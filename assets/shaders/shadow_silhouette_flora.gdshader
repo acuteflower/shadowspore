@@ -10,6 +10,7 @@ varying float feet_y;
 void vertex() {
 	local_y = VERTEX.y;
 	feet_y = (COLOR.r - 0.5) * 1000.0;
+	v_world_origin = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xy;
 }
 void fragment() {
 	COLOR = vec4(1.0, 1.0, 1.0, step(local_y, feet_y + 0.5) * step(0.55, texture(TEXTURE, wind_uv(UV, vec2(textureSize(TEXTURE, 0)))).a));

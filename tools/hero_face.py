@@ -135,8 +135,8 @@ def tidy_rows(rows, eyes=None):
 
 
 # sheets whose rows are the eight facings (E SE S SW W NW N NE), repeated (the main sheet has 16 rows: standing, crouched)
-SECTOR_ROWS = {"player": 16, "player_attack": 8, "player_cast": 8, "player_climb": 8, "player_combo": 8, "player_drink": 8,
-               "player_eat": 8, "player_feed": 8, "player_fish": 8, "player_heavy": 8, "player_pick": 8, "player_pull": 8,
+SECTOR_ROWS = {"player": 16, "player_agile": 8, "player_attack": 8, "player_cast": 8, "player_climb": 8, "player_combo": 8, "player_drink": 8,
+               "player_eat": 8, "player_feed": 8, "player_finisher": 8, "player_fish": 8, "player_heavy": 8, "player_pick": 8, "player_pull": 8,
                "player_rest": 8, "player_sit": 8, "player_standby": 8, "player_step": 8, "player_stumble": 8, "player_swim": 8,
                "player_swim_under": 8, "player_touch": 8}
 

@@ -626,18 +626,22 @@ func _tick_companions(delta: float) -> void:
 		if bird == null or int(data["m"]) != 0:
 			continue
 		var gap: float = bird.global_position.distance_to(player.global_position)
-		var moving: bool = player.velocity.length() > 8.0
-		_still[peer] = 0.0 if moving or player.attack.is_swinging() else float(_still.get(peer, 0.0)) + delta
+		var fast_or_agile: bool = player.sprinting or player._step_t >= 0.0 or player.agile_active() or player.attack.is_swinging() or player.velocity.length() > 74.0
+		_still[peer] = 0.0 if (fast_or_agile or player.swim > 0) else float(_still.get(peer, 0.0)) + delta
 		if bird.rider != 0:
-			if player.sprinting or player.attack.is_swinging() or player.velocity.length() > 70.0:
+			if fast_or_agile or player.swim > 0:
 				bird._ride.rpc(0)
 				_still[peer] = 0.0
-				bird.fly_to(player.global_position + Vector2.from_angle(randf() * TAU) * 26.0)
+				var fwd: Vector2 = player.velocity.normalized() if player.velocity.length() > 10.0 else player.facing.normalized()
+				var flank: Vector2 = Vector2(-fwd.y, fwd.x) * (18.0 if randf() < 0.5 else -18.0)
+				bird.fly_to(player.global_position + fwd * 28.0 + flank)
 			continue
 		if gap > float(cfg["teleport_distance"]) and not _watched_by_other(bird.global_position, float(cfg["teleport_hidden"]), player):
 			bird.global_position = player.global_position + Vector2.from_angle(randf() * TAU) * 40.0
 		elif gap > float(cfg["follow_distance"]) and bird.state != WildCorvid.State.FLY and bird.offered_peer == 0:
-			bird.fly_to(player.global_position + Vector2.from_angle(randf() * TAU) * 28.0)
+			var lead_dir: Vector2 = player.velocity.normalized() if player.sprinting and player.velocity.length() > 20.0 else Vector2.ZERO
+			var flank2: Vector2 = Vector2(-lead_dir.y, lead_dir.x) * 20.0 if lead_dir != Vector2.ZERO else Vector2.from_angle(randf() * TAU) * 26.0
+			bird.fly_to(player.global_position + lead_dir * 26.0 + flank2)
 		elif float(_still[peer]) >= float(cfg["shoulder_after"]) and gap < float(cfg["shoulder_reach"]) and bird.state != WildCorvid.State.FLY:
 			bird._ride.rpc(peer)
 		_ability(peer, data, bird, player, cfg)

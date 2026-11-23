@@ -262,9 +262,14 @@ func _rebuild() -> void:
 	_on = not chosen.is_empty()
 
 
-## True when part of the thing's mirror image (from its waterline down, as tall as the thing) lies on river or lake water.
+## True when part of the thing's mirror image (from its waterline down, as tall as the thing) lies on water, wet swash sand, or puddles.
 func _water_below(thing: Node2D, _view: Rect2) -> bool:
-	if rivers == null or not is_instance_valid(rivers):
+	var has_rivers: bool = rivers != null and is_instance_valid(rivers)
+	var water_fields: Array[Node] = []
+	for patch: Node in Terrain.patches:
+		if patch.has_method("reflects_at") or patch.has_method("water_field_at"):
+			water_fields.append(patch)
+	if not has_rivers and water_fields.is_empty():
 		return false
 	var line: float = _line_of(thing)
 	var bounds: Rect2 = _bounds_of(thing)
@@ -273,16 +278,38 @@ func _water_below(thing: Node2D, _view: Rect2) -> bool:
 	var height: float = maxf(line - bounds.position.y, 8.0)
 	var left: float = bounds.position.x
 	var right: float = bounds.end.x
-	# a quick look first: no water near the foot within the image's size = nothing to mirror
-	var near: Vector2 = rivers.field_at(Vector2(thing.global_position.x, line + height * 0.5))
-	if not is_finite(near.x) or near.x > height * 0.5 + (right - left) * 0.5 + SAMPLE:
+	var probe: Vector2 = Vector2(thing.global_position.x, line + height * 0.5)
+	var max_reach: float = height * 0.5 + (right - left) * 0.5 + SAMPLE
+	var rivers_near_ok: bool = false
+	if has_rivers:
+		var near: Vector2 = rivers.field_at(probe)
+		rivers_near_ok = is_finite(near.x) and near.x <= max_reach
+	var active_fields: Array[Node] = []
+	for wf_node: Node in water_fields:
+		if wf_node.has_method("field_at"):
+			var near_wf: Vector2 = wf_node.call("field_at", probe) as Vector2
+			if is_finite(near_wf.x) and near_wf.x <= max_reach + 48.0:
+				active_fields.append(wf_node)
+		else:
+			active_fields.append(wf_node)
+	if not rivers_near_ok and active_fields.is_empty():
 		return false
 	var y: float = line + 1.0
 	while y <= line + height:
 		var x: float = left
 		while x <= right:
-			if rivers.field_at(Vector2(x, y)).x <= 0.0:
+			var sample_pos: Vector2 = Vector2(x, y)
+			if rivers_near_ok and rivers.field_at(sample_pos).x <= 0.0:
 				return true
+			for wf_node: Node in active_fields:
+				if wf_node.has_method("reflects_at") and bool(wf_node.call("reflects_at", sample_pos)):
+					return true
+				if wf_node.has_method("water_field_at"):
+					var wf: Dictionary = wf_node.call("water_field_at", sample_pos) as Dictionary
+					if bool(wf.get("water", false)) or bool(wf.get("wet_sand", false)):
+						return true
+				if wf_node.has_method("has_dynamic_water") and bool(wf_node.call("has_dynamic_water", sample_pos)):
+					return true
 			x += SAMPLE
 		y += SAMPLE
 	return false
@@ -340,7 +367,7 @@ func _skip(sprite: Sprite2D) -> bool:
 
 static func skip_part(sprite: Sprite2D) -> bool:
 	var named: String = String(sprite.name).to_lower()
-	if named.contains("shadow") or named.contains("swimunder") or named.contains("underwater") or named.contains("decal"):
+	if named.contains("shadow") or named.contains("swimunder") or named.contains("underwater") or named.contains("decal") or named.contains("overhang"):
 		return true
 	if sprite.z_index < 0 and sprite.z_as_relative:
 		return true ## ground pieces (beds, footprints, yard ground) lie flat

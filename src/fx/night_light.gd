@@ -41,17 +41,18 @@ func _ready() -> void:
 	color = glow_color
 	_phase = fposmod(position.x * 0.37 + position.y * 0.71, TAU)
 	add_to_group("night_lights")
-	_notifier = VisibleOnScreenNotifier2D.new()
-	var reach: float = float(radius) + 16.0
-	_notifier.rect = Rect2(-reach, -reach * squash, reach * 2.0, reach * 2.0 * squash)
-	_notifier.screen_entered.connect(_on_screen_entered)
-	_notifier.screen_exited.connect(_on_screen_exited)
-	add_child(_notifier)
-	var camera: Camera2D = get_viewport().get_camera_2d() if get_viewport() != null else null
-	if camera != null:
-		var reach_total: float = reach + 400.0
-		if global_position.distance_squared_to(camera.get_screen_center_position()) > reach_total * reach_total:
-			_on_screen = false
+	if DisplayServer.get_name() != "headless":
+		_notifier = VisibleOnScreenNotifier2D.new()
+		var reach: float = float(radius) + 16.0
+		_notifier.rect = Rect2(-reach, -reach * squash, reach * 2.0, reach * 2.0 * squash)
+		_notifier.screen_entered.connect(_on_screen_entered)
+		_notifier.screen_exited.connect(_on_screen_exited)
+		add_child(_notifier)
+		var camera: Camera2D = get_viewport().get_camera_2d() if get_viewport() != null else null
+		if camera != null:
+			var reach_total: float = reach + 400.0
+			if global_position.distance_squared_to(camera.get_screen_center_position()) > reach_total * reach_total:
+				_on_screen = false
 	set_night(TimeManager.night_amount())
 
 
@@ -159,6 +160,9 @@ static func budget(tree: SceneTree, center: Vector2) -> void:
 			if light._on_screen != on_screen:
 				light._on_screen = on_screen
 				light._update_active()
+		elif not light._on_screen:
+			light._on_screen = true
+			light._update_active()
 		if not light._on_screen:
 			continue
 		if light.radius <= SMALL_RADIUS:

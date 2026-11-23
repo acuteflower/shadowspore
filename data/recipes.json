@@ -393,5 +393,65 @@
   "seconds": 2.0,
   "trust": 0,
   "info": "GEPRESSTE NACHTSAAT FÜR LICHTE ÄHREN"
+ },
+ "waybread_poultice": {
+  "name": "WEGERICH-WUNDWICKEL",
+  "station": "workshop",
+  "by": "self",
+  "in": {
+   "waybread_leaf": 2,
+   "silver_yarrow": 1,
+   "plant_fiber": 1
+  },
+  "out": {
+   "waybread_poultice": 2
+  },
+  "seconds": 1.4,
+  "trust": 0,
+  "info": "KRÄUTERUMSCHLAG AUS WEGERICH UND SCHAFGARBE"
+ },
+ "elder_rosehip_tea": {
+  "name": "HOLUNDER-HAGEBUTTEN-SUD",
+  "station": "workshop",
+  "by": "self",
+  "in": {
+   "elderberry": 2,
+   "rosehip": 2,
+   "meadowsweet_sprig": 1
+  },
+  "out": {
+   "elder_rosehip_tea": 2
+  },
+  "seconds": 1.8,
+  "trust": 0,
+  "info": "WÄRMENDER REISESUD GEGEN KÄLTE UND ERSCHÖPFUNG"
+ },
+ "nettle_linen": {
+  "name": "FEINES NESSELTUCH",
+  "station": "workshop",
+  "by": "self",
+  "in": {
+   "nettle_fiber": 3
+  },
+  "out": {
+   "nettle_linen": 1
+  },
+  "seconds": 1.6,
+  "trust": 0,
+  "info": "GESCHMEIDIGES GEWEBE AUS RUINEN-NESSELFASERN"
+ },
+ "rope_ivy": {
+  "name": "EFEU-BINDEGARN",
+  "station": "workshop",
+  "by": "self",
+  "in": {
+   "ivy_tendril": 2
+  },
+  "out": {
+   "rope": 1
+  },
+  "seconds": 1.1,
+  "trust": 0,
+  "info": "ZÄHE RANKEN ZU FESTEM SEIL GEDREHT"
  }
 }

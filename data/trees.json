@@ -1,0 +1,407 @@
+{
+ "valley_oak": {
+  "name": "Glimmtal-Stieleiche",
+  "latin": "Quercus glimmensis",
+  "rig": "valley_oak_rig",
+  "biomes": ["meadow", "forest_edge"],
+  "rain_colors": ["55985f", "7cb96d", "2f624e", "c79a68"],
+  "autumn_colors": ["d89e3c", "b86432", "8a422c"],
+  "bark_colors": ["977f8b", "6f5869", "4b394f"],
+  "wood_colors": ["e6c494", "be8e5c", "8c5e42"],
+  "light_color": "#5ce8dc",
+  "light_energy": 0.09,
+  "fireflies": true,
+  "sway_gain": 1.0,
+  "harvest": {
+   "tool": "axe",
+   "hits": 6
+  },
+  "pickup": {
+   "prompt": "WUNDHARZ ERNTEN",
+   "regrow_days": 3,
+   "drops": [
+    {"id": "oak_amber", "min": 1, "max": 2, "chance": 1.0},
+    {"id": "oak_bark", "min": 1, "max": 2, "chance": 0.85},
+    {"id": "oak_polypore", "min": 1, "max": 1, "chance": 0.45}
+   ]
+  },
+  "stages": {
+   "0": {
+    "id": "s0",
+    "label": "Keimende Tal-Eichel",
+    "grow_days": 2,
+    "next_stage": 1,
+    "choppable": false,
+    "walk_through_flex": true,
+    "hits": 1,
+    "drops": []
+   },
+   "1": {
+    "id": "s1",
+    "label": "Eichen-Gerte",
+    "grow_days": 3,
+    "next_stage": 2,
+    "choppable": false,
+    "sickle_cut": true,
+    "walk_through_flex": true,
+    "hits": 1,
+    "drops": [
+     {"id": "stick", "min": 1, "max": 1, "chance": 1.0},
+     {"id": "leaf", "min": 1, "max": 2, "chance": 0.7}
+    ]
+   },
+   "2": {
+    "id": "s2",
+    "label": "Jung-Eiche",
+    "grow_days": 5,
+    "next_stage": 3,
+    "choppable": true,
+    "walk_through_flex": false,
+    "hits": 2,
+    "drops": [
+     {"id": "oak_wood", "min": 1, "max": 2, "chance": 1.0},
+     {"id": "stick", "min": 1, "max": 1, "chance": 0.6}
+    ]
+   },
+   "3": {
+    "id": "s3",
+    "label": "Aufstrebende Hain-Eiche",
+    "grow_days": 8,
+    "next_stage": 4,
+    "choppable": true,
+    "walk_through_flex": false,
+    "hits": 4,
+    "chip_drop": {"id": "oak_bark", "chance": 0.30},
+    "drops": [
+     {"id": "oak_wood", "min": 3, "max": 4, "chance": 1.0},
+     {"id": "valley_acorn", "min": 1, "max": 1, "chance": 0.55},
+     {"id": "stick", "min": 1, "max": 2, "chance": 0.65}
+    ]
+   },
+   "4": {
+    "id": "s4",
+    "label": "Reife Glimmtal-Eiche",
+    "grow_days": 14,
+    "next_stage": 4,
+    "choppable": true,
+    "has_pickup": true,
+    "walk_through_flex": false,
+    "hits": 6,
+    "chip_drop": {"id": "oak_wood", "chance": 0.35},
+    "drops": [
+     {"id": "oak_wood", "min": 5, "max": 7, "chance": 1.0},
+     {"id": "oak_bark", "min": 1, "max": 2, "chance": 0.80},
+     {"id": "valley_acorn", "min": 1, "max": 3, "chance": 0.90}
+    ]
+   },
+   "5": {
+    "id": "s5",
+    "label": "Uralte Hutebaum-Matriarchin",
+    "grow_days": 0,
+    "next_stage": 5,
+    "choppable": false,
+    "veteran_landmark": true,
+    "has_pickup": true,
+    "has_rest_seat": true,
+    "has_hollow": true,
+    "walk_through_flex": false,
+    "hits": 10,
+    "drops": [
+     {"id": "oak_wood", "min": 8, "max": 10, "chance": 1.0},
+     {"id": "oak_amber", "min": 2, "max": 3, "chance": 1.0},
+     {"id": "valley_acorn", "min": 2, "max": 4, "chance": 1.0}
+    ]
+   },
+   "6": {
+    "id": "s6_log",
+    "label": "Bemooster Ammenstamm",
+    "grow_days": 0,
+    "next_stage": 6,
+    "choppable": true,
+    "nurse_log": true,
+    "walk_through_flex": false,
+    "hits": 3,
+    "drops": [
+     {"id": "oak_wood", "min": 2, "max": 3, "chance": 1.0},
+     {"id": "oak_polypore", "min": 1, "max": 2, "chance": 0.85},
+     {"id": "valley_acorn", "min": 1, "max": 1, "chance": 0.50}
+    ]
+   }
+  }
+ },
+ "silver_birch": {
+  "name": "Glimmtal-Hängebirke",
+  "latin": "Betula pendula glimmensis",
+  "rig": "silver_birch_rig",
+  "biomes": ["birch_grove", "meadow", "forest_edge", "moor"],
+  "rain_colors": ["72bc6a", "a6df86", "488e5c", "f0dc74"],
+  "autumn_colors": ["ffe45c", "f0b834", "d48828"],
+  "autumn_hue": 1.0,
+  "bark_colors": ["f4f0f7", "cfc7de", "3a2c4a"],
+  "wood_colors": ["f7ebd6", "dfc29c", "b8926c"],
+  "light_color": "#8cf6ee",
+  "light_energy": 0.08,
+  "fireflies": true,
+  "sway_gain": 1.36,
+  "seat_prompt": "UNTER DER MUTTERBIRKE RASTEN",
+  "harvest": {
+   "tool": "axe",
+   "hits": 5
+  },
+  "pickup": {
+   "prompt": "BIRKENSAFT & BAST ERNTEN",
+   "regrow_days": 2,
+   "drops": [
+    {"id": "birch_sap", "min": 1, "max": 2, "chance": 1.0},
+    {"id": "birch_bark", "min": 1, "max": 2, "chance": 0.90},
+    {"id": "birch_chaga", "min": 1, "max": 1, "chance": 0.40}
+   ]
+  },
+  "stages": {
+   "0": {
+    "id": "s0",
+    "label": "Flügelnuss-Keimling",
+    "grow_days": 1,
+    "next_stage": 1,
+    "choppable": false,
+    "walk_through_flex": true,
+    "hits": 1,
+    "drops": []
+   },
+   "1": {
+    "id": "s1",
+    "label": "Kupferrinden-Birkenrute",
+    "grow_days": 2,
+    "next_stage": 2,
+    "choppable": false,
+    "sickle_cut": true,
+    "walk_through_flex": true,
+    "hits": 1,
+    "drops": [
+     {"id": "stick", "min": 1, "max": 2, "chance": 1.0},
+     {"id": "birch_catkin", "min": 1, "max": 1, "chance": 0.45}
+    ]
+   },
+   "2": {
+    "id": "s2",
+    "label": "Weißende Jungbirke",
+    "grow_days": 4,
+    "next_stage": 3,
+    "choppable": true,
+    "walk_through_flex": false,
+    "hits": 2,
+    "drops": [
+     {"id": "birch_wood", "min": 1, "max": 2, "chance": 1.0},
+     {"id": "birch_bark", "min": 1, "max": 1, "chance": 0.70}
+    ]
+   },
+   "3": {
+    "id": "s3",
+    "label": "Schlanke Pionierbirke",
+    "grow_days": 6,
+    "next_stage": 4,
+    "choppable": true,
+    "walk_through_flex": false,
+    "hits": 3,
+    "chip_drop": {"id": "birch_bark", "chance": 0.40},
+    "drops": [
+     {"id": "birch_wood", "min": 2, "max": 4, "chance": 1.0},
+     {"id": "birch_bark", "min": 1, "max": 2, "chance": 0.85},
+     {"id": "birch_catkin", "min": 1, "max": 2, "chance": 0.65}
+    ]
+   },
+   "4": {
+    "id": "s4",
+    "label": "Glimmtal-Hängebirke",
+    "grow_days": 10,
+    "next_stage": 4,
+    "choppable": true,
+    "has_pickup": true,
+    "walk_through_flex": false,
+    "hits": 5,
+    "chip_drop": {"id": "birch_bark", "chance": 0.42},
+    "drops": [
+     {"id": "birch_wood", "min": 4, "max": 6, "chance": 1.0},
+     {"id": "birch_bark", "min": 2, "max": 3, "chance": 0.90},
+     {"id": "birch_catkin", "min": 1, "max": 3, "chance": 0.90}
+    ]
+   },
+   "5": {
+    "id": "s5",
+    "label": "Uralte Silber-Mutterbirke",
+    "grow_days": 0,
+    "next_stage": 5,
+    "choppable": false,
+    "veteran_landmark": true,
+    "has_pickup": true,
+    "has_rest_seat": true,
+    "has_hollow": true,
+    "walk_through_flex": false,
+    "hits": 8,
+    "drops": [
+     {"id": "birch_wood", "min": 7, "max": 9, "chance": 1.0},
+     {"id": "birch_sap", "min": 2, "max": 3, "chance": 1.0},
+     {"id": "birch_chaga", "min": 1, "max": 2, "chance": 0.90},
+     {"id": "birch_catkin", "min": 2, "max": 4, "chance": 1.0}
+    ]
+   },
+   "6": {
+    "id": "s6_log",
+    "label": "Weißrindiger Birken-Ammenstamm",
+    "grow_days": 0,
+    "next_stage": 6,
+    "choppable": true,
+    "nurse_log": true,
+    "walk_through_flex": false,
+    "hits": 2,
+    "drops": [
+     {"id": "birch_wood", "min": 2, "max": 3, "chance": 1.0},
+     {"id": "birch_bark", "min": 1, "max": 2, "chance": 0.95},
+     {"id": "birch_chaga", "min": 1, "max": 1, "chance": 0.70}
+    ]
+   }
+  }
+ },
+ "wild_apple": {
+  "name": "Glimmtal-Wildapfel",
+  "latin": "Malus sylvestris glimmensis",
+  "rig": "wild_apple_rig",
+  "biomes": ["meadow", "orchard_glade", "country_lane"],
+  "rain_colors": ["549250", "82bf64", "316444", "b4e286"],
+  "autumn_colors": ["df642c", "c83432", "f7b848"],
+  "blossom_colors": ["fff4f8", "ffd6e6", "e88aa8"],
+  "autumn_hue": 2.0,
+  "bark_colors": ["b89188", "8f696b", "3c2736"],
+  "wood_colors": ["f0d4b4", "c97868", "9e4e48"],
+  "light_color": "#a6f6ee",
+  "light_energy": 0.08,
+  "fireflies": true,
+  "sway_gain": 1.12,
+  "default_phenology": 2,
+  "seat_prompt": "UNTER DEM ALTEN APFELBAUM RASTEN",
+  "harvest": {
+   "tool": "axe",
+   "hits": 5
+  },
+  "pickup": {
+   "prompt": "WILDÄPFEL SCHÜTTELN",
+   "shake_harvest": true,
+   "regrow_days": 3,
+   "drops": [
+    {"id": "wild_apple_fruit", "min": 3, "max": 5, "chance": 1.0},
+    {"id": "apple_seed", "min": 1, "max": 2, "chance": 0.75}
+   ]
+  },
+  "blossom_pickup": {
+   "prompt": "BLÜTENZWEIGE PFLÜCKEN",
+   "shake_harvest": true,
+   "regrow_days": 3,
+   "drops": [
+    {"id": "apple_blossom", "min": 2, "max": 4, "chance": 1.0}
+   ]
+  },
+  "stages": {
+   "0": {
+    "id": "s0",
+    "label": "Apfelkern-Keimling",
+    "grow_days": 2,
+    "next_stage": 1,
+    "choppable": false,
+    "walk_through_flex": true,
+    "hits": 1,
+    "drops": []
+   },
+   "1": {
+    "id": "s1",
+    "label": "Dornige Wildapfel-Rute",
+    "grow_days": 3,
+    "next_stage": 2,
+    "choppable": false,
+    "sickle_cut": true,
+    "walk_through_flex": true,
+    "hits": 1,
+    "drops": [
+     {"id": "stick", "min": 1, "max": 2, "chance": 1.0}
+    ]
+   },
+   "2": {
+    "id": "s2",
+    "label": "Junger Wiesen-Apfelbaum",
+    "grow_days": 5,
+    "next_stage": 3,
+    "choppable": true,
+    "walk_through_flex": false,
+    "hits": 2,
+    "drops": [
+     {"id": "apple_wood", "min": 1, "max": 2, "chance": 1.0},
+     {"id": "apple_seed", "min": 1, "max": 1, "chance": 0.60}
+    ]
+   },
+   "3": {
+    "id": "s3",
+    "label": "Knorriger Halbstamm-Apfel",
+    "grow_days": 7,
+    "next_stage": 4,
+    "choppable": true,
+    "has_pickup": true,
+    "walk_through_flex": false,
+    "hits": 4,
+    "chip_drop": {"id": "apple_wood", "chance": 0.32},
+    "drops": [
+     {"id": "apple_wood", "min": 2, "max": 4, "chance": 1.0},
+     {"id": "wild_apple_fruit", "min": 1, "max": 2, "chance": 0.85},
+     {"id": "apple_seed", "min": 1, "max": 2, "chance": 0.70}
+    ]
+   },
+   "4": {
+    "id": "s4",
+    "label": "Reifer Glimmtal-Wildapfel",
+    "grow_days": 12,
+    "next_stage": 4,
+    "choppable": true,
+    "has_pickup": true,
+    "walk_through_flex": false,
+    "hits": 5,
+    "chip_drop": {"id": "apple_wood", "chance": 0.38},
+    "drops": [
+     {"id": "apple_wood", "min": 4, "max": 6, "chance": 1.0},
+     {"id": "wild_apple_fruit", "min": 2, "max": 4, "chance": 0.95},
+     {"id": "apple_seed", "min": 1, "max": 3, "chance": 0.90}
+    ]
+   },
+   "5": {
+    "id": "s5",
+    "label": "Uralte Hohle Apfel-Mutter",
+    "grow_days": 0,
+    "next_stage": 5,
+    "choppable": false,
+    "veteran_landmark": true,
+    "has_pickup": true,
+    "has_rest_seat": true,
+    "has_hollow": true,
+    "walk_through_flex": false,
+    "hits": 9,
+    "drops": [
+     {"id": "apple_wood", "min": 6, "max": 8, "chance": 1.0},
+     {"id": "wild_apple_fruit", "min": 3, "max": 5, "chance": 1.0},
+     {"id": "wild_mistletoe", "min": 1, "max": 2, "chance": 1.0},
+     {"id": "apple_seed", "min": 2, "max": 4, "chance": 1.0}
+    ]
+   },
+   "6": {
+    "id": "s6_log",
+    "label": "Hohler Bemooster Apfelstamm",
+    "grow_days": 0,
+    "next_stage": 6,
+    "choppable": true,
+    "nurse_log": true,
+    "walk_through_flex": false,
+    "hits": 3,
+    "drops": [
+     {"id": "apple_wood", "min": 2, "max": 3, "chance": 1.0},
+     {"id": "apple_seed", "min": 1, "max": 2, "chance": 0.80}
+    ]
+   }
+  }
+ }
+}

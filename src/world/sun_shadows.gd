@@ -21,6 +21,7 @@ const DUSK: float = 0.79 ## ... and on the western one
 const MIN_STRENGTH: float = 0.02
 const FLORA_UNIFORMS: PackedStringArray = ["frame_size", "pivot_row", "amount", "flutter", "cell_w", "origin", "phase_seed"]
 const ROWS_UNIFORMS: PackedStringArray = ["pivot_row", "dir", "amount", "flutter", "speed", "cell_w", "wind", "time"]
+const CANOPY_UNIFORMS: PackedStringArray = ["frame_size", "anchor_px", "world_anchor", "stiffness", "flutter", "phase_seed", "wind_exposure", "rain_droop"]
 const SWAY_STEP: float = 0.004 ## radians of sway before a copy is re-angled (about half a pixel at a crown's height)
 const SUN_SIDE: float = 0.65 ## how strongly the sun's side of a thing is warmed and the far side cooled (day_sun_side)
 const FORESHORTEN: float = 0.62 ## north-south distances on the ground look this much shorter in the 3/4 view
@@ -54,6 +55,7 @@ var _item_mat: Array[RID] = [] ## per copy slot: the silhouette material it draw
 var _sil_mats: Dictionary = {} ## instance id of a caster's wind material -> {"src": ShaderMaterial, "mat": ShaderMaterial, "rows": bool, "t": msec}
 var _flora_shader: Shader
 var _rows_shader: Shader
+var _canopy_shader: Shader
 var _owner: PackedInt64Array = [] ## per copy slot: the instance id that owns it (0 = free)
 var _alloc: Dictionary = {} ## instance id -> Vector2i(first slot, slot count): a thing keeps its copies while it stays chosen
 var _parts: Dictionary = {} ## instance id -> {"t": msec, "list": Array[Sprite2D]}
@@ -88,6 +90,7 @@ func _ready() -> void:
 	_silhouette.shader = load("res://assets/shaders/shadow_silhouette.gdshader") as Shader
 	_flora_shader = load("res://assets/shaders/shadow_silhouette_flora.gdshader") as Shader
 	_rows_shader = load("res://assets/shaders/shadow_silhouette_rows.gdshader") as Shader
+	_canopy_shader = load("res://assets/shaders/shadow_silhouette_canopy.gdshader") as Shader
 	_overlay = Polygon2D.new()
 	_overlay.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 	_overlay.name = "Shade"
@@ -208,7 +211,7 @@ func _rebuild() -> void:
 	# every thing keeps the copy slots it had (only new ones are drawn at once, the rest follow round robin)
 	var keep: Dictionary = {}
 	for thing: Node2D in _active:
-		if thing is FirTree and (thing as FirTree).is_falling():
+		if thing.has_method("is_falling") and bool(thing.call("is_falling")):
 			_parts.erase(thing.get_instance_id()) ## the toppling part is made of new sprites
 		keep[thing.get_instance_id()] = _sprites_of(thing).size()
 	for id: Variant in _alloc.keys():
@@ -230,7 +233,7 @@ func _rebuild() -> void:
 		_slot_start[k] = run.x
 		_slot_cap[k] = run.y
 		var thing: Node2D = _active[k]
-		var falling: bool = thing is FirTree and (thing as FirTree).is_falling()
+		var falling: bool = thing.has_method("is_falling") and bool(thing.call("is_falling"))
 		_slot_moving[k] = 1 if falling or WaterReflections.is_moving(thing) else 0
 		_slot_dirty[k] = 1 if fresh else 0
 		_slot_sway[k] = 1 if thing is FirTree or thing is Bush or _sways(thing) else 0
@@ -249,16 +252,18 @@ func _sways(thing: Node2D) -> bool:
 	return _kinds_of(thing).count(0) != _kinds_of(thing).size()
 
 
-## 0 = a plain picture, 1 = flora_wind (small plants), 2 = sway_rows (rags, garden plants, the crow tree).
+## 0 = a plain picture, 1 = flora_wind (small plants), 2 = sway_rows (rags, garden plants, the crow tree), 3 = canopy_cluster (LivingTree 2.0).
 func _wind_kind(sprite: Sprite2D) -> int:
 	var material: ShaderMaterial = _wind_material(sprite)
 	if material == null:
 		return 0
 	var path: String = material.shader.resource_path
-	if path.ends_with("flora_wind.gdshader"):
+	if path.ends_with("flora_wind.gdshader") or path.ends_with("living_flora.gdshader"):
 		return 1
 	if path.ends_with("sway_rows.gdshader"):
 		return 2
+	if path.ends_with("canopy_cluster.gdshader"):
+		return 3
 	return 0
 
 
@@ -282,12 +287,13 @@ func _material_for(sprite: Sprite2D, kind: int, plain: RID) -> RID:
 	var entry: Dictionary = _sil_mats.get(id, {}) as Dictionary
 	if entry.is_empty():
 		var made: ShaderMaterial = ShaderMaterial.new()
-		made.shader = _flora_shader if kind == 1 else _rows_shader
-		for uniform: String in FLORA_UNIFORMS if kind == 1 else ROWS_UNIFORMS: ## set once by their owners (wind/time: every frame in the pass)
+		made.shader = _flora_shader if kind == 1 else (_rows_shader if kind == 2 else _canopy_shader)
+		var uniform_list: PackedStringArray = FLORA_UNIFORMS if kind == 1 else (ROWS_UNIFORMS if kind == 2 else CANOPY_UNIFORMS)
+		for uniform: String in uniform_list: ## set once by their owners (wind/time: every frame in the pass)
 			var value: Variant = source.get_shader_parameter(uniform)
 			if value != null:
 				made.set_shader_parameter(uniform, value)
-		entry = {"src": source, "mat": made, "rows": kind == 2, "t": 0}
+		entry = {"src": source, "mat": made, "rows": kind == 2, "canopy": kind == 3, "t": 0}
 		_sil_mats[id] = entry
 	var mat: ShaderMaterial = entry["mat"] as ShaderMaterial
 	entry["t"] = Time.get_ticks_msec()
@@ -420,7 +426,7 @@ func _draw_pass() -> void:
 			continue
 		var lag: Vector2 = WaterReflections.drawn_offset(thing) if moving else Vector2.ZERO ## the picture is drawn interpolated
 		var bend: Transform2D = shear(thing.global_position + lag, cast)
-		var falling: bool = thing is FirTree and (thing as FirTree).is_falling()
+		var falling: bool = thing.has_method("is_falling") and bool(thing.call("is_falling"))
 		var n: int = 0
 		var kinds: PackedByteArray = _kinds_of(thing)
 		var part: int = -1
@@ -438,7 +444,7 @@ func _draw_pass() -> void:
 				RenderingServer.canvas_item_set_material(item, wanted)
 				_item_mat[slot] = wanted
 			_slot_sprite[slot] = sprite
-			_slot_angle[slot] = sprite.skew + sprite.rotation
+			_slot_angle[slot] = sprite.skew + sprite.rotation + sprite.position.x * 0.011 + sprite.position.y * 0.017
 			if _item_shown[slot] == 0:
 				RenderingServer.canvas_item_set_visible(item, true)
 				_item_shown[slot] = 1
@@ -483,7 +489,7 @@ func _follow_sway(thing: Node2D, start: int, cap: int) -> void:
 		if not is_instance_valid(held):
 			continue
 		var sprite: Sprite2D = held as Sprite2D
-		var angle: float = sprite.skew + sprite.rotation
+		var angle: float = sprite.skew + sprite.rotation + sprite.position.x * 0.011 + sprite.position.y * 0.017
 		if absf(angle - _slot_angle[slot]) < SWAY_STEP:
 			continue ## not enough to move the shadow by a pixel
 		_slot_angle[slot] = angle

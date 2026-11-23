@@ -161,7 +161,19 @@ func _rivers() -> WorldRivers:
 	return null
 
 
+func _water_field_patch(point: Vector2) -> Node:
+	for patch: Node in Terrain.patches:
+		if patch.has_method("water_field_at"):
+			var wf: Dictionary = patch.call("water_field_at", point) as Dictionary
+			if bool(wf.get("in_bounds", false)):
+				return patch
+	return null
+
+
 func _field(point: Vector2) -> Vector2:
+	var wf_patch: Node = _water_field_patch(point)
+	if wf_patch != null and wf_patch.has_method("field_at"):
+		return wf_patch.call("field_at", point) as Vector2
 	var rivers: WorldRivers = _rivers()
 	return rivers.field_at(point) if rivers != null else Vector2(INF, 0.0)
 
@@ -173,6 +185,10 @@ func _flow(point: Vector2) -> Vector2:
 ## The current at a point: the river's direction times its strength (slack by the banks, full in the channel, still in
 ## lakes and pools). The baked flow field alone only holds the direction.
 func current_at(point: Vector2) -> Vector2:
+	var wf_patch: Node = _water_field_patch(point)
+	if wf_patch != null and wf_patch.has_method("water_flow_at"):
+		var raw_flow: Vector2 = wf_patch.call("water_flow_at", point) as Vector2
+		return (raw_flow / 28.0).limit_length(1.0) if raw_flow.length_squared() > 0.0001 else Vector2.ZERO
 	var rivers: WorldRivers = _rivers()
 	if rivers == null or rivers.fauna == null:
 		return Vector2.ZERO

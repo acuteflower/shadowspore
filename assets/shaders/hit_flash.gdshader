@@ -35,6 +35,9 @@ uniform bool step_light = false;
 uniform float veil : hint_range(0.0, 1.0) = 0.0;
 uniform float veil_keep : hint_range(0.0, 1.0) = 0.5;
 uniform float veil_seed = 0.0;
+// Movement 2.0: subtle night-indigo shadow meld while sneaking in canopy/night cover (V9), and 1-px wind flutter on loose coat hem in gusts (V3).
+uniform float prowl_shade : hint_range(0.0, 1.0) = 0.0;
+uniform float idle_wind_px : hint_range(-2.0, 2.0) = 0.0;
 
 float veil_hash(vec2 p) {
 	return fract(sin(dot(p, vec2(41.3, 289.1)) + veil_seed * 3.17) * 15731.743);
@@ -137,8 +140,16 @@ vec2 step_cover(vec2 px) {
 
 void fragment() {
 	float outfit_lume = 0.0;
+	vec2 sample_uv = UV;
+	float wy = floor(local_px.y);
+	if (abs(idle_wind_px) >= 0.5 && step_mode == 0 && wy >= -19.0 && wy <= -7.0) {
+		float w_shift = round(idle_wind_px * smoothstep(-19.0, -9.0, wy));
+		sample_uv.x -= w_shift / float(textureSize(TEXTURE, 0).x);
+	}
 	if (use_cosmetics) {
-		COLOR = sample_hero_ex(texture(TEXTURE, UV), UV, outfit_lume) * v_modulate;
+		COLOR = sample_hero_ex(texture(TEXTURE, sample_uv), sample_uv, outfit_lume) * v_modulate;
+	} else if (sample_uv != UV) {
+		COLOR = texture(TEXTURE, sample_uv) * v_modulate;
 	}
 	if (wound > 0.0 && COLOR.a > 0.01) {
 		float lum = dot(COLOR.rgb, vec3(0.3, 0.59, 0.11));
@@ -179,6 +190,11 @@ void fragment() {
 		}
 	}
 	COLOR.rgb = day_grade(COLOR.rgb, daylight_position, 1.0);
+	if (prowl_shade > 0.005 && COLOR.a > 0.01) {
+		float pl = dot(COLOR.rgb, vec3(0.3, 0.59, 0.11));
+		vec3 night_cloak = mix(vec3(0.055, 0.04, 0.11), COLOR.rgb * vec3(0.74, 0.78, 0.96), smoothstep(0.05, 0.75, pl));
+		COLOR.rgb = mix(COLOR.rgb, night_cloak, prowl_shade * 0.42);
+	}
 	if (outfit_lume > 0.05 && COLOR.a > 0.01) {
 		// Soft moonlit-silk luminescence on embroidered ice-lotus & champagne-gold threads at night
 		float night_k = clamp(1.0 - g_day_strength, 0.0, 1.0);

@@ -206,10 +206,12 @@ func _physics_process(delta: float) -> void:
 ## Every peer: the bird sits on a player's shoulder (peer != 0) or leaves it (0). It is pinned to her every physics frame.
 @rpc("authority", "call_local", "reliable")
 func _ride(peer: int) -> void:
+	var was_riding: bool = rider != 0
 	rider = peer
 	_moving = false
 	if peer == 0:
-		_height = 0.0
+		if not was_riding:
+			_height = 0.0
 		state = State.WATCH
 		_elapsed = 0.0
 		_duration = 1.0
@@ -233,8 +235,11 @@ func _sit_on_shoulder() -> void:
 		return
 	var cfg: Dictionary = PetRules.table()["companion"] as Dictionary
 	var off: Array = cfg["shoulder_offset"] as Array
-	global_position = carrier.global_position + Vector2(float(off[0]), float(off[1]))
-	_height = float(cfg["shoulder_height"])
+	var left_side: Vector2 = -GripRig.right_of(carrier.facing.normalized() if carrier.facing.length_squared() > 0.01 else Vector2.DOWN)
+	var shoulder_shift: Vector2 = Vector2(left_side.x * absf(float(off[0])), float(off[1]) + left_side.y * 1.4)
+	global_position = carrier.global_position + shoulder_shift
+	var walk_bob: float = sin(carrier._walk_time / float(Player.WALK_FRAMES) * TAU * 2.0) * 0.75 if carrier.velocity.length() > 6.0 else 0.0
+	_height = float(cfg["shoulder_height"]) - walk_bob
 	state = State.ROOST
 	if carrier.velocity.length() > 5.0:
 		facing = carrier.velocity.angle()

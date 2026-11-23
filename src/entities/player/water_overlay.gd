@@ -9,8 +9,19 @@ const EASE_SPEED: float = 30.0 ## px/s
 const SORT_SHIFT: float = 6.0 ## node sits this far below the feet so it is drawn after the sprite
 
 var submerge: float = 0.0 ## target depth in px, set by the player from the surface data
+var fill_color: Color = FILL
+var rim_color: Color = RIM
 
 var _current: float = 0.0
+
+
+func set_water_colors(fill: Color, rim: Color) -> void:
+	if fill_color == fill and rim_color == rim:
+		return
+	fill_color = fill
+	rim_color = rim
+	if _current > 0.0:
+		queue_redraw()
 
 
 func _process(delta: float) -> void:
@@ -25,7 +36,7 @@ func _draw() -> void:
 	var depth: int = roundi(_current)
 	if depth < 1:
 		return
-	var fill: Color = Color(FILL, minf(0.48, 0.26 + 0.02 * depth))
+	var fill: Color = Color(fill_color, minf(0.48, 0.26 + 0.02 * depth))
 	var top: int = 1 - depth
 	# Narrow the edges at the feet so the tint sits inside the little waterline.
 	if depth > 1:
@@ -35,4 +46,4 @@ func _draw() -> void:
 		var rise: int = 1 if posmod(x + shimmer, 7) == 0 else 0
 		var lit: bool = posmod(x + shimmer, 8) < 4
 		var alpha: float = 0.58 if lit else 0.32
-		draw_rect(Rect2(x, top - rise, 1, 1), Color(RIM, alpha))
+		draw_rect(Rect2(x, top - rise, 1, 1), Color(rim_color, alpha))

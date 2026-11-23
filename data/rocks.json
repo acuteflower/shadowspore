@@ -1,0 +1,93 @@
+{
+ "valley_stone": {
+  "name": "Glimmtal-Fels",
+  "latin": "Grauwacke glimmensis",
+  "rig": "valley_stone_rig",
+  "biomes": ["meadow", "forest_edge", "rocky_slope"],
+  "chip_colors": ["b8c3bb", "75878c", "506475", "263643"],
+  "spark_colors": ["fff0b0", "e6c468"],
+  "dust_color": "#a8b4b0",
+  "moss_colors": ["346e52", "55985f", "7cb96d"],
+  "harvest": {
+   "tool": "pickaxe",
+   "regrow_days": 4
+  },
+  "pickup_s0": {
+   "prompt": "FELDSTEIN AUFHEBEN",
+   "drops": [
+    {"id": "stone", "min": 1, "max": 2, "chance": 1.0}
+   ]
+  },
+  "stages": {
+   "0": {
+    "id": "s0",
+    "label": "Loser Lesestein",
+    "archetypes": ["s0_a", "s0_b"],
+    "mineable": true,
+    "hand_pickup": true,
+    "leave_rubble": false,
+    "hits": 1,
+    "regrow_days": 2,
+    "drops": [
+     {"id": "stone", "min": 1, "max": 2, "chance": 1.0}
+    ]
+   },
+   "1": {
+    "id": "s1",
+    "label": "Kleiner Findling",
+    "archetypes": ["s1_a", "s1_b"],
+    "mineable": true,
+    "hand_pickup": false,
+    "leave_rubble": true,
+    "hits": 2,
+    "regrow_days": 3,
+    "chip_drop": {"id": "stone", "chance": 0.45},
+    "drops": [
+     {"id": "stone", "min": 2, "max": 3, "chance": 1.0}
+    ]
+   },
+   "2": {
+    "id": "s2",
+    "label": "Kantiger Grauwacke-Block",
+    "archetypes": ["s2_a", "s2_b", "s2_c"],
+    "mineable": true,
+    "hand_pickup": false,
+    "leave_rubble": true,
+    "hits": 4,
+    "regrow_days": 4,
+    "chip_drop": {"id": "stone", "chance": 0.55},
+    "drops": [
+     {"id": "stone", "min": 4, "max": 6, "chance": 1.0}
+    ]
+   },
+   "3": {
+    "id": "s3",
+    "label": "Geschichteter Felsaufschluss",
+    "archetypes": ["s3_a", "s3_b", "s3_c"],
+    "mineable": true,
+    "hand_pickup": false,
+    "leave_rubble": true,
+    "hits": 6,
+    "regrow_days": 5,
+    "chip_drop": {"id": "stone", "chance": 0.65},
+    "drops": [
+     {"id": "stone", "min": 7, "max": 10, "chance": 1.0}
+    ]
+   },
+   "4": {
+    "id": "s4",
+    "label": "Mächtige Glimmtal-Felsgruppe",
+    "archetypes": ["s4_a", "s4_b"],
+    "mineable": true,
+    "hand_pickup": false,
+    "leave_rubble": true,
+    "hits": 9,
+    "regrow_days": 7,
+    "chip_drop": {"id": "stone", "chance": 0.75},
+    "drops": [
+     {"id": "stone", "min": 12, "max": 16, "chance": 1.0}
+    ]
+   }
+  }
+ }
+}

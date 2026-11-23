@@ -2699,5 +2699,414 @@
    "idle_glint": true
   },
   "description": "Von Caelia in himmlischem Sternenfeuer geschmiedet. Rechtsklick entfesselt Sternenstich (Astralsichel + 3 fallende Sterne) und Himmelsfall (5 heilende Sternenlanzen vom Himmel)."
+ },
+ "oak_wood": {
+  "name": "Glimmeichen-Holz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/oak_wood.png",
+  "description": "Schweres, warm gemasertes Kernholz der alten Tal-Eichen. Trägt Brücken, Fachwerk und Wehrgänge über Generationen."
+ },
+ "oak_bark": {
+  "name": "Eichen-Gerbrinde",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/oak_bark.png",
+  "description": "Tief gefurchte, bemooste Borke voller herber Gerbstoffe. Grundzutat für zusammenziehende Wund- und Rindenhaut-Sude."
+ },
+ "oak_amber": {
+  "name": "Eichen-Wundharz",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/oak_amber.png",
+  "description": "Goldenes Harz, mit dem eine alte Glimmtal-Eiche ihre Wetterwunden versiegelt. Bindet Lichtwärme in Esmas Schutz-Elixieren."
+ },
+ "valley_acorn": {
+  "name": "Tal-Eichel",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "tool": "acorn_seed",
+  "icon": "res://assets/items/valley_acorn.png",
+  "description": "Praller Samen einer Glimmtal-Stieleiche mit rauem Hütchen. Kann in fruchtbaren Boden gepflanzt werden, um einen neuen Baum heranzuziehen."
+ },
+ "oak_polypore": {
+  "name": "Glimmschwamm",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/oak_polypore.png",
+  "description": "Geschichteter Konsolenpilz von der feuchten Nordflanke alter Eichen. Sein türkiser Saum atmet nachts leise im Takt des Wurzelnetzes."
+ },
+ "birch_wood": {
+  "name": "Silberbirken-Holz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/birch_wood.png",
+  "description": "Helles, seidig glattes und biegsames Holz der Hängebirke. Leicht zu tragen, zäh im Schwung — ideal für feine Bögen, Dachspindeln und helle Möbel."
+ },
+ "birch_bark": {
+  "name": "Birken-Papierbast",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/birch_bark.png",
+  "description": "Schneeweiße, sich einrollende Rindenstreifen voller natürlichem Betulin. Brennt selbst im strömenden Regen und hält Schrift wie Wundverbände trocken."
+ },
+ "birch_sap": {
+  "name": "Klarer Birkensaft",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/birch_sap.png",
+  "description": "Kühl schimmernder Frühjahrs-Stammfluss einer Glimmtal-Hängebirke. Klärt Esmas Elixiere und trägt die Frische des tauenden Waldbodens in sich."
+ },
+ "birch_catkin": {
+  "name": "Goldenes Birkenkätzchen",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "tool": "birch_seed",
+  "icon": "res://assets/items/birch_catkin.png",
+  "description": "Hängendes Blüten- und Samenkätzchen voller geflügelter Nüsschen. Keimt als lichthungriger Pionierbaum rasch auf offenen Lichtungen."
+ },
+ "birch_chaga": {
+  "name": "Funken-Chaga",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/birch_chaga.png",
+  "description": "Kohleschwarze, zerklüftete Pilzknolle aus der Rindennarbe alter Silberbirken. Im Inneren glimmt ein gold-türkises Adernetz voller Heilkraft."
+ },
+ "apple_wood": {
+  "name": "Wildapfel-Kernholz",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/apple_wood.png",
+  "description": "Dichtes, warm lachsrot gemasertes Edelholz alter Wiesen-Holzäpfel. Zäh, feinporig und kaum zu spalten — begehrt für Bogenwurfarme und Schnitzwerk."
+ },
+ "wild_apple_fruit": {
+  "name": "Glimmtal-Wildapfel",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/wild_apple_fruit.png",
+  "stats": {
+   "heal": 8
+  },
+  "description": "Kleiner, sonnenrot gebräunter Holzapfel von der Talwiese. Knackig, herb-süß und voller Frische — stellt sofort 8 Gesundheit wieder her."
+ },
+ "apple_blossom": {
+  "name": "Wildapfel-Blüte",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/apple_blossom.png",
+  "description": "Zartrosa bis schneeweiße Blütendolde mit goldenem Staubkranz. Duftet nach Frühlingstau und veredelt Esmas milde Heil- und Klarheitssude."
+ },
+ "wild_mistletoe": {
+  "name": "Silbermistel",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": false,
+  "icon": "res://assets/items/wild_mistletoe.png",
+  "description": "Immergrüner Gabelzweig aus der Krone uralter Apfelbäume. Seine perlweißen Beeren berühren niemals die Erde und bewahren nachts stilles Mondlicht."
+ },
+ "apple_seed": {
+  "name": "Wildapfel-Kern",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": true,
+  "tool": "apple_seed",
+  "icon": "res://assets/items/apple_seed.png",
+  "description": "Dunkelbraun glänzende Tropfenkerne aus dem Gehäuse reifer Holzäpfel. Keimen auf sonnigen Wiesen zu neuen knorrigen Streuobstbäumen heran."
+ },
+ "waybread_leaf": {
+  "name": "Pflaster-Wegerich",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/waybread_leaf.png",
+  "description": "Zähes, längsgeripptes Krautblatt vom festgetretenen Wegesrand. Kühlt Schürfwunden und lässt sich mit Pflanzenfaser rasch zu einem Feldverband wickeln."
+ },
+ "stonecrop_gold": {
+  "name": "Mauerpfeffer-Goldblüte",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/stonecrop_gold.png",
+  "description": "Sonnenwarme Sternblütchen aus trockenen Heiligtumsfugen. Liefern ein beständiges Altgold-Pigment für Banner, Lasuren und Haarschmuck."
+ },
+ "silver_yarrow": {
+  "name": "Silber-Schafgarbe",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/silver_yarrow.png",
+  "description": "Würzig-herber Blütenschirm von sonnigen Wegböschungen. Seit alters her geschätztes Wund- und Teekraut der Talwanderer."
+ },
+ "chicory_petal": {
+  "name": "Sternwarten-Blüte",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/chicory_petal.png",
+  "description": "Zart rauchblaue Strahlenblüte der Wegwarte, die sich nur dem Morgen- und Mittagslicht öffnet."
+ },
+ "wild_thyme": {
+  "name": "Steinthymian",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": true,
+  "icon": "res://assets/items/wild_thyme.png",
+  "stats": {
+   "heal": 4,
+   "regen": 6,
+   "regen_seconds": 6
+  },
+  "description": "Harzig duftendes Polsterkraut von sonnenwarmen Pflasterkanten. Weitet beim Kauen den Atem und stellt sanft Gesundheit wieder her."
+ },
+ "rune_blossom": {
+  "name": "Runen-Steinbrechblüte",
+  "kind": "material",
+  "rarity": "rare",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": false,
+  "icon": "res://assets/items/rune_blossom.png",
+  "description": "Filigrane türkis-weiße Sternrispe, deren Wurzeln nur in uraltem Heiligtums-Mörtel Halt finden. Bewahrt nachts einen stillen Funken Wächterlicht."
+ },
+ "mullein_torch_head": {
+  "name": "Wächterkerzen-Kolben",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": false,
+  "icon": "res://assets/items/mullein_torch_head.png",
+  "description": "Wollig-dichter goldener Blütenstand der großen Königskerze. Mit Baumharz getränkt brennt er selbst im Herbststurm ruhig weiter."
+ },
+ "star_dew_drop": {
+  "name": "Sternen-Morgentau",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": false,
+  "icon": "res://assets/items/star_dew_drop.png",
+  "description": "Kristallklare Tauperle aus den Fächerblättern des Frauenmantels und antiken Tauschalen. Bewahrt die Frische des Morgens für Esmas Klarblick-Sude."
+ },
+ "dusk_spur": {
+  "name": "Nachtsporn-Kelch",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": false,
+  "icon": "res://assets/items/dusk_spur.png",
+  "description": "Tief pflaumenviolette Spornblüte vom schattigen Waldsaum. Ihr feiner Sporenstaub glimmt in der Dämmerung auf."
+ },
+ "ivy_tendril": {
+  "name": "Zähe Efeuranke",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/ivy_tendril.png",
+  "description": "Biegsame, kaum zerreißbare Kletterranke von alten Ruinenquadern — vorzügliches natürliches Bindegarn."
+ },
+ "sorrel_leaf": {
+  "name": "Mond-Sauerklee",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": true,
+  "icon": "res://assets/items/sorrel_leaf.png",
+  "stats": {
+   "heal": 6
+  },
+  "description": "Zartes dreiteiliges Waldkleeblatt mit frisch-säuerlichem Biss. Kühlt den Gaumen und stellt sofort 6 Gesundheit wieder her."
+ },
+ "nettle_fiber": {
+  "name": "Feine Nesselfaser",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/nettle_fiber.png",
+  "description": "Seidig gekämmte Bastfasern aus Ruinen-Nesselhorsten. Viel geschmeidiger als grobe Grasfaser und zu feinem Nesseltuch verwebbar."
+ },
+ "meadowsweet_sprig": {
+  "name": "Mädesüß-Rispe",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/meadowsweet_sprig.png",
+  "description": "Schaumig-cremefarbene Blütendolde aus feuchten Senken, die nach Honig und Mandeln duftet."
+ },
+ "rosehip": {
+  "name": "Dämmer-Hagebutte",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/rosehip.png",
+  "stats": {
+   "heal": 6,
+   "regen": 8,
+   "regen_seconds": 8
+  },
+  "description": "Leuchtend rubinrote Sammelfrucht der wilden Heckenrose. Reich an herber Kraft — stellt 6 Gesundheit sofort und 8 über 8 Sekunden wieder her."
+ },
+ "elder_blossom": {
+  "name": "Holunderblüte",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/elder_blossom.png",
+  "description": "Breiter rahmweißer Blütenteller voll goldenem Blütenstaub vom alten Glimm-Holunder."
+ },
+ "elderberry": {
+  "name": "Glimm-Holunderbeere",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/elderberry.png",
+  "stats": {
+   "heal": 5,
+   "regen": 10,
+   "regen_seconds": 10
+  },
+  "description": "Schwere, fast schwarze Beerendolde an rötlichen Stielen. Kräftig und wärmend, besonders heiß aufgegossen."
+ },
+ "sloe_berry": {
+  "name": "Frost-Schlehe",
+  "kind": "material",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 99,
+  "hotbar": false,
+  "icon": "res://assets/items/sloe_berry.png",
+  "description": "Taublau bereifte Steinfrucht vom dornigen Heckenbusch. Roh pelzig-herb, im Sud jedoch ein unverwüstlicher Reiseproviant."
+ },
+ "wild_blackberry": {
+  "name": "Dornenbrombeere",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": true,
+  "icon": "res://assets/items/wild_blackberry.png",
+  "stats": {
+   "heal": 8,
+   "regen": 6,
+   "regen_seconds": 6
+  },
+  "description": "Saftig glänzende, dunkelviolette Waldrandbeere aus dornigem Rankengeflecht. Süß und belebend."
+ },
+ "rose_briar_cutting": {
+  "name": "Heckenrosen-Steckling",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 30,
+  "hotbar": false,
+  "icon": "res://assets/items/rose_briar_cutting.png",
+  "description": "Kräftiger junger Wurzeltrieb einer Dämmer-Heckenrose mit frischer Knospe, bereit zum Einpflanzen am eigenen Hof."
+ },
+ "waybread_poultice": {
+  "name": "Wegerich-Wundwickel",
+  "kind": "consumable",
+  "rarity": "common",
+  "enchant_slots": 0,
+  "max_stack": 20,
+  "hotbar": true,
+  "icon": "res://assets/items/waybread_poultice.png",
+  "stats": {
+   "heal": 14,
+   "regen": 8,
+   "regen_seconds": 6
+  },
+  "description": "Aus zerstoßenem Pflaster-Wegerich, Schafgarbe und Pflanzenfaser gewickelter Kräuterumschlag. Stillt Wunden rasch unterwegs ohne Trank-Abklingzeit."
+ },
+ "elder_rosehip_tea": {
+  "name": "Holunder-Hagebutten-Sud",
+  "kind": "consumable",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 20,
+  "hotbar": true,
+  "icon": "res://assets/items/elder_rosehip_tea.png",
+  "stats": {
+   "heal": 10,
+   "regen": 24,
+   "regen_seconds": 16
+  },
+  "description": "Dampfender rubin-violetter Kräuteraufguss aus Glimm-Holunder, Hagebutten und Mädesüß. Wärmt tief durch und regeneriert 24 Gesundheit über 16 Sekunden."
+ },
+ "nettle_linen": {
+  "name": "Feines Nesseltuch",
+  "kind": "material",
+  "rarity": "uncommon",
+  "enchant_slots": 0,
+  "max_stack": 50,
+  "hotbar": false,
+  "icon": "res://assets/items/nettle_linen.png",
+  "description": "Dicht und geschmeidig gewebtes Tuch aus hellgrüner Nesselfaser mit violetter Webkante."
  }
 }

@@ -134,34 +134,34 @@ float quartz_field(vec2 px, float arid) {
 	return cl * (0.64 + 0.52 * pocket_t);
 }
 
-// World-space sculpted 2-blade grass tufts; thins and shortens into sparse dry straw across the steppe transition.
+// Calm, velvety world-space turf micro-nap (soft +-1 step; lets LivingGrass blades own crisp foreground silhouettes).
 int blade_shift(vec2 px, float macro, float wear, float arid) {
 	if (arid >= 0.54) {
 		return 0;
 	}
-	vec2 cell = floor(vec2(px.x / 7.0, px.y / 7.0));
+	vec2 cell = floor(vec2(px.x / 10.0, px.y / 9.0));
 	float h = hash(cell + vec2(3.0, 1103.0));
 	float dry_thin = 1.0 - smoothstep(0.10, 0.54, arid);
-	float density = (0.40 + 0.18 * smoothstep(0.64, 0.24, macro)) * (1.0 - smoothstep(0.15, 0.7, wear)) * dry_thin;
+	float density = (0.24 + 0.12 * smoothstep(0.64, 0.24, macro)) * (1.0 - smoothstep(0.15, 0.7, wear)) * dry_thin;
 	if (h > density) {
 		return 0;
 	}
 	float h2 = hash(cell + vec2(2909.0, 9.0));
 	float h3 = hash(cell + vec2(5021.0, 7717.0));
 	float h4 = hash(cell + vec2(941.0, 4441.0));
-	float foot_x = cell.x * 7.0 + 2.0 + floor(h2 * 3.0);
-	float foot_y = cell.y * 7.0 + 4.0 + floor(h4 * 2.0);
-	float height = (arid > 0.26 ? 2.0 : 3.0) + floor(h3 * 2.0);
-	bool dark = h4 > 0.70;
+	float foot_x = cell.x * 10.0 + 3.0 + floor(h2 * 4.0);
+	float foot_y = cell.y * 9.0 + 5.0 + floor(h4 * 2.0);
+	float height = 2.0 + floor(h3 * 2.0);
+	bool dark = h4 > 0.62;
 	float dir = h3 > 0.5 ? 1.0 : -1.0;
-	float sway = floor(sin(TIME * 1.3 + cell.x * 0.7 + cell.y * 0.4) * 0.55 + 0.5);
+	float sway = floor(sin(g_wind_clock * 1.4 + cell.x * 0.5 + cell.y * 0.3) * 0.5 + 0.5);
 	float up = foot_y - px.y;
 	if (up == 0.0 && (px.x == foot_x || px.x == foot_x + 1.0)) {
 		return -1;
 	}
 	for (int i = 0; i < 2; i++) {
 		float blade_h = i == 0 ? height : height - 1.0;
-		if ((i == 1 && h2 < 0.25) || blade_h < 2.0) {
+		if ((i == 1 && h2 < 0.35) || blade_h < 2.0) {
 			continue;
 		}
 		if (up < 1.0 || up >= blade_h) {
@@ -172,9 +172,6 @@ int blade_shift(vec2 px, float macro, float wear, float arid) {
 			: foot_x + 1.0 + (up >= 2.0 ? -dir : 0.0);
 		if (px.x != bx) {
 			continue;
-		}
-		if (up == blade_h - 1.0) {
-			return dark ? 1 : (i == 0 ? 2 : 1);
 		}
 		return dark ? -1 : 1;
 	}
@@ -439,8 +436,8 @@ void fragment() {
 				shift += open_meadow * w_ripple * min(g_wind_gust, 1.35) * day * 0.28;
 			}
 		}
-		float eff_shift = clamp(shift * 0.56, -1.65, 1.42);
-		float swell = (fbm(px / 24.0 + vec2(5.0, 13.0)) - 0.5) * 0.42;
+		float eff_shift = clamp(shift * 0.50, -1.65, 1.12);
+		float swell = (fbm(px / 24.0 + vec2(5.0, 13.0)) - 0.5) * 0.36;
 
 		float dune_creep = g_wind_sand.z;
 		float wind_push = g_wind_sand.w;

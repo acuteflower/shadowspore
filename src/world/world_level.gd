@@ -2902,7 +2902,12 @@ func water_depth(point: Vector2) -> float:
 	var chunk: Vector2i = Vector2i(floori(point.x / (CHUNK * 16.0)), floori(point.y / (CHUNK * 16.0)))
 	if not _chunks.has(chunk) or Interiors.slot_at(point) >= 0 or MineManager.in_mine(point):
 		return -1.0
-	return _rivers.depth_amount(point)
+	for patch: Node in Terrain.patches:
+		if patch.has_method("water_field_at") and patch.has_method("depth_amount"):
+			var wf: Dictionary = patch.call("water_field_at", point) as Dictionary
+			if bool(wf.get("in_bounds", false)):
+				return float(patch.call("depth_amount", point))
+	return _rivers.depth_amount(point) if _rivers != null else -1.0
 
 
 ## Enemy navigation stays inside loaded land, including wall faces used by climb links.
@@ -2913,8 +2918,18 @@ func navigation_floor(point: Vector2) -> bool:
 		return true ## inside a building the floor is the room (its colliders do the rest): the story fights there
 	var tile: Vector2i = Vector2i(floori(point.x / 16.0), floori(point.y / 16.0))
 	var chunk: Vector2i = Vector2i(floori(point.x / (CHUNK * 16.0)), floori(point.y / (CHUNK * 16.0)))
-	var floor: bool = (_land_at(tile.x, tile.y) and _relief.is_land(tile.x, tile.y)) or _rivers.lake_at(point)
-	return _chunks.has(chunk) and floor and not _rivers.is_deep(point)
+	var floor: bool = (_land_at(tile.x, tile.y) and _relief.is_land(tile.x, tile.y)) or (_rivers != null and _rivers.lake_at(point))
+	if not _chunks.has(chunk) or not floor:
+		return false
+	for patch: Node in Terrain.patches:
+		if patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", point)):
+			return true
+	for patch: Node in Terrain.patches:
+		if patch.has_method("water_field_at") and patch.has_method("is_deep"):
+			var wf: Dictionary = patch.call("water_field_at", point) as Dictionary
+			if bool(wf.get("in_bounds", false)):
+				return not bool(patch.call("is_deep", point))
+	return _rivers == null or not _rivers.is_deep(point)
 
 
 ## Grows void rectangles over equal runs of consecutive rows and emits finished ones.

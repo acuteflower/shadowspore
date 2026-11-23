@@ -199,5 +199,25 @@
     "color": "8af6e0",
     "hot": "e4fff8",
     "glyph": "spark"
+  },
+  "webbed": {
+    "name": "SPORENSEIDE",
+    "seconds": 1.35,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "9a5cff",
+    "hot": "ecd2ff",
+    "glyph": "drop"
+  },
+  "shadow_venom": {
+    "name": "SCHATTENGIFT",
+    "seconds": 4.0,
+    "tick": 1.0,
+    "damage_ratio": 0.015,
+    "min_damage": 1,
+    "color": "b04fff",
+    "hot": "f4d0ff",
+    "glyph": "drop"
   }
 }

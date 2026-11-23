@@ -5,13 +5,16 @@
 [ext_resource type="Texture2D" path="res://assets/enemies/shadow_spider_body.png" id="3_body"]
 [ext_resource type="Shader" path="res://assets/shaders/hit_flash.gdshader" id="4_flash"]
 [ext_resource type="Script" path="res://src/components/health_component.gd" id="5_health"]
-[ext_resource type="Script" path="res://src/components/hurtbox_component.gd" id="6_hurtbox"]
+[ext_resource type="Script" path="res://src/entities/enemies/spider_hurtbox.gd" id="6_hurtbox"]
 [ext_resource type="Script" path="res://src/fx/void_health_bar.gd" id="7_bar"]
 [ext_resource type="Texture2D" path="res://assets/fx/void_shard.png" id="8_shard"]
 [ext_resource type="Script" path="res://src/components/shadow_trail_component.gd" id="9_trail"]
 [ext_resource type="Script" path="res://src/components/drop_component.gd" id="10_drop"]
 [ext_resource type="Script" path="res://src/fx/night_light.gd" id="11_light"]
 [ext_resource type="Script" path="res://src/components/enemy_navigation.gd" id="12_navigation"]
+[ext_resource type="Script" path="res://src/components/enemy_sense_component.gd" id="13_senses"]
+[ext_resource type="Script" path="res://src/components/enemy_posture_component.gd" id="14_posture"]
+[ext_resource type="Script" path="res://src/components/enemy_world_bridge.gd" id="15_bridge"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flash"]
 resource_local_to_scene = true
@@ -62,6 +65,12 @@ properties/5/replication_mode = 0
 properties/6/path = NodePath(".:damage_scale")
 properties/6/spawn = true
 properties/6/replication_mode = 0
+properties/7/path = NodePath(".:brood_variant")
+properties/7/spawn = true
+properties/7/replication_mode = 0
+properties/8/path = NodePath(".:ambush_mode")
+properties/8/spawn = true
+properties/8/replication_mode = 0
 
 [node name="ShadowSpider" type="CharacterBody2D"]
 collision_layer = 4
@@ -78,11 +87,15 @@ script = ExtResource("2_rig")
 material = SubResource("ShaderMaterial_flash")
 texture = ExtResource("3_body")
 hframes = 8
+vframes = 6
 
 [node name="Front" type="Node2D" parent="Rig"]
 
 [node name="Glow" type="Node2D" parent="Rig"]
 material = SubResource("CanvasItemMaterial_add")
+
+[node name="WorldBridge" type="Node2D" parent="."]
+script = ExtResource("15_bridge")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -4)
@@ -112,8 +125,8 @@ material = SubResource("CanvasItemMaterial_unlit")
 [node name="NightLight" type="PointLight2D" parent="."]
 position = Vector2(0, -2)
 script = ExtResource("11_light")
-radius = 26
-base_energy = 0.5
+radius = 28
+base_energy = 0.52
 glow_color = Color(0.85, 0.35, 1, 1)
 
 [node name="DeathFx" type="CPUParticles2D" parent="."]
@@ -141,6 +154,12 @@ script = ExtResource("9_trail")
 
 [node name="Navigation" type="Node" parent="."]
 script = ExtResource("12_navigation")
+
+[node name="Senses" type="Node" parent="."]
+script = ExtResource("13_senses")
+
+[node name="Posture" type="Node" parent="."]
+script = ExtResource("14_posture")
 
 [node name="DropComponent" type="Node" parent="."]
 script = ExtResource("10_drop")

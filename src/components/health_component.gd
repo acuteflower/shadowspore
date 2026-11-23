@@ -52,7 +52,10 @@ func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0
 		amount = maxf(roundf(amount * LevelRewards.damage_factor(armor) * 10.0) / 10.0, 0.1)
 	if absorb > 0.0:
 		amount = maxf(roundf(amount * (1.0 - absorb) * 10.0) / 10.0, 0.1)
-	_notify.rpc(amount, from, knockback, _warded(maxf(current - amount, floor_value)))
+	var next_hp: float = _warded(maxf(current - amount, floor_value))
+	if next_hp <= 0.0 and FinisherComponent.try_intercept_lethal(self, amount, from, source):
+		return
+	_notify.rpc(amount, from, knockback, next_hp)
 
 
 ## Host only: a blow that cannot kill (a story or boss moment): takes `amount`, but never more than all but one point, and ignores the grace period after a hit.

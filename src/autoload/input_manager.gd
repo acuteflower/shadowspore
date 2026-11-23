@@ -91,6 +91,10 @@ func attack_pressed() -> bool:
 	return not ui_blocking and not build_open and not freecam_open and Input.is_action_pressed("action_primary")
 
 
+func attack_just_pressed() -> bool:
+	return not ui_blocking and not build_open and not freecam_open and Input.is_action_just_pressed("action_primary")
+
+
 ## Right mouse button / pad button: the weapon's secondary attack (the sword's heavy blow: hold to charge, let go to strike).
 func secondary_pressed() -> bool:
 	return not ui_blocking and not build_open and not map_open and not freecam_open and Input.is_action_just_pressed("action_secondary")

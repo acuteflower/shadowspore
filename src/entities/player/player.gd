@@ -114,6 +114,12 @@ const STEP_BACK: float = 0.13 ## ... she starts to condense out of the rift (fra
 const STEP_FORM: float = 0.08 ## ... and needs this long to be whole again
 const STEP_END: float = 0.32 ## ... back in her own animation
 const CAST_SHEET_ID: int = 18 ## `_use_sheet` number of the casting sheet (docs/magie_konzept.md)
+const AGILE_SHEET_ID: int = 19 ## Movement 2.0 sheet (`tools/art_hero_agile.py`: start, brake, pivot, strafe_r/l, crouch_bridge, vault, hop)
+const AGILE_SHEET: Texture2D = preload("res://assets/characters/player_agile.png")
+const AGILE_BLOOD: Texture2D = preload("res://assets/characters/player_agile_blood.png")
+const FINISHER_SHEET_ID: int = 20 ## Combat V2 Finisher sheet (`tools/art_hero_finisher.py`: 8 sectors x 16 keys)
+const FINISHER_SHEET: Texture2D = preload("res://assets/characters/player_finisher.png")
+const FINISHER_BLOOD: Texture2D = preload("res://assets/characters/player_finisher_blood.png")
 const CAST_SHEET_PATH: String = "res://assets/characters/player_cast.png" ## tools/art_hero_cast.py: 8 sectors x 12 frames per clip (CAST_CLIPS)
 const CAST_BLOOD_PATH: String = "res://assets/characters/player_cast_blood.png"
 const CAST_CLIPS: Array[String] = ["light", "root", "ember", "veil", "maw"]
@@ -233,6 +239,16 @@ var spells: SpellComponent ## the magic staff and its crystals (docs/magie_konze
 var _cast_target: Vector2 = Vector2.ZERO ## where the running cast aims (world px), for the staff's pose
 var _rig_cast_shoulder: PackedVector2Array ## the casting sheet's rig (tools/art_hero_cast.py: 12 frames x 2 clips, legs planted)
 var _rig_cast_hand: PackedVector2Array
+var _rig_agile_shoulder: PackedVector2Array
+var _rig_agile_hand: PackedVector2Array
+var _agile_cols: int = 43
+var finisher: FinisherComponent
+var _rig_finisher_shoulder: PackedVector2Array
+var _rig_finisher_hand: PackedVector2Array
+var _finisher_cols: int = 16
+var air_height: float = 0.0 ## Movement 2.0 airborne height in px (`Vault` / `Ledge Hop`)
+var _net_vis_offset: Vector2 = Vector2.ZERO ## Remote-peer 20 Hz smoothing offset (`LocomotionComponent`)
+var _surface_id: String = "grass"
 var _cast_sheet: Texture2D
 var _cast_blood: Texture2D
 var effects: StatusEffects ## burning and the like (data/status_effects.json)
@@ -296,7 +312,10 @@ var bandaged: bool = false ## the rescuer dressed the wound: no blood, no red bo
 @onready var attack: AttackComponent = $AttackComponent
 @onready var talismans: TalismanComponent = $TalismanComponent
 @onready var appearance: AppearanceComponent = $AppearanceComponent
+@onready var locomotion: LocomotionComponent = $LocomotionComponent
 @onready var climb: WallClimb = $WallClimb
+@onready var agile: AgileTraversal = $AgileTraversal
+@onready var move_fx: MovementFx = $MovementFx
 @onready var _camera: Camera2D = $Camera2D
 @onready var _sprite: Sprite2D = $Sprite2D
 @onready var _dash_dust: CPUParticles2D = $DashDust
@@ -323,6 +342,11 @@ func _ready() -> void:
 	add_child(stepper)
 	_standby_rng.randomize()
 	_load_rig()
+	if locomotion != null:
+		locomotion.setup(self)
+		locomotion.impulse_emitted.connect(func(wpos: Vector2, idir: Vector2, ikind: String) -> void:
+			if move_fx != null and ikind == "pivot":
+				move_fx.spawn_spore_flecks(wpos, idir, 3))
 	var rest: RestComponent = RestComponent.new()
 	rest.name = "RestComponent"
 	add_child(rest)
@@ -339,6 +363,11 @@ func _ready() -> void:
 	spells.set_multiplayer_authority(get_multiplayer_authority())
 	spells.setup(self)
 	add_child(spells)
+	finisher = FinisherComponent.new()
+	finisher.name = "FinisherComponent"
+	finisher.set_multiplayer_authority(get_multiplayer_authority())
+	finisher.setup(self)
+	add_child(finisher)
 	effects = StatusEffects.new()
 	effects.name = "Effects"
 	effects.set_multiplayer_authority(get_multiplayer_authority())
@@ -438,9 +467,13 @@ func view_camera() -> Camera2D:
 
 
 func _process(delta: float) -> void:
-	## the camera looks a little ahead of where she walks: the smoothing alone lets her drift towards the edge she is heading for
-	var lead_goal: Vector2 = velocity * CAMERA_LEAD if is_multiplayer_authority() and intro == null and not story_lock and health.current > 0.0 else Vector2.ZERO
-	_lead = _lead.lerp(lead_goal, 1.0 - exp(-CAMERA_LEAD_EASE * delta))
+	## LivingCamera 2.0 (T10): comfort deadzone near rest, adaptive forward sightline in sprint/Reisetritt, and subtle combat aim framing
+	var active_cam: bool = is_multiplayer_authority() and intro == null and not story_lock and health.current > 0.0
+	if locomotion != null:
+		_lead = locomotion.compute_camera_offset(delta, active_cam)
+	else:
+		var lead_goal: Vector2 = velocity * CAMERA_LEAD if active_cam else Vector2.ZERO
+		_lead = _lead.lerp(lead_goal, 1.0 - exp(-CAMERA_LEAD_EASE * delta))
 	_camera.offset = view_shift + _lead + ((Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake * GameSettings.shake_factor()).round() if _shake > 0.0 else Vector2.ZERO)
 	_shake = move_toward(_shake, 0.0, 14.0 * delta)
 
@@ -504,21 +537,51 @@ func _update_desert_heat(delta: float) -> void:
 	set_meta(&"_heat_drive_age", drive_age)
 	heat_amount = clampf(heat_amount + drive * delta, 0.0, 1.0)
 
+func agile_active() -> bool:
+	return agile != null and agile.active()
+
+
+func _on_agile_touchdown(at: Vector2, dir: Vector2, is_hop: bool) -> void:
+	_footsteps.step(_surface, dir * (95.0 if is_hop else 115.0), false, _wet, 2)
+	if locomotion != null:
+		locomotion.emit_world_impulse(at, dir, 22.0 if is_hop else 18.0, 0.95, 7.2, "land")
+	if move_fx != null and is_hop:
+		move_fx.spawn_spore_flecks(at, dir, 3)
+	if is_hop:
+		_shake = maxf(_shake, 1.1)
+
+
 func _physics_process(delta: float) -> void:
+	if is_multiplayer_authority() and locomotion != null:
+		locomotion.poll_action_buffer(delta)
 	var sub_pos: Vector2i = Vector2i((global_position / 4.0).floor())
-	if sub_pos != _last_surface_tile:
+	var in_dynamic_water: bool = false
+	for patch: Node in Terrain.patches:
+		if patch.has_method("has_dynamic_water") and bool(patch.call("has_dynamic_water", global_position)):
+			in_dynamic_water = true
+			break
+	if sub_pos != _last_surface_tile or in_dynamic_water:
 		_last_surface_tile = sub_pos
 		var surf_id: String = Terrain.surface_at(global_position)
 		if surf_id == "quicksand" and talismans != null and talismans.perks.has("prism_break"):
 			surf_id = "quartz" ## Fessel des Ersten Schmelzers freezes quicksand underfoot
+		_surface_id = surf_id
 		_surface = Terrain.surface_data(surf_id)
 		var on_water_deck: bool = false
-		var rivers_patch: WorldRivers = null
+		var water_patch: Node = null
 		for patch: Node in Terrain.patches:
-			if patch is WorldRivers:
-				rivers_patch = patch as WorldRivers
-			elif patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", global_position)):
+			if patch.has_method("has_water_deck_at") and bool(patch.call("has_water_deck_at", global_position)):
 				on_water_deck = true
+			if patch.has_method("wade_data"):
+				if patch is WorldRivers:
+					if water_patch == null:
+						water_patch = patch
+				elif patch.has_method("water_field_at"):
+					var wf: Dictionary = patch.call("water_field_at", global_position) as Dictionary
+					if bool(wf.get("in_bounds", false)):
+						water_patch = patch
+				elif water_patch == null:
+					water_patch = patch
 		if on_water_deck:
 			set_meta("water_deck", true)
 			if swimmer != null:
@@ -526,24 +589,41 @@ func _physics_process(delta: float) -> void:
 		else:
 			if has_meta("water_deck"):
 				remove_meta("water_deck")
-			if rivers_patch != null:
-				_surface = rivers_patch.wade_data(global_position, _surface)
+			if water_patch != null:
+				_surface = water_patch.call("wade_data", global_position, _surface) as Dictionary
 		_last_surface_result = _surface
 	else:
 		_surface = _last_surface_result
 	var down: bool = health.current <= 0.0
 	_sprite.self_modulate = Color(0.35, 0.25, 0.5, 0.55) if down else Color.WHITE.lerp(Color(1.5, 1.9, 1.55), _eat_glow())
+	_net_vis_offset = Vector2.ZERO
 	if climb.active():
 		climb.step(delta)
 		_set_focus(null)
+		if agile != null:
+			agile.hide_prompt()
+	elif finisher != null and finisher.active():
+		finisher.step_physics(delta)
+		_set_focus(null)
+		climb.hide_prompt()
+		if agile != null:
+			agile.hide_prompt()
+	elif agile != null and agile.active():
+		agile.step(delta)
+		_set_focus(null)
+		climb.hide_prompt()
 	elif down:
 		velocity = Vector2.ZERO
 		_set_focus(null)
 		climb.hide_prompt()
+		if agile != null:
+			agile.hide_prompt()
 	elif launch_left > 0.0 and is_multiplayer_authority():
 		_step_launch(delta)
 		_set_focus(null)
 		climb.hide_prompt()
+		if agile != null:
+			agile.hide_prompt()
 	elif intro != null or story_lock:
 		velocity = Vector2.ZERO ## the intro owns her: it places her and shows the frames
 		if story_lock and intro == null and auto_walk != Vector2.INF and is_multiplayer_authority():
@@ -554,18 +634,26 @@ func _physics_process(delta: float) -> void:
 				move_and_slide()
 		_set_focus(null)
 		climb.hide_prompt()
+		if agile != null:
+			agile.hide_prompt()
 	elif stumbling:
 		velocity = velocity.move_toward(Vector2.ZERO, 260.0 * delta) ## she slides on a little
 		if is_multiplayer_authority():
 			move_and_slide()
 		_set_focus(null)
 		climb.hide_prompt()
+		if agile != null:
+			agile.hide_prompt()
 		_update_stumble(delta)
 	elif is_multiplayer_authority():
 		_move(delta)
 		_update_interact()
 	else:
-		position += velocity * delta ## remote player: the synchronizer sends at 20 Hz, so carry on with the synced velocity until the next packet
+		if locomotion != null:
+			_net_vis_offset = locomotion.step_remote_smoothing(delta)
+		else:
+			position += velocity * delta
+	air_height = finisher.air_height() if (finisher != null and finisher.active()) else (agile.air_height if (agile != null and agile.active()) else 0.0)
 	attack.visible = not down and intro == null and not fainting and not stumbling and not climb.active() and carry_stone == 0
 	_wound = move_toward(_wound, _wound_target(), delta * 0.5)
 	if _wound != _wound_sent:
@@ -639,16 +727,30 @@ func _try_shadow_step(input_dir: Vector2) -> bool:
 	var reach: float = effective_step_range()
 	var hit: KinematicCollision2D = move_and_collide(way * reach, true)
 	var travel: Vector2 = way * reach if hit == null else hit.get_travel()
+	# T8: Glancing wall-tangent glide when stepping within < 38 degrees of a cliff or wall surface
+	if hit != null:
+		var normal: Vector2 = hit.get_normal()
+		var max_glide_deg: float = float(MovementRules.section("spore_step").get("wall_glide_deg", 38.0))
+		var head_on_cos: float = sin(deg_to_rad(max_glide_deg))
+		if -way.dot(normal) <= head_on_cos:
+			var slide_dir: Vector2 = way.slide(normal).normalized()
+			var rem_len: float = (reach - travel.length()) * 0.88
+			if slide_dir != Vector2.ZERO and rem_len > 4.0:
+				var xform: Transform2D = global_transform.translated(travel)
+				if not test_move(xform, slide_dir * rem_len):
+					travel += slide_dir * rem_len
 	if travel.length() < 12.0:
 		return false
 	if not stamina.spend(step_cost()):
 		return false ## out of breath: the void does not take her
+	if locomotion != null:
+		locomotion.clear_buffer("shadow_step")
 	stepper.start_cooldown()
 	attack.cancel_action() ## out of the swing or the charge, no blow lands
 	_step_carry = velocity.length() ## a sprint is not broken: she keeps it through the void
-	facing = way
+	facing = travel.normalized()
 	velocity = Vector2.ZERO
-	play_shadow_step.rpc(global_position, global_position + travel, way)
+	play_shadow_step.rpc(global_position, global_position + travel, facing)
 	return true
 
 
@@ -686,6 +788,8 @@ func play_shadow_step(from: Vector2, to: Vector2, way: Vector2) -> void:
 		var fx: ShadowStepFx = ShadowStepFx.new()
 		get_tree().current_scene.add_child(fx)
 		fx.setup(from, to, _step_dir, STEP_GONE, STEP_BACK)
+	if move_fx != null:
+		move_fx.spawn_spore_flecks(from, _step_dir, 3)
 	Sfx.at(self, "step_out", from, -3.0)
 
 
@@ -759,6 +863,10 @@ func _finish_step() -> void:
 	(_sprite.material as ShaderMaterial).set_shader_parameter("step_light", false)
 	_sprite.position = Vector2(0.0, _sink)
 	_set_step_extras(true)
+	if move_fx != null:
+		move_fx.trigger_choker_glint(0.22)
+	if locomotion != null:
+		locomotion.trigger_step_exit_glide(_step_carry)
 
 
 ## The game-drawn sword arm and the worn jewellery cannot dissolve with her: they are hidden for the step (the sheet carries both arms).
@@ -772,12 +880,16 @@ func _set_step_extras(on: bool) -> void:
 ## Dev menu: jumps to a place (the owner moves herself; the synchronizer tells the others).
 func request_teleport(to: Vector2) -> void:
 	climb.before_teleport()
+	if agile != null:
+		agile.before_teleport()
 	if swimmer != null:
 		swimmer.reset() ## she lands on foot; the next step decides again
 		swim = SwimRules.NONE
 	global_position = to
 	velocity = Vector2.ZERO
 	_lead = Vector2.ZERO
+	if locomotion != null:
+		locomotion.reset_camera_anchor()
 	reset_physics_interpolation() ## a jump, not a move: without this she is drawn streaking across the world for one tick
 	_camera.reset_smoothing()
 
@@ -792,6 +904,8 @@ var launch_to: Vector2 = Vector2.ZERO
 
 func launch(target: Vector2, seconds: float) -> void:
 	climb.interrupt()
+	if agile != null:
+		agile.interrupt()
 	_rpc_launch.rpc_id(get_multiplayer_authority(), target, seconds)
 
 
@@ -841,6 +955,8 @@ func _on_inventory_changed() -> void:
 ## Everyone sees the hit; the owner also gets knocked back and shaken.
 func _on_damaged(amount: float, from: Vector2, knockback: float) -> void:
 	climb.interrupt()
+	if agile != null:
+		agile.interrupt()
 	if not (_drinking() and knockback < DRINK_BREAK_KNOCKBACK): ## only a heavy blow knocks the vial from her lips
 		_busy = false ## a hit interrupts picking
 	_cancel_standby()
@@ -927,7 +1043,8 @@ func _is_submerged() -> bool:
 ## Owner: runs the swim rules for this frame and publishes the technique in `swim` (synced). The ban only keeps her from starting to swim.
 func _update_swim(delta: float, dir: Vector2) -> int:
 	var allowed: bool = health.current > 0.0 and not story_lock and intro == null and not _busy and not fainting and not stumbling and not attack.is_swinging()
-	swim = swimmer.step(delta, float(_surface.get("depth_amount", 0.0)), bool(_surface.get("water", false)), allowed, dir != Vector2.ZERO, InputManager.sprint_held(), stamina, wounded)
+	var can_swim_water: bool = bool(_surface.get("water", false)) and _surface_id != "puddle"
+	swim = swimmer.step(delta, float(_surface.get("depth_amount", 0.0)), can_swim_water, allowed, dir != Vector2.ZERO, InputManager.sprint_held(), stamina, wounded)
 	return swim
 
 
@@ -936,14 +1053,43 @@ func _update_water(delta: float) -> void:
 	if swim > 0 or _swim_exit_t >= 0.0:
 		submerge = 0.0 ## the swim sheet carries its own waterline (step 3 adds the water in front)
 	_water.submerge = submerge
+	_apply_water_colors()
 	_update_swim_slot()
 	_update_wet(delta)
 	_sink = move_toward(_sink, roundf(submerge / 2.5), 20.0 * delta)
-	if bool(_surface.get("ripples", false)) and velocity.length() < 5.0: ## ripples while standing still
+	if (bool(_surface.get("ripples", false)) or _surface_id == "puddle") and velocity.length() < 5.0: ## ripples while standing still
 		_idle_ripple_timer -= delta
 		if _idle_ripple_timer <= 0.0:
-			_ripples.add(global_position)
+			_ripples.add(global_position, 0.35 if _surface_id == "puddle" else 0.45)
 			_idle_ripple_timer = 0.9
+
+
+func _apply_water_colors() -> void:
+	var w_fill: Color = Color("438780")
+	var w_rim: Color = Color("91bbae")
+	var w_foam: Color = Color("bfe9ff")
+	if _surface.has("water_color"):
+		w_fill = _surface["water_color"] as Color
+		w_rim = _surface.get("water_rim", w_rim) as Color
+		w_foam = _surface.get("water_foam", w_foam) as Color
+	else:
+		for patch: Node in Terrain.patches:
+			if patch.has_method("water_color_at") and patch.has_method("water_field_at"):
+				var wf: Dictionary = patch.call("water_field_at", global_position) as Dictionary
+				if bool(wf.get("in_bounds", false)):
+					var cols: Dictionary = patch.call("water_color_at", global_position) as Dictionary
+					w_fill = cols.get("fill", w_fill) as Color
+					w_rim = cols.get("rim", w_rim) as Color
+					w_foam = cols.get("foam", w_foam) as Color
+					break
+	if _water != null:
+		_water.set_water_colors(w_fill, w_rim)
+	if _swim_water != null:
+		_swim_water.set_water_colors(w_fill, w_rim, w_foam)
+	if _swim_under != null and _swim_under.material is ShaderMaterial:
+		var smat: ShaderMaterial = _swim_under.material as ShaderMaterial
+		smat.set_shader_parameter("fill", w_fill)
+		smat.set_shader_parameter("rim", w_rim)
 
 
 ## A one-shot swim sound at her feet (every peer plays its own; positional).
@@ -959,19 +1105,31 @@ func _swim_sound(sound_name: String, db: float, pitch: float = 1.0) -> void:
 	sound.play()
 
 
+func _current_flow() -> Vector2:
+	var flow_vel: Variant = _surface.get("flow_velocity", Vector2.ZERO)
+	if flow_vel is Vector2 and (flow_vel as Vector2).length_squared() > 0.0001:
+		return ((flow_vel as Vector2) / 28.0).limit_length(1.0)
+	if fishing != null:
+		return fishing.current_at(global_position)
+	return Vector2.ZERO
+
+
 ## The river carries her a little (docs/schwimmen_konzept.md 4.4): at most 18 % of the walking speed, none while crawling.
 func _swim_drift(state: int) -> Vector2:
-	if state == SwimRules.CRAWL or fishing == null:
+	if state == SwimRules.CRAWL:
+		return Vector2.ZERO
+	var flow: Vector2 = _current_flow()
+	if flow == Vector2.ZERO:
 		return Vector2.ZERO
 	var cfg: Dictionary = SwimRules.cfg().get("current", {}) as Dictionary
-	return fishing.current_at(global_position) * max_speed * float(cfg.get("max_drift", 0.18))
+	return flow * max_speed * float(cfg.get("max_drift", 0.18))
 
 
 ## Swimming against the stream is slower (breaststroke up to 15 %).
 func _against_current(dir: Vector2, state: int) -> float:
-	if state != SwimRules.BREAST or fishing == null:
+	if state != SwimRules.BREAST:
 		return 1.0
-	var flow: Vector2 = fishing.current_at(global_position)
+	var flow: Vector2 = _current_flow()
 	if flow == Vector2.ZERO:
 		return 1.0
 	var cfg: Dictionary = SwimRules.cfg().get("current", {}) as Dictionary
@@ -984,8 +1142,12 @@ func _update_wet(delta: float) -> void:
 	if swim > 0:
 		_swim_swum += delta
 		target = 1.0
+	elif _surface_id == "puddle" or String(_surface.get("sound", "")) == "puddle":
+		target = 0.65
 	elif float(_surface.get("submerge", 0.0)) > 6.0:
 		target = 0.45
+	elif float(_surface.get("submerge", 0.0)) > 0.0:
+		target = 0.35
 	var was: float = _wet
 	var rained_on: float = 0.0 ## the weather (docs/wetter_konzept.md 9): rain soaks her slowly, under a crown or a roof she stays dry
 	if swim == 0 and WeatherManager.current != null and target == 0.0:
@@ -1005,27 +1167,34 @@ func _update_wet(delta: float) -> void:
 			_swim_water.splash(global_position + Vector2(randf_range(-4.0, 4.0), randf_range(-1.0, 1.0)), 1, 0.2, false, 10.0 + randf() * 8.0)
 
 
-## Tells the river surface where a swimmer is so the water rings around her (WorldRivers.set_swimmer, shader river_water).
+## Tells the river or water-field surface where a swimmer is so the water rings around her.
 func _update_swim_slot() -> void:
 	var on: bool = swim > 0 and swimmer != null
 	if not on and not _swim_slot_on:
 		return
 	for patch: Node in Terrain.patches:
-		if patch is WorldRivers:
+		if patch.has_method("set_swimmer"):
 			var slot: Vector4 = Vector4(roundf(global_position.x), roundf(global_position.y), 9.0, 0.0)
 			if on:
 				slot.w = clampf(0.25 + (_swim_water.energy if _swim_water != null else 0.2), 0.2, 1.0)
-			(patch as WorldRivers).set_swimmer(get_instance_id(), slot)
+			patch.call("set_swimmer", get_instance_id(), slot)
 	_swim_slot_on = on
 
 
 ## Called at every footfall (also for remote players, driven by the walk animation).
 func _on_step() -> void:
-	_footsteps.step(_surface, velocity, stealth.sneaking, _wet, 0 if carry_stone != 0 else _gait)
+	var step_gait: int = 0 if carry_stone != 0 else _gait
+	_footsteps.step(_surface, velocity, stealth.sneaking, _wet, step_gait)
+	if move_fx != null and not stealth.sneaking:
+		move_fx.on_biome_footstep(_footsteps.contact_position(velocity), _surface_id, velocity, step_gait)
 	if (wounded or _wound > 0.55) and not bandaged:
 		BloodSplat.drop(get_tree().current_scene, global_position + Vector2(randf_range(-3.0, 3.0), randf_range(-1.0, 2.0)), 1 + int(randf() < 0.4))
-	if bool(_surface.get("ripples", false)):
-		_ripples.add(_footsteps.contact_position(velocity), clampf(velocity.length() / 65.0, 0.35, 1.5))
+	if bool(_surface.get("ripples", false)) or _surface_id == "puddle":
+		var foot_pos: Vector2 = _footsteps.contact_position(velocity)
+		var ripple_strength: float = clampf(velocity.length() / 65.0, 0.45 if _surface_id == "puddle" else 0.35, 1.5)
+		_ripples.add(foot_pos, ripple_strength, velocity)
+		if _surface_id == "puddle" and _swim_water != null:
+			_swim_water.splash(foot_pos, 3, 0.45, false, 1.0)
 
 
 func _update_run_dust() -> void:
@@ -1042,12 +1211,14 @@ func _move(delta: float) -> void:
 			velocity = Vector2.ZERO
 			return
 		_finish_step() ## ... then, with a direction held, she runs straight on at the speed she had (the landing pose is skipped)
-		velocity = held.normalized() * maxf(_step_carry, max_speed * (WOUND_SPEED if wounded else 1.0))
+		var exit_mult: float = float(MovementRules.section("spore_step").get("exit_glide_mult", 1.14))
+		velocity = held.normalized() * maxf(_step_carry, max_speed * exit_mult * (WOUND_SPEED if wounded else 1.0))
 	if carry_stone != 0: ## a moonstone in her arms: slow, no sprint, no swing, no dodge (she sets it down with E)
 		_move_carrying(delta)
 		return
-	## Alt breaks everything she is doing (a swing in any phase, a charge, picking, eating, a gesture): a real dodge
-	if InputManager.shadow_step_pressed() and stepper.is_ready() and swim == 0 and not (fishing != null and fishing.locks_movement()) and bool(_surface.get("allow_blink", true)):
+	## Alt (or a buffered Alt within 130 ms, T7) breaks everything she is doing: a real dodge
+	var want_step: bool = InputManager.shadow_step_pressed() or (locomotion != null and locomotion.peek_buffered("shadow_step"))
+	if want_step and stepper.is_ready() and swim == 0 and not (fishing != null and fishing.locks_movement()) and bool(_surface.get("allow_blink", true)):
 		if _try_shadow_step(InputManager.move_vector()):
 			return
 	var eating: bool = _busy and (_busy_kind == "eat" or _busy_kind.begins_with("drink")) ## eating and drinking, unlike picking, go on while she walks
@@ -1055,10 +1226,14 @@ func _move(delta: float) -> void:
 		velocity = velocity.move_toward(Vector2.ZERO, friction * 2.0 * delta)
 		move_and_slide()
 		return
-	if _busy and not eating: ## she stands still while she picks
-		velocity = velocity.move_toward(Vector2.ZERO, friction * 2.0 * delta)
-		move_and_slide()
-		return
+	if _busy and not eating:
+		## T7: Allow smooth movement-cancel out of the follow-through tail of non-cast busy actions
+		if InputManager.move_vector() != Vector2.ZERO and locomotion != null and locomotion.can_movement_cancel_busy(_busy_kind, _busy_time, _busy_length()):
+			_busy = false
+		else:
+			velocity = velocity.move_toward(Vector2.ZERO, friction * 2.0 * delta)
+			move_and_slide()
+			return
 	var charging: bool = _update_charge()
 	_update_alt()
 	var dir: Vector2 = InputManager.move_vector()
@@ -1067,36 +1242,64 @@ func _move(delta: float) -> void:
 	var swimming: int = _update_swim(delta, dir)
 	var can_sprint: bool = bool(_surface.get("allow_sprint", true)) and not wounded ## wounded: no sprinting
 	var want_sprint: bool = InputManager.sprint_held() and can_sprint and dir != Vector2.ZERO and not attack.is_swinging() and not _busy and not charging
-	if not InputManager.sprint_held() or stamina.current >= SPRINT_RECOVER:
-		_winded = false
+	var in_combat: bool = attack.is_in_combat(1.5)
+	var aim_vec: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER) if (in_combat and InputManager.using_mouse and not InputManager.mod_menu_open) else facing
+
 	if swimming > 0:
+		if not InputManager.sprint_held() or stamina.current >= SPRINT_RECOVER:
+			_winded = false
 		sprinting = swimming == SwimRules.CRAWL ## the crawl is the sprint of the water (it pays its own stamina)
-	elif want_sprint and not _winded and stamina.current > 0.0:
-		sprinting = stamina.drain(sprint_cost_per_sec * stamina.sprint_scale(), delta)
-		_winded = not sprinting ## out of breath: no one-frame sprint blips every time a crumb of stamina comes back
+		stealth.sneaking = false
+		if dir == Vector2.ZERO:
+			velocity = velocity.move_toward(_swim_drift(swimming), friction * delta)
+		else:
+			velocity = velocity.move_toward(dir * swimmer.speed(wounded) * _against_current(dir, swimming) + _swim_drift(swimming), acceleration * 0.5 * delta)
+	elif locomotion != null:
+		stealth.sneaking = InputManager.sneak_held() and not want_sprint and not _busy and not charging
+		var loco: Dictionary = locomotion.step_ground_locomotion(
+			delta,
+			dir,
+			_surface_id,
+			_surface,
+			can_sprint,
+			want_sprint,
+			_winded,
+			attack.is_in_combat(float(MovementRules.section("reisetritt").get("combat_memory_seconds", 4.0))),
+			aim_vec,
+			charging
+		)
+		velocity = loco["velocity"] as Vector2
+		sprinting = bool(loco["sprinting"])
+		_winded = bool(loco["winded"])
+		if sprinting:
+			stealth.sneaking = false
 	else:
-		sprinting = false
+		if not InputManager.sprint_held() or stamina.current >= SPRINT_RECOVER:
+			_winded = false
+		if want_sprint and not _winded and stamina.current > 0.0:
+			sprinting = stamina.drain(sprint_cost_per_sec * stamina.sprint_scale(), delta)
+			_winded = not sprinting
+		else:
+			sprinting = false
+		stealth.sneaking = InputManager.sneak_held() and not sprinting and not _busy and not charging
+		if dir == Vector2.ZERO:
+			velocity = velocity.move_toward(Vector2.ZERO, friction * delta)
+		else:
+			var base_speed: float = sprint_speed if sprinting else (sneak_speed if stealth.sneaking else max_speed)
+			var speed: float = base_speed * float(_surface.get("speed", 1.0)) * _slow_factor() * (WOUND_SPEED if wounded else 1.0) * attack.charge_move_factor()
+			velocity = velocity.move_toward(dir * speed, acceleration * (TURN_BOOST if velocity.dot(dir) < 0.0 else 1.0) * delta)
 
 	if BLINK_ENABLED and InputManager.blink_pressed() and blink.is_ready() and not _busy and swimming == 0 and bool(_surface.get("allow_blink", true)):
 		_try_blink()
 
-	stealth.sneaking = InputManager.sneak_held() and not sprinting and not _busy and not charging and swimming == 0
-
-	if dir == Vector2.ZERO:
-		velocity = velocity.move_toward(_swim_drift(swimming) if swimming > 0 else Vector2.ZERO, friction * delta)
-	elif swimming > 0:
-		velocity = velocity.move_toward(dir * swimmer.speed(wounded) * _against_current(dir, swimming) + _swim_drift(swimming), acceleration * 0.5 * delta) ## water gives way slowly
-	else:
-		var base_speed: float = sprint_speed if sprinting else (sneak_speed if stealth.sneaking else max_speed)
-		var speed: float = base_speed * float(_surface.get("speed", 1.0)) * _slow_factor() * (WOUND_SPEED if wounded else 1.0) * attack.charge_move_factor()
-		velocity = velocity.move_toward(dir * speed, acceleration * (TURN_BOOST if velocity.dot(dir) < 0.0 else 1.0) * delta)
 	move_and_slide()
 
+	var diag_grace: float = float(MovementRules.section("turn").get("diagonal_grace", DIAGONAL_GRACE))
 	if dir != Vector2.ZERO:
 		var heading: Vector2 = dir.normalized()
 		var was_diagonal: bool = absf(_face_dir.x) > 0.3 and absf(_face_dir.y) > 0.3
 		var now_straight: bool = absf(heading.x) < 0.05 or absf(heading.y) < 0.05
-		if was_diagonal and now_straight and heading.dot(_face_dir) > 0.6 and _face_hold < DIAGONAL_GRACE:
+		if was_diagonal and now_straight and heading.dot(_face_dir) > 0.6 and _face_hold < diag_grace:
 			_face_hold += delta ## one key of a diagonal was let go: the other usually follows within a frame or two
 		else:
 			_face_hold = 0.0
@@ -1110,22 +1313,25 @@ func _move(delta: float) -> void:
 	if charging:
 		facing = attack.aim_dir ## follows the cursor while the blow is charged
 		return
-	var in_combat: bool = attack.is_in_combat(1.5)
 	if in_combat and InputManager.using_mouse and not InputManager.mod_menu_open:
-		var look_mouse: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER)
-		if look_mouse != Vector2.ZERO:
-			facing = look_mouse
+		if aim_vec != Vector2.ZERO:
+			facing = aim_vec
 	elif dir != Vector2.ZERO:
 		facing = _face_dir
-	if InputManager.attack_pressed() and spells != null and spells.staff_held and attack.holds_staff() and not _busy and swimming == 0:
+	var want_primary: bool = InputManager.attack_pressed() or (locomotion != null and locomotion.peek_buffered("attack"))
+	if want_primary and spells != null and spells.staff_held and attack.holds_staff() and not _busy and swimming == 0:
 		var aim_at: Vector2 = InputManager.aim_world_position() if InputManager.using_mouse else global_position + facing * 60.0
 		if spells.try_cast(aim_at): ## a staff in her hand: the left button casts its crystal (docs/magie_konzept.md)
+			if locomotion != null:
+				locomotion.clear_buffer("attack")
 			sprinting = false
 	if InputManager.secondary_held() and spells != null and spells.staff_held and spells.prongs > 1 and attack.holds_staff() and not _busy and swimming == 0:
 		var aim_right: Vector2 = InputManager.aim_world_position() if InputManager.using_mouse else global_position + facing * 60.0
 		if spells.try_cast(aim_right, 1): ## the Bleichgabel: the right button casts the crystal of its second prong (docs/magie_konzept.md 17)
 			sprinting = false
-	if InputManager.attack_pressed() and attack.can_attack() and not _busy and swimming == 0:
+	if want_primary and attack.can_attack() and not _busy and swimming == 0:
+		if locomotion != null:
+			locomotion.clear_buffer("attack")
 		if InputManager.using_mouse:
 			var attack_aim: Vector2 = InputManager.aim_vector(global_position + BODY_CENTER)
 			if attack_aim != Vector2.ZERO:
@@ -1244,7 +1450,7 @@ func _animate_carry(delta: float) -> void:
 
 
 func is_busy() -> bool:
-	return _busy or climb.active() or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging() or swim > 0
+	return _busy or climb.active() or agile_active() or stumbling or fainting or intro != null or story_lock or attack.is_swinging() or attack.is_charging() or swim > 0
 
 
 ## Local player: picks toward `dir` (about a second, she stands still, the weapon is put away);
@@ -1443,6 +1649,8 @@ func _slow_factor() -> float:
 		factor = minf(factor, value)
 	if effects != null and effects.has("hallucinated"):
 		factor *= 0.7 ## hallucinating: 30 % slower
+	if effects != null and effects.has("webbed"):
+		factor *= 0.78 ## Sporenseide: -22 % locomotion speed until snapped by ShadowStep or blade swing
 	return factor
 
 
@@ -1451,9 +1659,12 @@ func _slow_factor() -> float:
 func _update_interact() -> void:
 	if _busy:
 		climb.hide_prompt()
+		if agile != null:
+			agile.hide_prompt()
 		return
-	var pressed: bool = InputManager.interact_pressed()
-	_scan_clock -= get_physics_process_delta_time()
+	var dt: float = get_physics_process_delta_time()
+	var pressed: bool = InputManager.interact_pressed() or (locomotion != null and locomotion.peek_buffered("interact"))
+	_scan_clock -= dt
 	if _scan_clock <= 0.0 or pressed:
 		_scan_clock = INTERACT_SCAN_SECONDS
 		_candidate = _scan_interact()
@@ -1462,11 +1673,28 @@ func _update_interact() -> void:
 	_set_focus(_candidate)
 	if _focus != null:
 		climb.hide_prompt()
+		if agile != null:
+			agile.hide_prompt()
 		if pressed:
+			if locomotion != null:
+				locomotion.clear_buffer("interact")
 			_focus.interact(self)
 		return
 	var direction: Vector2 = InputManager.move_vector()
-	if not climb.offer(facing if direction == Vector2.ZERO else direction, pressed) and pressed and _hotbar != null:
+	var probe_dir: Vector2 = facing if direction == Vector2.ZERO else direction
+	if climb.offer(probe_dir, pressed):
+		if agile != null:
+			agile.hide_prompt()
+		if pressed and locomotion != null:
+			locomotion.clear_buffer("interact")
+		return
+	if agile != null and agile.offer(probe_dir, pressed, dt):
+		if pressed and locomotion != null:
+			locomotion.clear_buffer("interact")
+		return
+	if pressed and _hotbar != null:
+		if locomotion != null:
+			locomotion.clear_buffer("interact")
 		use_slot(_hotbar.selected) ## nothing to use here: E eats from the selected hotbar slot
 
 
@@ -1541,6 +1769,14 @@ func _load_rig() -> void:
 	var standby: Dictionary = rig.get("standby", {}) as Dictionary
 	_rig_standby_shoulder = _points(standby.get("shoulder", []))
 	_rig_standby_hand = _points(standby.get("hand", []))
+	var agile_rig: Dictionary = rig.get("agile", {}) as Dictionary
+	_agile_cols = int(agile_rig.get("cols", 43))
+	_rig_agile_shoulder = _points(agile_rig.get("shoulder", []))
+	_rig_agile_hand = _points(agile_rig.get("hand", []))
+	var finisher_rig: Dictionary = rig.get("finisher", {}) as Dictionary
+	_finisher_cols = int(finisher_rig.get("cols", 16))
+	_rig_finisher_shoulder = _points(finisher_rig.get("shoulder", []))
+	_rig_finisher_hand = _points(finisher_rig.get("hand", []))
 	_rig_cast_shoulder = _points(rig.get("cast_shoulder", []))
 	_rig_cast_hand = _points(rig.get("cast_hand", []))
 	if not _rig_cast_hand.is_empty() and ResourceLoader.exists(CAST_SHEET_PATH):
@@ -1801,6 +2037,41 @@ static func _feet_together(phase: float) -> bool:
 	return absf(u - 1.6) < 0.45
 
 
+## Movement 2.0 (`V2`, `V8`, `V9`, `T9`): selects `player_agile.png` column `(col0, col1, blend)` when an agile or transition clip is active, or `(-1, -1, 0)` for `player.png`.
+func _pick_agile_clip(moving: bool, running: bool) -> Vector3:
+	if _rig_agile_hand.size() != 8 * _agile_cols or _rig_agile_shoulder.size() != 8 * _agile_cols:
+		return Vector3(-1.0, -1.0, 0.0)
+	if agile != null and agile.active():
+		var acol: int = agile.frame_col()
+		return Vector3(float(acol), float(acol), 0.0)
+	if locomotion == null or wounded:
+		return Vector3(-1.0, -1.0, 0.0)
+	if locomotion.pivot_left > 0.0 and not stealth.sneaking:
+		var p_dur: float = maxf(float(MovementRules.section("turn").get("pivot_seconds", 0.14)), 0.01)
+		var pk: float = clampf(1.0 - locomotion.pivot_left / p_dur, 0.0, 0.999) * 4.0
+		var pi: int = clampi(int(pk), 0, 3)
+		return Vector3(float(7 + pi), float(7 + mini(pi + 1, 3)), pk - float(pi))
+	if locomotion.crouch_bridge_left > 0.0:
+		var ck: float = clampf(1.0 - locomotion.crouch_bridge_left / 0.11, 0.0, 0.999) * 2.0
+		var ci: int = clampi(int(ck), 0, 1)
+		var ccol: int = (23 + ci) if locomotion.crouch_going_down else (24 - ci)
+		return Vector3(float(ccol), float(ccol), 0.0)
+	if not moving and locomotion.brake_left > 0.0 and not stealth.sneaking:
+		var bk: float = clampf(1.0 - locomotion.brake_left / 0.24, 0.0, 0.999) * 4.0
+		var bi: int = clampi(int(bk), 0, 3)
+		return Vector3(float(3 + bi), float(3 + mini(bi + 1, 3)), bk - float(bi))
+	if moving and locomotion.start_left > 0.0 and not stealth.sneaking:
+		var sk: float = clampf(1.0 - locomotion.start_left / 0.16, 0.0, 0.999) * 3.0
+		var si: int = clampi(int(sk), 0, 2)
+		return Vector3(float(si), float(mini(si + 1, 2)), sk - float(si))
+	if moving and not running and not stealth.sneaking and locomotion.quadrant in [MovementRules.Quadrant.STRAFE_RIGHT, MovementRules.Quadrant.STRAFE_LEFT]:
+		var sbase: int = 11 if locomotion.quadrant == MovementRules.Quadrant.STRAFE_RIGHT else 17
+		var st_i: int = int(_walk_time) % 6
+		var st_next: int = (st_i + 1) % 6
+		return Vector3(float(sbase + st_i), float(sbase + st_next), _walk_time - floorf(_walk_time))
+	return Vector3(-1.0, -1.0, 0.0)
+
+
 func _animate(delta: float) -> void:
 	if climb.active():
 		_cancel_standby()
@@ -1808,6 +2079,7 @@ func _animate(delta: float) -> void:
 		_sprite.frame_coords = climb.frame()
 		_sprite.position = climb.sprite_offset()
 		_sprite.skew = 0.0
+		attack.position = Vector2.ZERO
 		return
 	if _sheet == CLIMB_SHEET:
 		_sprite.position.x = 0.0
@@ -1819,15 +2091,23 @@ func _animate(delta: float) -> void:
 		return
 	if _sheet == STEP_SHEET_ID:
 		_sprite.position.x = 0.0
-	var angle: float = facing.angle() / (PI / 4.0)
-	if absf(wrapf(angle - float(_sector), -4.0, 4.0)) > 0.62: ## hysteresis: no flicker on sector borders
-		_sector = posmod(roundi(angle), 8)
+	if finisher != null and finisher.active():
+		_cancel_standby()
+		_sector = finisher.sector()
+	elif agile != null and agile.active():
+		_cancel_standby()
+		_sector = agile.sector()
+	else:
+		var angle: float = facing.angle() / (PI / 4.0)
+		if absf(wrapf(angle - float(_sector), -4.0, 4.0)) > 0.62: ## hysteresis: no flicker on sector borders
+			_sector = posmod(roundi(angle), 8)
 
 	var moving: bool = velocity.length() > 5.0
 	var running: bool = moving and sprinting and not stealth.sneaking
 	var col: int
 	if moving:
-		var direction: float = -1.0 if velocity.dot(facing) < 0.0 else 1.0 ## walking backwards plays in reverse
+		var in_strafe: bool = locomotion != null and not running and not stealth.sneaking and locomotion.quadrant in [MovementRules.Quadrant.STRAFE_RIGHT, MovementRules.Quadrant.STRAFE_LEFT]
+		var direction: float = 1.0 if in_strafe else (-1.0 if velocity.dot(facing) < 0.0 else 1.0) ## walking backwards plays in reverse; strafing advances forward
 		if _last_step < 0 and _settle <= 0.0:
 			_walk_time = 1.0 ## setting off: the first frame is the push-off, not a wide-legged stride out of the idle stance
 			_cadence = 0.0
@@ -1858,12 +2138,16 @@ func _animate(delta: float) -> void:
 		_idle_time = fposmod(_idle_time + IDLE_FPS * (0.6 if wounded else 1.0) * delta, float(IDLE_FRAMES)) ## slow, heavy breathing when wounded
 		col = IDLE_COL + int(_idle_time)
 	var was_standby: bool = _standby_clip >= 0
-	_update_standby(delta, moving)
+	_update_standby(delta, moving or agile_active())
 	if was_standby and _standby_clip < 0 and not moving:
 		col = IDLE_COL ## the gesture ends on exactly this breathing frame
 	var main_frame: int = (_sector + (8 if stealth.sneaking else 0)) * SHEET_COLS + col
 	_animate_limp(delta, moving)
-	_sprite.position.y = _sink + _limp_dip
+	var stair_dy: float = locomotion.stair_bob if locomotion != null else 0.0
+	var vert_dy: float = _sink + _limp_dip + roundf(-air_height + stair_dy)
+	var net_px: Vector2 = _net_vis_offset.round()
+	_sprite.position = Vector2(net_px.x, vert_dy + net_px.y)
+	attack.position = net_px
 	var shoulder: Vector2 = Vector2(-4.0, -31.0)
 	var hand: Vector2 = Vector2(-5.0, -21.0)
 	var free_hand: bool = false ## the main sheet plays: the held item may move the fist to its own hold (AttackComponent / GripRig)
@@ -1873,8 +2157,21 @@ func _animate(delta: float) -> void:
 	var arm_f1: int = main_frame
 	var arm_blend: float = 0.0
 	if main_frame < _rig_hand.size():
-		shoulder = _rig_shoulder[main_frame]
-		hand = _rig_hand[main_frame]
+		if moving:
+			# V1: Continuous 60-144 Hz sub-frame arm & weapon interpolation across walking/jogging/sprinting strides
+			var st0: int = int(_walk_time) % WALK_FRAMES
+			var st1: int = (st0 + 1) % WALK_FRAMES
+			var ft: float = _walk_time - floorf(_walk_time)
+			var gbase: int = [0, JOG_COL, RUN_COL][_gait]
+			var rbase: int = (_sector + (8 if stealth.sneaking else 0)) * SHEET_COLS
+			arm_f0 = rbase + gbase + st0
+			arm_f1 = rbase + gbase + st1
+			arm_blend = ft
+			shoulder = _rig_shoulder[arm_f0].lerp(_rig_shoulder[arm_f1], ft)
+			hand = _rig_hand[arm_f0].lerp(_rig_hand[arm_f1], ft)
+		else:
+			shoulder = _rig_shoulder[main_frame]
+			hand = _rig_hand[main_frame]
 	if _busy:
 		var holding: bool = (_busy_kind == "touch" and touch_hold and _busy_time >= TOUCH_HOLD_AT) or (_busy_kind == "feed" and feed_hold and _busy_time >= FEED_REACH_TIME)
 		if holding:
@@ -1901,6 +2198,23 @@ func _animate(delta: float) -> void:
 		hand = Vector2(0.0, -22.0)
 		arm_tex0 = ""
 		arm_tex1 = ""
+	elif finisher != null and finisher.active() and _rig_finisher_hand.size() == 8 * _finisher_cols:
+		var fkey: float = finisher.frame_key()
+		var fi0: int = clampi(int(fkey), 0, _finisher_cols - 1)
+		var fi1: int = mini(fi0 + 1, _finisher_cols - 1)
+		var fb: float = fkey - float(fi0)
+		var ff0: int = _sector * _finisher_cols + fi0
+		var ff1: int = _sector * _finisher_cols + fi1
+		_use_sheet(FINISHER_SHEET_ID)
+		_sprite.frame = ff0
+		shoulder = _rig_finisher_shoulder[ff0].lerp(_rig_finisher_shoulder[ff1], fb)
+		hand = _rig_finisher_hand[ff0].lerp(_rig_finisher_hand[ff1], fb)
+		arm_tex0 = "player_finisher.png"
+		arm_tex1 = "player_finisher.png"
+		arm_f0 = ff0
+		arm_f1 = ff1
+		arm_blend = fb
+		free_hand = false
 	elif _busy and _busy_kind.begins_with("cast_") and _cast_sheet != null:
 		## Casting (docs/magie_konzept.md): its own sheet, legs planted; the right arm holds the staff from the rig, the staff's angle follows STAFF_KEYS.
 		var clip: int = maxi(CAST_CLIPS.find(_cast_motion()), 0)
@@ -2026,16 +2340,33 @@ func _animate(delta: float) -> void:
 		arm_f1 = base + next
 		arm_blend = key - float(i)
 	else:
-		_use_sheet(0)
-		_sprite.frame = main_frame
-		free_hand = not swim_drawn
+		var agile_sel: Vector3 = _pick_agile_clip(moving, running)
+		if agile_sel.x >= 0.0:
+			var ac0: int = int(agile_sel.x)
+			var ac1: int = int(agile_sel.y)
+			var ab: float = agile_sel.z
+			var af0: int = _sector * _agile_cols + ac0
+			var af1: int = _sector * _agile_cols + ac1
+			_use_sheet(AGILE_SHEET_ID)
+			_sprite.frame = af0
+			shoulder = _rig_agile_shoulder[af0].lerp(_rig_agile_shoulder[af1], ab)
+			hand = _rig_agile_hand[af0].lerp(_rig_agile_hand[af1], ab)
+			arm_tex0 = "player_agile.png"
+			arm_tex1 = "player_agile.png"
+			arm_f0 = af0
+			arm_f1 = af1
+			arm_blend = ab
+			free_hand = not agile_active()
+		else:
+			_use_sheet(0)
+			_sprite.frame = main_frame
+			free_hand = not swim_drawn
 	if not (_busy and _busy_kind == "eat"):
 		_eat_fx.clear()
 	if not _drinking():
 		_drink_fx.clear()
 	if not (_busy and _busy_kind == "feed"):
 		_feed_fx.clear()
-	var vert_dy: float = _sink + _limp_dip
 	attack.rig_shoulder = shoulder + Vector2(-_sprite.skew * shoulder.y, vert_dy)
 	attack.rig_hand = hand + Vector2(-_sprite.skew * hand.y, vert_dy)
 	var a3_0: Array[Vector3] = GripRig.frame_arm3(arm_tex0, arm_f0)
@@ -2086,7 +2417,9 @@ func _animate(delta: float) -> void:
 	attack.body_dir = Vector2.from_angle(float(_sector) * PI / 4.0) ## the item rests relative to the facing the sheet shows, not the cursor
 	attack.free_hand = free_hand
 	attack.mirror_material(_sprite.material)
-	attack.sheathed = stealth.sneaking or (_busy and not _busy_kind.begins_with("cast_")) or swim_drawn ## sneaking, picking and swimming put the weapon away (a cast needs the staff)
+	var tool_in_hotbar: bool = inventory != null and inventory.selected >= 0 and inventory.selected < inventory.slots.size() and not (inventory.slots[inventory.selected] as Dictionary).is_empty()
+	var peaceful_travel: bool = locomotion != null and locomotion.reisetritt and not attack.is_in_combat(3.0) and not attack.holds_staff() and not attack.always_drawn and not tool_in_hotbar
+	attack.sheathed = stealth.sneaking or peaceful_travel or (_busy and not _busy_kind.begins_with("cast_")) or swim_drawn ## sneaking, peaceful Reisetritt, picking and swimming put the weapon away
 	if attack.holds_staff() and not fish_frame_ok:
 		attack.rod_pose = _staff_pose(moving)
 	if attack.arm_shown() == swim_drawn:
@@ -2403,6 +2736,8 @@ func _animate_limp(delta: float, moving: bool) -> void:
 			if _drip_timer <= 0.0:
 				_drip_timer = randf_range(2.0, 4.5)
 				BloodSplat.drop(get_tree().current_scene, global_position + Vector2(randf_range(-4.0, 4.0), randf_range(-1.0, 1.0)), 1)
+	elif locomotion != null:
+		lean = locomotion.headwind_lean
 	_limp_dip = lerpf(_limp_dip, dip, minf(1.0, 14.0 * delta))
 	_sprite.skew = lerpf(_sprite.skew, lean, minf(1.0, 10.0 * delta))
 
@@ -2434,8 +2769,16 @@ func _use_sheet(sheet: int) -> void:
 		_sprite.offset = Vector2(0.0, -23.0)
 	if _swim_under != null:
 		_swim_under.visible = sheet == 13
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", _cast_blood if sheet == CAST_SHEET_ID else STEP_BLOOD if sheet == STEP_SHEET_ID else WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", FINISHER_BLOOD if sheet == FINISHER_SHEET_ID else AGILE_BLOOD if sheet == AGILE_SHEET_ID else _cast_blood if sheet == CAST_SHEET_ID else STEP_BLOOD if sheet == STEP_SHEET_ID else WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
 	match sheet:
+		FINISHER_SHEET_ID:
+			_sprite.texture = FINISHER_SHEET
+			_sprite.hframes = _finisher_cols
+			_sprite.vframes = 8
+		AGILE_SHEET_ID:
+			_sprite.texture = AGILE_SHEET
+			_sprite.hframes = _agile_cols
+			_sprite.vframes = 8
 		CLIMB_SHEET:
 			_sprite.texture = WallClimb.SHEET
 			_sprite.hframes = WallClimb.COLUMNS
@@ -2453,14 +2796,16 @@ func _use_sheet(sheet: int) -> void:
 			var under_material: ShaderMaterial = ShaderMaterial.new()
 			under_material.shader = load("res://assets/shaders/swim_under.gdshader") as Shader
 			_swim_under.material = under_material
-			_swim_water = SwimWater.new()
-			_swim_water.name = "SwimWater"
-			add_child(_swim_water)
+			if _swim_water == null:
+				_swim_water = SwimWater.new()
+				_swim_water.name = "SwimWater"
+				add_child(_swim_water)
 			_swim_under.texture = SWIM_UNDER
 			_swim_under.offset = SWIM_OFFSET
 			_swim_under.hframes = _sprite.hframes
 			_swim_under.vframes = 8
 			_swim_under.visible = true
+			_apply_water_colors()
 		1:
 			_sprite.texture = ATTACK_SHEET
 			_sprite.hframes = ATTACK_COLS

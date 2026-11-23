@@ -16,10 +16,25 @@ var energy: float = 0.0 ## 0 treading .. 1 crawl, eased
 var moving: bool = false
 var heading: Vector2 = Vector2.RIGHT ## ground direction of travel
 var intensity: float = 0.0 ## 0..1 fade in/out with the swim blend
+var fill_color: Color = FILL
+var rim_color: Color = RIM
+var foam_color: Color = FOAM
 
 var _drops: Array[Dictionary] = [] ## {p: Vector2 world foot pos, h: height px, v: Vector2, vh: float, age: float, life: float, foam: bool}
 var _bubbles: Array[Dictionary] = []
 var _back: Node2D
+
+
+func set_water_colors(fill: Color, rim: Color, foam: Color = FOAM) -> void:
+	if fill_color == fill and rim_color == rim and foam_color == foam:
+		return
+	fill_color = fill
+	rim_color = rim
+	foam_color = foam
+	if intensity > 0.02 or not _drops.is_empty() or not _bubbles.is_empty():
+		queue_redraw()
+		if _back != null:
+			_back.queue_redraw()
 
 
 func _ready() -> void:
@@ -81,11 +96,11 @@ func _draw() -> void:
 			var y: int = int(roundf(wave * (0.6 + 1.0 * energy)))
 			var edge: float = 1.0 - absf(float(x)) / float(half + 1)
 			var lit: bool = posmod(x + int(t * 5.0), 5) < 2
-			var tint: Color = FOAM if (lit and energy > 0.5) else RIM
+			var tint: Color = foam_color if (lit and energy > 0.5) else rim_color
 			if night > 0.3 and posmod(x * 3 + int(t * 6.0), 7) == 0:
 				tint = MOON ## a moon glint on the ripple
 			draw_rect(Rect2(x, y, 1, 1), Color(tint, (0.7 + 0.3 * edge) * intensity))
-			draw_rect(Rect2(x, y + 1, 1, 1), Color(FILL, (0.7 * edge + 0.15) * intensity))
+			draw_rect(Rect2(x, y + 1, 1, 1), Color(fill_color, (0.7 * edge + 0.15) * intensity))
 		# The bow wave: two short V lines ahead of her, longer and brighter the faster she swims.
 		if moving:
 			var fwd: Vector2 = Vector2(heading.x, heading.y * 0.5).normalized()
@@ -95,14 +110,14 @@ func _draw() -> void:
 				var base: Vector2 = fwd * (6.0 + float(k) * 0.6) + Vector2(0.0, -1.0)
 				for sgn: int in [-1, 1]:
 					var p: Vector2 = (base - fwd * float(k) * 1.1 + side * float(k) * 0.9 * float(sgn)).round()
-					draw_rect(Rect2(p, Vector2.ONE), Color(FOAM if energy > 0.6 and k < 2 else RIM, (0.7 - 0.07 * float(k)) * intensity))
+					draw_rect(Rect2(p, Vector2.ONE), Color(foam_color if energy > 0.6 and k < 2 else rim_color, (0.7 - 0.07 * float(k)) * intensity))
 	for d: Dictionary in _drops:
 		var local: Vector2 = to_local((d["p"] as Vector2)) + Vector2(0.0, -SORT_SHIFT - float(d["h"]))
 		var fade: float = 1.0 - float(d["age"]) / float(d["life"])
-		draw_rect(Rect2(local.round(), Vector2.ONE), Color(FOAM if bool(d["foam"]) else RIM, 0.9 * fade))
+		draw_rect(Rect2(local.round(), Vector2.ONE), Color(foam_color if bool(d["foam"]) else rim_color, 0.9 * fade))
 	for b: Dictionary in _bubbles:
 		var local: Vector2 = to_local((b["p"] as Vector2)) + Vector2(sin(float(b["age"]) * 9.0), -SORT_SHIFT - float(b["h"]))
-		draw_rect(Rect2(local.round(), Vector2.ONE), Color(FOAM, 0.7 * (1.0 - float(b["age"]) / 0.8)))
+		draw_rect(Rect2(local.round(), Vector2.ONE), Color(foam_color, 0.7 * (1.0 - float(b["age"]) / 0.8)))
 
 
 ## Behind the swimmer: a flat ring of water (1 : 0.45) with the violet shadow of the body on it.
@@ -117,9 +132,9 @@ func _draw_back() -> void:
 		var a: float = TAU * float(i) / 40.0
 		var wob: float = 1.0 + 0.06 * sin(a * 3.0 + t * 2.0)
 		var p: Vector2 = Vector2(roundf(cos(a) * rx * wob), roundf(sin(a) * ry * wob))
-		_back.draw_rect(Rect2(p, Vector2.ONE), Color(FILL, 0.85 * intensity))
+		_back.draw_rect(Rect2(p, Vector2.ONE), Color(fill_color, 0.85 * intensity))
 		if posmod(i + int(t * 4.0), 2) == 0:
-			_back.draw_rect(Rect2(p + Vector2(0.0, -1.0), Vector2.ONE), Color(MOON if (TimeManager.night_amount() > 0.3 and i % 5 == 0) else RIM, 0.75 * intensity))
+			_back.draw_rect(Rect2(p + Vector2(0.0, -1.0), Vector2.ONE), Color(MOON if (TimeManager.night_amount() > 0.3 and i % 5 == 0) else rim_color, 0.75 * intensity))
 	for y: int in range(-2, 3):
 		var w: int = int(rx * 0.8 * (1.0 - absf(float(y)) / 3.0))
 		_back.draw_rect(Rect2(-w, y, w * 2, 1), Color(SHADOW, 0.3 * intensity))

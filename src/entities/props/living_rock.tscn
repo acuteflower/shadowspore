@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/entities/props/living_rock.gd" id="1_rock"]
+[ext_resource type="Script" path="res://src/entities/props/harvest_hurtbox.gd" id="2_hurtbox"]
+
+[node name="LivingRock" type="Node2D"]
+y_sort_enabled = false
+script = ExtResource("1_rock")
+
+[node name="Body" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape2D" parent="Body"]
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_hurtbox")
+
+[node name="Shape" type="CollisionShape2D" parent="Hurtbox"]

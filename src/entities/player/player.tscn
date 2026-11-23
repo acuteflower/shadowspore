@@ -20,6 +20,9 @@
 [ext_resource type="Script" path="res://src/components/talisman_component.gd" id="19_talisman"]
 [ext_resource type="Script" path="res://src/components/wall_climb.gd" id="20_climb"]
 [ext_resource type="Script" path="res://src/components/appearance_component.gd" id="21_appearance"]
+[ext_resource type="Script" path="res://src/components/locomotion_component.gd" id="22_locomotion"]
+[ext_resource type="Script" path="res://src/components/agile_traversal.gd" id="23_agile"]
+[ext_resource type="Script" path="res://src/fx/movement_fx.gd" id="24_move_fx"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_flash"]
 resource_local_to_scene = true
@@ -76,6 +79,9 @@ properties/9/replication_mode = 2
 properties/10/path = NodePath("AppearanceComponent:hair_id")
 properties/10/spawn = true
 properties/10/replication_mode = 2
+properties/11/path = NodePath("LocomotionComponent:sync_flags")
+properties/11/spawn = true
+properties/11/replication_mode = 2
 
 [node name="Player" type="CharacterBody2D"]
 y_sort_enabled = true
@@ -87,8 +93,17 @@ script = ExtResource("1_script")
 [node name="SkillTreeComponent" type="Node" parent="."]
 script = ExtResource("18_skills")
 
+[node name="LocomotionComponent" type="Node" parent="."]
+script = ExtResource("22_locomotion")
+
 [node name="WallClimb" type="Node" parent="."]
 script = ExtResource("20_climb")
+
+[node name="AgileTraversal" type="Node" parent="."]
+script = ExtResource("23_agile")
+
+[node name="MovementFx" type="Node2D" parent="."]
+script = ExtResource("24_move_fx")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
 material = SubResource("ShaderMaterial_flash")

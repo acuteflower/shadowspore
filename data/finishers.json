@@ -1,0 +1,40 @@
+{
+	"settings": {
+		"weapon_classes": ["sword_1h", "sword_rift", "sword_starlight"],
+		"solo_threat_radius": 165.0,
+		"boss_minion_push_radius": 140.0,
+		"boss_minion_push_speed": 92.0,
+		"grace_padding": 0.35,
+		"watchdog_padding": 0.28,
+		"move_cancel_at": 0.90
+	},
+	"groups": {
+		"arachnid": ["spider_impale_down"]
+	},
+	"moves": {
+		"spider_impale_down": {
+			"name": "Abgrund-Pfähler",
+			"clip": "impale_down",
+			"frames": 16,
+			"duration": 1.02,
+			"slide_duration": 0.12,
+			"stand_rx": 14.5,
+			"stand_ry": 10.5,
+			"hop_height": 5.5,
+			"hop_start": 0.03,
+			"hop_end": 0.24,
+			"t_plunge": 0.24,
+			"t_press": 0.52,
+			"t_rip": 0.78,
+			"hitstop_plunge": 0.045,
+			"hitstop_press": 0.055,
+			"hitstop_rip": 0.035,
+			"shake_plunge": 3.2,
+			"shake_press": 4.0,
+			"shake_rip": 4.8,
+			"zoom_plunge": 1.08,
+			"zoom_press": 1.11,
+			"view_shift_px": 5.0
+		}
+	}
+}

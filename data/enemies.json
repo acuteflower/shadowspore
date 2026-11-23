@@ -1,6 +1,7 @@
 {
  "shadow_spider": {
   "name": "Schattenspinne",
+  "finisher_group": "arachnid",
   "max_health": 48,
   "chase_speed": 100,
   "wander_speed": 12,
@@ -84,7 +85,76 @@
    "cooldown": 3.5,
    "max_span": 88,
    "max_levels": 1
-  }
+  },
+  "senses": {
+   "fov_deg": 124,
+   "peripheral_scale": 0.56,
+   "tremor_walk": 132,
+   "tremor_sprint": 215,
+   "tremor_sneak": 32,
+   "tremor_land": 185,
+   "tremor_swing": 160,
+   "memory_seconds": 8.0,
+   "investigate_seconds": 2.8,
+   "hesitate_min_range": 102,
+   "hesitate_seconds": 0.45
+  },
+  "posture": {
+   "max": 34.0,
+   "regen_delay": 2.4,
+   "regen_per_sec": 8.0,
+   "front_guard_mult": 0.85,
+   "rear_weak_mult": 1.25,
+   "exposed_mult": 1.35,
+   "exposed_seconds": 1.1,
+   "expose_knockback": 108.0
+  },
+  "backstep": {
+   "distance": 32.0,
+   "duration": 0.22,
+   "cooldown": 5.4,
+   "trigger_hits": 2,
+   "trigger_range": 40.0
+  },
+  "venom_lunge": {
+   "min_range": 26.0,
+   "max_range": 62.0,
+   "windup": 0.52,
+   "aim_lock": 0.26,
+   "duration": 0.19,
+   "recover": 0.76,
+   "cooldown": 5.8,
+   "distance": 46.0,
+   "width": 10.0,
+   "damage": 15.0,
+   "knockback": 78.0,
+   "venom_seconds": 4.0
+  },
+  "web_seconds": 1.35,
+  "pack_recoil_seconds": 0.35,
+  "variants": [
+   {
+    "id": "common",
+    "scale": 1.0,
+    "leg_scale": 1.0,
+    "speed_mult": 1.0,
+    "thorns": false
+   },
+   {
+    "id": "scout",
+    "scale": 0.88,
+    "leg_scale": 1.08,
+    "speed_mult": 1.12,
+    "thorns": false
+   },
+   {
+    "id": "thorn",
+    "scale": 1.14,
+    "leg_scale": 1.06,
+    "speed_mult": 0.94,
+    "thorns": true
+   }
+  ]
  },
  "void_listener": {
   "name": "Leerenhorcher",
@@ -180,6 +250,7 @@
  },
  "guard_spider": {
   "name": "Wächterspinne",
+  "finisher_group": "arachnid",
   "max_health": 48,
   "chase_speed": 100,
   "wander_speed": 12,
@@ -255,6 +326,7 @@
  },
  "ambush_spider": {
   "name": "Schattenspinne",
+  "finisher_group": "arachnid",
   "max_health": 150,
   "chase_speed": 100,
   "wander_speed": 12,
@@ -325,7 +397,76 @@
    "cooldown": 3.5,
    "max_span": 88,
    "max_levels": 1
-  }
+  },
+  "senses": {
+   "fov_deg": 124,
+   "peripheral_scale": 0.56,
+   "tremor_walk": 132,
+   "tremor_sprint": 215,
+   "tremor_sneak": 32,
+   "tremor_land": 185,
+   "tremor_swing": 160,
+   "memory_seconds": 8.0,
+   "investigate_seconds": 2.8,
+   "hesitate_min_range": 102,
+   "hesitate_seconds": 0.45
+  },
+  "posture": {
+   "max": 34.0,
+   "regen_delay": 2.4,
+   "regen_per_sec": 8.0,
+   "front_guard_mult": 0.85,
+   "rear_weak_mult": 1.25,
+   "exposed_mult": 1.35,
+   "exposed_seconds": 1.1,
+   "expose_knockback": 108.0
+  },
+  "backstep": {
+   "distance": 32.0,
+   "duration": 0.22,
+   "cooldown": 5.4,
+   "trigger_hits": 2,
+   "trigger_range": 40.0
+  },
+  "venom_lunge": {
+   "min_range": 26.0,
+   "max_range": 62.0,
+   "windup": 0.52,
+   "aim_lock": 0.26,
+   "duration": 0.19,
+   "recover": 0.76,
+   "cooldown": 5.8,
+   "distance": 46.0,
+   "width": 10.0,
+   "damage": 15.0,
+   "knockback": 78.0,
+   "venom_seconds": 4.0
+  },
+  "web_seconds": 1.35,
+  "pack_recoil_seconds": 0.35,
+  "variants": [
+   {
+    "id": "common",
+    "scale": 1.0,
+    "leg_scale": 1.0,
+    "speed_mult": 1.0,
+    "thorns": false
+   },
+   {
+    "id": "scout",
+    "scale": 0.88,
+    "leg_scale": 1.08,
+    "speed_mult": 1.12,
+    "thorns": false
+   },
+   {
+    "id": "thorn",
+    "scale": 1.14,
+    "leg_scale": 1.06,
+    "speed_mult": 0.94,
+    "thorns": true
+   }
+  ]
  },
  "void_crusher": {
   "name": "Leerenbrecher",

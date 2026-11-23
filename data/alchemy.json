@@ -33,6 +33,9 @@
 					"min": 20,
 					"trust": 0,
 					"yield": 2,
+					"cleanse": [
+						"shadow_venom"
+					],
 					"in": {
 						"wound_leaf": 3,
 						"dusk_berry": 2
@@ -43,6 +46,9 @@
 					"min": 30,
 					"trust": 10,
 					"yield": 2,
+					"cleanse": [
+						"shadow_venom"
+					],
 					"in": {
 						"wound_leaf": 4,
 						"moonbell": 2,
@@ -54,6 +60,9 @@
 					"min": 45,
 					"trust": 25,
 					"yield": 2,
+					"cleanse": [
+						"shadow_venom"
+					],
 					"in": {
 						"wound_leaf": 4,
 						"sun_seed": 2,
@@ -67,7 +76,8 @@
 					"trust": 40,
 					"yield": 2,
 					"cleanse": [
-						"burn"
+						"burn",
+						"shadow_venom"
 					],
 					"in": {
 						"wound_leaf": 5,
@@ -83,7 +93,8 @@
 					"trust": 60,
 					"yield": 1,
 					"cleanse": [
-						"burn"
+						"burn",
+						"shadow_venom"
 					],
 					"overheal": true,
 					"in": {

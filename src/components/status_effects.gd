@@ -131,6 +131,12 @@ func _physics_process(delta: float) -> void:
 	if _effects.is_empty():
 		return
 	var is_host: bool = multiplayer.is_server()
+	if is_host and _effects.has("webbed"):
+		var webbed_player: Player = get_parent() as Player
+		if webbed_player != null and (webbed_player._step_t >= 0.0 or (webbed_player.attack != null and webbed_player.attack.is_swinging())):
+			_rpc_clear.rpc("webbed")
+			if _effects.is_empty():
+				return
 	_wet_check -= delta
 	var check_water: bool = is_host and _wet_check <= 0.0
 	if check_water:
@@ -222,6 +228,12 @@ func _show(id: String) -> void:
 		(get_parent() as Node2D).add_child(fx)
 		fx.bind(self)
 		_fx[id] = fx
+	if id == "webbed" and not _fx.has(id) and DisplayServer.get_name() != "headless":
+		var wfx: WebbedFx = WebbedFx.new()
+		wfx.name = "WebbedFx"
+		(get_parent() as Node2D).add_child(wfx)
+		wfx.bind(self)
+		_fx[id] = wfx
 	if id == "moon_glow" and not _fx.has(id) and DisplayServer.get_name() != "headless":
 		var light: NightLight = NightLight.new()
 		light.name = "MoonGlowLight"

@@ -1,3 +1,5 @@
+#ifndef WATER_REFLECT_INC
+#define WATER_REFLECT_INC
 // Mirror images on water (docs/wasserspiegelung.md). WaterReflections renders upside-down copies of
 // Ellie, trees, animals ... into one small screen-sized buffer; every water surface (rivers, lakes,
 // rain puddles) looks its world pixel up in it. Off (g_reflect_on 0) = no texture read at all.
@@ -22,3 +24,4 @@ vec3 reflect_tint(vec3 reflected, vec3 water) {
 	vec3 cool = reflected * vec3(0.86, 0.95, 1.0) + water * 0.08;
 	return mix(cool, water, 0.08);
 }
+#endif

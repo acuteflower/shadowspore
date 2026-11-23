@@ -46,7 +46,8 @@ func _ready() -> void:
 		_rig.add_child(node)
 	var body: Sprite2D = _rig.get_node("Body") as Sprite2D
 	body.texture = BODY
-	body.hframes = 8
+	body.hframes = SpiderRig.BODY_COLS
+	body.vframes = SpiderRig.BODY_ROWS
 	var flash: ShaderMaterial = ShaderMaterial.new()
 	flash.shader = FLASH
 	body.material = flash

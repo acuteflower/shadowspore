@@ -9,13 +9,71 @@
 		"sound": "grass"
 	},
 	"path": {
-		"speed": 1.0,
+		"speed": 1.04,
 		"step": {
 			"kind": "puff",
-			"color": "#d6c9a8",
+			"color": "#c8ba9e",
 			"amount": 3
 		},
 		"sound": "path"
+	},
+	"gravel": {
+		"speed": 1.03,
+		"step": {
+			"kind": "puff",
+			"color": "#cfd4d0",
+			"amount": 3
+		},
+		"sound": "slope",
+		"sound_gain": 0.5
+	},
+	"ancient_stone": {
+		"speed": 1.05,
+		"step": {
+			"kind": "puff",
+			"color": "#cfd6ce",
+			"amount": 2
+		},
+		"sound": "stone",
+		"sound_gain": 0.4
+	},
+	"forest_floor": {
+		"speed": 0.96,
+		"step": {
+			"kind": "puff",
+			"color": "#6e4f3a",
+			"amount": 3
+		},
+		"footprint": {
+			"color": "#1e1412",
+			"seconds": 7
+		},
+		"sound": "bed",
+		"sound_gain": -0.6
+	},
+	"moss": {
+		"speed": 0.98,
+		"step": {
+			"kind": "puff",
+			"color": "#62a468",
+			"amount": 2
+		},
+		"sound": "grass",
+		"sound_gain": -2.6
+	},
+	"damp_earth": {
+		"speed": 0.88,
+		"step": {
+			"kind": "puff",
+			"color": "#4a3328",
+			"amount": 4
+		},
+		"footprint": {
+			"color": "#1c1210",
+			"seconds": 12
+		},
+		"sound": "mud",
+		"sound_gain": -1.4
 	},
 	"mud": {
 		"speed": 0.7,
@@ -168,5 +226,50 @@
 			"amount": 5
 		},
 		"sound": "puddle"
+	},
+	"beach_sand": {
+		"speed": 0.92,
+		"dust": true,
+		"step": {
+			"kind": "puff",
+			"color": "#e8d2a0",
+			"amount": 4
+		},
+		"footprint": {
+			"color": "#8b7352",
+			"seconds": 9
+		},
+		"sound": "sand",
+		"sound_gain": 0.3
+	},
+	"wet_sand": {
+		"speed": 0.96,
+		"dust": false,
+		"ripples": false,
+		"step": {
+			"kind": "puff",
+			"color": "#8c7a5e",
+			"amount": 2
+		},
+		"footprint": {
+			"color": "#4f4232",
+			"seconds": 5
+		},
+		"sound": "mud",
+		"sound_gain": 0.35
+	},
+	"tide_shallow": {
+		"speed": 0.78,
+		"submerge": 3,
+		"ripples": true,
+		"water": true,
+		"allow_sprint": true,
+		"step": {
+			"kind": "splash",
+			"color": "#bfe9ff",
+			"amount": 6
+		},
+		"sound": "shallow_water",
+		"sound_gain": 0.45
 	}
 }

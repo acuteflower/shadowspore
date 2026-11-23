@@ -1,0 +1,518 @@
+{
+  "s0_a": {
+    "frame_w": 32,
+    "frame_h": 28,
+    "feet_x": 16,
+    "feet_y": 22,
+    "height_px": 11,
+    "half_w_px": 8,
+    "body_half_h_px": 4,
+    "sheet": "res://assets/props/valley_stone/s0_a.png",
+    "glow_sheet": "res://assets/props/valley_stone/s0_a_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s0_b": {
+    "frame_w": 32,
+    "frame_h": 28,
+    "feet_x": 16,
+    "feet_y": 22,
+    "height_px": 11,
+    "half_w_px": 8,
+    "body_half_h_px": 4,
+    "sheet": "res://assets/props/valley_stone/s0_b.png",
+    "glow_sheet": "res://assets/props/valley_stone/s0_b_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s1_a": {
+    "frame_w": 48,
+    "frame_h": 42,
+    "feet_x": 24,
+    "feet_y": 34,
+    "height_px": 20,
+    "half_w_px": 14,
+    "body_half_h_px": 6,
+    "sheet": "res://assets/props/valley_stone/s1_a.png",
+    "glow_sheet": "res://assets/props/valley_stone/s1_a_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s1_b": {
+    "frame_w": 48,
+    "frame_h": 42,
+    "feet_x": 24,
+    "feet_y": 34,
+    "height_px": 20,
+    "half_w_px": 14,
+    "body_half_h_px": 6,
+    "sheet": "res://assets/props/valley_stone/s1_b.png",
+    "glow_sheet": "res://assets/props/valley_stone/s1_b_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s2_a": {
+    "frame_w": 68,
+    "frame_h": 56,
+    "feet_x": 34,
+    "feet_y": 46,
+    "height_px": 32,
+    "half_w_px": 21,
+    "body_half_h_px": 8,
+    "sheet": "res://assets/props/valley_stone/s2_a.png",
+    "glow_sheet": "res://assets/props/valley_stone/s2_a_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s2_b": {
+    "frame_w": 68,
+    "frame_h": 56,
+    "feet_x": 34,
+    "feet_y": 46,
+    "height_px": 32,
+    "half_w_px": 21,
+    "body_half_h_px": 8,
+    "sheet": "res://assets/props/valley_stone/s2_b.png",
+    "glow_sheet": "res://assets/props/valley_stone/s2_b_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s2_c": {
+    "frame_w": 68,
+    "frame_h": 56,
+    "feet_x": 34,
+    "feet_y": 46,
+    "height_px": 32,
+    "half_w_px": 21,
+    "body_half_h_px": 8,
+    "sheet": "res://assets/props/valley_stone/s2_c.png",
+    "glow_sheet": "res://assets/props/valley_stone/s2_c_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s3_a": {
+    "frame_w": 92,
+    "frame_h": 76,
+    "feet_x": 46,
+    "feet_y": 64,
+    "height_px": 48,
+    "half_w_px": 30,
+    "body_half_h_px": 11,
+    "sheet": "res://assets/props/valley_stone/s3_a.png",
+    "glow_sheet": "res://assets/props/valley_stone/s3_a_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s3_b": {
+    "frame_w": 92,
+    "frame_h": 76,
+    "feet_x": 46,
+    "feet_y": 64,
+    "height_px": 48,
+    "half_w_px": 30,
+    "body_half_h_px": 11,
+    "sheet": "res://assets/props/valley_stone/s3_b.png",
+    "glow_sheet": "res://assets/props/valley_stone/s3_b_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s3_c": {
+    "frame_w": 92,
+    "frame_h": 76,
+    "feet_x": 46,
+    "feet_y": 64,
+    "height_px": 48,
+    "half_w_px": 30,
+    "body_half_h_px": 11,
+    "sheet": "res://assets/props/valley_stone/s3_c.png",
+    "glow_sheet": "res://assets/props/valley_stone/s3_c_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s4_a": {
+    "frame_w": 124,
+    "frame_h": 96,
+    "feet_x": 62,
+    "feet_y": 82,
+    "height_px": 64,
+    "half_w_px": 44,
+    "body_half_h_px": 14,
+    "sheet": "res://assets/props/valley_stone/s4_a.png",
+    "glow_sheet": "res://assets/props/valley_stone/s4_a_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  },
+  "s4_b": {
+    "frame_w": 124,
+    "frame_h": 96,
+    "feet_x": 62,
+    "feet_y": 82,
+    "height_px": 64,
+    "half_w_px": 44,
+    "body_half_h_px": 14,
+    "sheet": "res://assets/props/valley_stone/s4_b.png",
+    "glow_sheet": "res://assets/props/valley_stone/s4_b_glow.png",
+    "num_cols": 15,
+    "glow_cols": 1,
+    "layers": {
+      "base_skirt": 0,
+      "intact": 1,
+      "chipped": 2,
+      "cracked_1": 3,
+      "cracked_2": 4,
+      "rubble": 5
+    },
+    "traits": {
+      "moss": [
+        6,
+        7
+      ],
+      "lichen": [
+        8,
+        9
+      ],
+      "ivy": [
+        10,
+        11
+      ],
+      "fern": [
+        12,
+        13
+      ],
+      "fungi": [
+        14
+      ]
+    },
+    "fungi_glow_col": 0
+  }
+}

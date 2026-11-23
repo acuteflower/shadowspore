@@ -1,0 +1,109 @@
+{
+	"curves": {
+		"instant_share": 0.45,
+		"instant_window": 0.045,
+		"accel": 880.0,
+		"sprint_surge_mult": 1.22,
+		"sprint_surge_seconds": 0.18,
+		"walk_brake": 1220.0,
+		"sprint_brake_glide": 650.0,
+		"sprint_brake_after": 0.38,
+		"wet_brake_scale": 0.72
+	},
+	"corner_nudge": {
+		"feeler_reach": 8.5,
+		"feeler_spread": 4.8,
+		"strength": 68.0,
+		"max_head_on_dot": 0.93
+	},
+	"turn": {
+		"carve_deg": 68.0,
+		"pivot_deg": 125.0,
+		"pivot_min_speed": 86.0,
+		"pivot_seconds": 0.14,
+		"pivot_accel_mult": 2.35,
+		"diagonal_grace": 0.075
+	},
+	"topography": {
+		"probe_px": 8.0,
+		"uphill_scale": 0.88,
+		"downhill_scale": 1.08,
+		"road_bonus": 1.06,
+		"road_surfaces": ["path", "stone", "quartz"],
+		"stair_bob_px": 1.0
+	},
+	"reisetritt": {
+		"enter_seconds": 1.1,
+		"road_stamina_scale": 0.0,
+		"wild_stamina_scale": 0.35,
+		"road_speed_bonus": 1.08,
+		"combat_memory_seconds": 4.0,
+		"threat_radius": 150.0
+	},
+	"buffer": {
+		"window_seconds": 0.13,
+		"cancel_tail_seconds": 0.17
+	},
+	"combat_footwork": {
+		"forward_deg": 55.0,
+		"strafe_deg": 125.0,
+		"strafe_speed_scale": 0.94,
+		"backpedal_speed_scale": 0.86
+	},
+	"camera": {
+		"deadzone_px": 9.0,
+		"walk_lead_sec": 0.20,
+		"sprint_lead_sec": 0.30,
+		"max_lead_px": 38.0,
+		"aim_share": 0.28,
+		"aim_max_px": 42.0,
+		"ease_speed": 3.8
+	},
+	"network": {
+		"hermite_decay": 18.0,
+		"snap_distance": 42.0
+	},
+	"agile": {
+		"vault_reach": 15.0,
+		"vault_max_span": 28.0,
+		"vault_seconds": 0.36,
+		"vault_arc_px": 8.5,
+		"hop_reach": 13.0,
+		"hop_max_span": 46.0,
+		"hop_push_seconds": 0.14,
+		"hop_seconds": 0.42,
+		"hop_arc_px": 7.0
+	},
+	"spore_step": {
+		"wall_glide_deg": 38.0,
+		"exit_glide_mult": 1.14,
+		"exit_glide_seconds": 0.15
+	},
+	"impulse": {
+		"noise": {
+			"sneak": 26.0,
+			"walk": 82.0,
+			"jog": 132.0,
+			"sprint": 195.0,
+			"pivot": 215.0,
+			"land": 175.0
+		},
+		"surface_noise": {
+			"grass": 0.90,
+			"moss": 0.52,
+			"forest_floor": 0.82,
+			"damp_earth": 0.86,
+			"bed": 0.88,
+			"field": 0.90,
+			"mud": 0.95,
+			"stone": 1.12,
+			"ancient_stone": 1.15,
+			"mine_stone": 1.14,
+			"gravel": 1.26,
+			"puddle": 1.18,
+			"shallow_water": 1.22,
+			"quartz": 1.08
+		},
+		"shadow_stealth_bonus": 0.76
+	}
+}

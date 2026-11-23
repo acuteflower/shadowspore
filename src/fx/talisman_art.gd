@@ -13,6 +13,7 @@ const STRIDE: int = 16
 const SHEETS: Dictionary = {
 	"player.png": "main", "player_attack.png": "attack", "player_pick.png": "pick", "player_eat.png": "eat", "player_pull.png": "pull",
 	"player_touch.png": "touch", "player_heavy.png": "heavy", "player_fish.png": "fish", "player_standby.png": "standby",
+	"player_agile.png": "agile", "player_finisher.png": "finisher",
 }
 const METALS: Dictionary = { ## dark .. highlight
 	"silver": ["6b7392", "93a0bc", "d4dbec", "f6f9ff"],

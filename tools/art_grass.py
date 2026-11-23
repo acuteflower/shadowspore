@@ -124,43 +124,40 @@ class Tile:
                     cleaned[y][x] = max(set(nb), key=nb.count)
         self.px = [[RAMP[cleaned[y][x]] for x in range(16)] for y in range(16)]
 
-        # Place 4 well-spaced, crisp pixel-art mini grass-blade / clover clusters inside the tile
+        # Soft, painterly moss-turf micro-cushions (1-step calm modulation, zero noisy static so LivingGrass shines on top)
         placed: list[tuple[int, int]] = []
-        target = 4 + (seed % 2)
-        for attempt in range(40):
+        target = 3 + (seed % 2)
+        for attempt in range(36):
             if len(placed) >= target:
                 break
             bx = self.rng.randint(2, 13)
             by = self.rng.randint(3, 13)
-            if any((bx - px0) ** 2 + (by - py0) ** 2 < 18 for px0, py0 in placed):
+            if any((bx - px0) ** 2 + (by - py0) ** 2 < 22 for px0, py0 in placed):
                 continue
             placed.append((bx, by))
             kind = (seed + len(placed) + attempt) % 3
-            lean = -1 if (bx + by + seed) % 2 == 0 else 1
             if kind == 0:
-                # Crisp V-blade pair with root tuck
-                self.put(bx, by, D)
+                # Soft velvety moss pillow tuck (M/B/L only — calm, painterly, never high-contrast confetti)
+                self.put(bx - 1, by, M)
+                self.put(bx, by, M)
+                self.put(bx + 1, by, M)
+                self.put(bx - 1, by - 1, L)
+                self.put(bx, by - 1, L)
+                self.put(bx + 1, by - 1, B)
+            elif kind == 1:
+                # Subtle low curved turf fold
+                self.put(bx, by, M)
                 self.put(bx + 1, by, M)
                 self.put(bx, by - 1, L)
-                self.put(bx - 1, by - 2, H)
-                self.put(bx + 1, by - 1, L)
-            elif kind == 1:
-                # Curved twin grass blades sweeping with the breeze
-                self.put(bx, by, D)
-                self.put(bx + 1, by, D if lean < 0 else M)
-                self.put(bx, by - 1, L)
-                self.put(bx + lean, by - 2, H)
-                self.put(bx + 1, by - 1, M)
-                self.put(bx + 1 + lean, by - 2, L)
+                self.put(bx + 1, by - 1, B)
+                self.put(bx - 1, by - 1, B)
             else:
-                # Scalloped 3-leaf turf cluster (matches bush leaf facets)
-                self.put(bx - 1, by, M)
-                self.put(bx, by, D)
-                self.put(bx + 1, by, D)
-                self.put(bx - 1, by - 1, H)
-                self.put(bx, by - 1, L)
+                # Quiet shaded soil-moss pocket
+                self.put(bx, by, M)
+                self.put(bx + 1, by, M)
                 self.put(bx + 1, by - 1, M)
-                self.put(bx, by - 2, H)
+                self.put(bx - 1, by - 1, L)
+                self.put(bx, by - 1, B)
 
     def wput(self, x: int, y: int, c) -> None:
         self.px[y % 16][x % 16] = c
@@ -488,7 +485,8 @@ def write_all() -> None:
         'sources/0 = SubResource("TileSetAtlasSource_grass")',
         "",
     ]
-    (ROOT.parent / "src" / "world" / "tileset.tres").write_text("\n".join(lines), newline="\n")
+    with open(ROOT.parent / "src" / "world" / "tileset.tres", "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(lines))
 
     emissive = {TEAL_D, TEAL, TEAL_L, CAP_D, CAP, CAP_L}
     glow_ids = [i for cat in ("bloom", "mushroom", "glyph") for i in cats.get(cat, [])]
@@ -516,9 +514,11 @@ def write_all() -> None:
         'sources/0 = SubResource("TileSetAtlasSource_glow")',
         "",
     ]
-    (ROOT.parent / "src" / "world" / "glow_tileset.tres").write_text("\n".join(glow_lines), newline="\n")
+    with open(ROOT.parent / "src" / "world" / "glow_tileset.tres", "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(glow_lines))
     table = {cat: [[i % COLS, i // COLS] for i in ids] for cat, ids in cats.items()}
-    (ROOT.parent / "data" / "grass_tiles.json").write_text(json.dumps(table, indent=1) + "\n", newline="\n")
+    with open(ROOT.parent / "data" / "grass_tiles.json", "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(json.dumps(table, indent=1) + "\n")
 
 
 if __name__ == "__main__":

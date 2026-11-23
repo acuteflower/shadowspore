@@ -154,6 +154,8 @@ var _trail_edge: Color = TRAIL_EDGE
 var _trail_core: Color = TRAIL_CORE
 var _sound_dir: String = ""
 var _idle_glint: bool = false
+var _in_finisher: bool = false
+var _finisher_ribbon: bool = false
 var _stamina: StaminaComponent
 var _talismans: TalismanComponent ## damage and charge speed of the worn jewellery
 var _skills: SkillTreeComponent ## which combo steps are learned (data/skills.json upgrades)
@@ -316,7 +318,44 @@ func animation_state() -> Vector2:
 
 
 func can_attack() -> bool:
-	return _phase == Phase.IDLE and held_weapon != "" and not always_drawn and not _charging
+	return _phase == Phase.IDLE and not _in_finisher and held_weapon != "" and not always_drawn and not _charging
+
+
+func trail_edge_color() -> Color:
+	return _trail_edge
+
+
+func trail_core_color() -> Color:
+	return _trail_core
+
+
+func prepare_for_finisher(dir: Vector2, weapon_id: String, refine_lvl: int) -> void:
+	if weapon_id != "" and held_weapon != weapon_id:
+		held_weapon = weapon_id
+	held_refine = refine_lvl
+	_charging = false
+	_charge_stage = 0
+	_phase = Phase.IDLE
+	_time = 0.0
+	_freeze = 0.0
+	_combo_index = 0
+	_server_combo_index = 0
+	_server_ready_msec = 0
+	_burst_done = true
+	_trail_age = TRAIL_FADE
+	_tips.clear()
+	_swing_from = _dir
+	aim_dir = dir.normalized() if dir.length_squared() > 0.001 else Vector2.RIGHT
+	_since_swing = 0.0
+	_weapon_alpha = 1.0
+	_in_finisher = true
+	_finisher_ribbon = false
+
+
+func end_finisher() -> void:
+	_in_finisher = false
+	_finisher_ribbon = false
+	_since_swing = 0.0
 
 
 ## The held weapon has a secondary attack and she has the strength to start it.
@@ -716,10 +755,19 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 		damage *= _talismans.dive_factor() ## Rissfeder: the first blow after a blink
 	var knockback: float = Items.stat(stack, "knockback", 0.0) * float(step["knock"])
 	var targets: Array[HurtboxComponent] = HitScan.fan(self, origin, dir, Items.stat(stack, "reach", 20.0) * float(step["reach"]), float(step["arc"]), HURTBOX_MASK)
+	var owner_player: Player = get_parent() as Player
+	if owner_player != null and owner_player.finisher != null:
+		owner_player.finisher.open_melee_hit_window(stack)
 	for target: HurtboxComponent in targets:
 		target.armor_floor = float(step.get("armor_floor", 0.0))
 		target.take_hit(damage, origin, knockback, get_multiplayer_authority())
 		target.armor_floor = 0.0
+	if owner_player != null and owner_player.finisher != null:
+		owner_player.finisher.close_melee_hit_window()
+		if owner_player.finisher.active():
+			if _talismans != null:
+				_talismans.spend_dive()
+			return
 	if not targets.is_empty():
 		var hit_pos: Vector2 = _hit_point(targets[0])
 		if _talismans != null:
@@ -727,7 +775,6 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 			_talismans.trigger_starlight(hit_pos, damage, get_multiplayer_authority())
 		_on_hit.rpc(hit_pos, dir, float(step["shake"]), float(step.get("hit_stop", 0.0)))
 	if String(Items.definition(stack).get("tool", "")) == "can":
-		var owner_player: Player = get_parent() as Player
 		var town_node: TownManager = get_tree().get_first_node_in_group("town") as TownManager if is_inside_tree() else null
 		if town_node != null and town_node.farm != null and owner_player != null:
 			town_node.farm.host_swing_refill(owner_player, dir)
@@ -1046,7 +1093,7 @@ func _track_tips(delta: float) -> void:
 		_tips[i]["age"] = float(_tips[i]["age"]) + delta
 		if float(_tips[i]["age"]) >= HEAVY_TRAIL_LIFE:
 			_tips.remove_at(i)
-	if (is_heavy_swing() or _is_diag()) and _phase != Phase.WINDUP and _freeze <= 0.0:
+	if ((is_heavy_swing() or _is_diag()) and _phase != Phase.WINDUP and _freeze <= 0.0) or _finisher_ribbon:
 		var dir: Vector2 = Vector2.from_angle(_blade_angle)
 		var base: Vector2 = _weapon.global_position
 		_tips.append({"mid": base + dir * _blade_length * BLADE_PX * 0.45, "tip": base + dir * _blade_length * BLADE_PX, "age": 0.0})
@@ -1188,7 +1235,7 @@ func _update_pose(delta: float) -> void:
 	var spring: Dictionary = GripRig.data().get("spring", {}) as Dictionary
 	var forward: Vector2 = body_dir.normalized() if body_dir.length() > 0.01 else Vector2.DOWN
 	var right: Vector2 = GripRig.right_of(forward)
-	var busy: bool = _phase != Phase.IDLE or _charging
+	var busy: bool = _phase != Phase.IDLE or _charging or _in_finisher
 	var blend: float = float(spring.get("blend", 4.5))
 	_ready_k = move_toward(_ready_k, 1.0 if is_in_combat(float(spring.get("ready_for", 2.2))) else 0.0, blend * delta)
 	_sprint_k = move_toward(_sprint_k, 1.0 if carrying and not busy else 0.0, blend * 1.5 * delta)
@@ -1255,19 +1302,34 @@ func _update_pose(delta: float) -> void:
 			_hand_vel = vel
 		_prev_hand = grip
 	_emit_kind = 0
-	var keyed: Variant = _keyed_dir(rest_dir) if _has_weapon else null
-	if keyed is Vector3:
-		_set_dir(keyed as Vector3, delta)
+	_finisher_ribbon = false
+	var fin_embed: float = 0.0
+	var fin_force_behind: int = -1
+	var p_owner: Player = get_parent() as Player
+	if _in_finisher and p_owner != null and p_owner.finisher != null and p_owner.finisher.active():
+		var fpose: Dictionary = p_owner.finisher.blade_pose(_swing_from, rest_dir)
+		if not fpose.is_empty():
+			_set_dir(fpose["dir"] as Vector3, delta)
+			fin_embed = float(fpose.get("embed", 0.0))
+			_emit_kind = int(fpose.get("emit_motes", 0))
+			_finisher_ribbon = bool(fpose.get("track_ribbon", false))
+			fin_force_behind = 1 if bool(fpose.get("behind", false)) else 0
 	else:
-		_spring_to(rest_dir, hand_acc, delta, spring, rod_pose.is_finite())
+		var keyed: Variant = _keyed_dir(rest_dir) if _has_weapon else null
+		if keyed is Vector3:
+			_set_dir(keyed as Vector3, delta)
+		else:
+			_spring_to(rest_dir, hand_acc, delta, spring, rod_pose.is_finite())
 	var shown: Vector2 = GripRig.project_dir(_dir)
 	var angle: float = shown.angle()
-	var length: float = clampf(shown.length(), 0.4, 1.0)
+	var length: float = clampf(shown.length() * (1.0 - fin_embed), 0.4, 1.0)
 	_rest_angle = angle
 	_rest_length = length
 	# depth: the item and the arm each go in front of or behind her body (a near arm may hold a blade that points away)
 	var mid: Vector3 = _fist3 + _dir * 7.0
-	if mid.y < -1.4:
+	if fin_force_behind >= 0:
+		_weapon_behind = fin_force_behind == 1
+	elif mid.y < -1.4:
 		_weapon_behind = true
 	elif mid.y > 0.4:
 		_weapon_behind = false

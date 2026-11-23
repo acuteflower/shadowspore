@@ -144,7 +144,7 @@ func clock_text() -> String:
 	return "%02d:%02d" % [minutes / 60, minutes % 60]
 
 
-## Escape menu (dev tab) and F4: sets the time of day. The host applies it; clients ask the host.
+## Escape menu (dev tab) and F4: sets the time of day. The host applies it; admin clients ask the host.
 func set_time(time: float) -> void:
 	time = fposmod(time, 1.0)
 	if multiplayer.is_server():
@@ -155,14 +155,32 @@ func set_time(time: float) -> void:
 			_rpc_time_jump.rpc(time_of_day, day, locked, advanced)
 		elif advanced:
 			day_started.emit(day)
-	elif NetworkManager.rpc_ready(self):
+	elif CloudSession.is_admin() and NetworkManager.rpc_ready(self):
 		_request_time.rpc_id(1, time)
+
+
+func set_day(new_day: int) -> void:
+	new_day = maxi(new_day, 0)
+	if multiplayer.is_server():
+		day = new_day
+		if NetworkManager.rpc_ready(self):
+			_sync_time.rpc(time_of_day, day, locked)
+	elif CloudSession.is_admin() and NetworkManager.rpc_ready(self):
+		_request_day.rpc_id(1, new_day)
 
 
 @rpc("any_peer", "call_remote", "reliable")
 func _request_time(time: float) -> void:
-	if multiplayer.is_server():
+	var sender: int = multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and (sender <= 1 or NetworkManager.is_peer_admin(sender)):
 		set_time(time)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _request_day(new_day: int) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and (sender <= 1 or NetworkManager.is_peer_admin(sender)):
+		set_day(new_day)
 
 
 func _process(delta: float) -> void:
@@ -173,14 +191,17 @@ func _process(delta: float) -> void:
 	if not locked:
 		time_of_day = fposmod(time_of_day + delta / DAY_LENGTH_SEC, 1.0)
 		_check_day(before)
+	if InputManager.debug_time_pressed():
+		if multiplayer.is_server():
+			before = time_of_day
+			time_of_day = fposmod(time_of_day + DEBUG_STEP, 1.0)
+			_check_day(before)
+			if NetworkManager.rpc_ready(self):
+				_sync_time.rpc(time_of_day, day, locked)
+		else:
+			set_time(fposmod(time_of_day + DEBUG_STEP, 1.0))
 	if not multiplayer.is_server():
 		return
-	if InputManager.debug_time_pressed():
-		before = time_of_day
-		time_of_day = fposmod(time_of_day + DEBUG_STEP, 1.0)
-		_check_day(before)
-		if NetworkManager.rpc_ready(self):
-			_sync_time.rpc(time_of_day, day, locked)
 	_sync_timer += delta
 	if _sync_timer >= SYNC_INTERVAL:
 		_sync_timer = 0.0

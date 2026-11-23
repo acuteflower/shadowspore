@@ -4,14 +4,95 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.7 Beta] – 2026-11-16
+### 🧭 Host-naher Koop-Spawn, Neue ESC-Koop-Sidebar, Live-Updates & Admin-Rechte
+
+![Hallgrat im Nachtlicht mit Laternen und Stadtmauer](docs/img/hallgrat_deko_night.png)
+
+> *Beitreten landet jetzt direkt beim Host statt bei `(0, 0)`, das untere Koop-Fenster weicht der neuen aufklappbaren Lobby-Leiste im Pause-Menü, Anfragen/Einladungen aktualisieren sich in Echtzeit und Admins behalten ihre Test-Werkzeuge auch in fremden Lobbys.*
+
+### 🌐 Koop-Beitritt, UI & Live-Synchronisation
+
+* **🟡 FIX – Host-naher Gast-Spawn:** Beim Betreten einer Koop-Welt spawnen Mitspieler nun zuverlässig auf einem freien Feld direkt neben dem Host (Außenwelt, Minen & Innenräume), bevor Chunks um die Position gestreamt werden.
+* **🟣 NEU – Koop-Steuerung in der ESC-Sidebar verankert:** Das separate Koop-Fenster unten links ist ausgeblendet; alle Lobby-Infos (Weltname, Spieleranzahl, Live-Ping, Room-Code-Kopie, Beitrittsmodus, Kick & Verlassen/Schließen) sitzen jetzt kompakt in der rechten Sozial-Sidebar (standardmäßig eingeklappt mit Live-Status-Dock).
+* **🟣 NEU – Echtzeit-Updates & Ingame-Meldungen:** WebSocket-Präsenz (`status_follow`), Freundesanfragen (`-2`/`-3`), Koop-Einladungen (`101`) sowie Beitrittsanfragen (`102`, inkl. Ablauf-Bereinigung) aktualisieren sich sofort live und zeigen dezente Toast-Hinweise am oberen Bildschirmrand.
+* **🟣 NEU – Admin-Cheats in fremden Host-Lobbys:** Verifizierte Admins können Entwickler-Menü (`F1`), Zeitsteuerung (`F4`/Uhrzeit/Mond), Wetter, Godmode, Ausdauer, Item-Drops, XP/Gold, Karten-Aufdeckung und Test-Tools nun auch als Gast in fremden Koop-Welten nutzen.
+
+---
+
+## [V0.9.6 Beta] – 2026-11-16
+### 🌐 Stabiles Koop-Relay-Pacing & Verbindungsdiagnose
+
+![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
+
+> *Schnellere und stabilere Beitritte in fortgeschrittene Koop-Welten dank geglättetem Relay-Datenfluss und präziserer Fehleranzeige bei Verbindungsabbrüchen.*
+
+### 🌐 Online-Koop-Stabilität
+
+* **🟡 FIX – Geglättetes Relay-TX-Pacing (`NakamaRelayPeer`):** Große Welt- und Snapshot-Pakete werden gleichmäßig über Frames verteilt gesendet (`8` Frames pro Tick bei gleichzeitig größeren `2400 B`-Chunks), sodass WebSocket-Queues bei Beitreten in weit fortgeschrittene Welten (`Tag 4+`) stabil bleiben.
+* **🟡 FIX – Unzuverlässige Updates gedrosselt:** Während zuverlässige Join-Snapshots ausstehen, werden überschüssige unzuverlässige Positions-Ticks sauber verworfen, ohne den Join-Sync zu verzögern.
+* **🟡 FIX – Präzisere Relay-Fehlermeldungen:** WebSocket-Abbrüche zeigen nun den konkreten Close-Code sowie ob die Trennung bereits beim Verbindungsaufbau auftrat.
+
+---
+
+## [V0.9.5 Beta] – 2026-11-16
+### 🌐 Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz: Große Welt-Snapshots, Gast-Synchronisation & Update-Wächter
+
+![Hallgrat im Nachtlicht mit Laternen und Stadtmauer](docs/img/hallgrat_deko_night.png)
+
+> *Auch riesige Welten lassen sich jetzt reibungslos gemeinsam betreten: Das Online-Relay teilt große Welt-Snapshots automatisch auf, synchronisiert alle Systeme beim Beitritt bis ins Detail und schützt laufende Lobbys vor veralteten Versionen.*
+
+> [!IMPORTANT]
+> **Große Welten im Online-Koop ohne Hürden!**
+> V0.9.5 Beta rüstet das Online-Relay für ausgewachsene Spielstände auf: Große Welt- und Stadt-Pakete werden automatisch in sichere Teilpakete zerlegt und verlustfrei zusammengesetzt, nachrückende Gäste erhalten den vollständigen Zustand aller Systeme, und ein neuer **Versionsschutz** sowie klare Trennungs-Meldungen sorgen für geordnete Mehrspieler-Runden.
+
+---
+
+### 🌐 Online-Relay-Chunking & Nahtloser Koop-Beitritt
+
+* **🟣 NEU – Automatische Paket-Aufteilung im Relay:** Große Welt-Snapshots (auch über `150 KB`) werden beim Übertragen übers Online-Relay automatisch in kompakte Teilpakete aufgeteilt und beim Empfänger bytegenau wieder zusammengesetzt – kein Abbruch mehr bei weit fortgeschrittenen Welten.
+* **🟣 NEU – Vollständige Gast-Synchronisation beim Beitritt:** Nachrückende Mitspieler übernehmen sauber ihren Charakterzustand und erhalten den aktuellen Stand von Stadtbau, Schatztruhen, Wegsteinen, Weltkarten-Entdeckung, Haustieren, Sternensaal, Wiesen-Details sowie Boss-Arenen (Aurelith & Hexenkönigin).
+* **🟣 NEU – Versionsschutz & Lobby-Kontrolle:** Der laufende Versions-Abgleich erkennt veraltete Spielversionen sofort, und erzwungene Trennungen (z. B. durch Kick, geschlossene Lobby oder Host-Abbruch) führen sauber mit klarer Rückmeldung zurück ins Hauptmenü.
+
+---
+
+### 🛠️ Stabilitäts- & Welt-Feinschliff
+
+* **🟡 FIX – Komponenten & Welt-Übergänge:** Verbesserte Synchronisation und Stabilität an Aussehen, Inventar, Fortschritt, Skillbaum, Zaubern, Ausruhen, Klettern, Innenräumen, Flussfauna sowie der Welt- & Quest-Anzeige im Mehrspieler.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Bereit für lange gemeinsame Abende in großen Welten – viel Spaß mit V0.9.5 Beta!*
+
+---
+
 ## [V0.9.4 Beta] – 2026-11-16
-### 🛠️ Cloud-Save-Hotfix, Coercion-Schutz & Relay-Stabilität
+### 🛡️ Cloud-Save-Härtung & Relay-Stabilität: Sichere Spielstand-Wiederherstellung, Relay-Schutz & Wildtier-Fixes
 
-> *Behebt den stummen Release-Absturz nach „Spiel fortsetzen“ sowie fehlerhafte RPC-Spams bei Verbindungsaufbau oder -verlust.*
+![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
 
-* **🟣 FIX – Cloud-Save-Crash bei „Spiel fortsetzen“ behoben:** Leere Lua-Tables in gespeicherten Cloud-Profilen (`[]` statt `{}`) werden beim Laden in allen Save- und Welt-Importern sicher umgewandelt – kein Release-Absturz (`0xc0000005`) mehr bei abgeschlossenen oder leeren Quest-/Inventar-/Weltfeldern.
-* **🟣 FIX – Saubere RPC- & Relay-Absicherung:** Snapshot-, Zeit- und Wildtier-RPCs warten sauber auf eine aktive `CONNECTION_CONNECTED`-Verbindung; ein abgebrochener Host-Relay fällt automatisch auf `OfflineMultiplayerPeer` zurück.
-* **🟣 FIX – Base64- & Karten-Schutz:** Leere `map`-Daten und ungültige Base64-Payloads werden ohne Dekompressions- oder Engine-Fehler abgefangen.
+> *Ein gezieltes Stabilitäts-Update unter der Haube: Cloud-Spielstände werden über alle Weltsysteme hinweg fehlerfrei wiederhergestellt und das Online-Relay fängt Verbindungsabbrüche sicher ab.*
+
+> [!IMPORTANT]
+> **Maximale Verlässlichkeit für Cloud-Welten & Online-Koop!**
+> V0.9.4 Beta räumt tiefgreifend bei der **Wiederherstellung von Cloud-Spielständen** und beim **Online-Relay** auf: Jeder Welt-, Charakter- und Stadtzustand wird beim Laden aus der Cloud sauber konvertiert, fehlerhafte Pakete werden sicher abgefangen, und bei Verbindungsabbrüchen fällt der Host kontrolliert zurück, ohne den Spielstand zu gefährden.
+
+---
+
+### 🛡️ Cloud-Save-Stabilität & Kompressions-Schutz
+
+* **🟡 FIX – Sichere Wiederherstellung aller Weltsysteme:** Beim Laden von Cloud-Spielständen werden Zahlen-, Listen- und Tabellendaten über sämtliche Systeme hinweg sauber umgewandelt – darunter Inventar, Quests, Skillbaum, Aussehen, Haustiere, Boss-Relikte, Sternensaal, Schatztruhen, Weltkarten-Entdeckung, Aussichtspunkte, Wegsteine, Dorfbrett, Karawane, Ackerbau, Stadtbau, Mine, Wüste, Wiesen-Sehenswürdigkeiten & Weltwunder, Wetter und Tageszeit.
+* **🟡 FIX – Fehlerhafte Speicherdaten abfangen:** Beschädigte oder ungültig komprimierte Spielstand-Pakete werden sauber abgewiesen, statt Abstürze auszulösen.
+
+---
+
+### 🌐 Online-Relay- & Welt-Stabilität
+
+* **🟡 FIX – Sicherer Relay-Verbindungsaufbau:** Netzwerk-Synchronisationen greifen erst dann, wenn die Verbindung vollständig steht; während des Verbindungsaufbaus oder bei leeren Server-Tabellen bleiben alle Welt-Importe absturzfrei.
+* **🟡 FIX – Saubere Host-Erholung bei Abbruch:** Bricht das Online-Relay unerwartet ab, wechselt der Host kontrolliert in den sicheren Offline-Zustand zurück, sodass die Welt weiterläuft.
+* **🟡 FIX – Wildtiere & Navigation:** Kleinere Stabilitäts-Korrekturen bei Wildtieren (Schmetterlinge, Kleintiere, Vögel, Kaninchen, Waldsäuger) und Gegner-Navigation sowie aktualisierte Website- & Update-Daten.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Ein ruhiges, wichtiges Fundament-Update für sichere Spielstände und stabile Online-Abenteuer – viel Spaß mit V0.9.4 Beta!*
 
 ---
 

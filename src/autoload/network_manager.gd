@@ -15,6 +15,7 @@ signal peer_joined(id: int)
 signal peer_left(id: int)
 signal peer_identity_verified(id: int)
 signal session_changed()
+signal ping_updated(ms: int)
 signal join_rejected(reason: String)
 
 var transport_mode: String = "offline" ## "offline" | "enet" | "relay"
@@ -818,6 +819,7 @@ func _rebuild_roster() -> void:
 			"is_host": id == 1,
 			"slot": int(_peer_slots.get(id, 0)),
 			"uid": String(_peer_uids.get(id, "")),
+			"role": peer_role(id),
 		})
 
 
@@ -875,8 +877,8 @@ func _rpc_pong(client_msec: int) -> void:
 	if multiplayer.is_server():
 		return
 	var rtt: int = maxi(Time.get_ticks_msec() - client_msec, 0)
-	if absi(rtt - last_ping_ms) >= 5 or last_ping_ms == 0:
-		last_ping_ms = rtt
+	var changed: bool = absi(rtt - last_ping_ms) >= 5 or last_ping_ms == 0
+	last_ping_ms = rtt
+	ping_updated.emit(last_ping_ms)
+	if changed:
 		session_changed.emit()
-	else:
-		last_ping_ms = rtt

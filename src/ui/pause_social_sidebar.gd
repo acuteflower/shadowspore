@@ -6,6 +6,9 @@ extends Control
 
 signal request_host_relay()
 signal request_join_match(info: Dictionary)
+signal request_leave_coop()
+signal request_kick_peer(peer_id: int)
+signal request_live_refresh()
 
 const COLLAPSED_W: float = 28.0
 const EXPANDED_W: float = 186.0
@@ -53,7 +56,7 @@ class _FeedCanvas extends Control:
 
 
 var _feed_viewport: _FeedCanvas = null
-var _expanded: bool = true
+var _expanded: bool = false
 var _slide_t: float = 0.0
 var _fade: float = 0.0
 var _time: float = 0.0
@@ -71,6 +74,8 @@ var _toast_t: float = 0.0
 var _last_refresh_msec: int = 0
 var _fixed_hits: Array[Dictionary] = []
 var _feed_hits: Array[Dictionary] = []
+var _live_poll_t: float = 0.0
+var _last_pending_badge: int = -1
 
 
 func _ready() -> void:
@@ -85,17 +90,25 @@ func _ready() -> void:
 	_feed_viewport.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_feed_viewport.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(_feed_viewport)
+	if NetworkManager != null:
+		NetworkManager.session_changed.connect(_on_live_state_changed)
+		NetworkManager.ping_updated.connect(_on_ping_updated)
+		NetworkManager.peer_joined.connect(_on_peer_changed)
+		NetworkManager.peer_left.connect(_on_peer_changed)
+	if CloudSession != null:
+		CloudSession.friends_changed.connect(_on_live_social_changed)
+		CloudSession.notifications_changed.connect(_on_live_social_changed)
+		CloudSession.profile_loaded.connect(_on_profile_loaded)
 
 
-func on_pause_opened(initial_expand_anim: bool = true) -> void:
+func on_pause_opened(_initial_expand_anim: bool = true) -> void:
 	_typing = false
 	_hover_id = ""
 	_arm_remove_id = ""
 	_arm_remove_t = 0.0
-	if initial_expand_anim:
-		_slide_t = 0.0
-	else:
-		_slide_t = 1.0 if _expanded else 0.0
+	_slide_t = 1.0 if _expanded else 0.0
+	_live_poll_t = 0.25
+	_last_pending_badge = int(_pending_counts()["pending"])
 	mark_dirty()
 
 
@@ -160,6 +173,12 @@ func advance(delta: float, fade: float, suppress: bool) -> void:
 		_arm_remove_t = maxf(_arm_remove_t - delta, 0.0)
 		if _arm_remove_t <= 0.0:
 			_arm_remove_id = ""
+	if CloudSession != null and CloudSession.is_logged_in() and not _busy:
+		_live_poll_t -= delta
+		if _live_poll_t <= 0.0:
+			_live_poll_t = 2.8
+			CloudSession.request_live_sync(false)
+			request_live_refresh.emit()
 	_sync_feed_viewport_rect()
 	queue_redraw()
 	if _feed_viewport != null:
@@ -334,11 +353,25 @@ func _dispatch_action(action: String, arg: String) -> void:
 				DisplayServer.clipboard_set(code)
 				Sfx.ui(self, "ui_click", -3.0)
 				_show_toast("CODE %s KOPIERT" % code)
+			elif NetworkManager.is_multiplayer_session() and NetworkManager.transport_mode != "relay":
+				var lan_addr: String = "%s:%d" % [NetworkManager.primary_ip(), NetworkManager.active_host_port]
+				DisplayServer.clipboard_set(lan_addr)
+				Sfx.ui(self, "ui_click", -3.0)
+				_show_toast("IP %s KOPIERT" % lan_addr)
 		"cycle_join_mode":
 			_do_cycle_join_mode()
 		"host_relay":
 			Sfx.ui(self, "ui_click", -2.0)
 			request_host_relay.emit()
+		"leave_coop":
+			if _arm_confirm("leave_coop"):
+				Sfx.ui(self, "ui_click", -2.0)
+				request_leave_coop.emit()
+		"kick_peer":
+			var target_peer: int = arg.to_int()
+			if target_peer > 1 and _arm_confirm("kick:%d" % target_peer):
+				Sfx.ui(self, "ui_click", -2.0)
+				request_kick_peer.emit(target_peer)
 		"focus_add":
 			_typing = true
 			Sfx.ui(self, "ui_click", -4.0)
@@ -364,15 +397,46 @@ func _dispatch_action(action: String, arg: String) -> void:
 		"friend_invite":
 			_do_invite_friend(arg)
 		"friend_remove":
-			if _arm_remove_id != arg:
-				_arm_remove_id = arg
-				_arm_remove_t = ARM_REMOVE_TIMEOUT
-				Sfx.ui(self, "ui_click", -4.0)
-				mark_dirty()
-			else:
-				_arm_remove_id = ""
-				_arm_remove_t = 0.0
+			if _arm_confirm(arg):
 				_do_remove_friend(arg, "FREUND ENTFERNT")
+
+
+func _arm_confirm(key: String) -> bool:
+	if _arm_remove_id != key:
+		_arm_remove_id = key
+		_arm_remove_t = ARM_REMOVE_TIMEOUT
+		Sfx.ui(self, "ui_click", -4.0)
+		mark_dirty()
+		return false
+	_arm_remove_id = ""
+	_arm_remove_t = 0.0
+	return true
+
+
+func _on_live_state_changed() -> void:
+	mark_dirty()
+
+
+func _on_ping_updated(_ms: int) -> void:
+	if visible:
+		mark_dirty()
+
+
+func _on_peer_changed(_id: int) -> void:
+	mark_dirty()
+
+
+func _on_profile_loaded(_p: Dictionary) -> void:
+	mark_dirty()
+
+
+func _on_live_social_changed() -> void:
+	var new_pending: int = int(_pending_counts()["pending"])
+	if visible and _last_pending_badge >= 0 and new_pending > _last_pending_badge:
+		Sfx.ui(self, "ui_click", -6.0)
+		_show_toast("NEUE ANFRAGE / EINLADUNG", false, 3.0)
+	_last_pending_badge = new_pending
+	mark_dirty()
 
 
 func _do_refresh_now() -> void:
@@ -548,7 +612,7 @@ func _pending_counts() -> Dictionary:
 			if bool(fr.get("online", false)):
 				online_friends += 1
 	return {
-		"pending": incoming + CloudSession.notifications.size(),
+		"pending": incoming + CloudSession.active_notifications().size(),
 		"online": online_friends,
 		"total": total_friends,
 	}
@@ -599,7 +663,7 @@ func _draw() -> void:
 		var sa: float = (0.24 - float(step) * 0.055) * a
 		draw_rect(Rect2(sx, 0.0, 3.0, vs.y), Color(0.02, 0.01, 0.05, sa))
 	# Full-height bark surface (#161021) matching Launcher's left rail
-	draw_rect(Rect2(dx, 0.0, vs.x - dx, vs.y), Color(COL_BARK, 0.94 * a))
+	draw_rect(Rect2(dx, 0.0, vs.x - dx, vs.y), Color(COL_BARK, 0.97 * a))
 	# Quiet top-of-rail bark checker grain (~3% lightness, subtle)
 	for py: int in range(2, 20, 4):
 		var start_x: int = int(dx) + (4 if (py / 4) % 2 == 0 else 2)
@@ -633,14 +697,24 @@ func _draw_collapsed_rail(dx: float, vs: Vector2, counts: Dictionary, a: float) 
 	# Subtle notification indicator right beside top avatar if invites/requests wait
 	if pending > 0:
 		var badge: Rect2 = Rect2(dx + 16.0, 21.0, 9.0, 9.0)
+		var pulse: float = 0.72 + 0.28 * sin(_time * 4.0)
 		draw_rect(badge, Color(COL_OUTLINE, a))
-		draw_rect(badge.grow(-1.0), Color(COL_GOLD, a))
+		draw_rect(badge.grow(-1.0), Color(COL_GOLD, a * pulse))
 		var btxt: String = str(mini(pending, 9))
 		PixelText.draw(self, btxt, Vector2i(roundi(badge.position.x + 3.0), roundi(badge.position.y + 1.0)), Color(COL_OUTLINE, a))
 	draw_rect(Rect2(dx + 6.0, 47.0, 16.0, 1.0), Color(COL_SEAM, 0.7 * a))
+	var fy: float = 53.0
+	if NetworkManager.is_multiplayer_session():
+		var coop_r: Rect2 = Rect2(dx + 4.0, 51.0, 20.0, 22.0)
+		_draw_box(coop_r, COL_TEAL_DEEP, COL_TEAL_TOP, a)
+		var p_cnt: String = "%d/%d" % [mini(maxi(NetworkManager.roster().size(), 1), 9), mini(maxi(NetworkManager.active_max_players, 1), 9)]
+		PixelText.draw(self, p_cnt, Vector2i(roundi(cx - float(PixelText.width(p_cnt)) * 0.5), 53), Color(COL_TEAL_TXT, a))
+		var sub_rail: String = "HOST" if multiplayer.is_server() else "%d" % mini(NetworkManager.last_ping_ms, 999)
+		var sub_col: Color = COL_GOLD if multiplayer.is_server() else _ping_color(NetworkManager.last_ping_ms)
+		PixelText.draw(self, sub_rail, Vector2i(roundi(cx - float(PixelText.width(sub_rail)) * 0.5), 63), Color(sub_col, a))
+		fy = 78.0
 	# Stack up to 5 online friends' mini 16x16 tiles cleanly down the rail (Valorant dock feel!)
 	if logged_in:
-		var fy: float = 53.0
 		var shown: int = 0
 		for fr: Dictionary in _sorted_accepted_friends():
 			if shown >= 5 or not bool(fr.get("online", false)):
@@ -825,18 +899,24 @@ func _draw_feed_content(canvas: CanvasItem) -> void:
 	var vh: float = _feed_viewport.size.y
 	var cw: float = vw - 6.0
 
+	var y: float = 2.0 - _scroll_y
+	if NetworkManager != null and NetworkManager.is_multiplayer_session():
+		y = _draw_coop_lobby_card(canvas, 4.0, y, cw, a)
+
 	if not CloudSession.is_logged_in():
-		_scroll_y = 0.0
-		_content_h = 54.0
-		var empty_box: Rect2 = Rect2(4.0, 4.0, cw - 2.0, 44.0)
+		var empty_box: Rect2 = Rect2(4.0, y + 2.0, cw - 2.0, 44.0)
 		_draw_box_on(canvas, empty_box, COL_CARD, COL_SEAM, a)
-		PixelText.draw(canvas, "KEINE CLOUD-SITZUNG", Vector2i(10, 11), Color(COL_GOLD, a))
-		PixelText.draw(canvas, "STARTE ÜBER DEN LAUNCHER,", Vector2i(10, 23), Color(COL_MUTED, a))
-		PixelText.draw(canvas, "UM FREUNDE ZU SEHEN.", Vector2i(10, 33), Color(COL_MUTED, a))
+		PixelText.draw(canvas, "KEINE CLOUD-SITZUNG", Vector2i(10, roundi(y + 9.0)), Color(COL_GOLD, a))
+		PixelText.draw(canvas, "STARTE ÜBER DEN LAUNCHER,", Vector2i(10, roundi(y + 21.0)), Color(COL_MUTED, a))
+		PixelText.draw(canvas, "UM FREUNDE ZU SEHEN.", Vector2i(10, roundi(y + 31.0)), Color(COL_MUTED, a))
+		y += 50.0
+		_content_h = maxf(y + _scroll_y + 4.0, vh)
+		_scroll_y = clampf(_scroll_y, 0.0, maxf(_content_h - vh, 0.0))
+		if _content_h > vh + 1.0:
+			_draw_scrollbar(canvas, vw - 3.0, vh, a)
 		return
 
-	var y: float = 2.0 - _scroll_y
-	var notifs: Array[Dictionary] = CloudSession.notifications
+	var notifs: Array[Dictionary] = CloudSession.active_notifications()
 	if not notifs.is_empty():
 		y = _draw_section_header(canvas, "EINLADUNGEN · %d" % notifs.size(), 4.0, y, cw, COL_GOLD, a)
 		for notif: Dictionary in notifs:
@@ -894,10 +974,100 @@ func _draw_section_header(canvas: CanvasItem, title: String, x: float, y: float,
 	return y + 11.0
 
 
+static func _ping_color(ms: int) -> Color:
+	if ms <= 0:
+		return COL_MUTED
+	if ms <= 85:
+		return COL_TEAL
+	if ms <= 175:
+		return COL_GOLD
+	return COL_RED
+
+
+func _draw_coop_lobby_card(canvas: CanvasItem, x: float, y: float, w: float, a: float) -> float:
+	var roster: Array[Dictionary] = NetworkManager.roster()
+	var count: int = maxi(roster.size(), 1)
+	var max_p: int = maxi(NetworkManager.active_max_players, 1)
+	y = _draw_section_header(canvas, "KOOP-LOBBY · %d/%d" % [count, max_p], x, y, w, COL_TEAL_TOP, a)
+	var card_top: float = y
+	var rows: int = maxi(roster.size(), 1)
+	var card_h: float = 35.0 + float(rows) * 14.0 + 19.0
+	var card: Rect2 = Rect2(x, card_top, w - 1.0, card_h)
+	canvas.draw_rect(card, Color(COL_CARD, a))
+	canvas.draw_rect(Rect2(card.position, Vector2(card.size.x, 1.0)), Color(COL_TEAL_TOP, 0.55 * a))
+	canvas.draw_rect(Rect2(card.position, Vector2(2.0, card_h)), Color(COL_TEAL, 0.85 * a))
+
+	var tx: float = x + 6.0
+	var inner_w: float = (w - 1.0) - 11.0
+	var is_srv: bool = multiplayer.multiplayer_peer == null or multiplayer.is_server()
+	var mode_tag: String = "RELAY" if NetworkManager.transport_mode == "relay" else "LAN"
+	var ping_str: String = ("HOST·%s" % mode_tag) if is_srv else ("%dMS" % NetworkManager.last_ping_ms)
+	var ping_col: Color = COL_GOLD if is_srv else _ping_color(NetworkManager.last_ping_ms)
+	var pw: float = float(PixelText.width(ping_str))
+	PixelText.draw(canvas, ping_str, Vector2i(roundi(x + w - 6.0 - pw), roundi(card_top + 5.0)), Color(ping_col, a))
+	var wname: String = NetworkManager.active_world_name if not NetworkManager.active_world_name.is_empty() else "KOOP-WELT"
+	PixelText.draw(canvas, _fit_text(wname, inner_w - pw - 6.0), Vector2i(roundi(tx), roundi(card_top + 5.0)), Color(COL_TEXT, a))
+
+	var rcode: String = _active_room_code()
+	var row2_y: float = card_top + 17.0
+	var left_w: float = 80.0
+	if not rcode.is_empty():
+		_draw_pill_btn_on(canvas, "lobby_code", Rect2(tx, row2_y, left_w, 13.0), _fit_text("CODE %s" % rcode, left_w - 6.0), COL_TEAL_DEEP, COL_TEAL_TOP, COL_TEAL_TXT, a, _feed_hits, "copy_room_code", "")
+	else:
+		left_w = 88.0 if is_srv else inner_w
+		var lan_lbl: String = "%s:%d" % [NetworkManager.primary_ip(), NetworkManager.active_host_port]
+		_draw_pill_btn_on(canvas, "lobby_code", Rect2(tx, row2_y, left_w, 13.0), _fit_text(lan_lbl, left_w - 6.0), COL_CARD_HOVER, COL_EDGE_MID, COL_MUTED, a, _feed_hits, "copy_room_code", "")
+	if inner_w - left_w >= 40.0:
+		var rx: float = tx + left_w + 4.0
+		var rw: float = inner_w - left_w - 4.0
+		var cur_mode: String = NetworkManager.active_join_mode
+		if is_srv and CloudSession.is_logged_in() and NetworkManager.transport_mode == "relay":
+			var m_col: Color = COL_TEAL_TXT if cur_mode == "open" else (COL_GOLD if cur_mode == "ask" else COL_MUTED)
+			_draw_pill_btn_on(canvas, "lobby_mode", Rect2(rx, row2_y, rw, 13.0), _fit_text(_join_mode_short(cur_mode), rw - 6.0), COL_WELL, COL_EDGE_MID, m_col, a, _feed_hits, "cycle_join_mode", "")
+		else:
+			_draw_box_on(canvas, Rect2(rx, row2_y, rw, 13.0), COL_WELL, COL_SEAM, a)
+			var stat_txt: String = _join_mode_short(cur_mode) if NetworkManager.transport_mode == "relay" else "AKTIV"
+			var stw: float = float(PixelText.width(stat_txt))
+			PixelText.draw(canvas, stat_txt, Vector2i(roundi(rx + (rw - stw) * 0.5), roundi(row2_y + 2.0)), Color(COL_MUTED, a))
+
+	canvas.draw_rect(Rect2(tx, card_top + 32.0, inner_w, 1.0), Color(COL_SEAM, 0.55 * a))
+	var ry: float = card_top + 35.0
+	var my_id: int = multiplayer.get_unique_id() if multiplayer.has_multiplayer_peer() else 1
+	if roster.is_empty():
+		canvas.draw_rect(Rect2(tx, ry + 4.0, 3.0, 3.0), Color(COL_GOLD, a))
+		PixelText.draw(canvas, _fit_text("%s (DU)" % _local_display_name(), inner_w - 8.0), Vector2i(roundi(tx + 6.0), roundi(ry + 2.0)), Color(COL_TEXT, a))
+	else:
+		for entry: Dictionary in roster:
+			var pid: int = int(entry.get("id", 0))
+			var pname: String = String(entry.get("name", "SPIELER"))
+			var entry_host: bool = bool(entry.get("is_host", false))
+			var is_me: bool = pid == my_id
+			canvas.draw_rect(Rect2(tx, ry + 4.0, 3.0, 3.0), Color(COL_GOLD if entry_host else COL_TEAL, a))
+			var can_kick: bool = is_srv and not entry_host and pid > 1
+			var rtag: String = "HOST" if entry_host else _role_short(String(entry.get("role", "")))
+			var right_reserve: float = 16.0 if can_kick else (float(PixelText.width(rtag)) + 6.0 if not rtag.is_empty() else 2.0)
+			var shown_name: String = "%s%s" % [pname, " (DU)" if is_me else ""]
+			PixelText.draw(canvas, _fit_text(shown_name, inner_w - 8.0 - right_reserve), Vector2i(roundi(tx + 6.0), roundi(ry + 2.0)), Color(COL_TEXT if is_me else COL_MUTED, a))
+			if can_kick:
+				var armed_k: bool = _arm_remove_id == ("kick:%d" % pid)
+				var klbl: String = "?" if armed_k else "X"
+				_draw_pill_btn_on(canvas, "kick_%d" % pid, Rect2(x + w - 18.0, ry, 12.0, 11.0), klbl, COL_RED_BG if armed_k else COL_WELL, COL_RED if armed_k else COL_SEAM, COL_TEXT if armed_k else COL_RED, a, _feed_hits, "kick_peer", str(pid))
+			elif not rtag.is_empty():
+				var rtw: float = float(PixelText.width(rtag))
+				PixelText.draw(canvas, rtag, Vector2i(roundi(x + w - 6.0 - rtw), roundi(ry + 2.0)), Color(COL_GOLD if entry_host else COL_FAINT, a))
+			ry += 14.0
+
+	var by: float = card_top + card_h - 18.0
+	var armed_l: bool = _arm_remove_id == "leave_coop"
+	var l_lbl: String = ("SCHLIESSEN?" if is_srv else "VERLASSEN?") if armed_l else ("WELT SCHLIESSEN" if is_srv else "WELT VERLASSEN")
+	_draw_pill_btn_on(canvas, "lobby_leave", Rect2(tx, by, inner_w, 14.0), l_lbl, COL_RED_BG if armed_l else COL_WELL, COL_RED if armed_l else COL_RED_RIM, COL_TEXT if armed_l else COL_RED, a, _feed_hits, "leave_coop", "")
+	return card_top + card_h + 5.0
+
+
 func _draw_notif_card(canvas: CanvasItem, notif: Dictionary, x: float, y: float, w: float, a: float) -> float:
 	var nid: String = String(notif.get("id", ""))
 	var code: int = int(notif.get("code", 0))
-	var c: Dictionary = notif.get("content", {}) as Dictionary
+	var c: Dictionary = CloudSession._parse_notif_content(notif)
 	var h: float = 38.0
 	var card: Rect2 = Rect2(x, y, w - 1.0, h)
 	var accent: Color = COL_TEAL_TOP if (code == 101 or code == 103) else (COL_GOLD if code == 102 else COL_RED)

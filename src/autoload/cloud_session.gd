@@ -1266,18 +1266,138 @@ func _read_cmdline_args() -> void:
 			refresh_token = arg.substr("--nakama-refresh=".length())
 
 
+var _notif_ws_welcomed: bool = false
+var _ws_followed_uids: Dictionary = {}
+var _ws_cid: int = 0
+var _live_sync_inflight: bool = false
+var _live_sync_last_ms: int = 0
+var _friend_refresh_queued_t: float = -1.0
+
+
+## Fetches friends + notifications with in-flight deduplication, pruning expired join requests
+## and subscribing to live friend online status over the notification WebSocket.
+func request_live_sync(force: bool = false) -> void:
+	if not is_logged_in() or _live_sync_inflight:
+		return
+	var now_ms: int = Time.get_ticks_msec()
+	if not force and _live_sync_last_ms > 0 and now_ms - _live_sync_last_ms < 1200:
+		return
+	_live_sync_inflight = true
+	_live_sync_last_ms = now_ms
+	await fetch_notifications()
+	prune_expired_notifications()
+	await refresh_friends()
+	_live_sync_inflight = false
+	_sync_ws_friend_follows()
+
+
+func active_notifications() -> Array[Dictionary]:
+	prune_expired_notifications()
+	return notifications
+
+
+func prune_expired_notifications() -> void:
+	if notifications.is_empty():
+		return
+	var kept: Array[Dictionary] = []
+	var expired_ids: Array[String] = []
+	for item: Dictionary in notifications:
+		var code: int = int(item.get("code", 0))
+		if code == 102:
+			var content: Dictionary = _parse_notif_content(item)
+			if _is_notif_expired(content):
+				var nid: String = String(item.get("id", ""))
+				if not nid.is_empty():
+					expired_ids.append(nid)
+				continue
+		kept.append(item)
+	if kept.size() != notifications.size():
+		notifications = kept
+		notifications_changed.emit()
+	for nid: String in expired_ids:
+		delete_notification(nid)
+
+
+func _schedule_live_friend_refresh(delay: float = 0.25) -> void:
+	if _friend_refresh_queued_t < 0.0 or delay < _friend_refresh_queued_t:
+		_friend_refresh_queued_t = delay
+
+
+func _ws_send_json(payload: Dictionary) -> void:
+	if _notif_ws == null or _notif_ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return
+	_ws_cid += 1
+	var msg: Dictionary = payload.duplicate()
+	msg["cid"] = str(_ws_cid)
+	_notif_ws.send_text(JSON.stringify(msg))
+
+
+func _ws_send_status(status_text: String) -> void:
+	_ws_send_json({"status_update": {"status": status_text}})
+
+
+func _sync_ws_friend_follows() -> void:
+	if _notif_ws == null or _notif_ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return
+	var new_uids: Array[String] = []
+	for fr: Dictionary in friends_cache:
+		if int(fr.get("state", -1)) != 0:
+			continue
+		var fid: String = String(fr.get("user_id", ""))
+		if fid.is_empty() or _ws_followed_uids.has(fid):
+			continue
+		_ws_followed_uids[fid] = true
+		new_uids.append(fid)
+	if not new_uids.is_empty():
+		_ws_send_json({"status_follow": {"user_ids": new_uids}})
+
+
+func _has_notification_id(nid: String) -> bool:
+	for item: Dictionary in notifications:
+		if String(item.get("id", "")) == nid:
+			return true
+	return false
+
+
+static func _parse_notif_content(row: Dictionary) -> Dictionary:
+	var raw_c: Variant = row.get("content", {})
+	if raw_c is Dictionary:
+		return raw_c as Dictionary
+	var parsed: Variant = JSON.parse_string(String(raw_c))
+	return parsed as Dictionary if parsed is Dictionary else {}
+
+
+static func _is_notif_expired(content: Dictionary) -> bool:
+	var exp_at: float = float(content.get("expires_at", 0))
+	return exp_at > 0.0 and exp_at <= Time.get_unix_time_from_system()
+
+
 func _poll_notif_ws(delta: float) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
+	if _friend_refresh_queued_t >= 0.0:
+		_friend_refresh_queued_t -= delta
+		if _friend_refresh_queued_t <= 0.0:
+			_friend_refresh_queued_t = -1.0
+			request_live_sync(true)
 	if not is_logged_in():
 		if _notif_ws.get_ready_state() != WebSocketPeer.STATE_CLOSED:
 			_notif_ws.close()
 		_notif_ws_token = ""
+		_notif_ws_welcomed = false
+		_ws_followed_uids.clear()
 		return
 	var state: WebSocketPeer.State = _notif_ws.get_ready_state()
+	if _notif_ws_token != token and state != WebSocketPeer.STATE_CLOSED:
+		_notif_ws.close()
+		_notif_ws_welcomed = false
+		_ws_followed_uids.clear()
+		return
 	if _notif_ws_token != token and state == WebSocketPeer.STATE_CLOSED:
 		_notif_ws_retry_t = 0.0
 	if state == WebSocketPeer.STATE_CLOSED:
+		_notif_ws_welcomed = false
+		_ws_followed_uids.clear()
 		_notif_ws_retry_t -= delta
 		if _notif_ws_retry_t <= 0.0:
 			_notif_ws_retry_t = 12.0
@@ -1287,7 +1407,13 @@ func _poll_notif_ws(delta: float) -> void:
 			_notif_ws.connect_to_url(ws_url)
 		return
 	_notif_ws.poll()
+	state = _notif_ws.get_ready_state()
 	if state == WebSocketPeer.STATE_OPEN:
+		if not _notif_ws_welcomed:
+			_notif_ws_welcomed = true
+			_ws_send_status("Online")
+			_sync_ws_friend_follows()
+			request_live_sync(true)
 		while _notif_ws.get_available_packet_count() > 0:
 			var pkt: PackedByteArray = _notif_ws.get_packet()
 			if pkt.is_empty():
@@ -1298,6 +1424,8 @@ func _poll_notif_ws(delta: float) -> void:
 
 
 func _handle_ws_envelope(env: Dictionary) -> void:
+	if env.has("status_presence_event") or env.has("status"):
+		_schedule_live_friend_refresh(0.45)
 	if not env.has("notifications"):
 		return
 	var container: Dictionary = SaveGame.as_dict(env.get("notifications"))
@@ -1308,8 +1436,37 @@ func _handle_ws_envelope(env: Dictionary) -> void:
 			continue
 		var row: Dictionary = item as Dictionary
 		var code: int = int(row.get("code", 0))
+		var notif_id: String = String(row.get("id", ""))
+		var fresh: bool = notif_id.is_empty() or not _has_notification_id(notif_id)
+		var notif_payload: Dictionary = _parse_notif_content(row)
+		if code == -2:
+			if fresh:
+				EventBus.toast("NEUE FREUNDSCHAFTSANFRAGE")
+			_schedule_live_friend_refresh(0.2)
+			continue
+		if code == -3:
+			if fresh:
+				EventBus.toast("FREUNDSCHAFTSANFRAGE ANGENOMMEN")
+			_schedule_live_friend_refresh(0.2)
+			continue
 		if code < 101 or code > 104:
 			continue
+		if code == 102 and _is_notif_expired(notif_payload):
+			if not notif_id.is_empty():
+				delete_notification(notif_id)
+			continue
+		if fresh:
+			if code == 101:
+				var inv_from: String = String(notif_payload.get("host_name", notif_payload.get("from_username", ""))).strip_edges()
+				var label_from: String = inv_from.to_upper() if not inv_from.is_empty() else "EIN FREUND"
+				EventBus.toast("KOOP-EINLADUNG VON %s" % label_from)
+				_schedule_live_friend_refresh(0.2)
+			elif code == 102:
+				var req_from: String = String(notif_payload.get("requester_name", notif_payload.get("from_username", ""))).strip_edges()
+				var label_req: String = req_from.to_upper() if not req_from.is_empty() else "EIN SPIELER"
+				EventBus.toast("%s MOECHTE BEITRETEN" % label_req)
+			elif code == 104:
+				EventBus.toast("BEITRITTSANFRAGE ABGELEHNT")
 		var parsed: Variant = JSON.parse_string(String(row.get("content", "{}")))
 		var content: Dictionary = parsed as Dictionary if parsed is Dictionary else {}
 		var nid: String = String(row.get("id", ""))

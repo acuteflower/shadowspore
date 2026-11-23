@@ -4,6 +4,37 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.9.7 Beta] – 2026-11-16
+### 🧭 Host-naher Koop-Spawn, Neue ESC-Koop-Sidebar, Live-Updates & Admin-Rechte
+
+![Hallgrat im Nachtlicht mit Laternen und Stadtmauer](docs/img/hallgrat_deko_night.png)
+
+> *Beitreten landet jetzt direkt beim Host statt bei `(0, 0)`, das untere Koop-Fenster weicht der neuen aufklappbaren Lobby-Leiste im Pause-Menü, Anfragen/Einladungen aktualisieren sich in Echtzeit und Admins behalten ihre Test-Werkzeuge auch in fremden Lobbys.*
+
+### 🌐 Koop-Beitritt, UI & Live-Synchronisation
+
+* **🟡 FIX – Host-naher Gast-Spawn:** Beim Betreten einer Koop-Welt spawnen Mitspieler nun zuverlässig auf einem freien Feld direkt neben dem Host (Außenwelt, Minen & Innenräume), bevor Chunks um die Position gestreamt werden.
+* **🟣 NEU – Koop-Steuerung in der ESC-Sidebar verankert:** Das separate Koop-Fenster unten links ist ausgeblendet; alle Lobby-Infos (Weltname, Spieleranzahl, Live-Ping, Room-Code-Kopie, Beitrittsmodus, Kick & Verlassen/Schließen) sitzen jetzt kompakt in der rechten Sozial-Sidebar (standardmäßig eingeklappt mit Live-Status-Dock).
+* **🟣 NEU – Echtzeit-Updates & Ingame-Meldungen:** WebSocket-Präsenz (`status_follow`), Freundesanfragen (`-2`/`-3`), Koop-Einladungen (`101`) sowie Beitrittsanfragen (`102`, inkl. Ablauf-Bereinigung) aktualisieren sich sofort live und zeigen dezente Toast-Hinweise am oberen Bildschirmrand.
+* **🟣 NEU – Admin-Cheats in fremden Host-Lobbys:** Verifizierte Admins können Entwickler-Menü (`F1`), Zeitsteuerung (`F4`/Uhrzeit/Mond), Wetter, Godmode, Ausdauer, Item-Drops, XP/Gold, Karten-Aufdeckung und Test-Tools nun auch als Gast in fremden Koop-Welten nutzen.
+
+---
+
+## [V0.9.6 Beta] – 2026-11-16
+### 🌐 Stabiles Koop-Relay-Pacing & Verbindungsdiagnose
+
+![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
+
+> *Schnellere und stabilere Beitritte in fortgeschrittene Koop-Welten dank geglättetem Relay-Datenfluss und präziserer Fehleranzeige bei Verbindungsabbrüchen.*
+
+### 🌐 Online-Koop-Stabilität
+
+* **🟡 FIX – Geglättetes Relay-TX-Pacing (`NakamaRelayPeer`):** Große Welt- und Snapshot-Pakete werden gleichmäßig über Frames verteilt gesendet (`8` Frames pro Tick bei gleichzeitig größeren `2400 B`-Chunks), sodass WebSocket-Queues bei Beitreten in weit fortgeschrittene Welten (`Tag 4+`) stabil bleiben.
+* **🟡 FIX – Unzuverlässige Updates gedrosselt:** Während zuverlässige Join-Snapshots ausstehen, werden überschüssige unzuverlässige Positions-Ticks sauber verworfen, ohne den Join-Sync zu verzögern.
+* **🟡 FIX – Präzisere Relay-Fehlermeldungen:** WebSocket-Abbrüche zeigen nun den konkreten Close-Code sowie ob die Trennung bereits beim Verbindungsaufbau auftrat.
+
+---
+
 ## [V0.9.5 Beta] – 2026-11-16
 ### 🌐 Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz: Große Welt-Snapshots, Gast-Synchronisation & Update-Wächter
 

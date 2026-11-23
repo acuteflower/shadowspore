@@ -12,9 +12,11 @@ const MAX_INCOMING_QUEUE: int = 8192
 const WS_BUFFER_BYTES: int = 2097152
 const FRAG_FLAG: int = 0x80
 const FRAG_HEADER_BYTES: int = 8
-const FRAG_PAYLOAD_LIMIT: int = 1800 ## Keep WebSocket JSON+base64 frames < 3 KB (below Nakama's 4096 B default cap)
+const FRAG_PAYLOAD_LIMIT: int = 2400 ## Keep WebSocket JSON+base64 frames ~3.3 KB (below Nakama's 4096 B default cap)
 const MAX_FRAG_GROUPS: int = 64
 const FRAG_TTL_MSEC: int = 30000
+const TX_FRAMES_PER_POLL: int = 8 ## Smooth bursty snapshot syncs so Nakama socket.outgoing_queue_size never overflows
+const TX_UNRELIABLE_BACKLOG_LIMIT: int = 12
 
 signal join_mode_changed(new_mode: String)
 
@@ -39,6 +41,8 @@ var _next_frag_id: int = 1
 var _peers: Dictionary = {} ## peer_id -> {"peer_id": int, "user_id": String, "uid": String, "username": String, "display_name": String}
 var _incoming: Array[Dictionary] = []
 var _rx_frags: Dictionary = {} ## "<peer>:<msg_id>" -> {"created": int, "total": int, "parts": Dictionary}
+var _tx_queue: Array[Dictionary] = [] ## [{"op": int, "bytes": PackedByteArray}]
+var _tx_sent_this_tick: int = 0
 
 
 static func build_ws_url(base_http_url: String, jwt_token: String) -> String:
@@ -113,6 +117,8 @@ func _connect_relay(base_http_url: String, jwt_token: String, target_match_id: S
 	_peers.clear()
 	_incoming.clear()
 	_rx_frags.clear()
+	_tx_queue.clear()
+	_tx_sent_this_tick = 0
 	_ws = WebSocketPeer.new()
 	_ws.outbound_buffer_size = WS_BUFFER_BYTES
 	_ws.inbound_buffer_size = WS_BUFFER_BYTES
@@ -172,10 +178,23 @@ func _put_packet_script(p_buffer: PackedByteArray) -> Error:
 	if p_buffer.size() > MAX_PACKET_SIZE:
 		return ERR_INVALID_PARAMETER
 	var reliable: bool = _transfer_mode == MultiplayerPeer.TRANSFER_MODE_RELIABLE
+	if not reliable and _tx_queue.size() >= TX_UNRELIABLE_BACKLOG_LIMIT:
+		return OK
 	for item: Dictionary in build_outgoing_frames(_target_peer, _transfer_channel, reliable, p_buffer):
+		_tx_queue.append(item)
+	return _drain_tx_queue()
+
+
+func _drain_tx_queue() -> Error:
+	if _status != MultiplayerPeer.CONNECTION_CONNECTED or _ws == null or _ws.get_ready_state() != WebSocketPeer.STATE_OPEN:
+		return OK
+	while not _tx_queue.is_empty() and _tx_sent_this_tick < TX_FRAMES_PER_POLL:
+		var item: Dictionary = _tx_queue[0]
 		var send_err: Error = _send_match_data(int(item["op"]), item["bytes"] as PackedByteArray)
 		if send_err != OK:
 			return send_err
+		_tx_queue.pop_front()
+		_tx_sent_this_tick += 1
 	return OK
 
 
@@ -232,6 +251,7 @@ func _is_server() -> bool:
 func _poll() -> void:
 	if _status == MultiplayerPeer.CONNECTION_DISCONNECTED or _deferred_connect:
 		return
+	_tx_sent_this_tick = 0
 	_ws.poll()
 	var state: WebSocketPeer.State = _ws.get_ready_state()
 	if state == WebSocketPeer.STATE_OPEN:
@@ -244,11 +264,24 @@ func _poll() -> void:
 			_handle_ws_text(pkt_bytes.get_string_from_utf8())
 			if _status == MultiplayerPeer.CONNECTION_DISCONNECTED:
 				return
+		if _status == MultiplayerPeer.CONNECTION_CONNECTED and not _tx_queue.is_empty():
+			var before_sent: int = _tx_sent_this_tick
+			_drain_tx_queue()
+			if _tx_sent_this_tick > before_sent and _ws.get_ready_state() == WebSocketPeer.STATE_OPEN:
+				_ws.poll()
 	elif state == WebSocketPeer.STATE_CLOSED:
 		if _status != MultiplayerPeer.CONNECTION_DISCONNECTED:
 			if last_error.is_empty():
 				var reason: String = _ws.get_close_reason()
-				last_error = reason if not reason.is_empty() else "RELAY-VERBINDUNG GESCHLOSSEN"
+				var code: int = _ws.get_close_code()
+				var phase: String = " BEIM VERBINDEN" if not _join_sent or _unique_id <= 0 else ""
+				push_warning("NakamaRelayPeer WS closed (code=%d reason='%s' connecting=%s)" % [code, reason, str(not phase.is_empty())])
+				if not reason.is_empty():
+					last_error = reason
+				elif code > 0 and code != 1000:
+					last_error = "RELAY-VERBINDUNG GESCHLOSSEN%s (CODE %d)" % [phase, code]
+				else:
+					last_error = "RELAY-VERBINDUNG GESCHLOSSEN%s" % phase
 			_close()
 
 
@@ -264,10 +297,14 @@ func _close() -> void:
 	_status = MultiplayerPeer.CONNECTION_DISCONNECTED
 	_join_sent = false
 	_deferred_connect = false
+	_tx_queue.clear()
+	_tx_sent_this_tick = 0
 	var old_peers: Array = _peers.keys()
 	_peers.clear()
 	_incoming.clear()
 	_rx_frags.clear()
+	_tx_queue.clear()
+	_tx_sent_this_tick = 0
 	if prev_status == MultiplayerPeer.CONNECTION_CONNECTED:
 		for pid: Variant in old_peers:
 			var id_num: int = int(pid)

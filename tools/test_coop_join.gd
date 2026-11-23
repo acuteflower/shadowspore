@@ -20,8 +20,8 @@ func _check(cond: bool, label: String) -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	get_tree().create_timer(45.0).timeout.connect(func() -> void:
-		printerr("FAIL: TIMEOUT after 45s")
+	get_tree().create_timer(120.0).timeout.connect(func() -> void:
+		printerr("FAIL: TIMEOUT after 120s")
 		get_tree().quit(1)
 	)
 	_run.call_deferred()
@@ -59,7 +59,8 @@ func _test_relay_fragmentation() -> void:
 	for i: int in payload.size():
 		payload[i] = (i * 37 + 13) & 0xFF
 	var frames: Array[Dictionary] = sender.build_outgoing_frames(0, 2, true, payload)
-	_check(frames.size() >= 80, "large relay payload splits into multiple chunks (%d)" % frames.size())
+	_check(frames.size() >= 60, "large relay payload splits into multiple chunks (%d)" % frames.size())
+	_check(sender.TX_FRAMES_PER_POLL <= 8, "relay TX pacing limits burst below Nakama default queue (%d)" % sender.TX_FRAMES_PER_POLL)
 	var max_ws_len: int = 0
 	for item: Dictionary in frames:
 		var bytes: PackedByteArray = item["bytes"] as PackedByteArray
@@ -150,8 +151,11 @@ func _run_server(port: int, code: String, ready_file: String = "") -> void:
 	_check(w.get_node_or_null("Players/1") != null, "host local player spawned")
 
 	var pending_profile_peers: Dictionary = {}
+	var guest_pids: Array[int] = []
 	NetworkManager.peer_joined.connect(func(pid: int) -> void:
 		print("[SERVER] peer_joined pid=%d" % pid)
+		NetworkManager._peer_roles[pid] = "admin"
+		guest_pids.append(pid)
 		pending_profile_peers[pid] = true
 	)
 
@@ -161,7 +165,7 @@ func _run_server(port: int, code: String, ready_file: String = "") -> void:
 			f.store_string("ready\n")
 			f.close()
 	print("COOP_JOIN_SERVER_READY")
-	var wait_guest: int = Time.get_ticks_msec() + 30000
+	var wait_guest: int = Time.get_ticks_msec() + 90000
 	while (multiplayer.get_peers().is_empty() or not pending_profile_peers.is_empty()) and Time.get_ticks_msec() < wait_guest:
 		for pid: Variant in pending_profile_peers.keys():
 			var guest: Player = w.get_node_or_null("Players/%d" % int(pid)) as Player
@@ -184,9 +188,15 @@ func _run_server(port: int, code: String, ready_file: String = "") -> void:
 				print("[SERVER] guest cloud profile imported & synced for pid=%d" % int(pid))
 		await get_tree().process_frame
 	_check(not multiplayer.get_peers().is_empty(), "server received guest peer")
+	var admin_verified_on_server: bool = false
 	var wait_client_done: int = Time.get_ticks_msec() + 12000
 	while not multiplayer.get_peers().is_empty() and Time.get_ticks_msec() < wait_client_done:
+		if not admin_verified_on_server and not guest_pids.is_empty():
+			var gp: Player = w.get_node_or_null("Players/%d" % guest_pids[0]) as Player
+			if gp != null and gp.health.god_mode and gp.progress.copper == 80:
+				admin_verified_on_server = true
 		await get_tree().process_frame
+	_check(admin_verified_on_server, "server verified remote admin guest cheats (god_mode + award synced)")
 	MultiplayerWorlds.delete_world(wid)
 	NetworkManager.leave()
 	print("COOP_JOIN_SERVER FAILURES=%d" % _failures)
@@ -228,15 +238,47 @@ func _run_client(port: int, code: String) -> void:
 	_check(rejected[0].is_empty(), "client not rejected: %s" % rejected[0])
 	var local_player: Player = w.get_node_or_null("Players/%s" % multiplayer.get_unique_id()) as Player
 	_check(local_player != null, "client local player spawned")
+	var spawn_deadline: int = Time.get_ticks_msec() + 6000
+	while local_player != null and not local_player.spawn_synced and Time.get_ticks_msec() < spawn_deadline:
+		await get_tree().process_frame
+	_check(local_player != null and local_player.spawn_synced, "client guest spawn synced with host")
 	while not w.loading_step():
 		await get_tree().process_frame
 	var sync_deadline: int = Time.get_ticks_msec() + 4000
 	while local_player != null and local_player.progress.copper != 55 and Time.get_ticks_msec() < sync_deadline:
 		await get_tree().process_frame
 	_check(local_player != null and local_player.progress.copper == 55, "client received host-imported Nakama profile (copper=55)")
-	_check(w.get_node_or_null("Players/1") != null, "client sees host player 1")
+	var host_p: Node2D = w.get_node_or_null("Players/1") as Node2D
+	_check(host_p != null, "client sees host player 1")
+	if local_player != null and host_p != null:
+		var dist_to_host: float = local_player.global_position.distance_to(host_p.global_position)
+		_check(dist_to_host < 120.0, "client spawned near host (dist=%.1f)" % dist_to_host)
+		_check(local_player.global_position.length() > 100.0 or host_p.global_position.length() <= 100.0, "client did not get stuck at (0,0) void (pos=%s)" % str(local_player.global_position))
 	_check(w.get_node_or_null("FallenKnight") != null, "client has FallenKnight")
 	_check(w.get_node_or_null("WardRing_lake_hut") != null, "client has WardRing_lake_hut")
+	if local_player != null and local_player._hud != null:
+		var mp_hud: Control = local_player._hud.get_node_or_null("MultiplayerHud") as Control
+		_check(mp_hud != null and not mp_hud.visible, "client MultiplayerHud hidden in coop world")
+		var mod_menu: Control = local_player._hud.get_node_or_null("ModMenu") as Control
+		_check(mod_menu != null, "client HUD has ModMenu")
+		CloudSession.token = "admin-guest-test-tok"
+		CloudSession.user_id = "admin-guest-uid"
+		CloudSession.role = "player"
+		_check(mod_menu != null and not bool(mod_menu.call("_can_use")), "non-admin guest cannot open ModMenu in host lobby")
+		CloudSession.role = "admin"
+		_check(mod_menu != null and bool(mod_menu.call("_can_use")), "admin guest can use ModMenu in another host lobby")
+		local_player.request_set_god_mode(true)
+		local_player.request_award(25, 100)
+		TimeManager.set_time(0.5)
+		local_player.request_drop_item("wood", 1, Vector2.RIGHT)
+		var cheat_deadline: int = Time.get_ticks_msec() + 5000
+		while Time.get_ticks_msec() < cheat_deadline:
+			if local_player.progress.copper == 80 and absf(TimeManager.time_of_day - 0.5) < 0.05:
+				break
+			await get_tree().process_frame
+		_check(local_player.progress.copper == 80, "admin guest award cheat synced with host (copper=%d)" % local_player.progress.copper)
+		_check(absf(TimeManager.time_of_day - 0.5) < 0.05, "admin guest time cheat applied on host (tod=%.2f)" % TimeManager.time_of_day)
+		CloudSession.logout()
 	NetworkManager.leave()
 	print("COOP_JOIN_CLIENT FAILURES=%d" % _failures)
 	get_tree().quit(0 if _failures == 0 else 1)

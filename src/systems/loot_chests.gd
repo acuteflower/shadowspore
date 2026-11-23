@@ -282,7 +282,8 @@ func request_dev(tier_name: String, pos: Vector2, arrive: bool = false) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_dev(tier_name: String, pos: Vector2, arrive: bool) -> void:
-	if multiplayer.is_server():
+	var sender: int = multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and (sender <= 1 or NetworkManager.is_peer_admin(sender)):
 		_host_dev(tier_name, pos, arrive)
 
 

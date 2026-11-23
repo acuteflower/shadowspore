@@ -149,7 +149,17 @@ func _run() -> void:
 	for _f: int in 45:
 		await get_tree().process_frame
 	_check(pause._opening and pause.visible, "ESC opens PauseMenu")
-	_check(sidebar.visible and sidebar.is_expanded(), "SocialSidebar starts expanded on ESC")
+	var mp_hud: Control = hud.get_node_or_null("MultiplayerHud") as Control
+	_check(mp_hud != null and not mp_hud.visible, "bottom-left MultiplayerHud stays hidden")
+	_check(sidebar.visible and not sidebar.is_expanded(), "SocialSidebar starts collapsed by default on ESC")
+	_check(is_equal_approx(sidebar.occupied_width(), 28.0), "SocialSidebar collapsed width is 28px rail (got %.1f)" % sidebar.occupied_width())
+	var init_rail_rect: Rect2 = _find_hit(sidebar._fixed_hits, "toggle_drawer")
+	_check(init_rail_rect.has_area(), "initial collapsed rail toggle hit rect present")
+	if init_rail_rect.has_area():
+		await _send_click(init_rail_rect.get_center())
+		for _f: int in 25:
+			await get_tree().process_frame
+	_check(sidebar.is_expanded(), "clicking collapsed rail expands SocialSidebar")
 	_check(sidebar.occupied_width() > 180.0, "SocialSidebar expanded width matches drawer spec (got %.1f)" % sidebar.occupied_width())
 
 	# Verify footer buttons are shifted cleanly left of drawer edge (no overlap)
@@ -250,6 +260,60 @@ func _run() -> void:
 	for _f: int in 25:
 		await get_tree().process_frame
 	_check(sidebar.is_expanded() and sidebar.occupied_width() > 180.0, "TAB key re-expands sidebar smoothly")
+
+	# Live WS envelope, expired join-request pruning, HudToast & anchored Coop Lobby Card checks
+	var toast_node: Control = hud.get_node_or_null("HudToast") as Control
+	_check(toast_node != null, "HUD mounts HudToast notification pill")
+	var saw_toasts: Array[String] = []
+	var on_toast: Callable = func(msg: String) -> void: saw_toasts.append(msg)
+	EventBus.toast_requested.connect(on_toast)
+	CloudSession._handle_ws_envelope({
+		"notifications": {
+			"notifications": [
+				{"id": "ws-fr-in", "code": -2, "content": "{}"},
+				{"id": "ws-fr-acc", "code": -3, "content": "{}"},
+			]
+		}
+	})
+	_check(saw_toasts.has("NEUE FREUNDSCHAFTSANFRAGE") and saw_toasts.has("FREUNDSCHAFTSANFRAGE ANGENOMMEN"), "live WS envelope toasts -2 and -3 friend events")
+	EventBus.toast_requested.disconnect(on_toast)
+
+	var expired_row: Dictionary = {
+		"id": "expired-102",
+		"code": 102,
+		"content": {"requester_name": "Alt", "requester_uid": "900001", "expires_at": Time.get_unix_time_from_system() - 30.0},
+	}
+	var valid_row: Dictionary = {
+		"id": "valid-102",
+		"code": 102,
+		"content": {"requester_name": "Frisch", "requester_uid": "900002", "expires_at": Time.get_unix_time_from_system() + 180.0},
+	}
+	CloudSession.notifications = [expired_row, valid_row]
+	var active_notifs: Array[Dictionary] = CloudSession.active_notifications()
+	_check(active_notifs.size() == 1 and String(active_notifs[0].get("id", "")) == "valid-102", "expired 102 join request pruned cleanly")
+
+	var mp_err: Error = NetworkManager.host_multiplayer(19876, "XYZ789", 4, "", "TEST-WELT")
+	_check(mp_err == OK, "NetworkManager.host_multiplayer starts for sidebar lobby check")
+	sidebar._scroll_y = 0.0
+	sidebar.mark_dirty()
+	for _f: int in 8:
+		await get_tree().process_frame
+	var lc_rect: Rect2 = _find_hit(sidebar._feed_hits, "lobby_code")
+	var ll_rect: Rect2 = _find_hit(sidebar._feed_hits, "lobby_leave")
+	_check(lc_rect.has_area(), "anchored Coop Lobby room-code button rendered inside sidebar")
+	_check(ll_rect.has_area(), "anchored Coop Lobby leave/close button rendered inside sidebar")
+	if lc_rect.has_area():
+		await _send_click(sidebar._feed_viewport.global_position + lc_rect.get_center())
+		for _f: int in 4:
+			await get_tree().process_frame
+		_check(sidebar._toast.contains("XYZ789"), "clicking Coop Lobby room code copies XYZ789 (toast=%s)" % sidebar._toast)
+	NetworkManager.ping_updated.emit(42)
+	for _f: int in 2:
+		await get_tree().process_frame
+	if not capture_dir.is_empty():
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/pause_sidebar_coop_lobby.png" % capture_dir)
+	NetworkManager.leave(false)
 
 	# Logged-out fallback check + optional offline screenshot
 	CloudSession.token = ""

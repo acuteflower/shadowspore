@@ -2157,10 +2157,63 @@ func teardown_step(deadline_usec: int) -> bool:
 	return _chunks.is_empty()
 
 
-func _spawn_position(index: int) -> Vector2:
+func _spawn_position(index: int, peer_id: int = 1) -> Vector2:
+	if peer_id > 1:
+		return _guest_spawn_position(index)
+	return _host_spawn_position(index)
+
+
+func _host_spawn_position(index: int) -> Vector2:
 	if _cover_at != Vector2.ZERO:
 		return _cover_at + Vector2(INTRO_SPAWN.x + 16.0 * (index % 2), INTRO_SPAWN.y + 16.0 * (index / 2))
 	return Vector2(_start) * 16.0 + Vector2(8.0 + 16.0 * index, 8.0)
+
+
+## Spawns joining coop guests on a free tile right beside the Host (outdoors, mines, or interiors).
+func _guest_spawn_position(index: int) -> Vector2:
+	var host: Node2D = _players.get_node_or_null("1") as Node2D
+	if host == null:
+		return _host_spawn_position(index)
+	var anchor: Vector2 = host.global_position
+	var host_slot: int = Interiors.slot_at(anchor)
+	var host_in_mine: bool = MineManager.in_mine(anchor)
+	var radii: Array[float] = [20.0, 30.0, 42.0, 56.0]
+	var passes: Array[bool] = [true, false]
+	var base_angle: float = float(maxi(index - 1, 0)) * (TAU / 4.0)
+	for strict_floor: bool in passes:
+		for r: float in radii:
+			for step: int in range(8):
+				var angle: float = base_angle + float(step) * (TAU / 8.0)
+				var candidate: Vector2 = anchor + Vector2.from_angle(angle) * r
+				if host_slot >= 0:
+					if Interiors.slot_at(candidate) != host_slot:
+						continue
+				elif host_in_mine:
+					if not MineManager.in_mine(candidate):
+						continue
+				else:
+					if Interiors.slot_at(candidate) >= 0 or MineManager.in_mine(candidate):
+						continue
+					if strict_floor and not navigation_floor(candidate):
+						continue
+				if not _spot_collides_world(candidate):
+					return candidate
+	return anchor
+
+
+func _spot_collides_world(pos: Vector2) -> bool:
+	var w2d: World2D = get_world_2d()
+	if w2d == null:
+		return false
+	var query: PhysicsShapeQueryParameters2D = PhysicsShapeQueryParameters2D.new()
+	var shape: CircleShape2D = CircleShape2D.new()
+	shape.radius = 6.0
+	query.shape = shape
+	query.transform = Transform2D(0.0, pos + Vector2(0.0, -2.0))
+	query.collision_mask = 1
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	return not w2d.direct_space_state.intersect_shape(query, 1).is_empty()
 
 
 func _clamp_spawn(pos: Vector2) -> Vector2:

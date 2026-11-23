@@ -84,14 +84,23 @@ func _exit_tree() -> void:
 
 ## Dev menu / story: hold a named state for `seconds` (0 = until `release`). The host decides and tells everyone.
 func force(id: String, seconds: float = 0.0) -> void:
-	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
-		return
 	if id != "" and WeatherRules.state_def(id).is_empty():
+		return
+	if multiplayer.multiplayer_peer != null and not multiplayer.is_server():
+		if CloudSession.is_admin() and NetworkManager.rpc_ready(self):
+			_rpc_request_force.rpc_id(1, id, seconds)
 		return
 	if NetworkManager.rpc_ready(self) and multiplayer.get_peers().size() > 0:
 		_rpc_force.rpc(id, seconds)
 	else:
 		_rpc_force(id, seconds)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_request_force(id: String, seconds: float) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and (sender <= 1 or NetworkManager.is_peer_admin(sender)):
+		force(id, seconds)
 
 
 func release() -> void:

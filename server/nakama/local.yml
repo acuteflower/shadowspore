@@ -12,6 +12,8 @@ socket:
   server_key: "shadowspore_dev_server_key"
   port: 7350
   max_message_size_bytes: 1048576
+  outgoing_queue_size: 4096
+  write_wait_ms: 10000
 
 console:
   port: 7351

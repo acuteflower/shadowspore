@@ -191,7 +191,12 @@ static func peer_ready_spawned(level: Node, main: Node, peer_connected_ok: bool)
 	if not peer_connected_ok or not is_instance_valid(level) or not _alive(main):
 		return false
 	var uid: int = main.multiplayer.get_unique_id()
-	return uid > 0 and level.get_node_or_null("Players/%s" % uid) != null
+	if uid <= 0:
+		return false
+	var player: Node = level.get_node_or_null("Players/%s" % uid)
+	if player == null:
+		return false
+	return bool(player.get("spawn_synced"))
 
 
 ## Builds the world under `main` and starts what `request` asks for (what main.gd did on its own before the menu existed).

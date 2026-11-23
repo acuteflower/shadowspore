@@ -92,6 +92,9 @@ func _ready() -> void:
 	_sidebar.request_host_relay.connect(_coop_start_host_relay)
 	_sidebar.request_join_match.connect(_on_sidebar_join_match)
 	add_child(_sidebar)
+	_sidebar.request_leave_coop.connect(_coop_leave_session)
+	_sidebar.request_kick_peer.connect(_coop_kick_peer)
+	_sidebar.request_live_refresh.connect(func() -> void: _maybe_refresh_coop_cloud(false))
 	NetworkManager.session_changed.connect(_on_session_changed)
 	NetworkManager.peer_joined.connect(func(_id: int) -> void:
 		if _paused_here and not multiplayer.get_peers().is_empty():
@@ -99,6 +102,7 @@ func _ready() -> void:
 			get_tree().paused = false
 		_on_session_changed()
 	)
+	NetworkManager.peer_left.connect(func(_id: int) -> void: _on_session_changed())
 	CloudSession.friends_changed.connect(_on_session_changed)
 	CloudSession.notifications_changed.connect(_on_session_changed)
 	CloudSession.profile_loaded.connect(func(_p: Dictionary) -> void: _on_session_changed())
@@ -244,11 +248,15 @@ func _add(col: int, kind: String, label: String, key: String = "", extra: Dictio
 	_cursor[col] += height
 
 
+func _can_cheat() -> bool:
+	return multiplayer.is_server() or CloudSession.is_admin()
+
+
 func _build_test_tools() -> void:
 	_add(0, "heading", "SPIELER")
 	_add(0, "button", "TITELKARTE ZEIGEN", "", {"action": "title_card"})
 	_add(0, "button", "AUF 5 HP SETZEN", "", {"action": "hurt5"})
-	if multiplayer.is_server():
+	if _can_cheat():
 		if get_tree().get_first_node_in_group("world") is WorldLevel:
 			_add(0, "button", "VORSTOSS AUSLÖSEN", "", {"action": "raid"})
 		_add(0, "button", "STARKES SCHWERT", "", {"action": "strong_sword"})
@@ -311,7 +319,7 @@ func _build_test_tools() -> void:
 			_add(0, "button", "ZURÜCK IN DIE WELT", "", {"action": "trials_leave"}) ## the save is loaded again
 		else:
 			_add(0, "button", "RÄTSELWELT BETRETEN", "", {"action": "trials_enter"}) ## the flat test world with every trial (unsaved progress here is lost)
-	if multiplayer.is_server():
+	if _can_cheat():
 		_add(0, "heading", "ANGELN")
 		_add(0, "button", "ANGEL + KÖDER", "", {"action": "fish_kit"})
 		if _town() != null and _town().caravan != null: ## the travelling merchant (docs/haendler_konzept.md)
@@ -466,26 +474,41 @@ static func _next_join_mode(mode: String) -> String:
 			return "private"
 
 
+func _coop_leave_session() -> void:
+	_do_flush_and_quit(true)
+
+
+func _coop_kick_peer(peer_id: int) -> void:
+	if not multiplayer.is_server() or peer_id <= 1:
+		return
+	var pname: String = NetworkManager.player_name_for(peer_id)
+	NetworkManager.kick_peer(peer_id)
+	_coop_toast = "%s GEKICKT" % (pname.to_upper() if not pname.is_empty() else "SPIELER")
+	_coop_toast_t = 2.4
+	if _sidebar != null:
+		_sidebar.mark_dirty()
+	_build_items()
+
+
 func _maybe_refresh_coop_cloud(force: bool = false) -> void:
 	if not CloudSession.is_logged_in():
 		return
 	var now: int = Time.get_ticks_msec()
-	var cooldown: int = 1800 if force else 5000
+	var cooldown: int = 1200 if force else 2500
 	if _coop_last_fetch_msec > 0 and now - _coop_last_fetch_msec < cooldown:
 		return
 	_coop_last_fetch_msec = now
 	if CloudSession.uid.is_empty():
 		CloudSession.fetch_my_profile()
-	CloudSession.refresh_friends()
-	CloudSession.fetch_notifications()
+	CloudSession.request_live_sync(force)
 
 
 func _build_coop_notifications(col: int) -> void:
 	_pending_invites.clear()
 	var added_hdr: bool = false
-	for notif: Dictionary in CloudSession.notifications:
+	for notif: Dictionary in CloudSession.active_notifications():
 		var code: int = int(notif.get("code", 0))
-		var content: Dictionary = notif.get("content", {}) as Dictionary
+		var content: Dictionary = CloudSession._parse_notif_content(notif)
 		if (code == 101 or code == 103) and not String(content.get("match_id", "")).is_empty():
 			if not added_hdr:
 				_add(col, "heading", "EINLADUNGEN")
@@ -884,15 +907,10 @@ func _activate(item: Dictionary) -> void:
 func _run_action(action: String) -> void:
 	if action.begins_with("food:"):
 		var feeder: Player = _player as Player
-		if feeder == null or not multiplayer.is_server():
+		if feeder == null or not _can_cheat():
 			_failed_flash = 2.5
 			return
-		var species: String = action.trim_prefix("food:")
-		var foods: Dictionary = PetRules.table()["foods"] as Dictionary
-		for item: String in foods:
-			var kind: String = String((foods[item] as Dictionary).get(species, ""))
-			if kind == "loves" or kind == "likes":
-				feeder.inventory.give(item, 20 if kind == "loves" else 10)
+		feeder.request_admin_action("food", [action.trim_prefix("food:")])
 		return
 	if action.begins_with("chest:"): ## dev: a loot chest a little in front of her (host decides)
 		var chests: LootChests = LootChests.of(get_tree())
@@ -1055,15 +1073,12 @@ func _run_action(action: String) -> void:
 			_open_t = 0.0
 			visible = false
 			TitleCard.show_card(self)
-		"caravan_come", "caravan_come2", "caravan_leave": ## dev, host: the caravan drives in now / packs up now
+		"caravan_come", "caravan_come2", "caravan_leave": ## dev: the caravan drives in now / packs up now
 			var caravan: CaravanManager = _town().caravan if _town() != null else null
-			if caravan == null or not multiplayer.is_server() or not _town().has_heart():
+			if caravan == null or not (_player is Player) or not _can_cheat() or not _town().has_heart():
 				_failed_flash = 2.5
 				return
-			if action == "caravan_leave":
-				caravan.debug_leave()
-			else:
-				caravan.debug_come(2 if action == "caravan_come2" else 1)
+			(_player as Player).request_admin_action(action)
 			_set_open(false)
 		"town_jump":
 			var town_world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
@@ -1131,11 +1146,10 @@ func _run_action(action: String) -> void:
 			aur_world.debug_aurelith(_player as Player, action != "aurelith_basin", stg)
 		"aurelith_relic":
 			var aur_wearer: Player = _player as Player
-			if aur_wearer == null or not multiplayer.is_server():
+			if aur_wearer == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if aur_wearer.inventory.count_item("fessel_des_schmelzers") == 0 and not TalismanRules.worn_ids(aur_wearer.inventory.equipment).has("fessel_des_schmelzers"):
-				aur_wearer.inventory.give("fessel_des_schmelzers", 1)
+			aur_wearer.request_admin_action("give_unique_talisman", ["fessel_des_schmelzers"])
 		"return_home":
 			var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
 			if world == null or not world.debug_can_return_home():
@@ -1180,87 +1194,65 @@ func _run_action(action: String) -> void:
 			_teleport_to_field()
 		"raid": ## the lure is full: the next tick of the night director gathers a raid (needs night creatures nearby and a founded town)
 			var level: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
-			if level == null or level.night == null or not level.night.active():
+			if level == null or level.night == null or not level.night.active() or not (_player is Player) or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			level.night.debug_force_raid()
+			(_player as Player).request_admin_action("raid")
 		"hurt5":
 			if _player != null:
 				_player.call("request_set_health", 5.0)
 		"refine_0", "refine_5", "refine_10", "refine_15":
 			var smith: Player = _player as Player
-			if smith == null or not multiplayer.is_server() or not smith.inventory.debug_set_refine(action.trim_prefix("refine_").to_int()):
+			var lvl: int = action.trim_prefix("refine_").to_int()
+			if smith == null or not _can_cheat():
 				_failed_flash = 2.5
-		"talismans_on", "talismans_off": ## the three first talismans on (given when missing) or off again; a slot opens only with its level (host)
+			elif multiplayer.is_server():
+				if not smith.inventory.debug_set_refine(lvl):
+					_failed_flash = 2.5
+			else:
+				smith.request_admin_action("refine", [lvl])
+		"talismans_on", "talismans_off":
 			var wearer: Player = _player as Player
-			if wearer == null or not multiplayer.is_server():
+			if wearer == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			for slot_name: String in wearer.inventory.equipment:
-				if action == "talismans_off" and slot_name.begins_with(TalismanRules.SLOT_PREFIX):
-					wearer.inventory.request("unequip", [slot_name, -1])
-			if action == "talismans_on":
-				for id: String in ["silver_chain", "wuchtreif", "schweigtropfen"]:
-					if wearer.inventory.count_item(id) == 0 and not TalismanRules.worn_ids(wearer.inventory.equipment).has(id):
-						wearer.inventory.give(id, 1)
-					for i: int in wearer.inventory.slots.size():
-						if not wearer.inventory.slots[i].is_empty() and String(wearer.inventory.slots[i]["id"]) == id:
-							wearer.inventory.request("equip", [i, ""])
-							break
-		"talismans_all": ## one of every talisman there is into the bag (host); what she already has is not given twice
+			wearer.request_admin_action(action)
+		"talismans_all":
 			var collector: Player = _player as Player
-			if collector == null or not multiplayer.is_server():
+			if collector == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			var items: Dictionary = DataRegistry.table("items")
-			for id: String in items:
-				var def: Dictionary = items[id] as Dictionary
-				if String(def.get("kind", "")) == "talisman" and collector.inventory.count_item(id) == 0 and not TalismanRules.worn_ids(collector.inventory.equipment).has(id):
-					collector.inventory.give(id, 1)
-		"magic_all": ## the Hexenulmenstab (once) and two of every crystal and gem of every tier into the bag (host)
+			collector.request_admin_action("talismans_all")
+		"magic_all":
 			var mage: Player = _player as Player
-			if mage == null or not multiplayer.is_server():
+			if mage == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			for staff_id: String in ["staff_hag_elm", "staff_bone_fork"]: ## the Hexenulmenstab and the Bleichgabel (docs/magie_konzept.md 17)
-				if not mage.inventory.has_item(staff_id):
-					mage.inventory.give(staff_id, 1)
-			var all_items: Dictionary = DataRegistry.table("items")
-			for id: String in all_items:
-				var kind: String = String((all_items[id] as Dictionary).get("kind", ""))
-				if kind == "crystal" or kind == "gem":
-					mage.inventory.give(id, 2)
-		"potions_all": ## every potion of every tier into the bag (host), 5 of each
+			mage.request_admin_action("magic_all")
+		"potions_all":
 			var brewer: Player = _player as Player
-			if brewer == null or not multiplayer.is_server():
+			if brewer == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			for type: String in AlchemyRules.TYPES:
-				for level: int in range(1, AlchemyRules.tier_count(type) + 1):
-					brewer.inventory.give(AlchemyRules.item_id(type, level), 5)
-		"rissfeder": ## the Rissfeder into the bag (host); not twice when she has it or wears it
+			brewer.request_admin_action("potions_all")
+		"rissfeder":
 			var keeper: Player = _player as Player
-			if keeper == null or not multiplayer.is_server():
+			if keeper == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if keeper.inventory.count_item("rissfeder") == 0 and not TalismanRules.worn_ids(keeper.inventory.equipment).has("rissfeder"):
-				keeper.inventory.give("rissfeder", 1)
-		"clarity": ## the Ohrringe der Klarheit into the bag (host), not twice
+			keeper.request_admin_action("give_unique_talisman", ["rissfeder"])
+		"clarity":
 			var wearer: Player = _player as Player
-			if wearer == null or not multiplayer.is_server():
+			if wearer == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if wearer.inventory.count_item("clarity_earrings") == 0 and not TalismanRules.worn_ids(wearer.inventory.equipment).has("clarity_earrings"):
-				wearer.inventory.give("clarity_earrings", 1)
+			wearer.request_admin_action("give_unique_talisman", ["clarity_earrings"])
 		"lake_witch_quest", "lake_witch_known": ## docs/seehexe_konzept.md 8: the entry quest from the start / all of it done
 			var story: LakeWitchStory = get_tree().get_first_node_in_group("lake_witch_story") as LakeWitchStory
-			if story == null or not multiplayer.is_server():
+			if story == null or not (_player is Player) or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if action == "lake_witch_quest":
-				story.debug_start()
-			else:
-				story.debug_known()
+			(_player as Player).request_admin_action(action)
 			_set_open(false)
 		"lake_witch": ## in front of the lake witch's door
 			if _player is Player:
@@ -1275,12 +1267,12 @@ func _run_action(action: String) -> void:
 				GameLauncher.launch(get_tree(), {"mode": "continue"})
 			else:
 				GameLauncher.launch(get_tree(), {"mode": "continue" if action == "zones_continue" else "new", "world": "zones"})
-		"moon:4", "moon:0": ## dev, host: the day moves on to the next one with that moon (the clock keeps its time)
-			if not multiplayer.is_server():
+		"moon:4", "moon:0": ## dev: the day moves on to the next one with that moon (the clock keeps its time)
+			if not _can_cheat():
 				_failed_flash = 2.5
 				return
 			var want: int = int(action.get_slice(":", 1))
-			TimeManager.day += posmod(want - posmod(TimeManager.day, 8), 8)
+			TimeManager.set_day(TimeManager.day + posmod(want - posmod(TimeManager.day, 8), 8))
 			_set_open(false)
 		"wisp_go", "wisp_reset", "crow_go", "crow_reset", "crow_kit", "raven_go", "raven_reset", "raven_kit", "weave_go", "weave_reset", "stars_go", "stars_reset": ## the trials (docs/raetsel_konzept.md)
 			var trials: Puzzles = Puzzles.of(get_tree())
@@ -1290,18 +1282,13 @@ func _run_action(action: String) -> void:
 				_failed_flash = 2.5
 				return
 			if action.ends_with("_reset") or action.ends_with("_kit"):
-				if not multiplayer.is_server():
+				if not _can_cheat():
 					_failed_flash = 2.5
 					return
-				if action == "raven_kit":
-					(_player as Player).inventory.give("lake_glimmer", 2)
-					(_player as Player).inventory.give("stone", 3)
-				elif action == "crow_kit":
-					(_player as Player).inventory.give("sun_seed", 10)
-					if not (_player as Player).inventory.has_item("hoe_basic"):
-						(_player as Player).inventory.give("hoe_basic", 1)
+				if action == "raven_kit" or action == "crow_kit":
+					(_player as Player).request_admin_action(action)
 				else:
-					trials.debug_reset(first)
+					(_player as Player).request_admin_action("trial_reset", [first])
 			else:
 				(_player as Player).request_teleport(trials.trial_spot(first))
 			_set_open(false)
@@ -1398,90 +1385,55 @@ func _run_action(action: String) -> void:
 			var w_off: Vector2 = Vector2(-8.0, 8.0) if action == "wonder_bell" else (Vector2(8.0, 42.0) if action == "wonder_guardians" else Vector2(8.0, 62.0))
 			(_player as Player).request_teleport(Vector2(w_tile) * 16.0 + w_off)
 			_set_open(false)
-		"wonder_starfall", "wonder_stag": ## dev, host: trigger clear night + nearby Starfall crater or peaceful SpiritStag
+		"wonder_starfall", "wonder_stag": ## dev: trigger clear night + nearby Starfall crater or peaceful SpiritStag
 			var nw: NightWonders = NightWonders.of(get_tree())
-			if nw == null or not (_player is Player) or not multiplayer.is_server():
+			if nw == null or not (_player is Player) or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if not TimeManager.is_night():
-				TimeManager.set_time(0.95)
-			if WeatherManager.current != null:
-				WeatherManager.current.force("clear")
-			var p_pos: Vector2 = (_player as Player).global_position
-			if action == "wonder_starfall":
-				var target: Vector2 = _nearby_night_wonder_pos(p_pos, 118.0)
-				if not nw.trigger_starfall(target).is_finite():
-					nw.trigger_starfall()
-			else:
-				var stag_pos: Vector2 = _nearby_night_wonder_pos(p_pos, 210.0)
-				if nw.spawn_spirit_stag(stag_pos) == null:
-					nw.spawn_spirit_stag()
+			var dev_nw_p: Player = _player as Player
+			var nw_target: Vector2 = _nearby_night_wonder_pos(dev_nw_p.global_position, 118.0 if action == "wonder_starfall" else 210.0)
+			dev_nw_p.request_admin_action(action, [nw_target])
 			_set_open(false)
-		"quartz_golem_spawn": ## dev, host: spawn a peaceful Quarzwächter near Ellie
+		"quartz_golem_spawn": ## dev: spawn a peaceful Quarzwächter near Ellie
 			var world_node: Node = get_tree().get_first_node_in_group("world")
-			if world_node == null or not world_node.has_method("spawn_quartz_golem") or not (_player is Player) or not multiplayer.is_server():
+			if world_node == null or not world_node.has_method("spawn_quartz_golem") or not (_player is Player) or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			var p_pos: Vector2 = (_player as Player).global_position + Vector2(44.0, 0.0)
-			world_node.call("spawn_quartz_golem", p_pos, PI, randi() % 3, false)
+			(_player as Player).request_admin_action("quartz_golem_spawn")
 			_set_open(false)
 		"starhall_go", "starhall_rescue", "starhall_light_step", "starhall_reset":
 			var gs: GoddessSystem = GoddessSystem.of(get_tree())
 			var dev_p: Player = _player as Player
-			if gs == null or dev_p == null or not multiplayer.is_server():
+			if gs == null or dev_p == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if action == "starhall_go":
-				gs.debug_enter_starhall(dev_p)
+			dev_p.request_admin_action(action)
+			if action == "starhall_go" or action == "starhall_rescue":
 				_set_open(false)
-			elif action == "starhall_rescue":
-				_set_open(false)
-				gs.debug_trigger_rescue(dev_p)
-			elif action == "starhall_light_step":
-				gs.debug_grant_light_step(dev_p, not dev_p.light_step)
-			else:
-				gs.debug_reset(dev_p)
-		"relics_reset": ## forget the boss kills of every player: the next kill of Mornath drops the Rissfeder for certain again (host)
+		"relics_reset": ## forget the boss kills of every player: the next kill of Mornath drops the Rissfeder for certain again
 			var ledger: BossRelics = BossRelics.of(get_tree())
-			if ledger == null or not multiplayer.is_server():
+			if ledger == null or not (_player is Player) or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			ledger.forget("boss_sky_cleaver")
-		"rift_sword": ## the Himmelsriss into the bag and into her hand (host); for the Rissfeder synergy get the feather too
+			(_player as Player).request_admin_action("relics_reset")
+		"rift_sword": ## the Himmelsriss into the bag and into her hand
 			var rifter: Player = _player as Player
-			if rifter == null or not multiplayer.is_server():
+			if rifter == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if not rifter.inventory.has_item("sword_rift"):
-				rifter.inventory.give("sword_rift", 1)
-			for i: int in rifter.inventory.slots.size():
-				if not rifter.inventory.slots[i].is_empty() and String(rifter.inventory.slots[i]["id"]) == "sword_rift":
-					rifter.inventory.request("equip", [i, ""])
-					break
-		"strong_sword": ## the void blade (30 damage) into the bag and into her hand (host)
+			rifter.request_admin_action("give_equip", ["sword_rift"])
+		"strong_sword": ## the void blade (30 damage) into the bag and into her hand
 			var fighter: Player = _player as Player
-			if fighter == null or not multiplayer.is_server():
+			if fighter == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if not fighter.inventory.has_item("sword_void"):
-				fighter.inventory.give("sword_void", 1)
-			for i: int in fighter.inventory.slots.size():
-				if not fighter.inventory.slots[i].is_empty() and String(fighter.inventory.slots[i]["id"]) == "sword_void":
-					fighter.inventory.request("equip", [i, ""])
-					break
-		"fish_kit": ## the rod, every bait and the two materials of the floats; the rod is selected (host)
+			fighter.request_admin_action("give_equip", ["sword_void"])
+		"fish_kit": ## the rod, every bait and the two materials of the floats; the rod is selected
 			var angler: Player = _player as Player
-			if angler == null or not multiplayer.is_server():
+			if angler == null or not _can_cheat():
 				_failed_flash = 2.5
 				return
-			if not angler.inventory.has_item("rod_basic"):
-				angler.inventory.give("rod_basic", 1)
-			for kit: Array in [["dusk_berry", 10], ["ember_berry", 5], ["brook_mint", 10], ["marsh_gold", 10], ["glow_cap", 10], ["void_splinter", 3]]:
-				angler.inventory.give(String(kit[0]), int(kit[1]))
-			for i: int in InventoryComponent.HOTBAR_SIZE:
-				if not angler.inventory.slots[i].is_empty() and String(angler.inventory.slots[i]["id"]) == "rod_basic":
-					angler.inventory.select(i)
-			angler.inventory.changed.emit()
+			angler.request_admin_action("fish_kit")
 		"fish_bank":
 			var walker: Player = _player as Player
 			var bank: Vector2 = FishingComponent.nearest_bank(get_tree(), walker.global_position) if walker != null else Vector2.INF

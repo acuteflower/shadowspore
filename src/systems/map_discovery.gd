@@ -18,6 +18,7 @@ var _seen: PackedByteArray = PackedByteArray()
 var _count: int = 0
 var _timer: float = 0.0
 var _before: PackedByteArray = PackedByteArray() ## the table as it was before the developer's "whole map" reveal; empty = no reveal active
+var _remote_revealed_all: bool = false
 var _export_cache: PackedByteArray = PackedByteArray()
 
 
@@ -130,29 +131,60 @@ func import_saved(data: PackedByteArray) -> void:
 
 
 ## Developer tool: the whole world counts as seen (every cell). The table from before is kept, so `reset_reveal` can give it back.
-## Host only; the save file keeps both tables (`export_before`), so the reveal survives saving, quitting and restarting.
+## Host only; admin clients ask the host. The save file keeps both tables (`export_before`), so the reveal survives saving, quitting and restarting.
 func reveal_all() -> void:
-	if not multiplayer.is_server() or is_reveal_all():
+	if not multiplayer.is_server():
+		if CloudSession.is_admin() and NetworkManager.rpc_ready(self) and not is_reveal_all():
+			_rpc_request_reveal.rpc_id(1, true)
+		return
+	if is_reveal_all():
 		return
 	_before = _seen.duplicate()
+	_remote_revealed_all = true
 	var full: PackedByteArray = PackedByteArray()
 	full.resize(GRID * GRID)
 	full.fill(1)
 	_set_table(full)
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_rpc_reveal_state.rpc(true)
 
 
-## Developer tool: the table from before `reveal_all` again (host only). Cells walked meanwhile are not lost: the reveal only ever added.
+## Developer tool: the table from before `reveal_all` again (host only; admin clients ask the host). Cells walked meanwhile are not lost.
 func reset_reveal() -> void:
-	if not multiplayer.is_server() or not is_reveal_all():
+	if not multiplayer.is_server():
+		if CloudSession.is_admin() and NetworkManager.rpc_ready(self) and is_reveal_all():
+			_rpc_request_reveal.rpc_id(1, false)
+		return
+	if not is_reveal_all():
 		return
 	var before: PackedByteArray = _before
 	_before = PackedByteArray()
+	_remote_revealed_all = false
 	_set_table(before)
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_rpc_reveal_state.rpc(false)
 
 
 ## True while the developer reveal is active (the saved table before it is kept).
 func is_reveal_all() -> bool:
-	return _before.size() == GRID * GRID
+	return _before.size() == GRID * GRID or _remote_revealed_all
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_request_reveal(on: bool) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if not multiplayer.is_server() or (sender > 1 and not NetworkManager.is_peer_admin(sender)):
+		return
+	if on:
+		reveal_all()
+	else:
+		reset_reveal()
+
+
+@rpc("authority", "call_remote", "reliable")
+func _rpc_reveal_state(on: bool) -> void:
+	_remote_revealed_all = on
+	replaced.emit()
 
 
 ## The table from before the reveal, compressed (save file); empty when no reveal is active.

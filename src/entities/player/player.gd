@@ -252,6 +252,8 @@ var swimmer: SwimComponent
 const SWIM_SUBMERGE: float = 17.0 ## px of water over her body while swimming (stand-in until the swim sheet exists)
 
 var _surface: Dictionary = {} ## terrain.json entry under the feet
+var spawn_synced: bool = true ## false on owning guest until Host confirms host-adjacent spawn
+var _spawn_wait_t: float = 0.0
 var _last_step: int = -1 ## walk-cycle frame of the previous tick, -1 while standing
 var _sink: float = 0.0 ## px the sprite sits lower in water
 var _idle_ripple_timer: float = 0.0
@@ -370,6 +372,10 @@ func _ready() -> void:
 		health.died.connect(_respawn_after_delay)
 	_camera.enabled = is_multiplayer_authority()
 	_camera.reset_smoothing()
+	var connected_guest: bool = not multiplayer.is_server() and is_multiplayer_authority() and multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+	spawn_synced = not connected_guest
+	if not spawn_synced:
+		_rpc_request_spawn_pos.rpc_id(1)
 	if is_multiplayer_authority():
 		var free_cam: FreeCam = FreeCam.new()
 		free_cam.name = "FreeCam"
@@ -505,6 +511,14 @@ func _update_desert_heat(delta: float) -> void:
 	heat_amount = clampf(heat_amount + drive * delta, 0.0, 1.0)
 
 func _physics_process(delta: float) -> void:
+	if not spawn_synced:
+		if is_multiplayer_authority() and not multiplayer.is_server():
+			_spawn_wait_t += delta
+			if _spawn_wait_t >= 0.35:
+				_spawn_wait_t = 0.0
+				if multiplayer.multiplayer_peer != null and multiplayer.multiplayer_peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+					_rpc_request_spawn_pos.rpc_id(1)
+		return
 	var sub_pos: Vector2i = Vector2i((global_position / 4.0).floor())
 	if sub_pos != _last_surface_tile:
 		_last_surface_tile = sub_pos
@@ -782,6 +796,44 @@ func request_teleport(to: Vector2) -> void:
 	_camera.reset_smoothing()
 
 
+## Authoritative spawn placement pushed from Host to owning guest during coop join.
+func push_spawn_to_owner(target: Vector2) -> void:
+	if not multiplayer.is_server():
+		return
+	var owner_id: int = name.to_int()
+	if owner_id > 1 and multiplayer.get_peers().has(owner_id):
+		_rpc_apply_spawn_pos.rpc_id(owner_id, target)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_request_spawn_pos() -> void:
+	if not multiplayer.is_server():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender <= 1 or sender != name.to_int():
+		return
+	var target: Vector2 = global_position
+	var players_node: Node = get_parent()
+	var lvl: TestLevel = players_node.get_parent() as TestLevel if players_node != null else null
+	if lvl != null:
+		target = lvl.resolve_guest_spawn(sender)
+	_rpc_apply_spawn_pos.rpc_id(sender, target)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_apply_spawn_pos(target: Vector2) -> void:
+	if multiplayer.get_remote_sender_id() != 1:
+		return
+	if spawn_synced:
+		return
+	spawn_synced = true
+	if is_node_ready():
+		request_teleport(target)
+	else:
+		position = target
+		call_deferred("request_teleport", target)
+
+
 ## A boss throws her across the floor: she slides from where she stands to `target` in `seconds` (fast at first, slowing down, stopped by anything solid on
 ## the way); she cannot act meanwhile. Sent to the one who owns her (`launch`), who moves her.
 var launch_left: float = 0.0
@@ -828,7 +880,8 @@ func request_heal() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_heal() -> void:
-	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+	var sender: int = multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and sender == get_multiplayer_authority() and (sender <= 1 or NetworkManager.is_peer_admin(sender)):
 		health.heal_full()
 
 
@@ -2417,8 +2470,233 @@ func request_set_health(value: float) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_set_health(value: float) -> void:
-	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
+	var sender: int = multiplayer.get_remote_sender_id()
+	if multiplayer.is_server() and sender == get_multiplayer_authority() and (sender <= 1 or NetworkManager.is_peer_admin(sender)):
 		health.set_health(value)
+
+
+func request_set_god_mode(on: bool) -> void:
+	health.god_mode = on
+	if not multiplayer.is_server():
+		request_admin_action("god_mode", [on])
+
+
+func request_set_infinite_stamina(on: bool) -> void:
+	stamina.infinite = on
+	if not multiplayer.is_server():
+		request_admin_action("stamina", [on])
+
+
+func request_award(copper: int, xp: int) -> void:
+	request_admin_action("award", [copper, xp])
+
+
+func request_drop_item(item_id: String, count: int, dir: Vector2) -> void:
+	request_admin_action("drop", [item_id, count, dir])
+
+
+## Admin cheat bridge: runs locally on host, or asks host on behalf of a server-verified admin peer.
+func request_admin_action(op: String, args: Array = []) -> void:
+	if multiplayer.is_server():
+		_exec_admin_action(op, args)
+	elif CloudSession.is_admin() and is_multiplayer_authority() and NetworkManager.rpc_ready(self):
+		_rpc_admin_action.rpc_id(1, op, args)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_admin_action(op: String, args: Array) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if not multiplayer.is_server() or sender <= 1 or sender != get_multiplayer_authority() or not NetworkManager.is_peer_admin(sender):
+		return
+	_exec_admin_action(op, args)
+
+
+func _exec_admin_action(op: String, args: Array) -> void:
+	if _exec_admin_player_action(op, args):
+		return
+	if _exec_admin_kit_action(op, args):
+		return
+	_exec_admin_world_action(op, args)
+
+
+func _exec_admin_player_action(op: String, args: Array) -> bool:
+	match op:
+		"god_mode":
+			health.god_mode = bool(args[0]) if not args.is_empty() else not health.god_mode
+			return true
+		"stamina":
+			stamina.infinite = bool(args[0]) if not args.is_empty() else not stamina.infinite
+			return true
+		"award":
+			if args.size() >= 2:
+				progress.award(int(args[0]), int(args[1]))
+			return true
+		"drop":
+			if args.size() >= 3:
+				var id: String = String(args[0])
+				if DataRegistry.table("items").has(id):
+					var cnt: int = clampi(int(args[1]), 1, 999)
+					var dir: Vector2 = args[2] as Vector2
+					DropComponent.spawn_thrown(get_tree(), id, cnt, global_position, dir)
+			return true
+		"refine":
+			if not args.is_empty():
+				inventory.debug_set_refine(int(args[0]))
+			return true
+		"give":
+			if args.size() >= 2:
+				inventory.give(String(args[0]), clampi(int(args[1]), 1, 999))
+			return true
+		"give_unique_talisman":
+			if not args.is_empty():
+				var tid: String = String(args[0])
+				if inventory.count_item(tid) == 0 and not TalismanRules.worn_ids(inventory.equipment).has(tid):
+					inventory.give(tid, 1)
+			return true
+		"give_equip":
+			if not args.is_empty():
+				var eid: String = String(args[0])
+				if not inventory.has_item(eid):
+					inventory.give(eid, 1)
+				for i: int in inventory.slots.size():
+					if not inventory.slots[i].is_empty() and String(inventory.slots[i]["id"]) == eid:
+						inventory.request("equip", [i, ""])
+						break
+			return true
+	return false
+
+
+func _exec_admin_kit_action(op: String, args: Array) -> bool:
+	match op:
+		"talismans_on", "talismans_off":
+			for slot_name: String in inventory.equipment:
+				if op == "talismans_off" and slot_name.begins_with(TalismanRules.SLOT_PREFIX):
+					inventory.request("unequip", [slot_name, -1])
+			if op == "talismans_on":
+				for id: String in ["silver_chain", "wuchtreif", "schweigtropfen"]:
+					if inventory.count_item(id) == 0 and not TalismanRules.worn_ids(inventory.equipment).has(id):
+						inventory.give(id, 1)
+					for i: int in inventory.slots.size():
+						if not inventory.slots[i].is_empty() and String(inventory.slots[i]["id"]) == id:
+							inventory.request("equip", [i, ""])
+							break
+			return true
+		"talismans_all":
+			var items: Dictionary = DataRegistry.table("items")
+			for id: String in items:
+				var def: Dictionary = items[id] as Dictionary
+				if String(def.get("kind", "")) == "talisman" and inventory.count_item(id) == 0 and not TalismanRules.worn_ids(inventory.equipment).has(id):
+					inventory.give(id, 1)
+			return true
+		"magic_all":
+			for staff_id: String in ["staff_hag_elm", "staff_bone_fork"]:
+				if not inventory.has_item(staff_id):
+					inventory.give(staff_id, 1)
+			var all_items: Dictionary = DataRegistry.table("items")
+			for id: String in all_items:
+				var kind: String = String((all_items[id] as Dictionary).get("kind", ""))
+				if kind == "crystal" or kind == "gem":
+					inventory.give(id, 2)
+			return true
+		"potions_all":
+			for ptype: String in AlchemyRules.TYPES:
+				for lvl: int in range(1, AlchemyRules.tier_count(ptype) + 1):
+					inventory.give(AlchemyRules.item_id(ptype, lvl), 5)
+			return true
+		"fish_kit":
+			if not inventory.has_item("rod_basic"):
+				inventory.give("rod_basic", 1)
+			for kit: Array in [["dusk_berry", 10], ["ember_berry", 5], ["brook_mint", 10], ["marsh_gold", 10], ["glow_cap", 10], ["void_splinter", 3]]:
+				inventory.give(String(kit[0]), int(kit[1]))
+			for i: int in InventoryComponent.HOTBAR_SIZE:
+				if not inventory.slots[i].is_empty() and String(inventory.slots[i]["id"]) == "rod_basic":
+					inventory.select(i)
+			inventory.changed.emit()
+			return true
+		"crow_kit":
+			inventory.give("sun_seed", 10)
+			if not inventory.has_item("hoe_basic"):
+				inventory.give("hoe_basic", 1)
+			return true
+		"raven_kit":
+			inventory.give("lake_glimmer", 2)
+			inventory.give("stone", 3)
+			return true
+		"food":
+			if not args.is_empty():
+				var species: String = String(args[0])
+				var foods: Dictionary = PetRules.table()["foods"] as Dictionary
+				for item: String in foods:
+					var kind: String = String((foods[item] as Dictionary).get(species, ""))
+					if kind == "loves" or kind == "likes":
+						inventory.give(item, 20 if kind == "loves" else 10)
+			return true
+	return false
+
+
+func _exec_admin_world_action(op: String, args: Array) -> void:
+	match op:
+		"unlock_goddess":
+			var gs: GoddessSystem = GoddessSystem.of(get_tree())
+			if gs != null:
+				gs.debug_unlock_statues(self)
+		"starhall_go", "starhall_rescue", "starhall_light_step", "starhall_reset":
+			var gs: GoddessSystem = GoddessSystem.of(get_tree())
+			if gs == null:
+				return
+			if op == "starhall_go":
+				gs.debug_enter_starhall(self)
+			elif op == "starhall_rescue":
+				gs.debug_trigger_rescue(self)
+			elif op == "starhall_light_step":
+				gs.debug_grant_light_step(self, not light_step)
+			else:
+				gs.debug_reset(self)
+		"caravan_come", "caravan_come2", "caravan_leave":
+			var town_n: TownManager = get_tree().get_first_node_in_group("town") as TownManager
+			if town_n != null and town_n.caravan != null and town_n.has_heart():
+				if op == "caravan_leave":
+					town_n.caravan.debug_leave()
+				else:
+					town_n.caravan.debug_come(2 if op == "caravan_come2" else 1)
+		"raid":
+			var level: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
+			if level != null and level.night != null and level.night.active():
+				level.night.debug_force_raid()
+		"wonder_starfall", "wonder_stag":
+			var nw: NightWonders = NightWonders.of(get_tree())
+			if nw == null:
+				return
+			if not TimeManager.is_night():
+				TimeManager.set_time(0.95)
+			if WeatherManager.current != null:
+				WeatherManager.current.force("clear")
+			var target_pt: Vector2 = args[0] as Vector2 if not args.is_empty() and args[0] is Vector2 else global_position + Vector2(120.0, 0.0)
+			if op == "wonder_starfall":
+				if not nw.trigger_starfall(target_pt).is_finite():
+					nw.trigger_starfall()
+			else:
+				if nw.spawn_spirit_stag(target_pt) == null:
+					nw.spawn_spirit_stag()
+		"quartz_golem_spawn":
+			var world_node: Node = get_tree().get_first_node_in_group("world")
+			if world_node != null and world_node.has_method("spawn_quartz_golem"):
+				world_node.call("spawn_quartz_golem", global_position + Vector2(44.0, 0.0), PI, randi() % 3, false)
+		"relics_reset":
+			var ledger: BossRelics = BossRelics.of(get_tree())
+			if ledger != null:
+				ledger.forget("boss_sky_cleaver")
+		"lake_witch_quest", "lake_witch_known":
+			var story: LakeWitchStory = get_tree().get_first_node_in_group("lake_witch_story") as LakeWitchStory
+			if story != null:
+				if op == "lake_witch_quest":
+					story.debug_start()
+				else:
+					story.debug_known()
+		"trial_reset":
+			var trials: Puzzles = Puzzles.of(get_tree())
+			if trials != null and not args.is_empty():
+				trials.debug_reset(String(args[0]))
 
 
 func _use_sheet(sheet: int) -> void:

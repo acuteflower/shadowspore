@@ -32,6 +32,7 @@ const GROUND_RECT: Rect2i = Rect2i(-52, -32, 104, 64) ## in tiles, covers arena 
 @onready var _enemies: Node2D = $Enemies
 
 var _enemy_count: int = 0
+var _pending_guest_spawns: Dictionary = {} ## peer_id -> Vector2 authoritative spawn next to host
 var _wave_count: int = 0
 var loading_in_steps: bool = false ## launcher drives initialization, chunk streaming, and warmup across frames
 var _stepped_init_done: bool = false
@@ -336,8 +337,27 @@ func _clamp_spawn(pos: Vector2) -> Vector2:
 	return pos.clamp(-ARENA_LIMIT, ARENA_LIMIT)
 
 
-func _spawn_position(index: int) -> Vector2:
+func _spawn_position(index: int, peer_id: int = 1) -> Vector2:
+	if peer_id > 1:
+		var host: Node2D = _players.get_node_or_null("1") as Node2D
+		if host != null:
+			var angle: float = float(maxi(index - 1, 0)) * (TAU / 4.0)
+			return host.global_position + Vector2.from_angle(angle) * 20.0
 	return Vector2(16 * index, 0)
+
+
+## Authoritative spawn spot for `peer_id` (cached while the peer spawns so synchronizer init cannot stomp it to zero).
+func resolve_guest_spawn(peer_id: int) -> Vector2:
+	var host: Node2D = _players.get_node_or_null("1") as Node2D
+	if peer_id > 1 and _pending_guest_spawns.has(peer_id):
+		var cached: Vector2 = _pending_guest_spawns[peer_id] as Vector2
+		if host == null or cached.distance_to(host.global_position) <= 160.0:
+			return cached
+	var idx: int = maxi(_players.get_child_count(), 1)
+	var pos: Vector2 = _spawn_position(idx, peer_id)
+	if peer_id > 1:
+		_pending_guest_spawns[peer_id] = pos
+	return pos
 
 
 ## Where a player comes back after dying.
@@ -395,7 +415,10 @@ func _pick_tile_kind(density: float, rng: RandomNumberGenerator) -> String:
 func _spawn_player(id: int) -> void:
 	var player: Player = PLAYER_SCENE.instantiate() as Player
 	player.name = str(id)
-	player.position = _spawn_position(_players.get_child_count())
+	var spawn_pos: Vector2 = _spawn_position(_players.get_child_count(), id)
+	if id > 1:
+		_pending_guest_spawns[id] = spawn_pos
+	player.position = spawn_pos
 	_players.add_child(player)
 	if id != multiplayer.get_unique_id():
 		var town: TownManager = get_tree().get_first_node_in_group("town") as TownManager
@@ -404,6 +427,8 @@ func _spawn_player(id: int) -> void:
 		var guest_user_id: String = NetworkManager.peer_user_id(id)
 		if CloudSession.is_logged_in() and not guest_user_id.is_empty():
 			_load_guest_cloud_character(id, player, guest_user_id)
+		player.position = spawn_pos
+		player.call_deferred("push_spawn_to_owner", spawn_pos)
 
 
 func _on_peer_identity_verified(peer_id: int) -> void:
@@ -433,6 +458,7 @@ func _load_guest_cloud_character(peer_id: int, player: Player, guest_user_id: St
 
 
 func _despawn_player(id: int) -> void:
+	_pending_guest_spawns.erase(id)
 	var player: Node = _players.get_node_or_null(str(id))
 	if player:
 		player.queue_free()

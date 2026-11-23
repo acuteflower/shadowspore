@@ -61,8 +61,8 @@ func _on_peer_left(id: int) -> void:
 
 
 func _sync_visibility() -> void:
-	var has_peers: bool = not multiplayer.get_peers().is_empty()
-	visible = NetworkManager.is_multiplayer_session() and (NetworkManager.transport_mode != "relay" or has_peers or NetworkManager.explicit_coop_hud)
+	## Coop status & controls moved into PauseSocialSidebar (ESC); bottom-left overlay stays hidden.
+	visible = false
 
 
 func _show_toast(msg: String, color: Color = Color("7fe3da")) -> void:

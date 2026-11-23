@@ -51,6 +51,19 @@ func bind(player: Node) -> void:
 	_goddess_unlock = _add_cheat("Wächterin über Statuen freischalten", _unlock_goddess)
 	_add_cheat("Stufenbelohnungen öffnen", _open_level_rewards)
 	_setup_world()
+	if _player != null and _player.progress != null:
+		_player.progress.changed.connect(_refresh_cheats_if_open)
+	var fog: MapDiscovery = _map_discovery()
+	if fog != null:
+		fog.replaced.connect(_refresh_cheats_if_open)
+	var gs: GoddessSystem = GoddessSystem.of(get_tree())
+	if gs != null:
+		gs.state_changed.connect(func(_pid: int) -> void: _refresh_cheats_if_open())
+
+
+func _refresh_cheats_if_open() -> void:
+	if visible and _section == Section.CHEATS:
+		_refresh_cheats()
 
 
 func close() -> void:
@@ -107,7 +120,7 @@ func _can_open() -> bool:
 
 
 func _can_use() -> bool:
-	return GameGuard.is_gameplay_allowed() and CloudSession.is_admin() and multiplayer.is_server() \
+	return GameGuard.is_gameplay_allowed() and CloudSession.is_admin() \
 		and is_instance_valid(_player) and _player.health.current > 0.0 \
 		and _player.intro == null and not _player.story_lock
 
@@ -233,13 +246,13 @@ func _refresh_cheats() -> void:
 
 func _toggle_god_mode() -> void:
 	if visible and _can_use():
-		_player.health.god_mode = not _player.health.god_mode
+		_player.request_set_god_mode(not _player.health.god_mode)
 		_refresh_cheats()
 
 
 func _toggle_stamina() -> void:
 	if visible and _can_use():
-		_player.stamina.infinite = not _player.stamina.infinite
+		_player.request_set_infinite_stamina(not _player.stamina.infinite)
 		_refresh_cheats()
 
 
@@ -251,7 +264,7 @@ func _heal() -> void:
 
 func _award(copper: int, xp: int, feedback: String) -> void:
 	if visible and _can_use():
-		_player.progress.award(copper, xp)
+		_player.request_award(copper, xp)
 		_status.text = feedback
 		_refresh_cheats()
 
@@ -290,7 +303,7 @@ func _unlock_goddess() -> void:
 	var goddess: GoddessSystem = GoddessSystem.of(get_tree())
 	if goddess == null:
 		return
-	goddess.debug_unlock_statues(_player)
+	_player.request_admin_action("unlock_goddess")
 	_status.text = "Wächterin über Statuen freigeschaltet"
 	_refresh_cheats()
 
@@ -366,5 +379,5 @@ func _drop(id: String) -> void:
 		return
 	var stack: Dictionary = {"id": id, "count": 1}
 	var count: int = maxi(1, Items.max_stack(stack)) if %FullStack.button_pressed else 1
-	DropComponent.spawn_thrown(get_tree(), id, count, _player.global_position, _player.facing)
+	_player.request_drop_item(id, count, _player.facing)
 	_status.text = "%d× %s gedroppt" % [count, Items.title(stack)]

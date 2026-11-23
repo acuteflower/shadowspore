@@ -228,6 +228,11 @@ func bind(player: Node) -> void:
 	mp_hud.name = "MultiplayerHud"
 	add_child(mp_hud)
 	move_child(mp_hud, $PauseMenu.get_index())
+	var toast_script: GDScript = preload("res://src/ui/hud_toast.gd")
+	var toast: Control = toast_script.new() as Control
+	toast.name = "HudToast"
+	add_child(toast)
+	move_child(toast, $PauseMenu.get_index())
 	var river_book: RiverBook = RiverBook.new()
 	river_book.name = "RiverBook"
 	add_child(river_book)

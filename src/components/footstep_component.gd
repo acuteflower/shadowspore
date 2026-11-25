@@ -4,8 +4,12 @@ extends Node2D
 ## footprints on soft ground. Called by the player at every footfall, on every peer.
 
 const FOOTPRINT: Texture2D = preload("res://assets/fx/footprint.png")
-const FOOTPRINT_Z: int = -9 ## above the ground layer, below all entities
+const FOOTPRINT_Z: int = -6 ## above WaterField sand (-7) & ground surfaces (-10), below flat props (-5) and entities (0)
 const FOOT_OFFSET: float = 2.5 ## px, feet alternate left/right of the walking line
+
+const STYLE_DEFAULT: int = 0
+const STYLE_DRY_SAND: int = 1
+const STYLE_WET_SAND: int = 2
 
 var _left_foot: bool = false
 
@@ -16,22 +20,27 @@ static var _canvas: FootprintCanvas = null
 
 class FootprintItem:
 	var pos: Vector2 = Vector2.ZERO
+	var world_pos: Vector2 = Vector2.ZERO
 	var rot: float = 0.0
 	var color: Color = Color.BLACK
 	var base_alpha: float = 0.7
 	var age: float = 0.0
 	var life: float = 10.0
+	var style: int = 0
+	var washable: bool = false
+	var washing: bool = false
 	var active: bool = false
 
 
 class FootprintCanvas:
 	extends Node2D
 
-	const POOL_SIZE: int = 128
+	const POOL_SIZE: int = 160
 	var _pool: Array[FootprintItem] = []
 	var _head: int = 0
 	var _has_active: bool = false
 	var _tex_offset: Vector2 = Vector2.ZERO
+	var _wash_timer: float = 0.0
 
 	func _init() -> void:
 		_tex_offset = -FOOTPRINT.get_size() * 0.5
@@ -39,15 +48,19 @@ class FootprintCanvas:
 		for i: int in POOL_SIZE:
 			_pool[i] = FootprintItem.new()
 
-	func add_footprint(pos: Vector2, rot: float, col: Color, alpha: float, life: float) -> void:
+	func add_footprint(pos: Vector2, world_pos: Vector2, rot: float, col: Color, alpha: float, life: float, style: int = 0, washable: bool = false) -> void:
 		var item: FootprintItem = _pool[_head]
 		_head = (_head + 1) % POOL_SIZE
 		item.pos = pos
+		item.world_pos = world_pos
 		item.rot = rot
 		item.color = col
 		item.base_alpha = alpha
 		item.age = 0.0
 		item.life = maxf(life, 0.01)
+		item.style = style
+		item.washable = washable
+		item.washing = false
 		item.active = true
 		_has_active = true
 		queue_redraw()
@@ -55,11 +68,32 @@ class FootprintCanvas:
 	func _process(delta: float) -> void:
 		if not _has_active:
 			return
+		_wash_timer += delta
+		var check_wash: bool = _wash_timer >= 0.10
+		if check_wash:
+			_wash_timer = 0.0
+		var wf_node: Node = null
+		if check_wash:
+			for patch: Node in Terrain.patches:
+				if is_instance_valid(patch) and patch.has_method(&"water_field_at"):
+					wf_node = patch
+					break
 		var any_active: bool = false
 		for item: FootprintItem in _pool:
 			if not item.active:
 				continue
-			item.age += delta
+			if check_wash and item.washable and wf_node != null:
+				var wf: Dictionary = wf_node.call(&"water_field_at", item.world_pos) as Dictionary
+				if bool(wf.get("in_bounds", false)):
+					if bool(wf.get("water", false)):
+						# Incoming ocean swash wave rolls over the print and washes it away!
+						item.washing = true
+						item.style = STYLE_WET_SAND
+					elif item.style == STYLE_DRY_SAND and bool(wf.get("wet_sand", false)):
+						item.style = STYLE_WET_SAND
+						item.color = Color("#3d332d")
+			var rate: float = 9.5 if item.washing else 1.0
+			item.age += delta * rate
 			if item.age >= item.life:
 				item.active = false
 			else:
@@ -71,15 +105,44 @@ class FootprintCanvas:
 	func _draw() -> void:
 		if not _has_active:
 			return
+		var night: float = TimeManager.night_amount()
 		for item: FootprintItem in _pool:
 			if not item.active:
 				continue
-			var t: float = item.age / item.life
-			var a: float = item.base_alpha if t < 0.6 else item.base_alpha * (1.0 - (t - 0.6) / 0.4)
-			var c: Color = item.color
-			c.a = a
+			var t: float = clampf(item.age / item.life, 0.0, 1.0)
+			var fade: float = 1.0 if t < 0.58 else (1.0 - (t - 0.58) / 0.42)
+			var a: float = item.base_alpha * clampf(fade, 0.0, 1.0)
+			if a <= 0.015:
+				continue
 			draw_set_transform(item.pos, item.rot, Vector2.ONE)
-			draw_texture(FOOTPRINT, _tex_offset, c)
+			if item.style == STYLE_DRY_SAND:
+				# Crisp 3D pixel-art dry-sand boot depression: sunlit NW raised sand rim + shaded sole & heel!
+				var rim_c: Color = Color(0.95, 0.87, 0.69).lerp(Color(0.45, 0.50, 0.66), night * 0.72)
+				rim_c.a = a * 0.78
+				draw_rect(Rect2(-2.5, -2.0, 4.0, 1.0), rim_c)
+				draw_rect(Rect2(-3.0, -1.0, 1.0, 2.0), rim_c)
+				var dep_c: Color = item.color.lerp(Color(0.14, 0.16, 0.27), night * 0.72)
+				dep_c.a = a * 0.88
+				draw_rect(Rect2(-2.0, -1.0, 5.0, 2.0), dep_c)
+				draw_rect(Rect2(-1.0, 1.0, 3.0, 1.0), dep_c)
+				var core_c: Color = dep_c.darkened(0.26)
+				core_c.a = a * 0.72
+				draw_rect(Rect2(-1.0, -0.5, 2.0, 1.0), core_c)
+				draw_rect(Rect2(1.5, -0.5, 1.0, 1.0), core_c)
+			elif item.style == STYLE_WET_SAND:
+				# Glistening dark water-filled wet-sand depression with tiny sky-sheen meniscus!
+				var wdep_c: Color = item.color.lerp(Color(0.08, 0.11, 0.20), night * 0.70)
+				wdep_c.a = a * 0.92
+				draw_rect(Rect2(-2.0, -1.5, 5.0, 3.0), wdep_c)
+				draw_rect(Rect2(-1.0, -2.0, 3.0, 1.0), wdep_c)
+				var sheen_c: Color = Color(0.60, 0.82, 0.84).lerp(Color(0.36, 0.48, 0.76), night)
+				sheen_c.a = a * (0.48 if not item.washing else 0.72)
+				draw_rect(Rect2(-1.0, 0.0, 2.0, 1.0), sheen_c)
+				draw_rect(Rect2(1.5, -0.5, 1.0, 1.0), sheen_c)
+			else:
+				var c: Color = item.color
+				c.a = a
+				draw_texture(FOOTPRINT, _tex_offset, c)
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
@@ -91,6 +154,7 @@ static func _get_canvas(tree: SceneTree) -> FootprintCanvas:
 		return null
 	_canvas = FootprintCanvas.new()
 	_canvas.name = "FootprintCanvas"
+	_canvas.z_as_relative = false
 	_canvas.z_index = FOOTPRINT_Z
 	scene.add_child(_canvas)
 	return _canvas
@@ -277,4 +341,11 @@ func _leave_footprint(data: Dictionary, velocity: Vector2, alpha: float = 0.7) -
 	var local_pos: Vector2 = canvas.to_local(global_pos)
 	var col: Color = Color(String(data.get("color", "#000000")))
 	var seconds: float = float(data.get("seconds", 10.0))
-	canvas.add_footprint(local_pos, rot, col, alpha, seconds)
+	var style_name: String = String(data.get("style", ""))
+	var style_id: int = STYLE_DEFAULT
+	if style_name == "dry_sand":
+		style_id = STYLE_DRY_SAND
+	elif style_name == "wet_sand":
+		style_id = STYLE_WET_SAND
+	var washable: bool = bool(data.get("washable", false))
+	canvas.add_footprint(local_pos, global_pos, rot, col, alpha, seconds, style_id, washable)

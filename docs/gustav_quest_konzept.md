@@ -1,5 +1,8 @@
 # Gustavs Rettung und die Werkstatt: Questkonzept
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 Stand: 2026-11-09. Status: **eingebaut (2026-11-09)**, siehe Abschnitt „Umsetzung“ am Ende. Vorher: Konzept. Alle Texte unten sind Platzhalter für den Dialog-Writer (`docs/prompts/dialogue_writer.md`, Dossier `docs/characters/gustav.md`). Figuren-Art (Gustav-Clips, Wagen) liefert der Art-Agent, nicht der Code-Agent.
 
 ---

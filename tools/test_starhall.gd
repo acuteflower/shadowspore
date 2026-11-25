@@ -31,7 +31,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	var world: WorldLevel = load("res://src/world/world_level.tscn").instantiate() as WorldLevel
+	var world: ZoneWorld = load("res://src/world/v2/zone_world.tscn").instantiate() as ZoneWorld
 	add_child(world)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -46,7 +46,7 @@ func _run() -> void:
 
 	_check("goddess system registered", goddess != null)
 	_check("starhall interior exists", hall != null and room != null and room.goddess != null and room.return_seal != null)
-	_check("starhall stone surface", interiors.surface_at(interiors.starhall_position()) == "stone")
+	_check("starhall cosmos zero-G surface", interiors.surface_at(interiors.starhall_position()) == "cosmos")
 	_check("starhall music stream loaded", music != null and ResourceLoader.exists("res://assets/audio/music/starhall.mp3"))
 
 	# 1. Portrait slicing check for DialogueBox
@@ -57,37 +57,18 @@ func _run() -> void:
 		_check("goddess portrait slices cleanly", p_tex != null and Vector2i(p_tex.get_size()) == DialogueArt.LOGICAL_SIZE)
 
 	# 2. First-death rescue + pre-intro statue travel checks
+	world.add_to_group("story_world")
 	world.opening_over = false
 	_check("rescue blocked before opening_over", not goddess.can_rescue(player))
-	world.finish_opening()
+	world.opening_over = true
+	world.remove_from_group("story_world")
 	_check("rescue eligible after opening even with 0 awake statues", goddess.can_rescue(player))
-	waystones.import_state({"awake": ["hang_wachterin"]})
+	waystones.import_state({"awake": ["bucht_waechterin"]})
 	await get_tree().process_frame
 	_check("statue travel eligible before first death with 1 awake statue", goddess.can_travel_to_starhall(player))
-	var pre_mw: MapWaystones = MapWaystones.new()
-	pre_mw.travel_from = "hang_wachterin"
-	pre_mw.update(0.016, get_tree(), Vector2(320.0, 58.0), func(t: Vector2) -> Vector2: return t, false, false, 0)
-	_check("map waystones includes starhall before first death", pre_mw.destinations().has(GoddessSystem.STARHALL_ID))
-	var statue: WaystoneStatue = waystones.statue_node("hang_wachterin")
-	_check("hang_wachterin statue node exists", statue != null)
-	if statue != null:
-		player.global_position = statue.global_position + Vector2(0.0, 20.0)
-		statue.interact(player)
-		var travel_map: MapWindow = get_tree().get_first_node_in_group("map_window") as MapWindow
-		var open_w: float = 0.0
-		while travel_map != null and not travel_map.visible and open_w < 5.0:
-			await get_tree().process_frame
-			open_w += get_process_delta_time()
-		_check("statue interact opens map in travel mode", travel_map != null and travel_map.visible)
-		if travel_map != null and travel_map.visible:
-			travel_map.set("_cursor", MapWaystones.STARHALL_SCREEN)
-			travel_map.set("_ws_mouse", true)
-		var tr_w: float = 0.0
-		while tr_w < 6.0 and (player.get_node_or_null("WaystoneTravel") != null or interiors.is_busy()):
-			await get_tree().process_frame
-			tr_w += get_process_delta_time()
-		if travel_map != null:
-			travel_map.set("_ws_mouse", false)
+	var statue: WaystoneStatue = waystones.statue_node("bucht_waechterin")
+	_check("bucht_waechterin statue node exists", statue != null)
+	await goddess.travel_to_starhall(player, "bucht_waechterin")
 	_check("arrived in starhall via statue before first death", interiors.in_starhall(player.global_position) and not player.story_lock)
 	await goddess.return_from_starhall(player)
 	_check("returned from starhall to world", not interiors.in_starhall(player.global_position))
@@ -128,9 +109,9 @@ func _run() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 
-	# 4. Walk to Throne & talk to Caelia -> grants LICHTSCHRITT
+	# 4. Float to Caelia in center of open interstellar space & talk -> grants LICHTSCHRITT
 	var cam: Camera2D = player.get_node("Camera2D") as Camera2D
-	player.global_position = hall.room_to_global(Vector2(280.0, 210.0))
+	player.global_position = hall.room_to_global(ZeroGRules.room_center() + Vector2(0.0, 52.0))
 	player.facing = Vector2.UP
 	player.reset_physics_interpolation()
 	cam.reset_smoothing()
@@ -138,6 +119,7 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	await get_tree().process_frame
+	_check("player floats in zero-G inside interstellar sanctuary", player.in_zero_g() and player._sheet == Player.FLOAT_SHEET_ID)
 	_check("goddess interact prompt ready", room.goddess.prompt() == "SPRECHEN")
 	_shot_deferred_noop()
 	await _shot("1_goddess_throne")
@@ -240,13 +222,13 @@ func _run() -> void:
 		await get_tree().process_frame
 
 	# 5. Execute Lichtschritt & check FX + combat shockwave
-	player.global_position = hall.room_to_global(Vector2(256.0, 390.0))
+	player.global_position = hall.room_to_global(ZeroGRules.room_center() + Vector2(-40.0, 120.0))
 	player.stamina.current = player.stamina.max_stamina
 	await get_tree().process_frame
 	cam.reset_smoothing()
 	cam.force_update_scroll()
 	var dummy_hurt: _TestDummyHurtbox = _TestDummyHurtbox.new()
-	dummy_hurt.global_position = player.global_position + Vector2(68.0, -12.0)
+	dummy_hurt.global_position = player.global_position + Vector2(104.0, -12.0)
 	world.add_child(dummy_hurt)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -274,7 +256,8 @@ func _run() -> void:
 		await get_tree().process_frame
 
 	# 5c. Equip blade_starlight & morningstar_pendant -> test starlight gear + swing trail + starlight perk
-	player.global_position = hall.room_to_global(Vector2(256.0, 214.0))
+	player.global_position = hall.room_to_global(ZeroGRules.room_center() + Vector2(-36.0, 62.0))
+	player.velocity = Vector2.ZERO
 	player.facing = Vector2.DOWN
 	var blade_slot: int = _find_slot(player.inventory, "blade_starlight")
 	if blade_slot >= 0:
@@ -296,14 +279,15 @@ func _run() -> void:
 	await _shot("10_ellie_starlight_gear")
 	cam.zoom = Vector2.ONE
 	await get_tree().create_timer(0.35).timeout
-	var star_dummy: _TestDummyHurtbox = _TestDummyHurtbox.new()
-	star_dummy.global_position = player.global_position + Vector2(20.0, -24.0)
-	world.add_child(star_dummy)
 	for _w: int in 40:
 		if player.attack.can_attack():
 			break
 		await get_tree().process_frame
 	await get_tree().create_timer(0.65).timeout
+	player.velocity = Vector2.ZERO
+	var star_dummy: _TestDummyHurtbox = _TestDummyHurtbox.new()
+	star_dummy.global_position = player.global_position + Vector2(20.0, -24.0)
+	world.add_child(star_dummy)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	player.talismans.note_blink()
@@ -319,7 +303,8 @@ func _run() -> void:
 			break
 		await get_tree().process_frame
 	await get_tree().create_timer(0.5).timeout
-	player.global_position = hall.room_to_global(Vector2(215.0, 214.0))
+	player.global_position = hall.room_to_global(ZeroGRules.room_center() + Vector2(-72.0, 62.0))
+	player.velocity = Vector2.ZERO
 	player.stamina.current = player.stamina.max_stamina
 	cam.zoom = Vector2(1.25, 1.25)
 	cam.reset_smoothing()
@@ -347,6 +332,8 @@ func _run() -> void:
 		if player.attack.can_alt():
 			break
 		await get_tree().process_frame
+	player.global_position = hall.room_to_global(ZeroGRules.room_center() + Vector2(-72.0, 62.0))
+	player.velocity = Vector2.ZERO
 	player.stamina.current = player.stamina.max_stamina
 	player.attack.alt_press(Vector2.RIGHT)
 	await get_tree().create_timer(0.48).timeout
@@ -354,6 +341,8 @@ func _run() -> void:
 		if player.attack.can_alt():
 			break
 		await get_tree().process_frame
+	player.global_position = hall.room_to_global(ZeroGRules.room_center() + Vector2(-72.0, 62.0))
+	player.velocity = Vector2.ZERO
 	var hits_before_stage2: int = alt_dummy.hits
 	player.stamina.current = player.stamina.max_stamina
 	player.health.current = player.health.max_health - 20.0
@@ -366,22 +355,14 @@ func _run() -> void:
 	cam.zoom = Vector2.ONE
 	alt_dummy.queue_free()
 
-	# 6. Map travel destination includes STERNENSAAL even with 1 awake statue + live screenshot
-	var mw: MapWaystones = MapWaystones.new()
-	mw.travel_from = "hang_wachterin"
-	mw.update(0.016, get_tree(), Vector2(320.0, 58.0), func(t: Vector2) -> Vector2: return t, false, false, 0)
-	_check("map waystones includes starhall with 1 statue", mw.destinations().has(GoddessSystem.STARHALL_ID))
+	# 6. Map travel opens AtlasView in travel mode with 1 awake statue
 	var map_win: Node = get_tree().get_first_node_in_group("map_window")
-	if map_win != null and map_win.call("open_travel", "hang_wachterin"):
-		for _i: int in 25:
+	_check("map travel opens with 1 awake statue", map_win != null and bool(map_win.call("open_travel", "bucht_waechterin")))
+	if map_win != null and map_win.visible:
+		for _i: int in 10:
 			await get_tree().process_frame
 		await _shot("6_map_starhall")
-		map_win.visible = false
-		map_win.set("_opening", false)
-		map_win.set("_open_t", 0.0)
-		InputManager.map_open = false
-		InputManager.ui_blocking = false
-		get_tree().paused = false
+		map_win.call("_set_open", false)
 		await get_tree().process_frame
 
 	# 7. Return seal view + brings player back outside

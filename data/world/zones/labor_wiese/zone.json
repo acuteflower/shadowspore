@@ -1,0 +1,146 @@
+{
+	"_doc": "PLATZHALTER-Zone für das Zonenlabor. `footprint` = Kontrollpunkte relativ zu `origin` (mit `curve` zu einer Kurve geglättet) plus {\"seam\": id} für die gemeinsame Naht (Kontinent-Tiles, bleibt wie gezeichnet). `places[].poly`, `landmarks[].pos` relativ zu `origin`. Die Landschaft (Wälder, Haine, Wege, Bäume) steht kontinentweit in data/world/landscape/lab.json; `nature` hält nur, was der Zone selbst gehört (Saat, Blumenteppich, Grenzgürtel).",
+	"id": "labor_wiese",
+	"name": "LABORWIESE",
+	"subtitle": "Wo das Gras atmet",
+	"continent": "lab",
+	"region": "labor",
+	"kind": "field",
+	"size_class": "S",
+	"origin": [
+		1000,
+		900
+	],
+	"size": [
+		158,
+		122
+	],
+	"biomes": [
+		"meadow"
+	],
+	"mood": "meadow_open",
+	"night": "meadow_default",
+	"danger": "ruhig",
+	"placeholder": true,
+	"footprint": [
+		[
+			10,
+			22
+		],
+		[
+			26,
+			9
+		],
+		[
+			52,
+			5
+		],
+		[
+			84,
+			8
+		],
+		[
+			112,
+			6
+		],
+		[
+			134,
+			14
+		],
+		{
+			"seam": "labor_naht"
+		},
+		[
+			138,
+			112
+		],
+		[
+			112,
+			118
+		],
+		[
+			80,
+			115
+		],
+		[
+			52,
+			118
+		],
+		[
+			26,
+			108
+		],
+		[
+			9,
+			90
+		],
+		[
+			5,
+			64
+		],
+		[
+			4,
+			40
+		]
+	],
+	"borders": [
+		{
+			"kind": "forest_sea",
+			"depth": 5
+		}
+	],
+	"places": [
+		{
+			"id": "bluetenmulde",
+			"name": "DIE BLÜTENMULDE",
+			"poly": [
+				[
+					30,
+					40
+				],
+				[
+					70,
+					30
+				],
+				[
+					90,
+					60
+				],
+				[
+					60,
+					90
+				],
+				[
+					26,
+					74
+				]
+			]
+		}
+	],
+	"landmarks": [
+		{
+			"id": "alte_eiche",
+			"kind": "lighthouse",
+			"name": "DIE ALTE EICHE",
+			"pos": [
+				96,
+				50
+			]
+		}
+	],
+	"nature": {
+		"seed": 11,
+		"meadow": true,
+		"turf": {
+			"accents": 0.07,
+			"kinds": [
+				"tuft",
+				"clump",
+				"clover",
+				"petal",
+				"flower"
+			]
+		}
+	},
+	"curve": true
+}

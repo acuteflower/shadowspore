@@ -329,8 +329,45 @@ func _rows(n: int) -> Array[Dictionary]:
 
 # ------------------------------------------------------------------------------------------------ frame
 
+var embedded_in_menu: bool = false
+
+
+func set_embedded_active(on: bool) -> void:
+	if on:
+		_owns_input = true
+		_opening = true
+		_open_t = 1.0
+		InputManager.progress_open = true
+		visible = true
+		modulate.a = 1.0
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		_refresh_state()
+		_selected = _first_claimable() if _claimed < _level else _level
+		var focus: Vector2 = _focus()
+		_center = Vector2(focus.x, 38.0)
+		_flying = false
+		_anchor = size * 0.5
+		_velocity = Vector2.ZERO
+		_zoom_target = focus.y
+		_zoom = _zoom_target
+		_xr_shown = _level_x(_level) + _fraction * SPACING - 60.0
+		for kind: String in LevelRewards.KINDS:
+			_shown[kind] = _stat(kind, _claimed)
+	else:
+		_opening = false
+		_open_t = 0.0
+		_owns_input = false
+		visible = false
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		InputManager.progress_open = false
+		_cancel_hold()
+		_dragging = false
+		_slider_drag = false
+		_velocity = Vector2.ZERO
+
+
 func _process(delta: float) -> void:
-	if InputManager.progress_pressed():
+	if not embedded_in_menu and InputManager.progress_pressed():
 		_set_open(not _opening)
 	if not _owns_input:
 		return
@@ -637,12 +674,17 @@ func _input(event: InputEvent) -> void:
 	if not _owns_input:
 		return
 	if event.is_action_pressed("ui_cancel"):
+		if embedded_in_menu:
+			return
 		_set_open(false)
 		get_viewport().set_input_as_handled()
 		return
 	if not _opening:
 		return
 	var mouse: InputEventMouseButton = event as InputEventMouseButton
+	if embedded_in_menu and mouse != null and mouse.pressed:
+		if Rect2(size.x * 0.5 - 82.0, GameMenu.RAIL_H + 2.0, 164.0, 24.0).has_point(mouse.position):
+			return
 	var motion: InputEventMouseMotion = event as InputEventMouseMotion
 	if mouse != null:
 		if mouse.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] and mouse.pressed:
@@ -1082,17 +1124,19 @@ func _draw_chrome() -> void:
 		return
 	var void_level: float = VineStyle.void_amount()
 	var plate: float = clampf((_open_t - 0.35) / 0.5, 0.0, 1.0)
-	VineStyle.tag(_chrome, "FORTSCHRITT", Vector2(size.x * 0.5, 0), plate, void_level, _time)
-	_text_centered(_chrome, "DER WACHSENDE WEG", Vector2(size.x * 0.5, 29), DIM)
+	if not embedded_in_menu:
+		VineStyle.tag(_chrome, "FORTSCHRITT", Vector2(size.x * 0.5, 0), plate, void_level, _time)
+		_text_centered(_chrome, "DER WACHSENDE WEG", Vector2(size.x * 0.5, 29), DIM)
 	_draw_level_vine(void_level)
 	_draw_stats(void_level)
 	_draw_details(void_level)
 	_draw_action(void_level)
 	_draw_zoom_vine(void_level)
-	var controls: String = "ZIEHEN / WASD: SCHIEBEN   RAD / Q E: ZOOM   R: MITTE   HALTEN: EINSAMMELN   P / ESC: ZURÜCK" if InputManager.using_mouse else "STICK: SCHIEBEN   LINKS RECHTS: STUFE   A: HALTEN   START: ZURÜCK"
-	var hint_width: float = PixelText.width(controls) + 16.0
-	_text_backing(Rect2(size.x * 0.5 - hint_width * 0.5, size.y - 19, hint_width, 15), 0.68)
-	_text_centered(_chrome, controls, Vector2(size.x * 0.5, size.y - 15), Color(DIM, 0.75))
+	if not embedded_in_menu:
+		var controls: String = "ZIEHEN / WASD: SCHIEBEN   RAD / Q E: ZOOM   R: MITTE   HALTEN: EINSAMMELN   P / ESC: ZURÜCK" if InputManager.using_mouse else "STICK: SCHIEBEN   LINKS RECHTS: STUFE   A: HALTEN   START: ZURÜCK"
+		var hint_width: float = PixelText.width(controls) + 16.0
+		_text_backing(Rect2(size.x * 0.5 - hint_width * 0.5, size.y - 19, hint_width, 15), 0.68)
+		_text_centered(_chrome, controls, Vector2(size.x * 0.5, size.y - 15), Color(DIM, 0.75))
 
 
 ## Top right: the level, the XP, and what the level does to the night.
@@ -1109,7 +1153,7 @@ func _draw_level_vine(void_level: float) -> void:
 
 ## Top left: the character as it is now (collected rewards only), with what is still waiting in gold.
 func _draw_stats(void_level: float) -> void:
-	var y: float = 40.0
+	var y: float = 52.0 if embedded_in_menu else 40.0
 	var reach: float = clampf((_open_t - 0.42) / 0.5, 0.0, 1.0)
 	var course: Callable = func(x: float) -> float: return y + 3.0 * sin(x / 170.0 * PI) + sin(x * 0.07 + 2.0) * 1.1
 	var block: Rect2 = Rect2(6, y + 7, 170, 74)

@@ -1,0 +1,4 @@
+[gd_scene load_steps=2 format=3]
+[ext_resource type="Script" path="res://tools/test_mod_menu_v2.gd" id="1"]
+[node name="ModMenuV2Test" type="Node"]
+script = ExtResource("1")

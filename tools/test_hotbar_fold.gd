@@ -2,6 +2,8 @@ extends Node
 ## The hotbar folds away after Hotbar.FOLD_DELAY s without switching and unfolds almost at once.
 ## `Godot --path . tools/test_hotbar_fold.tscn [-- --capture=/abs/folder]` (headless works without captures). Prints `HOTBAR FOLD OK`.
 
+const HudTestWorld := preload("res://tools/hud_test_world.gd")
+
 var failures: int = 0
 var folder: String = ""
 
@@ -30,14 +32,14 @@ func _shot(name: String) -> void:
 
 
 func _run() -> void:
-	var world: WorldLevel = load("res://src/world/world_level.tscn").instantiate() as WorldLevel
-	add_child(world)
-	await get_tree().process_frame
-	var player: Player = world._players.get_child(0) as Player
-	player.quests.set_flag("hud_unlocked")
-	world.finish_opening()
+	var player: Player = await HudTestWorld.open(self) ## the v2 main world (ZoneWorld), loaded in steps
+	check(player != null, "v2 world loaded with a local player")
+	if player == null:
+		get_tree().quit(1)
+		return
 	var hud: Node = player._hud
 	var bar: Hotbar = hud.get_node("Hotbar") as Hotbar
+	bar.wake() ## loading the world took a while: start from a freshly opened hotbar
 	var health: Control = hud.get_node("HealthBar") as Control
 	var stamina: Control = hud.get_node("StaminaBar") as Control
 	var health_x: float = health.offset_left

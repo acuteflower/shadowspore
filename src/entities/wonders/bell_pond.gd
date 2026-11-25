@@ -15,7 +15,7 @@ const STONE_TEX: String = "res://assets/props/bell_stepping_stone.png"
 const STONE_GLOW: String = "res://assets/props/bell_stepping_stone_glow.png"
 const BELL_WAV: String = "res://assets/audio/meadow_wonders/bell_underwater.wav"
 
-var wonders: MeadowWonders
+var wonders: Node
 var wonder_id: String = "wonder_bell_pond"
 var shore_pos: Vector2 = Vector2.ZERO
 var spire_pos: Vector2 = Vector2.ZERO
@@ -40,7 +40,7 @@ var _tolled_this_night: bool = false
 var _bird_flight: float = 0.0 ## 0 perched on spire roof, >0 darting gracefully across water
 
 
-func setup(owner_wonders: MeadowWonders, spec: Dictionary) -> void:
+func setup(owner_wonders: Node, spec: Dictionary) -> void:
 	wonders = owner_wonders
 	wonder_id = String(spec.get("id", "wonder_bell_pond"))
 	chest_tier = String(spec.get("chest_tier", "legendary"))

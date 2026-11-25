@@ -27,6 +27,18 @@ var _fissures: Array[Dictionary] = [] ## {ang, len, seed}
 var _light: NightLight = null
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
+# Finisher V2 (docs/finisher_v2_konzept.md)
+var _glint_age: float = -1.0 ## apex: the core flares and a star locks on it
+var _core_age: float = -1.0 ## rip: the torn core flies up along the rip and shatters
+var _core_pos: Vector2 = Vector2.ZERO
+var _core_vel: Vector2 = Vector2.ZERO
+var _core_burst: bool = false
+var _break_age: float = -1.0 ## Kern-Bruch: cracks over the carapace, dust sucked back into the wound, implosion ring
+var _dust: Array[Dictionary] = [] ## {from, age, life, col}
+var _homers: Array[Dictionary] = [] ## {pos, vel, age, col} core sparks that fly to the player (the reward)
+var _home_to: Node2D = null
+const CORE_Y: float = -9.0
+
 
 func _ready() -> void:
 	z_index = 6
@@ -132,7 +144,7 @@ func trigger_rip(rip_dir: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	var dirty: bool = false
+	var dirty: bool = _step_v2(delta)
 	if _plunge_age >= 0.0:
 		_plunge_age += delta
 		dirty = true
@@ -174,7 +186,7 @@ func _process(delta: float) -> void:
 
 	if dirty:
 		queue_redraw()
-	elif _plunge_age < 0.0 and _press_age < 0.0 and _rip_age < 0.0 and _chips.is_empty() and (_light == null or _light.base_energy <= 0.01):
+	elif _plunge_age < 0.0 and _press_age < 0.0 and _rip_age < 0.0 and _chips.is_empty() and _v2_idle() and (_light == null or _light.base_energy <= 0.01):
 		queue_free()
 
 
@@ -183,6 +195,7 @@ func _px(p: Vector2, c: Color, sz: int = 1) -> void:
 
 
 func _draw() -> void:
+	_draw_v2_under()
 	# 1. Ground-hugging glowing Void fissures during Beat 2 (Second Deep Press)!
 	if _press_age >= 0.0:
 		var pk: float = clampf(_press_age / 0.34, 0.0, 1.0)
@@ -264,3 +277,197 @@ func _draw() -> void:
 		col_c.a = 1.0 - smoothstep(0.55, 1.0, age_c / maxf(life_c, 0.01))
 		var scr: Vector2 = (c["pos"] as Vector2) + Vector2(0.0, -float(c["z"]))
 		_px(scr, col_c, int(c["sz"]))
+	_draw_v2_over()
+
+
+# --- Finisher V2 (docs/finisher_v2_konzept.md) -----------------------------------------------------------------------
+
+
+## Apex hang: the core of the pinned target flares and a star locks onto it (where the blade will go in).
+func trigger_apex_glint() -> void:
+	_glint_age = 0.0
+	if _light != null:
+		_light.glow_color = DANGER_PINK.lerp(CORE_WHITE, 0.3)
+		_light.base_energy = maxf(_light.base_energy, 0.7)
+		_light.set_night(TimeManager.night_amount())
+	queue_redraw()
+
+
+## Rip: the core is torn out on the blade and flies up along the rip; it bursts in the air and its sparks fly to `home_to` (the reward).
+func trigger_core_tear(rip_dir: Vector2, home_to: Node2D) -> void:
+	_core_age = 0.0
+	_core_burst = false
+	_core_pos = Vector2(0.0, CORE_Y)
+	var d: Vector2 = rip_dir.normalized() if rip_dir.length_squared() > 0.001 else Vector2(0.0, -1.0)
+	_core_vel = Vector2(d.x * 70.0, minf(d.y * 70.0, 0.0) - 95.0)
+	_home_to = home_to
+	queue_redraw()
+
+
+## Kern-Bruch: cracks race over the carapace, the chitin dust is sucked back into the wound, then the hole implodes.
+func trigger_core_break() -> void:
+	_break_age = 0.0
+	_dust.clear()
+	for i: int in 28:
+		var a: float = _rng.randf_range(0.0, TAU)
+		var r: float = _rng.randf_range(9.0, 19.0)
+		var col: Color = CHITIN_MID if i % 3 == 0 else (RIM_VIOLET if i % 3 == 1 else (GLOW_VIOLET if i % 2 == 0 else VEIN_VIOLET))
+		_dust.append({
+			"from": Vector2(cos(a) * r, -6.0 + sin(a) * r * 0.62),
+			"delay": _rng.randf_range(0.1, 0.32),
+			"life": _rng.randf_range(0.3, 0.42),
+			"col": col,
+		})
+	queue_redraw()
+
+
+func _v2_idle() -> bool:
+	return _glint_age < 0.0 and _core_age < 0.0 and _break_age < 0.0 and _homers.is_empty()
+
+
+func _step_v2(delta: float) -> bool:
+	var dirty: bool = false
+	if _glint_age >= 0.0:
+		_glint_age += delta
+		dirty = true
+		if _glint_age > 0.3:
+			_glint_age = -1.0
+	if _core_age >= 0.0:
+		_core_age += delta
+		dirty = true
+		if not _core_burst:
+			_core_pos += _core_vel * delta
+			_core_vel.y += 260.0 * delta
+			if _core_age >= 0.14:
+				_burst_core()
+		elif _core_age > 0.5:
+			_core_age = -1.0
+	if _break_age >= 0.0:
+		_break_age += delta
+		dirty = true
+		if _break_age > 1.0:
+			_break_age = -1.0
+	var goal: Vector2 = Vector2(0.0, -18.0)
+	if _home_to != null and is_instance_valid(_home_to):
+		goal = _home_to.global_position + Vector2(0.0, -18.0) - global_position
+	for i: int in range(_homers.size() - 1, -1, -1):
+		var h: Dictionary = _homers[i]
+		var age: float = float(h["age"]) + delta
+		var pos: Vector2 = h["pos"] as Vector2
+		var vel: Vector2 = h["vel"] as Vector2
+		var pull: float = smoothstep(0.08, 0.35, age)
+		vel = vel.lerp((goal - pos).normalized() * 230.0, clampf(pull * 9.0 * delta, 0.0, 1.0))
+		pos += vel * delta
+		h["age"] = age
+		h["pos"] = pos
+		h["vel"] = vel
+		dirty = true
+		if age > 1.4 or (age > 0.15 and pos.distance_to(goal) < 5.0):
+			_homers.remove_at(i)
+	return dirty
+
+
+func _burst_core() -> void:
+	_core_burst = true
+	if _light != null:
+		_light.glow_color = DANGER_PINK.lerp(CORE_WHITE, 0.5)
+		_light.base_energy = maxf(_light.base_energy, 1.4)
+	for i: int in 14:
+		var a: float = _rng.randf_range(0.0, TAU)
+		var spd: float = _rng.randf_range(30.0, 90.0)
+		_chips.append({
+			"pos": _core_pos,
+			"vel": Vector2(cos(a), sin(a) * 0.7) * spd,
+			"z": 0.0,
+			"vz": _rng.randf_range(-10.0, 40.0),
+			"col": CORE_WHITE if i % 3 == 0 else DANGER_PINK,
+			"sz": 2 if i % 5 == 0 else 1,
+			"age": 0.0,
+			"life": _rng.randf_range(0.2, 0.38),
+		})
+	for i: int in 7:
+		var a2: float = _rng.randf_range(0.0, TAU)
+		_homers.append({
+			"pos": _core_pos,
+			"vel": Vector2(cos(a2), sin(a2)) * _rng.randf_range(50.0, 95.0),
+			"age": 0.0,
+			"col": CORE_WHITE if i % 2 == 0 else DANGER_PINK,
+		})
+
+
+## Under the chips: the cracks over the carapace and the dust that is sucked in.
+func _draw_v2_under() -> void:
+	if _break_age < 0.0:
+		return
+	var kb: float = _break_age
+	var crack_reach: float = smoothstep(0.0, 0.14, kb)
+	var crack_fade: float = 1.0 - smoothstep(0.35, 0.7, kb)
+	if crack_fade > 0.0:
+		for f_i: int in 6:
+			var ang: float = float(f_i) * TAU / 6.0 + 0.4
+			var flen: float = 13.0 * crack_reach
+			var dir2: Vector2 = Vector2(cos(ang), sin(ang) * 0.66)
+			var perp2: Vector2 = Vector2(-dir2.y, dir2.x)
+			var steps: int = maxi(2, int(flen / 1.5))
+			for s: int in range(1, steps + 1):
+				var u: float = float(s) / float(steps)
+				var pt: Vector2 = Vector2(0.0, CORE_Y + 3.0) + dir2 * (flen * u) + perp2 * (sin(u * 7.0 + float(f_i)) * 1.2)
+				var col_f: Color = CORE_WHITE if u < 0.4 else GLOW_VIOLET
+				col_f.a = crack_fade * (1.0 - u * 0.5)
+				_px(pt, col_f)
+	for d: Dictionary in _dust:
+		var t0: float = float(d["delay"])
+		var life: float = float(d["life"])
+		var u_d: float = clampf((kb - t0) / life, 0.0, 1.0)
+		if kb < t0 or u_d >= 1.0:
+			continue
+		var p: Vector2 = (d["from"] as Vector2).lerp(Vector2(0.0, CORE_Y + 3.0), u_d * u_d * u_d)
+		var col_d: Color = d["col"] as Color
+		col_d.a = smoothstep(0.0, 0.2, u_d)
+		_px(p, col_d)
+	# the hole implodes (a ring closing in), then a small ring of dust pops outwards
+	if kb >= 0.6 and kb < 0.72:
+		var ki: float = (kb - 0.6) / 0.12
+		_ring(Vector2(0.0, CORE_Y + 3.0), lerpf(12.0, 1.0, ki * ki), Color(GLOW_VIOLET, 1.0 - ki * 0.4))
+	elif kb >= 0.72 and kb < 0.98:
+		var ko: float = (kb - 0.72) / 0.26
+		_ring(Vector2(0.0, -2.0), lerpf(3.0, 22.0, 1.0 - (1.0 - ko) * (1.0 - ko)), Color(RIM_VIOLET, 1.0 - ko))
+
+
+## Over everything: the apex star, the flying core, the sparks that fly to her.
+func _draw_v2_over() -> void:
+	if _glint_age >= 0.0:
+		var kg: float = clampf(_glint_age / 0.3, 0.0, 1.0)
+		var arm: int = int(roundf(lerpf(2.0, 9.0, sin(kg * PI))))
+		var c0: Color = Color(CORE_WHITE, 1.0 - kg * 0.6)
+		var c1: Color = Color(DANGER_PINK, 0.9 * (1.0 - kg))
+		var at: Vector2 = Vector2(0.0, CORE_Y)
+		_px(at, c0, 1)
+		for i: int in range(1, arm + 1):
+			var c: Color = c0 if i <= (arm >> 1) else c1
+			_px(at + Vector2(i, 0), c)
+			_px(at + Vector2(-i, 0), c)
+			if i <= arm - 2:
+				_px(at + Vector2(0, i), c)
+				_px(at + Vector2(0, -i), c)
+	if _core_age >= 0.0 and not _core_burst:
+		var cp: Vector2 = _core_pos
+		for o: Vector2 in [Vector2.ZERO, Vector2(1, 0), Vector2(0, 1), Vector2(1, 1)]:
+			_px(cp + o, CORE_WHITE)
+		for o2: Vector2 in [Vector2(-1, 0), Vector2(2, 0), Vector2(0, -1), Vector2(1, -1), Vector2(0, 2), Vector2(1, 2), Vector2(-1, 1), Vector2(2, 1)]:
+			_px(cp + o2, DANGER_PINK)
+	for h: Dictionary in _homers:
+		var hp: Vector2 = h["pos"] as Vector2
+		var hv: Vector2 = h["vel"] as Vector2
+		var hc: Color = h["col"] as Color
+		_px(hp, hc)
+		var tail: Color = Color(GLOW_VIOLET, 0.6)
+		_px(hp - hv.normalized() * 1.5, tail)
+		_px(hp - hv.normalized() * 3.0, Color(GLOW_VIOLET, 0.3))
+
+
+func _ring(center: Vector2, radius: float, col: Color) -> void:
+	var steps: int = maxi(8, int(radius * 2.4))
+	for i: int in steps:
+		var a: float = float(i) / float(steps) * TAU
+		_px(center + Vector2(cos(a) * radius, sin(a) * radius * 0.6), col)

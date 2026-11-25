@@ -25,7 +25,7 @@ const THRESHOLD_PAUSE: float = 3.6 ## seconds from the last spider's death to he
 const HOLOGRAM_AT: Vector2 = Vector2(0, 112) ## from the tree: on the open floor in front of it
 const THORN_GLOW_ALPHA: float = 0.55
 
-var world: WorldLevel
+var world: Node
 var boss: MirrorWitch
 var stage: Stage = Stage.CALM
 var released: bool = false ## she was freed (saved): the tree stays liberated, she never comes back
@@ -50,7 +50,7 @@ var _asked_open: bool = false
 var _said: Dictionary = {} ## local: the quest's one-off remarks already made (hallucination, phantom)
 
 
-func setup(p_world: WorldLevel) -> void:
+func setup(p_world: Node) -> void:
 	world = p_world
 	name = "WitchArena"
 	add_to_group("witch_arena")

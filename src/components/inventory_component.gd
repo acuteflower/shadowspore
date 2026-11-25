@@ -9,8 +9,10 @@ signal socketed(socket: String) ## host: a crystal went into or out of a staff (
 const HOTBAR_SIZE: int = 8
 const BACKPACK_SIZE: int = 24
 const SIZE: int = HOTBAR_SIZE + BACKPACK_SIZE
+const MAX_BONUS_SLOTS: int = 16
 const LOADOUT: String = "default"
 
+var bonus_slots: int = 0 ## unlocked by Schattenfrucht Sporen-Schwellen (Taschen-Geflecht I/II/III)
 var slots: Array = [] ## Dictionary stacks, index < HOTBAR_SIZE is the hotbar
 var equipment: Dictionary = {} ## slot name -> stack
 var held: Dictionary = {} ## the stack on the cursor while the inventory window is open (the host holds the truth, the owner sees it)
@@ -93,18 +95,40 @@ func request(op: String, args: Array) -> void:
 		_rpc_request.rpc_id(1, op, args)
 
 
+func active_size() -> int:
+	return slots.size()
+
+
+func backpack_size() -> int:
+	return maxi(slots.size() - HOTBAR_SIZE, BACKPACK_SIZE)
+
+
+func set_bonus_slots(extra: int) -> void:
+	var clamped: int = clampi(extra, 0, MAX_BONUS_SLOTS)
+	var target: int = SIZE + clamped
+	bonus_slots = clamped
+	if slots.size() >= target:
+		return
+	while slots.size() < target:
+		slots.append({})
+	if multiplayer.is_server():
+		_commit()
+	else:
+		changed.emit()
+
+
 ## Host only. Returns how many items did not fit. `extra` is what a stack carries besides id and count (the refinement of a weapon, `Items.extras`):
 ## such a stack is never merged into another one.
 func add_item(id: String, count: int = 1, extra: Dictionary = {}) -> int:
 	var probe: Dictionary = {"id": id, "count": 1}
 	var limit: int = Items.max_stack(probe)
-	for i: int in SIZE: ## top up existing stacks first
+	for i: int in slots.size(): ## top up existing stacks first
 		var existing: Dictionary = slots[i]
 		if extra.is_empty() and count > 0 and not existing.is_empty() and existing["id"] == id and Items.extras(existing).is_empty() and int(existing["count"]) < limit:
 			var added: int = mini(limit - int(existing["count"]), count)
 			existing["count"] = int(existing["count"]) + added
 			count -= added
-	for i: int in SIZE:
+	for i: int in slots.size():
 		if count > 0 and slots[i].is_empty() and _fits(i, probe):
 			var placed: int = mini(limit, count)
 			var fresh: Dictionary = {"id": id, "count": placed}
@@ -118,7 +142,7 @@ func add_item(id: String, count: int = 1, extra: Dictionary = {}) -> int:
 func has_room(id: String) -> bool:
 	var probe: Dictionary = {"id": id, "count": 1}
 	var limit: int = Items.max_stack(probe)
-	for i: int in SIZE:
+	for i: int in slots.size():
 		var existing: Dictionary = slots[i]
 		if existing.is_empty():
 			if _fits(i, probe):
@@ -182,7 +206,7 @@ func exchange_items(take_id: String, take_count: int, reward_id: String, reward_
 
 func _take_items(id: String, count: int) -> void:
 	var order: Array[int] = [] ## plain pieces go first: a refined weapon is only given up when nothing else is left
-	for i: int in SIZE:
+	for i: int in slots.size():
 		order.append(i)
 	order.sort_custom(func(a: int, b: int) -> bool: return Items.refine(slots[a] as Dictionary) < Items.refine(slots[b] as Dictionary) or (Items.refine(slots[a] as Dictionary) == Items.refine(slots[b] as Dictionary) and a < b))
 	for i: int in order:
@@ -311,7 +335,7 @@ func refill_water(slot_index: int = -1) -> bool:
 		targets.append(slot_index)
 	else:
 		targets.append(selected)
-		for i: int in SIZE:
+		for i: int in slots.size():
 			if i != selected:
 				targets.append(i)
 	for idx: int in targets:
@@ -355,7 +379,7 @@ func _fits(index: int, stack: Dictionary) -> bool:
 
 
 func _valid(index: int) -> bool:
-	return index >= 0 and index < SIZE
+	return index >= 0 and index < slots.size()
 
 
 func _commit() -> void:
@@ -814,7 +838,7 @@ func _throw(stack: Dictionary, count: int) -> bool:
 
 ## Merges equal stacks in the rucksack (not the hotbar) and sorts it: tools, gear, food, materials; rarer first, then by name.
 func _sort() -> bool:
-	return _sort_slots(slots, HOTBAR_SIZE, SIZE)
+	return _sort_slots(slots, HOTBAR_SIZE, slots.size())
 
 
 ## The same for the open container (R / "Sortieren" in a box window).
@@ -945,7 +969,7 @@ func _unequip(slot_name: String, to: int) -> bool:
 		return false
 	var stack: Dictionary = equipment[slot_name]
 	if to < 0:
-		for i: int in SIZE:
+		for i: int in slots.size():
 			if slots[i].is_empty() and _fits(i, stack):
 				to = i
 				break
@@ -992,6 +1016,7 @@ func _rpc_state(state: Dictionary) -> void:
 	if multiplayer.get_remote_sender_id() != 1:
 		return
 	slots = state["slots"]
+	bonus_slots = clampi(slots.size() - SIZE, 0, MAX_BONUS_SLOTS)
 	equipment = state["equipment"]
 	held = state.get("held", {})
 	if state.has("hidden") and state["hidden"] is Dictionary:

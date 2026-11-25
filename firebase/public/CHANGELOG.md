@@ -4,14 +4,185 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.10.2 Beta] – 2026-11-25
+### 🗺️ Zonenwelt ALTMARK, Windkap & Südkap, Feldcodex-Menü & Wind-Strand
+
+![Erlenbach-Mündung in die Silberbucht am Windkap](docs/img/windkap_v0102_estuary.png)
+
+> *Mit V0.10.2 Beta öffnet sich der Kontinent ALTMARK: Windkap und das weite Südkap verschmelzen nahtlos im Hintergrund, das neue Feldcodex-Menü vereint Atlas, Fortschrittspfad, Schattenfrüchte und Chronik unter einem Dach, und am Strand zieht echter Treibsand mit dem Küstenwind.*
+
+> [!IMPORTANT]
+> **Großer Meilenstein für Shadowspore 2.0!**
+> V0.10.2 Beta führt die komplette **Zonenwelt-Architektur (`ALTMARK`)** mit 4-Ebenen-Atlas, dem **Feldcodex-Ingame-Menü** samt eigenem **Schattenfrüchte-Reiter** und neuem rautenförmigem **Fortschrittspfad**, die **Steinsetzer-Prüfungstafel & Dungeons**, den **Sternensaal (Zero-G)** sowie den großen **Windkap- & Südkap-Welt-Feinschliff** (realistische Gewässerübergänge, windbewegter Sand, belebte Felsplateaus und ultraschnelles Südkap-Streaming) ein.
+
+<details>
+<summary><b>📋 Alle Neuerungen von V0.10.2 Beta auf einen Blick</b></summary>
+
+1. **🗺️ Zonenwelt ALTMARK & Nahtloses Südkap-Streaming:** Mehrstufige Zonenwelt (`ZoneWorld`, `ZoneDirector`, `PocketSpace`, `SaveGame v2`), 4-Ebenen-Atlas (`Zone → Region → Kontinent → Welt`), überarbeitetes Windkap samt nahtlosem Übergang ins XL-Gebiet **Südkap** (inkl. ~7× beschleunigter Gras-/Zonenerstellung & Worker-Thread-sicherer `WaterBridge`).
+2. **📖 Feldcodex — Vereintes Ingame-Menü:** Modernes, harmonisch texturiertes & animiertes Steinsetzer-Menü mit den Reitern **Atlas**, **Aufgaben**, **Fortschritt** (rautenförmiger Fähigkeiten-Fortschrittspfad + Stufen), **Schattenfrüchte**, **Welt** (*Chronik* mit Sidebar, *Stadt*, *Vögel*, *Flussbuch*) und **System** (Settings, Steuerung, Koop) — das Inventar bleibt direkt und schlank auf `I`.
+3. **🏖️ Windkap-Welt-Feinschliff (Gewässer, Wind-Strand & Felsplateaus):** Stetige Mündung von Erlenbach in die Silberbucht & Erlenweiher, sauberer goldener Strandsand ohne Flecken mit echter `WorldWind`-Treibsand- & Dünenbewegung, auswaschbaren 3D-Fußspuren und dicht strukturierten Felsbereichen aus bestehenden `LivingRock`- & Steingrund-Assets.
+4. **🏛️ HUD v2, Koop-Chat, Dungeons & Sternensaal:** Dynamische HUD-Regie (`HudDirector`), integrierter Koop-Chat, instanziierte Steinsetzer-Dungeons (`Sturmhafen`), Göttin Caelias Sternensaal mit Zero-G-Bewegung und überarbeitete 3D-Schwertführung mit persistenten Schnittspuren.
+
+</details>
+
+---
+
+### 🗺️ Zonenwelt ALTMARK, Windkap & Nahtloser Südkap-Übergang
+
+![Nahtloser Übergang vom Windkap ins Südkap](docs/img/windkap_v0102_suedkap.png)
+
+* **🟣 NEU – Kontinent ALTMARK & 4-Ebenen-Atlas:** Komplett neue Zonenwelt mit 11 geplanten Zonen in 5 Regionen, nahtlosem Multi-Zone-Koop-Streaming (`ZoneDirector`), interaktivem 4-Ebenen-Atlas (`Zone → Region → Kontinent → Welt`), Wegsteinen, Aussichtspunkten und Zonen-Ankunftstiteln.
+* **🟣 NEU – Startzone Windkap & Nachbarzone Südkap:** Handgeformte Küsten-Startzone mit Lager, Windkap-Ruine, Erlenbach-Brücke, Erlenweiher, Schattenfrüchten und offenem Ostweg ins XL-Küstengebiet **Südkap**.
+* **🟢 FIX & PERFORMANCE – Südkap-Eintritt & ~7× schnelleres Zonen-Streaming:** Thread-Guard-Blockade an `WaterBridge.has_water_deck_at()` beim Hintergrund-Streaming behoben; Zero-Allocation-Habitat-Queries, vorgenerierte Noise-Tabellen, flache MultiMesh-Bandpuffer und frühes XL-Preloading sorgen dafür, dass sich der Übergang nach Südkap rechtzeitig und ohne Nebelwand-Artefakte öffnet.
+
+---
+
+### 🏖️ Strand-Windbewegung, Gewässer & Felsplateaus
+
+![Goldener Sandstrand mit Wind-Treibsand, Dünenhafer und Fußspuren](docs/img/windkap_v0102_beach.png)
+
+* **🔵 REWORK – Realistische Gewässer-Übergänge:** Fließender Übergang von Erlenbach in die Silberbucht (Brackwasser-Mündung mit Strömung und glattem SDF-Verlauf) sowie sauber eingebetteter Waldsee *Erlenweiher*.
+* **🟣 NEU – Echte `WorldWind`-Strand- & Sandbewegung:** Trockener Strandsand reagiert direkt auf Windrichtung, Böen und Sturm mit wandernden Dünenrippeln, 4-Tap-Treibsand-Schleiern, fliegenden `2×1`-Saltationskörnern, Luft-Treibsand-Partikeln (`WorldWind`), feiner Brandungsgischt und windbewegtem Strandhafer.
+* **🔵 REWORK – Sauberer Sand & Belebte Felsplateaus:** Alle störenden Wasser-/Treibgut-Flecken und Dauerpfützen vom trockenen Strandsand entfernt; Felsbereiche im Nordwesten und rund um das Windkap mit bestehenden `LivingRock`-Formationen, Moos- und Steindetails natürlich verdichtet.
+
+---
+
+### 📖 Feldcodex — Das neue Ingame-Menü & Schattenfrüchte
+
+* **🟣 NEU – Feldcodex-Menü:** Einheitliches, animiertes Steinsetzer-Ingame-Menü mit klaren Oberreitern (*Atlas*, *Aufgaben*, *Fortschritt*, *Schattenfrüchte*, *Welt*, *System*), während das Inventar wie gewohnt schnell auf `I` öffnet.
+* **🔵 REWORK – Rauten-Fortschrittspfad & Schattenfrüchte:** Neuer zentraler Fortschrittspfad mit 3 Startpunkten in einer Mittelraute, der sich in die Himmelsrichtungen mit gestalteten Fähigkeits-Medaillons verzweigt; eigener **Schattenfrüchte**-Tab mit lebendig animierten Früchten sowie überarbeitete **Chronik** (mit Sidebar), **Flussbuch**, **Quests** und korrigierten **System-Settings**.
+
+---
+
+### 🏛️ HUD v2, Koop-Chat, Dungeons & Sternensaal
+
+* **🟣 NEU – HUD v2 & Ingame-Chat:** Profilbasierte HUD-Regie (`HudDirector`), kollabierbare Hotbar, Weg- & Begleiter-Ranken, gestaffelte Benachrichtigungen und voll integrierter Multiplayer-Chat.
+* **🟣 NEU – Dungeons, Sternensaal & Schwertführung:** Instanziierte Steinsetzer-Prüfungen (`PocketSpace.Lane.DUNGEON`), Göttin Caelias schwereloser Sternensaal (Zero-G) sowie verfeinerte 3D-Schwertführung samt persistenten Welt-Schnittspuren (`SlashWorldFx`).
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Betretet ALTMARK, spürt den Küstenwind an der Silberbucht und erkundet das neue Südkap – viel Spaß mit V0.10.2 Beta!*
+
+---
+
+## [V0.10-1 Beta] – 2026-11-23
+### 🌿 Shadowspore 2.0: Movement 2.0, Lebendige Natur, Wasser 2.0 & Abgrund-Finisher
+
+![Wasser 2.0 im Abendgold mit Uferflora und Spiegelungen](docs/img/water_v2_polish/golden_hour.png)
+
+> *Mit V0.10-1 Beta beginnt die Ära von Shadowspore 2.0: Ellie bewegt sich geschmeidiger als je zuvor, Wälder und Gewässer atmen echtes Leben, und im Kampf gegen die neuen Schattenspinnen entscheidet der erste echte Finisher über Sieg oder Untergang.*
+
+> [!IMPORTANT]
+> **Der Startschuss für Shadowspore 2.0!**
+> V0.10-1 Beta baut das Fundament von Bewegung, Natur und Kampf grundlegend um: **Movement 2.0** mit Sprint-Antritt, Kurven-Abgleiten, Übersteigen (`Vault`), Kanten-Absprung und dem ausdauerschonenden **Reisetritt**; **Schattenspinne 2.0** samt Haltungssystem und dem ersten 3-Phasen-**Finisher („Abgrund-Pfähler“)**; **Lebendige Natur 2.0** mit Taleichen, Silberbirken, Wildäpfeln, mehrstufigen Felsen, reaktivem Gras und über `30` neuen Kräutern & Rezepten; sowie **Wasser 2.0** mit Küstenbrandung, Gezeitentümpeln und Biolumineszenz.
+
+<details>
+<summary><b>📋 Alle Groß-Systeme von V0.10-1 Beta auf einen Blick</b></summary>
+
+1. **🏃 Movement 2.0 (`T1–T12` & `V1–V12`):** Taktiler Sprint-Antritt, Brems-Ausfedern, 180°-Sprint-Pivot, Corner-Smoothing, Hang- & Straßen-Physik, **Reisetritt** (0 Ausdauer auf Straßen), **Vault** über Stämme/Zäune, **Ledge Hop** an Klippen, `130 ms`-Eingabepuffer, adaptive **LivingCamera 2.0**, 20-Hz-Koop-Glättung & biom-echte Schritt-Effekte.
+2. **🕷️ Schattenspinne 2.0 & Finisher „Abgrund-Pfähler“:** Sichtkegel & Erschütterungs-Sinne, Haltungs- & Schwachstellen-System, Backstep, Gift-Sprungangriff, `3` Spinnenvarianten (*Gewöhnlich*, *Späher*, *Dornen*) und der erste 3-Beat-Schwert-Finisher.
+3. **🌳 Lebendige Natur 2.0:** **Taleeiche**, **Silberbirke** und **Wildapfel** (Stockausschlag, Wurzel-Sitzplätze, Schüttel-Ernte), mehrstufig abbaubare **lebende Felsen** & antike Ruinensteine, reaktives **lebendes Gras** sowie **Sanktuar-Flora** mit über `30` neuen Items & Rezepten.
+4. **🌊 Wasser 2.0:** Küstenschelf, Brandung, Strandpfützen, Gezeitentümpel, Schilf-Bachufer, Sturm-Schaumkronen, Nacht-Biolumineszenz & Wasserbrücken.
+
+</details>
+
+---
+
+### 🏃 Movement 2.0 – Geschmeidige Steuerung & Lebendige Animation
+
+* **🟣 NEU – Taktiler Antritt, Pivot & Kurven-Abgleiten:** Sofortiger Sprint-Antritt (`1,22×` Schwung), federndes Abstoppen, knackige 180°-Kehrtwenden mit Stiefel-Stemmen sowie automatisches **Corner-Smoothing** an Baumstämmen, Felsen, Türrahmen und Zäunen.
+* **🟣 NEU – Der „Reisetritt“ (Wanderfluss):** Außerhalb von Kampf und Nachtgefahr verbraucht Sprinten auf gebauten Straßen **0 Ausdauer** (`+8 %` Tempo) und in der Wildnis **`-65 %` Ausdauer**. Bergauf (`0,88×`) und Bergab (`1,08×`) reagieren nun spürbar auf das Gelände.
+* **🟣 NEU – Übersteigen (`Vault`) & Kanten-Absprung (`Ledge Hop`):** Im Sprint per `E` geschmeidig über gefallene Baumstämme und Zäune setzen oder an sicheren Geländekanten hinunterspringen (`HINUNTERSPRINGEN`) – inklusive handgeformter 8-Richtungs-Übergangsposen für alle Frisuren und Outfits.
+* **🟣 NEU – Kinetik-Schritt, Kampf-Beinarbeit & Kamera 2.0:** `Schattenschritt` und `Lichtschritt` queren flache Rinnen und gleiten an flachen Wänden ab; im Kampf greifen eigene Strafe- & Backpedal-Schritte; die neue **LivingCamera 2.0** verbindet ruhiges Zielen mit dynamischem Lauf-Vorlauf, während Mitspieler dank **20-Hz-Interpolation** selbst bei schnellen Manövern flüssig bleiben.
+* **🟣 NEU – Biom-Schrittpoesie & Shadowspore-Signatur:** Morgentau auf Wiesen, feuchte Abdrücke nach Regen, Sporen im Hexenwald, Quarzfunken in der Wüste sowie feine Sporen-Splitter und ein kurzes Glühen am Sonnenquarz-Halsband beim Schritt-Ende.
+
+---
+
+### 🕷️ Schattenspinne 2.0 & Erster Finisher („Abgrund-Pfähler“)
+
+* **🔵 REWORK – Schattenspinne 2.0:** Vollständig erneuerte KI mit `124°`-Sichtfeld, Erschütterungs-Wahrnehmung (Schleichen vs. Sprinten), **Haltungs-System** (Frontschutz vs. Flanken- & Rückentreffer), taktischem **Backstep**, **Gift-Sprungangriff**, Einspinnen sowie den `3` Varianten *Gewöhnlich*, *Späher* (kleiner & schneller) und *Dornen* (größer & dornig).
+* **🟣 NEU – Finisher-System (`Abgrund-Pfähler`):** Schwere Schwerttreffer gegen überwältigte oder tödlich geschwächte Gegner starten den ersten 3-stufigen Finisher (Einstoßen, tiefes Nachdrücken durch den geborstenen Panzer, Herausreißen mit Kamerazoom & Schutzfenster).
+
+---
+
+### 🌳 Lebendige Natur 2.0 – Bäume, Felsen, Gras & Sanktuar-Flora
+
+![Lebendige Natur 2.0: Sanktuar-Flora, Eichen und Wiesenpfade](docs/img/flora_showcase_v1/01_sq2_sanctuary_flora_overview.png)
+![Wildapfel-Lichtung im Mittagslicht](docs/img/wild_apple_glade_v1/30_sq4s_apple_meadow_noon.png)
+
+* **🟣 NEU – Lebende Bäume (`Taleeiche`, `Silberbirke`, `Wildapfel`):** Mehrstufiges Wachstum, begehbare Wurzel-Sitzplätze, **Stockausschlag** aus gefällten Stümpfen, Schüttel- & Rindenernte sowie umstürzende Stämme, die das Gras darunter sichtbar plattdrücken.
+* **🟣 NEU – Lebende Felsen & Antike Ruinen:** Mehrstufig abbaubare Felsen (Abplatzen bis zum begehbaren Schutt samt späterer Erholung) und einzeln aufsammelbare Feldsteine.
+* **🟣 NEU – Lebendes Gras:** Feine 6-px-Grasbänder, die sich unter Ellies Schritten und Angriffen organisch teilen.
+* **🟣 NEU – Sanktuar-Flora, 30+ neue Funde & Rezepte:** Zahlreiche neue Wildkräuter, Baumschätze und Handwerkszutaten – darunter *Glimmtal-Wildapfel*, *Klarer Birkensaft*, *Funken-Chaga*, *Eichen-Wundharz*, *Silbermistel*, *Pflaster-Wegerich*, *Sternen-Morgentau* und neue Heil-/Handwerksrezepte (*Wegerich-Wundwickel*, *Holunder-Hagebutten-Sud*, *Feines Nesseltuch*, *Efeu-Bindegarn*). *(Das veraltete frühere Kochsystem wurde im Zuge der Neuausrichtung entfernt.)*
+
+---
+
+### 🌊 Wasser 2.0 – Küsten, Gezeitentümpel & Biolumineszenz
+
+* **🔵 REWORK – Wasser 2.0:** Grundlegende optische und räumliche Überarbeitung aller Gewässer: Ozeanschelf mit Brandung, Strandpfützen und Küstendünen mit Strandhafer, lebendige Gezeitentümpel, schilfgesäumte Bachufer, weiße Sturm-Schaumkronen, nächtliche Biolumineszenz und neue Wasserbrücken.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Willkommen in Shadowspore 2.0! Probiert Movement 2.0, schüttelt einen Wildapfelbaum und stellt euch den neuen Schattenspinnen – viel Spaß mit V0.10-1 Beta!*
+
+---
+
+## [V0.9.5 Beta] – 2026-11-16
+### 🌐 Nahtloser Koop-Beitritt, Relay-Chunking & Versionsschutz: Große Welt-Snapshots, Gast-Synchronisation & Update-Wächter
+
+![Hallgrat im Nachtlicht mit Laternen und Stadtmauer](docs/img/hallgrat_deko_night.png)
+
+> *Auch riesige Welten lassen sich jetzt reibungslos gemeinsam betreten: Das Online-Relay teilt große Welt-Snapshots automatisch auf, synchronisiert alle Systeme beim Beitritt bis ins Detail und schützt laufende Lobbys vor veralteten Versionen.*
+
+> [!IMPORTANT]
+> **Große Welten im Online-Koop ohne Hürden!**
+> V0.9.5 Beta rüstet das Online-Relay für ausgewachsene Spielstände auf: Große Welt- und Stadt-Pakete werden automatisch in sichere Teilpakete zerlegt und verlustfrei zusammengesetzt, nachrückende Gäste erhalten den vollständigen Zustand aller Systeme, und ein neuer **Versionsschutz** sowie klare Trennungs-Meldungen sorgen für geordnete Mehrspieler-Runden.
+
+---
+
+### 🌐 Online-Relay-Chunking & Nahtloser Koop-Beitritt
+
+* **🟣 NEU – Automatische Paket-Aufteilung im Relay:** Große Welt-Snapshots (auch über `150 KB`) werden beim Übertragen übers Online-Relay automatisch in kompakte Teilpakete aufgeteilt und beim Empfänger bytegenau wieder zusammengesetzt – kein Abbruch mehr bei weit fortgeschrittenen Welten.
+* **🟣 NEU – Vollständige Gast-Synchronisation beim Beitritt:** Nachrückende Mitspieler übernehmen sauber ihren Charakterzustand und erhalten den aktuellen Stand von Stadtbau, Schatztruhen, Wegsteinen, Weltkarten-Entdeckung, Haustieren, Sternensaal, Wiesen-Details sowie Boss-Arenen (Aurelith & Hexenkönigin).
+* **🟣 NEU – Versionsschutz & Lobby-Kontrolle:** Der laufende Versions-Abgleich erkennt veraltete Spielversionen sofort, und erzwungene Trennungen (z. B. durch Kick, geschlossene Lobby oder Host-Abbruch) führen sauber mit klarer Rückmeldung zurück ins Hauptmenü.
+
+---
+
+### 🛠️ Stabilitäts- & Welt-Feinschliff
+
+* **🟡 FIX – Komponenten & Welt-Übergänge:** Verbesserte Synchronisation und Stabilität an Aussehen, Inventar, Fortschritt, Skillbaum, Zaubern, Ausruhen, Klettern, Innenräumen, Flussfauna sowie der Welt- & Quest-Anzeige im Mehrspieler.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Bereit für lange gemeinsame Abende in großen Welten – viel Spaß mit V0.9.5 Beta!*
+
+---
+
 ## [V0.9.4 Beta] – 2026-11-16
-### 🛠️ Cloud-Save-Hotfix, Coercion-Schutz & Relay-Stabilität
+### 🛡️ Cloud-Save-Härtung & Relay-Stabilität: Sichere Spielstand-Wiederherstellung, Relay-Schutz & Wildtier-Fixes
 
-> *Behebt den stummen Release-Absturz nach „Spiel fortsetzen“ sowie fehlerhafte RPC-Spams bei Verbindungsaufbau oder -verlust.*
+![Leuchtende Nachtströmung im Flusstal](docs/img/river_night_glow.png)
 
-* **🟣 FIX – Cloud-Save-Crash bei „Spiel fortsetzen“ behoben:** Leere Lua-Tables in gespeicherten Cloud-Profilen (`[]` statt `{}`) werden beim Laden in allen Save- und Welt-Importern sicher umgewandelt – kein Release-Absturz (`0xc0000005`) mehr bei abgeschlossenen oder leeren Quest-/Inventar-/Weltfeldern.
-* **🟣 FIX – Saubere RPC- & Relay-Absicherung:** Snapshot-, Zeit- und Wildtier-RPCs warten sauber auf eine aktive `CONNECTION_CONNECTED`-Verbindung; ein abgebrochener Host-Relay fällt automatisch auf `OfflineMultiplayerPeer` zurück.
-* **🟣 FIX – Base64- & Karten-Schutz:** Leere `map`-Daten und ungültige Base64-Payloads werden ohne Dekompressions- oder Engine-Fehler abgefangen.
+> *Ein gezieltes Stabilitäts-Update unter der Haube: Cloud-Spielstände werden über alle Weltsysteme hinweg fehlerfrei wiederhergestellt und das Online-Relay fängt Verbindungsabbrüche sicher ab.*
+
+> [!IMPORTANT]
+> **Maximale Verlässlichkeit für Cloud-Welten & Online-Koop!**
+> V0.9.4 Beta räumt tiefgreifend bei der **Wiederherstellung von Cloud-Spielständen** und beim **Online-Relay** auf: Jeder Welt-, Charakter- und Stadtzustand wird beim Laden aus der Cloud sauber konvertiert, fehlerhafte Pakete werden sicher abgefangen, und bei Verbindungsabbrüchen fällt der Host kontrolliert zurück, ohne den Spielstand zu gefährden.
+
+---
+
+### 🛡️ Cloud-Save-Stabilität & Kompressions-Schutz
+
+* **🟡 FIX – Sichere Wiederherstellung aller Weltsysteme:** Beim Laden von Cloud-Spielständen werden Zahlen-, Listen- und Tabellendaten über sämtliche Systeme hinweg sauber umgewandelt – darunter Inventar, Quests, Skillbaum, Aussehen, Haustiere, Boss-Relikte, Sternensaal, Schatztruhen, Weltkarten-Entdeckung, Aussichtspunkte, Wegsteine, Dorfbrett, Karawane, Ackerbau, Stadtbau, Mine, Wüste, Wiesen-Sehenswürdigkeiten & Weltwunder, Wetter und Tageszeit.
+* **🟡 FIX – Fehlerhafte Speicherdaten abfangen:** Beschädigte oder ungültig komprimierte Spielstand-Pakete werden sauber abgewiesen, statt Abstürze auszulösen.
+
+---
+
+### 🌐 Online-Relay- & Welt-Stabilität
+
+* **🟡 FIX – Sicherer Relay-Verbindungsaufbau:** Netzwerk-Synchronisationen greifen erst dann, wenn die Verbindung vollständig steht; während des Verbindungsaufbaus oder bei leeren Server-Tabellen bleiben alle Welt-Importe absturzfrei.
+* **🟡 FIX – Saubere Host-Erholung bei Abbruch:** Bricht das Online-Relay unerwartet ab, wechselt der Host kontrolliert in den sicheren Offline-Zustand zurück, sodass die Welt weiterläuft.
+* **🟡 FIX – Wildtiere & Navigation:** Kleinere Stabilitäts-Korrekturen bei Wildtieren (Schmetterlinge, Kleintiere, Vögel, Kaninchen, Waldsäuger) und Gegner-Navigation sowie aktualisierte Website- & Update-Daten.
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Ein ruhiges, wichtiges Fundament-Update für sichere Spielstände und stabile Online-Abenteuer – viel Spaß mit V0.9.4 Beta!*
 
 ---
 

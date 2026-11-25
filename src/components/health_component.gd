@@ -52,9 +52,14 @@ func take_damage(amount: float, from: Vector2, knockback: float, source: int = 0
 		amount = maxf(roundf(amount * LevelRewards.damage_factor(armor) * 10.0) / 10.0, 0.1)
 	if absorb > 0.0:
 		amount = maxf(roundf(amount * (1.0 - absorb) * 10.0) / 10.0, 0.1)
+	var vuln: float = CounterComponent.vulnerability_of(get_parent()) * StaggerComponent.vulnerability_of(get_parent())
+	if vuln > 1.001:
+		amount = roundf(amount * vuln * 10.0) / 10.0
 	var next_hp: float = _warded(maxf(current - amount, floor_value))
 	if next_hp <= 0.0 and FinisherComponent.try_intercept_lethal(self, amount, from, source):
 		return
+	if is_inside_tree():
+		get_tree().call_group("dungeons", "note_damage_event", get_parent(), amount, source)
 	_notify.rpc(amount, from, knockback, next_hp)
 
 

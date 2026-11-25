@@ -35,6 +35,27 @@ var _surface_rect: ColorRect
 var _props_root: Node2D
 var _glow_root: Node2D
 var _rock_footprints: Array[RockFootprint] = []
+var _rocky_bbox: Rect2 = Rect2()
+var _has_rocky_bbox: bool = false
+var _rock_bounds: Rect2 = Rect2()
+var _has_rock_bounds: bool = false
+
+
+func _expand_rocky_bbox(r: Rect2) -> void:
+	var padded: Rect2 = r.grow(16.0)
+	if not _has_rocky_bbox:
+		_rocky_bbox = padded
+		_has_rocky_bbox = true
+	else:
+		_rocky_bbox = _rocky_bbox.merge(padded)
+
+
+func _expand_rock_bounds(r: Rect2) -> void:
+	if not _has_rock_bounds:
+		_rock_bounds = r
+		_has_rock_bounds = true
+	else:
+		_rock_bounds = _rock_bounds.merge(r)
 
 
 func _ready() -> void:
@@ -54,6 +75,10 @@ func setup(world_rect: Rect2, texel_px: float = 2.0) -> void:
 	_detail_img = Image.create(_map_w, _map_h, false, Image.FORMAT_RGBA8)
 	_detail_img.fill(Color(0.0, 0.0, 0.0, 0.0))
 	_rock_footprints.clear()
+	_rocky_bbox = Rect2()
+	_has_rocky_bbox = false
+	_rock_bounds = Rect2()
+	_has_rock_bounds = false
 	detail_count = 0
 
 	_prop_mat = ShaderMaterial.new()
@@ -112,6 +137,7 @@ func paint_rocky_highland_zone(rect: Rect2, blend_west_px: float = 48.0, seed_va
 	moss_n.fractal_octaves = 2
 
 	var bb: Rect2 = rect.grow(blend_west_px + 12.0)
+	_expand_rocky_bbox(bb)
 	var x0: int = clampi(floori((bb.position.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var x1: int = clampi(ceili((bb.end.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var y0: int = clampi(floori((bb.position.y - bounds.position.y) / cell_px), 0, _map_h - 1)
@@ -149,6 +175,90 @@ func paint_rocky_highland_zone(rect: Rect2, blend_west_px: float = 48.0, seed_va
 			_detail_img.set_pixel(ix, iy, dt)
 
 
+## Paints an arbitrary closed rocky highland polygon (e.g. WINDKAP headlands & NW cliff tiers) with variable stony loam,
+## fractured scree ribbons, exposed bedrock cores on upper tiers, crustose lichen & highland moss pockets. Worker-safe.
+func paint_rocky_polygon(poly_px: PackedVector2Array, strength: float = 0.85, blend_px: float = 34.0, seed_val: int = 701) -> void:
+	if poly_px.size() < 3 or _strata_img == null or _detail_img == null:
+		return
+	var edge_n: FastNoiseLite = FastNoiseLite.new()
+	edge_n.seed = seed_val
+	edge_n.frequency = 0.017
+	edge_n.fractal_octaves = 2
+
+	var loam_n: FastNoiseLite = FastNoiseLite.new()
+	loam_n.seed = seed_val + 31
+	loam_n.frequency = 0.022
+	loam_n.fractal_octaves = 2
+
+	var scree_n: FastNoiseLite = FastNoiseLite.new()
+	scree_n.seed = seed_val + 73
+	scree_n.frequency = 0.028
+	scree_n.fractal_octaves = 2
+
+	var moss_n: FastNoiseLite = FastNoiseLite.new()
+	moss_n.seed = seed_val + 119
+	moss_n.frequency = 0.030
+	moss_n.fractal_octaves = 2
+
+	var bb: Rect2 = Rect2(poly_px[0], Vector2.ZERO)
+	for pt: Vector2 in poly_px:
+		bb = bb.expand(pt)
+	bb = bb.grow(blend_px + 28.0)
+	_expand_rocky_bbox(bb)
+
+	var x0: int = clampi(floori((bb.position.x - bounds.position.x) / cell_px), 0, _map_w - 1)
+	var x1: int = clampi(ceili((bb.end.x - bounds.position.x) / cell_px), 0, _map_w - 1)
+	var y0: int = clampi(floori((bb.position.y - bounds.position.y) / cell_px), 0, _map_h - 1)
+	var y1: int = clampi(ceili((bb.end.y - bounds.position.y) / cell_px), 0, _map_h - 1)
+	var str_k: float = clampf(strength, 0.15, 1.0)
+	var n_pts: int = poly_px.size()
+
+	for iy: int in range(y0, y1 + 1):
+		for ix: int in range(x0, x1 + 1):
+			var wp: Vector2 = _px_to_world(ix, iy)
+			var inside: bool = Geometry2D.is_point_in_polygon(wp, poly_px)
+			var edge_d: float = 1e9
+			for k: int in n_pts:
+				var a: Vector2 = poly_px[k]
+				var b: Vector2 = poly_px[(k + 1) % n_pts]
+				var ab: Vector2 = b - a
+				var l2: float = ab.length_squared()
+				var t_seg: float = clampf((wp - a).dot(ab) / l2, 0.0, 1.0) if l2 > 0.0001 else 0.0
+				edge_d = minf(edge_d, wp.distance_to(a + ab * t_seg))
+			var signed_d: float = (edge_d if inside else -edge_d) + edge_n.get_noise_2d(wp.x, wp.y) * 24.0
+			var zone_w: float = smoothstep(-blend_px * 0.45, blend_px * 0.85, signed_d)
+			if zone_w <= 0.01:
+				continue
+
+			var st: Color = _strata_img.get_pixel(ix, iy)
+			var dt: Color = _detail_img.get_pixel(ix, iy)
+
+			var ln: float = loam_n.get_noise_2d(wp.x, wp.y) * 0.5 + 0.5
+			var loam_v: float = smoothstep(0.24, 0.68, ln) * zone_w * lerpf(0.68, 0.94, str_k)
+			st.r = maxf(st.r, loam_v)
+
+			var sn: float = scree_n.get_noise_2d(wp.x, wp.y) * 0.5 + 0.5
+			if sn > 0.42:
+				st.g = maxf(st.g, smoothstep(0.42, 0.76, sn) * zone_w * lerpf(0.62, 0.90, str_k))
+
+			# Upper rocky tiers expose stepped bedrock & crustose lichen in their core!
+			if str_k >= 0.34 and signed_d > blend_px * 0.35:
+				var core_w: float = smoothstep(blend_px * 0.35, blend_px * 1.4, signed_d) * smoothstep(0.32, 0.65, str_k)
+				var bn: float = (ln * 0.55 + sn * 0.45)
+				if bn > 0.44:
+					var bv: float = smoothstep(0.44, 0.74, bn) * core_w * 0.88
+					st.b = maxf(st.b, bv)
+					if bv > 0.35:
+						dt.g = maxf(dt.g, smoothstep(0.45, 0.78, sn) * bv * 0.75)
+
+			var mn: float = moss_n.get_noise_2d(wp.x, wp.y) * 0.5 + 0.5
+			if mn > 0.60:
+				dt.r = maxf(dt.r, smoothstep(0.60, 0.82, mn) * zone_w * 0.72)
+
+			_strata_img.set_pixel(ix, iy, st)
+			_detail_img.set_pixel(ix, iy, dt)
+
+
 ## Paints an exposed stratified bedrock shelf / highland stone terrace (`stone` underfoot) with crustose lichens & edge scree.
 func paint_bedrock_shelf(center: Vector2, radii: Vector2, strength: float = 0.94, seed_val: int = 811) -> void:
 	if _strata_img == null or _detail_img == null:
@@ -163,6 +273,7 @@ func paint_bedrock_shelf(center: Vector2, radii: Vector2, strength: float = 0.94
 	lich_n.frequency = 0.048
 
 	var bb: Rect2 = Rect2(center - radii * 1.55, radii * 3.1)
+	_expand_rocky_bbox(bb)
 	var x0: int = clampi(floori((bb.position.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var x1: int = clampi(ceili((bb.end.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var y0: int = clampi(floori((bb.position.y - bounds.position.y) / cell_px), 0, _map_h - 1)
@@ -205,6 +316,7 @@ func paint_scree_fan(center: Vector2, radii: Vector2, strength: float = 0.88, se
 	noise.seed = seed_val
 	noise.frequency = 0.038
 	var bb: Rect2 = Rect2(center - radii * 1.4, radii * 2.8)
+	_expand_rocky_bbox(bb)
 	var x0: int = clampi(floori((bb.position.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var x1: int = clampi(ceili((bb.end.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var y0: int = clampi(floori((bb.position.y - bounds.position.y) / cell_px), 0, _map_h - 1)
@@ -240,6 +352,7 @@ func paint_quarry_trail(points: Array[Vector2], half_width: float = 9.0, seed_va
 	for p: Vector2 in points:
 		bb = bb.expand(p)
 	bb = bb.grow(half_width + 16.0)
+	_expand_rocky_bbox(bb)
 	var x0: int = clampi(floori((bb.position.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var x1: int = clampi(ceili((bb.end.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var y0: int = clampi(floori((bb.position.y - bounds.position.y) / cell_px), 0, _map_h - 1)
@@ -283,6 +396,7 @@ func paint_moss_pocket(center: Vector2, radii: Vector2, strength: float = 0.88, 
 	noise.seed = seed_val
 	noise.frequency = 0.048
 	var bb: Rect2 = Rect2(center - radii * 1.4, radii * 2.8)
+	_expand_rocky_bbox(bb)
 	var x0: int = clampi(floori((bb.position.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var x1: int = clampi(ceili((bb.end.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var y0: int = clampi(floori((bb.position.y - bounds.position.y) / cell_px), 0, _map_h - 1)
@@ -308,12 +422,14 @@ func register_rock_outcrop(center: Vector2, half_w_px: float, body_half_h_px: fl
 	fp.center = center
 	fp.radii = Vector2(maxf(half_w_px, 6.0), maxf(body_half_h_px + 2.0, 4.5))
 	_rock_footprints.append(fp)
+	_expand_rock_bounds(Rect2(center - Vector2(fp.radii.x + 10.0, fp.radii.y + 8.0), Vector2((fp.radii.x + 10.0) * 2.0, fp.radii.y * 2.0 + 28.0)))
 
 	var noise: FastNoiseLite = FastNoiseLite.new()
 	noise.seed = seed_val
 	noise.frequency = 0.052
 	var outer: Vector2 = fp.radii * 2.35 + Vector2(8.0, 6.0)
 	var bb: Rect2 = Rect2(center - outer, outer * 2.0)
+	_expand_rocky_bbox(bb)
 	var x0: int = clampi(floori((bb.position.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var x1: int = clampi(ceili((bb.end.x - bounds.position.x) / cell_px), 0, _map_w - 1)
 	var y0: int = clampi(floori((bb.position.y - bounds.position.y) / cell_px), 0, _map_h - 1)
@@ -416,7 +532,7 @@ func _process(_delta: float) -> void:
 ## Returns underfoot surface ID (`data/terrain.json`) for `Terrain.patches`:
 ## `"stone"` on exposed bedrock shelves, `"gravel"` on angular scree/talus, `"moss"` on moss cushions, `"slope"` on stony loam.
 func surface_at(world_pos: Vector2) -> String:
-	if _strata_img == null or not bounds.has_point(world_pos):
+	if _strata_img == null or not _has_rocky_bbox or not _rocky_bbox.has_point(world_pos) or not bounds.has_point(world_pos):
 		return ""
 	var p: Vector2i = _world_to_px(world_pos)
 	var ix: int = clampi(p.x, 0, _map_w - 1)
@@ -439,7 +555,7 @@ func surface_at(world_pos: Vector2) -> String:
 ## - Clears upright blades on exposed bedrock, packed scree, worn quarry tracks, and +13px south of every `LivingRock` face!
 ## - Tucks short hardy `stone_seam` sedges/clover into bedrock margins, boulder collars, and loose scree aprons!
 func grass_habitat_at(world_pos: Vector2) -> Dictionary:
-	if _strata_img == null or not bounds.has_point(world_pos):
+	if _strata_img == null or not _has_rocky_bbox or not _rocky_bbox.has_point(world_pos) or not bounds.has_point(world_pos):
 		return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
 
 	var r_zone: int = _boulder_grass_zone(world_pos)
@@ -454,24 +570,25 @@ func grass_habitat_at(world_pos: Vector2) -> Dictionary:
 	var st: Color = _strata_img.get_pixel(ix, iy)
 	var dt: Color = _detail_img.get_pixel(ix, iy)
 
-	# Exposed bedrock shelf core stays clean stone; fracture margins get short crevice tufts!
-	if st.b >= 0.52 and dt.r < 0.45:
+	# Exposed bedrock shelf core stays clean stone; fracture margins & ledges get short crevice tufts!
+	if st.b >= 0.66 and dt.r < 0.42:
 		return {"density": 0.0, "height_scale": 0.55, "style": "none"}
-	if st.b >= 0.24:
-		return {"density": 0.52, "height_scale": 0.56, "style": "stone_seam"}
+	if st.b >= 0.22:
+		var bt: float = clampf((st.b - 0.22) / 0.44, 0.0, 1.0)
+		return {"density": lerpf(0.62, 0.24, bt), "height_scale": lerpf(0.66, 0.54, bt), "style": "stone_seam"}
 
-	# Packed angular scree core stays clear; outer loose scree apron grows sparse hardy tufts
-	if st.g >= 0.52 and dt.r < 0.45:
+	# Packed angular scree core stays clear; outer loose scree & rocky loam grow natural hardy highland tufts!
+	if st.g >= 0.64 and dt.r < 0.42:
 		return {"density": 0.0, "height_scale": 0.55, "style": "none"}
-	if dt.a >= 0.52 or st.r >= 0.66:
+	if dt.a >= 0.52 or st.r >= 0.78:
 		return {"density": 0.0, "height_scale": 0.55, "style": "none"}
 
-	if st.g >= 0.20 or st.r >= 0.22:
-		var rockiness: float = clampf(maxf((st.g - 0.20) / 0.34, (st.r - 0.22) / 0.46), 0.0, 1.0)
+	if st.g >= 0.18 or st.r >= 0.20:
+		var rockiness: float = clampf(maxf((st.g - 0.18) / 0.46, (st.r - 0.20) / 0.58), 0.0, 1.0)
 		return {
-			"density": lerpf(0.86, 0.22, rockiness),
+			"density": lerpf(0.88, 0.28, rockiness),
 			"height_scale": lerpf(0.90, 0.58, rockiness),
-			"style": "stone_seam" if rockiness > 0.48 else "path_edge",
+			"style": "stone_seam" if rockiness > 0.44 else "path_edge",
 		}
 
 	if dt.r >= 0.36:
@@ -480,14 +597,87 @@ func grass_habitat_at(world_pos: Vector2) -> Dictionary:
 	return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
 
 
+var _strata_bytes: PackedByteArray = PackedByteArray()
+var _detail_bytes: PackedByteArray = PackedByteArray()
+
+
+func prepare_fast_queries() -> void:
+	if _strata_img != null:
+		_strata_bytes = _strata_img.get_data()
+	if _detail_img != null:
+		_detail_bytes = _detail_img.get_data()
+
+
+## Zero-allocation habitat query for `LivingGrass._build_tufts()` (`Vector3(density, height_scale, style_code)`).
+func grass_habitat_vec(world_pos: Vector2) -> Vector3:
+	if _strata_img == null or not _has_rocky_bbox or not _rocky_bbox.has_point(world_pos) or not bounds.has_point(world_pos):
+		return Vector3(1.0, 1.0, 1.0)
+
+	var r_zone: int = _boulder_grass_zone(world_pos)
+	if r_zone == 2:
+		return Vector3(0.0, 0.55, 0.0)
+	if r_zone == 1:
+		return Vector3(0.68, 0.58, 2.0)
+
+	var inv_c: float = 1.0 / cell_px
+	var ix: int = clampi(floori((world_pos.x - bounds.position.x) * inv_c), 0, _map_w - 1)
+	var iy: int = clampi(floori((world_pos.y - bounds.position.y) * inv_c), 0, _map_h - 1)
+	var st_r: float
+	var st_g: float
+	var st_b: float
+	var dt_r: float
+	var dt_a: float
+	if not _strata_bytes.is_empty() and not _detail_bytes.is_empty():
+		var bi: int = (iy * _map_w + ix) * 4
+		st_r = float(_strata_bytes[bi]) * (1.0 / 255.0)
+		st_g = float(_strata_bytes[bi + 1]) * (1.0 / 255.0)
+		st_b = float(_strata_bytes[bi + 2]) * (1.0 / 255.0)
+		dt_r = float(_detail_bytes[bi]) * (1.0 / 255.0)
+		dt_a = float(_detail_bytes[bi + 3]) * (1.0 / 255.0)
+	else:
+		var st: Color = _strata_img.get_pixel(ix, iy)
+		var dt: Color = _detail_img.get_pixel(ix, iy)
+		st_r = st.r
+		st_g = st.g
+		st_b = st.b
+		dt_r = dt.r
+		dt_a = dt.a
+
+	if st_b >= 0.66 and dt_r < 0.42:
+		return Vector3(0.0, 0.55, 0.0)
+	if st_b >= 0.22:
+		var bt: float = clampf((st_b - 0.22) / 0.44, 0.0, 1.0)
+		return Vector3(lerpf(0.62, 0.24, bt), lerpf(0.66, 0.54, bt), 2.0)
+
+	if st_g >= 0.64 and dt_r < 0.42:
+		return Vector3(0.0, 0.55, 0.0)
+	if dt_a >= 0.52 or st_r >= 0.78:
+		return Vector3(0.0, 0.55, 0.0)
+
+	if st_g >= 0.18 or st_r >= 0.20:
+		var rockiness: float = clampf(maxf((st_g - 0.18) / 0.46, (st_r - 0.20) / 0.58), 0.0, 1.0)
+		return Vector3(lerpf(0.88, 0.28, rockiness), lerpf(0.90, 0.58, rockiness), 2.0 if rockiness > 0.44 else 3.0)
+
+	if dt_r >= 0.36:
+		return Vector3(0.76, 0.78, 5.0)
+
+	return Vector3(1.0, 1.0, 1.0)
+
+
 func _boulder_grass_zone(world_pos: Vector2) -> int:
+	if _rock_footprints.is_empty() or not _has_rock_bounds or not _rock_bounds.has_point(world_pos):
+		return 0
 	var zone: int = 0
 	for fp: RockFootprint in _rock_footprints:
 		var dx: float = absf(world_pos.x - fp.center.x)
-		var dy: float = world_pos.y - fp.center.y
 		var rx_in: float = fp.radii.x + 2.0
+		if dx > rx_in + 6.0:
+			continue
+		var dy: float = world_pos.y - fp.center.y
 		var ry_n: float = fp.radii.y + 1.0
 		var ry_s: float = fp.radii.y + 13.0
+		if dy < -(ry_n + 5.0) or dy > (ry_s + 5.0):
+			continue
 		var ny: float = dy / (ry_s if dy >= 0.0 else ry_n)
 		var nx: float = dx / rx_in
 		if (nx * nx + ny * ny) <= 1.0:

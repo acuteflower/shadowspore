@@ -254,11 +254,12 @@ func _step_flashes(delta: float) -> void:
 
 func _step_camera(delta: float) -> void:
 	var cam: Camera2D = _player.view_camera()
-	var zoom_goal: float = lerpf(1.0, ZOOM, smoothstep(0.0, 1.6, _t))
+	var base_z: float = _zoom0.x if _zoom0.x > 0.05 else Player.DEFAULT_CAMERA_ZOOM.x
+	var zoom_goal: float = lerpf(base_z, ZOOM, smoothstep(0.0, 1.6, _t))
 	if _land >= 0.0:
 		zoom_goal += 0.06 * smoothstep(0.0, 3.0, _land)
 	if _leave > 0.0:
-		zoom_goal = lerpf(zoom_goal, 1.0, _leave)
+		zoom_goal = lerpf(zoom_goal, base_z, _leave)
 	cam.zoom = Vector2.ONE * zoom_goal
 	var spot: Vector2 = _boss.call("landing_spot") as Vector2
 	var eye: Vector2 = _boss.call("eye_position") as Vector2

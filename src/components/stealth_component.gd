@@ -19,10 +19,12 @@ var sneaking: bool = false:
 
 
 func detection_multiplier() -> float:
+	var vt: VeilThreads = VeilThreads.of(get_tree()) if is_inside_tree() else null
+	var spore_scale: float = vt.stealth_spook_scale() if vt != null else 1.0
 	if not sneaking:
-		return 1.0
+		return spore_scale
 	var shade_bonus: float = lerpf(1.0, float(MovementRules.section("impulse").get("shadow_stealth_bonus", 0.76)), clampf(shadow_cover, 0.0, 1.0))
-	return sneak_detection_multiplier * shade_bonus
+	return sneak_detection_multiplier * shade_bonus * spore_scale
 
 
 ## Talismans (Schweigtropfen), weather cover, and Movement 2.0 surface acoustics (`surface_noise_mult` + brief `impulse_bonus`).

@@ -112,6 +112,48 @@ static func is_last_engaged_threat(player: Player, dying_targets: Array[Node2D])
 	return true
 
 
+## True when `player` is in a state that allows starting a finisher at all (alive, free, on foot, not in another special move).
+static func player_can_finish(p: Player) -> bool:
+	if p == null or not is_instance_valid(p) or p.finisher == null or p.finisher.active():
+		return false
+	if not p.is_inside_tree() or not p.is_physics_processing():
+		return false
+	if p.health.current <= 0.0 or p.intro != null or p.story_lock or p.fainting or p.stumbling:
+		return false
+	if p.swim > 0 or p.climb.active() or p.carry_stone != 0 or (p.agile != null and p.agile.active()):
+		return false
+	return true
+
+
+## Host, Finisher V2 "Kern entblößt" (docs/finisher_v2_konzept.md): could a nearby player finish `target` right now?
+## 0 = no; 1 = the next sword blow is lethal anyway (the hurtbox then guarantees it, `ShadowSpider.evaluate_hurtbox_hit`); 2 = only E (EXPOSED).
+static func ready_kind_for(target: Node2D, health: HealthComponent, exposed: bool) -> int:
+	if target == null or health == null or health.current <= 0.0 or not target.is_inside_tree():
+		return 0
+	if target.has_method("can_accept_finisher") and not bool(target.call("can_accept_finisher")):
+		return 0
+	if pick_move_for_target(target) == "":
+		return 0
+	var radius: float = float(settings().get("ready_scan_radius", 120.0))
+	var best: int = 0
+	for node: Node in target.get_tree().get_nodes_in_group("players"):
+		var p: Player = node as Player
+		if p == null or not is_instance_valid(p) or p.global_position.distance_to(target.global_position) > radius:
+			continue
+		if not player_can_finish(p) or p.inventory == null:
+			continue
+		var stack: Dictionary = p.inventory.active_stack()
+		if not weapon_supports_finisher(stack):
+			continue
+		if not is_target_boss(target) and not is_last_engaged_threat(p, [target]):
+			continue
+		if health.current <= Items.stat(stack, "damage", 1.0):
+			return 1
+		if exposed:
+			best = 2
+	return best
+
+
 static func _floor_at(tree: SceneTree, pos: Vector2) -> int:
 	for world: Node in tree.get_nodes_in_group("world"):
 		if world.has_method("navigation_floor"):

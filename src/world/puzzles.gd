@@ -23,31 +23,65 @@ func _ready() -> void:
 	add_to_group("puzzles")
 	y_sort_enabled = true
 	var table: Dictionary = DataRegistry.table("puzzles")
-	for entry: Dictionary in table.get(source, []) as Array:
-		var trial_id: String = String(entry.get("id", ""))
-		var kind: String = String(entry.get("kind", ""))
-		if trial_id == "" or _trials.has(trial_id) or not KINDS.has(kind):
-			continue
-		var node: WorldTrial = null
-		match kind:
-			"wisp":
-				node = WispTrail.new()
-			"crow_hoard", "raven_trade":
-				node = CrowHoard.new()
-			"root_weave":
-				node = RootWeave.new()
-			"star_mirror":
-				node = StarMirror.new()
-			"prism_seal":
-				node = PrismSeal.new()
-		node.name = "Trial_" + trial_id
-		node.setup(entry, table.get(String(KINDS[kind]), {}) as Dictionary)
-		node.solved.connect(_on_trial_solved)
-		add_child(node)
-		_trials[trial_id] = node
-		_specs[trial_id] = entry
+	if not source.is_empty():
+		for entry: Dictionary in table.get(source, []) as Array:
+			place_trial(entry, Vector2.ZERO)
 	if multiplayer.is_server():
 		multiplayer.peer_connected.connect(func(peer: int) -> void: _rpc_snapshot.rpc_id(peer, PackedStringArray(_solved.keys()), _progress()))
+
+
+## Dynamically place a trial (used by v2 zones when a ZoneStage attaches). `origin_tile` offsets zone-local tile coordinates.
+func place_trial(raw_entry: Dictionary, origin_tile: Vector2 = Vector2.ZERO) -> WorldTrial:
+	var entry: Dictionary = _offset_entry(raw_entry, origin_tile) if origin_tile != Vector2.ZERO else raw_entry
+	var trial_id: String = String(entry.get("id", ""))
+	var kind: String = String(entry.get("kind", ""))
+	if trial_id == "" or not KINDS.has(kind):
+		return null
+	if _trials.has(trial_id):
+		return _trials[trial_id] as WorldTrial
+	var table: Dictionary = DataRegistry.table("puzzles")
+	var node: WorldTrial = null
+	match kind:
+		"wisp":
+			node = WispTrail.new()
+		"crow_hoard", "raven_trade":
+			node = CrowHoard.new()
+		"root_weave":
+			node = RootWeave.new()
+		"star_mirror":
+			node = StarMirror.new()
+		"prism_seal":
+			node = PrismSeal.new()
+	if node == null:
+		return null
+	node.name = "Trial_" + trial_id
+	node.setup(entry, table.get(String(KINDS[kind]), {}) as Dictionary)
+	node.solved.connect(_on_trial_solved)
+	add_child(node)
+	_trials[trial_id] = node
+	_specs[trial_id] = entry
+	if _solved.has(trial_id):
+		node.set_solved_instant()
+	return node
+
+
+static func _offset_entry(raw_entry: Dictionary, origin_tile: Vector2) -> Dictionary:
+	var out: Dictionary = raw_entry.duplicate(true)
+	for key: String in ["tile", "mound"]:
+		var val: Variant = out.get(key)
+		if val is Array and (val as Array).size() >= 2:
+			var arr: Array = val as Array
+			out[key] = [float(arr[0]) + origin_tile.x, float(arr[1]) + origin_tile.y]
+	for list_key: String in ["route", "stations"]:
+		var list_v: Variant = out.get(list_key)
+		if list_v is Array:
+			var shifted: Array = []
+			for pt_v: Variant in list_v as Array:
+				if pt_v is Array and (pt_v as Array).size() >= 2:
+					var pa: Array = pt_v as Array
+					shifted.append([float(pa[0]) + origin_tile.x, float(pa[1]) + origin_tile.y])
+			out[list_key] = shifted
+	return out
 
 
 ## Where the world must stay free of generated props: [world px, radius in tiles].

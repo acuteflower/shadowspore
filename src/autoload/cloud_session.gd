@@ -14,7 +14,7 @@ const AUTO_SAVE_INTERVAL_SEC: float = 20.0
 const DIRTY_SAVE_DEBOUNCE_SEC: float = 1.25
 const SNAPSHOT_REFRESH_SEC: float = 1.5
 const QUIT_FLUSH_TIMEOUT_MSEC: int = 3200
-const COOP_PORTABLE_KEYS: PackedStringArray = ["health", "copper", "xp", "claimed", "skill_tree", "slots", "equipment", "raw_rolls", "bandaged", "appearance"]
+const COOP_PORTABLE_KEYS: PackedStringArray = ["health", "copper", "xp", "claimed", "skill_tree", "slots", "equipment", "raw_rolls", "bandaged", "appearance", "dungeons"]
 const COOP_PRESERVE_KEYS: PackedStringArray = ["pos", "quests", "board_local"]
 
 signal auth_changed(logged_in: bool)
@@ -22,6 +22,9 @@ signal profile_loaded(profile: Dictionary)
 signal save_info_changed()
 signal auto_save_finished(ok: bool)
 signal _async_local_save_finished(ok: bool)
+signal realtime_envelope(envelope: Dictionary)
+signal realtime_connected()
+signal realtime_disconnected()
 signal friends_changed()
 signal friends_list_loaded(friends: Array)
 signal notifications_changed()
@@ -62,6 +65,7 @@ var friends_cache: Array[Dictionary] = []
 var notifications: Array[Dictionary] = []
 
 var _notif_ws: WebSocketPeer = WebSocketPeer.new()
+var _chat_socket_open: bool = false
 var _notif_ws_token: String = ""
 var _notif_ws_retry_t: float = 0.0
 var _ipc_server: TCPServer = null
@@ -85,6 +89,12 @@ var _solo_profile_preserve: Dictionary = {}
 var _watched_world_id: int = 0
 var _watched_player_id: int = 0
 var _http_timeout_override_msec: int = 0
+var _server_clock_offset_sec: int = 0
+
+
+## Returns the best available UTC unix timestamp (Nakama server offset when synced, local clock fallback).
+func server_unix_time() -> int:
+	return int(Time.get_unix_time_from_system()) + _server_clock_offset_sec
 
 
 class _AutoSaveDriver extends Node:
@@ -384,7 +394,7 @@ func refresh_cloud_save_info() -> void:
 
 
 func _apply_world_meta(meta: Dictionary) -> void:
-	if meta.is_empty() or bool(meta.get("empty", false)):
+	if meta.is_empty() or bool(meta.get("empty", false)) or int(meta.get("version", 0)) < SaveGame.VERSION:
 		has_cloud_save = false
 		cloud_save_day = -1
 		cloud_save_time = 0.0
@@ -562,7 +572,7 @@ func save_world_state(world_data: Dictionary) -> bool:
 	var res: Dictionary = await _call_ok_rpc("save_cloud_world", {"data": wrapped})
 	var ok: bool = bool(res.get("ok", false))
 	if ok:
-		_apply_world_meta({"day": day_val, "time": time_val, "saved_at": saved_val})
+		_apply_world_meta({"version": SaveGame.VERSION, "day": day_val, "time": time_val, "saved_at": saved_val})
 	return ok
 
 
@@ -617,7 +627,12 @@ func load_world_state() -> Dictionary:
 	var wrapped: Dictionary = await read_storage("saves", "world_state")
 	if wrapped.is_empty() or bool(wrapped.get("empty", false)):
 		return {}
-	return SaveGame.decompress_json(String(wrapped.get("gz", "")))
+	if int(wrapped.get("version", 0)) < SaveGame.VERSION:
+		return {}
+	var data: Dictionary = SaveGame.decompress_json(String(wrapped.get("gz", "")))
+	if data.is_empty() or int(data.get("version", 0)) < SaveGame.VERSION:
+		return {}
+	return data
 
 
 ## Loads account's `player_profile` and (if server/host) `world_state` into the active world.
@@ -629,10 +644,10 @@ func load_cloud_into(tree: SceneTree, resume: bool = true) -> bool:
 	var player: Player = SaveGame._local_player(tree)
 	if player == null:
 		return false
-	var pdata: Dictionary = await load_player_profile()
 	var wdata: Dictionary = await load_world_state()
-	if wdata.is_empty():
+	if wdata.is_empty() or int(wdata.get("version", 0)) < SaveGame.VERSION:
 		return false
+	var pdata: Dictionary = await load_player_profile()
 	if not pdata.is_empty():
 		_remember_solo_preserve(pdata)
 		SaveGame.import_player_data(player, pdata, true, true)
@@ -1063,10 +1078,12 @@ func refresh_friends() -> Array[Dictionary]:
 func fetch_notifications() -> Array[Dictionary]:
 	if not is_logged_in():
 		return notifications
+	var account: String = user_id
 	var res: Dictionary = await _request_json(HTTPClient.METHOD_GET, "/v2/notification?limit=20", "", true)
-	if not bool(res.get("ok", false)):
+	if user_id != account or not bool(res.get("ok", false)):
 		return notifications
 	var raw_list: Array = SaveGame.as_array(SaveGame.as_dict(res.get("data")).get("notifications"))
+	Chat.handle_invites(raw_list)
 	var out: Array[Dictionary] = []
 	for item: Variant in raw_list:
 		if not (item is Dictionary):
@@ -1266,9 +1283,27 @@ func _read_cmdline_args() -> void:
 			refresh_token = arg.substr("--nakama-refresh=".length())
 
 
+func send_realtime(envelope: Dictionary) -> Error:
+	if _notif_ws.get_ready_state() != WebSocketPeer.STATE_OPEN or not is_logged_in():
+		return ERR_UNAVAILABLE
+	return _notif_ws.send_text(JSON.stringify(envelope))
+
+
+func recent_chat_messages(channel_id: String) -> Array:
+	var result: Dictionary = await _request_json(HTTPClient.METHOD_GET, "/v2/channel/%s?limit=50&forward=false" % channel_id.uri_encode(), "", true)
+	return SaveGame.as_array(SaveGame.as_dict(result.get("data")).get("messages"))
+
+
 func _poll_notif_ws(delta: float) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
+	var connected: bool = is_logged_in() and _notif_ws.get_ready_state() == WebSocketPeer.STATE_OPEN
+	if connected != _chat_socket_open:
+		_chat_socket_open = connected
+		if connected:
+			realtime_connected.emit()
+		else:
+			realtime_disconnected.emit()
 	if not is_logged_in():
 		if _notif_ws.get_ready_state() != WebSocketPeer.STATE_CLOSED:
 			_notif_ws.close()
@@ -1298,6 +1333,7 @@ func _poll_notif_ws(delta: float) -> void:
 
 
 func _handle_ws_envelope(env: Dictionary) -> void:
+	realtime_envelope.emit(env)
 	if not env.has("notifications"):
 		return
 	var container: Dictionary = SaveGame.as_dict(env.get("notifications"))

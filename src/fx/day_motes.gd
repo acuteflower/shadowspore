@@ -49,7 +49,7 @@ func _ready() -> void:
 func _density() -> float:
 	var base: float = clampf(0.9 * TimeManager.sun_amount() + 0.9 * TimeManager.golden_amount(), 0.0, 1.0)
 	var magic_desert: float = maxf(WeatherManager.resonance_now() * 0.88, WeatherManager.arcane_storm_now() * 0.96)
-	return maxf(base, magic_desert)
+	return maxf(base * ZoneMood.value("motes"), magic_desert) ## the zone's pollen (2.0 zone world, 1 elsewhere)
 
 
 func _process(delta: float) -> void:

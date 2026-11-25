@@ -1,5 +1,8 @@
 # Die Seehexe und ihr Haus am Rand (Konzept, 2026-11-11)
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 Status: **Alle drei Schritte gebaut (2026-11-11), siehe Abschnitt 13.** Setzt Punkt 12.4 aus `docs/magie_konzept.md` um („Die Seehexe, ihre Hütte unten links am Hexenwald-See“). Offene Entscheidungen stehen in Abschnitt 12, der Einbauplan in Abschnitt 11.
 
 ## 1. Idee in einem Satz

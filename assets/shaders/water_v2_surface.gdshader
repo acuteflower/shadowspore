@@ -17,6 +17,8 @@ uniform sampler2D wave_ringbuffer : filter_linear, repeat_enable;
 
 uniform float bank_reach_px = 18.0;
 uniform float deep_threshold = 0.64;
+uniform vec2 sand_drift = vec2(0.0);
+uniform float dune_creep = 0.0;
 
 varying vec2 v_world_px;
 
@@ -34,39 +36,40 @@ vec2 w2_sdf_gradient(vec2 sample_pos) {
 	return length(g) > 0.001 ? normalize(g) : vec2(1.0, 0.0);
 }
 
-// Natural, rounded underwater bed rendering (no rigid 4x3 brick grids!).
+// Natural, varied underwater bed rendering (cohesive organic shingle, sunlit sand ripples, slate, woodland silt).
 vec3 w2_render_bed(vec2 ref_px, int bed_id, float depth, vec2 flow_v) {
 	if (bed_id == 1) {
-		// Smoothly graded river shingle + organic jittered rounded river cobbles (top-left lit)
-		float bed_macro = w2_fbm(ref_px / 14.0 + vec2(5.2, 11.4));
-		vec3 base = mix(vec3(0.35, 0.37, 0.35), vec3(0.48, 0.47, 0.41), bed_macro);
+		// Smoothly graded woodland river gravel + natural varied river stones (no uniform polka dots!)
+		float bed_macro = w2_fbm(ref_px / 16.0 + vec2(5.2, 11.4));
+		float shingle_var = w2_vnoise(ref_px / 7.5 + vec2(23.0, 7.0));
+		vec3 base = mix(vec3(0.28, 0.33, 0.31), vec3(0.45, 0.46, 0.39), clamp(bed_macro * 0.72 + shingle_var * 0.28, 0.0, 1.0));
 
-		vec2 cell = floor(ref_px / vec2(6.0, 5.0));
+		vec2 cell = floor(ref_px / vec2(8.0, 6.5));
 		float h = w2_hash(cell + vec2(13.0, 29.0));
-		if (h > 0.44) {
-			vec2 jitter = vec2(w2_hash(cell + 3.0), w2_hash(cell + 9.0)) * vec2(2.4, 2.0) + vec2(1.8, 1.5);
-			vec2 p_center = cell * vec2(6.0, 5.0) + jitter;
-			vec2 d = (ref_px - p_center) / vec2(2.1 + fract(h * 7.3) * 0.8, 1.6 + fract(h * 11.1) * 0.6);
+		if (h > 0.56) {
+			vec2 jitter = vec2(w2_hash(cell + 3.0), w2_hash(cell + 9.0)) * vec2(3.4, 2.6) + vec2(2.0, 1.8);
+			vec2 p_center = cell * vec2(8.0, 6.5) + jitter;
+			vec2 d = (ref_px - p_center) / vec2(2.3 + fract(h * 7.3) * 1.1, 1.6 + fract(h * 11.1) * 0.8);
 			float r2 = dot(d, d);
 			if (r2 < 1.0) {
-				vec3 stone_hi = mix(vec3(0.55, 0.54, 0.47), vec3(0.46, 0.51, 0.46), fract(h * 17.0));
-				vec3 stone_sh = stone_hi * 0.68;
-				float lit = clamp(0.55 - d.x * 0.35 - d.y * 0.45, 0.0, 1.0);
+				vec3 stone_hi = mix(vec3(0.52, 0.53, 0.45), vec3(0.42, 0.48, 0.44), fract(h * 17.0));
+				vec3 stone_sh = stone_hi * 0.72;
+				float lit = clamp(0.55 - d.x * 0.32 - d.y * 0.42, 0.0, 1.0);
 				base = mix(stone_sh, stone_hi, lit);
 			}
 		}
 		return base;
 	} else if (bed_id == 2) {
-		// Sunlit underwater coastal sand ripples
-		float rip = sin(ref_px.x * 0.25 + ref_px.y * 0.14 + w2_fbm(ref_px / 16.0) * 2.8);
+		// Sunlit underwater coastal sand ripples (matches dry sand palette seamlessly!)
+		float rip = sin(ref_px.x * 0.22 + ref_px.y * 0.16 + w2_fbm(ref_px / 16.0) * 2.8);
 		float m = w2_fbm(ref_px / 22.0 + vec2(9.0, 4.0));
-		return mix(vec3(0.68, 0.58, 0.42), vec3(0.86, 0.76, 0.56), clamp(0.5 + rip * 0.22 + (m - 0.5) * 0.28, 0.0, 1.0));
+		return mix(vec3(0.64, 0.55, 0.41), vec3(0.86, 0.77, 0.58), clamp(0.5 + rip * 0.22 + (m - 0.5) * 0.28, 0.0, 1.0));
 	} else if (bed_id == 3 || bed_id == 6) {
 		return w2_shade_coast_rock(ref_px) * (bed_id == 6 ? vec3(0.62, 0.76, 0.82) : vec3(0.84, 0.88, 0.94));
 	}
-	// Rich woodland silt / loam bed (bed_id == 4 / fallback)
+	// Rich woodland silt / loam bed (bed_id == 4 / 5 / fallback)
 	float s_n = w2_fbm(ref_px / 15.0 + vec2(14.0, 8.0));
-	return mix(vec3(0.22, 0.25, 0.22), vec3(0.34, 0.35, 0.29), s_n);
+	return mix(vec3(0.22, 0.26, 0.23), vec3(0.35, 0.36, 0.30), s_n);
 }
 
 // Sculpted 3/4 riparian cushion-moss bank matching the meadow turf palette cleanly.
@@ -83,24 +86,31 @@ vec3 w2_shade_bank_moss(vec2 px, float wet) {
 	return w2_clean_ramp5(m0, m1, m2, m3, m4, t);
 }
 
-// Blends coastal dry sand and stratified slate headland at 1px precision (zero 2x2 texel stairs!).
+// Blends crisp pixel-art wind-swept coastal sand, glistening wet swash mirror, and stratified slate headland!
 vec3 w2_blend_coast_ground(vec2 px, vec2 sample_pos, float sdf_px, float wetness, float turb) {
-	float w_rock = w2_bilinear_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 3);
-	float wrack = smoothstep(14.0, 20.0, sdf_px) * (1.0 - smoothstep(23.0, 31.0, sdf_px));
-	vec3 sand_col = w2_shade_dry_sand(px, wrack);
+	float w_rock = w2_soft_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 3);
+	vec3 sand_col = w2_shade_dry_sand(px, sand_drift, dune_creep, wetness);
 
 	if (wetness > 0.04) {
-		float wet_contour = clamp(wetness + (w2_fbm(px / 11.0 + vec2(3.0, 9.0)) - 0.5) * 0.16, 0.0, 1.0);
-		float wet_step = floor(wet_contour * 8.0 + 0.5) / 8.0;
-		vec3 wet_sand = sand_col * vec3(0.62, 0.60, 0.64);
-		wet_sand = mix(wet_sand, vec3(0.44, 0.53, 0.60), wetness * 0.20 * (1.0 - g_night * 0.6));
-		vec4 mirror = w2_reflect_at(px, vec2(0.0), 0.14, g_water_time);
+		float wet_contour = clamp(wetness + (w2_fbm(px / 10.5 + vec2(3.0, 9.0)) - 0.5) * 0.16, 0.0, 1.0);
+		// Crisp 6-step pixel-art drying contour + dark capillary moisture rim at the tide edge!
+		float wet_step = floor(wet_contour * 6.0 + 0.5) / 6.0;
+		float cap_rim = smoothstep(0.08, 0.24, wet_contour) * (1.0 - smoothstep(0.24, 0.44, wet_contour));
+		vec3 wet_sand = sand_col * vec3(0.57, 0.56, 0.62);
+		// Cool sunlit sky-film sheen on freshly washed mirror sand (softens cleanly at night)
+		float mirror_k = smoothstep(0.42, 0.96, wet_contour);
+		vec3 sky_sheen = mix(vec3(0.46, 0.62, 0.68), vec3(0.22, 0.30, 0.48), g_night);
+		sky_sheen = mix(sky_sheen, vec3(0.92, 0.76, 0.54), g_day_gold * 0.48 * (1.0 - g_night));
+		wet_sand = mix(wet_sand, sky_sheen, mirror_k * 0.24);
+		vec4 mirror = w2_reflect_at(px, vec2(0.0), 0.12, g_water_time);
 		if (mirror.a > 0.02 && wetness > 0.24) {
-			wet_sand = mix(wet_sand, reflect_tint(mirror.rgb, wet_sand), mirror.a * wetness * 0.48);
+			wet_sand = mix(wet_sand, reflect_tint(mirror.rgb, wet_sand), mirror.a * wetness * 0.50);
 		}
 		sand_col = mix(sand_col, wet_sand, wet_step);
+		// Crisp narrow capillary darkening right where dry sand wicks up seawater
+		sand_col *= mix(vec3(1.0), vec3(0.84, 0.81, 0.82), cap_rim * 0.55);
 	} else if (turb > 0.10) {
-		sand_col *= mix(vec3(1.0), vec3(0.80, 0.77, 0.74), smoothstep(0.10, 0.60, turb) * 0.42);
+		sand_col *= mix(vec3(1.0), vec3(0.78, 0.75, 0.74), smoothstep(0.10, 0.60, turb) * 0.45);
 	}
 
 	if (w_rock <= 0.02) {
@@ -108,17 +118,17 @@ vec3 w2_blend_coast_ground(vec2 px, vec2 sample_pos, float sdf_px, float wetness
 	}
 	vec3 rock_col = w2_shade_coast_rock(px);
 	if (wetness > 0.05) {
-		rock_col *= mix(vec3(1.0), vec3(0.58, 0.62, 0.74), wetness * 0.80);
+		rock_col *= mix(vec3(1.0), vec3(0.56, 0.61, 0.74), wetness * 0.80);
 	}
 	if (w_rock >= 0.98) {
 		return rock_col;
 	}
 	// 1px-crisp organic slate-to-sand contour with a narrow damp sand toe shadow
-	float rock_f = w_rock + (w2_fbm(px / 7.0 + vec2(6.0, 13.0)) - 0.5) * 0.30;
-	float rock_k = smoothstep(0.44, 0.58, rock_f);
-	float toe_damp = smoothstep(0.24, 0.46, rock_f) * (1.0 - rock_k);
-	vec3 damp_sand_toe = sand_col * vec3(0.76, 0.72, 0.68);
-	return mix(mix(sand_col, damp_sand_toe, toe_damp * 0.75), rock_col, rock_k);
+	float rock_f = w_rock + (w2_fbm(px / 7.5 + vec2(6.0, 13.0)) - 0.5) * 0.32;
+	float rock_k = smoothstep(0.44, 0.56, rock_f);
+	float toe_damp = smoothstep(0.22, 0.45, rock_f) * (1.0 - rock_k);
+	vec3 damp_sand_toe = sand_col * vec3(0.75, 0.71, 0.69);
+	return mix(mix(sand_col, damp_sand_toe, toe_damp * 0.78), rock_col, rock_k);
 }
 
 vec3 w2_rain_rings(vec2 px, vec3 col, float t) {
@@ -176,31 +186,35 @@ void fragment() {
 	bool is_puddle_surface = false;
 
 	if (regime == 0) {
-		// Dry coastal sand & rocky headland (Square -2) — 1px bilinear lobes feathering into dune meadow!
-		float w_sand = w2_bilinear_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 2);
-		float w_rock = w2_bilinear_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 3);
+		// Dry coastal dunes & rocky headland — crisp clod-warped sandy-loam drifts feathering harmoniously into meadow turf!
+		float w_sand = w2_soft_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 2);
+		float w_rock = w2_soft_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 3);
 		float w_coast = clamp(w_sand + w_rock, 0.0, 1.0);
 		if (w_coast <= 0.01) {
 			discard;
 		}
 		col = w2_blend_coast_ground(px, sample_pos, sdf_px, 0.0, flow.z);
 		if (w_coast < 0.99) {
-			float fray = w_coast + (w2_fbm(px / 11.5 + vec2(17.0, 3.0)) - 0.5) * 0.42;
-			if (fray < 0.44) {
+			// Multi-scale organic windblown sand pockets (ZERO 4px/16px blocky staircases!)
+			float clod = w2_fbm(px / 13.0 + vec2(17.0, 3.0)) * 0.68
+				+ w2_vnoise(floor(px / 2.0) * 0.62 + vec2(9.0, 41.0)) * 0.32 - 0.5;
+			float fray = w_coast + clod * 0.58;
+			if (fray < 0.42) {
 				discard;
 			}
-			// Warm sandy-turf transition lip into coastal grass (1px smooth, zero 2x2 stairs!)
-			float rim_blend = smoothstep(0.44, 0.72, fray);
-			col = mix(vec3(0.44, 0.55, 0.34), col, rim_blend);
-			alpha = smoothstep(0.44, 0.56, fray);
+			// Harmonious sandy-loam & sage coastal-turf border lip (matches GroundSurfaces & LivingGrass!)
+			float rim_inner = smoothstep(0.42, 0.74, fray);
+			vec3 sandy_turf = mix(vec3(0.34, 0.49, 0.31), vec3(0.58, 0.57, 0.39), smoothstep(0.42, 0.62, fray));
+			col = mix(sandy_turf, col, rim_inner);
+			// Crisp 1px pixel-art border edge (zero muddy wide transparency halo!)
+			alpha = smoothstep(0.42, 0.50, fray);
 		}
 	} else if (regime == 5) {
-		// R5: Crisp 1px-framed pixel-art puddles & tidepools (crystal sand puddles, crisp wet-rim Rahmen, zero airbrush blur or 3x2 blocks!)
+		// R5: Crisp 1px-framed pixel-art puddles & tidepools
 		float edge_warp = (w2_fbm(px / 6.5 + vec2(9.1, 4.3)) - 0.5) * 2.6 + (w2_vnoise(px / 3.0) - 0.5) * 0.65;
 		float p_sdf = puddle_eff + edge_warp;
 		vec2 p_grad = w2_sdf_gradient(sample_pos);
 		float p_north = clamp(-p_grad.y, 0.0, 1.0);
-		float p_sun = clamp(dot(p_grad, vec2(0.55, 0.83)), 0.0, 1.0);
 
 		if (p_sdf <= 0.0) {
 			is_puddle_surface = true;
@@ -214,7 +228,6 @@ void fragment() {
 			float band_y = floor(clamp(0.52 + 0.42 * sin((px.y + wob * 8.0) * 0.095), 0.0, 0.99) * 5.0) / 4.0;
 
 			if (bed_id == 2) {
-				// Coastal beach-sand puddle: luminous crystal sea-turquoise over golden sand + crisp 1px meniscus!
 				vec3 sea_shallow = vec3(0.46, 0.85, 0.81);
 				vec3 sea_mid = vec3(0.23, 0.69, 0.68);
 				vec3 aqua = mix(sea_shallow, sea_mid, clamp(depth_n * 0.80 + (0.5 - band_y) * 0.18, 0.0, 1.0));
@@ -222,13 +235,11 @@ void fragment() {
 				aqua = mix(aqua, vec3(0.10, 0.20, 0.36), g_night * 0.72);
 				col = mix(bed_col * 0.92, aqua, 0.64 + 0.22 * depth_n);
 				if (p_sdf > -1.15) {
-					// Crisp 1px inner rim: shaded 3/4 wet-sand bevel at top, bright sea-aqua meniscus below!
 					vec3 north_lip = bed_col * vec3(0.58, 0.56, 0.54);
 					vec3 south_meniscus = mix(vec3(0.78, 0.96, 0.94), vec3(0.38, 0.50, 0.72), g_night);
 					col = mix(col, mix(south_meniscus, north_lip, p_north * 0.75), 0.52);
 				}
 			} else if (bed_id == 3) {
-				// Coastal slate tidepool: recessed 3/4 dark slate north wall + jewel-clear emerald-turquoise!
 				vec3 tp_col = mix(vec3(0.30, 0.75, 0.73), vec3(0.13, 0.48, 0.54), depth_n);
 				tp_col = mix(tp_col, vec3(0.10, 0.22, 0.38), g_night * 0.70);
 				col = mix(bed_col * 0.80, tp_col, 0.68 + 0.20 * depth_n);
@@ -238,7 +249,6 @@ void fragment() {
 					col = mix(col, mix(south_rim, north_wall, p_north * 0.82), 0.58);
 				}
 			} else {
-				// Meadow / brookside rain puddle: crisp quantized sky-mirror + clean 1px meniscus rim!
 				vec3 sky_day = mix(vec3(0.28, 0.49, 0.56), vec3(0.60, 0.78, 0.84), band_y);
 				vec3 sky_gold = mix(vec3(0.46, 0.42, 0.40), vec3(0.90, 0.76, 0.54), band_y);
 				sky_day = mix(sky_day, sky_gold, g_day_gold * 0.62);
@@ -274,8 +284,6 @@ void fragment() {
 			col = w2_rain_rings(px, col, g_water_time);
 			alpha = 1.0;
 		} else if (p_sdf <= 3.1) {
-			// Crisp discrete 2-step pixel-art outer basin frame ("Rahmen" — zero airbrush alpha blur!):
-			// Step 1 (0..1.45 px): crisp wet basin lip; Step 2 (1.45..3.1 px): damp outer collar!
 			if (bed_id == 2) {
 				vec3 base_s = w2_blend_coast_ground(px, sample_pos, sdf_px, 0.0, flow.z);
 				if (p_sdf <= 1.45) {
@@ -288,7 +296,6 @@ void fragment() {
 				vec3 base_r = w2_blend_coast_ground(px, sample_pos, sdf_px, 0.0, flow.z);
 				col = (p_sdf <= 1.45) ? (base_r * vec3(0.55, 0.59, 0.72)) : (base_r * vec3(0.76, 0.79, 0.88));
 			} else {
-				// Meadow / brookside puddle frame: crisp 1.4px dark wet-earth/moss lip + 1.6px damp turf collar!
 				if (p_sdf <= 1.40) {
 					col = mix(vec3(0.13, 0.24, 0.19), vec3(0.09, 0.16, 0.15), p_north * 0.75);
 				} else {
@@ -303,108 +310,8 @@ void fragment() {
 				discard;
 			}
 		}
-	} else if (regime == 3) {
-		// Square -2: Coastal surf, smooth swash, subtle natural obstacle foam & wet mirror sand!
-		float turb = flow.z;
-		float swash_off = w2_swash_offset_px(sample_pos.y, g_water_time, g_wind_dir, g_wind_gust, g_storm);
-		float front_warp = (w2_fbm(vec2(px.x * 0.055, px.y * 0.085) + vec2(g_water_time * 0.10, 0.0)) - 0.5) * 3.0;
-		float eff_sdf = sdf_px - swash_off + front_warp;
-		float wetness = w2_sand_wetness(sdf_px, sample_pos.y, g_water_time, g_wind_dir, g_wind_gust, g_storm);
-
-		if (eff_sdf <= 0.0) {
-			float swash_film = clamp(-eff_sdf * 0.006, 0.0, 0.14);
-			float s_depth = clamp(max(depth, swash_film), 0.02, 0.465);
-			float contour_n = (w2_fbm(px / 20.0 - vec2(g_water_time * 0.16, 0.0)) - 0.5) * 0.065;
-			float opt_d = clamp((s_depth - 0.02) / 0.445 + wave.z * 0.08 + contour_n, 0.0, 1.0);
-			vec3 water_col = w2_clean_ramp6(
-				vec3(0.50, 0.85, 0.81), // sunlit crystal swash aqua
-				vec3(0.34, 0.76, 0.74), // clear shallow lagoon
-				vec3(0.21, 0.64, 0.64), // lagoon turquoise
-				vec3(0.14, 0.51, 0.55), // mid coastal teal
-				vec3(0.10, 0.39, 0.46), // outer surf teal
-				vec3(0.08, 0.30, 0.39), // shelf petrol (exact match with REGIME_OCEAN onset!)
-				opt_d
-			);
-
-			// Smooth non-snapping underwater sand/rock refraction
-			float bed_fade = 1.0 - smoothstep(0.20, 0.465, s_depth);
-			vec2 wn = wave.xy + vec2(
-				sin(mod(eff_sdf * 0.22 + g_water_time * 1.9 + px.y * 0.09, W2_TAU)),
-				cos(mod(px.y * 0.17 - g_water_time * 1.5, W2_TAU)) * 0.4
-			) * 0.32 * bed_fade;
-			if (bed_fade > 0.01) {
-				vec2 ref_px = px + wn * 1.6;
-				float w_rock = w2_bilinear_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 3);
-				vec3 bed_sand = w2_render_bed(ref_px, 2, s_depth, vec2(0.4, 0.0));
-				vec3 bed_col = (w_rock > 0.02) ? mix(bed_sand, w2_render_bed(ref_px, 3, s_depth, vec2(0.0)), w_rock) : bed_sand;
-				float clarity = exp(-s_depth * 3.1);
-				col = mix(water_col, bed_col, clarity * 0.52 * bed_fade);
-			} else {
-				col = water_col;
-			}
-
-			// C1-smooth sun caustics (continuous across s_depth = 0.465 into REGIME_OCEAN!)
-			float caust_fade = 1.0 - smoothstep(0.30, 0.62, s_depth);
-			float daylight = g_day_strength * day_cloud(px) * (1.0 - flow.w) * (1.0 - g_night);
-			if (daylight > 0.04 && caust_fade > 0.02) {
-				float c_net = w2_dual_caustics(px, vec2(0.42, 0.06), g_water_time);
-				if (c_net > 0.20) {
-					vec3 c_tint = mix(vec3(0.76, 0.97, 0.92), vec3(1.0, 0.84, 0.52), g_day_gold);
-					col = mix(col, c_tint, c_net * daylight * 0.36 * caust_fade);
-				}
-			}
-
-			// Connected cellular lace foam + natural obstacle surf-break (ZERO bullseye rings!)
-			float shore_band = 1.0 - smoothstep(0.0, 22.0, -eff_sdf);
-			float cell_web = 1.0 - abs(w2_fbm(vec2(px.x * 0.10 - g_water_time * 0.36, px.y * 0.085)) - 0.48) * 3.6;
-			float lace_n = w2_fbm(vec2(px.x * 0.07 - g_water_time * 0.28, px.y * 0.075 + 5.0));
-			float crest = smoothstep(-8.0, -2.2, eff_sdf) * (1.0 - smoothstep(-2.2, 0.0, eff_sdf));
-			float storm_foam = clamp(g_wind_gust * 0.08 + g_storm * 0.22, 0.0, 0.30);
-			float foam_field = shore_band * smoothstep(0.26 - storm_foam, 0.72, cell_web * 0.62 + lace_n * 0.52);
-
-			if (eff_sdf > -1.6) {
-				foam_field = max(foam_field, 0.82); // clean connected swash lip
-			} else if (crest > 0.32 && lace_n > 0.44) {
-				foam_field = max(foam_field, crest * 0.70);
-			}
-
-			// Subtle organic lacy seafoam hugging rocks/driftwood ONLY while real surf washes past them
-			if (turb > 0.18 && eff_sdf > -12.0) {
-				float swash_p = w2_swash_phase(sample_pos.y, g_water_time);
-				float surge_pulse = 0.45 + 0.55 * (1.0 - smoothstep(0.0, 0.42, abs(swash_p - 0.20)));
-				float obs_lace = smoothstep(0.20, 0.78, turb) * (1.0 - smoothstep(0.0, 12.0, -eff_sdf)) * surge_pulse * (0.48 + 0.52 * lace_n);
-				foam_field = max(foam_field, obs_lace * 0.82);
-			}
-
-			if (foam_field > 0.28) {
-				vec3 foam_core = mix(vec3(0.91, 0.99, 0.98), vec3(0.99, 0.94, 0.82), g_day_gold * 0.35);
-				vec3 foam_soft = mix(vec3(0.62, 0.90, 0.88), vec3(0.86, 0.84, 0.72), g_day_gold * 0.35);
-				vec3 f_col = foam_field > 0.62 ? foam_core : foam_soft;
-				float f_mix = smoothstep(0.28, 0.68, foam_field) * 0.90;
-				col = mix(col, f_col, f_mix);
-			}
-
-			// Fresnel reflections
-			float rough = 0.62 + g_rain * 0.9 + g_storm * 0.7;
-			vec4 mirror = w2_reflect_at(px, wn, rough, g_water_time);
-			if (mirror.a > 0.02) {
-				float fresnel = mix(0.28, 0.65, smoothstep(0.04, 0.46, s_depth)) * (1.0 - foam_field * 0.80);
-				col = mix(col, reflect_tint(mirror.rgb, col), mirror.a * fresnel);
-			}
-
-			if (abs(wave.z) > 0.03) {
-				col = mix(col, vec3(0.88, 0.99, 0.98), clamp(wave.z * 0.45, -0.15, 0.45));
-			}
-			if (wave.w > 0.03) {
-				col = mix(col, vec3(0.92, 0.99, 0.98), clamp(wave.w * 0.85, 0.0, 0.85));
-			}
-			col = w2_rain_rings(px, col, g_water_time);
-		} else {
-			// Dry or wet coastal sand / headland rock (1px-smooth bilinear rock-to-sand transition!)
-			col = w2_blend_coast_ground(px, sample_pos, sdf_px, wetness, turb);
-		}
 	} else if (regime == 4) {
-		// Square -3: Open ocean, silky 6-stop depth & swell contours, seamless shelf caustics, connected whitecaps!
+		// Open Ocean: silky 6-stop depth & swell contours, seamless shelf caustics, connected whitecaps!
 		float sh = w2_swell_height(sample_pos, g_water_time, g_wind_dir, g_wind_gust, g_storm);
 		vec2 swn = w2_swell_normal(sample_pos, g_water_time, g_wind_dir, g_wind_gust, g_storm);
 		float swell_blend = smoothstep(0.465, 0.64, depth);
@@ -413,23 +320,21 @@ void fragment() {
 		float ocean_macro = (w2_fbm(px / 20.0 - vec2(g_water_time * 0.16, 0.0)) - 0.5) * 0.065;
 		float opt_d = clamp(shelf_t - sh * 0.08 * swell_blend + ocean_macro + wave.z * 0.05, 0.0, 1.0);
 		col = w2_clean_ramp6(
-			vec3(0.08, 0.30, 0.39), // shelf petrol (exact match with REGIME_SURF edge!)
-			vec3(0.07, 0.25, 0.36), // upper ocean teal-cobalt
-			vec3(0.06, 0.20, 0.32), // mid ocean cobalt
-			vec3(0.05, 0.15, 0.27), // deep Prussian blue
-			vec3(0.04, 0.11, 0.22), // twilight abyssal blue
-			vec3(0.03, 0.08, 0.17), // deep abyssal indigo
+			vec3(0.08, 0.30, 0.39),
+			vec3(0.07, 0.25, 0.36),
+			vec3(0.06, 0.20, 0.32),
+			vec3(0.05, 0.15, 0.27),
+			vec3(0.04, 0.11, 0.22),
+			vec3(0.03, 0.08, 0.17),
 			opt_d
 		);
 
-		// Deep reef silhouettes dimly visible in swell troughs
 		if (bed_id == 6 || bed_id == 3) {
 			vec2 ref_px = px + wn * 1.4;
 			vec3 reef = w2_render_bed(ref_px, 6, depth, vec2(0.0));
 			col = mix(col, reef, clamp((1.0 - depth) * 0.58, 0.08, 0.40));
 		}
 
-		// Seamless shallow-shelf caustics matching REGIME_SURF across x = -960 (depth = 0.465..0.62)!
 		float caust_fade = 1.0 - smoothstep(0.30, 0.62, depth);
 		float daylight = g_day_strength * day_cloud(px) * (1.0 - flow.w) * (1.0 - g_night);
 		if (daylight > 0.04 && caust_fade > 0.02) {
@@ -440,7 +345,6 @@ void fragment() {
 			}
 		}
 
-		// Smoothly graded sunlit swell flanks & cool troughs
 		float flank = clamp(sh * 0.65 + swn.x * 0.25, -0.6, 0.8) * swell_blend;
 		if (flank > 0.12) {
 			col = mix(col, vec3(0.17, 0.46, 0.56), clamp((flank - 0.12) * 0.50, 0.0, 0.38));
@@ -448,7 +352,6 @@ void fragment() {
 			col *= mix(1.0, 0.80, clamp((-flank - 0.12) * 0.72, 0.0, 0.40));
 		}
 
-		// Cohesive wave-crest shimmer (connected strokes, ZERO isolated 1px white specks!)
 		float sun_glint = g_day_strength * day_cloud(px) * (1.0 - g_night);
 		if (sun_glint > 0.15 && flank > 0.28) {
 			float shimmer_n = w2_fbm(px / vec2(9.0, 4.5) - vec2(g_water_time * 0.32, g_water_time * 0.12));
@@ -459,7 +362,6 @@ void fragment() {
 			}
 		}
 
-		// Storm whitecaps
 		float wind_energy = clamp(g_wind_gust * 0.35 + g_storm * 0.85, 0.0, 1.0);
 		if (swell_blend > 0.05 && wind_energy > 0.05) {
 			vec2 cap_da_raw = vec2(0.92, 0.39) + g_wind_dir * 0.25;
@@ -494,103 +396,228 @@ void fragment() {
 		}
 		col = w2_rain_rings(px, col, g_water_time);
 	} else {
-		// REGIME_BROOK (1) or REGIME_LAKE (2) — lush overhanging moss banks + natural shingle pockets + C1-smooth flow!
-		bool is_lake = (regime == 2);
-		float shore_warp = (w2_fbm(px / 9.5 + vec2(3.7, 8.1)) - 0.5) * 3.2 + (w2_vnoise(px / 4.0 + vec2(1.9, 6.3)) - 0.5) * 0.75;
-		float b_sdf = sdf_px + shore_warp;
+		// UNIFIED CONTINUOUS WATER PIPELINE (REGIME_BROOK=1, REGIME_LAKE=2, REGIME_SURF=3):
+		// Smoothly connects rivers -> sandy estuaries -> surf bays AND rivers -> lakes with ZERO staircase seams!
+		vec4 rw = w2_smooth_regime_weights(sample_pos, map_origin, map_size, water_geo_map);
+		float w_fresh = rw.x + rw.y;
+		float w_marine = rw.z + rw.w;
+		float surf_mix = (w_fresh + w_marine > 0.001)
+			? smoothstep(0.02, 0.98, w_marine / (w_fresh + w_marine))
+			: (regime == 3 ? 1.0 : 0.0);
+		float lake_mix = (w_fresh > 0.001)
+			? smoothstep(0.02, 0.98, rw.y / w_fresh)
+			: (regime == 2 ? 1.0 : 0.0);
+
+		float turb = flow.z;
+		vec2 flow_v = flow.xy;
+		float flow_len = length(flow_v);
+		// Outgoing freshwater plume strength where a river discharges into coastal surf
+		float outflow_k = smoothstep(0.40, 0.84, flow_len) * (1.0 - smoothstep(4.0, 62.0, -sdf_px));
+
+		float shore_warp = (w2_fbm(px / 9.5 + vec2(3.7, 8.1)) - 0.5) * 3.2
+			+ (w2_vnoise(px / 4.0 + vec2(1.9, 6.3)) - 0.5) * 0.75;
+		float swash_off = w2_swash_offset_px(sample_pos.y, g_water_time, g_wind_dir, g_wind_gust, g_storm);
+		float front_warp = (w2_fbm(vec2(px.x * 0.055, px.y * 0.085) + vec2(g_water_time * 0.10, 0.0)) - 0.5) * 3.0;
+		float swash_damp = 1.0 - outflow_k * 0.42;
+		float eff_sdf = sdf_px + mix(shore_warp, -swash_off * swash_damp + front_warp, surf_mix);
+
 		vec2 grad = w2_sdf_gradient(sample_pos);
 		float north_cut = clamp(-grad.y, 0.0, 1.0);
 		float sun_face = clamp(dot(grad, vec2(0.56, 0.83)), 0.0, 1.0);
 
-		if (b_sdf <= 0.0) {
-			vec2 flow_v = flow.xy;
-			vec2 wn = wave.xy + vec2(
+		if (eff_sdf <= 0.0) {
+			// --- Continuous Water Optics (Brook Emerald <-> Lake Jade <-> Brackish Estuary <-> Coastal Turquoise!) ---
+			float swash_film = clamp(-eff_sdf * 0.006, 0.0, 0.14);
+			float s_depth = clamp(max(depth, swash_film * surf_mix), 0.02, 1.0);
+
+			// Flowing organic brackish plume eddies where river meets sea!
+			float eddy = w2_fbm(px / 15.0 - flow_v * g_water_time * 0.46 + vec2(4.0, 11.0));
+			float marine_k = clamp(surf_mix * (1.0 - outflow_k * (0.36 + 0.46 * eddy) * 0.62), 0.0, 1.0);
+
+			vec3 water_col = vec3(0.0);
+			if (marine_k < 0.99) {
+				float macro_w = (w2_fbm(px / 18.0 - flow_v * g_water_time * 0.22) - 0.5) * 0.08;
+				float f_opt = clamp(depth + wave.z * 0.06 + macro_w, 0.0, 1.0);
+				vec3 brook_c = w2_clean_ramp6(
+					vec3(0.34, 0.58, 0.49),
+					vec3(0.24, 0.50, 0.43),
+					vec3(0.17, 0.42, 0.37),
+					vec3(0.13, 0.33, 0.32),
+					vec3(0.09, 0.25, 0.26),
+					vec3(0.07, 0.19, 0.22),
+					f_opt
+				);
+				vec3 lake_c = w2_clean_ramp5(
+					vec3(0.30, 0.58, 0.54),
+					vec3(0.22, 0.49, 0.47),
+					vec3(0.16, 0.39, 0.40),
+					vec3(0.11, 0.29, 0.32),
+					vec3(0.08, 0.21, 0.25),
+					f_opt
+				);
+				water_col = mix(brook_c, lake_c, lake_mix);
+			}
+			if (marine_k > 0.01) {
+				float contour_n = (w2_fbm(px / 20.0 - vec2(g_water_time * 0.16, 0.0)) - 0.5) * 0.065;
+				float m_opt = clamp((min(s_depth, 0.465) - 0.02) / 0.445 + wave.z * 0.08 + contour_n, 0.0, 1.0);
+				vec3 surf_c = w2_clean_ramp6(
+					vec3(0.50, 0.85, 0.81),
+					vec3(0.34, 0.76, 0.74),
+					vec3(0.21, 0.64, 0.64),
+					vec3(0.14, 0.51, 0.55),
+					vec3(0.10, 0.39, 0.46),
+					vec3(0.08, 0.30, 0.39),
+					m_opt
+				);
+				water_col = (marine_k >= 0.99) ? surf_c : mix(water_col, surf_c, marine_k);
+			}
+
+			// Smooth refracted underwater bed (pebble/silt smoothly transitions into sunlit estuary sand!)
+			float bed_fade_surf = 1.0 - smoothstep(0.20, 0.465, s_depth);
+			vec2 wn_fresh = vec2(
 				sin(mod(px.y * 0.21 + g_water_time * 1.65 + px.x * 0.07, W2_TAU)) * 0.26,
 				cos(mod(px.x * 0.18 - g_water_time * 1.35 + px.y * 0.06, W2_TAU)) * 0.26
 			);
-			float macro_w = (w2_fbm(px / 18.0 - flow_v * g_water_time * 0.22) - 0.5) * 0.08;
-			float opt_d = clamp(depth + wave.z * 0.06 + macro_w, 0.0, 1.0);
-			vec3 water_col = is_lake
-				? w2_clean_ramp5(vec3(0.30, 0.58, 0.54), vec3(0.22, 0.49, 0.47), vec3(0.16, 0.39, 0.40), vec3(0.11, 0.29, 0.32), vec3(0.08, 0.21, 0.25), opt_d)
-				: w2_clean_ramp6(
-					vec3(0.34, 0.58, 0.49), // clear sunlit ford jade
-					vec3(0.24, 0.50, 0.43), // shallow brook emerald
-					vec3(0.17, 0.42, 0.37), // mid woodland stream teal
-					vec3(0.13, 0.33, 0.32), // deeper channel jade
-					vec3(0.09, 0.25, 0.26), // deep pool petrol
-					vec3(0.07, 0.19, 0.22), // northern Kolk core
-					opt_d
-				);
+			vec2 wn_surf = vec2(
+				sin(mod(eff_sdf * 0.22 + g_water_time * 1.9 + px.y * 0.09, W2_TAU)),
+				cos(mod(px.y * 0.17 - g_water_time * 1.5, W2_TAU)) * 0.4
+			) * 0.32 * bed_fade_surf;
+			vec2 wn = wave.xy + mix(wn_fresh, wn_surf, surf_mix);
 
-			// Smooth liquid bed refraction
-			vec2 ref_px = px + wn * 1.5;
-			vec3 bed_col = w2_render_bed(ref_px, bed_id == 0 ? 1 : bed_id, depth, flow_v);
-			float edge_shallow = smoothstep(-5.0, 0.0, b_sdf);
-			float clarity = clamp(exp(-depth * (is_lake ? 3.1 : 2.5)) + edge_shallow * 0.28, 0.0, 0.90);
-			col = mix(water_col, bed_col, clarity * 0.64);
+			vec2 ref_px = px + wn * 1.55;
+			float w_sand_bed = w2_soft_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 2);
+			float w_rock_bed = w2_soft_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 3);
+			float sand_bed_k = clamp(max(w_sand_bed, marine_k * (1.0 - w_rock_bed)), 0.0, 1.0);
 
-			// C1-continuous dual-phase flow-advected surface streaks (ZERO 1-second repeat pop!)
-			float spd = is_lake ? 0.09 : 0.26;
-			float ph0 = fract(g_water_time * spd);
-			float ph1 = fract(ph0 + 0.5);
-			float w0 = 0.5 - 0.5 * cos(ph0 * W2_TAU);
-			vec2 fdir = length(flow_v) > 0.05 ? normalize(flow_v) : vec2(0.0, 1.0);
-			vec2 across = vec2(-fdir.y, fdir.x);
-			vec2 p0 = px - flow_v * ph0 * 26.0;
-			vec2 p1 = px - flow_v * ph1 * 26.0;
-			vec2 q0 = vec2(dot(p0, fdir), dot(p0, across));
-			vec2 q1 = vec2(dot(p1, fdir), dot(p1, across));
-			float s0 = smoothstep(0.58, 0.88, sin(q0.x * 0.22 + sin(q0.y * 0.27) * 1.5) * 0.55 + w2_vnoise(q0 / vec2(14.0, 7.0)) * 0.55);
-			float s1 = smoothstep(0.58, 0.88, sin(q1.x * 0.22 + sin(q1.y * 0.27) * 1.5) * 0.55 + w2_vnoise(q1 / vec2(14.0, 7.0)) * 0.55);
-			float streak_v = mix(s1, s0, w0) * (1.0 - flow.w * 0.7);
-			if (streak_v > 0.22) {
-				col = mix(col, vec3(0.46, 0.72, 0.65), streak_v * 0.34);
+			vec3 bed_col = vec3(0.0);
+			if (sand_bed_k < 0.98 && w_rock_bed < 0.98) {
+				int fresh_bed_id = (bed_id == 0 || bed_id == 2 || bed_id == 3) ? (lake_mix > 0.5 ? 5 : 1) : bed_id;
+				bed_col = w2_render_bed(ref_px, fresh_bed_id, s_depth, flow_v);
+			}
+			if (sand_bed_k > 0.02) {
+				vec3 bed_sand = w2_render_bed(ref_px, 2, s_depth, vec2(0.4, 0.0));
+				bed_col = (sand_bed_k >= 0.98) ? bed_sand : mix(bed_col, bed_sand, sand_bed_k);
+			}
+			if (w_rock_bed > 0.02) {
+				vec3 bed_rock = w2_render_bed(ref_px, 3, s_depth, vec2(0.0));
+				bed_col = (w_rock_bed >= 0.98) ? bed_rock : mix(bed_col, bed_rock, w_rock_bed);
 			}
 
-			// C1-smooth dual-layer sun caustics
-			float daylight = g_day_strength * day_cloud(px) * (1.0 - flow.w) * (1.0 - g_night);
-			if (daylight > 0.04 && depth < 0.76) {
-				float c_net = w2_dual_caustics(px, flow_v, g_water_time);
-				if (c_net > 0.20) {
-					vec3 c_tint = mix(vec3(0.74, 0.94, 0.80), vec3(1.0, 0.82, 0.48), g_day_gold);
-					col = mix(col, c_tint, c_net * daylight * 0.40 * (1.0 - depth * 0.65));
+			float edge_shallow = smoothstep(-5.0, 0.0, eff_sdf);
+			float fresh_clarity = clamp(exp(-depth * mix(2.5, 3.1, lake_mix)) + edge_shallow * 0.28, 0.0, 0.90) * 0.64;
+			float surf_clarity = exp(-s_depth * 3.1) * 0.52 * bed_fade_surf;
+			col = mix(water_col, bed_col, mix(fresh_clarity, surf_clarity, marine_k));
+
+			// C1-continuous flow streaks (active in brooks, gently fanning out into lake inlets & coastal estuaries!)
+			vec2 fdir = flow_len > 0.05 ? (flow_v / flow_len) : vec2(0.0, 1.0);
+			vec2 across = vec2(-fdir.y, fdir.x);
+			float stream_vis = clamp((1.0 - marine_k * 0.78) * (1.0 - lake_mix * 0.70) + outflow_k * 0.45, 0.0, 1.0);
+			if (stream_vis > 0.04) {
+				float spd = mix(0.26, 0.11, lake_mix);
+				float ph0 = fract(g_water_time * spd);
+				float ph1 = fract(ph0 + 0.5);
+				float w0 = 0.5 - 0.5 * cos(ph0 * W2_TAU);
+				vec2 p0 = px - flow_v * ph0 * 26.0;
+				vec2 p1 = px - flow_v * ph1 * 26.0;
+				vec2 q0 = vec2(dot(p0, fdir), dot(p0, across));
+				vec2 q1 = vec2(dot(p1, fdir), dot(p1, across));
+				float s0 = smoothstep(0.58, 0.88, sin(q0.x * 0.22 + sin(q0.y * 0.27) * 1.5) * 0.55 + w2_vnoise(q0 / vec2(14.0, 7.0)) * 0.55);
+				float s1 = smoothstep(0.58, 0.88, sin(q1.x * 0.22 + sin(q1.y * 0.27) * 1.5) * 0.55 + w2_vnoise(q1 / vec2(14.0, 7.0)) * 0.55);
+				float streak_v = mix(s1, s0, w0) * (1.0 - flow.w * 0.7) * stream_vis;
+				if (streak_v > 0.18) {
+					vec3 streak_c = mix(vec3(0.46, 0.72, 0.65), vec3(0.62, 0.88, 0.84), marine_k);
+					col = mix(col, streak_c, streak_v * 0.34);
 				}
 			}
 
-			// 2D-wave-distorted Fresnel reflections
-			float rough = (is_lake ? 0.32 : 0.78) + g_rain * 1.2 + g_storm * 0.7;
-			vec4 mirror = w2_reflect_at(px, wn, rough, g_water_time);
-			if (mirror.a > 0.02) {
-				float fresnel = mix(0.42, 0.84, clamp(depth * 0.8 + (is_lake ? 0.2 : 0.0), 0.0, 1.0)) * (1.0 - flow.w * 0.45);
-				col = mix(col, reflect_tint(mirror.rgb, col), mirror.a * fresnel);
+			// C1-smooth dual-layer sun caustics (continuous across rivers, lakes, estuaries, surf & ocean!)
+			float daylight = g_day_strength * day_cloud(px) * (1.0 - flow.w) * (1.0 - g_night);
+			float caust_fade = mix(1.0 - depth * 0.65, 1.0 - smoothstep(0.30, 0.62, s_depth), marine_k);
+			if (daylight > 0.04 && caust_fade > 0.02) {
+				vec2 caust_flow = mix(flow_v, vec2(0.42, 0.06), marine_k);
+				float c_net = w2_dual_caustics(px, caust_flow, g_water_time);
+				if (c_net > 0.20) {
+					vec3 c_day = mix(vec3(0.74, 0.94, 0.80), vec3(0.76, 0.97, 0.92), marine_k);
+					vec3 c_tint = mix(c_day, vec3(1.0, 0.83, 0.50), g_day_gold);
+					col = mix(col, c_tint, c_net * daylight * mix(0.40, 0.36, marine_k) * caust_fade);
+				}
 			}
 
-			// Soft flow-aligned obstacle wake wisps behind boulders & bridge piers
-			float turb = flow.z;
-			if (turb > 0.06) {
+			// Connected coastal lace foam + river-meets-surf estuary bar eddies (curves cleanly around river mouths!)
+			float foam_field = 0.0;
+			if (surf_mix > 0.02) {
+				float shore_band = 1.0 - smoothstep(0.0, 22.0, -eff_sdf);
+				float cell_web = 1.0 - abs(w2_fbm(vec2(px.x * 0.10 - g_water_time * 0.36, px.y * 0.085)) - 0.48) * 3.6;
+				float lace_n = w2_fbm(vec2(px.x * 0.07 - g_water_time * 0.28, px.y * 0.075 + 5.0));
+				float crest = smoothstep(-8.0, -2.2, eff_sdf) * (1.0 - smoothstep(-2.2, 0.0, eff_sdf));
+				float storm_foam = clamp(g_wind_gust * 0.08 + g_storm * 0.22, 0.0, 0.30);
+				foam_field = shore_band * smoothstep(0.26 - storm_foam, 0.72, cell_web * 0.62 + lace_n * 0.52);
+
+				if (eff_sdf > -1.6) {
+					foam_field = max(foam_field, 0.82);
+				} else if (crest > 0.32 && lace_n > 0.44) {
+					foam_field = max(foam_field, crest * 0.70);
+				}
+
+				if (turb > 0.16 && eff_sdf > -16.0) {
+					float swash_p = w2_swash_phase(sample_pos.y, g_water_time);
+					float surge_pulse = 0.45 + 0.55 * (1.0 - smoothstep(0.0, 0.42, abs(swash_p - 0.20)));
+					float obs_lace = smoothstep(0.18, 0.78, turb) * (1.0 - smoothstep(0.0, 16.0, -eff_sdf)) * surge_pulse * (0.48 + 0.52 * lace_n);
+					foam_field = max(foam_field, obs_lace * 0.80);
+				}
+				// Subtle organic estuary mixing wisps only where surf laps the mouth (never a hard bar stripe!)
+				if (outflow_k > 0.20 && turb > 0.12 && eff_sdf < -3.0) {
+					float bar_n = w2_fbm(vec2(dot(px, across) * 0.18, dot(px, fdir) * 0.10 - g_water_time * 0.42));
+					float bar_foam = outflow_k * smoothstep(0.12, 0.30, turb) * smoothstep(0.58, 0.88, bar_n) * 0.44;
+					foam_field = max(foam_field, bar_foam);
+				}
+				foam_field *= surf_mix * (1.0 - outflow_k * 0.48);
+				if (foam_field > 0.28) {
+					vec3 foam_core = mix(vec3(0.91, 0.99, 0.98), vec3(0.99, 0.94, 0.82), g_day_gold * 0.35);
+					vec3 foam_soft = mix(vec3(0.62, 0.90, 0.88), vec3(0.86, 0.84, 0.72), g_day_gold * 0.35);
+					vec3 f_col = foam_field > 0.62 ? foam_core : foam_soft;
+					float f_mix = smoothstep(0.28, 0.68, foam_field) * 0.90;
+					col = mix(col, f_col, f_mix);
+				}
+			}
+
+			// Flow-aligned obstacle wake wisps in rivers & lakes
+			if (turb > 0.06 && surf_mix < 0.92) {
 				float wake_n = w2_fbm(vec2(dot(px, across) * 0.22, dot(px, fdir) * 0.12 - g_water_time * 0.55));
-				float foam_w = clamp(turb * (0.55 + 0.55 * wake_n), 0.0, 1.0);
+				float foam_w = clamp(turb * (0.55 + 0.55 * wake_n), 0.0, 1.0) * (1.0 - surf_mix);
 				if (foam_w > 0.30) {
 					vec3 bow_c = foam_w > 0.66 ? vec3(0.84, 0.95, 0.92) : vec3(0.52, 0.78, 0.74);
 					col = mix(col, bow_c, smoothstep(0.30, 0.82, foam_w) * 0.72);
 				}
 			}
 
-			// Soft 3/4 overhanging mossy bank shadow in shallow water + delicate sunlit meniscus
-			float bank_sh = (0.35 + 0.65 * north_cut) * (1.0 - smoothstep(0.0, 3.2, -b_sdf));
-			col = mix(col, col * vec3(0.60, 0.68, 0.72), bank_sh * 0.48);
-			if (b_sdf > -1.2) {
-				float meniscus_n = w2_vnoise(px / vec2(6.0, 4.0) + vec2(g_water_time * 0.22, 0.0));
-				if (meniscus_n > 0.52) {
-					col = mix(col, vec3(0.72, 0.88, 0.82), (0.18 + 0.18 * sun_face) * smoothstep(0.52, 0.82, meniscus_n));
+			// 2D-wave-distorted Fresnel reflections
+			float rough_fresh = mix(0.78, 0.32, lake_mix) + g_rain * 1.2 + g_storm * 0.7;
+			float rough_surf = 0.62 + g_rain * 0.9 + g_storm * 0.7;
+			vec4 mirror = w2_reflect_at(px, wn, mix(rough_fresh, rough_surf, surf_mix), g_water_time);
+			if (mirror.a > 0.02) {
+				float fr_fresh = mix(0.42, 0.84, clamp(depth * 0.8 + lake_mix * 0.2, 0.0, 1.0)) * (1.0 - flow.w * 0.45);
+				float fr_surf = mix(0.28, 0.65, smoothstep(0.04, 0.46, s_depth)) * (1.0 - foam_field * 0.80);
+				col = mix(col, reflect_tint(mirror.rgb, col), mirror.a * mix(fr_fresh, fr_surf, surf_mix));
+			}
+
+			// Soft 3/4 overhanging bank shadow & sunlit meniscus on freshwater banks
+			if (surf_mix < 0.95) {
+				float bank_sh = (0.35 + 0.65 * north_cut) * (1.0 - smoothstep(0.0, 3.2, -eff_sdf)) * (1.0 - surf_mix);
+				col = mix(col, col * vec3(0.60, 0.68, 0.72), bank_sh * 0.48);
+				if (eff_sdf > -1.2) {
+					float meniscus_n = w2_vnoise(px / vec2(6.0, 4.0) + vec2(g_water_time * 0.22, 0.0));
+					if (meniscus_n > 0.52) {
+						col = mix(col, vec3(0.72, 0.88, 0.82), (0.18 + 0.18 * sun_face) * smoothstep(0.52, 0.82, meniscus_n) * (1.0 - surf_mix));
+					}
 				}
 			}
 
 			if (abs(wave.z) > 0.03) {
-				col = mix(col, vec3(0.84, 0.96, 0.94), clamp(wave.z * 0.48, -0.18, 0.48));
+				col = mix(col, vec3(0.86, 0.98, 0.96), clamp(wave.z * 0.46, -0.16, 0.46));
 			}
 			if (wave.w > 0.03) {
-				col = mix(col, vec3(0.88, 0.97, 0.95), clamp(wave.w * 0.82, 0.0, 0.85));
+				col = mix(col, vec3(0.90, 0.98, 0.97), clamp(wave.w * 0.84, 0.0, 0.85));
 			}
 			col = w2_rain_rings(px, col, g_water_time);
 
@@ -598,41 +625,57 @@ void fragment() {
 				col = mix(col, col * vec3(0.36, 0.40, 0.56), clamp(flow.w, 0.0, 1.0));
 			}
 		} else {
-			// Lush 1px-organic riparian bank: overhanging emerald moss reaches the water along most banks,
-			// alternating naturally with rounded river-shingle pockets on gentle bends & the southern ford!
-			float wide = w2_fbm(px / 20.0 + vec2(7.0, 13.0));
-			float edge = mix(5.5, min(bank_reach_px - 3.0, 12.5), smoothstep(0.20, 0.80, wide));
-			if (b_sdf >= edge) {
-				discard;
-			}
+			// --- Dry Ground / Beach Sand / Sandy Estuary Bank / Woodland Moss Bank ---
+			float w_sand = w2_soft_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 2);
+			float w_rock = w2_soft_bed_weight(sample_pos, map_origin, map_size, water_geo_map, 3);
+			float w_coast_bed = clamp(w_sand + w_rock, 0.0, 1.0);
+			float coast_k = clamp(max(surf_mix, smoothstep(0.14, 0.78, w_coast_bed + (w2_fbm(px / 10.5) - 0.5) * 0.34)), 0.0, 1.0);
 
-			float wet = 1.0 - smoothstep(0.0, 3.2, b_sdf);
-			float bank_var = w2_fbm(px / 18.0 + vec2(23.0, 9.0));
-			float ford_near = 1.0 - smoothstep(18.0, 42.0, abs(sample_pos.y - 96.0));
-			// Only ~25% of shoreline (gentle bends / southern ford) exposes rounded river pebbles; 75% is plush overhanging moss!
-			float shingle_pocket = max(smoothstep(0.64, 0.86, bank_var) * (0.45 + 0.55 * sun_face), ford_near * 0.72) * (1.0 - north_cut * 0.55);
-			float shingle_w = shingle_pocket * 4.4;
+			float swash_wet = w2_sand_wetness(sdf_px, sample_pos.y, g_water_time, g_wind_dir, g_wind_gust, g_storm) * surf_mix;
+			float river_lip_wet = (1.0 - smoothstep(0.0, 5.5, eff_sdf)) * (1.0 - surf_mix) * 0.82;
+			float bank_wet = max(swash_wet, river_lip_wet);
 
-			vec3 moss_col = w2_shade_bank_moss(px, wet);
-			vec3 col_bank = moss_col;
-			if (shingle_w > 0.4 && b_sdf < shingle_w + 1.5) {
-				vec3 shingle_col = w2_render_bed(px, 1, 0.0, vec2(0.0)) * mix(vec3(0.92, 0.91, 0.86), vec3(0.68, 0.72, 0.74), wet);
-				float moss_blend = smoothstep(shingle_w - 1.0, shingle_w + 1.4, b_sdf);
-				col_bank = mix(shingle_col, moss_col, moss_blend);
-			}
+			if (coast_k >= 0.98) {
+				// Pure coastal beach / sandy estuary spit (ZERO green moss!)
+				col = w2_blend_coast_ground(px, sample_pos, sdf_px, bank_wet, turb);
+				alpha = 1.0;
+			} else {
+				float wide = w2_fbm(px / 20.0 + vec2(7.0, 13.0));
+				float edge = mix(5.5, min(bank_reach_px - 3.0, 12.5), smoothstep(0.20, 0.80, wide));
+				if (eff_sdf >= edge && coast_k <= 0.02) {
+					discard;
+				}
+				float wet = 1.0 - smoothstep(0.0, 3.2, eff_sdf);
+				float bank_var = w2_fbm(px / 18.0 + vec2(23.0, 9.0));
+				float ford_near = 1.0 - smoothstep(18.0, 42.0, abs(sample_pos.y - 96.0));
+				float shingle_pocket = max(smoothstep(0.64, 0.86, bank_var) * (0.45 + 0.55 * sun_face), ford_near * 0.72) * (1.0 - north_cut * 0.55);
+				float shingle_w = shingle_pocket * 4.4;
 
-			// Soft damp moss-edge bevel right at the water line (NO dark brown strip or black outline!)
-			if (b_sdf < 1.2) {
-				col_bank *= mix(vec3(0.78, 0.84, 0.82), vec3(1.0), b_sdf / 1.2);
-			}
-			col = col_bank;
-
-			if (flow.w > 0.02) {
-				col = mix(col, col * vec3(0.42, 0.45, 0.60), clamp(flow.w, 0.0, 1.0));
-			}
-			alpha = 1.0 - smoothstep(edge - 2.8, edge, b_sdf);
-			if (alpha <= 0.02) {
-				discard;
+				vec3 moss_col = w2_shade_bank_moss(px, wet);
+				vec3 col_bank = moss_col;
+				if (shingle_w > 0.4 && eff_sdf < shingle_w + 1.5) {
+					vec3 shingle_col = w2_render_bed(px, 1, 0.0, vec2(0.0)) * mix(vec3(0.92, 0.91, 0.86), vec3(0.68, 0.72, 0.74), wet);
+					float moss_blend = smoothstep(shingle_w - 1.0, shingle_w + 1.4, eff_sdf);
+					col_bank = mix(shingle_col, moss_col, moss_blend);
+				}
+				if (eff_sdf < 1.2) {
+					col_bank *= mix(vec3(0.78, 0.84, 0.82), vec3(1.0), eff_sdf / 1.2);
+				}
+				if (coast_k > 0.02) {
+					// Seamless woodland-moss-bank to damp-coastal-sand transition where river meets beach!
+					vec3 coast_col = w2_blend_coast_ground(px, sample_pos, sdf_px, bank_wet, turb);
+					col = mix(col_bank, coast_col, coast_k);
+					alpha = mix(1.0 - smoothstep(edge - 2.8, edge, eff_sdf), 1.0, smoothstep(0.05, 0.45, coast_k));
+				} else {
+					col = col_bank;
+					alpha = 1.0 - smoothstep(edge - 2.8, edge, eff_sdf);
+				}
+				if (flow.w > 0.02) {
+					col = mix(col, col * vec3(0.42, 0.45, 0.60), clamp(flow.w, 0.0, 1.0));
+				}
+				if (alpha <= 0.02) {
+					discard;
+				}
 			}
 		}
 	}

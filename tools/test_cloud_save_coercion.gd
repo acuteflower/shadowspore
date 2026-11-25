@@ -39,12 +39,12 @@ func _run() -> void:
 	var valid_stack: Dictionary = SaveGame._stack({"id": "torch", "count": 3.0})
 	_check(String(valid_stack.get("id", "")) == "torch" and valid_stack.get("count") is int and int(valid_stack.get("count", 0)) == 3, "_stack converts float count to int")
 
-	# 2. Boot real campaign WorldLevel + Player
-	var world: WorldLevel = load("res://src/world/world_level.tscn").instantiate() as WorldLevel
+	# 2. Boot real campaign ZoneWorld + Player
+	var world: ZoneWorld = load("res://src/world/v2/zone_world.tscn").instantiate() as ZoneWorld
 	add_child(world)
 	await get_tree().process_frame
 	var player: Player = world._players.get_child(0) as Player
-	_check(player != null and is_instance_valid(player), "WorldLevel spawns local player")
+	_check(player != null and is_instance_valid(player), "ZoneWorld spawns local player")
 
 	# Wait briefly if chunk streaming uses steps
 	var deadline: int = Time.get_ticks_msec() + 15000
@@ -120,8 +120,9 @@ func _run() -> void:
 	_check(true, "CloudSession._remember_solo_preserve tolerates collapsed tables")
 
 	# 5. Nakama-corrupted world payload across all subsystem importers
+	_check(not SaveGame.import_world_data(get_tree(), {"version": 1, "day": 3}, player, false), "import_world_data rejects legacy v1 saves")
 	var corrupted_world: Dictionary = {
-		"version": 1,
+		"version": SaveGame.VERSION,
 		"day": 3,
 		"time": 0.45,
 		"opening_over": true,

@@ -14,6 +14,8 @@ var sand_drift: Vector2 = Vector2.ZERO
 var dune_creep: float = 0.0
 var _debris_timer: float = 0.5
 var _sand_timer: float = 0.18
+var _beach_sand_timer: float = 0.12
+var _spray_timer: float = 0.30
 var _world: Variant ## dynamic to avoid the WorldLevel -> HUD/interior preload cycle
 var _previous: Dictionary = {}
 var _prune_wait: float = 0.5
@@ -76,7 +78,7 @@ func _process(delta: float) -> void:
 	var rate: float = 0.23 + 0.55 * strength
 	var envelope: float = pow(maxf(0.0,sin(clock*rate+0.6)),3.0)
 	gust = (0.15+0.85*envelope) * lerpf(0.55,2.5,strength) + 0.35 * storm * (0.5+0.5*sin(clock*3.1))
-	gust *= wind_gain() ## rain, downpour and storm bend crowns, bushes, grass and flowers far harder than a calm day (calm: exactly 1)
+	gust *= wind_gain() * ZoneMood.value("wind") ## the zone's own wind (2.0, 1 elsewhere); rain, downpour and storm bend crowns, bushes, grass and flowers far harder than a calm day (calm: exactly 1)
 	RenderingServer.global_shader_parameter_set("g_wind_dir",direction) ## the same wind for the shaders of the small plants (flora_wind)
 	RenderingServer.global_shader_parameter_set("g_wind_gust",gust)
 	RenderingServer.global_shader_parameter_set("g_wind_clock",clock)
@@ -124,8 +126,8 @@ func _contact_node(body: Node2D, delta: float, details: Array[Node]) -> bool:
 	if not (body is Player):
 		force *= 0.65
 	var touched: bool = false
-	for node: MeadowDetails in details:
-		if node.stamp_segment(before, pos, force):
+	for node: Node in details:
+		if node.has_method("stamp_segment") and bool(node.call("stamp_segment", before, pos, force)):
 			touched = true
 	var player: Player = body as Player
 	if touched and player != null and player.is_multiplayer_authority() and _rustle_wait <= 0.0 and not InputManager.ui_blocking and not player.story_lock:
@@ -162,9 +164,9 @@ func _contacts(delta: float) -> void:
 				var obj: Object = instance_from_id(id)
 				if obj == null or not (obj is Node2D) or not (obj as Node2D).is_inside_tree():
 					_previous.erase(id)
-	for node: MeadowDetails in details:
-		if moved_any or not node._bends.is_empty() or node._dirty:
-			node.advance_contacts(delta)
+	for node: Node in details:
+		if node.has_method("advance_contacts"):
+			node.call("advance_contacts", delta)
 
 func _viewer() -> Player:
 	for player: Player in Player.all:
@@ -174,10 +176,25 @@ func _viewer() -> Player:
 func _air_allowed(player: Player) -> bool:
 	return player != null and not player.story_lock and not InputManager.ui_blocking and not InputManager.map_open and _world.navigation_floor(player.global_position)
 
+func _active_coast_water(pos: Vector2) -> WaterField:
+	for patch: Node in Terrain.patches:
+		if patch is WaterField and patch.is_inside_tree():
+			var wf: WaterField = patch as WaterField
+			if wf.bounds.has_point(pos):
+				return wf
+	return null
+
 func _budget() -> int:
 	var viewer: Player = _viewer()
 	var arid_bonus: int = 5 if viewer != null and BiomeBlend.arid_at(viewer.global_position) > 0.45 else 0
-	return int(_config.get("air_budget",8)) + arid_bonus + int(_config.get("storm_budget",34) * clampf((strength-0.55)/0.45,0.0,1.0))
+	var beach_bonus: int = 0
+	if viewer != null:
+		var wf: WaterField = _active_coast_water(viewer.global_position)
+		if wf != null:
+			var f_v: Vector2 = wf.field_at(viewer.global_position)
+			if f_v.x >= -140.0 and f_v.x <= 220.0:
+				beach_bonus = 14
+	return int(_config.get("air_budget",8)) + arid_bonus + beach_bonus + int(_config.get("storm_budget",34) * clampf((strength-0.55)/0.45,0.0,1.0))
 
 func _release_seed(pos: Vector2) -> void:
 	if _air.size() >= _budget(): return
@@ -197,6 +214,20 @@ func _advance_air(delta: float) -> void:
 			var w_s: Vector2 = sample_soft(particle.pos as Vector2)
 			var skim_dir: Vector2 = (Vector2(0.9653, 0.2612) * 0.70 + Vector2(absf(w_s.x) + 0.15, clampf(w_s.y, -0.04, 0.36)) * 0.30).normalized()
 			vel = skim_dir * (20.0 + minf(w_s.length(), 1.35) * 18.0) + Vector2(0.0, sin(clock * 2.2 + float(particle.phase)) * 1.8)
+		elif int(particle.kind) == 10: ## coastal beach sand wisps & saltation grains skimming low with LIVE WorldWind!
+			var w_c: Vector2 = sample_soft(particle.pos as Vector2)
+			var c_dir: Vector2 = w_c.normalized() if w_c.length_squared() > 0.0001 else direction
+			var c_perp: Vector2 = Vector2(-c_dir.y, c_dir.x)
+			vel = c_dir * (26.0 + minf(w_c.length(), 1.65) * 34.0 + storm * 28.0) + c_perp * sin(clock * 3.1 + float(particle.phase)) * 3.2
+			var c_wf: WaterField = _active_coast_water(particle.pos as Vector2)
+			if c_wf != null:
+				var c_surf: String = c_wf.surface_at(particle.pos as Vector2)
+				if c_surf != "beach_sand":
+					# Blown sand settles quickly once it hits damp wet sand, water, or grass!
+					particle.age = float(particle.age) + delta * 2.8
+		elif int(particle.kind) == 11: ## sea-breeze surf spray mist drifting lightly off breaking waves
+			var w_sp: Vector2 = sample(particle.pos as Vector2)
+			vel = w_sp * (24.0 + storm * 28.0) + Vector2(0.0, -3.5 + sin(clock * 2.8 + float(particle.phase)) * 2.4)
 		elif int(particle.kind) >= 6: ## storm debris rides the wind hard: leaves and dust fly, twigs tumble
 			var speed: float = 95.0 if int(particle.kind) == 8 else 62.0
 			vel = sample(particle.pos as Vector2) * speed + Vector2(0.0, sin(clock * 5.0 + float(particle.phase)) * 14.0 + (6.0 if int(particle.kind) == 7 else -2.0))
@@ -206,6 +237,7 @@ func _advance_air(delta: float) -> void:
 		particle.pos = (particle.pos as Vector2)+vel*delta
 	_spawn_debris(delta, viewer)
 	_spawn_desert_sand(delta, viewer)
+	_spawn_coastal_beach_wind(delta, viewer)
 	_air_timer -= delta
 	if _air_timer > 0.0: return
 	var gap: Array = _config.get("air_spawn_gap",[1.8,4.6])
@@ -217,16 +249,18 @@ func _advance_air(delta: float) -> void:
 	var chunks: Array[Node] = get_tree().get_nodes_in_group("meadow_details")
 	for attempt: int in 8:
 		if chunks.is_empty(): break
-		var detail: MeadowDetails = chunks[_rng.randi_range(0,chunks.size()-1)] as MeadowDetails
-		if detail.sources.is_empty(): continue
-		var index: int = _rng.randi_range(0,detail.sources.size()-1)
-		var candidate: Vector2 = detail.sources[index]
+		var detail: Node = chunks[_rng.randi_range(0, chunks.size() - 1)]
+		var srcs: Variant = detail.get("sources")
+		var skinds: Variant = detail.get("source_kinds")
+		if not (srcs is Array) or (srcs as Array).is_empty() or not (skinds is Array): continue
+		var index: int = _rng.randi_range(0, (srcs as Array).size() - 1)
+		var candidate: Vector2 = (srcs as Array)[index] as Vector2
 		if candidate.distance_to(viewer.global_position) < 180.0:
 			source = candidate
-			plant_kind = detail.source_kinds[index]
+			plant_kind = int((skinds as Array)[index])
 			break
 	if not source.is_finite(): return
-	if plant_kind >= MeadowDetails.MEADOW_COUNT or BiomeBlend.amount_at(source) > 0.5: ## the Hexenwald's air: dead leaves from the crowns, now and then ash
+	if plant_kind >= 26 or BiomeBlend.amount_at(source) > 0.5: ## the Hexenwald's air: dead leaves from the crowns, now and then ash
 		var leaf: bool = _rng.randf() < 0.7
 		_air.append({"pos":source-Vector2(_rng.randf_range(-12,12),_rng.randf_range(38,80)) if leaf else source-Vector2(0,_rng.randf_range(20,40)),"origin":source,"age":0.0,"life":_rng.randf_range(5.0,8.0),"kind":4 if leaf else 5,"phase":_rng.randf()*TAU,"petal_tint":[Color("5a2430"),Color("8e3a3a"),Color("6a4e42"),Color("927460")][_rng.randi_range(0,3)]})
 		return
@@ -277,6 +311,62 @@ func _spawn_desert_sand(delta: float, viewer: Player) -> void:
 		return
 	_air.append({"pos": pos, "origin": pos, "age": 0.0, "life": _rng.randf_range(1.4, 2.4), "kind": 9, "phase": _rng.randf() * TAU, "spark": _rng.randf() > 0.90})
 
+## Live coastal beach wind: low-skimming Treibsand wisps over dry beach sand + fine sea-breeze spray off breaking surf!
+func _spawn_coastal_beach_wind(delta: float, viewer: Player) -> void:
+	if not _air_allowed(viewer) or not _safe_for_trace(viewer):
+		return
+	var wf: WaterField = _active_coast_water(viewer.global_position)
+	if wf == null:
+		return
+	var wdir: Vector2 = direction.normalized() if direction.length_squared() > 0.0001 else Vector2.RIGHT
+	var across: Vector2 = Vector2(-wdir.y, wdir.x)
+
+	# 1. Dry beach sand wisps & saltation grains (paused during heavy rain)
+	if rain < 0.40 and gust >= 0.06:
+		_beach_sand_timer -= delta
+		if _beach_sand_timer <= 0.0:
+			var push: float = clampf(0.45 + gust * 1.05 + storm * 0.95, 0.35, 2.6)
+			_beach_sand_timer = _rng.randf_range(0.07, 0.18) / push
+			if _air.size() < _budget():
+				for _try: int in 6:
+					var pos: Vector2 = viewer.global_position + wdir * _rng.randf_range(-190.0, 90.0) + across * _rng.randf_range(-170.0, 170.0)
+					if wf.surface_at(pos) == "beach_sand":
+						_air.append({
+							"pos": pos,
+							"origin": pos,
+							"age": 0.0,
+							"life": _rng.randf_range(1.0, 1.95),
+							"kind": 10,
+							"phase": _rng.randf() * TAU,
+							"len": _rng.randi_range(3, 5),
+							"spark": _rng.randf() > 0.84,
+						})
+						break
+
+	# 2. Airy coastal sea-spray mist lifting off breaking surf crests
+	if gust >= 0.14 or storm > 0.15:
+		_spray_timer -= delta
+		if _spray_timer <= 0.0:
+			var sp_push: float = clampf(0.30 + gust * 0.75 + storm * 1.4, 0.25, 2.6)
+			_spray_timer = _rng.randf_range(0.24, 0.56) / sp_push
+			if _air.size() < _budget():
+				var near_shore: Vector2 = wf.nearest_coast_px(viewer.global_position)
+				if near_shore != Vector2.INF and near_shore.distance_squared_to(viewer.global_position) <= 260.0 * 260.0:
+					for _try2: int in 5:
+						var cand: Vector2 = near_shore + Vector2(_rng.randf_range(-150.0, 150.0), _rng.randf_range(-120.0, 120.0))
+						var wfd: Dictionary = wf.water_field_at(cand)
+						var sdf_v: float = float(wfd.get("static_sdf_px", 99.0))
+						if int(wfd.get("regime", 0)) == WaterRules.REGIME_SURF and sdf_v >= -18.0 and sdf_v <= 6.0:
+							_air.append({
+								"pos": cand,
+								"origin": cand,
+								"age": 0.0,
+								"life": _rng.randf_range(0.85, 1.65),
+								"kind": 11,
+								"phase": _rng.randf() * TAU,
+							})
+							break
+
 func _safe_for_trace(player: Player) -> bool:
 	for node: Node in get_tree().get_nodes_in_group("predators"):
 		if (node as Node2D).global_position.distance_to(player.global_position)<180.0: return false
@@ -322,6 +412,26 @@ func _draw() -> void:
 				for j: int in 3:
 					var p_step: Vector2 = (at - Vector2(0.9653, 0.2612) * float(j) * 1.4).round()
 					draw_rect(Rect2(p_step, Vector2.ONE), Color(sand_c, sand_c.a * (1.0 - float(j) * 0.28)))
+		elif kind == 10: ## live coastal beach Treibsand streak & saltation grain aligned with real WorldWind
+			var night_k: float = TimeManager.night_amount()
+			var spark_c: bool = bool(particle.get("spark", false))
+			var w_draw: Vector2 = direction.normalized() if direction.length_squared() > 0.0001 else Vector2.RIGHT
+			if spark_c:
+				var gcol: Color = Color(0.97, 0.92, 0.76).lerp(Color(0.56, 0.60, 0.78), night_k * 0.72)
+				draw_rect(Rect2(at, Vector2.ONE), Color(gcol, alpha * lerpf(0.46, 0.24, night_k)))
+			else:
+				var base_s: Color = Color(0.95, 0.87, 0.68).lerp(Color(0.50, 0.54, 0.70), night_k * 0.72)
+				var slen: int = clampi(int(particle.get("len", 4)), 2, 5)
+				var base_a: float = alpha * lerpf(0.56, 0.28, night_k)
+				for j: int in slen:
+					var p_step: Vector2 = (at - w_draw * float(j) * 1.35).round()
+					draw_rect(Rect2(p_step, Vector2.ONE), Color(base_s, base_a * (1.0 - float(j) / float(slen + 1))))
+		elif kind == 11: ## sea-breeze surf spray mist mote
+			var night_s: float = TimeManager.night_amount()
+			var sp_col: Color = Color(0.86, 0.97, 0.96).lerp(Color(0.44, 0.70, 0.82), night_s * 0.68)
+			var w_sp: Vector2 = direction.normalized() if direction.length_squared() > 0.0001 else Vector2.RIGHT
+			draw_rect(Rect2(at, Vector2.ONE), Color(sp_col, alpha * lerpf(0.30, 0.20, night_s)))
+			draw_rect(Rect2((at - w_sp * 1.4).round(), Vector2.ONE), Color(sp_col, alpha * lerpf(0.14, 0.10, night_s)))
 		elif kind == 4: ## a tumbling leaf: flat, then on edge, then flat again
 			var leaf_color: Color = particle.get("petal_tint",Color("6a4e42")) as Color
 			leaf_color.a = alpha*0.85

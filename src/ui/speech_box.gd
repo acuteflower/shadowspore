@@ -21,12 +21,18 @@ var _phase: int = 0 ## 0 idle, 1 growing, 2 typing and holding, 3 fading
 var _t: float = 0.0
 var _typed: float = 0.0
 var _alpha: float = 1.0
+var hud_lift: float = 0.0 ## set by the HUD director: the parts below it in `above_bar` take this much room
 var _time: float = 0.0
 var _next_id: int = 0
 var _done_id: int = 0
 var _gen: int = 0
 var _dialogue: DialogueBox
 var _quests: QuestComponent
+
+
+## Room it takes above the hotbar (HUD director stacking): its card while a line shows.
+func hud_height() -> float:
+	return 0.0 if _phase == 0 else 22.0 + _lines.size() * 10.0
 
 
 func _ready() -> void:
@@ -169,7 +175,7 @@ func _draw() -> void:
 	var width: float = clampf(widest + 30.0, 150.0, MAX_TEXT + 34.0)
 	var height: float = 22.0 + _lines.size() * 10.0
 	var rise: float = (1.0 - grow) * 10.0 + leave * 6.0
-	var origin: Vector2 = Vector2(roundf((size.x - width) / 2.0), roundf(size.y - BOTTOM_GAP - height + rise))
+	var origin: Vector2 = Vector2(roundf((size.x - width) / 2.0), roundf(size.y - BOTTOM_GAP - hud_lift - height + rise))
 	# the vine along the top edge grows out from the middle, a leaf at either end
 	var reach: float = width * 0.5 * grow
 	for dir: int in [-1, 1]:

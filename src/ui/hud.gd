@@ -22,160 +22,20 @@ var _opened: bool = false
 var _was_locked: bool = false ## the story held parts of the HUD back until now
 var _prepared: Array[Dictionary] = [] ## {node, material, children: [[child, material, use_parent]]}
 
-const IDLE_HIDE_SECONDS: float = 10.0 ## no input, no cursor movement and no movement of her for this long: the HUD fades away
-const IDLE_FADE_OUT: float = 1.4 ## seconds to fade away
-const IDLE_FADE_IN: float = 0.25 ## seconds to come back on activity
-const BOSS_FADE_OUT: float = 0.35 ## peripheral HUD fade-out when a boss fight starts
-const BOSS_FADE_IN: float = 0.55 ## peripheral HUD fade-in once the boss fight ends
-const IDLE_PARTS: Array[String] = ["ClockVine", "PurseVine", "Hotbar", "HealthBar", "StaminaBar", "BlinkIcon", "StatusTags", "QuestVine", "HintCard", "FishingHud", "MultiplayerHud"]
-## In boss fights, hide all peripheral info HUDs while keeping BossBar and the Hotbar combat strip.
-const BOSS_HIDE_PARTS: Array[String] = ["ClockVine", "PurseVine", "QuestVine", "HintCard", "FishingHud", "MultiplayerHud"]
-
+var vista_hide: bool = false ## panoramic VistaPoint seating gently hides the HUD (the director's `vista` context)
+var director: HudDirector ## where every part lives and when it shows (data/hud.json, docs/hud_v2_konzept.md 4.2)
 var _player: Node2D
 var _heat_haze: HeatHaze
-var _idle_time: float = 0.0
-var _idle_alpha: float = 1.0 ## 1 = HUD shown, 0 = hidden by idling
-var vista_hide: bool = false ## panoramic VistaPoint seating gently hides the HUD right away
-var _vista_alpha: float = 1.0
-var _boss_alpha: float = 1.0 ## 0 while a boss fight is active, hiding non-combat HUDs
-var _cover_alpha: Dictionary = {} ## part name -> fade of the full-screen menus (QuestVine, HintCard)
-var _last_pos: Vector2 = Vector2.INF
-var _fold_base: Dictionary = {} ## part -> its offsets from hud.tscn, before the hotbar fold moved it
-var _part_cache: Dictionary = {} ## cached child node refs by name (updated via child_entered_tree / child_exiting_tree)
-var _last_fold: Vector4 = Vector4(INF, INF, INF, INF)
-var _last_fade_alphas: Dictionary = {}
 var _hotbar_node: Hotbar
-var _blink_icon_node: CanvasItem
-var _inventory_window: CanvasItem
-var _map_window: CanvasItem
-var _quest_journal: CanvasItem
-
-
-## Any real input or cursor movement counts as activity.
-func _input(event: InputEvent) -> void:
-	if event is InputEventMouseMotion:
-		if (event as InputEventMouseMotion).relative != Vector2.ZERO:
-			_idle_time = 0.0
-	elif event is InputEventKey or event is InputEventMouseButton or event is InputEventJoypadButton:
-		_idle_time = 0.0
-	elif event is InputEventJoypadMotion and absf((event as InputEventJoypadMotion).axis_value) > 0.25:
-		_idle_time = 0.0
-
-
-## True while something keeps the HUD up even without input (menus, cutscenes, fishing, boss fights, taking damage).
-func _holds_hud(covered: bool) -> bool:
-	if covered or _intro_active or InputManager.ui_blocking or InputManager.menu_open or _is_boss_fight_active():
-		return true
-	if _player != null and is_instance_valid(_player):
-		if _last_pos != Vector2.INF and _player.global_position.distance_squared_to(_last_pos) > 0.0001:
-			return true
-		_last_pos = _player.global_position
-		var fishing: FishingComponent = _player.get("fishing") as FishingComponent
-		if fishing != null and fishing.state != FishingComponent.S.IDLE:
-			return true
-	return false
-
-
-func _is_boss_fight_active() -> bool:
-	var boss: BossBar = _cached_node("BossBar") as BossBar
-	if boss != null and boss.is_fighting():
-		return true
-	return get_tree() != null and get_tree().root.get_node_or_null("BossIntroLayer") != null
 
 
 func _on_player_damaged(_amount: float, _from: Vector2, _knockback: float) -> void:
-	_idle_time = 0.0
-
-
-func _cached_node(part: String) -> Node:
-	if _part_cache.has(part):
-		var n: Node = _part_cache[part] as Node
-		if n == null or is_instance_valid(n):
-			return n
-	var found: Node = get_node_or_null(part)
-	_part_cache[part] = found
-	return found
-
-
-func _apply_idle_fade(delta: float, covered: bool) -> void:
-	if _holds_hud(covered):
-		_idle_time = 0.0
-	else:
-		_idle_time += delta
-	var fade_out: bool = _idle_time >= IDLE_HIDE_SECONDS
-	var speed: float = 1.0 / (IDLE_FADE_OUT if fade_out else IDLE_FADE_IN)
-	_idle_alpha = move_toward(_idle_alpha, 0.0 if fade_out else 1.0, delta * speed)
-	var vista_active: bool = vista_hide and not covered and not InputManager.menu_open
-	_vista_alpha = move_toward(_vista_alpha, 0.0 if vista_active else 1.0, delta / (0.85 if vista_active else 0.35))
-	var boss_active: bool = _is_boss_fight_active()
-	_boss_alpha = move_toward(_boss_alpha, 0.0 if boss_active else 1.0, delta / (BOSS_FADE_OUT if boss_active else BOSS_FADE_IN))
-	var base_alpha: float = _idle_alpha * _vista_alpha
-	for part: String in IDLE_PARTS:
-		var node: CanvasItem = _cached_node(part) as CanvasItem
-		if node != null:
-			var boss_mult: float = _boss_alpha if BOSS_HIDE_PARTS.has(part) else 1.0
-			var target_alpha: float = base_alpha * float(_cover_alpha.get(part, 1.0)) * boss_mult
-			if absf(float(_last_fade_alphas.get(part, -1.0)) - target_alpha) > 0.0005:
-				_last_fade_alphas[part] = target_alpha
-				node.modulate.a = target_alpha
-
-
-## Full-screen menus cover the quest branch and tutorial card.
-func _process(delta: float) -> void:
-	var skills: SkillTreeWindow = _cached_node("SkillTreeWindow") as SkillTreeWindow
-	var progress: ProgressWindow = _cached_node("ProgressWindow") as ProgressWindow
-	var pause: CanvasItem = _cached_node("PauseMenu") as CanvasItem
-	var covered: bool = (_inventory_window != null and _inventory_window.visible) or (_map_window != null and _map_window.visible) or (_quest_journal != null and _quest_journal.visible) or (skills != null and skills.visible) or (progress != null and progress.visible) or (pause != null and pause.visible) ## the Escape menu too
-	var boss: BossBar = _cached_node("BossBar") as BossBar
-	if boss != null:
-		boss.set_covered(covered)
-	for part: String in ["QuestVine", "HintCard", "MultiplayerHud"]:
-		_cover_alpha[part] = move_toward(float(_cover_alpha.get(part, 1.0)), 0.0 if covered else 1.0, delta * 8.0)
-	_apply_idle_fade(delta, covered)
-	_follow_hotbar_fold()
-
-
-## The folded hotbar sinks and draws in: the sap vines stay on its ends, the skill crystal sinks and fades with the pendants.
-func _follow_hotbar_fold() -> void:
-	var bar: Hotbar = _hotbar_node
-	if bar == null:
-		return
-	var state: Vector4 = Vector4(bar.drop, bar.inset, bar.sink, bar.shown)
-	if state == _last_fold:
-		return
-	_last_fold = state
-	_shift_part("Hotbar", Vector2(0.0, bar.drop))
-	_shift_part("HealthBar", Vector2(bar.inset, bar.drop))
-	_shift_part("StaminaBar", Vector2(-bar.inset, bar.drop))
-	_shift_part("BlinkIcon", Vector2(-bar.inset, bar.drop + bar.sink))
-	_shift_part("StatusTags", Vector2(0.0, bar.drop)) ## burning and the like stay above the health vine
-	if _blink_icon_node != null:
-		_blink_icon_node.self_modulate.a = bar.shown
-
-
-func _shift_part(part: String, by: Vector2) -> void:
-	var node: Control = _cached_node(part) as Control
-	if node == null:
-		return
-	if not _fold_base.has(part):
-		_fold_base[part] = Rect2(node.offset_left, node.offset_top, node.offset_right, node.offset_bottom) ## (left, top, right, bottom) as laid out in hud.tscn
-	var base: Rect2 = _fold_base[part]
-	node.offset_left = base.position.x + by.x
-	node.offset_right = base.size.x + by.x
-	node.offset_top = base.position.y + by.y
-	node.offset_bottom = base.size.y + by.y
+	if director != null:
+		director.wake()
 
 
 func _ready() -> void:
 	_hotbar_node = get_node_or_null("Hotbar") as Hotbar
-	_blink_icon_node = get_node_or_null("BlinkIcon") as CanvasItem
-	_inventory_window = get_node_or_null("InventoryWindow") as CanvasItem
-	_map_window = get_node_or_null("MapWindow") as CanvasItem
-	_quest_journal = get_node_or_null("QuestJournal") as CanvasItem
-	for child: Node in get_children():
-		_part_cache[child.name] = child
-	child_entered_tree.connect(func(c: Node) -> void: _part_cache[c.name] = c)
-	child_exiting_tree.connect(func(c: Node) -> void: _part_cache.erase(c.name); _last_fade_alphas.erase(c.name))
 	if _hotbar_node != null:
 		_hotbar_node.visibility_changed.connect(func() -> void: _sync_hotbar_bars.call_deferred())
 	process_mode = Node.PROCESS_MODE_ALWAYS ## the HUD keeps moving while the Escape menu pauses the game
@@ -220,6 +80,18 @@ func bind(player: Node) -> void:
 	var boss_bar: BossBar = BossBar.new() ## the boss's health: `get_tree().call_group("boss_bar", "track", name, health)`
 	boss_bar.name = "BossBar"
 	add_child(boss_bar)
+	var dungeon_hud: DungeonHud = DungeonHud.new()
+	add_child(dungeon_hud)
+	dungeon_hud.bind(player)
+	var ready_banner: DungeonReadyBanner = DungeonReadyBanner.new()
+	add_child(ready_banner)
+	ready_banner.bind(player)
+	var dungeon_win: DungeonWindow = DungeonWindow.new()
+	add_child(dungeon_win)
+	dungeon_win.bind(player)
+	var dungeon_res: DungeonResultWindow = DungeonResultWindow.new()
+	add_child(dungeon_res)
+	dungeon_res.bind(player)
 	var fishing_hud: FishingHud = FishingHud.new() ## the rod's bait tags (docs/fishing.md)
 	fishing_hud.name = "FishingHud"
 	add_child(fishing_hud)
@@ -261,6 +133,35 @@ func bind(player: Node) -> void:
 	var mod_menu: Control = preload("res://src/ui/mod_menu.tscn").instantiate() as Control
 	add_child(mod_menu)
 	mod_menu.call("bind", player)
+	HudText.refresh()
+	var way: WayVine = WayVine.new() ## the compass twig at the top centre (docs/hud_v2_konzept.md 4.4)
+	way.name = "WayVine"
+	way.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	way.offset_top = 0.0
+	way.offset_bottom = 26.0
+	add_child(way)
+	move_child(way, $ClockVine.get_index())
+	way.bind(_player)
+	var mates: CompanionVine = CompanionVine.new() ## the other players on the left rail (docs/hud_v2_konzept.md 4.7)
+	mates.name = "CompanionVine"
+	mates.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(mates)
+	move_child(mates, $ClockVine.get_index())
+	mates.bind(_player)
+	var notices: HudNotices = HudNotices.new() ## big / medium / small notices (docs/hud_v2_konzept.md 3.F)
+	notices.setup(self, _player)
+	add_child(notices)
+	var game_menu: GameMenu = GameMenu.new() ## unified 7-tab Feldcodex menu (docs/schattenfruechte_und_menue_konzept.md)
+	game_menu.name = "GameMenu"
+	add_child(game_menu)
+	game_menu.bind(player, self)
+	var chat_ui: CanvasLayer = preload("res://src/ui/game_chat.gd").new() as CanvasLayer
+	chat_ui.name = "GameChat"
+	add_child(chat_ui)
+	director = HudDirector.new()
+	director.name = "Director"
+	director.setup(self, _player)
+	add_child(director)
 	var w_node: Node = get_tree().get_first_node_in_group("world")
 	_story_world = w_node != null and w_node.is_in_group("story_world")
 	_story_quests = player.quests
@@ -325,12 +226,15 @@ func _finish_reveal() -> void:
 ## These systems are introduced later. The quest flag is persisted with quest state;
 ## the knight/combat sequence that will unlock it is deliberately not implemented yet.
 func _refresh_story_hud() -> void:
-	var unlocked: bool = not _story_world or (_story_quests != null and _story_quests.has_flag("hud_unlocked"))
-	var config: Dictionary = DataRegistry.get_entry("ground", "story_start")
+	var held: Array[String] = director.locked_parts() if director != null else [] as Array[String] ## data/hud.json `unlock`
+	var unlocked: bool = true
+	for part: String in held:
+		if _story_world and (_story_quests == null or not _story_quests.has_flag(director.unlock_flag(part))):
+			unlocked = false
 	var grow: bool = unlocked and _story_world and _was_locked and _opened and not _intro_active and _prepared.is_empty()
 	if grow: ## the vines that were held back grow in from their roots when she first leaves the hut
-		_prepare(config.get("hidden_hud", []) as Array)
-	for part: String in config.get("hidden_hud", []) as Array:
+		_prepare(held)
+	for part: String in held:
 		var node: CanvasItem = get_node_or_null(part) as CanvasItem
 		if node != null:
 			node.visible = unlocked

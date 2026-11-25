@@ -1,0 +1,24 @@
+{
+  "zone_id": "hexenwald_saum",
+  "origin": [
+    1327,
+    702
+  ],
+  "size": [
+    487,
+    422
+  ],
+  "px_per_tile": 4,
+  "light_alpha_bits": {
+    "WATER": 1,
+    "MEADOW": 2,
+    "CANOPY": 4,
+    "GLOW_WARM": 8,
+    "GLOW_ARCANE": 16,
+    "INK_CLIFF": 32,
+    "SAND_WAY": 64,
+    "VALID": 128
+  },
+  "campfires": [],
+  "settlements": []
+}

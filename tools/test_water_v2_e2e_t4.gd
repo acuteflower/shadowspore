@@ -333,7 +333,6 @@ static func _scenario_5_world_rivers_coexistence(tree: SceneTree, ctx: RefCounte
 	NetworkManager.host_singleplayer()
 	var world_packed: PackedScene = ctx.call(&"load_scene", String(ctx.get(&"WORLD_LEVEL_PATH"))) as PackedScene
 	var wf_scr: GDScript = ctx.call(&"load_script", String(ctx.get(&"WATER_FIELD_PATH"))) as GDScript
-	var rivers_scr: GDScript = ctx.call(&"load_script", "res://src/water/world_rivers.gd") as GDScript
 	var ok_coexist: bool = false
 	var ok_cleanup: bool = false
 
@@ -341,26 +340,8 @@ static func _scenario_5_world_rivers_coexistence(tree: SceneTree, ctx: RefCounte
 		var world_inst: Node = world_packed.instantiate()
 		if world_inst is Node2D:
 			var world: Node2D = world_inst as Node2D
-			world.set(&"opening_over", true)
 			tree.root.add_child(world)
-			world.set_process(false)
-			var wildlife: Node = world.get_node_or_null("Wildlife")
-			if wildlife != null:
-				wildlife.process_mode = Node.PROCESS_MODE_DISABLED
-			var chunks: Dictionary = world.get(&"_chunks") as Dictionary
-			for c: Vector2i in chunks.keys():
-				world.call(&"_unload_chunk", c)
-
-			var data: Dictionary = DataRegistry.table("rivers_baked")
-			var chunks_dict: Dictionary = data.get("chunks", {}) as Dictionary
-			var rivers_ok: bool = false
-			if not chunks_dict.is_empty():
-				var first_key: String = String(chunks_dict.keys()[0])
-				var cell: Vector2i = Vector2i(int(first_key.get_slice(",", 0)), int(first_key.get_slice(",", 1)))
-				world.call(&"_load_chunk", cell)
-				await ctx.call(&"step_frames", tree, 2)
-				var rivers_node: Node = world.get(&"_rivers") as Node
-				rivers_ok = rivers_node != null and Terrain.patches.has(rivers_node)
+			await ctx.call(&"step_frames", tree, 4)
 
 			var wf_node: Node2D = wf_scr.new() as Node2D
 			tree.root.add_child(wf_node)
@@ -369,19 +350,20 @@ static func _scenario_5_world_rivers_coexistence(tree: SceneTree, ctx: RefCounte
 			var wf_registered: bool = Terrain.patches.has(wf_node)
 			var wf_isolated: bool = String(wf_node.call(&"surface_at", Vector2(384.0, 22.0))) == ""
 			var wf_west_active: bool = String(wf_node.call(&"surface_at", Vector2(-384.0, 0.0))) != ""
-			ok_coexist = rivers_ok and wf_registered and wf_isolated and wf_west_active
+			var zone_wf_count: int = 0
+			for patch: Node in Terrain.patches:
+				if is_instance_valid(patch) and patch.get_script() == wf_scr:
+					zone_wf_count += 1
+			ok_coexist = zone_wf_count >= 2 and wf_registered and wf_isolated and wf_west_active
 
-			chunks = world.get(&"_chunks") as Dictionary
-			for c: Vector2i in chunks.keys():
-				world.call(&"_unload_chunk", c)
 			await ctx.call(&"cleanup_node", tree, wf_node)
 			await ctx.call(&"cleanup_node", tree, world)
 
 			var leaked_patches: Array[Node] = []
 			for patch: Node in Terrain.patches:
-				if not is_instance_valid(patch) or (rivers_scr != null and patch.get_script() == rivers_scr) or patch.get_script() == wf_scr:
+				if not is_instance_valid(patch) or patch.get_script() == wf_scr:
 					leaked_patches.append(patch)
 			ok_cleanup = leaked_patches.is_empty()
 
-	_chk(ctx, ok_coexist, "S5", "Scenario 5a: WorldLevel + WorldRivers and WaterField coexist cleanly in Terrain.patches")
-	_chk(ctx, ok_cleanup, "S5", "Scenario 5b: Teardown removes all WorldRivers & WaterField patches from Terrain.patches without leaks")
+	_chk(ctx, ok_coexist, "S5", "Scenario 5a: ZoneWorld + standalone WaterField coexist cleanly in Terrain.patches")
+	_chk(ctx, ok_cleanup, "S5", "Scenario 5b: Teardown removes all WaterField patches from Terrain.patches without leaks")

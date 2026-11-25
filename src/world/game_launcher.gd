@@ -4,10 +4,9 @@ extends RefCounted
 ## A request is {mode, address}; modes: "continue" (load the save if there is one, else a new game), "new", "host" (up to 4 players), "join".
 ## The menu (and the pause menu's "Neu beginnen") puts a request in `pending` and reloads main.tscn; `main.gd` takes it and calls `start`.
 
-const WORLD_PATH: String = "res://src/world/world_level.tscn" ## loaded at run time: a preload makes a cycle (World -> pause menu -> launcher -> World)
+const WORLD_PATH: String = "res://src/world/v2/zone_world.tscn" ## loaded at run time: a preload makes a cycle (World -> pause menu -> launcher -> World)
 const ARENA_PATH: String = "res://src/world/test_level.tscn"
 const TRIALS_PATH: String = "res://src/world/trial_level.tscn" ## the flat test world with every trial (`--trials`, request `world` "trials")
-const ZONES_PATH: String = "res://src/world/zones/zone_world.tscn" ## EXPERIMENTAL TEST SYSTEM ONLY (not in the official game): Lost-Ark-style zoned world (`--zones`, request `world` "zones")
 const MAIN: String = "res://src/world/main.tscn"
 const PREWARMER_SCRIPT: GDScript = preload("res://src/systems/shader_prewarmer.gd")
 const RelayPeer: GDScript = preload("res://src/autoload/nakama_relay_peer.gd")
@@ -86,10 +85,6 @@ static func from_args(args: PackedStringArray) -> Dictionary:
 		return {"mode": "join", "address": args[0].get_slice("=", 1) if "=" in args[0] else "127.0.0.1"}
 	if args.has("--trials"):
 		return {"mode": "new", "world": "trials"}
-	if args.has("--zones-continue"):
-		return {"mode": "continue", "world": "zones"}
-	if args.has("--zones"):
-		return {"mode": "new", "world": "zones"}
 	if args.has("--new"):
 		return {"mode": "new"}
 	for flag: String in ["--arena", "--skip-intro", "--skip-menu"]:
@@ -117,6 +112,7 @@ static func launch(tree: SceneTree, request: Dictionary) -> void:
 	InputManager.journal_open = false
 	InputManager.skills_open = false
 	InputManager.progress_open = false
+	InputManager.dungeons_open = false
 	var to_menu: bool = request.is_empty() or bool(request.get("to_menu", false))
 	if to_menu:
 		pending = {}
@@ -227,8 +223,6 @@ static func start(main: Node, request: Dictionary) -> void:
 	if not GameGuard.is_strict_mode():
 		if String(request.get("world", "")) == "trials":
 			path = TRIALS_PATH
-		elif String(request.get("world", "")) == "zones" or args.has("--zones") or args.has("--zones-continue"):
-			path = ZONES_PATH
 	var load_error: Error = ResourceLoader.load_threaded_request(path)
 	if load_error != OK:
 		_loading_failed(main, screen, "WELT KONNTE NICHT GELADEN WERDEN")
@@ -249,7 +243,7 @@ static func start(main: Node, request: Dictionary) -> void:
 		await CloudSession.fetch_my_profile()
 		if not _alive(main):
 			return
-	var is_test_sandbox: bool = (path == TRIALS_PATH or path == ZONES_PATH)
+	var is_test_sandbox: bool = (path == TRIALS_PATH)
 	var open_live_relay: bool = mode == "host_relay" or ((mode == "continue" or mode == "new") and CloudSession.is_logged_in() and not is_test_sandbox)
 	var err: Error = OK
 	if open_live_relay:

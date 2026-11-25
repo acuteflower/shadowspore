@@ -1,5 +1,8 @@
 # Wiesenbiom-Ausbau – Master-Konzept („Die Lebendige Wiese“)
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 > **Status:** Vollständig implementiert & verifiziert (Stufen 1–6 abgeschlossen am 2026-11-14).
 > **Fokus:** Ausschließlich das gemeinsame Standard-Biom **`meadow`** (~500.736 Tiles über die fünf Überregionen *Die Lichtung*, *Nebelwald*, *Glasklippen*, *Versunkene Ruinen* und *Das Leerenblühen*). Hexenwald (`witch_forest`) und Sonnenquarz-Öde (`quartz_desert`) bleiben komplett unangetastet.
 > **Grundregel (`CLAUDE.md` / `GEMINI.md`):** Gebackene Höhen, Kollisionen, Küstenlinien (`land_sdf.png`), Flüsse und Spielstände bleiben kompatibel; alle neuen Systeme sind **streng statisch getypt**, **datengetrieben (`res://data/*.json`)**, **Multiplayer-first (Host-authoritativ)** und multithreading-sicher (`Jobs`).
@@ -275,7 +278,7 @@ flowchart TD
     - **`SpiritStag` (`src/entities/wildlife/spirit_stag.gd`):** Unangreifbares Geistertier auf stillen Nachtlichtungen; Wachsamkeits-/Fluchtlogik gegen Ungeduldige vs. Huf-Scharren & Relikt-Freigabe bei `sneak`-Annäherung.
   - **Belohnungs-Verknüpfung über bestehende Systeme:**
     - Befüllung von `data/loot_chests.json` (`placed`: ~35–45 handplatzierte *Wurzelkisten*, *Mondsiegeltruhen* und *Glutreliquiare* an den neuen Wachtürmen, Mühlen, Brückenpfeilern, Solitärbäumen, Klippen und Weltwundern).
-    - 3–4 exklusive Fund-Baupläne für Glimmrast (`data/town.json`), 2–3 alte Kultursamen (`data/farming.json`), 3 Fund-Kochrezepte (`data/cooking.json`) und 3 Entdecker-Talismane (`data/items.json`).
+    - 3–4 exklusive Fund-Baupläne für Glimmrast (`data/town.json`), 2–3 alte Kultursamen (`data/farming.json`), 3 Fund-Alchemierezepte (`data/alchemy.json`) und 3 Entdecker-Talismane (`data/items.json`).
 - **Art & Audio:** `tools/art_spirit_stag.py` (8 Richtungen: Idle, Lauschen, Scharren, Verneigen, Sprung in den Nebel + Geweih-Glow), `tools/art_starfall.py` + `tools/audio_night_wonders.py`.
 - **Tests:** `tools/test_night_wonders.tscn` (Sternschnuppen-Einschlag & Morgengrauen-Despawn, Kronenhirsch-Flucht bei Lauf vs. Relikt-Drop bei `sneak`, 0 Hurtbox-Regel, Loopback-Sync).
 

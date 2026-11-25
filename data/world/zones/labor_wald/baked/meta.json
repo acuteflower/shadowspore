@@ -1,0 +1,24 @@
+{
+  "zone_id": "labor_wald",
+  "origin": [
+    1140,
+    876
+  ],
+  "size": [
+    166,
+    150
+  ],
+  "px_per_tile": 4,
+  "light_alpha_bits": {
+    "WATER": 1,
+    "MEADOW": 2,
+    "CANOPY": 4,
+    "GLOW_WARM": 8,
+    "GLOW_ARCANE": 16,
+    "INK_CLIFF": 32,
+    "SAND_WAY": 64,
+    "VALID": 128
+  },
+  "campfires": [],
+  "settlements": []
+}

@@ -42,14 +42,17 @@ func _player(stream: AudioStream) -> AudioStreamPlayer:
 
 
 func follow(sun: float, night: float, indoors: bool, delta: float) -> void:
-	_fade(_day, 0.0 if indoors else sun, delta)
-	_fade(_night, 0.0 if indoors else night, delta)
+	var day_k: float = ZoneMood.value("amb_day") ## the zone's beds (2.0 zone world, all 1 elsewhere)
+	var night_k: float = ZoneMood.value("amb_night")
+	var wind_k: float = ZoneMood.value("amb_wind")
+	_fade(_day, 0.0 if indoors else sun * day_k, delta)
+	_fade(_night, 0.0 if indoors else night * night_k, delta)
 	if _wind_day != null:
-		_fade(_wind_day, 0.0 if indoors else sun, delta, -20.0)
+		_fade(_wind_day, 0.0 if indoors else sun * wind_k, delta, -20.0)
 	if _wind_night != null:
-		_fade(_wind_night, 0.0 if indoors else night, delta, -21.0)
+		_fade(_wind_night, 0.0 if indoors else night * wind_k, delta, -21.0)
 	if _crickets != null:
-		_fade(_crickets, 0.0 if indoors else night, delta, -24.0)
+		_fade(_crickets, 0.0 if indoors else night * ZoneMood.value("amb_crickets"), delta, -24.0)
 
 
 func _fade(p: AudioStreamPlayer, amount: float, delta: float, level: float = LEVEL_DB) -> void:

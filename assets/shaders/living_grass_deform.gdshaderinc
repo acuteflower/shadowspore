@@ -1,5 +1,6 @@
 // Shared world-space noise, toroidal ring-buffer deformation sampling, environment coupling
-// (puddles, rain, wear, biomes) and parabolic vertex displacement for LivingGrass (lit + night glow).
+// (puddles, rain, wear, biomes), live actor parting curtain, and parabolic vertex displacement
+// for LivingGrass v4 (standard 20x24 & tall 24x36 tiers, lit + night glow).
 // Included AFTER `daylight.gdshaderinc` so all global daylight/weather uniforms are already declared.
 
 global uniform float g_wind_clock;
@@ -17,6 +18,8 @@ uniform vec2 field_origin = vec2(-256.0, -256.0);
 uniform float field_size = 512.0;
 uniform sampler2D deform_tex : filter_linear, repeat_enable;
 uniform vec4 actors[4]; // (world_x, world_y, shadow_radius, weight)
+uniform float foot_y_local = 10.0; // +10.0 for 20x24 standard (foot y=22), +16.0 for 24x36 tall (foot y=34)
+uniform float tier_scale = 1.0;    // 1.0 = standard meadow tier, 1.55 = knee/hip-high tall grass tier
 
 // Integer hash synced with ground_tone.gdshader so macro light & puddle shapes match pixel-for-pixel.
 float lg_hash(vec2 p) {
@@ -109,23 +112,57 @@ void lg_displace_vertex(
 	vec2 bend = (def.rg - vec2(0.5)) * 2.0;
 	float crush = clamp(def.b, 0.0, 1.0);
 	float wobble = (def.a - 0.5) * 2.0;
-	out_crush = crush;
-	out_bend_len = clamp(length(bend), 0.0, 1.4);
+
+	// Live zero-lag actor parting curtain: tall & mid blades split cleanly left/right around wading legs!
+	vec2 live_part = vec2(0.0);
+	float live_press = 0.0;
+	bool is_tall = tier_scale > 1.2;
+	for (int i = 0; i < 4; i++) {
+		float aw = actors[i].w;
+		if (aw <= 0.001) {
+			continue;
+		}
+		vec2 delta = foot - actors[i].xy;
+		// Asymmetric 3/4 oval: wider sideways parting, tighter behind, slightly deeper in front of legs
+		float r_part = max(actors[i].z, 6.0) * (is_tall ? 1.38 : 0.96);
+		vec2 scaled = delta * vec2(1.0, 1.28);
+		float d = length(scaled);
+		if (d < r_part) {
+			float f = 1.0 - smoothstep(r_part * 0.12, r_part, d);
+			vec2 away = d > 0.4 ? normalize(delta + vec2(sign(delta.x + 0.01) * 1.4, 0.0)) : vec2(1.0, 0.0);
+			// Prioritize lateral parting so tall grass opens like a natural curtain around legs/coat!
+			vec2 curtain = normalize(vec2(away.x * 1.45, away.y * 0.55));
+			live_part += curtain * f * aw;
+			live_press = max(live_press, f * aw * (is_tall ? 0.52 : 0.25));
+		}
+	}
+
+	out_crush = clamp(max(crush, live_press * 0.65), 0.0, 1.0);
+	out_bend_len = clamp(length(bend) + length(live_part) * 0.75, 0.0, 1.5);
 
 	float h = clamp(uv.y, 0.0, 1.0);
 	float phase = custom.g * 6.2831853;
 	float flex = custom.b;
 	float hscale = custom.a;
+	if (hscale <= 0.001) {
+		out_crush = 0.0;
+		out_bend_len = 0.0;
+		out_sheen = 0.0;
+		out_wet = 0.0;
+		out_keep = 0.0;
+		return;
+	}
 
-	// Puddle / trodden path / deep desert graceful thinning (hash-frayed organic edges)
+	// Puddle / trodden path / deep desert graceful thinning (tall grass steps down smoothly near borders)
 	float puddle = lg_puddle_mask(floor(foot), arid);
 	float tuft_h = fract(custom.g * 7.31 + foot.x * 0.013 + foot.y * 0.019);
+	float tall_edge_bias = is_tall ? 0.14 : 0.0;
 	float keep = 1.0;
-	if (puddle > 0.35 + 0.35 * tuft_h) {
+	if (puddle > 0.35 - tall_edge_bias + 0.35 * tuft_h) {
 		keep = 0.0;
-	} else if (wear > 0.38 + 0.38 * tuft_h) {
+	} else if (wear > 0.38 - tall_edge_bias + 0.38 * tuft_h) {
 		keep = 0.0;
-	} else if (arid > 0.44 + 0.24 * tuft_h) {
+	} else if (arid > 0.44 - tall_edge_bias * 0.5 + 0.24 * tuft_h) {
 		keep = 0.0;
 	}
 	out_keep = keep;
@@ -133,17 +170,20 @@ void lg_displace_vertex(
 	// Stepped 15 Hz pixel-crisp animation clock so tips move cleanly in whole art pixels without jitter
 	float clock = floor(g_wind_clock * 15.0) / 15.0;
 	vec2 wdir = length(g_wind_dir) > 0.01 ? normalize(g_wind_dir) : vec2(0.96, 0.28);
+	vec2 wperp = vec2(-wdir.y, wdir.x);
 	float g_soft = g_wind_gust <= 1.1 ? g_wind_gust : 1.1 + 0.85 * tanh((g_wind_gust - 1.1) * 0.35);
 
-	// Rolling meadow gust wave + organic spatial domain warp
-	float warp = sin(foot.y * 0.042 + foot.x * 0.019) * 1.15 + cos(foot.x * 0.031 - foot.y * 0.027) * 0.65;
-	float wave_arg = dot(foot, wdir) * 0.024 - clock * 1.95 + warp;
-	float wave = pow(0.5 + 0.5 * sin(wave_arg), 2.2);
-	float breeze = (0.14 + g_soft * (0.30 + 0.70 * wave)) * flex;
+	// Dual-wave organic rolling meadow gust fronts + cross-eddy turbulence (billowing wind ripples!)
+	float warp = sin(foot.y * 0.038 + foot.x * 0.017) * 1.25 + cos(foot.x * 0.029 - foot.y * 0.024) * 0.72;
+	float wave_primary = pow(0.5 + 0.5 * sin(dot(foot, wdir) * 0.021 - clock * 1.80 + warp), 2.1);
+	float wave_eddy = 0.5 + 0.5 * sin(dot(foot, wperp) * 0.034 + dot(foot, wdir) * 0.012 - clock * 1.22 - warp * 0.65);
+	float wave = clamp(wave_primary * 0.74 + wave_primary * wave_eddy * 0.40 + wave_eddy * 0.12, 0.0, 1.0);
+	float breeze = (0.14 + g_soft * (0.30 + 0.78 * wave)) * flex;
 
-	// Independent per-tuft dance: every tuft has its own natural period & micro-flutter
-	float indie_a = sin(clock * (1.85 + flex * 1.65) + phase) * (0.45 + 0.55 * breeze);
-	float indie_b = sin(clock * 4.35 + phase * 3.17) * 0.28 * (0.35 + g_soft);
+	// Independent per-tuft harmonic dance: tall grass sways slower & deeper, short grass flutters briskly
+	float freq_scale = is_tall ? 0.76 : 1.0;
+	float indie_a = sin(clock * (1.80 + flex * 1.55) * freq_scale + phase) * (0.45 + 0.55 * breeze);
+	float indie_b = sin(clock * 4.20 * freq_scale + phase * 3.17) * 0.26 * (0.35 + g_soft);
 	float free_sway = 1.0 - 0.85 * crush;
 
 	// Wetness weight & active raindrop micro-tremor
@@ -154,24 +194,28 @@ void lg_displace_vertex(
 	if (rain_l > 0.05) {
 		float drop_cyc = fract(clock * 1.9 + custom.g * 17.3);
 		float hit = step(0.91 - 0.14 * rain_l, drop_cyc) * (1.0 - smoothstep(0.91, 1.0, drop_cyc));
-		rain_dip = hit * (1.4 + 1.2 * rain_l) * free_sway;
+		rain_dip = hit * (1.4 + 1.3 * rain_l) * tier_scale * free_sway;
 	}
-	float wet_droop = wet_here * 1.35 * (1.0 - 0.4 * crush);
+	float wet_droop = wet_here * 1.45 * tier_scale * (1.0 - 0.4 * crush);
 
-	vec2 wind_disp = (wdir * breeze * 2.45 + vec2(indie_a * 1.25 + indie_b, indie_a * 0.28)) * free_sway;
-	// True parabolic arch (enabled by our 5-row subdivided tuft mesh!):
-	// lower stem stays planted in the soil, mid-stem curves organically, tips sweep & fold cleanly.
-	float arch = pow(h, 1.38);
-	float roll = pow(h, 1.16);
-	vec2 part_disp = bend * vec2(5.8 + 4.2 * crush, 2.2 + 1.6 * crush) + vec2(wobble * 2.4, -abs(wobble) * 0.5);
-	float flatten_y = (crush * 7.4 + min(out_bend_len, 1.0) * 1.5) * hscale * roll;
+	// Sweeping parabolic wind arch (tall blades bend smoothly in a wider sweeping arc!)
+	vec2 wind_disp = (wdir * breeze * 2.55 * tier_scale + vec2((indie_a * 1.28 + indie_b) * tier_scale, indie_a * 0.28 * tier_scale)) * free_sway;
+	// Subtle vertical dip when strong wind bends tall blades sideways (arc-length conservation!)
+	float wind_sag = clamp(abs(wind_disp.x) * (is_tall ? 0.22 : 0.12), 0.0, is_tall ? 3.8 : 1.5);
+
+	float arch = pow(h, is_tall ? 1.46 : 1.38);
+	float roll = pow(h, 1.18);
+	vec2 part_disp = bend * vec2((5.8 + 4.4 * crush) * tier_scale, (2.2 + 1.7 * crush) * tier_scale)
+		+ live_part * vec2(is_tall ? 7.2 : 3.2, is_tall ? 2.4 : 1.0)
+		+ vec2(wobble * 2.5 * tier_scale, -abs(wobble) * 0.55 * tier_scale);
+	float flatten_y = (crush * 7.8 * tier_scale + live_press * (is_tall ? 3.6 : 1.2) + min(length(bend), 1.0) * 1.5 * tier_scale) * hscale * roll;
 
 	// Edge fraying: tufts right beside paths, puddles or desert edge grow slightly shorter
 	float env_trim = max(max(puddle * 0.45, smoothstep(0.15, 0.65, wear) * 0.42), smoothstep(0.20, 0.60, arid) * 0.35);
-	float height_trim = ((1.0 - hscale) * 3.0 + env_trim * 5.0) * h;
+	float height_trim = ((1.0 - hscale) * (is_tall ? 6.0 : 3.4) + env_trim * (is_tall ? 8.0 : 5.0)) * h;
 
 	vert.x += round((wind_disp.x + part_disp.x) * arch);
-	vert.y += round((wind_disp.y + part_disp.y + wet_droop + rain_dip) * arch + flatten_y + height_trim);
+	vert.y += round((wind_disp.y + part_disp.y + wet_droop + rain_dip + wind_sag) * arch + flatten_y + height_trim);
 
-	out_sheen = wave * clamp(g_soft, 0.0, 1.2) * free_sway;
+	out_sheen = wave * clamp(g_soft + 0.15, 0.0, 1.25) * free_sway;
 }

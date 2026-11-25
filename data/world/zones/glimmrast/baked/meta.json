@@ -1,0 +1,30 @@
+{
+  "zone_id": "glimmrast",
+  "origin": [
+    825,
+    715
+  ],
+  "size": [
+    537,
+    500
+  ],
+  "px_per_tile": 4,
+  "light_alpha_bits": {
+    "WATER": 1,
+    "MEADOW": 2,
+    "CANOPY": 4,
+    "GLOW_WARM": 8,
+    "GLOW_ARCANE": 16,
+    "INK_CLIFF": 32,
+    "SAND_WAY": 64,
+    "VALID": 128
+  },
+  "campfires": [],
+  "settlements": [
+    [
+      268.45,
+      250.0,
+      22.0
+    ]
+  ]
+}

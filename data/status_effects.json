@@ -7,7 +7,9 @@
     "min_damage": 2,
     "extinguish": "water",
     "color": "ff6ad8",
-    "hot": "ffd0f2"
+    "hot": "ffd0f2",
+    "good": false,
+    "glyph": "flame"
   },
   "brandmark": {
     "name": "BRANDMAL",
@@ -16,7 +18,9 @@
     "damage_ratio": 0.0,
     "min_damage": 0,
     "color": "ff4fd8",
-    "hot": "fff0fb"
+    "hot": "fff0fb",
+    "good": false,
+    "glyph": "flame"
   },
   "hallucinated": {
     "name": "HALLUZINIERT",
@@ -49,7 +53,8 @@
     "phantom": [
       7.0,
       18.0
-    ]
+    ],
+    "good": false
   },
   "glutatem": {
     "name": "GLUTATEM",
@@ -60,7 +65,8 @@
     "color": "ffb347",
     "hot": "fff0b0",
     "glyph": "spark",
-    "tiered": true
+    "tiered": true,
+    "good": true
   },
   "wound_pause": {
     "name": "WUNDPAUSE",
@@ -70,7 +76,8 @@
     "min_damage": 0,
     "color": "ff6f8e",
     "hot": "ffd0dc",
-    "glyph": "drop"
+    "glyph": "drop",
+    "good": false
   },
   "food_pause": {
     "name": "ESSPAUSE",
@@ -80,7 +87,8 @@
     "min_damage": 0,
     "color": "8ad48a",
     "hot": "e0ffe0",
-    "hidden": true
+    "hidden": true,
+    "good": false
   },
   "ashen": {
     "name": "ASCHENHAUT",
@@ -91,7 +99,9 @@
     "extinguish": "water",
     "color": "ff7a2a",
     "hot": "ffd9a0",
-    "tiered": true
+    "tiered": true,
+    "good": true,
+    "glyph": "drop"
   },
   "clear_vision": {
     "name": "KLARBLICK",
@@ -102,7 +112,8 @@
     "color": "a8ff6a",
     "hot": "eaffc4",
     "glyph": "eye",
-    "tiered": true
+    "tiered": true,
+    "good": true
   },
   "wisp": {
     "name": "IRRLICHT",
@@ -113,7 +124,8 @@
     "color": "4fe0d0",
     "hot": "d6fff6",
     "glyph": "spark",
-    "tiered": true
+    "tiered": true,
+    "good": true
   },
   "special_pause": {
     "name": "SUDPAUSE",
@@ -123,7 +135,8 @@
     "min_damage": 0,
     "color": "b99bff",
     "hot": "efe4ff",
-    "glyph": "drop"
+    "glyph": "drop",
+    "good": false
   },
   "void_rift": {
     "name": "LEERE",
@@ -134,7 +147,8 @@
     "color": "6a3fa0",
     "hot": "c8b4f0",
     "glyph": "drop",
-    "tiered": true
+    "tiered": true,
+    "good": false
   },
   "veil": {
     "name": "VERNEBELT",
@@ -145,7 +159,8 @@
     "color": "b9aaff",
     "hot": "f2eeff",
     "glyph": "eye",
-    "tiered": true
+    "tiered": true,
+    "good": true
   },
   "sun_heat": {
     "name": "ERHITZT",
@@ -157,7 +172,8 @@
     "permanent": true,
     "color": "ffb347",
     "hot": "fff2b8",
-    "glyph": "spark"
+    "glyph": "spark",
+    "good": false
   },
   "refreshed": {
     "name": "ERFRISCHT",
@@ -167,7 +183,8 @@
     "min_damage": 0,
     "color": "4fe6d8",
     "hot": "e2fffc",
-    "glyph": "drop"
+    "glyph": "drop",
+    "good": true
   },
   "well_rested": {
     "name": "AUSGERUHT",
@@ -177,7 +194,8 @@
     "min_damage": 0,
     "color": "ffd875",
     "hot": "fff6d1",
-    "glyph": "rest"
+    "glyph": "rest",
+    "good": true
   },
   "tired": {
     "name": "ÜBERMÜDET",
@@ -188,7 +206,8 @@
     "color": "7a82ad",
     "hot": "cbd2f2",
     "glyph": "drowse",
-    "tiered": true
+    "tiered": true,
+    "good": false
   },
   "moon_glow": {
     "name": "MONDSCHIMMER",
@@ -198,7 +217,8 @@
     "min_damage": 0,
     "color": "8af6e0",
     "hot": "e4fff8",
-    "glyph": "spark"
+    "glyph": "spark",
+    "good": true
   },
   "webbed": {
     "name": "SPORENSEIDE",
@@ -208,7 +228,20 @@
     "min_damage": 0,
     "color": "9a5cff",
     "hot": "ecd2ff",
-    "glyph": "drop"
+    "glyph": "drop",
+    "good": false
+  },
+  "shadow_rush": {
+    "name": "SCHATTENRAUSCH",
+    "seconds": 3.0,
+    "tick": 99.0,
+    "damage_ratio": 0.0,
+    "min_damage": 0,
+    "color": "ff4fd8",
+    "hot": "ffd6f5",
+    "glyph": "spark",
+    "speed_mult": 1.1,
+    "good": true
   },
   "shadow_venom": {
     "name": "SCHATTENGIFT",
@@ -218,6 +251,7 @@
     "min_damage": 1,
     "color": "b04fff",
     "hot": "f4d0ff",
-    "glyph": "drop"
+    "glyph": "drop",
+    "good": false
   }
 }

@@ -2,8 +2,14 @@ extends Control
 ## Top left: the day as a vine branch growing out of the left screen edge, left = midnight, middle = noon, right =
 ## midnight. The sun (by day) or moon (by night) slides along it like a bead, lighting the path it
 ## has travelled. Both ends of the day lie in the void: black bark, violet veins, tendrils. The
-## clock hangs underneath, with the day number and the phase of the day, and under it where she is
-## (tile X and Y of the 1100 x 1100 world; switch it off in the settings).
+## clock hangs underneath, with the day number and the phase of the day.
+## Ortsranke (docs/hud_v2_konzept.md 3.A): under it the zone and the place she is in, behind a danger rune (RUHIG an
+## empty diamond, RAU half filled, WILD filled with thorns; faint by day, full from dusk; a magenta pulse when she walks
+## into a more dangerous zone), and a place found for the first time types itself in with the ENTDECKT stamp
+## (`show_place`, fed by `ZoneArrival`). Nachtknospe (3.D): at the arc's right end a bud shows the moon's phase (new
+## moon dark with a magenta rim), an omen eye opens over it before a special night, and from dusk a thorn twig grows
+## from it, longer the darker the moon and the wilder the zone. The tile position (continent + zone tile) is a
+## developer line, setting POSITION.
 
 const WIDTH: float = 150.0
 const BASE_Y: float = 14.0
@@ -37,6 +43,18 @@ const SLEEP_BUD_OPEN: Array[String] = [
 ]
 const HANG_X: float = 28.0
 const CLOCK_POS: Vector2 = Vector2(56, 27)
+const PLACE_Y: float = 54.0 ## the Ortsranke's row
+const POS_Y: float = 63.0 ## the developer position row
+const PLACE_HOLD: float = 3.2 ## how long a newly found place shows its stamp
+const STAMP_AT: float = 0.45
+const PLACE_TICK: float = 0.25
+const DANGERS: Array[String] = ["ruhig", "rau", "wild"]
+const DANGER_WORDS: Array[String] = ["RUHIG", "RAU", "WILD"]
+const RUNE: Color = Color("c9b8f0")
+const THORN: Color = Color("ff4fa8")
+const STAMP: Color = Color("8a2a3c")
+const STAMP_LIGHT: Color = Color("ffe0c8")
+const GOLD: Color = Color("ffd27a")
 
 var _time: float = 0.0
 var _day_pop: float = 0.0 ## 1 -> 0 after a new day begins
@@ -44,6 +62,15 @@ var _shown_day: int = 0
 var _player: Node2D
 var _arc: PackedFloat64Array = PackedFloat64Array()
 var _night_profile: PackedFloat64Array = PackedFloat64Array()
+var _zone_name: String = ""
+var _zone_origin: Vector2i = Vector2i.ZERO
+var _has_zone: bool = false
+var _place_name: String = "" ## the place she stands in now ("" = none)
+var _place_fx: Dictionary = {} ## {name, first, age}: a place just reached
+var _danger: int = -1 ## 0 ruhig, 1 rau, 2 wild; -1 = no zone world
+var _danger_pulse: float = 0.0 ## 1 -> 0 after she walked into a more dangerous zone
+var _omen: String = "none"
+var _place_tick: float = 0.0
 
 
 func _ready() -> void:
@@ -56,6 +83,7 @@ func _ready() -> void:
 		_night_profile[xi] = TimeManager.night_at(xi / WIDTH)
 	_shown_day = TimeManager.day
 	TimeManager.day_started.connect(func(_d: int) -> void: _day_pop = 1.0)
+	add_to_group("place_vine")
 
 
 ## `player` is untyped on purpose (the player scene preloads the HUD).
@@ -69,15 +97,96 @@ var _last_step: int = -1
 
 func _process(delta: float) -> void:
 	_time += delta
-	var pop_active: bool = _day_pop > 0.0
-	if pop_active:
+	_watch_zone(delta)
+	var pop_active: bool = _day_pop > 0.0 or _danger_pulse > 0.0 or (not _place_fx.is_empty() and float(_place_fx.age) < PLACE_HOLD + 0.6)
+	if _day_pop > 0.0:
 		_day_pop = maxf(_day_pop - 0.5 * delta, 0.0)
+	_danger_pulse = maxf(_danger_pulse - 0.7 * delta, 0.0)
+	if not _place_fx.is_empty():
+		var before: float = float(_place_fx.age)
+		_place_fx.age = before + delta
+		if bool(_place_fx.first) and before < STAMP_AT and float(_place_fx.age) >= STAMP_AT:
+			_stamp_sound()
+		if float(_place_fx.age) > PLACE_HOLD + 0.6:
+			_place_fx = {}
 	_redraw_wait -= delta
 	var step: int = int(TimeManager.time_of_day * 512.0) + TimeManager.day * 1024
 	if pop_active or _redraw_wait <= 0.0 or step != _last_step:
 		_redraw_wait = 0.18
 		_last_step = step
 		queue_redraw()
+
+
+## A place reached (ZoneArrival): its name types itself into the Ortsranke, `first` stamps ENTDECKT next to it.
+func show_place(_id: StringName, place_name: String, first: bool) -> void:
+	_place_name = place_name
+	_place_fx = {"name": place_name, "first": first, "age": 0.0}
+	queue_redraw()
+
+
+## What the Ortsranke shows (tests): {zone, place, danger, stamp, omen}.
+func place_state() -> Dictionary:
+	return {"zone": _zone_name, "place": _place_name, "danger": DANGERS[_danger] if _danger >= 0 else "",
+		"stamp": not _place_fx.is_empty() and bool(_place_fx.first), "omen": _omen}
+
+
+func _stamp_sound() -> void:
+	if not ResourceLoader.exists("res://assets/audio/skills/reveal.wav"):
+		return
+	var stamp: AudioStreamPlayer = AudioStreamPlayer.new()
+	stamp.stream = load("res://assets/audio/skills/reveal.wav") as AudioStream
+	stamp.volume_db = -12.0
+	stamp.bus = &"SFX" if AudioServer.get_bus_index(&"SFX") >= 0 else &"Master"
+	add_child(stamp)
+	stamp.finished.connect(stamp.queue_free)
+	stamp.play()
+
+
+func _director() -> ZoneDirector:
+	var world: Node = get_tree().get_first_node_in_group("world")
+	if world == null or not world.has_method("director"):
+		return null
+	return world.call("director") as ZoneDirector
+
+
+func _watch_zone(delta: float) -> void:
+	_place_tick -= delta
+	if _place_tick > 0.0 or _player == null or not is_instance_valid(_player):
+		return
+	_place_tick = PLACE_TICK
+	var world: Node = get_tree().get_first_node_in_group("world")
+	var night_director: Node = world.get("night") as Node if world != null else null
+	_omen = String(night_director.call("tonight_special")) if night_director != null and night_director.has_method("tonight_special") else "none"
+	var director: ZoneDirector = _director()
+	if director == null or director.atlas == null:
+		_has_zone = false
+		_danger = -1
+		return
+	var peer: int = multiplayer.get_unique_id() if multiplayer.has_multiplayer_peer() else 1
+	var zone_id: StringName = director.player_zone.get(peer, &"") as StringName
+	if zone_id == &"":
+		zone_id = director.atlas.zone_at(director.continent_id, _player.global_position)
+	var zone: Atlas.Zone = director.atlas.zone(zone_id)
+	if zone == null:
+		_has_zone = false
+		return
+	_has_zone = true
+	_zone_name = zone.name
+	_zone_origin = zone.origin
+	var danger: int = maxi(DANGERS.find(zone.danger), 0)
+	if _danger >= 0 and danger != _danger:
+		var worse: bool = danger > _danger
+		if worse:
+			_danger_pulse = 1.0
+		var text: String = ("GEFAHR: %s" if worse else "RUHIGERES LAND: %s") % DANGER_WORDS[danger]
+		HudNotices.post(get_tree(), "small", "danger", {"text": text, "color": THORN if worse else Color("7fe0c8")})
+	_danger = danger
+	var here: StringName = director.atlas.place_at(director.continent_id, _player.global_position)
+	_place_name = ""
+	for place: Atlas.Place in zone.places:
+		if place.id == here:
+			_place_name = place.name
+			break
 
 
 static func arc_y(x: float) -> float:
@@ -149,6 +258,7 @@ func _draw() -> void:
 	_draw_bead(now, night)
 	if can_sleep:
 		_draw_sleep_bud(bud_x, true)
+	_draw_night_bud(night)
 	_draw_text(now, night, tone)
 
 
@@ -230,7 +340,7 @@ func _draw_text(now: float, night: float, tone: Color) -> void:
 		clock = clock.replace(":", " ")
 	var color: Color = VineStyle.PETAL.lerp(VineStyle.LEAF_VOID_LIGHT, night)
 	draw_set_transform(CLOCK_POS, 0.0, Vector2(2, 2))
-	PixelText.draw(self, clock, Vector2i.ZERO, color, Color(VineStyle.OUTLINE, 1.0).lerp(VineStyle.BARK_VOID_LIGHT, night))
+	HudText.ink(self, clock, Vector2i.ZERO, color, Color(VineStyle.OUTLINE, 1.0).lerp(VineStyle.BARK_VOID_LIGHT, night))
 	draw_set_transform(Vector2.ZERO)
 
 	var bounce: float = roundf(sin(_day_pop * PI) * 2.0)
@@ -239,19 +349,133 @@ func _draw_text(now: float, night: float, tone: Color) -> void:
 	var hang_n: float = TimeManager.night_at(HANG_X / WIDTH)
 	for y: int in range(int(arc_y(HANG_X)) + 2, 37):
 		draw_rect(Rect2(HANG_X + roundf(sin(_time * 1.1) * float(y - 33) / 33.0), y, 1, 1), VineStyle.BARK_LIGHT.lerp(VineStyle.BARK_VOID_LIGHT, hang_n) if y % 2 == 0 else VineStyle.BARK.lerp(VineStyle.BARK_VOID, hang_n))
-	PixelText.draw(self, day_text, Vector2i(int(hang_x) - PixelText.width(day_text) / 2, 37 - int(bounce)), UiStyle.TEXT_DIM.lerp(SUN_LIGHT, _day_pop).lerp(VineStyle.LEAF_VOID_LIGHT, hang_n * 0.6), VineStyle.OUTLINE)
+	HudText.ink(self, day_text, Vector2i(int(hang_x) - PixelText.width(day_text) / 2, 37 - int(bounce)), UiStyle.TEXT_DIM.lerp(SUN_LIGHT, _day_pop).lerp(VineStyle.LEAF_VOID_LIGHT, hang_n * 0.6), VineStyle.OUTLINE)
 	if _day_pop > 0.0: ## sparks around the new day
 		for k: int in 6:
 			var angle: float = k * TAU / 6.0 + _day_pop * 2.0
 			var r: float = (1.0 - _day_pop) * 12.0 + 3.0
 			draw_rect(Rect2(roundf(hang_x + cos(angle) * r), roundf(41 + sin(angle) * r * 0.6), 1, 1), Color(SUN_LIGHT, _day_pop))
 	var word: String = _phase_word(now)
-	PixelText.draw(self, word, Vector2i(int(CLOCK_POS.x) + 19 - PixelText.width(word) / 2, 43), Color(tone, 0.85), VineStyle.OUTLINE)
-	if _player != null and bool(GameSettings.get_value("position")):
+	HudText.ink(self, word, Vector2i(int(CLOCK_POS.x) + 19 - PixelText.width(word) / 2, 43), Color(tone, 0.85), VineStyle.OUTLINE)
+	_draw_place_line(night)
+	if _player != null and bool(GameSettings.get_value("position")): ## developer line: continent tile, zone tile
 		var tile: Vector2i = Vector2i((_player.global_position / 16.0).floor())
-		var where: String = "X %d  Y %d" % [tile.x, tile.y]
-		PixelText.draw(self, where, Vector2i(int(CLOCK_POS.x) + 19 - PixelText.width(where) / 2, 54), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.6), 0.75), VineStyle.OUTLINE)
+		var where: String = "K %d,%d" % [tile.x, tile.y]
+		if _has_zone:
+			where += "  Z %d,%d" % [tile.x - _zone_origin.x, tile.y - _zone_origin.y]
+		HudText.draw(self, where, Vector2(12.0, POS_Y if _has_zone else PLACE_Y), Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.6), 0.75))
 	_draw_weather(night, word)
+
+
+## Ortsranke: danger rune, zone name and (when she is inside one) the place, with the ENTDECKT stamp on a first visit.
+func _draw_place_line(night: float) -> void:
+	if not _has_zone:
+		return
+	var y: float = PLACE_Y
+	var dusk: float = clampf(night / 0.2, 0.0, 1.0)
+	_draw_rune(Vector2(6.0, y + 2.0), night, dusk)
+	var zone_color: Color = Color(GOLD.lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.5), 0.9)
+	var x: float = 12.0
+	HudText.draw(self, _zone_name, Vector2(x, y), zone_color)
+	x += HudText.width(_zone_name)
+	var place: String = _place_name
+	var fx_age: float = float(_place_fx.get("age", 99.0))
+	if not _place_fx.is_empty():
+		place = String(_place_fx.name)
+	if place == "":
+		return
+	HudText.draw(self, "·", Vector2(x + 2.0, y), Color(zone_color, 0.6))
+	x += 8.0
+	var typed: int = place.length()
+	if fx_age < 0.6:
+		typed = int(ceilf(float(place.length()) * clampf(fx_age / 0.6, 0.0, 1.0)))
+	var glow: float = clampf(1.0 - (fx_age - 0.6) / 1.4, 0.0, 1.0) if not _place_fx.is_empty() else 0.0
+	var place_color: Color = Color("f4ead2").lerp(Color.WHITE, glow * 0.5).lerp(VineStyle.LEAF_VOID_LIGHT, night * 0.4)
+	if glow > 0.0:
+		VineStyle.glow(self, Vector2(x + HudText.width(place) * 0.5, y + 2.0), 10.0, GOLD, 0.35 * glow)
+	HudText.draw(self, place.substr(0, typed), Vector2(x, y), place_color)
+	if _place_fx.is_empty() or not bool(_place_fx.first) or fx_age < STAMP_AT:
+		return
+	var stamp_age: float = fx_age - STAMP_AT
+	var shown: float = 1.0 - clampf((fx_age - PLACE_HOLD) / 0.6, 0.0, 1.0)
+	var size: float = 2.0 if stamp_age < 0.07 else 1.0 ## lands with a thump: one frame big, then its size
+	var word: String = "ENTDECKT"
+	var w: float = float(PixelText.width(word)) * size
+	var box_pos: Vector2 = Vector2(x + HudText.width(place) + 4.0, y - 2.0 - (size - 1.0) * 3.0).round()
+	var box: Rect2 = Rect2(box_pos, Vector2(w + 4.0 * size, 5.0 * size + 4.0))
+	draw_rect(box.grow(1.0), Color(VineStyle.OUTLINE, shown * 0.9))
+	draw_rect(box, Color(STAMP, shown))
+	draw_rect(Rect2(box.position, Vector2(box.size.x, 1.0)), Color(STAMP.lightened(0.25), shown))
+	draw_set_transform(box.position + Vector2(2.0 * size, 2.0), 0.0, Vector2(size, size))
+	HudText.ink(self, word, Vector2i.ZERO, Color(STAMP_LIGHT, shown))
+	draw_set_transform(Vector2.ZERO)
+
+
+## The danger rune: a 5 x 5 diamond. RUHIG empty, RAU the lower half filled, WILD filled with four thorns.
+func _draw_rune(c: Vector2, night: float, dusk: float) -> void:
+	if _danger < 0:
+		return
+	var alpha: float = lerpf(0.45, 1.0, dusk)
+	var rim: Color = Color(RUNE.lerp(THORN, 0.35 * night * float(_danger) / 2.0), alpha)
+	var fill: Color = Color(THORN.lerp(VineStyle.VOID_GLOW, 0.4), alpha * (0.7 + 0.3 * night))
+	if _danger_pulse > 0.0: ## a magenta ring runs out of the rune
+		var r: float = 3.0 + (1.0 - _danger_pulse) * 9.0
+		for k: int in 16:
+			var a: float = float(k) / 16.0 * TAU
+			draw_rect(Rect2(roundf(c.x + cos(a) * r), roundf(c.y + sin(a) * r * 0.8), 1, 1), Color(THORN, _danger_pulse * 0.8))
+		VineStyle.glow(self, c, 6.0, THORN, _danger_pulse)
+	for dy: int in range(-2, 3):
+		var half: int = 2 - absi(dy)
+		for dx: int in range(-half, half + 1):
+			var p: Rect2 = Rect2(c.x + dx, c.y + dy, 1, 1)
+			if absi(dx) == half:
+				draw_rect(p, rim)
+			elif _danger == 2 or (_danger == 1 and dy >= 0):
+				draw_rect(p, fill)
+	if _danger == 2:
+		for d: Vector2 in [Vector2(-2, -2), Vector2(2, -2), Vector2(-2, 2), Vector2(2, 2)]:
+			draw_rect(Rect2(c.x + d.x, c.y + d.y, 1, 1), Color(THORN, alpha * 0.85))
+
+
+## Nachtknospe at the arc's right end: the moon's phase, an omen eye before a special night, the thorn twig from dusk.
+func _draw_night_bud(night: float) -> void:
+	var c: Vector2 = Vector2(WIDTH + 5.0, roundf(arc_y(WIDTH)) + 1.0)
+	var phase: float = TimeManager.moon_phase() ## 0 new, 0.5 full
+	var lit: float = 0.5 - 0.5 * cos(TAU * phase)
+	var waxing: bool = phase < 0.5
+	var dusk: float = clampf(night * 1.6 + maxf(TimeManager.time_of_day - 0.72, 0.0) * 8.0, 0.0, 1.0)
+	if TimeManager.time_of_day < 0.5 and night < 0.05:
+		dusk = 0.0
+	var factors: Array[float] = [0.45, 0.7, 1.0]
+	var reach: int = int(roundf(14.0 * dusk * (1.0 - 0.5 * lit) * factors[maxi(_danger, 0)]))
+	for i: int in reach: ## the thorn twig hangs down from the bud and curls
+		var t: float = float(i)
+		var p: Vector2 = c + Vector2(roundf(sin(t * 0.32) * 2.0 + t * 0.15), 3.0 + t)
+		draw_rect(Rect2(p, Vector2(1, 1)), VineStyle.BARK_VOID_LIGHT if i % 2 == 0 else VineStyle.BARK_VOID)
+		if i % 3 == 2:
+			var side: float = 1.0 if (i / 3) % 2 == 0 else -1.0
+			draw_rect(Rect2(p + Vector2(side, 0.0), Vector2(1, 1)), Color(THORN, 0.5 + 0.5 * night))
+	for d: Vector2i in [Vector2i(-3, 0), Vector2i(3, 0), Vector2i(0, -3), Vector2i(0, 3), Vector2i(-2, -2), Vector2i(2, -2), Vector2i(-2, 2), Vector2i(2, 2)]:
+		draw_rect(Rect2(c.x + d.x, c.y + d.y, 1, 1), VineStyle.OUTLINE)
+	for dy: int in range(-2, 3): ## the bud: a disc lit like the moon
+		for dx: int in range(-2, 3):
+			if dx * dx + dy * dy > 5:
+				continue
+			var u: float = (float(dx) + 2.0) / 4.0
+			var on: bool = (u >= 1.0 - lit) if waxing else (u <= lit)
+			var color: Color = MOON if on else Color("1a1430")
+			if lit < 0.08 and dx * dx + dy * dy >= 4:
+				color = THORN.lerp(VineStyle.VOID_GLOW, 0.5 + 0.5 * sin(_time * 2.0))
+			draw_rect(Rect2(c.x + dx, c.y + dy, 1, 1), color)
+	if _omen != "none" and dusk > 0.05: ## the omen: an eye opens over the bud
+		var open: float = clampf(sin(_time * 1.3) * 1.5 + 0.8, 0.0, 1.0) * dusk
+		var e: Vector2 = c + Vector2(0.0, -6.0)
+		VineStyle.glow(self, e, 5.0, THORN, 0.6 * open)
+		draw_rect(Rect2(e.x - 2.0, e.y, 5, 1), Color(THORN, open))
+		if open > 0.5:
+			draw_rect(Rect2(e.x - 1.0, e.y - 1.0, 3, 1), Color(THORN.darkened(0.3), open))
+			draw_rect(Rect2(e.x - 1.0, e.y + 1.0, 3, 1), Color(THORN.darkened(0.3), open))
+			draw_rect(Rect2(e.x, e.y, 1, 1), Color("1a0010"))
 
 
 ## The weather as a little pixel picture right of the phase word (always shown): sun or moon, clouds, rain that falls by its amount, bolt, wind, fog.

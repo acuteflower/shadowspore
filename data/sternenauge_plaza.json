@@ -1,0 +1,16 @@
+{
+	"_doc": "Generiert von tools/art_sternenauge_plaza.py.",
+	"sanctum_radii": [
+		171.0,
+		96.1
+	],
+	"stele_frame": [
+		32,
+		68
+	],
+	"stele_foot": [
+		16,
+		63
+	],
+	"stele_variants": 3
+}

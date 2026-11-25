@@ -1,5 +1,8 @@
 # Hexenwald (Konzept und Stand)
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 Das erste **neue** Gebiet der Karte: ein eigenes Biom, nicht aus Bestehendem umgewandelt, sondern als neues Land, das die Südküste der Stadtgegend fortsetzt. Thema: ein dunkler, düsterer Märchenwald, in dem Hexen hausen. In Stufe 1 gibt es nur den Boden: Gras in einer dunklen, kühlen Palette, keine Bäume, keine Pflanzen, keine Tiere, keine Orte.
 
 ## 1. Leitgedanken

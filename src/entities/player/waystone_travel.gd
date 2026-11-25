@@ -1,11 +1,10 @@
 class_name WaystoneTravel
 extends Node
-## Travelling from an awakened waystone (a child of the player, local only; E at the statue): she walks up close to the statue, lays both palms on it (the same
-## touch animation as when it was woken), the map opens in travel mode (`MapWindow.open_travel`: the other awakened statues are highlighted, holding the mouse or E
-## on one chooses it). Chosen: the statue flares, the screen floods with light, she is set down in front of the other statue and the light recedes. Closing the
-## map without choosing just lets her step back. The teleport itself is the owner moving herself (`Player.request_teleport`, the synchronizer tells the others).
+## Travelling from an awakened waystone (a child of the player, local only; E at the statue): she walks up close to the statue,
+## lays both palms on it, and opens the map/atlas in travel mode (`MapWindow.open_travel`).
+## Supports both loaded statues (`WorldLevel`) and cross-zone waystones in unloaded `ZoneWorld` zones!
 
-const ARRIVE: Vector2 = Vector2(0, 28) ## where she stands in front of the destination (the plinth's collision ends about 9 px south of its middle)
+const ARRIVE: Vector2 = Vector2(0, 28)
 const APPROACH: Vector2 = Vector2(0, 15)
 
 var _done: bool = false
@@ -29,7 +28,11 @@ func start(player: Player, statue: WaystoneStatue) -> void:
 	player.velocity = Vector2.ZERO
 	player.begin_touch((statue.global_position + Vector2(0, -8) - player.global_position).normalized(), Callable())
 	await get_tree().create_timer(0.55).timeout
-	statue.flare(0.5)
+	if not is_instance_valid(player):
+		queue_free()
+		return
+	if is_instance_valid(statue):
+		statue.flare(0.5)
 	var map: MapWindow = get_tree().get_first_node_in_group("map_window") as MapWindow
 	if map == null or not is_instance_valid(player) or not map.open_travel(statue.id):
 		_finish(player)
@@ -44,19 +47,30 @@ func start(player: Player, statue: WaystoneStatue) -> void:
 		map.travel_cancelled.disconnect(_on_cancelled)
 	if _chosen == GoddessSystem.STARHALL_ID and is_instance_valid(player):
 		player.release_touch()
-		statue.flare(1.0)
+		if is_instance_valid(statue):
+			statue.flare(1.0)
 		var goddess: GoddessSystem = GoddessSystem.of(get_tree())
 		if goddess != null:
 			await goddess.travel_to_starhall(player, statue.id)
 		_finish(player)
 		return
-	var target: WaystoneStatue = manager.statue_node(_chosen) if manager != null else null
-	if _chosen == "" or target == null or not is_instance_valid(player):
+
+	# If MapWindow v2 already handled the Veil flight + zone load + teleport, finish cleanly
+	if map != null and map.has_method("did_handle_v2_waystone_travel") and bool(map.call("did_handle_v2_waystone_travel")):
 		_finish(player)
 		return
-	# the light takes her
+
+	var dest_pos: Vector2 = manager.arrival_position(_chosen) if manager != null else Vector2.INF
+	if _chosen == "" or not dest_pos.is_finite() or not is_instance_valid(player):
+		_finish(player)
+		return
+
+	# The light takes her (loads destination zone if needed in v2)
 	player.release_touch()
-	statue.flare(1.0)
+	if is_instance_valid(statue):
+		statue.flare(1.0)
+	if manager != null:
+		manager.request_prepare_zone(_chosen)
 	var layer: CanvasLayer = CanvasLayer.new()
 	layer.layer = 96
 	var flood: ColorRect = ColorRect.new()
@@ -68,12 +82,17 @@ func start(player: Player, statue: WaystoneStatue) -> void:
 	var fade_in: Tween = create_tween().set_ignore_time_scale(true)
 	fade_in.tween_property(flood, "color:a", 1.0, 0.7)
 	await fade_in.finished
-	player.request_teleport(target.global_position + ARRIVE)
+	if manager != null:
+		dest_pos = manager.arrival_position(_chosen)
+	if is_instance_valid(player) and dest_pos.is_finite():
+		player.request_teleport(dest_pos)
 	var settle: Tween = create_tween().set_ignore_time_scale(true)
 	settle.tween_property(flood, "color", Color(0.03, 0.02, 0.07, 1.0), 0.5)
 	await settle.finished
-	await get_tree().create_timer(0.9).timeout ## the world streams in round the new place
-	target.flare(0.9)
+	await get_tree().create_timer(0.9).timeout
+	var target_statue: WaystoneStatue = manager.statue_node(_chosen) if manager != null else null
+	if target_statue != null:
+		target_statue.flare(0.9)
 	var fade_out: Tween = create_tween().set_ignore_time_scale(true)
 	fade_out.tween_property(flood, "color:a", 0.0, 1.0)
 	await fade_out.finished

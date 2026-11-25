@@ -14,7 +14,8 @@
 		"alarm": {"label": "ALARMREICHWEITE", "unit": "percent", "min": -0.75, "max": 0.5, "lower_better": true},
 		"absorb": {"label": "SCHADEN GESCHLUCKT", "unit": "percent", "min": 0, "max": 0.5},
 		"blink_cooldown": {"label": "SCHRITTPAUSE", "unit": "percent", "min": -0.6, "max": 0.5, "lower_better": true},
-		"corvid_calm": {"label": "KRÄHENGUNST", "unit": "percent", "min": 0, "max": 0.9}
+		"corvid_calm": {"label": "KRÄHENGUNST", "unit": "percent", "min": 0, "max": 0.9},
+		"knock_resist": {"label": "RÜCKSTOSS-SCHUTZ", "unit": "percent", "min": 0, "max": 0.8}
 	},
 	"perks": {
 		"_doc": "Besondere Fähigkeiten einzelner Stücke (items.json `perks`: [Schlüssel]). `text` ist die Kartenbeschreibung, {schlüssel} wird durch den Wert aus diesem Eintrag ersetzt (`percent`: diese Schlüssel als Prozent). Wirkung: TalismanComponent.",
@@ -56,6 +57,13 @@
 			"damage": 0.35,
 			"radius": 38,
 			"knockback": 90
+		},
+		"tide_surge": {
+			"name": "GEZEITENSTOSS",
+			"text": "Nach einem Klangkonter oder Schattenschritt trifft dein nächster Schlag {window} s lang um {damage} % härter.",
+			"percent": ["damage"],
+			"window": 4.0,
+			"damage": 0.16
 		}
 	}
 }

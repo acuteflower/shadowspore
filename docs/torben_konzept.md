@@ -1,6 +1,6 @@
 # Torben, der Schmied: Einbau-Konzept
 
-Stand: 2026-11-09. Status: **Konzept, nichts gebaut.** Grundlage ist das Dossier `docs/characters/torben.md` (Kanon, wird hier nicht verändert; Abweichungen stehen in Abschnitt 13). Alle Texte in diesem Dokument sind **Platzhalter** für den Dialog-Writer (`docs/prompts/dialogue_writer.md`, nennt Torben schon). Figur, Porträt, Gebäude, Audio und Code entstehen direkt in Claude Code, ohne Subagents.
+Stand: 2026-11-09. Status: **Gebaut (Torben & Veredelung; für v2-Heimatzone `glimmrast` vorgesehen).** Grundlage ist das Dossier `docs/characters/torben.md` (Kanon, wird hier nicht verändert; Abweichungen stehen in Abschnitt 13). Alle Texte in diesem Dokument sind **Platzhalter** für den Dialog-Writer (`docs/prompts/dialogue_writer.md`, nennt Torben schon). Figur, Porträt, Gebäude, Audio und Code entstehen direkt in Claude Code, ohne Subagents.
 
 Vorbild für Aufbau und Tiefe ist `docs/gustav_quest_konzept.md`. Torben ist bewusst **das Spiegelbild von Gustav**: Gustav redet für zwei und wird gerettet; Torben schweigt für drei und rettet sich selbst, nur nicht vor dem, was er nicht greifen kann.
 

@@ -6,7 +6,7 @@ const WATER_FIELD_PATH: String = "res://src/water/water_field.gd"
 const WATER_BRIDGE_PATH: String = "res://src/water/water_bridge.gd"
 const WATER_AMBIENCE_PATH: String = "res://src/water/water_ambience.gd"
 const GRASS_LAB_PATH: String = "res://tools/grass_lab.tscn"
-const WORLD_LEVEL_PATH: String = "res://src/world/world_level.tscn"
+const WORLD_LEVEL_PATH: String = "res://src/world/v2/zone_world.tscn"
 
 const R1_PROTECTED_FILES: Array[String] = [
 	"res://src/world/ground_surfaces.gd",

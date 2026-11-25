@@ -173,7 +173,7 @@ func _populate_one_species(cell: Vector2i, settled: Dictionary, origin: Vector2,
 		spec.merge(spec["witch_forest"] as Dictionary, true)
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	rng.seed = hash(Vector3i(cell.x, cell.y, _seed + hash(species)))
-	var w_wind_tiny: float = MeadowHabitats.wind_meadow_at(origin + Vector2(256.0, 256.0)) if species == "bee" else 0.0
+	var w_wind_tiny: float = 0.0
 	var tiny_chance: float = float(spec["chunk_chance"]) * (1.0 + 1.45 * w_wind_tiny)
 	if rng.randf() > tiny_chance:
 		return false

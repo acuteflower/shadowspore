@@ -163,7 +163,7 @@ func _draw() -> void:
 ## Text is not mirrored: `pos` is where its left edge would be in the unmirrored drawing.
 func _text(text: String, pos: Vector2i, color: Color, outline: Color) -> void:
 	draw_set_transform(Vector2.ZERO)
-	PixelText.draw(self, text, Vector2i(int(size.x) - pos.x - PixelText.width(text), pos.y), color, outline)
+	HudText.ink(self, text, Vector2i(int(size.x) - pos.x - PixelText.width(text), pos.y), color, outline)
 	draw_set_transform(Vector2(size.x, 0.0), 0.0, Vector2(-1, 1))
 
 

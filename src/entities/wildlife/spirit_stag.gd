@@ -21,7 +21,7 @@ const PAW_DURATION_SEC: float = 0.95
 const VANISH_DURATION_SEC: float = 0.85
 
 var stag_id: int = 0
-var wonders: NightWonders
+var wonders: Node
 var state: int = State.IDLE
 var face_west: bool = false
 
@@ -38,7 +38,7 @@ var _blessed_peer: int = 0
 var _blessing_done: bool = false
 
 
-func setup(owner_wonders: NightWonders, sid: int, pos_px: Vector2) -> void:
+func setup(owner_wonders: Node, sid: int, pos_px: Vector2) -> void:
 	wonders = owner_wonders
 	stag_id = sid
 	position = pos_px.round()

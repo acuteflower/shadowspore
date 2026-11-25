@@ -22,6 +22,7 @@ art_hero3d.frame() runs it on every frame it renders (only while the eye ramp is
     py -3 tools/hero_face.py a.png ...  (just these)
 Run it on freshly rendered (or the original) sheets.
 """
+import math
 import sys
 from collections import Counter
 from pathlib import Path
@@ -29,17 +30,18 @@ from pathlib import Path
 import numpy as np
 
 EYE = [(0x2a, 0x1c, 0x52), (0x5f, 0x3b, 0xc9), (0xa7, 0x7b, 0xff), (0xef, 0xe6, 0xff)]  # = art_hero3d RAMPS[EYE]
-SKIN = [(0xd2, 0xa2, 0x9c), (0xef, 0xc3, 0xb6), (0xfa, 0xdf, 0xd2), (0xff, 0xf2, 0xe8),  # current porcelain-rose skin
+SKIN = [(0xdc, 0x94, 0x96), (0xf2, 0xb8, 0xb2), (0xfd, 0xe0, 0xd2), (0xff, 0xf3, 0xe8),  # current art_hero3d porcelain-rose skin
+        (0xd2, 0xa2, 0x9c), (0xef, 0xc3, 0xb6), (0xfa, 0xdf, 0xd2), (0xff, 0xf2, 0xe8),  # previous porcelain-rose skin
         (0xd7, 0x9a, 0x88), (0xef, 0xc0, 0xa8), (0xf9, 0xdc, 0xc6), (0xff, 0xf1, 0xe4),  # legacy skin (for standalone re-runs)
         (0xd5, 0x8a, 0x86), (0xe5, 0xa3, 0x9b), (0xf2, 0xba, 0xb0), (0xf8, 0xcf, 0xc6)]  # blush
 HAIR = [(0x8f, 0x84, 0xc2), (0xbd, 0xb3, 0xe4), (0xe9, 0xe3, 0xf7), (0xff, 0xfa, 0xf0)]  # = art_hero3d RAMPS[HAIR]
 MOUTH = [(0x84, 0x40, 0x5a), (0xb2, 0x58, 0x73), (0xd9, 0x8a, 0xa0), (0xf0, 0xb2, 0xc2)]  # = art_hero3d RAMPS[MOUTH]
-LASH, IRIS = EYE[0], EYE[1]
-STAMP = [LASH, IRIS]  # one column, top to bottom
+LASH, IRIS = EYE[0], (0x6e, 0x48, 0xdc)
+STAMP = [LASH, IRIS]  # crisp 1x2 pixel violet eye (lash over luminous iris)
 GAP = 2  # skin pixels between the two eyes of a face seen from the front
-GAP_TURNED = 1  # ... of a face turned three-quarters (the far eye near the head's edge): foreshortened
-FACING_MIN = 0.12  # an eye is drawn when it looks at the camera at least this much (profile far eye about -0.4, three-quarter far eye 0.28)
-SEP_FRONT = 2.45  # projected distance (px) between the eye centres from which the face counts as seen from the front
+GAP_TURNED = 1  # ... of a face turned three-quarters: foreshortened
+FACING_MIN = 0.16  # draw when eye faces the camera clearly
+SEP_FRONT = 2.65  # projected px distance between eye centres at SCALE=1.04 where face counts as front-facing (S ~2.88, SE/SW ~2.04)
 
 
 def _ink(c, k=0.55):  # = art_hero3d.ink_color
@@ -116,8 +118,62 @@ def _clean(arr: np.ndarray):
 
 
 def stamp(arr: np.ndarray, eyes) -> np.ndarray:
-    """Faceless stylized heroine: clean any stray decal pixels and leave smooth shaded porcelain skin (no eyes, no mouth)."""
-    out, _face = _clean(arr)
+    """Clean stray decal pixels and paint crisp, non-drifting 1x2 pixel violet eyes aligned to the 3D head."""
+    out, face = _clean(arr)
+    if not eyes:
+        return out
+    h, w = face.shape
+    vis = [e for e in eyes if len(e) >= 4 and float(e[2]) > FACING_MIN]
+    if not vis:
+        return out
+    # Sort by facing (nearer eye first)
+    vis.sort(key=lambda e: float(e[2]), reverse=True)
+    # Check whether head is upright vs lying sideways (wake/faint/swim)
+    ux, uy = (float(vis[0][4]), float(vis[0][5])) if len(vis[0]) >= 6 else (0.0, -1.0)
+    upright = abs(uy) >= abs(ux)
+    if not upright:
+        # Prone/sleeping/swimming: draw subtle 1-px lash dot only
+        for e in vis:
+            ex, ey, _fac, closed = int(round(e[0])), int(round(e[1])), float(e[2]), bool(e[3])
+            if 0 <= ex < w and 0 <= ey < h and face[ey, ex]:
+                out[ey, ex, :3] = LASH if closed else IRIS
+        return out
+
+    # Upright head: place both visible eyes on a crisp aligned row with fixed spacing
+    if len(vis) >= 2:
+        e0, e1 = vis[0], vis[1]
+        sep = abs(float(e0[0]) - float(e1[0]))
+        gap = GAP if sep >= SEP_FRONT else GAP_TURNED
+        y_row = int(round((float(e0[1]) + float(e1[1])) * 0.5))
+        x_mid = (float(e0[0]) + float(e1[0])) * 0.5
+        if gap == 2:
+            xs = [int(math.floor(x_mid - 1.5)), int(math.floor(x_mid + 1.5))]
+        else:
+            cx0 = int(round(float(e0[0])))
+            dx = 1 if float(e1[0]) >= float(e0[0]) else -1
+            xs = [cx0, cx0 + dx * 2]
+        pairs = [(xs[0], y_row, bool(e0[3])), (xs[1], y_row, bool(e1[3]))]
+    else:
+        e0 = vis[0]
+        cx = int(round(float(e0[0])))
+        cy = int(round(float(e0[1])))
+        # Nudge 1 px inward off the head edge in profile so the eye sits cleanly inside the cheek
+        if 0 <= cy < h:
+            skin_xs = [x for x in range(max(0, cx - 4), min(w, cx + 5)) if face[cy, x]]
+            if len(skin_xs) >= 3:
+                cx = max(min(skin_xs) + 1, min(max(skin_xs) - 1, cx))
+        pairs = [(cx, cy, bool(e0[3]))]
+
+    for ex, ey, closed in pairs:
+        if closed:
+            if 0 <= ex < w and 0 <= ey < h and face[ey, ex]:
+                out[ey, ex, :3] = LASH
+            continue
+        # Require BOTH pixels of the 1x2 eye to sit cleanly inside skin (no half-clipped eye leaking beside hair!)
+        if not (0 <= ex < w and 0 <= ey < h - 1 and face[ey, ex] and face[ey + 1, ex]):
+            continue
+        for dy, col in enumerate(STAMP):
+            out[ey + dy, ex, :3] = col
     return out
 
 
@@ -161,7 +217,7 @@ def tidy_sheet(arr: np.ndarray, name: str) -> np.ndarray:
     if not rows:
         return tidy(arr)
     fh = arr.shape[0] // rows
-    fw = FRAME_W.get(name, 48)
+    fw = FRAME_W.get(name, 56)
     out = arr.copy()
     for r in range(rows):
         strip = tidy(arr[r * fh:(r + 1) * fh], r % 8)

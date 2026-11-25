@@ -102,6 +102,9 @@ var _chase_nav_clear: bool = false
 var _chase_next_check: int = -1
 var _chase_last_pos: Vector2 = Vector2(INF, INF)
 var _tether: MyceliumTether = null
+var finisher_ready_kind: int = 0 ## Finisher V2 (docs/finisher_v2_konzept.md): 0 = no, 1 = the next sword blow is lethal and finishes, 2 = EXPOSED (E finishes); host decides, RPC on change
+var _ready_scan_left: float = 0.0
+var _finisher_prompt: SpiderFinisherPrompt = null
 
 static var _cliff_cache: Array[RID] = []
 static var _cliff_cache_msec: int = -1000
@@ -162,6 +165,10 @@ func _ready() -> void:
 	_enter_state()
 	if state == State.EMERGE:
 		_begin_emergence()
+	_finisher_prompt = SpiderFinisherPrompt.new()
+	_finisher_prompt.name = "FinisherPrompt"
+	_finisher_prompt.spider = self
+	add_child(_finisher_prompt)
 	if not multiplayer.is_server():
 		_request_state.rpc_id(1)
 
@@ -218,6 +225,7 @@ func _on_tether_tripped(world_pos: Vector2, player: Player) -> void:
 
 
 func _process(delta: float) -> void:
+	_rig.finisher_ready = finisher_ready_kind > 0 and state not in [State.DEAD, State.FINISHED_IMPALED]
 	_rig.emergence = clampf(_state_time / ShadowBirth.DURATION, 0.0, 1.0) if state == State.EMERGE else 1.0
 	_rig.health_ratio = _health.current / maxf(_health.max_health, 1.0)
 	if state == State.CANOPY_WAIT:
@@ -259,6 +267,10 @@ func _physics_process(delta: float) -> void:
 	_state_time += delta
 	if not multiplayer.is_server() or state in [State.DEAD, State.FINISHED_IMPALED]:
 		return
+	_ready_scan_left -= delta
+	if _ready_scan_left <= 0.0:
+		_ready_scan_left = float(FinisherRules.settings().get("ready_scan_seconds", 0.1))
+		_set_finisher_ready(FinisherRules.ready_kind_for(self, _health, state == State.EXPOSED))
 	if state == State.EMERGE:
 		velocity = Vector2.ZERO
 		if _state_time >= ShadowBirth.DURATION:
@@ -1301,6 +1313,9 @@ func evaluate_hurtbox_hit(damage: float, from_pos: Vector2, knockback: float) ->
 		if to_att.length_squared() > 1.0 and absf(angle_difference(heading, to_att.angle())) <= deg_to_rad(75.0):
 			_recent_front_hits += 1
 			_front_hit_window = 2.2
+	# Finisher V2: "Kern entblößt" is a promise. While the core beats (kind 1), any sword blow of the eligible player finishes, even a guarded one.
+	if multiplayer.is_server() and finisher_ready_kind == 1 and FinisherComponent.melee_window_open():
+		scaled_dmg = maxf(scaled_dmg, _health.current)
 	return scaled_dmg
 
 
@@ -1368,6 +1383,31 @@ func is_being_finished() -> bool:
 	return state == State.FINISHED_IMPALED
 
 
+## Host: Finisher V2 readiness changed -> every peer (the core glow and the E prompt read it).
+func _set_finisher_ready(kind: int) -> void:
+	if kind == finisher_ready_kind:
+		return
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_rpc_finisher_ready.rpc(kind)
+	else:
+		_rpc_finisher_ready(kind)
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_finisher_ready(kind: int) -> void:
+	var was: int = finisher_ready_kind
+	finisher_ready_kind = kind
+	if was == 0 and kind > 0 and state not in [State.DEAD, State.FINISHED_IMPALED]:
+		Sfx.at(self, "finisher_ready", global_position, -8.0, 0.03)
+
+
+## The spider where E would finish it (the prompt's reach).
+func finisher_prompt_text() -> String:
+	if finisher_ready_kind <= 0 or state in [State.DEAD, State.FINISHED_IMPALED]:
+		return ""
+	return "Finisher"
+
+
 ## Synchronized Finisher lock (`T3`, `V2`): pins the spider at `target_pos` for Ellie's 3-beat impale!
 func begin_finisher_impale(stand_pos: Vector2, target_pos: Vector2, _sec: int, duration: float) -> void:
 	CombatCoordinator.release_melee_token(self, _target)
@@ -1381,6 +1421,7 @@ func begin_finisher_impale(stand_pos: Vector2, target_pos: Vector2, _sec: int, d
 		heading = to_attacker.angle()
 		attack_dir = to_attacker.normalized()
 	state = State.FINISHED_IMPALED
+	finisher_ready_kind = 0
 	_state_time = 0.0
 	_zone.visible = false
 	_zone_active = false
@@ -1408,6 +1449,7 @@ func on_finisher_beat(beat_idx: int) -> void:
 			_bridge.on_hit_splatter(global_position, attack_origin, true)
 	elif beat_idx == 3:
 		_rig.hit_flash(attack_dir, true)
+		_rig.core_break = true
 
 
 func complete_finisher_kill(attacker_peer_id: int) -> void:
@@ -1426,7 +1468,8 @@ func _on_died() -> void:
 		_tether.sever()
 	_hurtbox.set_deferred("collision_layer", 0)
 	_body_shape.set_deferred("disabled", true)
-	_death_fx.restart()
+	if not _rig.core_break:
+		_death_fx.restart() ## the finisher's Kern-Bruch brings its own (FinisherFx)
 	_trail.infest(global_position)
 	if _bridge != null:
 		_bridge.on_ground_burst(global_position, 28.0, 1.0)

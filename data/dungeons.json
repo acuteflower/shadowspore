@@ -1,0 +1,418 @@
+{
+	"_doc": "Dungeon-Register für ALTMARK (docs/dungeon_konzept.md). Jeder spielbare Dungeon besitzt eine eigene .tscn-Szene.",
+	"scaling": {
+		"hp": [
+			1.0,
+			1.65,
+			2.25,
+			2.8
+		],
+		"damage": [
+			1.0,
+			1.1,
+			1.18,
+			1.25
+		],
+		"stagger": [
+			1.0,
+			1.75,
+			2.4,
+			3.0
+		]
+	},
+	"archetypes": {
+		"swarm": {
+			"code": "I",
+			"name": "SCHWARM-TIEFE",
+			"short": "SCHWARM",
+			"color": "b06bff",
+			"summary": "Untergrund-Gewölbe mit dichten Gegnerhorden & Läuterungsbalken."
+		},
+		"expedition": {
+			"code": "II",
+			"name": "ABGRUND-EXPEDITION",
+			"short": "EXPEDITION",
+			"color": "4df2e0",
+			"summary": "Handgebaute Anlage mit Erkundung, Mechaniken & leichtem Endkampf."
+		},
+		"arena": {
+			"code": "III",
+			"name": "STURMFELD",
+			"short": "STURMFELD",
+			"color": "ffb84d",
+			"summary": "Offene Kampfbühne mit eskalierenden Wellen & Feldereignissen."
+		},
+		"guardian": {
+			"code": "IV",
+			"name": "WÄCHTER-JAGD",
+			"short": "WÄCHTER",
+			"color": "ff4fd8",
+			"summary": "Kompaktes Heiligtum rund um einen großen, mehrphasigen Bosskampf."
+		}
+	},
+	"dungeons": [
+		{
+			"id": "suedkap_gezeitenkammern",
+			"name": "DIE GEZEITENKAMMERN",
+			"subtitle": "Altes Schleusenwerk unter den Molen von Sturmhafen",
+			"zone": "suedkap",
+			"zone_name": "SÜDKAP",
+			"waystone_id": "waechterin_sturmhafen",
+			"entrance_tile": [
+				372.0,
+				272.0
+			],
+			"archetype": "expedition",
+			"min_level": 5,
+			"max_players": 4,
+			"playable": true,
+			"scene": "res://src/world/dungeons/suedkap_gezeitenkammern/suedkap_gezeitenkammern.tscn",
+			"banner": "res://assets/ui/dungeon_banner_sturmhafen.png",
+			"accent": "4df2e0",
+			"description": "Unter den zyklopischen Molen des alten Sturmhafens stehen die Klangstein-Schleusen der Steinsetzer halb unter Wasser. Senke den Gezeitenpegel, entriegle das Trockendock und stelle dich Vorgath, der Brut der Mole.",
+			"first_clear": {
+				"xp": 240,
+				"copper": 110,
+				"items": [
+					{
+						"id": "anchor_pendant",
+						"count": 1
+					},
+					{
+						"id": "iron_ingot",
+						"count": 4
+					},
+					{
+						"id": "void_splinter",
+						"count": 2
+					}
+				]
+			},
+			"resonance_reward": {
+				"xp": 140,
+				"copper": [
+					50,
+					75
+				],
+				"echo_shards": [
+					14,
+					18
+				],
+				"guaranteed": [
+					{
+						"id": "iron_ingot",
+						"min": 3,
+						"max": 5
+					},
+					{
+						"id": "iron_plate",
+						"min": 1,
+						"max": 2
+					},
+					{
+						"id": "void_splinter",
+						"min": 1,
+						"max": 3
+					},
+					{
+						"id": "lake_glimmer",
+						"min": 1,
+						"max": 1
+					}
+				],
+				"exclusive": [
+					{
+						"id": "tide_bracelet",
+						"chance": 0.18
+					},
+					{
+						"id": "harbor_guard_sword",
+						"chance": 0.12
+					},
+					{
+						"id": "anchor_pendant",
+						"chance": 0.1
+					}
+				]
+			},
+			"repeat_reward": {
+				"xp": 35,
+				"copper": [
+					15,
+					25
+				],
+				"echo_shards": [
+					12,
+					18
+				],
+				"bonus_items": [
+					{
+						"id": "potion_heal_1",
+						"min": 1,
+						"max": 2,
+						"chance": 0.75
+					},
+					{
+						"id": "iron_ore",
+						"min": 2,
+						"max": 4,
+						"chance": 0.65
+					}
+				]
+			},
+			"preview_items": [
+				"anchor_pendant",
+				"tide_bracelet",
+				"harbor_guard_sword",
+				"iron_plate",
+				"void_splinter",
+				"lake_glimmer"
+			],
+			"entrance_name": "Das Fluttor der Alten Mole"
+		},
+		{
+			"id": "erlenfurt_brueckenkopf",
+			"name": "DER GEBROCHENE BRÜCKENKOPF",
+			"subtitle": "Umkämpfte Flussfurt an Gustavs alter Steinbrücke",
+			"zone": "erlenfurt",
+			"zone_name": "ERLENFURT",
+			"archetype": "arena",
+			"min_level": 8,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "ffb84d",
+			"description": "Sechs eskalierende Wellen bei steigendem Hochwasser auf der offenen Brückenruine.",
+			"preview_items": [
+				"iron_plate",
+				"void_splinter",
+				"shadow_core"
+			]
+		},
+		{
+			"id": "glimmrast_sporenkanaele",
+			"name": "DIE SPORENKANÄLE",
+			"subtitle": "Steinsetzer-Abwasserbögen unter dem Heimattal",
+			"zone": "glimmrast",
+			"zone_name": "GLIMMRAST",
+			"archetype": "swarm",
+			"min_level": 11,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "b06bff",
+			"description": "Dichtes Untergrund-Schwarmgewölbe mit hunderten Schattenwesen und pochenden Sporenkernen.",
+			"preview_items": [
+				"void_splinter",
+				"shadow_core",
+				"lake_glimmer"
+			]
+		},
+		{
+			"id": "klippenstieg_nebelkanzel",
+			"name": "DIE NEBELKANZEL",
+			"subtitle": "Sturmschwinges Horst über dem Klippenfjord",
+			"zone": "klippenstieg",
+			"zone_name": "KLIPPENSTIEG",
+			"archetype": "guardian",
+			"min_level": 14,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "ff4fd8",
+			"description": "Reiner Wächter-Bosskampf auf einer schmalen Felsplatte hoch über den Wolken.",
+			"preview_items": [
+				"shadow_core",
+				"lake_moonstone"
+			]
+		},
+		{
+			"id": "hexenwald_spiegelkloster",
+			"name": "DAS VERSUNKENE SPIEGELKLOSTER",
+			"subtitle": "Alte Zirkel-Abtei im grünen Dämmernebel",
+			"zone": "hexenwald_saum",
+			"zone_name": "HEXENWALD-SAUM",
+			"archetype": "expedition",
+			"min_level": 17,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "a8ff6a",
+			"description": "Erkundung durch Nebelgänge, Spiegellicht-Brechung und der Hüterin des Zirkels.",
+			"preview_items": [
+				"shadow_core",
+				"curse_silver",
+				"lake_moonstone"
+			]
+		},
+		{
+			"id": "hallgrat_westviertel",
+			"name": "DAS VERLORENE WESTVIERTEL",
+			"subtitle": "Abgesackte Klangsteingassen unter Hallgrat",
+			"zone": "hallgrat",
+			"zone_name": "HALLGRAT",
+			"archetype": "swarm",
+			"min_level": 20,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "b06bff",
+			"description": "Zerstörte Stadtgassen voller Leerenwesen, zerbrechender Glasbrücken und Klangpylone.",
+			"preview_items": [
+				"shadow_core",
+				"void_slag",
+				"prism_shard"
+			]
+		},
+		{
+			"id": "hexenwald_wurzelherz",
+			"name": "DAS WURZELHERZ",
+			"subtitle": "Lebende Dornenkuppel am Bleichen Teich",
+			"zone": "hexenwald_kern",
+			"zone_name": "HEXENWALD-KERN",
+			"archetype": "guardian",
+			"min_level": 23,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "ff4fd8",
+			"description": "Großer Wächterkampf inmitten pulsierender Wurzeln und schützender Feenringe.",
+			"preview_items": [
+				"shadow_core",
+				"void_slag",
+				"curse_silver"
+			]
+		},
+		{
+			"id": "kristallgrat_amphitheater",
+			"name": "DAS RESONANZ-AMPHITHEATER",
+			"subtitle": "Hochgebirgs-Arena aus gesintertem Klangkristall",
+			"zone": "kristallgrat",
+			"zone_name": "KRISTALLGRAT",
+			"archetype": "arena",
+			"min_level": 26,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "ffb84d",
+			"description": "Sieben hochintensive Kampfwelle unter singenden Kristallbögen.",
+			"preview_items": [
+				"void_slag",
+				"prism_shard",
+				"sun_quartz"
+			]
+		},
+		{
+			"id": "muehlenaue_rotmantelgruft",
+			"name": "DIE GRUFT DER ROTMÄNTEL",
+			"subtitle": "Unterirdische Ordens-Grenzfeste vor Varnholm",
+			"zone": "muehlenaue",
+			"zone_name": "MÜHLENAUE",
+			"archetype": "expedition",
+			"min_level": 28,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "4df2e0",
+			"description": "Weitläufige Ordens-Katakomben mit Wachtfeuern und dem Echo des letzten Wachtors.",
+			"preview_items": [
+				"void_slag",
+				"shadow_core",
+				"star_shard"
+			]
+		},
+		{
+			"id": "varnholm_bluetensaal",
+			"name": "DER BLÜTENSAAL",
+			"subtitle": "Echo des Gefäßes am Großen Riss",
+			"zone": "varnholm",
+			"zone_name": "VARNHOLM",
+			"archetype": "guardian",
+			"min_level": 30,
+			"max_players": 4,
+			"playable": false,
+			"scene": "",
+			"accent": "ff4fd8",
+			"description": "Der ultimative Endgame-Bosskampf im geborstenen Herzen des Hauses Varn.",
+			"preview_items": [
+				"void_slag",
+				"star_shard",
+				"ur_prisma"
+			]
+		}
+	],
+	"echo_exchange": [
+		{
+			"id": "ex_harbor_sword",
+			"item_id": "harbor_guard_sword",
+			"count": 1,
+			"cost": 55,
+			"weekly_limit": 1,
+			"requires_clear": "suedkap_gezeitenkammern",
+			"tag": "STURMHAFEN · PECHSCHUTZ"
+		},
+		{
+			"id": "ex_tide_bracelet",
+			"item_id": "tide_bracelet",
+			"count": 1,
+			"cost": 40,
+			"weekly_limit": 1,
+			"requires_clear": "suedkap_gezeitenkammern",
+			"tag": "STURMHAFEN · PECHSCHUTZ"
+		},
+		{
+			"id": "ex_anchor_pendant",
+			"item_id": "anchor_pendant",
+			"count": 1,
+			"cost": 30,
+			"weekly_limit": 1,
+			"requires_clear": "suedkap_gezeitenkammern",
+			"tag": "STURMHAFEN"
+		},
+		{
+			"id": "ex_iron_ingot_pack",
+			"item_id": "iron_ingot",
+			"count": 4,
+			"cost": 12,
+			"weekly_limit": 4,
+			"requires_clear": "",
+			"tag": "VERFEINERUNG"
+		},
+		{
+			"id": "ex_iron_plate_pack",
+			"item_id": "iron_plate",
+			"count": 2,
+			"cost": 16,
+			"weekly_limit": 3,
+			"requires_clear": "",
+			"tag": "VERFEINERUNG"
+		},
+		{
+			"id": "ex_void_splinter_pack",
+			"item_id": "void_splinter",
+			"count": 3,
+			"cost": 18,
+			"weekly_limit": 3,
+			"requires_clear": "",
+			"tag": "VERFEINERUNG"
+		},
+		{
+			"id": "ex_lake_glimmer",
+			"item_id": "lake_glimmer",
+			"count": 1,
+			"cost": 20,
+			"weekly_limit": 2,
+			"requires_clear": "",
+			"tag": "KRISTALLE"
+		},
+		{
+			"id": "ex_heal_potions",
+			"item_id": "potion_heal_2",
+			"count": 2,
+			"cost": 10,
+			"weekly_limit": 4,
+			"requires_clear": "",
+			"tag": "VORRAT"
+		}
+	]
+}

@@ -27,7 +27,7 @@ func _run() -> void:
 	var tbl: Dictionary = DataRegistry.table("finishers")
 	_check(not tbl.is_empty() and tbl.has("moves") and tbl.has("settings"), "data/finishers.json loads via DataRegistry")
 	var move_cfg: Dictionary = FinisherRules.move_config("spider_impale_down")
-	_check(int(move_cfg.get("frames", 0)) == 16 and float(move_cfg.get("duration", 0.0)) > 0.9, "spider_impale_down config valid")
+	_check(int(move_cfg.get("frames", 0)) == 24 and float(move_cfg.get("duration", 0.0)) > 0.9, "spider_impale_down config valid")
 
 	_check(FinisherRules.weapon_supports_finisher({"id": "sword_basic", "count": 1}), "sword_1h supports Finisher")
 	if not DataRegistry.get_entry("items", "sword_rift").is_empty():
@@ -60,12 +60,26 @@ func _run() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	_check(Player.FINISHER_SHEET != null and Player.FINISHER_SHEET.get_size() == Vector2(16.0 * 48.0, 8.0 * 56.0), "player_finisher.png loads with 16x8 48x56 layout")
+	_check(Player.FINISHER_SHEET != null and Player.FINISHER_SHEET.get_size() == Vector2(24.0 * 48.0, 8.0 * 56.0), "player_finisher.png loads with 24x8 48x56 layout")
 	_check(Player.FINISHER_BLOOD != null and Player.FINISHER_BLOOD.get_size() == Player.FINISHER_SHEET.get_size(), "player_finisher_blood.png matches dimensions")
 	_check(bool(ArmPainter.depth_source(Player.FINISHER_BLOOD).get("valid", false)), "player_finisher_blood.png carries valid 3D ArmPainter depth encoding")
-	_check(player._rig_finisher_hand.size() == 16 * 8 and player._rig_finisher_shoulder.size() == 16 * 8, "hero_rig.json finisher shoulder/hand points loaded (128 frames)")
+	_check(player._rig_finisher_hand.size() == 24 * 8 and player._rig_finisher_shoulder.size() == 24 * 8, "hero_rig.json finisher shoulder/hand points loaded (192 frames)")
 	_check(GripRig.frame_arm3("player_finisher.png", 4).size() == 4, "hero_arm3d.json 3D arm joints mapped for player_finisher.png")
-	_check(TalismanArt.frame_data(Player.FINISHER_SHEET, 2 * 16 + 8).size() == 16, "hero_jewelry.json collar/earring anchors mapped for player_finisher.png")
+	_check(TalismanArt.frame_data(Player.FINISHER_SHEET, 2 * 24 + 8).size() == 16, "hero_jewelry.json collar/earring anchors mapped for player_finisher.png")
+
+	# Finisher V2 timeline (docs/finisher_v2_konzept.md): data keys map onto the 24 sheet columns, the flick tail onto 20..23
+	var keys: Array = move_cfg.get("keys", []) as Array
+	var flick_keys: Array = move_cfg.get("flick_keys", []) as Array
+	_check(int(move_cfg.get("frames", 0)) == 24 and keys.size() >= 6 and flick_keys.size() >= 2, "V2 timeline: 24 frames, keys and flick keys present")
+	_check(is_equal_approx(FinisherComponent._sample_keys(keys, 0.23), 3.0), "V2 timeline: apex hang sits on columns 3..4 (got %.2f)" % FinisherComponent._sample_keys(keys, 0.23))
+	_check(is_equal_approx(FinisherComponent._sample_keys(keys, float(move_cfg["t_plunge"])), 6.0), "V2 timeline: the plunge lands on column 6")
+	_check(FinisherComponent._sample_keys(flick_keys, 1.2) >= 20.0, "V2 timeline: the flick ending uses columns 20..23")
+	var beats: Array[float] = [float(move_cfg["t_plunge"]), float(move_cfg["t_press"]), float(move_cfg["t_rip"])]
+	_check(beats[1] - beats[0] > (beats[2] - beats[1]) * 1.4, "V2 rhythm: the grinding press is clearly longer than the brace before the rip (no metronome)")
+	_check(float(move_cfg["duration"]) <= 1.3, "V2 rule: the finisher stays <= 1.3 s")
+	for wav_v2: String in ["finisher_ready.wav", "finisher_apex.wav", "finisher_core.wav", "finisher_flick.wav"]:
+		_check(ResourceLoader.exists("res://assets/audio/sfx/" + wav_v2), "V2 SFX '%s' exists" % wav_v2)
+	_check(not StatusEffects.definition("shadow_rush").is_empty(), "V2 reward effect 'shadow_rush' is defined")
 
 	for hstyle: String in ["default", "blade_bob", "storm_tail", "moon_knot", "dusk_braids", "night_bun"]:
 		_check(
@@ -141,6 +155,11 @@ func _run() -> void:
 	player.global_position = Vector2(-20.0, 0.0)
 	player.facing = Vector2.RIGHT
 	player.effects.apply("webbed", 2.0) ## Verify launching Finisher snaps boot silk!
+	_check(FinisherRules.ready_kind_for(sp_second, sp_second._health, false) == 1, "V2 Kern entblößt: a lethal last threat reads as ready (kind 1)")
+	player.stamina.current = 10.0
+	if player.quests != null:
+		player.quests.set_flag(String(FinisherRules.settings().get("flick_flag", "rescued")))
+	var saw_flick: bool = false
 
 	var seen_beats: Array[int] = []
 	var beat_conn: Callable = func(_mid: String, b_idx: int) -> void:
@@ -168,6 +187,8 @@ func _run() -> void:
 			var bpose: Dictionary = player.finisher.blade_pose(Vector3.RIGHT, Vector3.RIGHT)
 			if float(bpose.get("embed", 0.0)) >= 0.35:
 				deep_embed_ok = true
+			if player.finisher.flick_ending():
+				saw_flick = true
 		elif started_ok:
 			break
 
@@ -183,6 +204,60 @@ func _run() -> void:
 	_check(not is_instance_valid(sp_second) or (sp_second._health.current <= 0.0 and sp_second.state == ShadowSpider.State.DEAD), "Target spider dies at Beat 3 Rip-Out (no 1-HP leftover)")
 	_check(player.progress.xp > xp_before, "Finisher kill awards full enemy XP to player")
 	_check(grass.crush_at(Vector2(4.0, 0.0)) >= 0.65, "Finisher stamps radial shockwave into LivingGrass")
+	_check(not is_instance_valid(sp_second) or sp_second._rig.core_break, "V2 Kern-Bruch: the rip tears the core out (rig core_break)")
+	_check(player.effects.has("shadow_rush"), "V2 reward: Schattenrausch after the finisher")
+	_check(player.stamina.current >= 10.0 + player.stamina.max_stamina * 0.3, "V2 reward: stamina comes back (%.1f)" % player.stamina.current)
+	if player.quests != null:
+		_check(saw_flick, "V2 ending: with the story flag the blade flick is chosen")
+		_check(player.quests.has_flag(String(FinisherRules.settings().get("name_card_flag", ""))), "V2 name card: the first finisher sets the seen flag")
+
+	# ------------------------------------------------------------------
+	# 3b. Finisher V2: the promise (kind 1 guarantees even a non-lethal blow) and E on an EXPOSED core (kind 2)
+	# ------------------------------------------------------------------
+	await get_tree().create_timer(0.3).timeout
+	await get_tree().physics_frame
+	player.global_position = Vector2(-20.0, -60.0)
+	player.facing = Vector2.RIGHT
+	var sp_promise: ShadowSpider = SPIDER_SCENE.instantiate() as ShadowSpider
+	sp_promise.position = Vector2(4.0, -60.0)
+	enemies.add_child(sp_promise)
+	sp_promise.set_physics_process(false)
+	await get_tree().physics_frame
+	sp_promise._health.current = sp_promise._health.max_health * 0.9 ## far from lethal
+	sp_promise._rpc_finisher_ready(1)
+	player.attack.attack(Vector2.RIGHT)
+	var promise_ok: bool = false
+	var pw: float = 0.0
+	while pw < 0.5 and not promise_ok:
+		await get_tree().physics_frame
+		pw += get_physics_process_delta_time()
+		promise_ok = player.finisher.active()
+	_check(promise_ok, "V2 promise: while the core beats, any sword blow finishes")
+	var pend: float = 0.0
+	while pend < 2.0 and player.finisher.active():
+		await get_tree().physics_frame
+		pend += get_physics_process_delta_time()
+	await get_tree().create_timer(0.3).timeout
+
+	var sp_exposed: ShadowSpider = SPIDER_SCENE.instantiate() as ShadowSpider
+	sp_exposed.position = Vector2(4.0, 60.0)
+	enemies.add_child(sp_exposed)
+	sp_exposed.set_physics_process(false)
+	await get_tree().physics_frame
+	player.global_position = Vector2(-20.0, 60.0)
+	sp_exposed._health.current = sp_exposed._health.max_health
+	_check(FinisherRules.ready_kind_for(sp_exposed, sp_exposed._health, true) == 2, "V2 EXPOSED at full health reads as E-ready (kind 2)")
+	_check(FinisherRules.ready_kind_for(sp_exposed, sp_exposed._health, false) == 0, "V2 a healthy, standing spider is not ready")
+	sp_exposed._rpc_finisher_ready(2)
+	_check(sp_exposed.finisher_prompt_text() != "", "V2 E prompt shows on an exposed core")
+	player.finisher.request_finisher(sp_exposed)
+	await get_tree().physics_frame
+	_check(player.finisher.active(), "V2 E on an exposed core starts the finisher")
+	var eend: float = 0.0
+	while eend < 2.0 and player.finisher.active():
+		await get_tree().physics_frame
+		eend += get_physics_process_delta_time()
+	_check(not is_instance_valid(sp_exposed) or sp_exposed._health.current <= 0.0, "V2 E finisher kills the exposed spider at the rip")
 
 	# ------------------------------------------------------------------
 	# 4. Boss Override Rule (`T2`): Boss Target Triggers Finisher Even With Minions Engaged + Pushes Minions Back!
@@ -233,10 +308,10 @@ func _run() -> void:
 
 	# Wait for Boss Finisher to finish cleanly
 	var end_wait: float = 0.0
-	while end_wait < 1.5 and player.finisher.active():
+	while end_wait < 2.5 and player.finisher.active():
 		await get_tree().physics_frame
 		end_wait += get_physics_process_delta_time()
-	_check(not player.finisher.active() and boss_sp._health.current <= 0.0, "Boss Finisher completes kill & restores control")
+	_check(not player.finisher.active() and boss_sp._health.current <= 0.0, "Boss Finisher completes kill & restores control (active=%s hp=%.1f)" % [str(player.finisher.active()), boss_sp._health.current])
 
 	if _failures == 0:
 		print("FINISHER V2 OK: %d/%d checks passed" % [_checks, _checks])

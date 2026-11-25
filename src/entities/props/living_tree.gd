@@ -202,6 +202,7 @@ var _trunk_sway_angle: float = 0.0
 var _trunk_sway_vel: float = 0.0
 
 var _canopy_wetness: float = 0.0 ## 0..1 hydrological interception reservoir
+var _wetness_sent: float = 0.0 ## last wetness pushed to the materials
 var _post_rain_timer: float = 0.0
 var _drip_wait: float = 0.4
 var _leaf_drift_wait: float = 2.2
@@ -1070,7 +1071,7 @@ func _server_pick_bark(who: Player = null) -> void:
 	else:
 		var out_dir: Vector2 = (who.global_position - global_position).normalized() if who != null else Vector2.DOWN
 		_server_roll_drops(drop_list, global_position + Vector2(0.0, -14.0), out_dir * 42.0, 14.0)
-	_rpc_sync_state.rpc(state, "shake_pick" if is_shake else "pick", 0.0)
+	_broadcast_tree_state(state, "shake_pick" if is_shake else "pick", 0.0)
 
 
 # ---------------- AXE CHOPPING & HOST-AUTHORITATIVE STATE ----------------
@@ -1091,12 +1092,12 @@ func harvest_hit(source: int) -> void:
 		state["f"] = TimeManager.day + 1
 		state["c"] = 0
 		_server_roll_drops(_stage_cfg.get("drops", []) as Array, global_position + Vector2(0.0, -8.0), Vector2(push_dir * 38.0, 6.0), 8.0)
-		_rpc_sync_state.rpc(state, "cut_whip", push_dir)
+		_broadcast_tree_state(state, "cut_whip", push_dir)
 		return
 
 	var choppable: bool = bool(_stage_cfg.get("choppable", false)) or (allow_veteran_chop and bool(_stage_cfg.get("veteran_landmark", false)))
 	if not choppable or held_tool != "axe":
-		_rpc_sync_state.rpc(state, "rustle", push_dir)
+		_broadcast_tree_state(state, "rustle", push_dir)
 		return
 
 	var cur_hp: int = int(state.get("hp", int(_stage_cfg.get("hits", 4)))) - 1
@@ -1108,11 +1109,11 @@ func harvest_hit(source: int) -> void:
 			var cd: Dictionary = _stage_cfg["chip_drop"] as Dictionary
 			if _rng.randf() < float(cd.get("chance", 0.3)):
 				_server_spawn_drop(String(cd["id"]), 1, global_position + Vector2(float(notch_side) * 8.0, -12.0), Vector2(float(notch_side) * 48.0, _rng.randf_range(-14.0, 18.0)), 12.0)
-		_rpc_sync_state.rpc(state, "axe_hit", push_dir)
+		_broadcast_tree_state(state, "axe_hit", push_dir)
 	else:
 		state["f"] = TimeManager.day + 1
 		state["c"] = 0
-		_rpc_sync_state.rpc(state, "fell", push_dir)
+		_broadcast_tree_state(state, "fell", push_dir)
 
 
 ## Direct test/script helper to apply a simulated axe strike from `from_world_pos` (host-only).
@@ -1126,11 +1127,30 @@ func strike_with_axe(from_world_pos: Vector2) -> void:
 	state["hp"] = maxi(0, cur_hp)
 	state["n"] = notch_side
 	if cur_hp > 0:
-		_rpc_sync_state.rpc(state, "axe_hit", push_dir)
+		_broadcast_tree_state(state, "axe_hit", push_dir)
 	else:
 		state["f"] = TimeManager.day + 1
 		state["c"] = 0
-		_rpc_sync_state.rpc(state, "fell", push_dir)
+		_broadcast_tree_state(state, "fell", push_dir)
+
+
+## Sends `_rpc_sync_state` safely: when inside a `ZoneStage`, targets only clients that currently hold that zone
+## (`ZoneDirector.peers_holding_zone`), avoiding "Node not found" RPC errors on distant clients.
+func _broadcast_tree_state(new_state: Dictionary, fx: String, dir: float) -> void:
+	var tree_parent: Node = get_parent()
+	var stage_node: ZoneStage = (tree_parent.get_parent() as ZoneStage) if tree_parent != null else null
+	if stage_node != null:
+		_rpc_sync_state(new_state, fx, dir)
+		if NetworkManager.rpc_ready(self) and stage_node.zone != null:
+			var director: ZoneDirector = stage_node.get_parent() as ZoneDirector
+			if director != null:
+				for peer: int in director.peers_holding_zone(stage_node.zone.id):
+					_rpc_sync_state.rpc_id(peer, new_state, fx, dir)
+		return
+	if NetworkManager.rpc_ready(self) and not multiplayer.get_peers().is_empty():
+		_rpc_sync_state.rpc(new_state, fx, dir)
+	else:
+		_rpc_sync_state(new_state, fx, dir)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -1228,7 +1248,7 @@ func advance_growth_days(days_delta: int = 1) -> void:
 		if cur_c == 0:
 			state["c"] = 1
 			state["d"] = TimeManager.day
-			_rpc_sync_state.rpc(state, "grow", 0.0)
+			_broadcast_tree_state(state, "grow", 0.0)
 		else:
 			state["f"] = 0
 			state["c"] = 0
@@ -1237,7 +1257,7 @@ func advance_growth_days(days_delta: int = 1) -> void:
 			state["hp"] = int(s1_cfg.get("hits", 1))
 			state["n"] = 0
 			state["d"] = TimeManager.day
-			_rpc_sync_state.rpc(state, "grow", 0.0)
+			_broadcast_tree_state(state, "grow", 0.0)
 		return
 
 	var grow_req: int = int(_stage_cfg.get("grow_days", 0))
@@ -1250,7 +1270,7 @@ func advance_growth_days(days_delta: int = 1) -> void:
 			state["hp"] = int(nxt_cfg.get("hits", 4))
 			state["n"] = 0
 			state["d"] = TimeManager.day
-			_rpc_sync_state.rpc(state, "grow", 0.0)
+			_broadcast_tree_state(state, "grow", 0.0)
 
 
 # ---------------- NONLINEAR FORESTRY FELLING PHYSICS ----------------
@@ -1461,14 +1481,16 @@ func _step_hydrology_and_air(dt: float) -> void:
 		_canopy_wetness = move_toward(_canopy_wetness, 0.0, dt * 0.022)
 		_post_rain_timer = maxf(0.0, _post_rain_timer - dt)
 
-	for tm: ShaderMaterial in [_base_trunk_mat, _upper_trunk_mat]:
-		if tm != null:
-			tm.set_shader_parameter("stemflow", _canopy_wetness)
-	for cn: ClusterNode in _clusters:
-		if cn.mat != null:
-			cn.mat.set_shader_parameter("rain_droop", _canopy_wetness)
-		if cn.glow_mat != null:
-			cn.glow_mat.set_shader_parameter("rain_droop", _canopy_wetness)
+	if absf(_canopy_wetness - _wetness_sent) > 0.002 or (_canopy_wetness == 0.0 and _wetness_sent != 0.0):
+		_wetness_sent = _canopy_wetness ## a dry tree no longer pushes every cluster's material every frame (forests)
+		for tm: ShaderMaterial in [_base_trunk_mat, _upper_trunk_mat]:
+			if tm != null:
+				tm.set_shader_parameter("stemflow", _canopy_wetness)
+		for cn: ClusterNode in _clusters:
+			if cn.mat != null:
+				cn.mat.set_shader_parameter("rain_droop", _canopy_wetness)
+			if cn.glow_mat != null:
+				cn.glow_mat.set_shader_parameter("rain_droop", _canopy_wetness)
 
 	# Canopy Drip-Line water droplets during & for 55s after rain!
 	if (_canopy_wetness > 0.22 or _post_rain_timer > 0.0) and _mote_canvas != null and _mote_canvas.motes.size() < 28:

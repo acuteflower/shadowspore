@@ -6,11 +6,15 @@ extends RefCounted
 
 
 static func ignite(boss: SkyCleaver, seconds: float) -> void:
-	_each(boss, func(decal: GroundDecal) -> void: decal.ignite(seconds), func(pillar: ArenaPillar) -> void: pillar.ignite(seconds))
+	_each(boss, func(decal: Node) -> void:
+		if decal.has_method("ignite"):
+			decal.call("ignite", seconds), func(pillar: ArenaPillar) -> void: pillar.ignite(seconds))
 
 
 static func extinguish(boss: SkyCleaver, seconds: float) -> void:
-	_each(boss, func(decal: GroundDecal) -> void: decal.extinguish(seconds), func(pillar: ArenaPillar) -> void: pillar.extinguish(seconds))
+	_each(boss, func(decal: Node) -> void:
+		if decal.has_method("extinguish"):
+			decal.call("extinguish", seconds), func(pillar: ArenaPillar) -> void: pillar.extinguish(seconds))
 
 
 static func _each(boss: SkyCleaver, on_floor: Callable, on_pillar: Callable) -> void:
@@ -18,9 +22,8 @@ static func _each(boss: SkyCleaver, on_floor: Callable, on_pillar: Callable) -> 
 		return
 	var tree: SceneTree = boss.get_tree()
 	for node: Node in tree.get_nodes_in_group("ground_glow"):
-		var decal: GroundDecal = node as GroundDecal
-		if decal != null and decal.decal_id == boss.arena + "_arena":
-			on_floor.call(decal)
+		if String(node.get("decal_id")) == boss.arena + "_arena":
+			on_floor.call(node)
 	for node: Node in tree.get_nodes_in_group("arena_pillars"):
 		var pillar: ArenaPillar = node as ArenaPillar
 		if pillar != null and pillar.arena == boss.arena:

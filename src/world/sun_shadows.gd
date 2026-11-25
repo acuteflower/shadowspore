@@ -258,7 +258,7 @@ func _wind_kind(sprite: Sprite2D) -> int:
 	if material == null:
 		return 0
 	var path: String = material.shader.resource_path
-	if path.ends_with("flora_wind.gdshader") or path.ends_with("living_flora.gdshader"):
+	if path.ends_with("flora_wind.gdshader"):
 		return 1
 	if path.ends_with("sway_rows.gdshader"):
 		return 2

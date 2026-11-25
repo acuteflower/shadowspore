@@ -278,7 +278,7 @@ func _play(stream: AudioStream, volume_db: float) -> void:
 
 func _finish() -> void:
 	_done = true
-	_camera.zoom = Vector2.ONE
+	_camera.zoom = Player.DEFAULT_CAMERA_ZOOM
 	_player.view_shift = Vector2.ZERO
 	_camera.position_smoothing_enabled = true
 	_player.end_room_intro(_room.room_to_global(STAND))

@@ -1,0 +1,597 @@
+{
+	"sheet": "res://assets/props/coastal_camp.png",
+	"glow_sheet": "res://assets/props/coastal_camp_glow.png",
+	"sheet_size": [
+		256,
+		192
+	],
+	"campfire_unlit": {
+		"rect": [
+			0,
+			0,
+			64,
+			48
+		],
+		"frame": [
+			64,
+			48
+		],
+		"ground": 36,
+		"anchor": [
+			32,
+			36
+		],
+		"offset": [
+			-32,
+			-36
+		],
+		"foot": [
+			38,
+			16
+		],
+		"colliders": [
+			[
+				-19,
+				-11,
+				38,
+				16
+			]
+		],
+		"fire_at": [
+			0,
+			-6
+		],
+		"seats": [
+			{
+				"id": "east",
+				"offset": [
+					34,
+					-2
+				],
+				"facing_sector": 4
+			},
+			{
+				"id": "south",
+				"offset": [
+					0,
+					22
+				],
+				"facing_sector": 6
+			}
+		]
+	},
+	"campfire_lit": {
+		"rect": [
+			64,
+			0,
+			64,
+			48
+		],
+		"frame": [
+			64,
+			48
+		],
+		"ground": 36,
+		"anchor": [
+			32,
+			36
+		],
+		"offset": [
+			-32,
+			-36
+		],
+		"foot": [
+			38,
+			16
+		],
+		"colliders": [
+			[
+				-19,
+				-11,
+				38,
+				16
+			]
+		],
+		"fire_at": [
+			0,
+			-6
+		],
+		"light": {
+			"color": "ff9448",
+			"radius": 96,
+			"squash": 0.7,
+			"energy": 1.35,
+			"at": [
+				0,
+				-6
+			],
+			"flicker": 0.35
+		}
+	},
+	"campfire_flame": {
+		"rect": [
+			0,
+			48,
+			256,
+			32
+		],
+		"frame": [
+			32,
+			32
+		],
+		"ground": 26,
+		"anchor": [
+			16,
+			26
+		],
+		"offset": [
+			-16,
+			-26
+		],
+		"cols": 8,
+		"fps": 11
+	},
+	"driftwood_bench_h": {
+		"rect": [
+			128,
+			0,
+			48,
+			32
+		],
+		"frame": [
+			48,
+			32
+		],
+		"ground": 24,
+		"anchor": [
+			24,
+			24
+		],
+		"offset": [
+			-24,
+			-24
+		],
+		"foot": [
+			36,
+			10
+		],
+		"colliders": [
+			[
+				-18,
+				-8,
+				36,
+				10
+			]
+		],
+		"seat_pos": [
+			0,
+			-4
+		]
+	},
+	"driftwood_stump": {
+		"rect": [
+			176,
+			0,
+			32,
+			32
+		],
+		"frame": [
+			32,
+			32
+		],
+		"ground": 24,
+		"anchor": [
+			16,
+			24
+		],
+		"offset": [
+			-16,
+			-24
+		],
+		"foot": [
+			16,
+			10
+		],
+		"colliders": [
+			[
+				-8,
+				-8,
+				16,
+				10
+			]
+		],
+		"seat_pos": [
+			0,
+			-4
+		]
+	},
+	"beach_pack_prop": {
+		"rect": [
+			208,
+			0,
+			48,
+			32
+		],
+		"frame": [
+			48,
+			32
+		],
+		"ground": 24,
+		"anchor": [
+			24,
+			24
+		],
+		"offset": [
+			-24,
+			-24
+		],
+		"foot": [
+			28,
+			10
+		],
+		"colliders": [
+			[
+				-14,
+				-8,
+				28,
+				10
+			]
+		]
+	},
+	"supply_chest": {
+		"rect": [
+			0,
+			80,
+			168,
+			48
+		],
+		"frame": [
+			56,
+			48
+		],
+		"ground": 39,
+		"anchor": [
+			28,
+			39
+		],
+		"offset": [
+			-28,
+			-39
+		],
+		"cols": 3,
+		"states": {
+			"closed": 0,
+			"unlocked": 1,
+			"open": 2
+		},
+		"foot": [
+			26,
+			9
+		],
+		"colliders": [
+			[
+				-13,
+				-7,
+				26,
+				9
+			]
+		],
+		"mouth": [
+			0.0,
+			-10.0
+		],
+		"lock": [
+			-2.0,
+			-3.0
+		],
+		"lid_top": [
+			0.0,
+			-14.0
+		]
+	},
+	"weapon_rack": {
+		"rect": [
+			168,
+			80,
+			48,
+			48
+		],
+		"frame": [
+			48,
+			48
+		],
+		"ground": 40,
+		"anchor": [
+			24,
+			40
+		],
+		"offset": [
+			-24,
+			-40
+		],
+		"foot": [
+			32,
+			10
+		],
+		"colliders": [
+			[
+				-16,
+				-8,
+				32,
+				10
+			]
+		],
+		"sword_slot": [
+			-7,
+			-8
+		],
+		"axe_slot": [
+			7,
+			-8
+		]
+	},
+	"chopping_stump": {
+		"rect": [
+			216,
+			80,
+			40,
+			48
+		],
+		"frame": [
+			40,
+			48
+		],
+		"ground": 40,
+		"anchor": [
+			20,
+			40
+		],
+		"offset": [
+			-20,
+			-40
+		],
+		"foot": [
+			20,
+			10
+		],
+		"colliders": [
+			[
+				-10,
+				-8,
+				20,
+				10
+			]
+		],
+		"axe_slot": [
+			1,
+			-13
+		]
+	},
+	"starter_sword_ground": {
+		"rect": [
+			0,
+			128,
+			32,
+			24
+		],
+		"frame": [
+			32,
+			24
+		],
+		"ground": 19,
+		"anchor": [
+			16,
+			19
+		],
+		"offset": [
+			-16,
+			-19
+		],
+		"item_id": "sword_basic",
+		"foot": [
+			18,
+			6
+		],
+		"prompt_anchor": [
+			0,
+			-16
+		]
+	},
+	"starter_axe_ground": {
+		"rect": [
+			32,
+			128,
+			32,
+			24
+		],
+		"frame": [
+			32,
+			24
+		],
+		"ground": 19,
+		"anchor": [
+			16,
+			19
+		],
+		"offset": [
+			-16,
+			-19
+		],
+		"item_id": "axe_basic",
+		"foot": [
+			18,
+			6
+		],
+		"prompt_anchor": [
+			0,
+			-16
+		]
+	},
+	"starter_sword_planted": {
+		"rect": [
+			64,
+			128,
+			24,
+			32
+		],
+		"frame": [
+			24,
+			32
+		],
+		"ground": 27,
+		"anchor": [
+			12,
+			27
+		],
+		"offset": [
+			-12,
+			-27
+		],
+		"item_id": "sword_basic",
+		"foot": [
+			10,
+			6
+		],
+		"prompt_anchor": [
+			0,
+			-28
+		]
+	},
+	"starter_axe_planted": {
+		"rect": [
+			88,
+			128,
+			24,
+			32
+		],
+		"frame": [
+			24,
+			32
+		],
+		"ground": 27,
+		"anchor": [
+			12,
+			27
+		],
+		"offset": [
+			-12,
+			-27
+		],
+		"item_id": "axe_basic",
+		"foot": [
+			12,
+			6
+		],
+		"prompt_anchor": [
+			0,
+			-26
+		]
+	},
+	"starter_sword_icon_16": {
+		"rect": [
+			112,
+			128,
+			16,
+			16
+		],
+		"frame": [
+			16,
+			16
+		],
+		"ground": 14,
+		"anchor": [
+			8,
+			14
+		],
+		"offset": [
+			-8,
+			-14
+		],
+		"item_id": "sword_basic"
+	},
+	"starter_axe_icon_16": {
+		"rect": [
+			128,
+			128,
+			16,
+			16
+		],
+		"frame": [
+			16,
+			16
+		],
+		"ground": 14,
+		"anchor": [
+			8,
+			14
+		],
+		"offset": [
+			-8,
+			-14
+		],
+		"item_id": "axe_basic"
+	},
+	"camp_rope_coil": {
+		"rect": [
+			144,
+			128,
+			24,
+			16
+		],
+		"frame": [
+			24,
+			16
+		],
+		"ground": 13,
+		"anchor": [
+			12,
+			13
+		],
+		"offset": [
+			-12,
+			-13
+		]
+	},
+	"camp_kindling": {
+		"rect": [
+			168,
+			128,
+			24,
+			16
+		],
+		"frame": [
+			24,
+			16
+		],
+		"ground": 13,
+		"anchor": [
+			12,
+			13
+		],
+		"offset": [
+			-12,
+			-13
+		]
+	},
+	"camp_pebbles": {
+		"rect": [
+			192,
+			128,
+			24,
+			16
+		],
+		"frame": [
+			24,
+			16
+		],
+		"ground": 13,
+		"anchor": [
+			12,
+			13
+		],
+		"offset": [
+			-12,
+			-13
+		]
+	}
+}

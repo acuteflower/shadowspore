@@ -60,3 +60,32 @@ static func next_tired(tired: bool, stamina: float, maximum: float) -> bool:
 	if tired and stamina >= maximum * float(cfg()["stamina"]["tired_resume"]):
 		return false
 	return tired
+
+
+const OFFSHORE_START_TILES: float = 14.0
+const OFFSHORE_MAX_TILES: float = 24.0
+const OFFSHORE_MAX_DRIFT: float = 64.0 ## px/s gentle return current toward shore deep offshore
+const OFFSHORE_MAX_STAMINA: float = 22.0 ## extra stamina/s drained deep offshore
+
+
+## Smooth 0..1 offshore intensity starting beyond `start_tiles` from the coastline.
+static func offshore_factor(offshore_tiles: float, start_tiles: float = OFFSHORE_START_TILES, max_tiles: float = OFFSHORE_MAX_TILES) -> float:
+	if offshore_tiles <= start_tiles:
+		return 0.0
+	var span: float = maxf(max_tiles - start_tiles, 1.0)
+	var t: float = clampf((offshore_tiles - start_tiles) / span, 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
+
+
+## Progressive gentle shoreward return current (px/s) when swimming beyond `start_tiles` offshore.
+static func offshore_drift(offshore_tiles: float, return_dir: Vector2, start_tiles: float = OFFSHORE_START_TILES, max_tiles: float = OFFSHORE_MAX_TILES) -> Vector2:
+	var f: float = offshore_factor(offshore_tiles, start_tiles, max_tiles)
+	if f <= 0.0 or return_dir == Vector2.ZERO:
+		return Vector2.ZERO
+	return return_dir.normalized() * (f * OFFSHORE_MAX_DRIFT)
+
+
+## Progressive extra stamina drain per second when swimming beyond `start_tiles` offshore.
+static func offshore_stamina_extra(offshore_tiles: float, start_tiles: float = OFFSHORE_START_TILES, max_tiles: float = OFFSHORE_MAX_TILES) -> float:
+	var f: float = offshore_factor(offshore_tiles, start_tiles, max_tiles)
+	return f * f * OFFSHORE_MAX_STAMINA

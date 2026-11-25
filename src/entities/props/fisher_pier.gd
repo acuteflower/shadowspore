@@ -8,7 +8,7 @@ const PIER_TEX: String = "res://assets/props/fisher_pier.png"
 const PIER_GLOW: String = "res://assets/props/fisher_pier_glow.png"
 const BOAT_TEX: String = "res://assets/props/reed_rowboat.png"
 
-var pois: MeadowPois
+var pois: Node
 var pier_id: String = ""
 var dir_idx: int = 0 ## 0 East, 1 West, 2 South, 3 North
 var boat_world_pos: Vector2 = Vector2.ZERO
@@ -23,7 +23,7 @@ var _light: NightLight
 var _boat_node: ReedRowboatSpot
 
 
-func setup(owner_pois: MeadowPois, spec: Dictionary) -> void:
+func setup(owner_pois: Node, spec: Dictionary) -> void:
 	pois = owner_pois
 	pier_id = String(spec.get("id", ""))
 	dir_idx = clampi(int(spec.get("dir", 0)), 0, 3)

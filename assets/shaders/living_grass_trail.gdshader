@@ -2,9 +2,9 @@ shader_type canvas_item;
 #include "res://assets/shaders/daylight.gdshaderinc"
 render_mode blend_mix;
 
-// Pressed-turf 2-zone trail underlay directly beneath LivingGrass (z_index = -9):
+// Pressed-turf 2-zone trail underlay directly beneath LivingGrass v4 (z_index = -10):
 // - Toroidal camera-centered ring-buffer sampling (repeat_enable + border fade = infinite Open World support!)
-// - Pixel-dithered cool damp moss core + directional laid-down blade streaks + subtle sunlit outer rim
+// - Pixel-dithered cool damp moss core + directional laid-down blade streaks + subtle sunlit outer parting rim
 // - Set `debug_overlay > 0.0` in GrassLab to visualize the raw crush & bend vector field.
 
 uniform vec2 field_origin = vec2(-256.0, -256.0);
@@ -47,7 +47,7 @@ void fragment() {
 	} else {
 		// Organic pixel-dithered pressed-turf core + directional laid-flat blade streaks
 		float grain = trail_hash(px);
-		float mask = smoothstep(0.12, 0.76, crush);
+		float mask = smoothstep(0.11, 0.74, crush);
 		if (mask <= 0.01 || grain > mask * 0.94 + 0.10) {
 			discard;
 		}
@@ -55,14 +55,15 @@ void fragment() {
 		float across = dot(px, vec2(-dir.y, dir.x));
 		float along = dot(px, dir);
 		// Fine directional crushed-blade striations aligned with the parting/stride vector
-		float streak = sin(across * 1.55 + sin(along * 0.25) * 1.1 + grain * 2.2);
+		float streak = sin(across * 1.65 + sin(along * 0.24) * 1.15 + grain * 2.1);
+		float blade_rib = step(0.46, streak) * step(0.32, fract(along * 0.18 + grain));
 		vec3 dark_moss = vec3(0.09, 0.20, 0.19);
-		vec3 damp_soil = vec3(0.14, 0.25, 0.21);
-		vec3 bent_sheen = vec3(0.27, 0.49, 0.35);
-		vec3 col = mix(dark_moss, damp_soil, smoothstep(0.55, 0.92, crush) * 0.45);
-		col = mix(col, bent_sheen, step(0.42, streak) * (0.28 + 0.16 * (1.0 - mask)));
+		vec3 damp_soil = vec3(0.15, 0.25, 0.20);
+		vec3 bent_sheen = vec3(0.28, 0.50, 0.34);
+		vec3 col = mix(dark_moss, damp_soil, smoothstep(0.54, 0.92, crush) * 0.46);
+		col = mix(col, bent_sheen, (step(0.40, streak) * 0.24 + blade_rib * 0.18) * (0.75 + 0.25 * (1.0 - mask)));
 		col = day_grade(col, px, 0.45);
-		float alpha = mask * (0.38 + 0.15 * step(0.52, grain));
+		float alpha = mask * (0.39 + 0.16 * step(0.50, grain));
 		COLOR = vec4(col, alpha);
 	}
 }

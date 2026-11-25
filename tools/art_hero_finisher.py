@@ -2,11 +2,18 @@
 from __future__ import annotations
 """Combat V2 Finisher sprite sheets for Ellie (`assets/characters/player_finisher.png`).
 
-Generates 8 genuine directions (E, SE, S, SW, W, NW, N, NE) x 16 columns of 48x56 frames:
-  - cols  0..15 (16f): `impale_down` — Move #1 ("Abgrund-Pfähler"):
-      * Beat 1 (0..5):  Spring hop & two-handed overhead vertical plunge into enemy core
-      * Beat 2 (6..10): Re-brace on pommel & brutal second deep press cracking the carapace
-      * Beat 3 (11..15): Explosive upward-diagonal wrench/rip-out & smooth combat guard settle
+Generates 8 genuine directions (E, SE, S, SW, W, NW, N, NE) x 24 columns of 48x56 frames for Move #1 ("Abgrund-Pfähler",
+docs/finisher_v2_konzept.md). Airborne frames (2..5) omit the baked ground shadow; the game lifts the sprite itself.
+  - clip `impale_down` (cols 0..19):
+      *  0..2:  crouch / anticipation, take-off (2 = feet leave the ground, arms rising)
+      *  3..4:  apex hang: both hands on the hilt high above the head, reverse grip, blade straight down (3 ~ 4, a held drift)
+      *  5..6:  plunge; 6 = impact, feet planted, hilt driven down at waist height in front of her
+      *  7..10: grinding second press on the pommel (10 = deepest)
+      * 11..12: brace / coil before the rip (weight back, knees bent)
+      * 13..15: explosive rip-out in a rising diagonal arc (15 = sword hand high above / behind the right shoulder)
+      * 16..19: settle back into the combat guard
+  - clip `impale_flick` (cols 20..23): alternative ending after 15 (story flag): wrist snap that flicks the blade down and
+    out to her side (chiburi), 23 = relaxed low ready stance, sword hand low at her side
 
 Outputs:
   - `assets/characters/player_finisher.png`                 (Base Body mannequin; airborne frames omit baked ground shadow)
@@ -63,8 +70,10 @@ def _pose(
     ankles=None,
     dy: float = 0.0,
     airborne: bool = False,
+    **extra: float,
 ) -> dict:
     p = hero.P(twist, lean, pz, feet, hand_r, hand_l, hair, flare)
+    p.update(extra)  # optional hair shaping: spread / curl / droop / pitch
     if abs(roll) > 1e-5:
         p["roll"] = roll
     if abs(head_yaw) > 1e-5:
@@ -84,222 +93,164 @@ def build_clips() -> tuple[dict, list[dict]]:
         clips_meta[name] = {"start": len(all_poses), "count": len(frames), "fps": fps}
         all_poses.extend(frames)
 
-    # Move #1: `impale_down` (16 frames) — Overhead Downward Impale -> Second Brutal Press -> Rip-Out
+    # Hand targets are model space (x: + = her left, y: height, z: + = forward / strike direction). The sword is drawn by the
+    # game at `hand_r` (the grip); in the apex / impact / press frames `hand_l` sits on the same hilt just below or beside it.
+    # Every target stays inside the 12.6 arm reach so the painted arm (hero_arm3d) really ends at the hilt.
+    GROUND = 2.5
     add_clip(
         "impale_down",
         16.0,
         [
-            # --- BEAT 1A: Spring gather & two-handed overhead lift (Frames 0..3) ---
-            _pose(
-                -0.18,
-                0.14,
-                0.6,
-                (),
-                (-4.4, 30.5, 3.2),
-                (-0.8, 29.5, 3.6),
-                (0.3, 0.1, -0.8),
-                0.08,
-                head_yaw=0.12,
-                ankles=((2.9, 2.5, 2.8), (-2.9, 2.5, -2.4)),
-                dy=-1.1,
+            # --- 0..2: crouch / anticipation and take-off ---
+            _pose(  # 0: settle into the crouch, hilt held low at her right hip
+                -0.18, 0.14, 0.6, (),
+                (-4.4, 30.5, 3.2), (-0.8, 29.5, 3.6),
+                (0.3, 0.1, -0.8), 0.08, head_yaw=0.12,
+                ankles=((2.9, GROUND, 2.8), (-2.9, GROUND, -2.4)), dy=-1.4,
             ),
-            _pose(
-                -0.26,
-                -0.06,
-                1.2,
-                (),
-                (-3.2, 39.5, 1.4),
-                (-0.6, 38.2, 2.0),
-                (0.6, 1.0, -1.6),
-                0.18,
-                head_yaw=0.18,
-                ankles=((2.8, 5.0, 2.2), (-2.9, 4.2, -2.6)),
-                dy=-0.2,
+            _pose(  # 1: deepest load, knees bent, both hands start to lift the hilt
+                -0.12, 0.24, 1.0, (),
+                (-3.2, 32.2, 6.4), (-0.2, 31.6, 6.6),
+                (0.3, 0.6, -1.4), 0.12, head_yaw=0.08,
+                ankles=((3.0, GROUND, 3.0), (-3.0, GROUND, -2.6)), dy=-2.6,
+            ),
+            _pose(  # 2: take-off, toes leave the ground, arms rising past the face
+                -0.06, -0.02, 1.4, (),
+                (-2.2, 42.6, 3.4), (0.4, 41.6, 3.8),
+                (0.2, 1.8, -1.8), 0.24, head_yaw=0.04,
+                ankles=((2.8, 4.2, 1.6), (-2.9, 3.4, -1.8)), dy=0.4,
                 airborne=True,
             ),
-            _pose(
-                -0.16,
-                -0.24,
-                1.4,
-                (),
-                (-1.8, 47.6, 1.8),
-                (1.2, 47.0, 2.4),
-                (0.4, 1.7, -2.4),
-                0.28,
-                head_yaw=0.10,
-                ankles=((2.9, 6.6, 3.0), (-2.9, 5.4, -3.4)),
-                dy=0.3,
-                airborne=True,
+            # --- 3..4: apex hang (reverse grip, blade straight down in front of her) ---
+            _pose(  # 3: both hands stacked on the hilt high above the head, knees tucked, hair floating up
+                0.0, -0.02, 1.8, (),
+                (-1.0, 49.6, 3.0), (0.3, 48.0, 3.3),
+                (0.2, 6.0, -0.8), 0.30,
+                ankles=((2.9, 7.2, 3.6), (-2.9, 6.4, 1.0)), dy=0.4,
+                airborne=True, spread=0.35,
             ),
-            _pose(
-                0.04,
-                0.18,
-                2.5,
-                (),
-                (-1.0, 36.2, 9.8),
-                (1.3, 37.0, 9.6),
-                (-0.4, 1.2, -1.2),
-                0.28,
-                ankles=((3.1, 4.2, 4.8), (-3.0, 3.4, -3.8)),
-                dy=-0.3,
-                airborne=True,
+            _pose(  # 4: the same hold with a tiny drift (the game holds here ~0.14 s)
+                0.0, -0.02, 1.85, (),
+                (-1.0, 49.7, 3.1), (0.3, 48.1, 3.4),
+                (0.3, 6.6, -0.6), 0.32,
+                ankles=((2.9, 7.5, 3.7), (-2.9, 6.7, 1.1)), dy=0.4,
+                airborne=True, spread=0.40,
             ),
-            # --- BEAT 1B: Vertical plunge impact & tension hold (Frames 4..5) ---
-            _pose(
-                0.10,
-                0.30,
-                3.3,
-                (),
-                (-0.8, 26.0, 12.6),
-                (1.3, 27.4, 12.4),
-                (-0.3, -0.2, 2.2),
-                0.24,
-                roll=-0.04,
-                head_yaw=-0.06,
-                ankles=((3.2, 2.5, 6.2), (-3.1, 2.5, -4.2)),
-                dy=-1.6,
+            # --- 5..6: plunge and impact ---
+            _pose(  # 5: driving down, legs reaching for the ground, hair whipped up by the fall
+                0.06, 0.24, 2.4, (),
+                (-0.6, 38.4, 9.4), (0.6, 37.0, 9.6),
+                (-0.1, 7.0, 0.6), 0.36, head_yaw=-0.02,
+                ankles=((3.1, 4.4, 4.4), (-3.0, 3.6, -2.4)), dy=-0.4,
+                airborne=True, spread=0.30,
             ),
-            _pose(
-                0.08,
-                0.26,
-                3.1,
-                (),
-                (-0.8, 26.6, 12.3),
-                (1.4, 28.0, 12.1),
-                (-0.2, 0.0, 1.4),
-                0.14,
-                roll=-0.03,
-                head_yaw=-0.05,
-                ankles=((3.2, 2.5, 6.0), (-3.1, 2.5, -4.2)),
-                dy=-1.3,
+            _pose(  # 6: impact, feet planted wide, both hands drive the hilt down at waist height in front of her
+                0.10, 0.30, 3.3, (),
+                (-0.4, 27.2, 12.0), (0.6, 25.8, 12.2),
+                (-0.3, -0.2, 2.4), 0.26, roll=-0.04, head_yaw=-0.06,
+                ankles=((3.2, GROUND, 6.2), (-3.1, GROUND, -4.2)), dy=-1.8,
             ),
-            # --- BEAT 2: Re-brace & second brutal two-handed deep press (Frames 6..10) ---
-            _pose(
-                -0.06,
-                0.20,
-                2.9,
-                (),
-                (-1.0, 28.0, 11.8),
-                (1.5, 31.0, 11.5),
-                (0.2, 0.3, 0.4),
-                0.10,
-                head_yaw=0.04,
-                ankles=((3.2, 2.5, 5.8), (-3.1, 2.5, -4.2)),
-                dy=-1.0,
+            # --- 7..10: grinding second press, her weight on the pommel ---
+            _pose(  # 7
+                0.14, 0.34, 3.5, (),
+                (-0.4, 26.4, 12.2), (0.9, 26.8, 12.0),
+                (-0.3, 0.0, 1.8), 0.18, roll=-0.06, head_yaw=-0.08,
+                ankles=((3.2, GROUND, 6.3), (-3.1, GROUND, -4.3)), dy=-2.0,
             ),
-            _pose(
-                0.20,
-                0.36,
-                3.6,
-                (),
-                (-0.4, 22.6, 13.0),
-                (1.2, 24.2, 12.8),
-                (-0.6, -0.4, 2.4),
-                0.22,
-                roll=-0.08,
-                head_yaw=-0.12,
-                ankles=((3.3, 2.5, 6.6), (-3.1, 2.5, -4.4)),
-                dy=-2.1,
+            _pose(  # 8
+                0.20, 0.38, 3.8, (),
+                (-0.3, 25.2, 12.3), (1.0, 25.6, 12.1),
+                (-0.5, -0.3, 2.2), 0.20, roll=-0.08, head_yaw=-0.12,
+                ankles=((3.3, GROUND, 6.6), (-3.1, GROUND, -4.4)), dy=-2.3,
             ),
-            _pose(
-                0.26,
-                0.40,
-                3.9,
-                (),
-                (-0.2, 20.6, 13.4),
-                (1.1, 22.2, 13.2),
-                (-0.8, -0.5, 2.6),
-                0.18,
-                roll=-0.10,
-                head_yaw=-0.16,
-                ankles=((3.4, 2.5, 6.8), (-3.2, 2.5, -4.5)),
-                dy=-2.5,
+            _pose(  # 9
+                0.24, 0.41, 4.0, (),
+                (-0.3, 24.0, 12.3), (1.0, 24.4, 12.1),
+                (-0.7, -0.4, 2.4), 0.18, roll=-0.10, head_yaw=-0.15,
+                ankles=((3.4, GROUND, 6.8), (-3.2, GROUND, -4.5)), dy=-2.6,
             ),
-            _pose(
-                0.30,
-                0.38,
-                3.8,
-                (),
-                (0.0, 20.8, 13.3),
-                (1.2, 22.4, 13.1),
-                (-0.7, -0.3, 1.8),
-                0.14,
-                roll=-0.11,
-                head_yaw=-0.18,
-                ankles=((3.4, 2.5, 6.8), (-3.2, 2.5, -4.5)),
-                dy=-2.4,
+            _pose(  # 10: deepest press, shoulders hunched over the hilt
+                0.27, 0.44, 4.2, (),
+                (-0.3, 23.0, 12.2), (1.0, 23.4, 12.0),
+                (-0.8, -0.5, 2.6), 0.16, roll=-0.11, head_yaw=-0.18,
+                ankles=((3.4, GROUND, 6.9), (-3.2, GROUND, -4.6)), dy=-2.8,
             ),
-            _pose(
-                0.18,
-                0.28,
-                3.2,
-                (),
-                (-0.5, 22.4, 12.4),
-                (3.0, 25.0, 9.8),
-                (-0.3, 0.0, 1.0),
-                0.12,
-                roll=-0.05,
-                head_yaw=-0.10,
-                ankles=((3.3, 2.5, 6.2), (-3.1, 2.5, -4.6)),
-                dy=-1.8,
+            # --- 11..12: brace / coil before the rip (weight back, knees bent, the hilt stays in the wound) ---
+            _pose(  # 11
+                0.18, 0.24, 2.6, (),
+                (-0.5, 24.0, 10.6), (1.0, 24.6, 10.4),
+                (-0.2, 0.2, 0.8), 0.12, roll=-0.04, head_yaw=-0.10,
+                ankles=((3.4, GROUND, 5.6), (-3.2, GROUND, -4.6)), dy=-2.9,
             ),
-            # --- BEAT 3: Violent wrench / rip-out & combat stance settle (Frames 11..15) ---
-            _pose(
-                -0.38,
-                -0.04,
-                1.4,
-                ((3.2, 5.2, 0.2), (-3.2, -4.4, 0.0)),
-                (-5.2, 31.5, 6.2),
-                (6.4, 29.8, 1.8),
-                (1.8, 0.9, -1.4),
-                0.28,
-                roll=0.08,
-                head_yaw=0.26,
+            _pose(  # 12: fully coiled, right shoulder wound forward, weight on the back leg
+                0.24, 0.16, 1.8, (),
+                (-0.6, 24.6, 9.6), (0.9, 25.2, 9.4),
+                (0.2, 0.4, -0.4), 0.10, roll=0.02, head_yaw=-0.14,
+                ankles=((3.4, GROUND, 5.0), (-3.2, GROUND, -4.8)), dy=-3.2,
             ),
-            _pose(
-                -0.72,
-                -0.16,
-                0.2,
-                ((3.1, 4.2, 0.4), (-3.2, -4.2, 0.0)),
-                (-8.6, 37.8, -1.8),
-                (7.8, 32.4, -3.2),
-                (3.2, 1.4, -2.2),
-                0.34,
-                roll=0.12,
-                head_yaw=0.46,
+            # --- 13..15: explosive rip-out, rising diagonal arc up and back over her right shoulder ---
+            _pose(  # 13: tearing free, the left hand lets go
+                -0.10, 0.10, 1.8, ((3.3, 4.8, 0.0), (-3.2, -4.6, 0.0)),
+                (-2.4, 28.0, 9.4), (4.6, 28.6, 5.0),
+                (0.9, 0.6, -1.0), 0.24, roll=0.04, head_yaw=0.06,
             ),
-            _pose(
-                -0.52,
-                -0.08,
-                0.4,
-                ((3.0, 3.6, 0.0), (-3.0, -3.2, 0.0)),
-                (-7.8, 32.2, -1.0),
-                (6.8, 28.8, -1.6),
-                (2.2, 0.8, -1.2),
-                0.20,
-                roll=0.07,
-                head_yaw=0.34,
+            _pose(  # 14: the blade rises past her chest, body uncoiling
+                -0.44, -0.06, 1.2, ((3.2, 4.4, 0.2), (-3.2, -4.4, 0.0)),
+                (-5.4, 38.4, 5.2), (6.4, 30.0, 1.8),
+                (2.0, 1.2, -1.6), 0.32, roll=0.08, head_yaw=0.26,
             ),
-            _pose(
-                -0.20,
-                0.04,
-                0.5,
-                ((2.9, 2.6, 0.0), (-2.9, -2.0, 0.0)),
-                (-5.8, 27.2, 0.8),
-                (5.6, 26.2, -0.4),
-                (0.9, 0.3, -0.4),
-                0.08,
-                head_yaw=0.14,
+            _pose(  # 15: sword hand high above and behind her right shoulder, left arm thrown out for balance
+                -0.70, -0.16, 0.4, ((3.1, 4.2, 0.4), (-3.2, -4.2, 0.0)),
+                (-6.2, 47.6, -2.6), (7.6, 32.4, -2.8),
+                (3.2, 1.6, -2.2), 0.36, roll=0.12, head_yaw=0.46,
             ),
-            _pose(
-                -0.04,
-                0.02,
-                0.2,
-                ((2.8, 1.4, 0.0), (-2.8, -1.2, 0.0)),
-                (-5.2, 25.0, 1.2),
-                (5.2, 25.0, 0.6),
-                (0.2, 0.0, 0.0),
-                0.02,
+            # --- 16..19: settle back into the combat guard ---
+            _pose(  # 16
+                -0.54, -0.10, 0.4, ((3.0, 3.8, 0.0), (-3.0, -3.6, 0.0)),
+                (-7.4, 40.2, -1.6), (7.0, 30.0, -2.0),
+                (2.6, 1.0, -1.6), 0.24, roll=0.08, head_yaw=0.36,
+            ),
+            _pose(  # 17
+                -0.36, -0.04, 0.4, ((3.0, 3.2, 0.0), (-3.0, -2.8, 0.0)),
+                (-7.4, 32.6, -0.6), (6.6, 28.6, -1.2),
+                (1.8, 0.6, -1.0), 0.16, roll=0.05, head_yaw=0.26,
+            ),
+            _pose(  # 18
+                -0.18, 0.02, 0.4, ((2.9, 2.4, 0.0), (-2.9, -1.9, 0.0)),
+                (-6.0, 27.4, 0.8), (5.6, 26.4, -0.4),
+                (0.9, 0.3, -0.4), 0.08, head_yaw=0.12,
+            ),
+            _pose(  # 19: combat guard
+                -0.04, 0.02, 0.2, ((2.8, 1.4, 0.0), (-2.8, -1.2, 0.0)),
+                (-5.2, 25.0, 1.2), (5.2, 25.0, 0.6),
+                (0.2, 0.0, 0.0), 0.02,
+            ),
+        ],
+    )
+    # Alternative ending (story flag `rescued`): played instead of 16..19, straight from the high rip pose (15).
+    add_clip(
+        "impale_flick",
+        16.0,
+        [
+            _pose(  # 20: wrist cocks, the hand comes forward over the shoulder (blade raised, ready to snap)
+                -0.46, -0.06, 0.6, ((3.1, 4.0, 0.2), (-3.1, -3.8, 0.0)),
+                (-5.4, 43.4, 2.6), (6.8, 30.6, -1.8),
+                (2.4, 1.2, -1.4), 0.28, roll=0.08, head_yaw=0.30,
+            ),
+            _pose(  # 21: the snap, arm whips down and out to her right side
+                -0.12, 0.06, 0.6, ((3.1, 3.6, 0.0), (-3.2, -3.6, 0.0)),
+                (-8.6, 31.0, 3.6), (5.8, 28.4, -0.8),
+                (-0.6, 0.8, 0.6), 0.30, roll=-0.04, head_yaw=0.06,
+            ),
+            _pose(  # 22: hard stop, arm extended low and out (ichor flies off the tip)
+                0.04, 0.10, 0.5, ((3.0, 3.2, 0.0), (-3.2, -3.2, 0.0)),
+                (-9.0, 27.4, 2.0), (5.2, 27.2, 0.2),
+                (-1.2, 0.2, 1.0), 0.18, roll=-0.05, head_yaw=-0.04,
+            ),
+            _pose(  # 23: relaxed low ready, sword hand low at her side, the blade pointing out and down
+                -0.02, 0.06, 0.3, ((2.9, 2.6, 0.0), (-3.1, -2.6, 0.0)),
+                (-7.6, 25.8, 1.4), (4.8, 26.6, 0.6),
+                (-0.3, 0.0, 0.3), 0.06, head_yaw=0.02,
             ),
         ],
     )
@@ -551,7 +502,7 @@ def main() -> None:
             hair_f_sheets["default"],
             hair_b_sheets["default"],
         )
-        pick_rows = [0, 1, 2, 4, 6]
+        pick_rows = list(range(ROWS))
         strip = np.zeros((len(pick_rows) * FH, COLS * FW, 4), dtype=np.uint8)
         strip[..., :3] = (20, 16, 32)
         strip[..., 3] = 255
@@ -561,9 +512,26 @@ def main() -> None:
             bg = strip[ri * FH : (ri + 1) * FH, :, :3].astype(np.float32)
             blended = cell_slice[..., :3].astype(np.float32) * alpha + bg * (1.0 - alpha)
             strip[ri * FH : (ri + 1) * FH, :, :3] = np.clip(blended, 0, 255).astype(np.uint8)
-        # Also mark rig["hand"] as a tiny cyan dot and rig["shoulder"] as gold in a separate row? Keep clean pixels!
         zoom = np.repeat(np.repeat(strip, 2, axis=0), 2, axis=1)
         write_array(contact_out, zoom)
+        # Debug twin (`<name>_rig.png`): the game-drawn sword arm as a gold shoulder->hand line, the grip (rig hand) as a cyan dot.
+        dbg = strip.copy()
+        for ri, sec in enumerate(pick_rows):
+            for c in range(COLS):
+                sx, sy = shoulders[sec * COLS + c]
+                hx, hy = hands[sec * COLS + c]
+                ox, oy = c * FW + FW // 2, ri * FH + int(GROUND_ROW)  # rig points are feet-relative
+                n = int(max(abs(hx - sx), abs(hy - sy))) + 1
+                for k in range(n + 1):
+                    t = k / max(n, 1)
+                    px, py = int(round(ox + sx + (hx - sx) * t)), int(round(oy + sy + (hy - sy) * t))
+                    if 0 <= px < dbg.shape[1] and 0 <= py < dbg.shape[0]:
+                        dbg[py, px, :3] = (230, 196, 104)
+                px, py = int(round(ox + hx)), int(round(oy + hy))
+                if 0 < px < dbg.shape[1] and 0 < py < dbg.shape[0]:
+                    dbg[py - 1 : py + 1, px - 1 : px + 1, :3] = (120, 244, 230)
+        dzoom = np.repeat(np.repeat(dbg, 2, axis=0), 2, axis=1)
+        write_array(contact_out.with_name(contact_out.stem + "_rig.png"), dzoom)
 
     print("player_finisher sheets, cosmetics, blood/depth, arm3d, jewelry and rig updated.", flush=True)
 

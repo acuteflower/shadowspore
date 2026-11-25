@@ -1,5 +1,8 @@
 # Boss arena (stage for the first boss fight)
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 Stage only: the boss design comes from another agent. Plateau at tile (499, 258) (relief level 3, ramp on the south side).
 
 - **Data:** `data/ground.json` `arenas[]` {id, tile, level, clear_margin, poly (px relative to the tile's centre, traced from the user's drawing), pillars [{pos, variant}]}.

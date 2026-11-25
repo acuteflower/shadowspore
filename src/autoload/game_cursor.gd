@@ -241,6 +241,10 @@ func _physics_process(delta: float) -> void:
 			_hover = HOVER_HARVEST
 			_hover_id = plant.get_instance_id()
 			return
+		if _hoe_tall_grass_at(aim):
+			_hover = HOVER_HARVEST
+			_hover_id = 0
+			return
 	elif _hover == HOVER_ENEMY or (_hover == HOVER_HARVEST and _hover_id != 0):
 		if _hover == HOVER_HARVEST:
 			var hover_obj: Object = instance_from_id(_hover_id)
@@ -352,6 +356,19 @@ func _can_harvest(plant: Object) -> bool:
 	return needs != "" and not held.is_empty() and String(Items.definition(held).get("tool", "")) == needs
 
 
+## While holding a hoe, hovering over removable tall grass lights up the harvest cursor (duck-typed).
+func _hoe_tall_grass_at(aim: Vector2) -> bool:
+	if _player == null or _player.inventory == null:
+		return false
+	var held: Dictionary = _player.inventory.active_stack()
+	if held.is_empty() or String(Items.definition(held).get("tool", "")) != "hoe":
+		return false
+	for node: Node in get_tree().get_nodes_in_group("living_grass"):
+		if is_instance_valid(node) and node.has_method("has_tall_tuft_near") and bool(node.call("has_tall_tuft_near", aim, 16.0)):
+			return true
+	return false
+
+
 # ---------------------------------------------------------------- what to show
 
 func _resolve() -> Look:
@@ -372,7 +389,7 @@ func _resolve() -> Look:
 		_wounded = bool(player.wounded)
 	var view: Viewport = get_viewport()
 	var over: Look = _control_look(view.gui_get_hovered_control(), kind)
-	if InputManager.ui_blocking or InputManager.menu_open or InputManager.map_open or (InputManager.skills_open or InputManager.progress_open):
+	if InputManager.ui_blocking or InputManager.menu_open or InputManager.map_open or (InputManager.skills_open or InputManager.progress_open or InputManager.dungeons_open):
 		if view.gui_is_dragging() or _holds_stack(player):
 			return Look.GRABBING
 		if InputManager.map_open or (InputManager.skills_open or InputManager.progress_open): ## both are dragged around

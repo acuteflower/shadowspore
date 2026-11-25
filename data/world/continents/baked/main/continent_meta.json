@@ -1,0 +1,223 @@
+{
+  "continent_id": "main",
+  "size": [
+    2400,
+    1800
+  ],
+  "px_per_tile": 1,
+  "light_alpha_bits": {
+    "WATER": 1,
+    "MEADOW": 2,
+    "CANOPY": 4,
+    "GLOW_WARM": 8,
+    "GLOW_ARCANE": 16,
+    "INK_CLIFF": 32,
+    "SAND_WAY": 64,
+    "VALID": 128
+  },
+  "rift_pos": [
+    1897.0,
+    532.6
+  ],
+  "rift_radius": 72.0,
+  "ocean_currents": [
+    [
+      [
+        165,
+        1580
+      ],
+      [
+        140,
+        1210
+      ],
+      [
+        175,
+        810
+      ],
+      [
+        260,
+        420
+      ],
+      [
+        410,
+        165
+      ]
+    ],
+    [
+      [
+        290,
+        1690
+      ],
+      [
+        720,
+        1705
+      ],
+      [
+        1220,
+        1655
+      ],
+      [
+        1640,
+        1690
+      ],
+      [
+        2020,
+        1520
+      ]
+    ],
+    [
+      [
+        580,
+        130
+      ],
+      [
+        1040,
+        125
+      ],
+      [
+        1480,
+        130
+      ],
+      [
+        1920,
+        175
+      ],
+      [
+        2210,
+        340
+      ]
+    ],
+    [
+      [
+        2240,
+        520
+      ],
+      [
+        2265,
+        880
+      ],
+      [
+        2185,
+        1240
+      ],
+      [
+        1995,
+        1560
+      ]
+    ]
+  ],
+  "old_names": [
+    {
+      "text": "K\u00dcSTENSAUM DER ALTEN",
+      "pos": [
+        719,
+        1210
+      ]
+    },
+    {
+      "text": "DIE MITTLERE MARK",
+      "pos": [
+        1094,
+        747
+      ]
+    },
+    {
+      "text": "GLASGRAD",
+      "pos": [
+        716,
+        558
+      ]
+    },
+    {
+      "text": "DORNENFORST",
+      "pos": [
+        1537,
+        1069
+      ]
+    },
+    {
+      "text": "DER \u00d6STLICHE SAUM",
+      "pos": [
+        1680,
+        467
+      ]
+    },
+    {
+      "text": "KAP DER ALTEN WACHE",
+      "pos": [
+        579,
+        1286
+      ]
+    },
+    {
+      "text": "GRAUER HOCHWEG",
+      "pos": [
+        601,
+        1066
+      ]
+    },
+    {
+      "text": "STURMHAFEN",
+      "pos": [
+        976,
+        1385
+      ]
+    },
+    {
+      "text": "FURT AM ERLENBACH",
+      "pos": [
+        939,
+        1144
+      ]
+    },
+    {
+      "text": "STEINSETZER-HOCH",
+      "pos": [
+        671,
+        746
+      ]
+    },
+    {
+      "text": "N\u00d6RDLICHES KLANGFELD",
+      "pos": [
+        826,
+        392
+      ]
+    },
+    {
+      "text": "WEIDENAUE",
+      "pos": [
+        1155,
+        503
+      ]
+    },
+    {
+      "text": "VALDRICS LICHTUNG",
+      "pos": [
+        1093,
+        989
+      ]
+    },
+    {
+      "text": "DUNKELSAUM",
+      "pos": [
+        1602,
+        889
+      ]
+    },
+    {
+      "text": "ALTE EIBENMARK",
+      "pos": [
+        1504,
+        1297
+      ]
+    },
+    {
+      "text": "HERRSCHAFT VARN",
+      "pos": [
+        1712,
+        407
+      ]
+    }
+  ]
+}

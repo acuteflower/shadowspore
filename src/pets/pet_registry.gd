@@ -779,6 +779,9 @@ func _rpc_glint(at: Vector2, warning: bool, seconds: float, key: String, word: S
 func _glint(at: Vector2, warning: bool, seconds: float, key: String, word: String) -> void:
 	if word != "":
 		_flash(key, word, "gift")
+		var me: int = multiplayer.get_unique_id() if multiplayer.has_multiplayer_peer() else 1
+		if not warning and companion_of(me) == key: ## the HUD's small line (docs/hud_v2_konzept.md 3.F)
+			HudNotices.post(get_tree(), "small", "pet_gift", {"text": "%s: %s IM HORT" % [name_of(key).to_upper(), word.to_upper()], "color": Color("ffd27a")})
 	var fx: PetGlint = PetGlint.new()
 	fx.warning = warning
 	fx.life = seconds
@@ -786,10 +789,10 @@ func _glint(at: Vector2, warning: bool, seconds: float, key: String, word: Strin
 	get_tree().current_scene.add_child(fx)
 
 
-## Local, every frame: G. A tap calls the companion, holding it (hold seconds) changes how it behaves.
+## Local, every frame: V. A tap calls the companion, holding it (hold seconds) changes how it behaves.
 func _poll_whistle(delta: float) -> void:
 	var me: int = multiplayer.get_unique_id()
-	if not _comp.has(me) or InputManager.ui_blocking or InputManager.menu_open:
+	if not _comp.has(me) or InputManager.ui_blocking or InputManager.menu_open or InputManager.build_open:
 		_whistle_held = -1.0
 		return
 	var hold: float = float((PetRules.table()["companion"] as Dictionary)["whistle_hold"])

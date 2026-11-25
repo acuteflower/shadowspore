@@ -1,6 +1,6 @@
 # Questtafel, Ausbau: "Das Gedächtnis der Stadt"
 
-Stand: 2026-11-11. Konzept, noch nichts gebaut. Baut auf `docs/questtafel_konzept.md` auf (Grundsystem steht: Zettel, Fenster, Aushang von außen, Melden beim Auftraggeber). Alle Texte sind Platzhalter für den Dialog-Autor.
+Stand: 2026-11-11. **Schritte 1–3 gebaut (`BoardManager`, `TrackedQuests`, `BoardNotes`); für v2-Heimatzone `glimmrast` vorgesehen.** Baut auf `docs/questtafel_konzept.md` auf (Grundsystem steht: Zettel, Fenster, Aushang von außen, Melden beim Auftraggeber). Alle Texte sind Platzhalter für den Dialog-Autor.
 
 ## 1. Leitidee
 

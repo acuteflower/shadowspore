@@ -9,6 +9,9 @@ extends SeatSpot
 
 const TEX_PATH: String = "res://assets/props/vista_spot.png"
 const GLOW_PATH: String = "res://assets/props/vista_spot_glow.png"
+## Variant 3: the Kanzelbank on the Sternenauge plaza (same 64x48 frame, `tools/art_sternenauge_plaza.py`)
+const BENCH_TEX_PATH: String = "res://assets/props/sternenauge/vista_bench.png"
+const BENCH_GLOW_PATH: String = "res://assets/props/sternenauge/vista_bench_glow.png"
 const FRAME_W: int = 64
 const FRAME_H: int = 48
 const GROUND_Y: float = 40.0 ## feet row inside the 64x48 frame
@@ -17,7 +20,7 @@ var vista_id: String = ""
 var vista_name: String = ""
 var vista_sub: String = ""
 var sector: int = 2 ## facing sector 0..7 (E, SE, S, SW, W, NW, N, NE)
-var variant: int = 0 ## 0 stone_ledge, 1 moss_log, 2 carved_bench
+var variant: int = 0 ## 0 stone_ledge, 1 moss_log, 2 carved_bench, 3 sternenauge bench
 var discovered_flag: bool = false
 
 var _body: Sprite2D
@@ -42,20 +45,27 @@ func _ready() -> void:
 
 func _build_visuals() -> void:
 	var offset_v: Vector2 = Vector2(0.0, -(GROUND_Y - float(FRAME_H) * 0.5))
-	if ResourceLoader.exists(TEX_PATH):
+	var bench: bool = variant == 3
+	var tex_path: String = BENCH_TEX_PATH if bench else TEX_PATH
+	var glow_path: String = BENCH_GLOW_PATH if bench else GLOW_PATH
+	var frames: int = 1 if bench else 3
+	var frame_idx: int = 0 if bench else clampi(variant, 0, 2)
+	if ResourceLoader.exists(tex_path):
 		_body = Sprite2D.new()
-		_body.texture = load(TEX_PATH) as Texture2D
-		_body.hframes = 3
+		_body.texture = load(tex_path) as Texture2D
+		_body.hframes = frames
 		_body.vframes = 1
-		_body.frame = clampi(variant, 0, 2)
+		_body.frame = frame_idx
 		_body.offset = offset_v
+		if bench:
+			_body.material = WindkapProps.day_material()
 		add_child(_body)
-	if ResourceLoader.exists(GLOW_PATH):
+	if ResourceLoader.exists(glow_path):
 		_glow = Sprite2D.new()
-		_glow.texture = load(GLOW_PATH) as Texture2D
-		_glow.hframes = 3
+		_glow.texture = load(glow_path) as Texture2D
+		_glow.hframes = frames
 		_glow.vframes = 1
-		_glow.frame = clampi(variant, 0, 2)
+		_glow.frame = frame_idx
 		_glow.offset = offset_v
 		_glow.material = Unlit.material()
 		_glow.modulate = Color(1.0, 1.0, 1.0, 0.45)
@@ -193,11 +203,11 @@ func _apply_local_vista_mode(player: Player, active: bool) -> void:
 	var cfg: Dictionary = manager.settings() if manager != null else {}
 	var world: Variant = get_tree().get_first_node_in_group("world")
 	if world != null:
-		if active:
+		if active and world.has_method("set_vista_focus"):
 			var look_world: Vector2 = global_position + sit_direction() * 220.0
-			world.set_vista_focus(look_world, 2)
-		else:
-			world.clear_vista_focus()
+			world.call("set_vista_focus", look_world, 2)
+		elif not active and world.has_method("clear_vista_focus"):
+			world.call("clear_vista_focus")
 	var music: MusicDirector = get_tree().get_first_node_in_group("music_director") as MusicDirector
 	if music != null:
 		music.vista_mode = active
@@ -228,7 +238,7 @@ func _apply_local_vista_mode(player: Player, active: bool) -> void:
 					snd.play()
 			else:
 				var dur_out: float = float(cfg.get("zoom_out_seconds", 0.85))
-				_cam_tween.tween_property(camera, "zoom", Vector2.ONE, dur_out)
+				_cam_tween.tween_property(camera, "zoom", Player.DEFAULT_CAMERA_ZOOM, dur_out)
 				_cam_tween.tween_property(player, "view_shift", Vector2.ZERO, dur_out)
 
 

@@ -1,6 +1,6 @@
 # Gefiederte Freunde – Pet- und Bindungssystem (Konzept)
 
-Status: **nur Konzept, nichts gebaut.** Erste Tierarten: Krähe und Rabe (`crow`, `raven`, `WildCorvid`). Der Aufbau ist artunabhängig, damit später Eule, Wiedehopf, Fuchs, Reh usw. nur noch einen `pet`-Block in `data/wildlife.json` brauchen.
+Status: **Stufen 1–3b gebaut (`PetRegistry`, `PetRules`, `WildCorvid`, aktiv in v2 WINDKAP).** Erste Tierarten: Krähe und Rabe (`crow`, `raven`, `WildCorvid`). Der Aufbau ist artunabhängig, damit später Eule, Wiedehopf, Fuchs, Reh usw. nur noch einen `pet`-Block in `data/wildlife.json` brauchen.
 
 Alle Texte, Namen und Zahlen sind Platzhalter bis zum Balancing (Abschnitt 14).
 
@@ -89,7 +89,7 @@ Futter sind normale Items, die in `data/pets.json` als `food` eingetragen sind. 
 | Fisch | `fish_silverling`, `fish_loach` (nur kleine Fische) | neutral | **liebt** |
 | Wurzeln/Knollen | `earth_tuber`, `night_beet` | neutral | neutral |
 | Pilze | `glow_cap` | mag nicht | mag nicht |
-| Später | gekochte Gerichte aus Kochen v2 (Krümel), Käse, Nüsse | – | – |
+| Später | Kräuter-Leckerbissen aus Alchemie, Käse, Nüsse | – | – |
 
 Dadurch wird Bestehendes sinnvoll: **Käfer und Raupen ablesen (E)**, Angeln, Beeren und Samen sammeln erhalten einen zusätzlichen Zweck. Keine neue Futterwirtschaft nötig.
 

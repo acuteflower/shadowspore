@@ -186,14 +186,15 @@ func _dress(chunk: MineChunk) -> void:
 	for node: Node2D in nodes:
 		yard.add_child(node)
 	chunk.decor = yard
-	var world: Variant = mines.get_parent() if mines != null else null
-	if world != null:
+	var world: Node = mines.get_parent() if mines != null else null
+	if world != null and "_things" in world and world.has_method("_spawn_thing"):
+		var things: Dictionary = world.get("_things") as Dictionary
 		for r: Dictionary in layout.chunk_rocks.get(chunk.cell, []) as Array:
 			var global: Vector2 = position + Vector2(float(r.x), float(r.y))
 			var cell: Vector2i = Vector2i(floori(global.x / 16.0), floori(global.y / 16.0))
-			if world._things.has(cell):
+			if things.has(cell):
 				continue
-			var rock: WorldProp = world._spawn_thing(cell, String(r.kind), int(r.variant))
+			var rock: WorldProp = world.call("_spawn_thing", cell, String(r.kind), int(r.variant)) as WorldProp
 			if rock == null:
 				continue
 			rock.position = global

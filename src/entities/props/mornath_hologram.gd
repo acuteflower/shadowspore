@@ -17,7 +17,7 @@ const SOUNDS: Dictionary = {
 	"crackle": preload("res://assets/audio/boss_intro/crackle.wav"),
 }
 
-var story: ArenaStory
+var story: Node
 var active: bool = false
 
 var _viewport: SubViewport

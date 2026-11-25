@@ -158,7 +158,11 @@ func _collect_cell_features(cell: Vector2i) -> Dictionary:
 					var chunk_obj: Variant = chunks_dict.get(cell + Vector2i(dx, dy))
 					if chunk_obj == null:
 						continue
-					for thing: WorldProp in (chunk_obj as WorldLevel.Chunk).things:
+					var chunk_things: Variant = chunk_obj.get("things")
+					if not (chunk_things is Array):
+						continue
+					for thing_v: Variant in chunk_things as Array:
+						var thing: WorldProp = thing_v as WorldProp
 						if thing == null or not is_instance_valid(thing):
 							continue
 						var p: Vector2 = thing.global_position

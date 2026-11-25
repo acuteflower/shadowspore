@@ -10,7 +10,7 @@ const CRATER_TEX: String = "res://assets/props/star_crater.png"
 const CRATER_GLOW: String = "res://assets/props/star_crater_glow.png"
 
 var crater_id: int = 0
-var wonders: NightWonders
+var wonders: Node
 var state_mode: int = 0
 
 var _body: Sprite2D
@@ -23,7 +23,7 @@ var _far_wait: float = 0.0
 var _impact_age: float = 0.0
 
 
-func setup(owner_wonders: NightWonders, cid: int, pos_px: Vector2, initial_state: int = 0) -> void:
+func setup(owner_wonders: Node, cid: int, pos_px: Vector2, initial_state: int = 0) -> void:
 	wonders = owner_wonders
 	crater_id = cid
 	position = pos_px.round()

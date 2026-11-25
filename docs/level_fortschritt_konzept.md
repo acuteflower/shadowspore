@@ -175,7 +175,7 @@ Nicht jede Stufe soll sich gleich anfühlen. Alle fünf Stufen (und ein paar Zwi
 | 8 | Tiefer Atem | Ausdauer erholt sich 10 % schneller | `StaminaComponent.regen_per_sec` |
 | 10 | Wurzeltiefe | Überheilung 10 → 15 % | `HealthComponent.overheal_ratio` |
 | 12 | Zweite Blüte | **Talisman-Platz II** | Slot `talisman_2` |
-| 15 | Handwerkerschaft | Rezept-Stufe II bei Gustav und in der Küche (bessere Werkzeuge, mehr Gerichte) | `data/recipes.json` mit `level`, Gustav-Werkbank, `data/cooking.json` |
+| 15 | Handwerkerschaft | Rezept-Stufe II bei Gustav und in der Alchemie (bessere Werkzeuge, mehr Tränke) | `data/recipes.json` mit `level`, Gustav-Werkbank, `data/alchemy.json` |
 | 20 | Dritte Blüte | **Talisman-Platz III**, Titel | Slot `talisman_3` |
 | 25 | Nachtgeübt | Überheilung 15 → 20 %; Hotbar-Ranke blüht voll aus | Overheal, `Hotbar` |
 | 30 | Vollendung | Titel „DIE LICHTBRINGERIN", Cursor-Akzent „Schleierblüte", Ellies Mantelsaum schimmert violett (Kunst) | `CursorArt`, Charakter-Kunst später |
@@ -202,10 +202,10 @@ Damit die gesenkte Kurve nicht nur „mehr vom Gleichen" ist, kommen XP aus alle
 | Nacht überlebt | wie bisher 8 + 1,5 · Stufe, +25 % ohne Verlust der Gruppe | `NightDirector` |
 | Quest-Schritt / Quest fertig | 10–25 / 40–200 | Block `reward: {xp}` in `data/quests.json`, `QuestComponent` |
 | Boss: Mornath | 1.500 (mehr als eine Stufe, ein Ereignis) | Boss-Kill |
-| **Entdeckungen (einmalig)** | Wegstein erwecken 60, neue Fischart 15, neues Gericht 20, neue Methode 10, Kartenanteil je Gebiet 5 % = 25 | Bücher (`FishBook`, `CookingBook`), `Waystones`, `MapDiscovery` – die speichern „erstes Mal" schon |
+| **Entdeckungen (einmalig)** | Wegstein erwecken 60, neue Fischart 15, neues Alchemie-Rezept 20, Kartenanteil je Gebiet 5 % = 25 | Bücher (`FishBook`), `Waystones`, `MapDiscovery` – die speichern „erstes Mal" schon |
 | Stadt | Teil fertig 10–30, neuer Siedler 50, Stadtstufe 100–300 | `TownManager` |
 | Mine | Truhe 6 (bleibt), neue tiefste Ebene 40 | `MineManager` (`deepest`) |
-| Bau/Handwerk, Angeln, Kochen | nur „erstes Mal"-XP, keine laufende (kein Grind) | s. o. |
+| Bau/Handwerk, Angeln, Alchemie | nur „erstes Mal"-XP, keine laufende (kein Grind) | s. o. |
 
 **Anti-Grind:** laufende Aktivitäten (Fische fangen, Holz hacken) geben keine XP; nur „erstes Mal", Quests, Kämpfe der Nacht und Bosse. So gibt es nichts zu farmen.
 

@@ -5,10 +5,13 @@ extends RefCounted
 ## damage numbers, the position display; music = volume of the bus "Music"). Effects and language are stored but have no effect yet.
 
 const PATH: String = "user://settings.cfg"
+const CHAT_OPACITY_MIN: int = 30
+const CHAT_OPACITY_MAX: int = 100
 const DEFAULTS: Dictionary = {
 	"master": 80, "music": 70, "sfx": 80,
 	"fullscreen": false, "vsync": true, "shake": 100,
-	"numbers": true, "language": "de", "position": true, "cursor": true,
+	"numbers": true, "language": "de", "position": false, "cursor": true,
+	"hud_contrast": false, "hud_big_text": false, "hud_tint": true, "chat_opacity": 85,
 	"quality": -1, "fps_cap": 7, "adaptive": false, "pixel_res": false,
 	"weather_fx": 2, "flash_soft": false, "reflections": true, "sun_shadows": true, "journal_still": false,
 	"player_name": "ELLIE",
@@ -25,6 +28,8 @@ static func get_value(key: String) -> Variant:
 
 static func set_value(key: String, value: Variant) -> void:
 	_load()
+	if key == "chat_opacity":
+		value = clampi(int(value), CHAT_OPACITY_MIN, CHAT_OPACITY_MAX)
 	_values[key] = value
 	apply()
 
@@ -33,7 +38,12 @@ static func shake_factor() -> float:
 	return float(get_value("shake")) / 100.0
 
 
+static func chat_opacity() -> float:
+	return float(clampi(int(get_value("chat_opacity")), CHAT_OPACITY_MIN, CHAT_OPACITY_MAX)) / 100.0
+
+
 static func apply() -> void:
+	HudText.refresh()
 	_load()
 	var master: int = int(get_value("master"))
 	AudioServer.set_bus_mute(0, master <= 0)
@@ -76,4 +86,7 @@ static func _load() -> void:
 		return
 	for key: String in DEFAULTS:
 		if file.has_section_key("settings", key):
-			_values[key] = file.get_value("settings", key)
+			var loaded_val: Variant = file.get_value("settings", key)
+			if key == "chat_opacity":
+				loaded_val = clampi(int(loaded_val), CHAT_OPACITY_MIN, CHAT_OPACITY_MAX)
+			_values[key] = loaded_val

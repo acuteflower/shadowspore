@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/test_admin_commands.gd" id="1"]
+
+[node name="TestAdminCommands" type="Node"]
+script = ExtResource("1")

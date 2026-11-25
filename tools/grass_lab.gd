@@ -27,6 +27,33 @@ const SQ4_CENTER: Vector2 = Vector2(1152.0, 12.0)
 const SQ4N_CENTER: Vector2 = Vector2(1152.0, -288.0)
 const SQ4S_CENTER: Vector2 = Vector2(1152.0, 288.0)
 const SQ5_CENTER: Vector2 = Vector2(1536.0, 12.0)
+const COSMOS_PORTAL_POS: Vector2 = Vector2(88.0, -54.0)
+
+class CosmosLabPortal:
+	extends StarHallReturnSeal
+	var on_enter: Callable
+
+	func _ready() -> void:
+		super._ready()
+		name = "CosmosLabPortal"
+
+	func _process(delta: float) -> void:
+		super._process(delta)
+		if _visual != null:
+			_visual.position.y -= 10.0
+
+	func prompt_position() -> Vector2:
+		return Vector2(0.0, -50.0)
+
+	func prompt() -> String:
+		var sys: GoddessSystem = GoddessSystem.of(get_tree())
+		if sys != null and sys.is_busy():
+			return ""
+		return "CAELIAS KOSMOS"
+
+	func interact(player: Player) -> void:
+		if on_enter.is_valid():
+			on_enter.call(player)
 
 const TIME_PRESETS: Array[Dictionary] = [
 	{"name": "MITTAG (0.50)", "t": 0.50, "tag": "noon"},
@@ -83,11 +110,11 @@ var _apple_phenology_cycle: int = 0
 var _autumn_mode: bool = false
 var _holding_axe: bool = false
 var _holding_pickaxe: bool = false
+var _holding_hoe: bool = false
 var _rock_builder: RockSquareBuilder
 var _rocky_ground: RockyGround
-var _flora_field: LivingFloraField
-var _holding_sickle: bool = false
-var _flora_capture_only: bool = false
+var _sanctuary_ruins_root: Node2D
+var _sanctuary_ruins: Array[SanctuaryRuin] = []
 var _water_debug: bool = false
 var _coastal_glow_sprites: Array[Sprite2D] = []
 var _last_coastal_night: float = -1.0
@@ -113,6 +140,8 @@ var _rock_capture_only: bool = false
 var _paths_capture_only: bool = false
 var _spider_capture_only: bool = false
 var _finisher_capture_only: bool = false
+var _grass_capture_only: bool = false
+var _cosmos_test_only: bool = false
 var _lab_spiders: Array[ShadowSpider] = []
 var _next_brood_variant: int = 0
 var _last_hud_surface: String = ""
@@ -122,9 +151,16 @@ var _ui_layer: CanvasLayer
 var _status_label: Label
 var _help_label: Label
 var _bg_matte: ColorRect
+var _interiors: Interiors
+var _goddess_sys: GoddessSystem
+var _cosmos_portal: CosmosLabPortal
+var _cosmos_return_pos: Vector2 = Vector2(88.0, -24.0)
+var _was_in_cosmos: bool = false
 
 var _metrics: Dictionary = {
 	"tuft_density": false,
+	"tall_grass_placed": false,
+	"hoe_clears_tall_grass": false,
 	"glow_layer": false,
 	"floral_petals": false,
 	"toroidal_recenter": false,
@@ -170,7 +206,6 @@ var _metrics: Dictionary = {
 	"rock_outcrops_placed": false,
 	"rock_surfaces_active": false,
 	"sanctuary_ruins_placed": false,
-	"sanctuary_flora_28": false,
 }
 
 
@@ -180,6 +215,7 @@ func _ready() -> void:
 	_build_matte_and_walls()
 	super._ready()
 	_setup_wind_and_foliage()
+	_setup_cosmos_teleport()
 	_setup_studio_ui()
 	_apply_time(0)
 	_apply_weather(0)
@@ -196,6 +232,10 @@ func _process(delta: float) -> void:
 	super._process(delta)
 	_sync_coastal_glow()
 	if _player != null and is_instance_valid(_player) and not _capture_only:
+		var in_cosmos: bool = Interiors.in_cosmos_band(_player.global_position)
+		if in_cosmos != _was_in_cosmos:
+			_was_in_cosmos = in_cosmos
+			_on_cosmos_presence_changed(in_cosmos)
 		var surf: String = Terrain.surface_at(_player.global_position)
 		var zone: String = _zone_label_at(_player.global_position)
 		if surf != _last_hud_surface or zone != _last_hud_zone:
@@ -209,6 +249,8 @@ func _zone_label(wx: float) -> String:
 
 
 func _zone_label_at(pos: Vector2) -> String:
+	if Interiors.in_cosmos_band(pos):
+		return "★ · CAELIAS KOSMOS (ZERO-G)"
 	var wx: float = pos.x
 	if wx < -960.0:
 		return "-3 · OFFENE SEE"
@@ -276,10 +318,17 @@ func _parse_args() -> void:
 			_finisher_capture_only = true
 			_capture_only = true
 			_test_mode = true
-		elif arg.begins_with("--flora-capture="):
-			_capture_dir = arg.trim_prefix("--flora-capture=")
-			_flora_capture_only = true
+		elif arg.begins_with("--grass-capture="):
+			_capture_dir = arg.trim_prefix("--grass-capture=")
+			_grass_capture_only = true
 			_capture_only = true
+			_test_mode = true
+		elif arg.begins_with("--cosmos-capture="):
+			_capture_dir = arg.trim_prefix("--cosmos-capture=")
+			_cosmos_test_only = true
+			_test_mode = true
+		elif arg == "--cosmos-test":
+			_cosmos_test_only = true
 			_test_mode = true
 		elif arg == "--test":
 			_test_mode = true
@@ -499,9 +548,10 @@ func _setup_wind_and_foliage() -> void:
 
 	_build_tree_glade()
 	_build_rock_outcrops()
-	_build_sanctuary_flora()
+	_build_sanctuary_ruins()
 
 	_metrics["tuft_density"] = _grass.tuft_count >= 1600
+	_metrics["tall_grass_placed"] = _grass.tall_tuft_count >= 220
 	_metrics["glow_layer"] = _grass.glow_tuft_count >= 350
 	_metrics["floral_petals"] = _grass._floral_cells.size() >= 40
 	_metrics["slabs_placed"] = _surfaces.slab_count >= 24
@@ -1230,7 +1280,14 @@ func _prepare_player() -> void:
 		_player.inventory.give("axe_basic", 1)
 		_player.inventory.give("pickaxe_basic", 1)
 		_player.inventory.give("sickle_basic", 1)
+		_player.inventory.give("hoe_basic", 1)
 		_equip_first_sword()
+	if _player.inventory != null and _player.inventory.count_item("hoe_basic") <= 0:
+		for i: int in range(1, mini(8, _player.inventory.slots.size())):
+			if (_player.inventory.slots[i] as Dictionary).is_empty():
+				_player.inventory.slots[i] = {"id": "hoe_basic", "count": 1}
+				_player.inventory.changed.emit()
+				break
 	if _player._hud != null and _player._hud is CanvasLayer:
 		(_player._hud as CanvasLayer).visible = _show_game_hud
 	_apply_camera_zoom()
@@ -1254,10 +1311,32 @@ func _toggle_axe_in_hand() -> void:
 	if _player == null or _player.inventory == null:
 		return
 	_holding_axe = not _holding_axe
+	_holding_pickaxe = false
+	_holding_hoe = false
 	if _holding_axe:
 		for i: int in mini(8, _player.inventory.slots.size()):
 			var st: Dictionary = _player.inventory.slots[i] as Dictionary
 			if not st.is_empty() and String(st.get("id", "")) == "axe_basic":
+				_player.inventory.select(i)
+				return
+	else:
+		for i: int in mini(8, _player.inventory.slots.size()):
+			var st: Dictionary = _player.inventory.slots[i] as Dictionary
+			if st.is_empty() or String(Items.definition(st).get("kind", "")) != "tool":
+				_player.inventory.select(i)
+				return
+
+
+func _toggle_hoe_in_hand() -> void:
+	if _player == null or _player.inventory == null:
+		return
+	_holding_hoe = not _holding_hoe
+	_holding_axe = false
+	_holding_pickaxe = false
+	if _holding_hoe:
+		for i: int in mini(8, _player.inventory.slots.size()):
+			var st: Dictionary = _player.inventory.slots[i] as Dictionary
+			if not st.is_empty() and String(st.get("id", "")) == "hoe_basic":
 				_player.inventory.select(i)
 				return
 	else:
@@ -1301,9 +1380,167 @@ func _setup_studio_ui() -> void:
 	_help_label = Label.new()
 	_help_label.add_theme_font_size_override("font_size", 8)
 	_help_label.add_theme_color_override("font_color", Color("9c95bd"))
-	_help_label.text = "[1-3] Wiese/Pfad/Wald  [4-6] Wasser  [7-0] Hain/Hang  [F1] Spinne  [F5] Rudel  [F6] Clear  [F7] Finisher (Shift:Boss)  [T] Zeit  [Z] 1x/2x"
+	_help_label.text = "[1-3] Wiese/Pfad/Wald  [4-6] Wasser  [7-0] Hain/Hang  [X/P/C] Axt/Spitzhacke/Hacke  [T] Zeit  [Z] 1x/2x"
 	vbox.add_child(_help_label)
 	_ui_layer.visible = _show_ui and not _capture_only
+
+
+func _setup_cosmos_teleport() -> void:
+	if _capture_only and not _cosmos_test_only:
+		return
+	_interiors = Interiors.new()
+	_interiors.name = "Interiors"
+	add_child(_interiors)
+
+	_goddess_sys = GoddessSystem.new()
+	_goddess_sys.name = "GoddessSystem"
+	add_child(_goddess_sys)
+
+	_cosmos_portal = CosmosLabPortal.new()
+	_cosmos_portal.position = COSMOS_PORTAL_POS
+	_cosmos_portal.on_enter = func(p: Player) -> void: _enter_cosmos(p)
+	add_child(_cosmos_portal)
+
+
+## Used by `GoddessSystem.return_from_starhall()` when Ellie activates Caelia's floating Return Rift (`E ZURÜCKKEHREN`).
+func respawn_point_for(_peer_id: int, _target: StringName = &"") -> Vector2:
+	return _cosmos_return_pos
+
+
+func _enter_cosmos(player: Player = null) -> void:
+	var target: Player = player if player != null else _player
+	if target == null or _interiors == null or _goddess_sys == null:
+		return
+	if _goddess_sys.is_busy() or _interiors._busy:
+		return
+	if Interiors.in_cosmos_band(target.global_position):
+		return
+	if _demo_active:
+		_stop_demo()
+	_cosmos_return_pos = target.global_position
+	if _cosmos_return_pos.distance_to(COSMOS_PORTAL_POS) < 20.0:
+		_cosmos_return_pos = COSMOS_PORTAL_POS + Vector2(0.0, 28.0)
+	_zoom_macro = false
+	_apply_camera_zoom()
+	_goddess_sys.travel_to_starhall(target, "")
+
+
+func _leave_cosmos(player: Player = null) -> void:
+	var target: Player = player if player != null else _player
+	if target == null or _goddess_sys == null:
+		return
+	if _goddess_sys.is_busy() or (_interiors != null and _interiors._busy):
+		return
+	if not Interiors.in_cosmos_band(target.global_position):
+		return
+	_goddess_sys.return_from_starhall(target)
+
+
+func _toggle_cosmos_teleport() -> void:
+	if _player == null:
+		return
+	if Interiors.in_cosmos_band(_player.global_position):
+		_leave_cosmos(_player)
+	else:
+		_enter_cosmos(_player)
+
+
+func _on_cosmos_presence_changed(in_cosmos: bool) -> void:
+	if _player != null and _player._hud != null and _player._hud is CanvasLayer:
+		(_player._hud as CanvasLayer).visible = true if in_cosmos else _show_game_hud
+	if _help_label != null:
+		if in_cosmos:
+			_help_label.text = "[WASD] Schwerelos schweben  [Shift] Sternengleiten  [Strg] Bremsen  [Alt] Lichtschritt  [E] Caelia / Rückkehr-Riss  [F8] Zurück ins Lab  [H] UI"
+		else:
+			_help_label.text = "[1-3] Wiese/Pfad/Wald  [4-6] Wasser  [7-0] Hain/Hang  [X/P/C] Axt/Spitzhacke/Hacke  [T] Zeit  [Z] 1x/2x"
+	if not in_cosmos and _player != null:
+		var pos: Vector2 = _player.global_position
+		if _grass != null:
+			_grass.recenter_field(pos)
+		if _birch_grass != null:
+			_birch_grass.recenter_field(pos)
+		if _apple_grass != null:
+			_apple_grass.recenter_field(pos)
+		if _water_field != null:
+			_water_field.recenter_wave_field(pos)
+		_apply_camera_zoom()
+	_update_ui_text()
+
+
+func _run_cosmos_teleport_test() -> void:
+	_demo_active = false
+	var ok: bool = true
+	if _player == null or _interiors == null or _goddess_sys == null or _cosmos_portal == null:
+		print("FAILED: GrassLab cosmos teleport nodes missing")
+		get_tree().quit(1)
+		return
+	_player.position = Vector2(54.0, -34.0)
+	_player.velocity = Vector2.ZERO
+	_player.facing = Vector2(0.8, -0.5).normalized()
+	_player._camera.reset_smoothing()
+	for _i: int in 10:
+		await get_tree().process_frame
+	if not _capture_dir.is_empty():
+		await _save_shot("01_grass_lab_portal.png")
+
+	# 1. Enter Caelia's Cosmos via the in-world floating Star Rift portal
+	_cosmos_portal.interact(_player)
+	var t: float = 0.0
+	while t < 3.0 and not Interiors.in_cosmos_band(_player.global_position):
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	for _j: int in 18:
+		await get_tree().physics_frame
+		await get_tree().process_frame
+
+	var entered: bool = Interiors.in_cosmos_band(_player.global_position) and Terrain.surface_at(_player.global_position) == "cosmos" and _player.in_zero_g()
+	print("%s: portal teleports Ellie into Caelia's Cosmos (Zero-G active)" % ("PASS" if entered else "FAILED"))
+	ok = ok and entered
+	var hud_vis: bool = _player._hud is CanvasLayer and (_player._hud as CanvasLayer).visible
+	print("%s: HUD auto-enabled inside Cosmos for Caelia dialogues" % ("PASS" if hud_vis else "FAILED"))
+	ok = ok and hud_vis
+	if not _capture_dir.is_empty():
+		for _c: int in 22:
+			await get_tree().process_frame
+		await _save_shot("02_cosmos_arrived.png")
+
+	# 2. Return via Caelia's floating Return Rift (`E ZURÜCKKEHREN`)
+	t = 0.0
+	while t < 2.0 and (_interiors._busy or _goddess_sys.is_busy()):
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	var hall: Interior = _interiors.interior("starhall")
+	var room: StarHallRoom = hall.get_node_or_null("StarHallRoom") as StarHallRoom if hall != null else null
+	if room != null and room.return_seal != null:
+		room.return_seal.interact(_player)
+	t = 0.0
+	while t < 3.0 and Interiors.in_cosmos_band(_player.global_position):
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	for _k: int in 12:
+		await get_tree().physics_frame
+		await get_tree().process_frame
+
+	var returned: bool = not Interiors.in_cosmos_band(_player.global_position) and not _player.in_zero_g()
+	print("%s: Caelia's Return Rift warps Ellie back to GrassLab" % ("PASS" if returned else "FAILED"))
+	ok = ok and returned
+
+	# 3. F8 Hotkey toggle into Cosmos
+	t = 0.0
+	while t < 2.0 and (_interiors._busy or _goddess_sys.is_busy()):
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	_toggle_cosmos_teleport()
+	t = 0.0
+	while t < 3.0 and not Interiors.in_cosmos_band(_player.global_position):
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	var f8_ok: bool = Interiors.in_cosmos_band(_player.global_position)
+	print("%s: F8 hotkey teleports straight into Caelia's Cosmos" % ("PASS" if f8_ok else "FAILED"))
+	ok = ok and f8_ok
+
+	print("GRASS_LAB_COSMOS: %s" % ("ok" if ok else "FAILED"))
+	get_tree().quit(0 if ok else 1)
 
 
 func _update_ui_text() -> void:
@@ -1326,6 +1563,8 @@ func _jump_to_square(target: Vector2) -> void:
 		_stop_demo()
 	_player.position = target
 	_player.velocity = Vector2.ZERO
+	if _interiors != null:
+		_interiors.apply_view(_player)
 	_player._camera.reset_smoothing()
 	if _grass != null:
 		_grass.recenter_field(target)
@@ -1351,6 +1590,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key: InputEventKey = event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
+	if InputManager.ui_blocking and key.physical_keycode != KEY_F8:
+		return
 	match key.physical_keycode:
 		KEY_1:
 			_jump_to_square(SQ1_CENTER)
@@ -1372,6 +1613,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_jump_to_square(SQ4S_CENTER)
 		KEY_9:
 			_jump_to_square(SQ5_CENTER)
+		KEY_F8:
+			_toggle_cosmos_teleport()
 		KEY_F1:
 			if key.shift_pressed:
 				_next_brood_variant = (_next_brood_variant + 1) % 3
@@ -1388,6 +1631,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_toggle_axe_in_hand()
 		KEY_P:
 			_toggle_pickaxe_in_hand()
+		KEY_C:
+			_toggle_hoe_in_hand()
 		KEY_M:
 			_apple_phenology_cycle = (_apple_phenology_cycle + 1) % 3
 			var target_ph: int = 1 if _apple_phenology_cycle == 1 else (2 if _apple_phenology_cycle == 2 else 0)
@@ -1635,9 +1880,13 @@ func _run_choreography(run_id: int) -> void:
 		get_tree().quit(0)
 		return
 
-	if _flora_capture_only:
-		if not await _run_flora_v2_captures(run_id): return
+	if _grass_capture_only:
+		if not await _run_grass_v4_captures(run_id): return
 		get_tree().quit(0)
+		return
+
+	if _cosmos_test_only:
+		await _run_cosmos_teleport_test()
 		return
 
 	# 1. SQUARE 1 — MEADOW IDLE & WALK TRAIL
@@ -1801,12 +2050,14 @@ func _run_choreography(run_id: int) -> void:
 		_grass.recenter_field(Vector2.ZERO)
 		_metrics["toroidal_recenter"] = shifted and c_before >= 0.70 and c_after >= 0.70
 
+		if not await _verify_hoe_tall_grass(run_id): return
 		if not await _run_water_v2_captures(run_id): return
 		if not await _run_water_v2_tests(run_id): return
 		_finish_test_run()
 		return
 
 	if _test_mode:
+		if not await _verify_hoe_tall_grass(run_id): return
 		_grass.recenter_field(Vector2.ZERO)
 		var probe_p: Vector2 = Vector2(12.0, 12.0)
 		_grass.stamp_rest_nest(probe_p, 14.0, 0.9, 3.0)
@@ -2519,7 +2770,7 @@ func _run_water_v2_tests(run_id: int) -> bool:
 
 func _finish_test_run() -> void:
 	var failures: int = 0
-	print("LivingGrass tufts: ", _grass.tuft_count if _grass != null else 0, " (glow: ", _grass.glow_tuft_count if _grass != null else 0, ")")
+	print("LivingGrass tufts: ", _grass.tuft_count if _grass != null else 0, " (std: ", _grass.std_tuft_count if _grass != null else 0, ", tall: ", _grass.tall_tuft_count if _grass != null else 0, ", glow: ", _grass.glow_tuft_count if _grass != null else 0, ")")
 	print("GroundSurfaces slabs: ", _surfaces.slab_count if _surfaces != null else 0, " | forest details: ", _surfaces.detail_count if _surfaces != null else 0)
 	for k: String in _metrics.keys():
 		var ok: bool = bool(_metrics[k])
@@ -2560,6 +2811,7 @@ func _toggle_pickaxe_in_hand() -> void:
 		return
 	_holding_pickaxe = not _holding_pickaxe
 	_holding_axe = false
+	_holding_hoe = false
 	if _holding_pickaxe:
 		for i: int in mini(8, _player.inventory.slots.size()):
 			var st: Dictionary = _player.inventory.slots[i] as Dictionary
@@ -2932,6 +3184,7 @@ func _ensure_sword_selected(sword_id: String = "sword_basic") -> void:
 		return
 	_holding_axe = false
 	_holding_pickaxe = false
+	_holding_hoe = false
 	_player.inventory.equipment["main_hand"] = {"id": sword_id, "count": 1}
 	for i: int in mini(8, _player.inventory.slots.size()):
 		var st: Dictionary = _player.inventory.slots[i] as Dictionary
@@ -3092,131 +3345,211 @@ func _run_finisher_v2_captures(run_id: int) -> bool:
 	return true
 
 
-# ---------------- SANCTUARY RUINS 2.0 & LIVING FLORA 2.0 (28 SPECIES) ----------------
+# ---------------- SANCTUARY RUINS 2.0 ----------------
 
-func _build_sanctuary_flora() -> void:
-	_flora_field = LivingFloraField.new()
-	_flora_field.name = "LivingFloraField"
-	add_child(_flora_field)
-	_flora_field.populate_sanctuary_ecosystem(_surfaces)
-	_metrics["sanctuary_ruins_placed"] = _flora_field.ruins.size() >= 8
-	_metrics["sanctuary_flora_28"] = _flora_field.species_placed.size() >= 28 and _flora_field.plants.size() >= 95
+func _build_sanctuary_ruins() -> void:
+	_sanctuary_ruins_root = Node2D.new()
+	_sanctuary_ruins_root.name = "SanctuaryRuins"
+	_sanctuary_ruins_root.y_sort_enabled = true
+	add_child(_sanctuary_ruins_root)
+	var placements: Array[Array] = [
+		["sanctuary_parapet", Vector2(218.0, -114.0), 0, false],
+		["ancient_dew_basin", Vector2(182.0, -94.0), 0, false],
+		["sanctuary_waymarker", Vector2(304.0, -14.0), 0, false],
+		["sanctuary_waymarker", Vector2(496.0, -16.0), 1, false],
+		["sanctuary_parapet", Vector2(496.0, -88.0), 1, false],
+		["fallen_column_drum", Vector2(546.0, -72.0), 0, false],
+		["fallen_column_drum", Vector2(264.0, 110.0), 1, true],
+		["ancient_dew_basin", Vector2(424.0, 48.0), 0, true],
+	]
+	for entry: Array in placements:
+		var r: SanctuaryRuin = SanctuaryRuin.new()
+		r.setup_ruin(String(entry[0]), entry[1] as Vector2, int(entry[2]), bool(entry[3]))
+		_sanctuary_ruins_root.add_child(r)
+		_sanctuary_ruins.append(r)
+	_metrics["sanctuary_ruins_placed"] = _sanctuary_ruins.size() >= 8
 
 
-func _select_tool_item(item_id: String) -> void:
-	if _player == null or _player.inventory == null:
-		return
-	for i: int in mini(8, _player.inventory.slots.size()):
-		var st: Dictionary = _player.inventory.slots[i] as Dictionary
-		if not st.is_empty() and String(st.get("id", "")) == item_id:
-			_player.inventory.select(i)
-			return
+# ---------------- LIVING GRASS v4 — MULTI-SPECIES & TALL GRASS SHOWCASE ----------------
 
-
-func _run_flora_v2_captures(run_id: int) -> bool:
+func _run_grass_v4_captures(run_id: int) -> bool:
 	var prev_ui: bool = _ui_layer.visible if _ui_layer != null else true
 	if _ui_layer != null:
 		_ui_layer.visible = false
 	_apply_layer_mode(0)
 	_apply_time(0)
-	_apply_weather(1) ## Gentle breeze so WorldWind sways wildflowers, bees orbit, and petals drift!
+	_apply_weather(1) ## Gentle breeze so wind waves & tall grass arch naturally!
 	_zoom_macro = false
 	_apply_camera_zoom()
-
-	# 1. Full 1x Noon Overview of Square 2: Ancient Stones 2.0, Standing Ruins, 4 Paths & All Flora Layers!
 	_player.visible = true
-	_player.facing = Vector2.RIGHT
-	_move_player_for_shot(Vector2(384.0, 0.0))
-	if not await _wait_sec(run_id, 0.35): return false
-	await _save_shot("01_sq2_sanctuary_flora_overview.png")
 
-	# 2. 2x Macro: Sanctuary Crossroads 2.0 (chisel marks, gold inlays, tilted runic stele, Sentinel Mullein, Thyme, Saxifrage & Crevice Weeds!)
+	# 1. Square 1 Full Meadow Overview (1x Noon): wildflower drifts + sweeping tall-grass belts + clearings!
+	_player.facing = Vector2.DOWN
+	_move_player_for_shot(Vector2(0.0, 6.0))
+	if not await _wait_sec(run_id, 0.35): return false
+	await _save_shot("01_sq1_meadow_v4_noon.png")
+
+	# 2. 2x Macro: Wading waist-deep through Tall Grass (Hohes Gras) with real-time leg parting curtain!
 	_zoom_macro = true
 	_apply_camera_zoom()
-	_player.visible = true
+	_player.facing = Vector2.RIGHT
+	_move_player_for_shot(Vector2(-70.0, 56.0))
+	if not await _wait_sec(run_id, 0.16): return false
+	if not await _hold(run_id, [&"move_right"], 0.95): return false
+	await _save_shot("02_tall_grass_wade_trail_2x.png")
+
+	# 3. 2x Macro: Sprinting through Tall Wildflower & Meadow Grass (dramatic wake + pollen/petal motes!)
+	_player.stamina.current = _player.stamina.max_stamina
+	_move_player_for_shot(Vector2(20.0, -48.0))
+	if not await _wait_sec(run_id, 0.12): return false
+	if not await _hold(run_id, [&"move_right", &"sprint"], 0.65): return false
+	await _save_shot("03_tall_grass_sprint_wake_2x.png")
+
+	# 4. 2x Macro: Diverse Wildflower Meadow Carpet (chamomile, daisies, buttercups, forget-me-nots, clover-rose, harebells, yarrow, dandelions!)
 	_player.facing = Vector2.DOWN
-	_move_player_for_shot(Vector2(364.0, 2.0))
-	if not await _wait_sec(run_id, 0.25): return false
-	await _save_shot("02_macro_crossroads_stones_weeds_2x.png")
+	_move_player_for_shot(Vector2(-104.0, -56.0))
+	if not await _wait_sec(run_id, 0.24): return false
+	await _save_shot("04_wildflower_diversity_2x.png")
 
-	# 3. 2x Macro (Morning Dew `t = 0.27`): NW Shrine Parapet, Star-Dew-Filled Basin, Dew-Pearl Lady's Mantle, Periwinkle & Blooming Wild Rose!
-	_player.visible = false
-	_apply_time(2) ## Morning / Dew (`0.27`) -> fills `ancient_dew_basin` & `star_mantle` pearls!
-	_move_player_for_shot(Vector2(226.0, -86.0))
-	if not await _wait_sec(run_id, 0.45): return false
-	await _save_shot("03_macro_shrine_parapet_dew_basin_2x.png")
-
-	# 4. 2x Macro: West Country Way Wildflowers (`silver_yarrow`, morning-open `way_chicory`, `waybread`, `dew_campion` & `meadow_clock` puffballs!)
-	_apply_time(0)
-	_move_player_for_shot(Vector2(204.0, 6.0))
-	if _flora_field != null:
-		_flora_field.spawn_dandelion_seeds(Vector2(196.0, 20.0), 8)
+	# 5. 2x Macro: Square -1 Riparian Brook Banks (tall cattails / Rohrkolben, plumed common reeds & yellow flag irises!)
+	_move_player_for_shot(Vector2(-356.0, -34.0))
 	if not await _wait_sec(run_id, 0.28): return false
-	await _save_shot("04_macro_west_roadside_wildflowers_2x.png")
+	await _save_shot("05_brook_cattails_reeds_2x.png")
 
-	# 5. 2x Macro: NE Ruin Spur & East Cart Track (`elderberry_shrub` in bloom & berry, `fallen_column_drum` with ivy, `bramble_thicket`, `wild_teasel` & `shadow_angelica`!)
-	_move_player_for_shot(Vector2(506.0, -56.0))
-	if _flora_field != null:
-		_flora_field.spawn_petals(Vector2(462.0, -118.0), 6, Color("f4f2fa"))
-	if not await _wait_sec(run_id, 0.28): return false
-	await _save_shot("05_macro_east_ruins_elder_bramble_2x.png")
+	# 6. 2x Macro: Square -2 Coastal Dunes (native low & tall Strandhafer with clean sand integration!)
+	_move_player_for_shot(Vector2(-600.0, 12.0))
+	if not await _wait_sec(run_id, 0.24): return false
+	await _save_shot("06_coastal_strandhafer_2x.png")
 
-	# 6. 2x Macro: South Stepping-Stone Garden & Damp Woodland Edge (`wild_rose_briar` with ruby rosehips, `meadowsweet`, `ostrich_fern`, `shadow_arum` & `wood_sorrel`!)
-	_move_player_for_shot(Vector2(476.0, 70.0))
-	if not await _wait_sec(run_id, 0.25): return false
-	await _save_shot("06_macro_south_stepping_woodland_edge_2x.png")
+	# 7. 2x Macro: Square 2 Stone Slabs & Paths (clean asymmetric clearance — tall grass NEVER covers slabs!)
+	_move_player_for_shot(Vector2(296.0, 62.0))
+	if not await _wait_sec(run_id, 0.24): return false
+	await _save_shot("07_stone_seam_clearance_2x.png")
 
-	# 7. 1x Golden Hour across Square 2: Warm Gold Inlay Catchlights & Real-Time Swaying `SunShadows`!
+	# 8. 2x Macro: Square 3 Woodland Floor (eagle-ferns, fiddleheads, bilberry, fallen-leaf sedges, pin-shrooms!)
+	_move_player_for_shot(Vector2(772.0, 38.0))
+	if not await _wait_sec(run_id, 0.24): return false
+	await _save_shot("08_woodland_ferns_2x.png")
+
+	# 9. Golden Hour (1x): Backlit subsurface translucency (SSS) across Square 1 tall grass & seed plumes!
 	_zoom_macro = false
 	_apply_camera_zoom()
-	_player.visible = true
-	_player.facing = Vector2.UP
 	_apply_time(1)
 	_apply_weather(1)
-	_move_player_for_shot(Vector2(384.0, 0.0))
+	_move_player_for_shot(Vector2(0.0, 24.0))
 	if not await _wait_sec(run_id, 0.35): return false
-	await _save_shot("07_sq2_golden_hour_sun_shadows.png")
+	await _save_shot("09_golden_hour_backlit_tall.png")
 
-	# 8. 1x Night Bioluminescence & Nyctinasty: Glowing Mullein Torches, Turquoise Saxifrage, Violet Columbine, Folded Sorrel & Runic Waymarkers!
+	# 10. Night Dew & Moon-Grass Glow (1x): Velvety moonlight balance + silver plumes & dew-pearl glimmer!
 	_apply_time(3)
 	_apply_weather(0)
-	if not await _wait_sec(run_id, 0.45): return false
-	await _save_shot("08_sq2_night_mystic_glow.png")
+	_move_player_for_shot(Vector2(0.0, 24.0))
+	if not await _wait_sec(run_id, 0.35): return false
+	await _save_shot("10_night_dew_moon_grass.png")
 
-	# 9. 2x Live Body-Parting & Dandelion Puff Interaction: Ellie striding through tall herbs & puffing a `meadow_clock`!
+	# 11. Rain & Mirror Puddles (1x): Wet droop + sky specular + tall-grass puddle clearance!
+	_apply_time(0)
+	_apply_weather(2)
+	_move_player_for_shot(Vector2(0.0, 14.0))
+	if not await _wait_sec(run_id, 0.35): return false
+	await _save_shot("11_rain_wet_tall_grass.png")
+
+	# 12. 2x Macro: Clearing a crisp pocket inside waist-high Tall Grass using the Hoe (`hoe_basic`)!
+	InputManager.using_mouse = false
 	_apply_time(0)
 	_apply_weather(1)
 	_zoom_macro = true
 	_apply_camera_zoom()
-	_player.visible = true
-	_move_player_for_shot(Vector2(544.0, 88.0))
+	var target_spot: Vector2 = _find_dense_tall_spot(Vector2(-30.0, 74.0))
+	_move_player_for_shot(target_spot + Vector2(-18.0, 0.0))
 	_player.facing = Vector2.RIGHT
-	if _flora_field != null:
-		_flora_field.spawn_dandelion_seeds(Vector2(536.0, 74.0), 12)
-		_flora_field.spawn_petals(Vector2(558.0, 70.0), 6, Color("f4f2fa"))
-	if not await _hold(run_id, [&"move_right"], 0.22): return false
-	await _save_shot("09_interactive_walk_parting_and_puff_2x.png")
+	if not _holding_hoe:
+		_toggle_hoe_in_hand()
+	if not await _wait_sec(run_id, 0.16): return false
+	_player.attack.attack(Vector2.RIGHT)
+	if not await _wait_sec(run_id, 0.50): return false
+	_move_player_for_shot(target_spot + Vector2(-8.0, 4.0))
+	_player.facing = Vector2.RIGHT
+	_player.attack.attack(Vector2.RIGHT)
+	if not await _wait_sec(run_id, 0.18): return false
+	await _save_shot("12_hoe_cleared_tall_grass_2x.png")
+	if _holding_hoe:
+		_toggle_hoe_in_hand()
 
-	# 10. 2x Live Sickle Harvest & Dew-Scoop Interaction: Sickle cutting `nettle_clump` -> `nettle_fiber` ItemDrop + realistic green stubble!
-	_apply_time(2)
-	_select_tool_item("sickle_basic")
-	_move_player_for_shot(Vector2(218.0, -96.0))
-	_player.facing = Vector2.UP
-	if _flora_field != null:
-		for fp: LivingFloraProp in _flora_field.plants:
-			if is_instance_valid(fp) and fp.species_id == "nettle_clump" and fp.position.distance_to(Vector2(238.0, -118.0)) < 12.0:
-				fp.cut_with_sickle(_player.global_position)
-				fp.cut_with_sickle(_player.global_position)
-				break
-		for r: SanctuaryRuin in _flora_field.ruins:
-			if is_instance_valid(r) and r.ruin_kind == "ancient_dew_basin" and r.position.distance_to(Vector2(182.0, -94.0)) < 12.0:
-				r._rpc_scoop_dew(1)
-				break
-	if not await _wait_sec(run_id, 0.22): return false
-	await _save_shot("10_interactive_sickle_and_dew_harvest_2x.png")
-
-	_zoom_macro = false
-	_apply_camera_zoom()
 	if _ui_layer != null:
 		_ui_layer.visible = prev_ui
+	_zoom_macro = false
+	_apply_camera_zoom()
+	return true
+
+
+func _find_dense_tall_spot(near_pos: Vector2) -> Vector2:
+	if _grass == null or _grass._tall_tufts.is_empty():
+		return near_pos
+	var best_pos: Vector2 = near_pos
+	var best_d2: float = INF
+	for tref: LivingGrass.TallTuftRef in _grass._tall_tufts:
+		if tref.removed:
+			continue
+		if absf(tref.pos.x) > 155.0 or absf(tref.pos.y) > 105.0:
+			continue
+		var d2: float = tref.pos.distance_squared_to(near_pos)
+		if d2 < best_d2:
+			best_d2 = d2
+			best_pos = tref.pos
+	return best_pos
+
+
+func _verify_hoe_tall_grass(run_id: int) -> bool:
+	if _grass == null or _player == null or _player.attack == null:
+		return true
+	InputManager.using_mouse = false
+	var spot: Vector2 = _find_dense_tall_spot(Vector2(-24.0, 74.0))
+	var stand_at: Vector2 = spot + Vector2(-16.0, 0.0)
+	_move_player_for_shot(stand_at)
+	_player.facing = Vector2.RIGHT
+	var tall_before: int = _grass.tall_tuft_count
+	var std_before: int = _grass.std_tuft_count
+	var had_tall: bool = _grass.has_tall_tuft_near(spot, 8.0)
+
+	# 1. Swinging the sword must NOT remove tall grass!
+	_ensure_sword_selected("sword_basic")
+	if not await _wait_sec(run_id, 0.10): return false
+	while Time.get_ticks_msec() < _player.attack._server_ready_msec + 20:
+		await get_tree().process_frame
+	_player.attack.attack(Vector2.RIGHT)
+	if not await _wait_sec(run_id, 0.55): return false
+	var sword_safe: bool = _grass.tall_tuft_count == tall_before
+
+	# 2. Swinging the hoe (`hoe_basic`) MUST remove tall grass while preserving standard turf underneath!
+	if not _holding_hoe:
+		_toggle_hoe_in_hand()
+	if not await _wait_sec(run_id, 0.10): return false
+	while Time.get_ticks_msec() < _player.attack._server_ready_msec + 20:
+		await get_tree().process_frame
+	_player.attack.attack(Vector2.RIGHT)
+	if not await _wait_sec(run_id, 0.55): return false
+	var tall_after: int = _grass.tall_tuft_count
+	var std_after: int = _grass.std_tuft_count
+	var cleared_here: bool = not _grass.has_tall_tuft_near(spot, 6.0)
+	var tallness_dropped: bool = _grass.tallness_at(spot) < 0.35
+	var exported_ok: bool = _grass.export_removed_tall().size() == (tall_before - tall_after)
+	if _holding_hoe:
+		_toggle_hoe_in_hand()
+
+	var ok: bool = (
+		had_tall
+		and sword_safe
+		and tall_after < tall_before
+		and std_after == std_before
+		and cleared_here
+		and tallness_dropped
+		and exported_ok
+	)
+	if not ok:
+		print("HOE_DEBUG had=%s sword_safe=%s tall=%d->%d std=%d->%d cleared=%s tallness=%.2f exp=%d" % [
+			str(had_tall), str(sword_safe), tall_before, tall_after, std_before, std_after,
+			str(cleared_here), _grass.tallness_at(spot), _grass.export_removed_tall().size(),
+		])
+	_metrics["hoe_clears_tall_grass"] = ok
 	return true

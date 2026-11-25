@@ -17,17 +17,17 @@ import menuIconsGlow from "../../assets/ui/menu_icons_glow.png?url";
 import avatarLichtung from "./art/avatar_lichtung.png?url";
 import avatarLeere from "./art/avatar_leere.png?url";
 import castSheet from "../../assets/ui/loading_cast.png?url";
-import sceneRiver from "../../docs/img/rivers_world.png?url";
-import sceneShore from "../../docs/img/lake_shore.png?url";
-import sceneTerraces from "../../docs/img/river_banks_v2.png?url";
+import sceneRiver from "../../docs/img/windkap_v0102_estuary.png?url";
+import sceneShore from "../../docs/img/windkap_v0102_beach.png?url";
+import sceneTerraces from "../../docs/img/windkap_v0102_suedkap.png?url";
 import sceneLake from "../../docs/img/lake_night.png?url";
 import sceneGlow from "../../docs/img/river_night_glow.png?url";
 
 // Only landscapes: no buildings, characters or UI in the background.
 const SCENES = [
-  { src: sceneRiver, name: "Tannen am Fluss" },
-  { src: sceneShore, name: "Schleierweiden am See" },
-  { src: sceneTerraces, name: "Terrassen am Rand der Leere" },
+  { src: sceneRiver, name: "Erlenbach-Mündung am Windkap" },
+  { src: sceneShore, name: "Windstrand der Silberbucht" },
+  { src: sceneTerraces, name: "Übergang ins Südkap" },
   { src: sceneLake, name: "Glimmende Ufer bei Nacht" },
   { src: sceneGlow, name: "Leuchtende Strömung" },
 ];

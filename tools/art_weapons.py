@@ -40,8 +40,9 @@ RAMPS = {  # dark .. light; bevel: lit rim = last, shaded rim = first, inside = 
     "timber": [hexc(c) for c in ("382538", "5c4048", "82605c", "a68378")],  # plain, humble wooden shaft for basic tools
     "cord": [hexc(c) for c in ("483844", "6e5a56", "967e6a", "baa288")],  # simple fiber/cord lashing
     "starlight": [hexc(c) for c in ("1b4f5c", "2e8892", "6ee8dc", "dcfff8")],  # celestial starlight blade from Caelia's altar
+    "tide_steel": [hexc(c) for c in ("1c3648", "31647a", "60a8be", "bce8f2", "e8fcff")],  # Sturmhafen harbor guard coastal steel
 }
-GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8"), "sword_rift": hexc("c07bff"), "blade_starlight": hexc("fff0b0")}
+GEM = {"sword_basic": hexc("b99bff"), "sword_iron": hexc("78f4e6"), "sword_void": hexc("ff4fd8"), "sword_rift": hexc("c07bff"), "blade_starlight": hexc("fff0b0"), "harbor_guard_sword": hexc("4df2e0")}
 
 
 # ------------------------------------------------------------------ geometry (item frame: pointing right, y down)
@@ -345,6 +346,7 @@ def bone_fork(w, h, tf):
 ITEMS = {  # id: (size, pivot in the item frame, builder, steel ramp, icon fit: (rotation, scale, offset))
     "sword_basic": ((34, 12), (4.5, 6.0), sword(21, "sword_basic", "steel"), "steel", (-45.0, 0.46, (1.6, 14.4))),
     "sword_iron": ((36, 12), (4.5, 6.0), sword(23, "sword_iron", "mint"), "mint", (-45.0, 0.44, (1.6, 14.4))),
+    "harbor_guard_sword": ((38, 12), (4.5, 6.0), sword(25, "harbor_guard_sword", "tide_steel"), "tide_steel", (-45.0, 0.42, (1.6, 14.4))),
     "blade_starlight": ((48, 16), (5.0, 8.0), starlight_sword, "starlight", (-45.0, 0.33, (2.9, 13.1))),
     "sword_void": ((42, 12), (4.5, 6.0), sword(29, "sword_void", "void"), "void", (-45.0, 0.4, (1.6, 14.4))),
     "sword_rift": ((50, 16), (4.5, 7.0), rift_sword, "raven", (-45.0, 0.4, (1.4, 14.4))),

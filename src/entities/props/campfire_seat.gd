@@ -15,8 +15,11 @@ func sit_direction() -> Vector2:
 	return Vector2.RIGHT.rotated(float(sit_sector()) * PI / 4.0)
 
 
+const FIRE_STUMP: Vector2 = Vector2(84.0, 64.0)
+const FIRE_LOG: Vector2 = Vector2(34.0, 92.0)
+
 func seat_position() -> Vector2:
-	return hut.global_position + (KnightFireScene.STUMP + Vector2(0, 3) if which == "east" else KnightFireScene.LOG + Vector2(4, 3))
+	return hut.global_position + (FIRE_STUMP + Vector2(0, 3) if which == "east" else FIRE_LOG + Vector2(4, 3))
 
 
 func approach_position() -> Vector2:

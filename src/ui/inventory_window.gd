@@ -65,6 +65,44 @@ var _hero_sector: int = 2
 var _refuse_text: String = "" ## "SCHON EIN ARMBAND ANGELEGT": shown under the slot that said no
 var _refuse_slot: ItemSlot
 var _refuse_t: float = 0.0
+var embedded_in_menu: bool = false ## true when hosted inside GameMenu ('Der Feldcodex')
+
+
+func set_embedded_active(open: bool) -> void:
+	_opening = open
+	InputManager.inventory_open = open
+	if open:
+		_sync_bonus_bag_slots()
+		_open_t = 0.65
+		visible = true
+		_hover = null
+	else:
+		_open_t = 0.0
+		visible = false
+		if _inventory != null:
+			_inventory.request("stow", [0])
+		if _tooltip != null:
+			_tooltip.hide()
+
+
+func _sync_bonus_bag_slots() -> void:
+	if _inventory == null:
+		return
+	var want_bag: int = _inventory.backpack_size() if _inventory.has_method("backpack_size") else InventoryComponent.BACKPACK_SIZE
+	var have_bag: int = 0
+	for t: Dictionary in _tags:
+		if String(t.get("group", "")) == "bag":
+			have_bag += 1
+	if want_bag <= have_bag:
+		return
+	_rows = ceili(float(want_bag) / float(COLUMNS))
+	for i: int in range(have_bag, want_bag):
+		var row: int = i / COLUMNS
+		var col: int = i % COLUMNS
+		_make_slot("inv", InventoryComponent.HOTBAR_SIZE + i, {
+			"group": "bag", "row": row, "col": col,
+			"delay": 0.15 + float(row) * 0.04, "len": 14.0,
+		})
 
 
 func _ready() -> void:
@@ -166,6 +204,7 @@ func _make_slot(kind: String, ref: Variant, tag: Dictionary) -> void:
 
 
 func _on_inventory_changed() -> void:
+	_sync_bonus_bag_slots()
 	for i: int in _slots.size():
 		var now: Dictionary = _inventory.stack_at(_slots[i].kind, _slots[i].ref)
 		if now != _last[i]:
@@ -178,12 +217,12 @@ func _on_inventory_changed() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	if InputManager.inventory_pressed() and not InputManager.menu_open and not InputManager.map_open and not (InputManager.skills_open or InputManager.progress_open) and get_tree().get_first_node_in_group("board_window") == null:
+	if not embedded_in_menu and InputManager.inventory_pressed() and not InputManager.menu_open and not InputManager.map_open and not (InputManager.skills_open or InputManager.progress_open) and get_tree().get_first_node_in_group("board_window") == null:
 		_set_open(not _opening) ## (not while a town window hangs on the screen)
 	_open_t = move_toward(_open_t, 1.0 if _opening else 0.0, delta / (OPEN_SECONDS if _opening else CLOSE_SECONDS))
 	visible = _open_t > 0.0
 	InputManager.item_keys_claimed = false
-	if _opening and _open_t >= 0.7:
+	if _opening and _open_t >= (0.2 if embedded_in_menu else 0.7):
 		_item_keys()
 	if not visible:
 		return
@@ -207,6 +246,8 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if embedded_in_menu:
+		return
 	if _opening and event.is_action_pressed("ui_cancel"):
 		_set_open(false)
 		get_viewport().set_input_as_handled()
@@ -217,6 +258,8 @@ func _gui_input(event: InputEvent) -> void:
 	var click: InputEventMouseButton = event as InputEventMouseButton
 	if click == null or not click.pressed or not _opening or _inventory == null or _inventory.held.is_empty():
 		return
+	if embedded_in_menu and click.position.y < GameMenu.RAIL_H:
+		return
 	if click.button_index == MOUSE_BUTTON_LEFT:
 		_inventory.request("throw", [true])
 	elif click.button_index == MOUSE_BUTTON_RIGHT:
@@ -224,7 +267,7 @@ func _gui_input(event: InputEvent) -> void:
 	accept_event()
 
 
-## Number keys, Q and R while the window is open (the hotbar must not also select on a number key that was used here).
+## Number keys, X (or Q standalone) and R while the window is open (the hotbar must not also select on a number key that was used here).
 func _item_keys() -> void:
 	var over: bool = _hover != null and is_instance_valid(_hover)
 	var holding: bool = _inventory != null and not _inventory.held.is_empty()
@@ -236,13 +279,28 @@ func _item_keys() -> void:
 			elif holding:
 				_inventory.request("hotkey", ["held", 0, n])
 	var all: bool = Input.is_key_pressed(KEY_CTRL)
-	if Input.is_action_just_pressed("item_throw"):
+	var throw_pressed: bool = (Input.is_physical_key_pressed(KEY_X) and false) if embedded_in_menu else Input.is_action_just_pressed("item_throw")
+	if throw_pressed:
 		if holding:
 			_inventory.request("throw", [all])
 		elif over:
 			_inventory.request("dropslot", [_hover.kind, _hover.ref, all])
 	if Input.is_action_just_pressed("item_sort"):
 		_inventory.request("sort", [0])
+
+
+func _input(event: InputEvent) -> void:
+	if not embedded_in_menu or not _opening or _inventory == null:
+		return
+	var ke: InputEventKey = event as InputEventKey
+	if ke != null and ke.pressed and not ke.echo and ke.keycode == KEY_X:
+		var all: bool = ke.ctrl_pressed
+		if not _inventory.held.is_empty():
+			_inventory.request("throw", [all])
+			get_viewport().set_input_as_handled()
+		elif _hover != null and is_instance_valid(_hover):
+			_inventory.request("dropslot", [_hover.kind, _hover.ref, all])
+			get_viewport().set_input_as_handled()
 
 
 func _set_open(open: bool) -> void:
@@ -252,6 +310,7 @@ func _set_open(open: bool) -> void:
 	InputManager.ui_blocking = open
 	InputManager.inventory_open = open
 	if open:
+		_sync_bonus_bag_slots()
 		_hover = null
 	else:
 		if _inventory != null:
@@ -369,7 +428,8 @@ func _look_at_cursor() -> void:
 func _draw() -> void:
 	var void_level: float = VineStyle.void_amount()
 	var fade: float = _open_t
-	draw_texture_rect(_vignette, Rect2(Vector2.ZERO, size), false, Color(1, 1, 1, fade))
+	if not embedded_in_menu:
+		draw_texture_rect(_vignette, Rect2(Vector2.ZERO, size), false, Color(1, 1, 1, fade))
 	draw_texture_rect(_pool, Rect2(-30.0, 40.0, 360.0, 280.0), false, Color(1, 1, 1, fade))
 	draw_texture_rect(_pool, Rect2(_bag_tip() - 60.0, 40.0, size.x - _bag_tip() + 120.0, 250.0), false, Color(1, 1, 1, fade))
 	if void_level > 0.01:
@@ -394,13 +454,14 @@ func _draw() -> void:
 	_draw_tag("AUSRÜSTUNG", Vector2(26, _canopy_y(26.0)), 0.25, void_level)
 	var bag_tag: Vector2 = Vector2(size.x - 26, _row_y(0, size.x - 26.0))
 	_draw_tag("RUCKSACK", bag_tag, 0.3, void_level)
+	var bag_cap: int = _inventory.backpack_size() if (_inventory != null and _inventory.has_method("backpack_size")) else InventoryComponent.BACKPACK_SIZE
 	var used: int = 0
-	for i: int in InventoryComponent.BACKPACK_SIZE:
-		if _inventory != null and not _inventory.stack_at("inv", InventoryComponent.HOTBAR_SIZE + i).is_empty():
+	for i: int in bag_cap:
+		if _inventory != null and (InventoryComponent.HOTBAR_SIZE + i) < _inventory.slots.size() and not _inventory.stack_at("inv", InventoryComponent.HOTBAR_SIZE + i).is_empty():
 			used += 1
-	var room: String = "%d/%d" % [used, InventoryComponent.BACKPACK_SIZE] ## how full the rucksack is
+	var room: String = "%d/%d" % [used, bag_cap] ## how full the rucksack is
 	var room_fade: float = clampf((_open_t - 0.55) / 0.3, 0.0, 1.0)
-	PixelText.draw(self, room, Vector2i(roundi(bag_tag.x) - PixelText.width(room) / 2, roundi(bag_tag.y) + 24), Color(Color("ff8a96") if used >= InventoryComponent.BACKPACK_SIZE else UiStyle.TEXT_DIM, 0.85 * room_fade), Color(VineStyle.OUTLINE, room_fade))
+	PixelText.draw(self, room, Vector2i(roundi(bag_tag.x) - PixelText.width(room) / 2, roundi(bag_tag.y) + 24), Color(Color("ff8a96") if used >= bag_cap else UiStyle.TEXT_DIM, 0.85 * room_fade), Color(VineStyle.OUTLINE, room_fade))
 
 	var held: Dictionary = _inventory.held if _inventory != null else {}
 	for i: int in _slots.size():
@@ -469,7 +530,7 @@ func _draw_legend(fade: float, void_level: float) -> void:
 		return
 	var holding: bool = not _inventory.held.is_empty()
 	var over: ItemSlot = _hover if _hover != null and is_instance_valid(_hover) and not _hover.stack().is_empty() else null
-	var throw_key: String = VineStyle.key_name("item_throw", "Q")
+	var throw_key: String = "X" if embedded_in_menu else VineStyle.key_name("item_throw", "Q")
 	var rows: Array = [] ## rows of [keys, word]
 	if holding:
 		rows.append([[[VineStyle.MOUSE_LEFT], "ABLEGEN"], [[VineStyle.MOUSE_RIGHT], "EINES"], [["1-8"], "HOTBAR"]])
@@ -482,6 +543,8 @@ func _draw_legend(fade: float, void_level: float) -> void:
 			second = "ANLEGEN"
 		rows.append([[[VineStyle.MOUSE_LEFT], "NEHMEN"], [[VineStyle.MOUSE_RIGHT], second], [["UMSCH", VineStyle.MOUSE_LEFT], "SCHNELL"]])
 		rows.append([[["1-8"], "HOTBAR"], [[throw_key], "WERFEN"], [["STRG", throw_key], "ALLES"]])
+	elif embedded_in_menu:
+		rows.append([[[VineStyle.key_name("item_sort", "R")], "SORTIEREN"]])
 	else:
 		rows.append([[[VineStyle.key_name("item_sort", "R")], "SORTIEREN"], [[VineStyle.key_name("inventory", "TAB")], "SCHLIESSEN"]])
 	for line: int in rows.size():

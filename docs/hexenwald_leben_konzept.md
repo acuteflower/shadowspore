@@ -1,5 +1,8 @@
 # Hexenwald: mehr Leben (Konzept und Stand, 2026-11-10)
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 Gehört zu `docs/hexenwald_konzept.md` (Gebiet, Boden, Gelände, Dämmer) und `docs/hexenwald_nebel_konzept.md` (Nebel, Trugbilder). Ziel: Der Hexenwald soll so lebendig wirken wie die Wiese, aber eigen bleiben. Er soll bewegt, geschichtet und mit Übergängen gestaltet sein, nicht einfach nur voller.
 
 ## 1. Befund (Ausgangslage)

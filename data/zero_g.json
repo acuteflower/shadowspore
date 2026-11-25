@@ -1,0 +1,46 @@
+{
+	"center": [1100.0, 1100.0],
+	"arrival": [1100.0, 1390.0],
+	"room_size": [2200.0, 2200.0],
+	"motion": {
+		"cruise_speed": 82.0,
+		"glide_speed": 158.0,
+		"precision_speed": 34.0,
+		"accel": 195.0,
+		"glide_accel": 290.0,
+		"counter_thrust_mult": 2.15,
+		"drag": 1.12,
+		"brake_drag": 4.9,
+		"settle_speed": 7.5,
+		"settle_drag": 3.4,
+		"boost_impulse": 36.0,
+		"boost_cooldown": 0.42,
+		"step_range": 86.0,
+		"step_carry_ratio": 0.65,
+		"step_exit_speed": 122.0,
+		"brake_dot_threshold": -0.38,
+		"brake_min_speed": 38.0,
+		"glide_enter_speed": 106.0,
+		"drift_enter_speed": 14.0
+	},
+	"horizon": {
+		"soft_radius": 760.0,
+		"hard_radius": 1040.0,
+		"return_accel": 340.0,
+		"tangential_damp": 0.45,
+		"bark_radius": 835.0
+	},
+	"idle_bob": {
+		"amp_y": 2.6,
+		"amp_x": 1.1,
+		"freq_y": 1.25,
+		"freq_x": 0.62
+	},
+	"camera": {
+		"lead_px": 22.0,
+		"glide_lead_px": 40.0,
+		"lag_rate": 3.0,
+		"caelia_pull_radius": 240.0,
+		"caelia_pull_weight": 0.22
+	}
+}

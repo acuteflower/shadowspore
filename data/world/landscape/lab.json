@@ -1,0 +1,77 @@
+{
+	"_doc": "Landschaft des Zonenlabors (isolierte Testfixture labor_wiese <-> labor_wald in Kontinent-Tiles).",
+	"turf": {
+		"forest": {
+			"accents": 0.11,
+			"kinds": ["fern", "mushroom", "tuft", "clump", "stone"]
+		}
+	},
+	"stands": [
+		{
+			"id": "kronenwald",
+			"name": "DER KRONENWALD",
+			"soil": true,
+			"spacing": 7.2,
+			"edge": 5.0,
+			"seed": 101,
+			"mix": [
+				{"species": "valley_oak", "w": 0.68, "stages": [3, 4, 5]},
+				{"species": "silver_birch", "w": 0.32, "stages": [2, 3, 4]}
+			],
+			"outline": [
+				[1122, 926], [1146, 918], [1180, 902], [1226, 892], [1268, 904],
+				[1292, 938], [1292, 978], [1274, 1008], [1232, 1018], [1186, 1012],
+				[1152, 994], [1142, 956], [1124, 948]
+			],
+			"glades": [
+				[[1202, 938], [1242, 938], [1242, 972], [1202, 972]]
+			]
+		},
+		{
+			"id": "apfelwiese",
+			"name": "APFELWIESE",
+			"soil": false,
+			"spacing": 9.0,
+			"edge": 3.5,
+			"seed": 203,
+			"mix": [
+				{"species": "wild_apple", "w": 1.0, "stages": [2, 3, 4]}
+			],
+			"outline": [
+				[1028, 920], [1072, 916], [1082, 942], [1034, 946]
+			]
+		},
+		{
+			"id": "birkeninsel",
+			"name": "BIRKENINSEL",
+			"soil": false,
+			"spacing": 6.5,
+			"edge": 3.5,
+			"seed": 307,
+			"mix": [
+				{"species": "silver_birch", "w": 1.0, "stages": [2, 3, 4]}
+			],
+			"outline": [
+				[1030, 980], [1068, 978], [1072, 1006], [1032, 1008]
+			]
+		}
+	],
+	"ways": [
+		{
+			"kind": "path",
+			"seed": 77,
+			"damp": 0.4,
+			"pts": [[1064, 968], [1106, 966], [1150, 966], [1192, 965], [1226, 956]]
+		}
+	],
+	"moss": [
+		[1222, 955, 14, 10],
+		[1250, 992, 12, 8]
+	],
+	"hollows": [
+		[1055, 960, 16, 11]
+	],
+	"trees": [
+		{"species": "valley_oak", "pos": [1096, 950], "stage": 5, "seed": 901}
+	]
+}

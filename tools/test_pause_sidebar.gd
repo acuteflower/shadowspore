@@ -136,7 +136,14 @@ func _run() -> void:
 		return
 
 	var hud: CanvasLayer = player.get("_hud") as CanvasLayer
+	var gm_node: Node = hud.get_node_or_null("GameMenu")
+	if gm_node != null:
+		gm_node.set_process(false)
+		gm_node.set_process_input(false)
+		gm_node.set_process_unhandled_input(false)
+	InputManager.unified_menu = false
 	var pause: PauseMenu = hud.get_node("PauseMenu") as PauseMenu
+	pause.embedded_in_menu = false
 	pause._coop_last_fetch_msec = Time.get_ticks_msec()
 	var sidebar: SocialSidebarScript = pause.get("_sidebar") as SocialSidebarScript
 	_check(sidebar != null, "PauseMenu creates SocialSidebar child")

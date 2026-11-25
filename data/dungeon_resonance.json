@@ -1,0 +1,16 @@
+{
+	"_doc": "Schleierresonanz & Echosplitter-Regeln (docs/dungeon_konzept.md Abschnitt 4). 06:00 & 18:00 UTC je +2 bis Cap 4 + Ruhebonus bei Überlauf.",
+	"max_charges": 4,
+	"charges_per_refresh": 2,
+	"refresh_offset_sec_utc": 21600,
+	"refresh_interval_sec": 43200,
+	"rest_max_units": 8,
+	"rest_units_per_double": 2,
+	"max_catchup_epochs": 60,
+	"weekly_echo_cap": 120,
+	"weekly_reset_offset_sec_utc": 367200,
+	"weekly_interval_sec": 604800,
+	"group_sparks": 3,
+	"ready_check_seconds": 20.0,
+	"exit_grace_seconds": 90.0
+}

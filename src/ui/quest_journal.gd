@@ -28,6 +28,51 @@ var _ribbon_goal: float = 0.0
 var _read_key: String = ""
 var _map: MapWindow
 var _layer: CanvasLayer
+var embedded_in_menu: bool = false
+
+
+func set_embedded_active(on: bool) -> void:
+	if on:
+		if _tracked == null:
+			return
+		_owns_input = true
+		_closing = false
+		_still = true
+		_tracked.journal_opened = true
+		InputManager.journal_open = true
+		_archive = _tracked.journal_archive
+		_selected_id = _tracked.journal_page
+		_art.opening = 1.0
+		_art.turn = 1.0
+		_art.ink = 1.0
+		_art.seal_flash = 0.0
+		if _veil != null:
+			_veil.visible = false
+		if _close_button != null:
+			_close_button.visible = false
+		if _art != null:
+			_art.hide_controls_hint = true
+		show()
+		_layer.show()
+		_refresh()
+		_art.ribbon = _ribbon_goal
+		_render_motion()
+	else:
+		_owns_input = false
+		_closing = false
+		_pending.clear()
+		if _confirm != null:
+			_confirm.hide()
+		hide()
+		if _layer != null:
+			_layer.hide()
+		if _veil != null:
+			_veil.visible = true
+		if _close_button != null:
+			_close_button.visible = true
+		if _art != null:
+			_art.hide_controls_hint = false
+		InputManager.journal_open = false
 
 var _veil: ColorRect
 var _art: QuestJournalArt
@@ -44,6 +89,7 @@ var _abandon_button: Button
 var _confirm: PanelContainer
 var _confirm_text: Label
 var _cancel_button: Button
+var _close_button: Button
 
 
 func _ready() -> void:
@@ -88,6 +134,7 @@ func _ready() -> void:
 		_tabs.append(tab)
 	var back: Button = _button(_paper, "J  Schließen", _request_close, "close", "close")
 	_place(_paper, back, Rect2(493, 28, 81, 19))
+	_close_button = back
 
 	_filters = HBoxContainer.new()
 	_filters.add_theme_constant_override("separation", 4)
@@ -293,6 +340,11 @@ func _render_motion() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if embedded_in_menu:
+		if _owns_input and not _pending.is_empty() and event.is_action_pressed("ui_cancel"):
+			_cancel_abandon()
+			get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("quest_journal"):
 		if _owns_input:
 			if _closing:

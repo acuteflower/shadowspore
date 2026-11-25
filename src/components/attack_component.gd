@@ -21,7 +21,11 @@ const TRAIL_STEPS: int = 14
 const TRAIL_EDGE: Color = Color("aac8ff")
 const TRAIL_CORE: Color = Color("f2f7ff")
 const MOTE_COLORS: Array[Color] = [Color("f2f7ff"), Color("aac8ff"), Color("c9a8ff"), Color("8a5cf0")] ## what a swing sheds: white, ice, lilac, violet
+const SWORD_STEEL_MOTES: Array[Color] = [Color("ffffff"), Color("e2f2ff"), Color("9ec0ee"), Color("5672ae")] ## normal tempered-steel sword sparkles
 const MOTES_PER_SEC: float = 110.0
+const SWORD_MOTES_PER_SEC: float = 56.0
+const MAX_ACTIVE_SLASHES: int = 6
+const SLASH_BACK_SORT_Y: float = -5.0 ## Y-sort behind Ellie's Sprite2D (y=0) but above her back sword (-6) and North enemies
 const BURST_LIFE: float = 0.2 ## seconds the shock crescent at the end of a swing lasts
 const SPARK_TEXTURE: Texture2D = preload("res://assets/fx/puff.png")
 const DEPTH_SQUASH: float = GripRig.SINP ## how much a direction toward the camera is shortened on screen (the hero renderer's camera)
@@ -154,6 +158,11 @@ var _trail_edge: Color = TRAIL_EDGE
 var _trail_core: Color = TRAIL_CORE
 var _sound_dir: String = ""
 var _idle_glint: bool = false
+var _is_sword: bool = false
+var _has_custom_fx_colors: bool = false
+var _active_slashes: Array[SwordSlashFx] = []
+var _slash_back: Node2D ## Y-sorted behind Ellie's body & silver hair when swinging North/NW/NE or back half of Whirlwind
+var _slash_front: Node2D ## Drawn in front of Ellie & South enemies when swinging E/SE/S/SW/W or front half of Whirlwind
 var _in_finisher: bool = false
 var _finisher_ribbon: bool = false
 var _stamina: StaminaComponent
@@ -171,12 +180,24 @@ func _ready() -> void:
 	if inventory == null:
 		inventory = get_node("../InventoryComponent") as InventoryComponent
 	_trail.draw.connect(_draw_trail)
+	_trail.material = Unlit.material()
+	_trail.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_arm.draw.connect(_draw_arm)
 	_arm_sort = Node2D.new()
 	_arm_sort.name = "ArmSort"
 	add_child(_arm_sort)
 	move_child(_arm_sort, _hand.get_index() + 1)
 	_arm.reparent(_arm_sort, false)
+	_slash_back = Node2D.new()
+	_slash_back.name = "SlashBack"
+	_slash_back.position = Vector2(0.0, SLASH_BACK_SORT_Y)
+	_slash_back.z_index = 0
+	add_child(_slash_back)
+	_slash_front = Node2D.new()
+	_slash_front.name = "SlashFront"
+	_slash_front.position = Vector2.ZERO
+	_slash_front.z_index = 1
+	add_child(_slash_front)
 	_stamina = get_node_or_null("../StaminaComponent") as StaminaComponent
 	_talismans = get_node_or_null("../TalismanComponent") as TalismanComponent
 	_skills = get_node_or_null("../SkillTreeComponent") as SkillTreeComponent
@@ -192,6 +213,7 @@ func _process(delta: float) -> void:
 		_freeze -= delta ## hit stop: the swing stands still for a moment, the world runs on
 	else:
 		_advance(delta)
+		_step_slashes(delta)
 		if _charging:
 			_charge_time += delta * _charge_rate()
 			_charge_effects(delta)
@@ -344,6 +366,7 @@ func prepare_for_finisher(dir: Vector2, weapon_id: String, refine_lvl: int) -> v
 	_burst_done = true
 	_trail_age = TRAIL_FADE
 	_tips.clear()
+	_clear_sword_slashes()
 	_swing_from = _dir
 	aim_dir = dir.normalized() if dir.length_squared() > 0.001 else Vector2.RIGHT
 	_since_swing = 0.0
@@ -753,14 +776,25 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 	if _talismans != null:
 		damage *= _talismans.damage_factor(bool(step.get("heavy", false))) ## Wuchtreif and the like (host: from its own copy of her bag)
 		damage *= _talismans.dive_factor() ## Rissfeder: the first blow after a blink
+		var owner_p_boost: Node = get_parent()
+		if owner_p_boost != null and _talismans.worn.has("tide_bracelet"):
+			var boost_until: int = int(owner_p_boost.get_meta(&"_counter_boost_until_msec", 0))
+			if Time.get_ticks_msec() <= boost_until:
+				damage *= 1.16
+				owner_p_boost.set_meta(&"_counter_boost_until_msec", 0)
 	var knockback: float = Items.stat(stack, "knockback", 0.0) * float(step["knock"])
+	var stagger_power: float = _stagger_power(step, stack)
 	var targets: Array[HurtboxComponent] = HitScan.fan(self, origin, dir, Items.stat(stack, "reach", 20.0) * float(step["reach"]), float(step["arc"]), HURTBOX_MASK)
 	var owner_player: Player = get_parent() as Player
 	if owner_player != null and owner_player.finisher != null:
 		owner_player.finisher.open_melee_hit_window(stack)
+	var peer_id: int = get_multiplayer_authority()
 	for target: HurtboxComponent in targets:
+		var enemy_node: Node = target.get_parent()
+		CounterComponent.try_hit_counter(enemy_node, origin, peer_id)
+		StaggerComponent.try_hit_stagger(enemy_node, stagger_power, peer_id)
 		target.armor_floor = float(step.get("armor_floor", 0.0))
-		target.take_hit(damage, origin, knockback, get_multiplayer_authority())
+		target.take_hit(damage, origin, knockback, peer_id)
 		target.armor_floor = 0.0
 	if owner_player != null and owner_player.finisher != null:
 		owner_player.finisher.close_melee_hit_window()
@@ -774,11 +808,40 @@ func _hit_scan(dir: Vector2, step: Dictionary, stack: Dictionary) -> void:
 			_talismans.spend_dive() ## it connected: the dive is used up
 			_talismans.trigger_starlight(hit_pos, damage, get_multiplayer_authority())
 		_on_hit.rpc(hit_pos, dir, float(step["shake"]), float(step.get("hit_stop", 0.0)))
-	if String(Items.definition(stack).get("tool", "")) == "can":
+	var tool_id: String = String(Items.definition(stack).get("tool", ""))
+	if tool_id == "can":
 		var town_node: TownManager = get_tree().get_first_node_in_group("town") as TownManager if is_inside_tree() else null
 		if town_node != null and town_node.farm != null and owner_player != null:
 			town_node.farm.host_swing_refill(owner_player, dir)
+	elif tool_id == "hoe" and owner_player != null and is_inside_tree():
+		var hoe_reach: float = Items.stat(stack, "reach", 22.0) * float(step["reach"])
+		var hoe_arc: float = float(step["arc"])
+		var cut_total: int = 0
+		for gnode: Node in get_tree().get_nodes_in_group("living_grass"):
+			var lg: LivingGrass = gnode as LivingGrass
+			if lg != null:
+				cut_total += lg.host_hoe_tall_grass(owner_player.global_position, dir, hoe_reach, hoe_arc)
+		if cut_total > 0 and targets.is_empty():
+			_on_hoe_clear.rpc_id(get_multiplayer_authority(), float(step.get("shake", 0.5)) * 0.65)
 	_rift(origin, dir, step, stack, damage, targets)
+
+
+func _stagger_power(step: Dictionary, stack: Dictionary) -> float:
+	if bool(step.get("heavy", false)):
+		var dmg_m: float = float(step.get("damage", 1.8))
+		var t: float = clampf((dmg_m - 1.5) / 1.9, 0.0, 1.0)
+		return lerpf(28.0, 55.0, t)
+	var tool_id: String = String(Items.definition(stack).get("tool", ""))
+	if tool_id == "pickaxe":
+		return 50.0
+	var blk: int = int(step.get("block", 0))
+	if blk >= 4:
+		return 42.0 ## 5th combo Wirbelklinge
+	if blk == 3:
+		return 24.0 ## 4th combo Aufwärtshieb
+	if String(step.get("style", "")) == "thrust":
+		return 14.0
+	return 11.0
 
 
 ## Host: what the Himmelsriss adds to a blow (docs/rissklinge.md): the thrust of the combo (`rift` "line") throws a short lane of light, a slash of the right-click
@@ -953,11 +1016,23 @@ func _on_hit(point: Vector2, dir: Vector2, shake: float, hit_stop: float = 0.0) 
 	if multiplayer.get_remote_sender_id() > 1:
 		return
 	_spawn_sparks(point, dir, hit_stop > 0.0)
+	for fx: SwordSlashFx in _active_slashes:
+		if is_instance_valid(fx) and fx._age <= 0.14:
+			fx.trigger_hit_flash()
 	if hit_stop > 0.0:
 		_freeze = maxf(_freeze, hit_stop) ## the heavy blow bites: the swing stands still for a moment (animation only)
 		_play_sound("hit", -2.0)
 	elif Sfx.has("sword_hit"):
 		Sfx.at(self, "sword_hit", point, -4.0, 0.06) ## every normal blow that lands
+	if is_multiplayer_authority():
+		hit_landed.emit(shake)
+
+
+## Subtle owner camera feedback when the hoe uproots tall grass without hitting a hurtbox.
+@rpc("any_peer", "call_local", "reliable")
+func _on_hoe_clear(shake: float) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
 	if is_multiplayer_authority():
 		hit_landed.emit(shake)
 
@@ -1099,33 +1174,37 @@ func _track_tips(delta: float) -> void:
 		_tips.append({"mid": base + dir * _blade_length * BLADE_PX * 0.45, "tip": base + dir * _blade_length * BLADE_PX, "age": 0.0})
 
 
-## Dust and chips where the blade bites the ground at the end of the blow.
+## Contextual surface & object particles where the blade sweeps or slams into the ground (all peers).
+func _trigger_slash_world_fx(heavy_impact: bool) -> void:
+	if not is_inside_tree():
+		return
+	var owner_player: Player = get_parent() as Player
+	if owner_player != null and owner_player.air_height > 4.0:
+		return
+	var def: Dictionary = DataRegistry.get_entry("items", held_weapon)
+	var tool_kind: String = String(def.get("tool", ""))
+	if tool_kind in ["rod", "staff", "can"]:
+		return
+	var weapon_tag: String = tool_kind if not tool_kind.is_empty() else String(def.get("weapon_class", "sword_1h"))
+	var fx: SlashWorldFx = SlashWorldFx.of(self)
+	if fx == null:
+		return
+	var exclude: Array[RID] = []
+	if owner_player != null:
+		exclude.append(owner_player.get_rid())
+	var dir: Vector2 = aim_dir.normalized() if aim_dir.length_squared() > 0.001 else Vector2.RIGHT
+	if heavy_impact:
+		fx.on_heavy_impact(global_position, dir, _reach, weapon_tag, exclude)
+	else:
+		var arc_rad: float = float(_step.get("arc", 1.75))
+		var sweep_sign: float = float(_step.get("sweep", 1.0))
+		var style_id: String = String(_step.get("style", "slash"))
+		fx.on_swing_sweep(global_position, dir, _reach, arc_rad, sweep_sign, style_id, weapon_tag, exclude)
+
+
+## Contextual impact burst where the heavy overhead chop bites into ground, water, or stone.
 func _impact_dust() -> void:
-	var at: Vector2 = global_position + aim_dir.normalized() * minf(_reach * 0.8, 40.0)
-	var dust: CPUParticles2D = CPUParticles2D.new()
-	dust.texture = SPARK_TEXTURE
-	dust.amount = 14
-	dust.lifetime = 0.45
-	dust.one_shot = true
-	dust.explosiveness = 1.0
-	dust.direction = Vector2.UP
-	dust.spread = 80.0
-	dust.gravity = Vector2(0, 40)
-	dust.initial_velocity_min = 25.0
-	dust.initial_velocity_max = 75.0
-	dust.damping_min = 90.0
-	dust.damping_max = 140.0
-	dust.scale_amount_min = 0.7
-	dust.scale_amount_max = 1.3
-	var ramp: Gradient = Gradient.new()
-	ramp.offsets = PackedFloat32Array([0.0, 1.0])
-	ramp.colors = PackedColorArray([Color(0.72, 0.68, 0.62, 0.7), Color(0.55, 0.5, 0.48, 0.0)])
-	dust.color_ramp = ramp
-	dust.z_index = 2
-	get_tree().current_scene.add_child(dust)
-	dust.global_position = at
-	dust.emitting = true
-	get_tree().create_timer(0.8).timeout.connect(dust.queue_free)
+	_trigger_slash_world_fx(true)
 	_play_sound("thud", -4.0)
 
 
@@ -1153,7 +1232,10 @@ func _play_sound(id: String, volume_db: float = 0.0, pitch: float = 1.0) -> void
 ## The look of this weapon's swing: colours of the motes and the trail and the folder of its own sounds (item `fx`), the shared ones when it has none.
 func _load_fx(def: Dictionary) -> void:
 	var fx: Dictionary = def.get("fx", {}) as Dictionary
-	_fx_colors = MOTE_COLORS.duplicate()
+	var is_sword: bool = String(def.get("weapon_class", "")).begins_with("sword_")
+	_is_sword = is_sword
+	_has_custom_fx_colors = fx.has("trail_edge") or fx.has("trail_core")
+	_fx_colors = SWORD_STEEL_MOTES.duplicate() if is_sword else MOTE_COLORS.duplicate()
 	var motes: Array = fx.get("motes", []) as Array
 	if motes.size() >= 4:
 		for i: int in 4:
@@ -1188,13 +1270,20 @@ func _refresh_weapon() -> void:
 
 func _advance(delta: float) -> void:
 	if _phase == Phase.IDLE:
+		if not is_processing():
+			_step_slashes(delta)
 		return
+	var stepped_manually: bool = not is_processing()
 	_time += delta
 	match _phase:
 		Phase.WINDUP:
 			if _time >= float(_step["windup"]):
 				_time -= float(_step["windup"])
 				_phase = Phase.ACTIVE
+				if _is_sword:
+					_spawn_sword_slash()
+				if not bool(_step.get("heavy", false)):
+					_trigger_slash_world_fx(false)
 				if is_multiplayer_authority() and float(_step["lunge"]) > 0.0:
 					lunged.emit(aim_dir * float(_step["lunge"]))
 		Phase.ACTIVE:
@@ -1207,6 +1296,117 @@ func _advance(delta: float) -> void:
 				_combo_deadline_msec = Time.get_ticks_msec() + int(_combo_window * 1000.0)
 				if bool(_step.get("alt", false)) and is_multiplayer_authority():
 					_alt_chain_ended()
+	if stepped_manually:
+		_step_slashes(delta)
+
+
+## Spawns the handcrafted pixel-art sword swing animation (`SwordSlashFx`) for the active sword step.
+func _spawn_sword_slash() -> void:
+	if _slash_back == null or _slash_front == null or _step.is_empty():
+		return
+	var kind: int = SwordSlashFx.Kind.FOREHAND
+	var power_scale: float = 1.0
+	if bool(_step.get("heavy", false)):
+		kind = SwordSlashFx.Kind.HEAVY
+		power_scale = lerpf(0.86, 1.04, clampf(float(_step.get("power", 1.0)), 0.0, 1.0))
+	elif _step.has("diag"):
+		var stage: int = int(_step.get("stage", 1))
+		kind = SwordSlashFx.Kind.HEAVY if stage >= 2 else SwordSlashFx.Kind.UPPERCUT
+		power_scale = 1.04 if stage >= 2 else 0.96
+	elif String(_step.get("style", "slash")) == "thrust":
+		kind = SwordSlashFx.Kind.THRUST
+	elif int(_step.get("block", -1)) == 4:
+		kind = SwordSlashFx.Kind.WHIRLWIND
+	elif int(_step.get("block", -1)) == 3:
+		kind = SwordSlashFx.Kind.UPPERCUT
+	elif float(_step.get("sweep", -1.0)) > 0.0:
+		kind = SwordSlashFx.Kind.BACKHAND
+	else:
+		kind = SwordSlashFx.Kind.FOREHAND
+
+	var anchor: Vector2 = BODY_CENTER + Vector2(0.0, 2.0)
+	var screen_turn: float = _slash_screen_turn(kind)
+	var active_dur: float = float(_step.get("active", 0.09))
+	var aim_n: Vector2 = aim_dir.normalized() if aim_dir.length_squared() > 0.001 else Vector2.RIGHT
+
+	if kind == SwordSlashFx.Kind.WHIRLWIND:
+		# Split the 340-degree horizontal vortex around Ellie's waist:
+		# upper/back half renders behind her head & hair; lower/front half sweeps in front of her legs!
+		var fx_back: SwordSlashFx = SwordSlashFx.create(
+			kind, anchor - _slash_back.position, aim_n, _reach, screen_turn, active_dur,
+			power_scale, _has_custom_fx_colors, _trail_edge, _trail_core, -1
+		)
+		var fx_front: SwordSlashFx = SwordSlashFx.create(
+			kind, anchor - _slash_front.position, aim_n, _reach, screen_turn, active_dur,
+			power_scale, _has_custom_fx_colors, _trail_edge, _trail_core, 1
+		)
+		_slash_back.add_child(fx_back)
+		_slash_front.add_child(fx_front)
+		_active_slashes.append(fx_back)
+		_active_slashes.append(fx_front)
+	else:
+		# When aiming upward (NW, N, NE -> seeing Ellie's back), render behind Ellie's body & silver hair!
+		var behind_ellie: bool = aim_n.y < -0.36
+		var layer: Node2D = _slash_back if behind_ellie else _slash_front
+		var fx: SwordSlashFx = SwordSlashFx.create(
+			kind, anchor - layer.position, aim_n, _reach, screen_turn, active_dur,
+			power_scale, _has_custom_fx_colors, _trail_edge, _trail_core, 0
+		)
+		layer.add_child(fx)
+		_active_slashes.append(fx)
+
+	while _active_slashes.size() > MAX_ACTIVE_SLASHES:
+		var oldest: SwordSlashFx = _active_slashes.pop_front() as SwordSlashFx
+		if is_instance_valid(oldest):
+			oldest.queue_free()
+
+
+## Computes the exact 2D screen sweep direction (+1 CW / -1 CCW on Y-down canvas) of Ellie's real 3D blade path.
+func _slash_screen_turn(kind: int) -> float:
+	if kind == SwordSlashFx.Kind.THRUST:
+		return 1.0
+	var aim: Vector2 = aim_dir.normalized() if aim_dir.length_squared() > 0.001 else Vector2.RIGHT
+	if bool(_step.get("heavy", false)):
+		var b_h: Vector2 = GripRig.project_dir(_chop_dir(deg_to_rad(68.0), 0.36))
+		var a_h: Vector2 = GripRig.project_dir(_chop_dir(deg_to_rad(-18.0), -0.24))
+		var c_h: float = b_h.cross(a_h)
+		return (1.0 if c_h > 0.0 else -1.0) if absf(c_h) > 0.05 else (-1.0 if aim.x < 0.0 else 1.0)
+	if _step.has("diag"):
+		var path: Dictionary = _step["diag"] as Dictionary
+		var p0: float = float(path.get("pitch0", 1.3))
+		var p1: float = float(path.get("pitch1", -0.15))
+		var y0: float = float(path.get("yaw0", 1.0))
+		var y1: float = float(path.get("yaw1", -1.0))
+		var b_d: Vector2 = GripRig.project_dir(_chop_dir(lerpf(p0, p1, 0.25), lerpf(y0, y1, 0.25)))
+		var a_d: Vector2 = GripRig.project_dir(_chop_dir(lerpf(p0, p1, 0.85), lerpf(y0, y1, 0.85)))
+		var c_d: float = b_d.cross(a_d)
+		var sw_d: float = float(_step.get("sweep", -1.0))
+		return (1.0 if c_d > 0.0 else -1.0) if absf(c_d) > 0.05 else (-1.0 if sw_d < 0.0 else 1.0)
+	var contact: Vector3 = GripRig.dir(aim.angle(), clampf(GripRig.aim_pitch(aim) + deg_to_rad(float(_shape.get("pitch", 0.0))), -1.05, 1.05))
+	var sweep_v: float = -1.0 if bool(_shape.get("top_down", false)) else float(_step.get("sweep", -1.0))
+	var tilt: float = _swing_tilt(sweep_v)
+	var before: Vector2 = GripRig.project_dir(GripRig.swing_dir(contact, aim, tilt, -sweep_v * 0.35))
+	var after: Vector2 = GripRig.project_dir(GripRig.swing_dir(contact, aim, tilt, sweep_v * 0.35))
+	var cross_v: float = before.cross(after)
+	return (1.0 if cross_v > 0.0 else -1.0) if absf(cross_v) > 0.06 else (-1.0 if sweep_v < 0.0 else 1.0)
+
+
+func _step_slashes(delta: float) -> void:
+	if _active_slashes.is_empty():
+		return
+	for i: int in range(_active_slashes.size() - 1, -1, -1):
+		var fx: SwordSlashFx = _active_slashes[i]
+		if not is_instance_valid(fx) or not fx.step(delta):
+			if is_instance_valid(fx):
+				fx.queue_free()
+			_active_slashes.remove_at(i)
+
+
+func _clear_sword_slashes() -> void:
+	for fx: SwordSlashFx in _active_slashes:
+		if is_instance_valid(fx):
+			fx.queue_free()
+	_active_slashes.clear()
 
 
 ## The owner's slash of the right-click chain ended: the first one opens the window for the second (and starts it at once when the button was pressed during
@@ -1663,16 +1863,19 @@ func arm_node() -> CanvasItem:
 	return _arm
 
 
-## The blade's trail: a wedge that grows with the sweep, brightest at the blade, fading afterwards.
+## The blade's trail: swords render textured animated pixel-art slashes (`SwordSlashFx`);
+## tools and finisher ribbons keep their lightweight procedural ribbon trail.
 func _draw_trail() -> void:
 	var alpha: float = 1.0 - _trail_age / TRAIL_FADE
-	_draw_heavy_ribbon()
-	if alpha > 0.0 and not _step.is_empty() and not bool(_step.get("heavy", false)) and not _step.has("diag"):
+	if not _is_sword or _finisher_ribbon:
+		_draw_heavy_ribbon()
+	if not _is_sword and alpha > 0.0 and not _step.is_empty() and not bool(_step.get("heavy", false)) and not _step.has("diag"):
 		if String(_step["style"]) == "thrust":
 			_draw_thrust_trail(alpha)
 		else:
 			_draw_slash_trail(alpha)
-	_draw_burst()
+	if not _is_sword:
+		_draw_burst()
 	_draw_edge_glow()
 	_draw_motes()
 	_draw_charge_glint()
@@ -1758,7 +1961,8 @@ func _draw_edge_glow() -> void:
 
 ## The blade sheds sparkles while it is in the air: from its outer part, flying on the way the tip really moved, rising a little and fading.
 func _emit_motes(thrust: bool, delta: float) -> void:
-	_mote_carry += delta * MOTES_PER_SEC
+	var rate: float = SWORD_MOTES_PER_SEC if _is_sword else MOTES_PER_SEC
+	_mote_carry += delta * rate
 	var grip: Vector2 = _grip_world()
 	var blade: Vector2 = _blade_vector()
 	var along: Vector2 = blade.normalized() if blade.length() > 0.01 else aim_dir.normalized()
@@ -1766,11 +1970,11 @@ func _emit_motes(thrust: bool, delta: float) -> void:
 	var flight: Vector2 = along if thrust or moved.length() < 0.5 else moved.normalized() ## the way the tip is moving
 	while _mote_carry >= 1.0:
 		_mote_carry -= 1.0
-		var kind: int = [0, 0, 0, 0, 0, 1][randi() % 6]
-		var color: Color = _fx_colors[1 + randi() % 2]
-		var speed: float = randf_range(18.0, 55.0)
-		var vel: Vector2 = flight * speed + along * randf_range(-12.0, 30.0) + Vector2(randf_range(-14.0, 14.0), randf_range(-14.0, 6.0))
-		_motes.append({"pos": grip + blade * randf_range(0.6, 1.0) + along.rotated(PI / 2.0) * randf_range(-1.5, 1.5), "vel": vel, "age": 0.0, "life": randf_range(0.2, 0.42), "kind": kind, "color": color, "size": randf_range(0.8, 1.3)})
+		var kind: int = ([0, 0, 0, 1, 1][randi() % 5]) if _is_sword else ([0, 0, 0, 0, 0, 1][randi() % 6])
+		var color: Color = _fx_colors[randi() % 3] if _is_sword else _fx_colors[1 + randi() % 2]
+		var speed: float = randf_range(24.0, 62.0) if _is_sword else randf_range(18.0, 55.0)
+		var vel: Vector2 = flight * speed + along * randf_range(-10.0, 32.0) + Vector2(randf_range(-12.0, 12.0), randf_range(-12.0, 6.0))
+		_motes.append({"pos": grip + blade * randf_range(0.65, 1.02) + along.rotated(PI / 2.0) * randf_range(-1.5, 1.5), "vel": vel, "age": 0.0, "life": randf_range(0.18, 0.36), "kind": kind, "color": color, "size": randf_range(0.8, 1.3)})
 	if _motes.size() > MAX_MOTES:
 		_motes = _motes.slice(_motes.size() - MAX_MOTES)
 
@@ -1813,9 +2017,9 @@ func _draw_motes() -> void:
 				var core: Color = _fx_colors[0]
 				core.a = color.a
 				_trail.draw_rect(Rect2(at, Vector2(1, 1)), core)
-			_: ## a streak along its flight
+			_: ## a short pixel-snapped streak along its flight
 				var dir: Vector2 = (mote["vel"] as Vector2).normalized()
-				var tail: Vector2 = at - dir * (3.0 + 7.0 * (1.0 - k))
+				var tail: Vector2 = (at - dir * (2.0 + 3.5 * (1.0 - k))).round()
 				_trail.draw_line(tail, at, color, 1.0)
 
 

@@ -22,6 +22,7 @@ var ink: float = 1.0
 var show_fern: bool = false
 var seal_flash: float = 0.0
 var night: float = 0.0
+var hide_controls_hint: bool = false
 var _flip: Control
 
 
@@ -65,7 +66,8 @@ func _draw() -> void:
 	if show_fern:
 		_pressed_fern(writing)
 	_bookmark(writing)
-	_controls(writing)
+	if not hide_controls_hint:
+		_controls(writing)
 	if ink < 1.0:
 		var width: float = roundf(28.0 + 124.0 * smoothstep(0.0, 1.0, ink))
 		draw_rect(Rect2(348, 61, width, 1), Color(TEAL, 0.36 * sin(PI * ink) * writing))

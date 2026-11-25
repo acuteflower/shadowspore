@@ -119,6 +119,8 @@ const VEIN_LIGHT: Color = VoidGlow.VEIN_LIGHT
 const EYE: Color = Color("ff4fd8")
 const EYE_HESITATE: Color = Color("cbaaff") ## Spore-kinship lavender matching Ellie's hair!
 const WARNING: Color = Color("ff4fd8")
+const READY_CORE: Color = Color("ff4fd8") ## Finisher V2: the exposed core
+const CORE_HOT: Color = Color("fff0fb")
 const SHADOW_INK: Color = Color("080512")
 const THORNS: Array[float] = [0.34, 0.56, 0.76]
 
@@ -135,6 +137,8 @@ var air_height: float = 0.0 ## > 0 during CANOPY_HANG / CANOPY_DROP
 var ceiling_height: float = 62.0 ## Silk drop line height above ground
 var brood_variant: int = 0 ## 0 = Common, 1 = Scout (0.88x, long legs), 2 = Thorn Elder (1.14x, permanent barbs)
 var finisher_stage: int = 0 ## 0 = gather, 1 = Plunge pinned, 2 = Second Deep Press cracked, 3 = Rip-Out yank
+var finisher_ready: bool = false ## Finisher V2 "Kern entblößt": the next sword blow (or E) finishes; the core beats magenta (docs/finisher_v2_konzept.md)
+var core_break: bool = false ## the finisher tore the core out: no core glow, the death collapses into the wound
 
 var _body_scale_mult: float = 1.0
 var _leg_scale_mult: float = 1.0
@@ -513,10 +517,21 @@ func _update_body(t: float, velocity: Vector2) -> void:
 				scale_goal *= Vector2(0.92, 1.14)
 				_warning = 1.0
 		Pose.DEAD:
-			# Authentic Arachnid Death Curl: sternum settles onto earth rather than cartoon pancake!
-			offset.y += 4.8 * smoothstep(0.0, 0.65, t)
-			scale_goal *= Vector2(0.96 - t * 0.08, 0.92 - t * 0.22)
-			_alpha = 1.0 - smoothstep(0.35, 1.0, t)
+			if core_break:
+				# Finisher V2 "Kern-Bruch": the torn carapace shudders, splits wide, then collapses into the wound it was ripped from.
+				var crack_k: float = smoothstep(0.0, 0.22, t)
+				var collapse: float = smoothstep(0.2, 0.72, t)
+				offset.y += 2.6 * crack_k + 2.0 * collapse
+				offset.x += sin(_time * 64.0) * 0.9 * (1.0 - collapse)
+				scale_goal *= Vector2(1.0 + 0.10 * crack_k - 0.78 * collapse, 1.0 - 0.08 * crack_k - 0.70 * collapse)
+				_alpha = 1.0 - smoothstep(0.42, 0.78, t)
+				_warning = 1.0 - collapse
+				telegraph = 0.2 * (1.0 - crack_k)
+			else:
+				# Authentic Arachnid Death Curl: sternum settles onto earth rather than cartoon pancake!
+				offset.y += 4.8 * smoothstep(0.0, 0.65, t)
+				scale_goal *= Vector2(0.96 - t * 0.08, 0.92 - t * 0.22)
+				_alpha = 1.0 - smoothstep(0.35, 1.0, t)
 
 	if _pose != Pose.DEAD:
 		_alpha = 1.0
@@ -1098,8 +1113,12 @@ func _draw_glow() -> void:
 		pulse = (0.62 + 0.30 * sin(_time * 22.0)) * _alpha
 
 	for spot_c: Vector3 in CORE_SPOTS:
+		if core_break:
+			break
 		var cs: float = pulse * clampf(spot_c.z * 0.50, 0.22, 0.70)
 		VoidGlow.halo_tex(layer, vg_tex, inverse * (center + _squash(fwd * spot_c.x + right * spot_c.y) * _body.scale), VEIN, cs, 0.62 if cs > 0.45 * _alpha else 0.36)
+
+	_draw_ready_core(layer, vg_tex, inverse * (center + _squash(fwd * CORE_SPOTS[0].x + right * CORE_SPOTS[0].y) * _body.scale))
 
 	var striking_pose: bool = _pose in [Pose.WINDUP, Pose.COIL, Pose.STRIKE, Pose.THROW, Pose.PULL, Pose.VENOM_WINDUP, Pose.VENOM_LUNGE]
 	var surge_travel: float = clampf(_pose_elapsed / maxf(_pose_duration * 0.85, 0.05), 0.0, 1.0) if striking_pose else -1.0
@@ -1136,3 +1155,31 @@ func _draw_glow() -> void:
 		VoidGlow.halo_tex(layer, vg_tex, inverse * pts[lcount >> 1], VEIN, 0.26 * _alpha * crouch_dim * halo_env, 0.40)
 		if is_active_strike_limb or night_k > 0.15:
 			VoidGlow.halo_tex(layer, vg_tex, inverse * pts[lcount - 1], WARNING if is_active_strike_limb else GLOW, (0.85 if is_active_strike_limb else 0.36 * halo_env) * _alpha, 0.62)
+
+
+## Finisher V2: the core on the abdomen. While `finisher_ready` it beats like a heart (double thump) in hot magenta with a small pixel cross,
+## so the player sees that the next sword blow (or E) finishes. Pinned by the finisher it burns white-hot stage by stage until the rip tears it out.
+func _draw_ready_core(layer: Node2D, vg_tex: ImageTexture, at: Vector2) -> void:
+	if core_break:
+		return
+	var impaled: bool = _pose == Pose.IMPALED and finisher_stage < 3
+	if not finisher_ready and not impaled:
+		return
+	var ph: float = fmod(_time, 0.82) / 0.82
+	var thump: float = maxf(exp(-pow((ph - 0.05) / 0.045, 2.0)), 0.7 * exp(-pow((ph - 0.24) / 0.05, 2.0)))
+	var hot: float = (0.3 + 0.3 * float(finisher_stage)) if impaled else 0.0
+	var col: Color = READY_CORE.lerp(CORE_HOT, hot)
+	var strength: float = (0.75 + 0.55 * thump + hot * 0.4) * _alpha
+	VoidGlow.halo_tex(layer, vg_tex, at, col, strength, 0.85)
+	var p: Vector2 = at.round()
+	var arm: int = 2 + int(roundf(thump * 2.0 + hot * 2.0))
+	var tip: Color = Color(CORE_HOT, 0.85 * _alpha)
+	var mid: Color = Color(col, 0.95 * _alpha)
+	layer.draw_rect(Rect2(p, Vector2.ONE), tip)
+	for i: int in range(1, arm + 1):
+		var c: Color = mid if i < arm else Color(col, 0.5 * _alpha)
+		layer.draw_rect(Rect2(p + Vector2(i, 0), Vector2.ONE), c)
+		layer.draw_rect(Rect2(p + Vector2(-i, 0), Vector2.ONE), c)
+		if i < arm:
+			layer.draw_rect(Rect2(p + Vector2(0, i), Vector2.ONE), c)
+			layer.draw_rect(Rect2(p + Vector2(0, -i), Vector2.ONE), c)

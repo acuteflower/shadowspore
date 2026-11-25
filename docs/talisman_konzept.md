@@ -194,7 +194,7 @@ Damit die Regel "eine je Gattung" eine **Entscheidung** erzeugt und nicht nur ei
 ## 9. Eigene Ideen (nichts davon ist beschlossen)
 
 1. **Resonanz / Sets** (später): trägt sie Kette, Ohrringe und Armband derselben **Familie** (Silber, Gold, Leere), erwacht ein kleiner Zusatz und die drei Stücke glänzen im Gleichtakt. Gibt der Regel "je Gattung nur eines" ein Ziel. Braucht mindestens zwei Familien, die ersten drei sind absichtlich gemischt.
-2. **Vierte Gattung Ring (Alltag)** (später, nur wenn gewollt): Angeln, Ernten, Kochen, Bauen. Brächte einen vierten Platz (zum Beispiel mit Stufe 30, "VOLLENDUNG" gibt heute keinen). Bis dahin **keine** Änderung an den Plätzen.
+2. **Vierte Gattung Ring (Alltag)** (später, nur wenn gewollt): Angeln, Ernten, Alchemie, Bauen. Brächte einen vierten Platz (zum Beispiel mit Stufe 30, "VOLLENDUNG" gibt heute keinen). Bis dahin **keine** Änderung an den Plätzen.
 3. **Preis der Legenden:** ein kleiner Nachteil, der die Stärke erdet (Schweigtropfen: −15 % Heilung, "die Leere nimmt, was sie schluckt"). Standard ist **keiner**.
 4. **Alarm-Anzeige durch die Ohrringe** (Abschnitt 7): der Schmuck als Lesehilfe, wie nah eine Gefahr ist, ohne neue Oberfläche.
 5. **Fassungen:** die Steine im Bild folgen `enchant_slots`; später lassen sich Kristalle einsetzen und tauschen, der Stein im Bild ändert die Farbe.

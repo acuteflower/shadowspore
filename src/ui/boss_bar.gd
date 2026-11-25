@@ -8,8 +8,10 @@ extends Control
 ## Cosmetic and local: every peer draws it from the replicated health of the boss.
 
 const W: int = 300 ## length of the whole crack in px
-const SIZE: Vector2 = Vector2(380, 52)
+const SIZE: Vector2 = Vector2(400, 72)
 const CRACK_Y: int = 34
+const STAGGER_Y: int = 50 ## golden stagger bar underneath the HP crack (docs/dungeon_konzept.md 3.3)
+const STAGGER_H: int = 6
 const TITLE_Y: int = 8 ## the name's top row (the pixel font at double size is 14 rows high, the crack lies below)
 const TITLE_SCALE: int = 2 ## the name is the pixel font at this scale (whole pixels)
 const TITLE_TRACK: int = 1 ## extra pixels (before scaling) between the letters
@@ -20,6 +22,17 @@ const VEIN_LOW: Color = Color("e0407f")
 const BUD: Color = Color("e04aa8")
 const FLASH: Color = Color("efe6ff")
 const GOLD: Color = Color("ffd98a")
+const STAGGER_DEEP: Color = Color("8c6322")
+const STAGGER_GOLD: Color = Color("ffd98a")
+const STAGGER_CORE: Color = Color("fff7d6")
+## Lost-Ark multi-layer HP bar palette (index 0 = final x1 bar, cycling upwards for x2..xN).
+const BAR_LAYERS: Array[Dictionary] = [
+	{"main": Color("e0407f"), "light": Color("ff92c8")}, ## x1 final urgent magenta-red
+	{"main": Color("d9a338"), "light": Color("fff0b0")}, ## x2 warm amber-gold
+	{"main": Color("32b57e"), "light": Color("9af2c8")}, ## x3 emerald
+	{"main": Color("36b8c4"), "light": Color("8cf7f0")}, ## x4 Steinsetzer turquoise
+	{"main": Color("8a4dff"), "light": Color("d4b8ff")}, ## x5+ signature Void violet
+]
 const PHASES: Array[float] = [1.0 / 3.0, 2.0 / 3.0]
 const INTRO_TIME: float = 1.1
 const DEATH_TIME: float = 1.3
@@ -32,6 +45,11 @@ enum State { HIDDEN, OPEN, DYING }
 
 var _state: State = State.HIDDEN
 var _health: HealthComponent
+var _stagger: StaggerComponent
+var _bars: int = 1 ## Lost-Ark layered HP count (1 = classic single bar, >=2 = x5/x10/x15 multi-layer)
+var _last_bar: int = 1
+var _stagger_open: float = 0.0 ## 0..1 smooth reveal of golden stagger bar below HP crack
+var _stagger_flash: float = 0.0
 var _title: String = ""
 var _time: float = 0.0
 var _grow: float = 0.0 ## 0..1 the crack tearing open from the middle
@@ -49,8 +67,16 @@ var _cover: float = 1.0 ## the HUD dims it behind full-screen windows
 var _covered: bool = false
 var _dirty: bool = true
 var _idle_time: float = 0.0
-const IDLE_REDRAW_INTERVAL: float = 0.066 ## ~15 FPS idle shimmer is plenty for pixel art
+var _motion: bool = false ## a smooth change (ghost, cover) that needs no more than MOTION_REDRAW_INTERVAL
+var _reach: float = 0.0 ## per redraw: half width of the opened tear (`_visible_column`)
+var _low_now: float = 0.0 ## per redraw: `_low()`, asked for every column by `_gap`
+const IDLE_REDRAW_INTERVAL: float = 0.1 ## idle shimmer at 10 FPS: whole-pixel twitching reads better a little jerky (docs/hud_v2_konzept.md 8.4)
+const MOTION_REDRAW_INTERVAL: float = 0.033 ## the ghost draining and the cover fading need at most 30 FPS
 
+
+## For the HUD director: the bar is on screen only while it tracks a boss.
+func hud_busy() -> bool:
+	return is_fighting()
 
 func _ready() -> void:
 	add_to_group("boss_bar")
@@ -76,27 +102,89 @@ func _ready() -> void:
 
 
 ## Shows the bar for `health`; it tears open. Calling it again switches to another boss.
-func track(title: String, health: HealthComponent) -> void:
+## `bars`: Lost-Ark multi-layer HP count (1 = classic single bar, e.g. 5 for Vorgath, 10 for Mornath).
+## `stagger`: optional `StaggerComponent` displayed live as a golden bar underneath the HP crack.
+func track(title: String, health: HealthComponent, bars: int = 1, stagger: StaggerComponent = null) -> void:
 	_untrack()
 	_health = health
+	_stagger = stagger
+	if _stagger == null and health != null and health.get_parent() != null:
+		_stagger = health.get_parent().get_node_or_null("StaggerComponent") as StaggerComponent
+	_bars = maxi(bars, 1)
 	_title = title
 	_seed = int(hash(title) % 997)
 	_state = State.OPEN
 	_grow = 0.0
 	_dying = 0.0
 	_time = 0.0
-	_ghost = _fraction()
+	_ghost = _layer_fraction()
 	_last_phase = _phase()
+	_last_bar = _current_bar()
+	_stagger_open = 1.0 if (_stagger != null and _stagger.active) else 0.0
+	_stagger_flash = 0.0
 	_shards.clear()
 	_flash = 0.4
 	health.damaged.connect(_on_damaged)
 	health.died.connect(_on_died)
 	health.changed.connect(_on_health_changed)
+	if _stagger != null and is_instance_valid(_stagger):
+		_stagger.stagger_changed.connect(_on_stagger_changed)
+		_stagger.stagger_broken.connect(_on_stagger_broken)
 	_dirty = true
 	visible = true
 	_fade = 1.0
 	modulate.a = 1.0
 	set_process(true)
+
+
+## Returns the active bar number (1.._bars) in multi-layer mode, or 1 in classic mode.
+func current_bar_number() -> int:
+	return _current_bar()
+
+
+func _current_bar() -> int:
+	if _bars <= 1:
+		return 1
+	var f: float = _fraction()
+	if f <= 0.0:
+		return 0
+	return clampi(ceili(f * float(_bars)), 1, _bars)
+
+
+## 0..1 fill within the currently active HP layer (equals `_fraction()` when `_bars == 1`).
+func _layer_fraction() -> float:
+	var f: float = _fraction()
+	if _bars <= 1:
+		return f
+	if f <= 0.0:
+		return 0.0
+	var scaled: float = f * float(_bars)
+	var b: int = clampi(ceili(scaled), 1, _bars)
+	return clampf(scaled - float(b - 1), 0.0, 1.0)
+
+
+func _layer_colors(bar_num: int) -> Dictionary:
+	var idx: int = clampi(bar_num - 1, 0, 999) % BAR_LAYERS.size()
+	return BAR_LAYERS[idx] as Dictionary
+
+
+func _on_stagger_changed(_cur: float, _maximum: float, _left: float, _dur: float) -> void:
+	_dirty = true
+
+
+func _on_stagger_broken(_source_peer: int) -> void:
+	_stagger_flash = 0.5
+	_impact = maxf(_impact, 0.45)
+	for i: int in range(0, W, 12):
+		_shards.append({
+			"pos": Vector2(_x0() + i, STAGGER_Y + 3),
+			"vel": Vector2(randf_range(-40.0, 40.0), randf_range(-65.0, -15.0)),
+			"life": randf_range(0.45, 0.85),
+			"max": 0.85,
+			"color": STAGGER_GOLD if (i % 24 == 0) else STAGGER_CORE,
+			"wide": true,
+		})
+	_dirty = true
 
 
 ## The boss is gone without dying (left the fight, despawned): the bar withers.
@@ -125,7 +213,13 @@ func _untrack() -> void:
 			_health.died.disconnect(_on_died)
 		if _health.changed.is_connected(_on_health_changed):
 			_health.changed.disconnect(_on_health_changed)
+	if _stagger != null and is_instance_valid(_stagger):
+		if _stagger.stagger_changed.is_connected(_on_stagger_changed):
+			_stagger.stagger_changed.disconnect(_on_stagger_changed)
+		if _stagger.stagger_broken.is_connected(_on_stagger_broken):
+			_stagger.stagger_broken.disconnect(_on_stagger_broken)
 	_health = null
+	_stagger = null
 
 
 func _fraction() -> float:
@@ -140,7 +234,7 @@ func _phase() -> int: ## 0 full .. 2 last third
 
 
 func _fill() -> int:
-	return ceili(W * _fraction())
+	return ceili(W * _layer_fraction())
 
 
 func _x0() -> int:
@@ -196,12 +290,22 @@ func _process(delta: float) -> void:
 	_time += delta
 	_flash = maxf(_flash - delta, 0.0)
 	_impact = maxf(_impact - delta, 0.0)
+	_stagger_flash = maxf(_stagger_flash - delta, 0.0)
 	match _state:
 		State.OPEN:
 			if _health == null or not is_instance_valid(_health):
 				release()
 			else:
 				_grow = minf(_grow + delta / INTRO_TIME, 1.0)
+				var bar_now: int = _current_bar()
+				if _bars > 1 and bar_now < _last_bar:
+					_impact = 0.42
+					_flash = 0.25
+					_ghost = 1.0
+					_ghost_wait = 0.15
+					_spawn_shards(Vector2(_x0() + _fill(), CRACK_Y), 18, 1.35)
+					_dirty = true
+				_last_bar = bar_now
 				var phase: int = _phase()
 				if phase > _last_phase:
 					_impact = 0.55
@@ -209,15 +313,20 @@ func _process(delta: float) -> void:
 					_spawn_shards(Vector2(_x0() + _fill(), CRACK_Y), 24, 1.4)
 					_dirty = true
 				_last_phase = phase
+				var lf: float = _layer_fraction()
 				if _ghost_wait > 0.0:
-					_ghost_wait -= delta
+					_ghost_wait -= delta ## the ghost holds still while it waits: nothing to redraw
+				elif _ghost > lf:
+					_ghost = maxf(lf, _ghost - GHOST_SPEED * delta)
+					_motion = true
+				elif lf > _ghost:
+					_ghost = lf
 					_dirty = true
-				elif _ghost > _fraction():
-					_ghost = maxf(_fraction(), _ghost - GHOST_SPEED * delta)
-					_dirty = true
-				elif _fraction() > _ghost:
-					_ghost = _fraction()
-					_dirty = true
+				var want_stagger: float = 1.0 if (_stagger != null and is_instance_valid(_stagger) and _stagger.active) else 0.0
+				var prev_stagger: float = _stagger_open
+				_stagger_open = move_toward(_stagger_open, want_stagger, delta * 5.5)
+				if absf(_stagger_open - prev_stagger) > 0.001 or want_stagger > 0.5:
+					_motion = true
 		State.DYING:
 			_dying += delta
 			_fade = clampf(1.0 - (_dying - 0.5) / (DEATH_TIME - 0.5), 0.0, 1.0)
@@ -236,7 +345,7 @@ func _process(delta: float) -> void:
 	var prev_cover: float = _cover
 	_cover = move_toward(_cover, 0.0 if _covered else 1.0, delta * 8.0)
 	if absf(_cover - prev_cover) > 0.001:
-		_dirty = true
+		_motion = true
 	modulate.a = _fade * _cover
 	_shards = _shards.filter(func(s: Dictionary) -> bool: return float(s["life"]) > 0.0)
 	if not _shards.is_empty():
@@ -247,9 +356,12 @@ func _process(delta: float) -> void:
 
 	var is_active_anim: bool = (_state == State.DYING or _grow < 1.0 or _flash > 0.0 or _impact > 0.0 or not _shards.is_empty())
 	_idle_time += delta
-	if is_active_anim or _dirty or _idle_time >= IDLE_REDRAW_INTERVAL:
+	if is_active_anim or _dirty or _idle_time >= IDLE_REDRAW_INTERVAL or (_motion and _idle_time >= MOTION_REDRAW_INTERVAL):
 		_idle_time = 0.0
 		_dirty = false
+		_motion = false
+		_reach = W * 0.5 * smoothstep(0.0, 1.0, _grow)
+		_low_now = _low()
 		if _rys.size() != W + 1:
 			_rys.resize(W + 1)
 		for i: int in W + 1:
@@ -293,12 +405,11 @@ func _ry_calc(i: int) -> int:
 
 
 func _visible_column(i: int) -> bool: ## the tear opens from the middle outwards
-	var reach: float = W * 0.5 * smoothstep(0.0, 1.0, _grow)
-	return absf(float(i) - W * 0.5) <= reach
+	return absf(float(i) - W * 0.5) <= _reach
 
 
 func _gap(i: int) -> bool:
-	var low: float = _low()
+	var low: float = _low_now
 	if low <= 0.0:
 		return false
 	return float(hash(Vector2i(i, floori(_time * 10.0) + _seed + 7)) % 100) / 100.0 < low * 0.3
@@ -381,18 +492,30 @@ func _draw() -> void:
 	var fill: int = _fill() if _state == State.OPEN else 0
 	var ghost_to: int = ceili(W * _ghost) if _state == State.OPEN else 0
 	var low: float = _low()
+	var bar_now: int = _current_bar()
 	var main: Color = VoidGlow.VEIN.lightened(0.15).lerp(VEIN_LOW, low)
 	var light: Color = VoidGlow.VEIN_LIGHT.lerp(BUD, low * 0.7)
+	var under_main: Color = Color(RAIL, 0.5)
+	if _bars > 1 and bar_now > 0:
+		var pal: Dictionary = _layer_colors(bar_now)
+		main = pal["main"] as Color
+		light = pal["light"] as Color
+		if bar_now > 1:
+			var upal: Dictionary = _layer_colors(bar_now - 1)
+			under_main = (upal["main"] as Color).darkened(0.28)
 	var edge: int = maxi(fill, ghost_to)
 	# The black the crack is torn into.
 	for i: int in range(W):
 		if not _visible_column(i):
 			continue
 		var r: int = _ry(i)
-		if i < edge or _state == State.DYING:
+		if i < edge or _state == State.DYING or (_bars > 1 and bar_now > 1):
 			draw_rect(Rect2(x0 + i, r - 4, 1, 10), Color(SMEAR, 0.55 * _end(i)))
-		if i >= edge and i % 2 == 0 and _state == State.OPEN:
-			draw_rect(Rect2(x0 + i, r, 1, 1), Color(RAIL, 0.5 * _end(i))) ## what could still be
+		if i >= edge and _state == State.OPEN:
+			if _bars > 1 and bar_now > 1:
+				draw_rect(Rect2(x0 + i, r, 1, 2), Color(under_main, 0.82 * _end(i))) ## gleaming next HP bar beneath!
+			elif i % 2 == 0:
+				draw_rect(Rect2(x0 + i, r, 1, 1), Color(RAIL, 0.5 * _end(i))) ## what could still be
 	# What was just lost, dying as glitch pixels.
 	for i: int in range(fill, ghost_to):
 		if _visible_column(i) and int(hash(Vector2i(i, floori(_time * 14.0) + _seed)) % 3) != 0:
@@ -417,10 +540,11 @@ func _draw() -> void:
 				draw_rect(Rect2(x0 + i, r + tw * 2, 1, 1), main)
 				draw_rect(Rect2(x0 + i + 1, r + tw * 3, 1, 1), Color(main, 0.85))
 				draw_rect(Rect2(x0 + i + 2, r + tw * 4, 1, 1), Color(main, 0.55))
+		var spark_at: int = _spark(fill)
 		for i: int in range(fill):
 			if not _visible_column(i):
 				continue
-			var d: int = absi(i - _spark(fill)) if _spark(fill) >= 0 else 99
+			var d: int = absi(i - spark_at) if spark_at >= 0 else 99
 			if d <= 4:
 				draw_rect(Rect2(x0 + i, _ry(i), 1, 2), Color(FLASH, 1.0 - float(d) * 0.2))
 			elif _flicker(i):
@@ -453,6 +577,34 @@ func _draw() -> void:
 					arm += 1
 			draw_rect(Rect2(x0 + col - 1, cy, 3, 1), Color(base.lightened(0.3), live))
 			draw_rect(Rect2(x0 + col, cy, 1, 1), Color(FLASH, beat_p * live))
+	# Lost-Ark multi-layer HP counter ("x5") to the right of the crack.
+	if _bars > 1 and _state == State.OPEN and _grow > 0.5 and bar_now > 0:
+		var tag: String = "x%d" % bar_now
+		var tag_col: Color = GOLD.lerp(FLASH, clampf(_impact * 1.4, 0.0, 1.0))
+		draw_set_transform(_shake(), 0.0, Vector2(2.0, 2.0))
+		PixelText.draw(self, tag, Vector2i((x0 + W + 6) / 2, (CRACK_Y - 6) / 2), tag_col, SMEAR)
+		draw_set_transform(_shake(), 0.0, Vector2.ONE)
+	# Integrated Golden Stagger Bar underneath the HP crack (docs/dungeon_konzept.md 3.3).
+	if _stagger_open > 0.01 and _state == State.OPEN:
+		var sw: int = roundi(float(W - 40) * smoothstep(0.0, 1.0, _stagger_open))
+		var sx: int = int(SIZE.x * 0.5 - float(sw) * 0.5)
+		var sy: int = STAGGER_Y
+		var sf: float = _stagger.fraction() if (_stagger != null and is_instance_valid(_stagger)) else 0.0
+		var tf: float = _stagger.time_fraction() if (_stagger != null and is_instance_valid(_stagger)) else 0.0
+		draw_rect(Rect2(sx - 2, sy - 2, sw + 4, STAGGER_H + 4), Color(SMEAR, 0.88 * _stagger_open))
+		draw_rect(Rect2(sx - 1, sy - 1, sw + 2, STAGGER_H + 2), Color(STAGGER_DEEP, 0.85 * _stagger_open))
+		draw_rect(Rect2(sx, sy, sw, STAGGER_H), Color(Color("1a1026"), 0.92 * _stagger_open))
+		var sfill: int = roundi(float(sw) * sf)
+		if sfill > 0:
+			var scol: Color = STAGGER_GOLD.lerp(STAGGER_CORE, clampf(_stagger_flash * 2.0, 0.0, 1.0))
+			draw_rect(Rect2(sx, sy, sfill, STAGGER_H), Color(scol, _stagger_open))
+			draw_rect(Rect2(sx, sy, sfill, 2), Color(STAGGER_CORE, 0.85 * _stagger_open))
+		## Thin turquoise countdown rail along the bottom edge of the stagger bar
+		var tfill: int = roundi(float(sw) * tf)
+		if tfill > 0:
+			draw_rect(Rect2(sx, sy + STAGGER_H + 1, tfill, 1), Color(Color("4df2e0"), 0.9 * _stagger_open))
+		if _stagger_open > 0.6:
+			PixelText.draw(self, "TAUMEL", Vector2i(sx - 34, sy - 1), Color(STAGGER_GOLD, _stagger_open), SMEAR)
 	# Shards.
 	for s: Dictionary in _shards:
 		var p: Vector2 = (s["pos"] as Vector2).round()

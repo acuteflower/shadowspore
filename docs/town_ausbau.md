@@ -1,6 +1,6 @@
 # Stadt-Ausbau – Konzept „Glimmrast wird lebendig"
 
-Status: **Konzept, nichts gebaut** (Stand 2026-11-07). Grundlage: Analyse der Stadt (`docs/town.md`). Dieses Dokument legt fest, **was jetzt umgesetzt wird**, wie es an die bestehenden Systeme anknüpft und in welcher Reihenfolge gebaut wird. Alles, was nicht hier steht, steht in Abschnitt 9 („Später").
+Status: **Gebaut (`Stadtbau 2.0`, Brunnenplatz, Salon, Karawane; für v2-Heimatzone `glimmrast` vorgesehen).** (Stand 2026-11-07). Grundlage: Analyse der Stadt (`docs/town.md`). Dieses Dokument legt fest, **was jetzt umgesetzt wird**, wie es an die bestehenden Systeme anknüpft und in welcher Reihenfolge gebaut wird. Alles, was nicht hier steht, steht in Abschnitt 9 („Später").
 
 ## 0. Umfang
 
@@ -121,7 +121,7 @@ Jetzt umsetzen (Nummern aus der Ideenliste):
 - **Wohlfühlbonus:** sitzt die Spielerin am Feuer und mindestens ein Siedler ist in der Runde, erhält sie nach 8 s **Feuerwärme**: `HealthComponent.regen` 6 HP über 6 s, danach 90 s Abklingzeit; zusätzlich kurz warmes Aufglimmen am Feuer und im Gesicht (leichte Lichtpuls-Optik, kein Bildschirm-Effekt). Keine neue Buff-Infrastruktur (die Regeneration gibt es).
 - **Geschichten:** nach der ersten Minute der Runde erzählt ein Siedler eine **Feuergeschichte** (siehe C16, Thema `fire_story`), mit Tageszähler, damit nichts doppelt kommt.
 - **Rand:** nicht in der Nacht des Raids (Warnung bricht die Runde ab), nicht bei Dialog/Story (`story_lock`).
-- **Haken für später:** Feste (Vollmond-Feuer), Musik, Essen teilen mit dem Kochsystem.
+- **Haken für später:** Feste (Vollmond-Feuer), Musik, gemeinsame Alchemie-Runden.
 - **Test:** `test_town` (Platzvergabe, Bonus einmal je Abklingzeit, Abbruch bei Raid).
 
 ### C16 Siedler reagieren aufeinander und auf die Stadt

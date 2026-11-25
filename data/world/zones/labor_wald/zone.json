@@ -1,0 +1,134 @@
+{
+	"_doc": "PLATZHALTER-Zone für das Zonenlabor. `footprint` = Kontrollpunkte relativ zu `origin` (mit `curve` zu einer Kurve geglättet) plus {\"seam\": id} für die gemeinsame Naht (Kontinent-Tiles, bleibt wie gezeichnet). `places[].poly`, `landmarks[].pos` relativ zu `origin`. Die Landschaft (Wälder, Haine, Wege, Bäume) steht kontinentweit in data/world/landscape/lab.json; `nature` hält nur, was der Zone selbst gehört (Saat, Blumenteppich, Grenzgürtel).",
+	"id": "labor_wald",
+	"name": "LABORWALD",
+	"subtitle": "Unter den Kronen",
+	"continent": "lab",
+	"region": "labor",
+	"kind": "field",
+	"size_class": "M",
+	"origin": [
+		1140,
+		876
+	],
+	"size": [
+		166,
+		150
+	],
+	"biomes": [
+		"meadow"
+	],
+	"mood": "forest_deep",
+	"night": "meadow_default",
+	"danger": "rau",
+	"placeholder": true,
+	"footprint": [
+		[
+			17,
+			42
+		],
+		[
+			32,
+			24
+		],
+		[
+			62,
+			10
+		],
+		[
+			104,
+			6
+		],
+		[
+			140,
+			16
+		],
+		[
+			158,
+			46
+		],
+		[
+			160,
+			84
+		],
+		[
+			152,
+			118
+		],
+		[
+			128,
+			140
+		],
+		[
+			92,
+			145
+		],
+		[
+			56,
+			142
+		],
+		[
+			24,
+			136
+		],
+		{
+			"seam": "labor_naht"
+		}
+	],
+	"borders": [
+		{
+			"kind": "forest_sea",
+			"depth": 6
+		}
+	],
+	"places": [
+		{
+			"id": "moosgrund",
+			"name": "DER MOOSGRUND",
+			"poly": [
+				[
+					60,
+					62
+				],
+				[
+					86,
+					56
+				],
+				[
+					104,
+					72
+				],
+				[
+					96,
+					94
+				],
+				[
+					70,
+					96
+				],
+				[
+					56,
+					80
+				]
+			],
+			"mood": "forest_glade",
+			"mood_amount": 0.75
+		}
+	],
+	"landmarks": [],
+	"nature": {
+		"seed": 23,
+		"meadow": false,
+		"turf": {
+			"accents": 0.07,
+			"kinds": [
+				"tuft",
+				"clump",
+				"clover",
+				"petal",
+				"flower"
+			]
+		}
+	},
+	"curve": true
+}

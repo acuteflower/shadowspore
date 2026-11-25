@@ -1,0 +1,44 @@
+{
+  "continent_id": "lab",
+  "size": [
+    2400,
+    1800
+  ],
+  "px_per_tile": 1,
+  "light_alpha_bits": {
+    "WATER": 1,
+    "MEADOW": 2,
+    "CANOPY": 4,
+    "GLOW_WARM": 8,
+    "GLOW_ARCANE": 16,
+    "INK_CLIFF": 32,
+    "SAND_WAY": 64,
+    "VALID": 128
+  },
+  "rift_pos": null,
+  "rift_radius": 0.0,
+  "ocean_currents": [],
+  "old_names": [
+    {
+      "text": "DAS LABOR",
+      "pos": [
+        1150,
+        920
+      ]
+    },
+    {
+      "text": "LABORWIESE",
+      "pos": [
+        1079,
+        962
+      ]
+    },
+    {
+      "text": "LABORWALD",
+      "pos": [
+        1220,
+        975
+      ]
+    }
+  ]
+}

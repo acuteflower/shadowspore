@@ -150,8 +150,8 @@ func setup(interior_id: String, data: Dictionary) -> void:
 			var rest: bool = bool(entry[1])
 			spot.use = func(player: Player) -> void:
 				var world: Node = get_tree().get_first_node_in_group("world")
-				if world is WorldLevel:
-					(world as WorldLevel).start_sleep(player, rest)
+				if world != null and world.has_method("start_sleep"):
+					world.call("start_sleep", player, rest)
 			add_child(spot)
 			bed_stories.append(spot)
 		var sleep_spot: BedRestSpot = BedRestSpot.new()
@@ -522,7 +522,7 @@ func _door(item: Dictionary, label: String, leaving: bool, main: bool = true) ->
 	way.opens = bool(item.get("opens", false))
 	way.needs = String(item.get("needs", ""))
 	way.locked_text = String(item.get("locked_text", ""))
-	way.label = label
+	way.label = String(item.get("label", label)) ## e.g. the crypt's stair: HINAUFSTEIGEN
 	way.leaf = leaf
 	way.reach_radius = 12.0
 	way.prompt_height = 34.0
@@ -825,6 +825,8 @@ func set_pocket_active(active: bool) -> void:
 		for light: PointLight2D in paused:
 			light.enabled = false
 		set_meta("_paused_lights", paused)
+		if _back != null and not _smoke_back:
+			_back.visible = false
 		visible = false
 		process_mode = Node.PROCESS_MODE_DISABLED
 	else:

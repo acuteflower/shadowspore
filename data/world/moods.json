@@ -1,0 +1,450 @@
+{
+	"_doc": "Mood profiles of the 2.0 zone world (ZoneMood, docs/v2_zonenwelt_atlas_konzept.md 7). A zone names one with `mood`, a place may lean towards one (`mood`, `mood_amount`). Every field is optional and neutral by default: tint_day / tint_night multiply the world light (1 1 1 = untouched, the night tint grows with the clock's night), sun scales the direct sun and its golden hour, shadow / light multiply the colour grade's tints, vibrance / contrast / bloom / vignette are added to the grade, wind scales the gusts of every plant, motes the daylight pollen, amb_day / amb_night / amb_wind / amb_crickets the sound beds. Profiles blend over about 30 tiles across a seam.",
+	"moods": {
+		"meadow_open": {
+			"tint_day": [
+				1.02,
+				1.01,
+				0.97
+			],
+			"tint_night": [
+				1.0,
+				1.0,
+				1.04
+			],
+			"sun": 1.0,
+			"light": [
+				1.03,
+				1.01,
+				0.97
+			],
+			"vibrance": 0.04,
+			"vignette": -0.03,
+			"wind": 1.25,
+			"motes": 1.25,
+			"amb_day": 1.0,
+			"amb_wind": 1.25,
+			"amb_crickets": 1.1
+		},
+		"forest_deep": {
+			"hud_bark": [
+				0.5,
+				0.78,
+				0.52
+			],
+			"hud_tint": 0.9,
+			"tint_day": [
+				0.86,
+				0.92,
+				0.88
+			],
+			"tint_night": [
+				0.84,
+				0.88,
+				0.96
+			],
+			"sun": 0.62,
+			"shadow": [
+				0.92,
+				1.02,
+				1.04
+			],
+			"light": [
+				0.96,
+				1.03,
+				0.94
+			],
+			"vibrance": -0.03,
+			"contrast": 0.03,
+			"bloom": 0.06,
+			"vignette": 0.12,
+			"wind": 0.55,
+			"motes": 0.45,
+			"amb_day": 0.75,
+			"amb_night": 1.15,
+			"amb_wind": 0.5,
+			"amb_crickets": 0.7
+		},
+		"forest_glade": {
+			"tint_day": [
+				0.98,
+				0.99,
+				0.93
+			],
+			"sun": 0.95,
+			"light": [
+				1.05,
+				1.02,
+				0.92
+			],
+			"vibrance": 0.03,
+			"vignette": 0.02,
+			"wind": 0.8,
+			"motes": 1.5,
+			"amb_day": 1.05,
+			"amb_wind": 0.7
+		},
+		"windkap_coast": {
+			"hud_bark": [
+				0.78,
+				0.84,
+				0.88
+			],
+			"hud_tint": 1.0,
+			"tint_day": [
+				0.99,
+				1.02,
+				1.03
+			],
+			"tint_night": [
+				0.96,
+				0.99,
+				1.06
+			],
+			"sun": 1.02,
+			"shadow": [
+				0.96,
+				0.99,
+				1.04
+			],
+			"light": [
+				1.03,
+				1.02,
+				0.99
+			],
+			"vibrance": 0.05,
+			"contrast": 0.01,
+			"bloom": 0.02,
+			"vignette": -0.02,
+			"wind": 1.35,
+			"motes": 1.15,
+			"amb_day": 1.05,
+			"amb_night": 0.95,
+			"amb_wind": 1.4,
+			"amb_crickets": 0.85
+		},
+		"windkap_headland": {
+			"hud_bark": [
+				0.8,
+				0.85,
+				0.9
+			],
+			"hud_tint": 0.8,
+			"tint_day": [
+				0.98,
+				1.01,
+				1.05
+			],
+			"tint_night": [
+				0.95,
+				0.98,
+				1.08
+			],
+			"sun": 1.06,
+			"shadow": [
+				0.94,
+				0.98,
+				1.06
+			],
+			"light": [
+				1.04,
+				1.02,
+				1.0
+			],
+			"vibrance": 0.04,
+			"contrast": 0.03,
+			"bloom": 0.03,
+			"vignette": -0.01,
+			"wind": 1.55,
+			"motes": 0.9,
+			"amb_day": 0.95,
+			"amb_night": 0.9,
+			"amb_wind": 1.65,
+			"amb_crickets": 0.55
+		},
+		"windkap_brook": {
+			"tint_day": [
+				0.97,
+				1.01,
+				1.02
+			],
+			"tint_night": [
+				0.94,
+				0.98,
+				1.05
+			],
+			"sun": 0.96,
+			"shadow": [
+				0.95,
+				1.01,
+				1.03
+			],
+			"light": [
+				1.01,
+				1.02,
+				0.98
+			],
+			"vibrance": 0.04,
+			"bloom": 0.02,
+			"wind": 0.9,
+			"motes": 1.25,
+			"amb_day": 1.05,
+			"amb_wind": 0.85,
+			"amb_crickets": 1.15
+		},
+		"windkap_orchard": {
+			"tint_day": [
+				1.04,
+				1.01,
+				0.95
+			],
+			"tint_night": [
+				1.0,
+				0.99,
+				1.03
+			],
+			"sun": 1.02,
+			"light": [
+				1.05,
+				1.02,
+				0.95
+			],
+			"vibrance": 0.05,
+			"vignette": -0.02,
+			"wind": 1.1,
+			"motes": 1.45,
+			"amb_day": 1.05,
+			"amb_wind": 1.05,
+			"amb_crickets": 1.25
+		},
+		"windkap_grove": {
+			"tint_day": [
+				0.94,
+				0.98,
+				0.94
+			],
+			"tint_night": [
+				0.92,
+				0.96,
+				1.04
+			],
+			"sun": 0.84,
+			"shadow": [
+				0.93,
+				1.01,
+				1.03
+			],
+			"light": [
+				1.02,
+				1.04,
+				0.95
+			],
+			"vibrance": 0.02,
+			"contrast": 0.02,
+			"bloom": 0.08,
+			"vignette": 0.05,
+			"wind": 0.65,
+			"motes": 1.6,
+			"amb_day": 0.9,
+			"amb_night": 1.15,
+			"amb_wind": 0.6,
+			"amb_crickets": 0.95
+		},
+		"glaskamm_stone": {
+			"hud_bark": [
+				0.72,
+				0.74,
+				0.86
+			],
+			"hud_tint": 0.8,
+			"tint_day": [
+				0.97,
+				0.99,
+				1.04
+			],
+			"tint_night": [
+				0.93,
+				0.96,
+				1.06
+			],
+			"sun": 0.96,
+			"shadow": [
+				0.94,
+				0.97,
+				1.05
+			],
+			"light": [
+				1.01,
+				1.02,
+				1.03
+			],
+			"vibrance": 0.01,
+			"contrast": 0.04,
+			"bloom": 0.03,
+			"vignette": 0.02,
+			"wind": 1.4,
+			"motes": 0.75,
+			"amb_day": 0.9,
+			"amb_night": 1.0,
+			"amb_wind": 1.45,
+			"amb_crickets": 0.5
+		},
+		"hexenwald_edge": {
+			"hud_bark": [
+				0.42,
+				0.62,
+				0.36
+			],
+			"hud_tint": 1.0,
+			"tint_day": [
+				0.89,
+				0.92,
+				0.93
+			],
+			"tint_night": [
+				0.85,
+				0.87,
+				0.99
+			],
+			"sun": 0.72,
+			"shadow": [
+				0.91,
+				0.99,
+				1.05
+			],
+			"light": [
+				0.97,
+				1.01,
+				0.96
+			],
+			"vibrance": -0.02,
+			"contrast": 0.04,
+			"bloom": 0.06,
+			"vignette": 0.1,
+			"wind": 0.65,
+			"motes": 0.8,
+			"amb_day": 0.8,
+			"amb_night": 1.2,
+			"amb_wind": 0.6,
+			"amb_crickets": 0.85
+		},
+		"leerenbluehen_rift": {
+			"hud_bark": [
+				0.6,
+				0.38,
+				0.9
+			],
+			"hud_tint": 0.6,
+			"hud_void": 1.0,
+			"tint_day": [
+				0.9,
+				0.85,
+				0.98
+			],
+			"tint_night": [
+				0.88,
+				0.79,
+				1.04
+			],
+			"sun": 0.78,
+			"shadow": [
+				0.94,
+				0.88,
+				1.08
+			],
+			"light": [
+				1.0,
+				0.93,
+				1.05
+			],
+			"vibrance": 0.02,
+			"contrast": 0.05,
+			"bloom": 0.12,
+			"vignette": 0.14,
+			"wind": 0.95,
+			"motes": 1.35,
+			"amb_day": 0.7,
+			"amb_night": 1.35,
+			"amb_wind": 0.9,
+			"amb_crickets": 0.35
+		},
+		"suedkap_harbor": {
+			"hud_bark": [
+				0.68,
+				0.8,
+				0.86
+			],
+			"hud_tint": 0.95,
+			"tint_day": [
+				0.96,
+				1.0,
+				1.04
+			],
+			"tint_night": [
+				0.91,
+				0.96,
+				1.08
+			],
+			"sun": 0.98,
+			"shadow": [
+				0.92,
+				0.97,
+				1.06
+			],
+			"light": [
+				1.02,
+				1.02,
+				0.98
+			],
+			"vibrance": 0.04,
+			"contrast": 0.03,
+			"bloom": 0.04,
+			"vignette": 0.02,
+			"wind": 1.48,
+			"motes": 0.95,
+			"amb_day": 1.0,
+			"amb_night": 1.05,
+			"amb_wind": 1.55,
+			"amb_crickets": 0.65
+		},
+		"suedkap_cliffs": {
+			"hud_bark": [
+				0.74,
+				0.82,
+				0.9
+			],
+			"hud_tint": 0.85,
+			"tint_day": [
+				0.97,
+				1.01,
+				1.06
+			],
+			"tint_night": [
+				0.9,
+				0.95,
+				1.1
+			],
+			"sun": 1.05,
+			"shadow": [
+				0.91,
+				0.96,
+				1.08
+			],
+			"light": [
+				1.04,
+				1.03,
+				1.01
+			],
+			"vibrance": 0.03,
+			"contrast": 0.04,
+			"bloom": 0.04,
+			"vignette": 0.01,
+			"wind": 1.65,
+			"motes": 0.8,
+			"amb_day": 0.92,
+			"amb_night": 1.0,
+			"amb_wind": 1.72,
+			"amb_crickets": 0.45
+		}
+	}
+}

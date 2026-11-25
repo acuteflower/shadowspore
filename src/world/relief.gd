@@ -10,10 +10,10 @@ extends RefCounted
 ## question about the data (collision, props, footsteps). The per-tile `FACE` kind is only the
 ## tile-grid approximation of the wall that props are kept away from.
 
-const TEXTURE: Texture2D = preload("res://assets/world/relief.png")
-const FIELD: Texture2D = preload("res://assets/world/relief_field.png")
-const WOBBLE: Texture2D = preload("res://assets/world/relief_wobble.png")
-const BLOCK: Texture2D = preload("res://assets/world/relief_block.png")
+const TEXTURE_PATH: String = "res://assets/world/relief.png"
+const FIELD_PATH: String = "res://assets/world/relief_field.png"
+const WOBBLE_PATH: String = "res://assets/world/relief_wobble.png"
+const BLOCK_PATH: String = "res://assets/world/relief_block.png"
 const CELLS: int = 4 ## collision cells per tile side (4 px each)
 const PROP_MARGIN: float = 12.0 ## px props keep from anything that is not their own flat floor (the smooth contour strays from the tile edge)
 const FLOOR: int = 0
@@ -94,22 +94,30 @@ static func clear_cache() -> void:
 
 
 func _init() -> void:
+	if not ResourceLoader.exists(TEXTURE_PATH) or not ResourceLoader.exists(FIELD_PATH) or not ResourceLoader.exists(BLOCK_PATH):
+		return
+	var tex: Texture2D = load(TEXTURE_PATH) as Texture2D
+	var fld: Texture2D = load(FIELD_PATH) as Texture2D
+	var blk: Texture2D = load(BLOCK_PATH) as Texture2D
+	var wob: Texture2D = load(WOBBLE_PATH) as Texture2D if ResourceLoader.exists(WOBBLE_PATH) else null
+	if tex == null or fld == null or blk == null:
+		return
 	var world_map_data: Dictionary = DataRegistry.table("world_map")
 	var active: String = String(world_map_data.get("biome", ""))
 	var own: Array = world_map_data.get("own_biomes", []) as Array
 	var expected: String = cache_key_for(active, own, town_styles)
 	if not has_cache(expected):
 		var built: Dictionary = build_base_data(
-			TEXTURE.get_image(),
-			FIELD.get_image(),
-			BLOCK.get_image(),
+			tex.get_image(),
+			fld.get_image(),
+			blk.get_image(),
 			active,
 			own,
 			DataRegistry.table("biomes").keys(),
 			DataRegistry.table("hallgrat"),
 			town_styles
 		)
-		store_cache(built, WOBBLE.get_image())
+		store_cache(built, wob.get_image() if wob != null else null)
 	_side = _cache_side
 	_block_side = _cache_block_side
 	town_cells = _cache_town_cells
@@ -364,103 +372,4 @@ func blockers(rect: Rect2i) -> Array[Rect2]:
 	return out
 
 
-# Editable relief keeps immutable copies so undo restores the original bake exactly.
-var editor_texture: ImageTexture
-var editor_field: ImageTexture
-var _base_bytes: PackedByteArray
-var _base_field: PackedByteArray
-var _base_block: PackedByteArray
 var _wobble_image: Image
-var _block_dirty: bool = false
-
-func editor_apply(edits: Dictionary) -> void:
-	var first_apply: bool = editor_texture == null
-	if first_apply:
-		var world_map_data: Dictionary = DataRegistry.table("world_map")
-		var expected: String = cache_key_for(String(world_map_data.get("biome", "")), world_map_data.get("own_biomes", []) as Array, town_styles)
-		_base_bytes = _cache_bytes if has_cache(expected) else _bytes.duplicate()
-		_base_field = _cache_field if has_cache(expected) else _field.duplicate()
-		_base_block = _cache_block if has_cache(expected) else _block.duplicate()
-		if _wobble_image == null:
-			_wobble_image = WOBBLE.get_image()
-	if not first_apply or not edits.is_empty():
-		_bytes = _base_bytes.duplicate()
-		_field = _base_field.duplicate()
-		if _block_dirty or not edits.is_empty():
-			_block = _base_block.duplicate()
-			_block_dirty = false
-		else:
-			_block = _base_block
-	var dirty: Dictionary = {}
-	for key_string: String in edits:
-		var cell: Vector2i = WorldEdits.cell(key_string)
-		if not is_land(cell.x, cell.y):
-			continue
-		var spec: Dictionary = edits[key_string]
-		if spec.has("biome"):
-			var biome_ids: Array = DataRegistry.table("biomes").keys()
-			_bytes[(cell.y * _side + cell.x) * 4 + 3] = 200 + maxi(0, biome_ids.find(RegionMap.active_biome(String(spec.biome))))
-		if not spec.has("height"):
-			continue
-		dirty[cell] = true
-		var idx: int = (cell.y * _side + cell.x) * 4
-		var height: int = clampi(int(spec.height), 0, 3)
-		_bytes[idx] = height
-		var style: int = clampi(int(spec.get("style", 0)), 0, 4)
-		if String(DataRegistry.table("world_map").get("biome", "")) == "meadow" and style >= 2:
-			style = 0 if style == 4 else 1
-		_bytes[idx + 1] = clampi(int(spec.get("kind", 0)), 0, 4) | (style << 4)
-		_bytes[idx + 2] = int(spec.get("geom", 0))
-		for ch: int in 3:
-			_field[(cell.y * _side + cell.x) * 3 + ch] = 255 if height > ch else 0
-	# Recompute only collision patches affected by edits: bilinear filter, rims,
-	# and the 32 px south-facing wall. Sampling matches the existing bake.
-	var patches: Dictionary = {}
-	for cell: Vector2i in dirty:
-		for y: int in range(maxi(0, cell.y - 1), mini(_side, cell.y + 5)):
-			for x: int in range(maxi(0, cell.x - 1), mini(_side, cell.x + 2)):
-				patches[Vector2i(x, y)] = true
-	var heights: Dictionary = {}
-	if not patches.is_empty() and not _block_dirty:
-		_block = _base_block.duplicate()
-		_block_dirty = true
-	for cell: Vector2i in patches:
-		for dy: int in CELLS:
-			for dx: int in CELLS:
-				var c: Vector2i = cell * CELLS + Vector2i(dx, dy)
-				var home: int = _editor_level(c, heights)
-				var solid: bool = false
-				for d: int in range(1, 9):
-					if _editor_level(c - Vector2i(0, d), heights) > home:
-						solid = true
-				for dir: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-					solid = solid or _editor_level(c + dir, heights) != home
-				# Connectors clear their wall and half a tile above their start.
-				var connector: bool = kind(cell.x, cell.y) >= RAMP
-				if dy >= 2 and kind(cell.x, cell.y + 1) >= RAMP:
-					connector = true
-				_block[c.y * _block_side + c.x] = 255 if solid and is_land(cell.x, cell.y) and not connector else 0
-	var image: Image = Image.create_from_data(_side, _side, false, Image.FORMAT_RGBA8, _bytes)
-	var field: Image = Image.create_from_data(_side, _side, false, Image.FORMAT_RGB8, _field)
-	if editor_texture == null:
-		editor_texture = ImageTexture.create_from_image(image)
-		editor_field = ImageTexture.create_from_image(field)
-	else:
-		editor_texture.update(image)
-		editor_field.update(field)
-
-func _editor_level(c: Vector2i, cache: Dictionary) -> int:
-	if cache.has(c):
-		return int(cache[c])
-	var pos: Vector2 = Vector2(c) * 4.0 + Vector2(2, 2)
-	var uv: Vector2 = pos / TILE - Vector2(0.5, 0.5)
-	var x: int = floori(uv.x)
-	var y: int = floori(uv.y)
-	var wobble: float = _wobble_image.get_pixel(posmod(int(pos.x), 256), posmod(int(pos.y), 256)).r - 128.0 / 255.0
-	var result: int = 0
-	for ch: int in 3:
-		var amount: float = lerpf(lerpf(_field_at(x, y, ch), _field_at(x + 1, y, ch), uv.x - x), lerpf(_field_at(x, y + 1, ch), _field_at(x + 1, y + 1, ch), uv.x - x), uv.y - y)
-		if amount + wobble > 0.5:
-			result += 1
-	cache[c] = result
-	return result

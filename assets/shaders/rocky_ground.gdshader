@@ -273,13 +273,18 @@ vec3 shade_bedrock_shelf(vec2 px, float bv) {
 	bool plate_fiss = (p_frac.y < 0.16 && p_hash < 0.44) || (p_frac.x < 0.15 && p_hash > 0.64);
 	bool plate_bev = !plate_fiss && (p_frac.y >= 0.16 && p_frac.y < 0.34 && p_hash < 0.44);
 
-	// Tectonic joint fracture network (1px dark rock fissures across broad bedrock slabs!)
+	// Tectonic joint fracture network (1px dark rock fissures + subtle crystalline quartz specks across broad bedrock slabs!)
 	float j_field = rg_vnoise(vec2(px.x * 0.075 - px.y * 0.055, px.y * 0.095 + px.x * 0.035) + vec2(43.0, 9.0));
 	float joint_dist = abs(j_field - 0.50);
 	if (joint_dist < 0.020 && bv > 0.56) {
 		return BEDROCK_RAMP[0];
 	}
 	if (joint_dist >= 0.020 && joint_dist < 0.038 && bv > 0.56) {
+		// Occasional embedded pale quartz crystal glint tucked inside a sunlit rock fracture!
+		float qh = rg_hash(floor(px / 2.0) + vec2(211.0, 89.0));
+		if (qh > 0.91) {
+			return mix(vec3(0.86, 0.90, 0.96), vec3(0.76, 0.84, 0.98), g_night);
+		}
 		return BEDROCK_RAMP[5];
 	}
 
@@ -299,7 +304,15 @@ vec3 shade_bedrock_shelf(vec2 px, float bv) {
 	float clust = rg_hash(floor(px / 2.0) + vec2(31.0, 83.0)) - 0.5;
 	float f = 3.55 + (bv - 0.55) * 1.35 + (p_hash - 0.5) * 1.15 + clust * 0.65;
 	int idx = clamp(int(floor(f)), 2, 5);
-	return BEDROCK_RAMP[idx];
+	vec3 stone_c = BEDROCK_RAMP[idx];
+	// Subtle geological mineral stratum variation (warm weathered limestone vs cool blue-slate across wide shelves!)
+	float min_var = rg_fbm(px / 44.0 + vec2(17.0, 61.0));
+	if (min_var > 0.60) {
+		stone_c *= vec3(1.05, 1.02, 0.94);
+	} else if (min_var < 0.40) {
+		stone_c *= vec3(0.94, 0.98, 1.05);
+	}
+	return stone_c;
 }
 
 // Stony Highland Mineral Loam & Worn Quarry Track

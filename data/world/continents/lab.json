@@ -1,0 +1,24 @@
+{
+	"_doc": "Isolierte Zonenlabor-Testfixture (labor_wiese <-> labor_wald) in Kontinent-Tiles. Getrennt von ALTMARK (main.json).",
+	"id": "lab",
+	"name": "ZONENLABOR",
+	"size": [2400, 1800],
+	"regions": [
+		{"id": "labor", "name": "DAS LABOR"}
+	],
+	"zones": [
+		"labor_wiese",
+		"labor_wald"
+	],
+	"thresholds": "world/thresholds_lab.json",
+	"landscape": "world/landscape/lab.json",
+	"seams": [
+		{
+			"id": "labor_naht",
+			"a": "labor_wiese",
+			"b": "labor_wald",
+			"kind": "forest_sea",
+			"pts": [[1140, 918], [1149, 938], [1154, 958], [1144, 976], [1141, 1010]]
+		}
+	]
+}

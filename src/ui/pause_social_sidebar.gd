@@ -53,6 +53,9 @@ class _FeedCanvas extends Control:
 
 
 var _feed_viewport: _FeedCanvas = null
+var top_inset: float = 0.0 ## vertical offset below GameMenu Canopy Rail when embedded
+var bottom_inset: float = 0.0 ## vertical clearance above GameMenu Footer Rail when embedded
+var codex_style: bool = false ## 1:1 tiled MenuChrome obsidian surface when docked in SystemTab
 var _expanded: bool = true
 var _slide_t: float = 0.0
 var _fade: float = 0.0
@@ -216,7 +219,7 @@ func _drawer_x() -> float:
 
 
 func _feed_top_y() -> float:
-	var base: float = 113.0 if CloudSession.is_logged_in() else 90.0
+	var base: float = (113.0 if CloudSession.is_logged_in() else 90.0) + top_inset
 	return base + (14.0 if _toast_t > 0.0 else 0.0)
 
 
@@ -224,7 +227,7 @@ func _feed_clip_rect() -> Rect2:
 	var vs: Vector2 = _view_size()
 	var dx: float = _drawer_x()
 	var top: float = _feed_top_y()
-	var bottom: float = vs.y - 18.0
+	var bottom: float = vs.y - bottom_inset - 18.0
 	return Rect2(dx + 4.0, top, EXPANDED_W - 8.0, maxf(bottom - top, 24.0))
 
 
@@ -321,6 +324,13 @@ func _dispatch_action(action: String, arg: String) -> void:
 	match action:
 		"toggle_drawer":
 			toggle_expanded()
+		"open_chat":
+			get_tree().call_group("game_chat", "open_chat")
+		"friend_dm":
+			for friend: Dictionary in CloudSession.friends_cache:
+				if String(friend.get("user_id", "")) == arg:
+					get_tree().call_group("game_chat", "open_friend", arg, String(friend.get("username", "Spieler")))
+					break
 		"refresh_social":
 			_do_refresh_now()
 		"copy_uid":
@@ -593,21 +603,26 @@ func _draw() -> void:
 	var dx: float = _drawer_x()
 	var es: float = _eased_slide()
 	var a: float = _fade
+	var y_top: float = top_inset
+	var y_h: float = maxf(vs.y - top_inset - bottom_inset, 40.0)
 	# Subtle soft dark feather to the left of the rail seam (Launcher-like separation, never heavy)
 	for step: int in 4:
 		var sx: float = dx - float(step + 1) * 3.0
 		var sa: float = (0.24 - float(step) * 0.055) * a
-		draw_rect(Rect2(sx, 0.0, 3.0, vs.y), Color(0.02, 0.01, 0.05, sa))
-	# Full-height bark surface (#161021) matching Launcher's left rail
-	draw_rect(Rect2(dx, 0.0, vs.x - dx, vs.y), Color(COL_BARK, 0.94 * a))
-	# Quiet top-of-rail bark checker grain (~3% lightness, subtle)
-	for py: int in range(2, 20, 4):
-		var start_x: int = int(dx) + (4 if (py / 4) % 2 == 0 else 2)
-		for px: int in range(start_x, int(vs.x) - 2, 6):
-			draw_rect(Rect2(px, py, 2, 2), Color(COL_BARK_ALT, 0.35 * a))
-	# Quiet dark plum left seam (#120a22 outer, #2b1f4a inner)
-	draw_rect(Rect2(dx, 0.0, 1.0, vs.y), Color(COL_OUTLINE, 0.9 * a))
-	draw_rect(Rect2(dx + 1.0, 0.0, 1.0, vs.y), Color(COL_SEAM, 0.85 * a))
+		draw_rect(Rect2(sx, y_top, 3.0, y_h), Color(0.02, 0.01, 0.05, sa))
+	# Bark surface (#161021) or 1:1 tiled obsidian weave when hosted inside Feldcodex SystemTab
+	if codex_style:
+		MenuChrome.draw_tiled_region(self, Rect2(dx, y_top, vs.x - dx, y_h), MenuChrome.TILE_INSET, Color(1.0, 1.0, 1.0, 0.96 * a))
+		draw_rect(Rect2(dx, y_top, 1.0, y_h), Color(MenuChrome.COL_OUTLINE, 0.95 * a))
+		draw_rect(Rect2(dx + 1.0, y_top, 1.0, y_h), Color(MenuChrome.COL_GOLD, 0.32 * a))
+	else:
+		draw_rect(Rect2(dx, y_top, vs.x - dx, y_h), Color(COL_BARK, 0.94 * a))
+		for py: int in range(int(y_top) + 2, int(y_top) + 20, 4):
+			var start_x: int = int(dx) + (4 if (py / 4) % 2 == 0 else 2)
+			for px: int in range(start_x, int(vs.x) - 2, 6):
+				draw_rect(Rect2(px, py, 2, 2), Color(COL_BARK_ALT, 0.35 * a))
+		draw_rect(Rect2(dx, y_top, 1.0, y_h), Color(COL_OUTLINE, 0.9 * a))
+		draw_rect(Rect2(dx + 1.0, y_top, 1.0, y_h), Color(COL_SEAM, 0.85 * a))
 	var counts: Dictionary = _pending_counts()
 	if es < 0.35:
 		_draw_collapsed_rail(dx, vs, counts, a * (1.0 - clampf(es / 0.35, 0.0, 1.0)))
@@ -623,24 +638,25 @@ func _draw_collapsed_rail(dx: float, vs: Vector2, counts: Dictionary, a: float) 
 	var logged_in: bool = CloudSession.is_logged_in()
 	var pending: int = int(counts["pending"])
 	var rail_hov: bool = _hover_id == "toggle_drawer"
+	var ty: float = top_inset
 	# Whole top toggle pill + expandable rail strip acts cleanly as one calm dock
-	var tog_r: Rect2 = Rect2(dx + 5.0, 6.0, 18.0, 13.0)
+	var tog_r: Rect2 = Rect2(dx + 5.0, ty + 6.0, 18.0, 13.0)
 	_draw_box(tog_r, COL_CARD_HOVER if rail_hov else COL_WELL, COL_EDGE_MID if rail_hov else COL_SEAM, a)
-	PixelText.draw(self, "<", Vector2i(roundi(cx - 1.0), 8), Color(COL_TEXT if rail_hov else COL_MUTED, a))
+	PixelText.draw(self, "<", Vector2i(roundi(cx - 1.0), roundi(ty + 8.0)), Color(COL_TEXT if rail_hov else COL_MUTED, a))
 	# Your mini 18x18 profile avatar anchored near top
-	var av_r: Rect2 = Rect2(dx + 5.0, 24.0, 18.0, 18.0)
+	var av_r: Rect2 = Rect2(dx + 5.0, ty + 24.0, 18.0, 18.0)
 	_draw_avatar_on(self, av_r, CloudSession.avatar_url if logged_in else "", _local_display_name(), logged_in, NetworkManager.is_multiplayer_session(), a, true)
 	# Subtle notification indicator right beside top avatar if invites/requests wait
 	if pending > 0:
-		var badge: Rect2 = Rect2(dx + 16.0, 21.0, 9.0, 9.0)
+		var badge: Rect2 = Rect2(dx + 16.0, ty + 21.0, 9.0, 9.0)
 		draw_rect(badge, Color(COL_OUTLINE, a))
 		draw_rect(badge.grow(-1.0), Color(COL_GOLD, a))
 		var btxt: String = str(mini(pending, 9))
 		PixelText.draw(self, btxt, Vector2i(roundi(badge.position.x + 3.0), roundi(badge.position.y + 1.0)), Color(COL_OUTLINE, a))
-	draw_rect(Rect2(dx + 6.0, 47.0, 16.0, 1.0), Color(COL_SEAM, 0.7 * a))
+	draw_rect(Rect2(dx + 6.0, ty + 47.0, 16.0, 1.0), Color(COL_SEAM, 0.7 * a))
 	# Stack up to 5 online friends' mini 16x16 tiles cleanly down the rail (Valorant dock feel!)
 	if logged_in:
-		var fy: float = 53.0
+		var fy: float = ty + 53.0
 		var shown: int = 0
 		for fr: Dictionary in _sorted_accepted_friends():
 			if shown >= 5 or not bool(fr.get("online", false)):
@@ -653,10 +669,10 @@ func _draw_collapsed_rail(dx: float, vs: Vector2, counts: Dictionary, a: float) 
 			shown += 1
 	# Bottom online summary
 	var cnt_str: String = "%d" % int(counts["online"]) if logged_in else "-"
-	var cy_txt: int = roundi(vs.y - 16.0)
+	var cy_txt: int = roundi(vs.y - bottom_inset - 16.0)
 	draw_rect(Rect2(cx - 2.0, float(cy_txt - 5), 4.0, 3.0), Color(COL_TEAL_TOP if int(counts["online"]) > 0 else COL_FAINT, a))
 	PixelText.draw(self, cnt_str, Vector2i(roundi(cx - float(PixelText.width(cnt_str)) * 0.5), cy_txt), Color(COL_MUTED, a))
-	_fixed_hits.append({"id": "toggle_drawer", "rect": Rect2(dx, 0.0, COLLAPSED_W, vs.y), "action": "toggle_drawer", "arg": ""})
+	_fixed_hits.append({"id": "toggle_drawer", "rect": Rect2(dx, ty, COLLAPSED_W, maxf(vs.y - ty - bottom_inset, 40.0)), "action": "toggle_drawer", "arg": ""})
 
 
 func _draw_expanded_contents(dx: float, vs: Vector2, counts: Dictionary, a: float) -> void:
@@ -672,23 +688,25 @@ func _draw_expanded_contents(dx: float, vs: Vector2, counts: Dictionary, a: floa
 
 
 func _draw_header(dx: float, a: float) -> void:
+	var ty: float = top_inset
 	var x0: float = dx + PAD_X
 	var dot_col: Color = COL_TEAL_TOP if CloudSession.is_logged_in() else COL_GOLD
-	draw_rect(Rect2(x0, 9.0, 3.0, 3.0), Color(dot_col, a))
-	PixelText.draw(self, "SOZIAL", Vector2i(roundi(x0 + 6.0), 7), Color(COL_MUTED, a))
+	draw_rect(Rect2(x0, ty + 9.0, 3.0, 3.0), Color(dot_col, a))
+	PixelText.draw(self, "SOZIAL", Vector2i(roundi(x0 + 6.0), roundi(ty + 7.0)), Color(COL_MUTED, a))
+	_draw_pill_btn("open_chat", Rect2(dx + 100.0, ty + 5.0, 42.0, 13.0), "CHAT", COL_CARD, COL_EDGE_MID, COL_LILAC, a, _fixed_hits)
 	# Refresh square button
-	var ref_r: Rect2 = Rect2(dx + EXPANDED_W - 38.0, 5.0, 14.0, 13.0)
+	var ref_r: Rect2 = Rect2(dx + EXPANDED_W - 38.0, ty + 5.0, 14.0, 13.0)
 	var ref_hov: bool = _hover_id == "hdr_refresh"
 	_draw_box(ref_r, COL_CARD_HOVER if ref_hov else COL_CARD, COL_EDGE_MID if ref_hov else COL_SEAM, a)
 	_draw_refresh_glyph(ref_r.position + Vector2(4.0, 4.0), Color(COL_TEXT if ref_hov else COL_MUTED, a))
 	_fixed_hits.append({"id": "hdr_refresh", "rect": ref_r, "action": "refresh_social", "arg": ""})
 	# Collapse ">" button
-	var cls_r: Rect2 = Rect2(dx + EXPANDED_W - 22.0, 5.0, 14.0, 13.0)
+	var cls_r: Rect2 = Rect2(dx + EXPANDED_W - 22.0, ty + 5.0, 14.0, 13.0)
 	var cls_hov: bool = _hover_id == "hdr_collapse"
 	_draw_box(cls_r, COL_CARD_HOVER if cls_hov else COL_CARD, COL_EDGE_MID if cls_hov else COL_SEAM, a)
 	PixelText.draw(self, ">", Vector2i(roundi(cls_r.position.x + 5.0), roundi(cls_r.position.y + 3.0)), Color(COL_TEXT if cls_hov else COL_MUTED, a))
 	_fixed_hits.append({"id": "hdr_collapse", "rect": cls_r, "action": "toggle_drawer", "arg": ""})
-	draw_rect(Rect2(x0, 21.0, EXPANDED_W - PAD_X * 2.0, 1.0), Color(COL_SEAM, 0.7 * a))
+	draw_rect(Rect2(x0, ty + 21.0, EXPANDED_W - PAD_X * 2.0, 1.0), Color(COL_SEAM, 0.7 * a))
 
 
 func _draw_refresh_glyph(at: Vector2, col: Color) -> void:
@@ -700,17 +718,18 @@ func _draw_refresh_glyph(at: Vector2, col: Color) -> void:
 
 
 func _draw_profile_card(dx: float, a: float) -> void:
+	var ty: float = top_inset
 	var logged_in: bool = CloudSession.is_logged_in()
 	var card_h: float = 61.0 if logged_in else 58.0
 	var x0: float = dx + PAD_X
 	var cw: float = EXPANDED_W - PAD_X * 2.0
-	var card: Rect2 = Rect2(x0, 25.0, cw, card_h)
+	var card: Rect2 = Rect2(x0, ty + 25.0, cw, card_h)
 	draw_rect(card, Color(COL_OUTLINE, a))
 	draw_rect(card.grow(-1.0), Color(COL_BARK_ALT, 0.92 * a))
 	draw_rect(Rect2(card.position.x + 1.0, card.position.y + 1.0, card.size.x - 2.0, 1.0), Color(COL_EDGE_MID, 0.75 * a))
 	draw_rect(Rect2(card.position.x + 1.0, card.end.y - 2.0, card.size.x - 2.0, 1.0), Color(COL_SEAM, 0.65 * a))
 	# Avatar box (30x30)
-	var av_rect: Rect2 = Rect2(x0 + 5.0, 30.0, 30.0, 30.0)
+	var av_rect: Rect2 = Rect2(x0 + 5.0, ty + 30.0, 30.0, 30.0)
 	var raw_name: String = _local_display_name()
 	_draw_avatar_on(self, av_rect, CloudSession.avatar_url if logged_in else "", raw_name, logged_in, NetworkManager.is_multiplayer_session(), a, false)
 	# Right info column
@@ -719,18 +738,18 @@ func _draw_profile_card(dx: float, a: float) -> void:
 	var role_str: String = _role_short(CloudSession.role) if logged_in else ""
 	var badge_w: float = float(PixelText.width(role_str) + 6) if not role_str.is_empty() else 0.0
 	var name_fit: String = _fit_text(raw_name, tw - (badge_w + 3.0 if badge_w > 0.0 else 0.0))
-	PixelText.draw(self, name_fit, Vector2i(roundi(tx), 29), Color(COL_TEXT, a))
+	PixelText.draw(self, name_fit, Vector2i(roundi(tx), roundi(ty + 29.0)), Color(COL_TEXT, a))
 	if not role_str.is_empty():
-		_draw_role_badge_on(self, Vector2(card.end.x - badge_w - 5.0, 28.0), CloudSession.role, a)
+		_draw_role_badge_on(self, Vector2(card.end.x - badge_w - 5.0, ty + 28.0), CloudSession.role, a)
 	if not logged_in:
-		PixelText.draw(self, "LOKAL · OFFLINE", Vector2i(roundi(tx), 41), Color(COL_GOLD, a))
-		PixelText.draw(self, _fit_text("ÜBER LAUNCHER ANMELDEN", tw), Vector2i(roundi(tx), 52), Color(COL_MUTED, a))
-		PixelText.draw(self, _fit_text("FÜR PROFIL & FREUNDE", cw - 12.0), Vector2i(roundi(x0 + 5.0), 67), Color(COL_FAINT, a))
+		PixelText.draw(self, "LOKAL · OFFLINE", Vector2i(roundi(tx), roundi(ty + 41.0)), Color(COL_GOLD, a))
+		PixelText.draw(self, _fit_text("ÜBER LAUNCHER ANMELDEN", tw), Vector2i(roundi(tx), roundi(ty + 52.0)), Color(COL_MUTED, a))
+		PixelText.draw(self, _fit_text("FÜR PROFIL & FREUNDE", cw - 12.0), Vector2i(roundi(x0 + 5.0), roundi(ty + 67.0)), Color(COL_FAINT, a))
 		return
 	# Clickable UID pill (12px height, generous bottom padding) + @username
 	var uid_txt: String = "#%s" % (CloudSession.uid if not CloudSession.uid.is_empty() else "------")
 	var uid_w: float = float(PixelText.width(uid_txt) + 8)
-	var uid_r: Rect2 = Rect2(tx, 39.0, uid_w, 12.0)
+	var uid_r: Rect2 = Rect2(tx, ty + 39.0, uid_w, 12.0)
 	var uid_hov: bool = _hover_id == "prof_uid"
 	_draw_box(uid_r, COL_CARD_HOVER if uid_hov else COL_WELL, COL_EDGE_LIT if uid_hov else COL_SEAM, a)
 	PixelText.draw(self, uid_txt, Vector2i(roundi(uid_r.position.x + 4.0), roundi(uid_r.position.y + 1.5)), Color(COL_TEXT if uid_hov else COL_LILAC, a))
@@ -738,7 +757,7 @@ func _draw_profile_card(dx: float, a: float) -> void:
 	if not CloudSession.username.is_empty():
 		var handle_max: float = card.end.x - 5.0 - (uid_r.end.x + 4.0)
 		if handle_max >= 16.0:
-			PixelText.draw(self, _fit_text("@%s" % CloudSession.username, handle_max), Vector2i(roundi(uid_r.end.x + 4.0), 41), Color(COL_FAINT, a))
+			PixelText.draw(self, _fit_text("@%s" % CloudSession.username, handle_max), Vector2i(roundi(uid_r.end.x + 4.0), roundi(ty + 41.0)), Color(COL_FAINT, a))
 	# World / Koop activity line
 	var in_coop: bool = NetworkManager.is_multiplayer_session()
 	var activity: String = ""
@@ -748,10 +767,10 @@ func _draw_profile_card(dx: float, a: float) -> void:
 		activity = _fit_text("IM SPIEL · TAG %d" % [CloudSession.cloud_save_day + 1], tw)
 	else:
 		activity = _fit_text("ONLINE · BEREIT", tw)
-	draw_rect(Rect2(tx, 56.0, 3.0, 3.0), Color(COL_TEAL_TOP, a))
-	PixelText.draw(self, activity, Vector2i(roundi(tx + 6.0), 53), Color(COL_MUTED, a))
+	draw_rect(Rect2(tx, ty + 56.0, 3.0, 3.0), Color(COL_TEAL_TOP, a))
+	PixelText.draw(self, activity, Vector2i(roundi(tx + 6.0), roundi(ty + 53.0)), Color(COL_MUTED, a))
 	# Profile action row (14px height, balanced 4px top/bottom padding)
-	var row_y: float = 67.0
+	var row_y: float = ty + 67.0
 	var cur_mode: String = NetworkManager.active_join_mode if in_coop else CloudSession.world_join_mode
 	var mode_txt: String = "MODUS: %s" % _join_mode_short(cur_mode)
 	var mode_r: Rect2 = Rect2(x0 + 5.0, row_y, 81.0, 14.0)
@@ -770,7 +789,7 @@ func _draw_profile_card(dx: float, a: float) -> void:
 
 func _draw_add_friend_row(dx: float, a: float) -> void:
 	var x0: float = dx + PAD_X
-	var y0: float = 91.0
+	var y0: float = top_inset + 91.0
 	var inp_w: float = 127.0
 	var inp_r: Rect2 = Rect2(x0, y0, inp_w, 16.0)
 	var inp_hov: bool = _hover_id == "add_input"
@@ -794,7 +813,7 @@ func _draw_add_friend_row(dx: float, a: float) -> void:
 func _draw_toast(dx: float, a: float) -> void:
 	var x0: float = dx + PAD_X
 	var cw: float = EXPANDED_W - PAD_X * 2.0
-	var tr: Rect2 = Rect2(x0, 110.0, cw, 12.0)
+	var tr: Rect2 = Rect2(x0, top_inset + 110.0, cw, 12.0)
 	var bg: Color = COL_RED_BG if _toast_err else COL_TEAL_DEEP
 	var rim: Color = COL_RED if _toast_err else COL_TEAL_TOP
 	_draw_box(tr, bg, rim, a * clampf(_toast_t * 2.0, 0.0, 1.0))
@@ -802,7 +821,7 @@ func _draw_toast(dx: float, a: float) -> void:
 
 
 func _draw_footer_bar(dx: float, vs: Vector2, counts: Dictionary, a: float) -> void:
-	var y: float = vs.y - 16.0
+	var y: float = vs.y - bottom_inset - 16.0
 	var x0: float = dx + PAD_X
 	draw_rect(Rect2(x0, y, EXPANDED_W - PAD_X * 2.0, 1.0), Color(COL_SEAM, 0.65 * a))
 	var key_r: Rect2 = Rect2(x0, y + 3.0, 17.0, 11.0)
@@ -940,8 +959,7 @@ func _draw_friend_card(canvas: CanvasItem, fr: Dictionary, kind: String, x: floa
 	var join_mode: String = String(fr.get("coop_join_mode", "ask"))
 	var can_join: bool = coop_active and join_mode != "private"
 	var can_inv: bool = kind == "friend" and online and _can_invite_friends()
-	var has_actions: bool = kind != "friend" or can_join or can_inv
-	var h: float = 40.0 if has_actions else 27.0
+	var h: float = 40.0
 	var card: Rect2 = Rect2(x, y, w - 1.0, h)
 	var card_alpha: float = a if (online or kind != "friend") else a * 0.72
 	var is_hov: bool = _hover_id.ends_with(fuid) and not fuid.is_empty()
@@ -987,25 +1005,26 @@ func _draw_friend_card(canvas: CanvasItem, fr: Dictionary, kind: String, x: floa
 		sub_col = COL_FAINT
 	PixelText.draw(canvas, _fit_text(sub_txt, w - 32.0), Vector2i(roundi(tx), roundi(y + 14.0)), Color(sub_col, card_alpha))
 	# Line 3: spacious 13px action buttons (no bottom glyph clipping!)
-	if has_actions:
-		var by: float = y + 24.0
-		var bx: float = tx
-		if kind == "incoming":
-			_draw_pill_btn_on(canvas, "fr_acc_%s" % fuid, Rect2(bx, by, 52.0, 13.0), "ANNEHMEN", COL_TEAL_BTN, COL_TEAL_TOP, COL_TEAL_TXT, a, _feed_hits, "friend_accept", fuid, "", COL_TEAL_DEEP)
-			_draw_pill_btn_on(canvas, "fr_dec_%s" % fuid, Rect2(bx + 55.0, by, 50.0, 13.0), "ABLEHNEN", COL_CARD, COL_RED_RIM, COL_RED, a, _feed_hits, "friend_decline", fuid)
-		elif kind == "outgoing":
-			_draw_pill_btn_on(canvas, "fr_can_%s" % fuid, Rect2(bx, by, 52.0, 13.0), "STORNO", COL_CARD, COL_SEAM, COL_MUTED, a, _feed_hits, "friend_cancel", fuid)
-		else:
-			if can_join:
-				var jlbl: String = "BEITRETEN" if join_mode == "open" else "ANFRAGEN"
-				var jfill: Color = COL_TEAL_BTN if join_mode == "open" else COL_CARD
-				var jrim: Color = COL_TEAL_TOP if join_mode == "open" else COL_EDGE_MID
-				var jtxt: Color = COL_TEAL_TXT if join_mode == "open" else COL_MUTED
-				var jbot: Color = COL_TEAL_DEEP if join_mode == "open" else Color(0, 0, 0, 0)
-				_draw_pill_btn_on(canvas, "fr_join_%s" % fuid, Rect2(bx, by, 54.0, 13.0), jlbl, jfill, jrim, jtxt, a, _feed_hits, "friend_join", fuid, "", jbot)
-				bx += 57.0
-			if can_inv:
-				_draw_pill_btn_on(canvas, "fr_inv_%s" % fuid, Rect2(bx, by, 52.0, 13.0), "EINLADEN", COL_CARD, COL_EDGE_MID, COL_LILAC, a, _feed_hits, "friend_invite", fuid)
+	var by: float = y + 24.0
+	var bx: float = tx
+	if kind == "incoming":
+		_draw_pill_btn_on(canvas, "fr_acc_%s" % fuid, Rect2(bx, by, 52.0, 13.0), "ANNEHMEN", COL_TEAL_BTN, COL_TEAL_TOP, COL_TEAL_TXT, a, _feed_hits, "friend_accept", fuid, "", COL_TEAL_DEEP)
+		_draw_pill_btn_on(canvas, "fr_dec_%s" % fuid, Rect2(bx + 55.0, by, 50.0, 13.0), "ABLEHNEN", COL_CARD, COL_RED_RIM, COL_RED, a, _feed_hits, "friend_decline", fuid)
+	elif kind == "outgoing":
+		_draw_pill_btn_on(canvas, "fr_can_%s" % fuid, Rect2(bx, by, 52.0, 13.0), "STORNO", COL_CARD, COL_SEAM, COL_MUTED, a, _feed_hits, "friend_cancel", fuid)
+	else:
+		_draw_pill_btn_on(canvas, "fr_dm_%s" % fuid, Rect2(bx, by, 24.0, 13.0), "DM", COL_BARK_ALT, COL_EDGE_MID, COL_LILAC, a, _feed_hits, "friend_dm", fuid)
+		bx += 27.0
+		if can_join:
+			var jlbl: String = "BEITRETEN" if join_mode == "open" else "ANFRAGEN"
+			var jfill: Color = COL_TEAL_BTN if join_mode == "open" else COL_CARD
+			var jrim: Color = COL_TEAL_TOP if join_mode == "open" else COL_EDGE_MID
+			var jtxt: Color = COL_TEAL_TXT if join_mode == "open" else COL_MUTED
+			var jbot: Color = COL_TEAL_DEEP if join_mode == "open" else Color(0, 0, 0, 0)
+			_draw_pill_btn_on(canvas, "fr_join_%s" % fuid, Rect2(bx, by, 54.0, 13.0), jlbl, jfill, jrim, jtxt, a, _feed_hits, "friend_join", fuid, "", jbot)
+			bx += 57.0
+		if can_inv:
+			_draw_pill_btn_on(canvas, "fr_inv_%s" % fuid, Rect2(bx, by, 52.0, 13.0), "EINLADEN", COL_CARD, COL_EDGE_MID, COL_LILAC, a, _feed_hits, "friend_invite", fuid)
 	return y + h + 3.0
 
 

@@ -3,7 +3,7 @@ extends Control
 ## Ellie's dialogue portrait: a still picture (healthy or wounded) from assets/ui/ellie_dialogue_v4.png (tools/art_portrait_talk.py, 103 x 153 px per cell,
 ## row 0 healthy, row 2 wounded). Speaking and blinking are switched off for now; the sheet still holds the mouth shapes and closed eyes for later.
 const SHEET: Texture2D = preload("res://assets/ui/ellie_dialogue_v4.png")
-const CELL: Vector2 = Vector2(103, 153)
+const CELL: Vector2 = Vector2(206, 306)
 var _healthy: AtlasTexture = AtlasTexture.new()
 var _wounded: AtlasTexture = AtlasTexture.new()
 var reflective: bool = false

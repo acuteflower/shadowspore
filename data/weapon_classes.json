@@ -234,7 +234,7 @@
 					"volley": {
 						"count": 5,
 						"spread": 40,
-						"length": 90,
+						"length": 112,
 						"width": 8,
 						"ratio": 0.4,
 						"max_hits": 3,
@@ -264,7 +264,7 @@
 					"volley": {
 						"count": 7,
 						"spread": 70,
-						"length": 110,
+						"length": 136,
 						"width": 8,
 						"ratio": 0.45,
 						"max_hits": 3,
@@ -278,7 +278,7 @@
 			"rift": {
 				"passive": {
 					"name": "SPITZENRISS",
-					"length": 72,
+					"length": 90,
 					"width": 9,
 					"ratio": 0.45,
 					"knock": 1.0,
@@ -395,7 +395,7 @@
 					},
 					"starfall": {
 						"mode": "crescent_rain",
-						"crescent_length": 125,
+						"crescent_length": 155,
 						"crescent_width": 16,
 						"crescent_ratio": 0.65,
 						"crescent_knock": 0.9,
@@ -430,7 +430,7 @@
 					},
 					"starfall": {
 						"mode": "constellation",
-						"distance": 66,
+						"distance": 82,
 						"stars": 5,
 						"star_spread": 36,
 						"star_delay": 0.18,

@@ -15,5 +15,13 @@ custom_templates/
 *.p12
 export_credentials.cfg
 
-# Python virtualenv for the tools/ scripts
+# Python virtualenv & bytecode for the tools/ scripts
 .venv/
+__pycache__/
+*.pyc
+
+# OS, logs, backups & local secrets
+.DS_Store
+*.bak
+*.log
+.webui_secret_key

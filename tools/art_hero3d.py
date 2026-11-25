@@ -25,12 +25,12 @@ FACE_EYES = None  # set by frame(): where the model's eyes are in this frame (fa
 LAST_EYES = None  # set automatically by render() from the "head" primitive so custom story/action scripts also place eyes accurately
 TIDY_EYES = True  # redraw the rendered eye blobs as fixed pixel eyes (hero_face.py); other characters with their own eye ramp are untouched
 
-FW, FH = 48, 56
-GROUND_ROW = 51.0
+FW, FH = 56, 64
+GROUND_ROW = 58.0
 SS = 4
 PITCH = math.radians(26.0)
 COSP, SINP = math.cos(PITCH), math.sin(PITCH)
-SCALE = 0.92
+SCALE = 1.04
 WALK_FRAMES, RUN_FRAMES, IDLE_FRAMES, JOG_FRAMES = 6, 6, 4, 6
 COLS = WALK_FRAMES + RUN_FRAMES + IDLE_FRAMES + JOG_FRAMES
 ATTACK_STEPS, ATTACK_FRAMES = 3, 6
@@ -49,18 +49,18 @@ COAT = 13
 RAMPS = [
     ["8f84c2", "bdb3e4", "e9e3f7", "fffaf0"],  # hair: cool lavender shade, warm silver-white light
     ["dc9496", "f2b8b2", "fde0d2", "fff3e8"],  # skin: luminous porcelain-cream with warm rose-blush shadow
-    ["0e0716", "1e112c", "36224c", "5e427e"],  # dark obsidian-violet leather (belt, bracers, thigh strap)
+    ["10091e", "24193d", "3e2e66", "655098"],  # dark obsidian-violet leather (fitted jacket, collar, belt, bracers, pouch)
     ["34185e", "6636ad", "9468ee", "cbaaff"],  # violet trim / lining
-    ["6f5020", "b48a38", "e6c468", "fff0b0"],  # gold
-    ["130e1e", "241b3a", "3a2e58", "5a4a88"],  # leggings
+    ["6f5020", "b48a38", "e6c468", "fff0b0"],  # gold (belt buckle, hairpin, collar clasp, boot accents)
+    ["140e24", "231b3d", "382c5c", "544682"],  # midnight-indigo fitted trousers / leggings
     ["2a1c52", "5f3bc9", "a77bff", "efe6ff"],  # eyes
     ["84405a", "b25873", "d98aa0", "f0b2c2"],  # mouth
     ["d58a86", "e5a39b", "f2bab0", "f8cfc6"],  # blush
     ["5a2fb0", "8a5cf0", "b99bff", "f0e6ff"],  # glowing crystal
     ["2a8c94", "3cc0c6", "78f4e6", "d0fff8"],  # teal lining
-    ["160b20", "311c3b", "4d2f5b", "704a80"],  # boots: rich plum thigh-high leather
+    ["281b36", "4b355e", "74558c", "9d7db8"],  # boots: warm dusty-plum leather (reads cleanly against dark trousers)
     ["2c1a30", "4b2c47", "6e4562", "96688a"],  # an old wool blanket (the hut's bed, tools/art_hero_wake.py)
-    ["1a0d24", "3a2144", "593766", "7e548c"],  # rich wine-plum bodice, puffed sleeves, pleated skirt & split coat
+    ["2a1640", "523173", "7c4fa6", "aa7cd2"],  # rich plum-violet split coat tails, shoulder mantle & sleeve cuffs
 ]
 RAMPS = [[hexc(c) for c in ramp] for ramp in RAMPS]
 DECAL_WEIGHT = {EYE: 2.4, MOUTH: 2.0, BLUSH: 1.4, CRYSTAL: 1.8, TEAL: 1.6, GOLD: 1.3}
@@ -607,6 +607,13 @@ def raster_hair_pair(h_prims: list[Prim], shared: tuple) -> tuple[list, list]:
 
 def render_layers(prims: list[Prim], shadow: bool = True) -> dict:
     """Renders modular pixel layers `{"body", "outfit", "hair_front", "hair_back"}` from transformed `prims`."""
+    global LAST_EYES
+    if _is_ellie():
+        LAST_EYES = None
+        for p in prims:
+            if p.kind == "head" and p.layer != "shield":
+                LAST_EYES = _eyes_from_head_prim(p)
+                break
     k = len(RAMPS) * 4
     o_prims = [p for p in prims if p.layer == "outfit"]
     h_prims = [p for p in prims if p.layer == "hair"]
@@ -727,13 +734,13 @@ def to_pixels(depth, code, shadow: bool = True):
                 if 0 <= nx < FW and 0 <= ny < FH and best[ny, nx] >= 0:
                     out[y][x] = ink_color(int(best[ny, nx]) // 4)
                     break
-    # ground shadow
+    # ground shadow (scaled proportionally to SCALE=1.04)
     if shadow:
         for y in range(FH):
             for x in range(FW):
                 if out[y][x][3] == 0:
-                    ex = (x + 0.5 - FW / 2) / 8.5
-                    ey = (y + 0.5 - (GROUND_ROW + 0.5)) / 2.4
+                    ex = (x + 0.5 - FW / 2) / 9.5
+                    ey = (y + 0.5 - (GROUND_ROW + 0.5)) / 2.7
                     if ex * ex + ey * ey <= 1.0:
                         out[y][x] = (0, 0, 0, 70)
     if ellie:  # Ellie only: clean hand-made pixel eyes (tools/hero_face.py)
@@ -1334,43 +1341,50 @@ def build(t: float, mode: str, crouch: bool, pose=None, outfit_id=None, hair_id=
     for sx in (-1, 1):
         m.ell((sway_x * 0.50 + sx * 1.24, 23.15, -1.02), (1.68, 1.88, 1.80), LEGGING, layer="body_under")  # natural rounded feminine glutes
 
-    # Seamless hip-to-waist yoke + pleated skirt bell (encloses hip sockets cleanly in all 8 facings & gaits)
-    cloth_ell((sway_x * 0.5, 23.2, 0.0), (4.10, 3.15, 3.45), COAT)
-    cloth_ell((sway_x * 0.35, 25.25, 0.05), (3.82, 2.25, 3.22), COAT)
-    cloth_ell((sway_x * 0.5, 20.4, 0.0), (4.25, 0.55, 3.60), LEATHER)  # crisp dark skirt bottom hem border
-    cloth_ell((0, 27.3, 0.05), (2.92, 1.05, 2.42), LEATHER)  # sleek dark cinched waist band
-    cloth_ell((-3.85, 24.6, 0.4), (0.85, 1.42, 1.18), LEATHER)  # pouch on the right hip
+    # Tailored adventurer waist belt with gold buckle, right-hip leather pouch, and iconic A-line split plum coat!
+    cloth_ell((sway_x * 0.40, 25.0, -0.35), (4.10, 2.40, 3.15), COAT)   # fitted hip-to-waist coat yoke
+    cloth_ell((sway_x * 0.45, 22.8, -0.75), (4.45, 2.75, 2.95), COAT)   # side/rear coat flare wrapping cleanly behind hips
+    cloth_ell((0, 27.3, 0.08), (3.32, 1.15, 2.74), LEATHER)             # sleek cinched obsidian waist belt
+    cloth_ell((0, 27.3, 2.76), (0.96, 0.78, 0.46), GOLD, kind="emit")   # crisp centered warm-gold belt buckle
+    cloth_ell((-4.15, 24.4, 0.45), (1.02, 1.56, 1.32), LEATHER)         # asymmetrical utility pouch on right hip
+    cloth_ell((-4.76, 24.9, 0.78), (0.42, 0.36, 0.40), GOLD, kind="emit")  # tiny gold pouch clasp
+
+    # Open-front flowing plum-violet coat skirts: crisp A-line flare framing dark trousers & boots from front & sides!
     for i in range(14):
         ph = 2 * math.pi * i / 14
-        wave = (0.55 * math.sin(w + ph * 2) if not walking else 0.9 * math.sin(w + ph) - 0.5 * math.cos(ph)) * 0.7 * (1.3 if running else 1.0)
-        tilt = 0.24 + 0.04 * (i % 2) + 0.04 * wave + (pose["flare"] * (0.6 + 0.4 * math.cos(ph)) if pose else 0.0)
+        # Keep the center-front V-slit cleanly open (ph near +pi/2 = +z forward) so dark trousers & boots read sharply
+        ang_front = abs(math.atan2(math.sin(ph - math.pi / 2), math.cos(ph - math.pi / 2)))
+        if ang_front < 0.56:
+            continue
+        wave = (0.45 * math.sin(w + ph * 2) if not walking else 0.85 * math.sin(w + ph) - 0.45 * math.cos(ph)) * 0.65 * (1.25 if running else 1.0)
+        tilt = 0.31 + 0.03 * (i % 2) + 0.04 * wave + (pose["flare"] * (0.55 + 0.45 * math.cos(ph)) if pose else 0.0)
         if sprint:
-            tilt += 0.16 * gk * max(0.0, -math.sin(ph))  # the back of the skirt lifts in the wind of the run
-        rx, rz = 4.24, 3.62
-        ax = (math.cos(ph) * rx, 23.1, math.sin(ph) * rz)
-        up = np.array([-math.sin(tilt) * math.cos(ph), math.cos(tilt), -math.sin(tilt) * math.sin(ph) * 0.8])
+            tilt += 0.18 * gk * max(0.0, -math.sin(ph))
+        rx, rz = 4.65, 3.55
+        ax = (math.cos(ph) * rx, 20.1, math.sin(ph) * rz - 0.30)
+        up = np.array([-math.sin(tilt) * math.cos(ph), math.cos(tilt), -math.sin(tilt) * math.sin(ph) * 0.85])
         tan = np.array([-math.sin(ph), 0, math.cos(ph)])
         R = frame_from(up, np.cross(tan, up))
         R = np.stack([np.cross(up / np.linalg.norm(up), R[:, 2]), up / np.linalg.norm(up), R[:, 2]], axis=1)
-        cloth_ell(ax, (1.22, 3.15, 0.70), COAT, R=R, kind="pleat", tag=float(i))
+        cloth_ell(ax, (1.52, 5.25, 0.76), COAT, R=R, kind="pleat", tag=float(i))
 
-    # Split coat tails sit behind the legs and sway independently, framing the stride cleanly from behind.
+    # Long split coat tails flare gracefully past the knees on sides & back (iconic ellie_turnaround_study silhouette!)
     for side in (-1, 1):
-        follow = (0.7 * math.sin(w + side * 0.45) if walking else 0.25 * math.sin(w + side))
+        follow = (0.75 * math.sin(w + side * 0.45) if walking else 0.25 * math.sin(w + side))
         if pose:
-            follow = 0.4 * float(pose.get("flare", 0.0))
-        drift = ((-0.9 if running else -0.35) * math.sin(w - 0.9) if walking else -0.5) if free and not crouch else 0.0
+            follow = 0.45 * float(pose.get("flare", 0.0))
+        drift = ((-0.95 if running else -0.35) * math.sin(w - 0.9) if walking else -0.45) if free and not crouch else 0.0
         if sprint:
             flap = math.sin(2 * w + side * 0.9)
-            cloth_ribbon([(side * 2.2, 24.0, -1.8),
-                          (side * 2.7 + drift * 0.4, 22.6 - 1.6 * (1.0 - gk) + 0.5 * flap, -6.8 + 2.5 * (1.0 - gk)),
-                          (side * 3.1 + drift, 21.2 - 4.0 * (1.0 - gk) + 1.5 * gk * math.sin(2 * w + side * 0.9 - 1.1), -12.2 + 5.6 * (1.0 - gk))],
-                         [1.55, 2.5, 2.0, 0.4], 0.70, COAT, (1, 0, 0), kind="")
+            cloth_ribbon([(side * 2.8, 23.8, -1.4),
+                          (side * 3.6 + drift * 0.4, 21.8 - 1.8 * (1.0 - gk) + 0.55 * flap, -7.4 + 2.6 * (1.0 - gk)),
+                          (side * 4.2 + drift, 19.6 - 4.4 * (1.0 - gk) + 1.6 * gk * math.sin(2 * w + side * 0.9 - 1.1), -13.4 + 5.8 * (1.0 - gk))],
+                         [2.05, 3.10, 2.55, 0.65], 0.76, COAT, (1, 0, 0), kind="")
             continue
-        cloth_ribbon([(side * 2.2, 24.0, -1.8),
-                      (side * 2.6 + drift * 0.45, 19.2, -4.3 + follow * 0.5),
-                      (side * 2.8 + drift, 14.2, -7.2 + follow)],
-                     [1.55, 2.5, 2.0, 0.4], 0.70, COAT, (1, 0, 0), kind="")
+        cloth_ribbon([(side * 2.8, 23.8, -1.4),
+                      (side * 3.75 + drift * 0.45, 17.5, -4.1 + follow * 0.55),
+                      (side * 4.35 + drift, 10.8, -7.0 + follow)],
+                     [2.05, 3.15, 2.65, 0.75], 0.76, COAT, (1, 0, 0), kind="")
 
     # --- legs (anatomically tapered thighs, slender knees, sculpted calves & petite feet; boots in outfit)
     leg_off = body_off if (pose and pose.get("leg_angles")) else np.zeros(3)  # climbing out / sitting: the legs sink with the body
@@ -1416,28 +1430,27 @@ def build(t: float, mode: str, crouch: bool, pose=None, outfit_id=None, hair_id=
             heel = ankle + np.array([0.0, -2.2, -0.85])
             foot_poses.append((side, hip_arr, knee_arr, ankle_arr, heel.copy(), Rf, True))
             m.ell(heel + Rf @ np.array([0.0, 0.62, 1.88]), (1.02, 0.76, 2.02), SKIN, R=Rf)
-            if side == 1:
-                cloth_ell(hip + (knee - hip) * 0.54, (1.80, 0.42, 1.92), LEATHER)  # sleek thigh garter strap
-            cloth_limb(knee, ankle, 1.58, 1.00, BOOT)
-            up = knee + (ankle - knee) * -0.24
-            cloth_limb(up, knee, 1.76, 1.64, BOOT)
-            cloth_ell(up, (1.84, 0.45, 1.88), LEATHER)
-            cloth_ell(heel + Rf @ np.array([0.0, 0.65, 2.05]), (1.26, 0.94, 2.45), BOOT, R=Rf)
-            cloth_ell(heel, (1.14, 0.80, 0.90), LEATHER)
-            cloth_ell(heel + Rf @ np.array([0.0, 2.3, 1.6]), (1.20, 0.28, 0.98), LEATHER, R=Rf)
+            # Sleek midnight-indigo trousers on thighs + tall sculpted dusty-plum knee boots (clean, crisp silhouette!)
+            cloth_limb(hip, knee, 1.98, 1.56, LEGGING)
+            boot_top = knee + (ankle - knee) * 0.04
+            cloth_limb(boot_top, ankle, 1.68, 1.08, BOOT)
+            cloth_ell(boot_top, (1.84, 0.62, 1.88), BOOT)       # sculpted flared boot cuff lip
+            cloth_ell(boot_top + (ankle - knee) * 0.08, (1.76, 0.34, 1.80), LEATHER)  # crisp dark cuff trim band
+            cloth_ell(heel + Rf @ np.array([0.0, 0.68, 2.08]), (1.32, 0.98, 2.52), BOOT, R=Rf)
+            cloth_ell(heel, (1.18, 0.82, 0.94), LEATHER)
+            cloth_ell(heel + Rf @ np.array([0.0, 2.25, 1.55]), (1.22, 0.28, 1.00), LEATHER, R=Rf)
             continue
         heel_st = ankle + np.array([0.0, -2.2, -0.85])
         foot_poses.append((side, hip_arr, knee_arr, ankle_arr, heel_st, None, False))
         m.ell(ankle + np.array([0.0, -1.55, 1.02]), (1.00, 0.76, 1.98), SKIN)
-        if side == 1:
-            cloth_ell(hip + (knee - hip) * 0.54, (1.80, 0.42, 1.92), LEATHER)  # sleek thigh garter strap
-        cloth_limb(knee, ankle, 1.58, 1.00, BOOT)
-        up = knee + (ankle - knee) * -0.24  # thigh-high boot top sits just above the knee
-        cloth_limb(up, knee, 1.76, 1.64, BOOT)
-        cloth_ell(up, (1.84, 0.45, 1.88), LEATHER)  # crisp dark boot cuff band
-        cloth_ell(ankle + np.array([0.0, -1.5, 1.2]), (1.26, 0.94, 2.45), BOOT)
-        cloth_ell(ankle + np.array([0.0, -2.2, -0.85]), (1.14, 0.80, 0.90), LEATHER)
-        cloth_ell(ankle + np.array([0.0, 0.3, 0.95]), (1.20, 0.28, 0.98), LEATHER)  # ankle strap
+        cloth_limb(hip, knee, 1.98, 1.56, LEGGING)
+        boot_top = knee + (ankle - knee) * 0.04
+        cloth_limb(boot_top, ankle, 1.68, 1.08, BOOT)
+        cloth_ell(boot_top, (1.84, 0.62, 1.88), BOOT)           # sculpted flared boot cuff lip
+        cloth_ell(boot_top + (ankle - knee) * 0.08, (1.76, 0.34, 1.80), LEATHER)  # crisp dark cuff trim band
+        cloth_ell(ankle + np.array([0.0, -1.5, 1.22]), (1.32, 0.98, 2.52), BOOT)
+        cloth_ell(ankle + np.array([0.0, -2.2, -0.85]), (1.18, 0.82, 0.94), LEATHER)
+        cloth_ell(ankle + np.array([0.0, 0.32, 0.96]), (1.22, 0.28, 1.00), LEATHER)  # ankle strap
 
     # --- torso: natural feminine S-curve mannequin + fitted wine-plum bodice & open scoop neckline
     m.off = body_off
@@ -1471,13 +1484,15 @@ def build(t: float, mode: str, crouch: bool, pose=None, outfit_id=None, hair_id=
     m.ell(T((0, 36.55 + breath * 0.10, 0.42)), (2.78, 1.85, 1.88), SKIN, R=TR)  # upper chest / collarbone skin
     m.ell(T((0, 36.20 + breath * 0.08, -0.42)), (3.08, 1.88, 2.02), SKIN, R=TR)  # wide clean upper back skin above bandeau
 
-    cloth_ell(T((0, 29.3 + breath * 0.05, 0.10)), (2.56, 2.95, 2.22), LEATHER, kind="corset", R=TR)
-    cloth_ell(T((0, 33.9 + breath * 0.12, 0.08)), (3.18 + breath * 0.06, 3.20, 2.52 + breath * 0.05), COAT, kind="corset", R=TR)
+    # Tailored obsidian-violet adventurer jacket with structured plum-violet shoulder mantle & lapel trim!
+    cloth_ell(T((0, 29.8 + breath * 0.05, 0.12)), (2.88, 3.10, 2.42), LEATHER, kind="corset", R=TR)   # sleek cinched lower bodice
+    cloth_ell(T((0, 34.0 + breath * 0.12, 0.08)), (3.55 + breath * 0.06, 3.35, 2.72 + breath * 0.05), LEATHER, kind="corset", R=TR)  # tailored upper jacket
+    cloth_ell(T((0, 33.4 + breath * 0.14, 1.76)), (1.42, 2.80, 1.24), COAT, R=TR)                     # rich plum center-front jacket plastron/trim
     for sx in (-1, 1):
-        cloth_ell(T((sx * 1.42, 33.85 + breath * 0.15, 1.68)), (1.58, 1.56, 1.52), COAT, R=TR)
-        cloth_ell(T((sx * 2.05, 36.65 + breath * 0.12, 0.45)), (1.12, 1.78, 1.22), COAT, R=TR)
-        cloth_ell(T((sx * 2.25, 36.65 + breath * 0.12, -0.55)), (1.14, 1.72, 1.20), COAT, R=TR)
-    cloth_ell(T((0, 35.7, -0.82)), (3.02, 2.95, 1.82), COAT, R=TR)  # plum bodice back panel
+        cloth_ell(T((sx * 1.58, 33.9 + breath * 0.15, 1.72)), (1.68, 1.62, 1.56), LEATHER, R=TR)      # fitted bodice chest contour
+        cloth_ell(T((sx * 2.55, 36.90 + breath * 0.12, 0.40)), (1.58, 1.85, 1.52), COAT, R=TR)        # structured plum-violet shoulder mantle front
+        cloth_ell(T((sx * 2.68, 36.85 + breath * 0.12, -0.58)), (1.58, 1.80, 1.48), COAT, R=TR)       # structured plum-violet shoulder mantle back
+    cloth_ell(T((0, 35.8, -0.88)), (3.50, 3.10, 1.96), COAT, R=TR)                                    # rich plum upper-back mantle panel
 
     # --- arms: sleek symmetrical feminine arms in body; puffed short plum sleeves + dark wrist bracers in outfit
     m.rig = {}
@@ -1507,13 +1522,15 @@ def build(t: float, mode: str, crouch: bool, pose=None, outfit_id=None, hair_id=
             arm_joints.append((side, sh.copy(), elbow.copy(), wrist.copy(), True))
             arm_pts["hand_l" if side == 1 else "hand_r"] = wrist_abs  # swimming: where the hands enter the water
             puff_end = sh + (elbow - sh) * 0.44
-            fore_mid = elbow + (wrist - elbow) * 0.52
+            fore_mid = elbow + (wrist - elbow) * 0.48
             m.layer = "body"
             m.limb(sh, elbow, 1.00, 0.86, SKIN)
             m.limb(elbow, wrist, 0.88, 0.74, SKIN)
             m.ell(wrist + 0.80 * d2, (0.78, 0.88, 0.78), SKIN)
-            cloth_limb(sh, puff_end, 1.44, 1.18, COAT)
-            cloth_limb(fore_mid, wrist, 0.98, 0.84, LEATHER)
+            cloth_limb(sh, puff_end, 1.54, 1.24, COAT)
+            cloth_limb(puff_end, elbow, 1.12, 0.98, LEATHER)
+            cloth_limb(elbow, fore_mid, 1.02, 0.94, COAT)
+            cloth_limb(fore_mid, wrist, 1.04, 0.88, LEATHER)
             continue
         if running:
             swing = -0.58 * math.cos(w if side == 1 else w + math.pi)
@@ -1558,20 +1575,23 @@ def build(t: float, mode: str, crouch: bool, pose=None, outfit_id=None, hair_id=
             continue
         arm_joints.append((side, sh.copy(), elbow.copy(), wrist.copy(), True))
         puff_end = sh + (elbow - sh) * 0.44
-        fore_mid = elbow + (wrist - elbow) * 0.52
+        fore_mid = elbow + (wrist - elbow) * 0.48
         m.layer = "body"
         m.limb(sh, elbow, 1.00, 0.86, SKIN)
         m.limb(elbow, wrist, 0.88, 0.74, SKIN)
         m.ell(wrist + 0.80 * d2, (0.78, 0.88, 0.78), SKIN)
-        cloth_limb(sh, puff_end, 1.44, 1.18, COAT)
-        cloth_limb(fore_mid, wrist, 0.98, 0.84, LEATHER)  # wrist bracer
+        cloth_limb(sh, puff_end, 1.54, 1.24, COAT)
+        cloth_limb(puff_end, elbow, 1.12, 0.98, LEATHER)
+        cloth_limb(elbow, fore_mid, 1.02, 0.94, COAT)
+        cloth_limb(fore_mid, wrist, 1.04, 0.88, LEATHER)  # sleek gauntlet bracer
     m.rig.update(arm_pts)
-    # --- neck, sleek faceless head & curtain hair
+    # --- neck, sleek high collar/choker, gold clasp + violet pendant, head & curtain hair
     m.layer = "body"
     m.limb(T((0, 37.0, 0.16)), T((0, 42.6, 0.34)), 1.24, 1.05, SKIN)
-    cloth_ell(T((0, 39.5, 0.25)), (1.18, 0.34, 1.18), LEATHER, R=TR)  # sleek dark choker
+    cloth_ell(T((0, 39.4, 0.22)), (1.42, 0.72, 1.38), LEATHER, R=TR)  # sleek high dark collar / choker
     if outfit_id == "default":
-        m.ell(T((0, 36.6, 2.38)), (0.50, 0.52, 0.40), CRYSTAL, kind="emit", R=TR, layer="outfit")  # pendant glint at neckline
+        m.ell(T((0, 38.6, 1.68)), (0.42, 0.36, 0.34), GOLD, kind="emit", R=TR, layer="outfit")     # gold collar clasp
+        m.ell(T((0, 37.2, 2.28)), (0.58, 0.66, 0.44), CRYSTAL, kind="emit", R=TR, layer="outfit")  # glowing violet crystal gem
     elif outfit_id != "none":
         import art_hero_outfit
         art_hero_outfit.build_outfit(m, outfit_id, sys.modules[__name__], {
@@ -1692,38 +1712,39 @@ def build(t: float, mode: str, crouch: bool, pose=None, outfit_id=None, hair_id=
                   H((2.15, 48.55, 3.05)),
                   H((3.45, 47.05, 1.85)) + hair_off(0.15, 4) * 0.15],
                  [0.88, 0.92, 0.35], 0.58, HAIR, (0, 0, 1), tag=4.0)
-        # Two long flowing front chest locks draping over her front shoulders to frame her scoop neckline & bodice
+        # Two long flowing front chest locks framing her face & widening her upper silhouette gracefully
         for side in (-1, 1):
             pts = []
             for l in np.linspace(0, 1, 7):
-                lx = side * (3.85 - 0.45 * (l ** 1.15))
-                ly = 47.0 - 13.8 * l
+                lx = side * (4.15 - 0.15 * (l ** 1.15) + 0.45 * math.sin(math.pi * min(l, 1.0)))
+                ly = 47.0 - 14.5 * l
                 lz = (0.95 if side == 1 else 1.10) + 1.85 * math.sin(math.pi * min(l * 0.72, 0.88))
                 base = HL((lx, ly, lz), l)
                 pts.append(HH(base + hair_off(l, 5 + side) * 0.38))
-            m.ribbon(pts, [0.98, 1.08, 1.02, 0.90, 0.72, 0.48, 0.20], 0.62, HAIR, (0, 0, 1), tag=7 + side)
-        back = [(-2.9, 1.0), (-1.9, 0.6), (-0.85, 0.0), (0.15, 0.4), (1.15, 0.0), (2.15, 0.7), (3.0, 1.1)]
+            m.ribbon(pts, [1.06, 1.18, 1.12, 0.98, 0.80, 0.54, 0.24], 0.66, HAIR, (0, 0, 1), tag=7 + side)
+        back = [(-3.2, 1.0), (-2.1, 0.6), (-0.95, 0.0), (0.15, 0.4), (1.25, 0.0), (2.3, 0.7), (3.3, 1.1)]
         for i, (bx, extra) in enumerate(back):
             pts = []
-            y_end = 18.8 + 4.0 * ((i * 7) % 5) / 4.0
+            y_end = 18.2 + 4.0 * ((i * 7) % 5) / 4.0
             for l in np.linspace(0, 1, 9):
-                spread = bx * (1.0 + 0.38 * l) + 0.28 * math.sin(3.0 * l + i) * l
+                spread = bx * (1.0 + 0.48 * l) + 0.32 * math.sin(3.0 * l + i) * l
                 at_y = 46.0 - (46.0 - y_end) * l
                 z = -3.05 - 0.95 * math.sin(math.pi * min(l * 0.92, 0.95)) - (0.45 + extra * 0.45) * l
                 z -= min(max((33.0 - at_y) / 9.0, 0.0), 1.0) * (2.65 + 0.85 * mi)
                 p = HL((spread, at_y, z), l)
                 pts.append(HH(p + hair_off(l, i)))
-            m.ribbon(pts, [1.35, 1.48, 1.42, 1.28, 1.08, 0.82, 0.52, 0.28, 0.12], 0.88, HAIR, (0, 0, -1), tag=i * 1.7)
+            m.ribbon(pts, [1.42, 1.56, 1.50, 1.36, 1.16, 0.88, 0.56, 0.30, 0.14], 0.90, HAIR, (0, 0, -1), tag=i * 1.7)
         for side in (-1, 1):
             pts = []
             for l in np.linspace(0, 1, 7):
-                sy_s = 45.8 - 20.5 * l
-                sz_s = -2.25 - 2.15 * (l ** 0.75) - min(max((33.0 - sy_s) / 8.5, 0.0), 1.0) * (2.35 + 0.75 * mi)
-                base = HL((side * (3.25 + 0.65 * l), sy_s, sz_s), l)
+                sy_s = 45.8 - 21.5 * l
+                sz_s = -2.15 - 2.15 * (l ** 0.75) - min(max((33.0 - sy_s) / 8.5, 0.0), 1.0) * (2.35 + 0.75 * mi)
+                base = HL((side * (3.65 + 1.05 * l), sy_s, sz_s), l)
                 pts.append(HH(base + hair_off(l, 9 + side * 2, 1.0)))
-            m.ribbon(pts, [0.80, 0.92, 0.78, 0.50, 0.1], 0.56, HAIR, (0, 0, -1), tag=13 + side * 1.3)
-        # hair ornament: small gold pin holding the left temple lock back
-        m.ell(H((3.35, 47.45, 2.15)), (0.48, 0.34, 0.38), GOLD, kind="emit", R=head_R)
+            m.ribbon(pts, [0.92, 1.06, 0.92, 0.62, 0.18], 0.60, HAIR, (0, 0, -1), tag=13 + side * 1.3)
+        # hair ornament: ornate gold pin with tiny violet crystal holding the left temple lock back
+        m.ell(H((3.35, 47.45, 2.15)), (0.64, 0.42, 0.44), GOLD, kind="emit", R=head_R)
+        m.ell(H((3.52, 47.42, 2.38)), (0.32, 0.32, 0.32), CRYSTAL, kind="emit", R=head_R)
     elif hair_id != "none":
         import art_hero_hair
         art_hero_hair.build_hair(m, hair_id, sys.modules[__name__], {

@@ -120,7 +120,7 @@ Neu: `RefineRules`, `data/refine.json`, `ShopWindow` `kind: "refine"` plus Auftr
 6. **Gefühl:** Enthüllungs-Karte, Klänge, Funken im Hammerclip, Schimmer ab +10, Leuchten bei +15.
 7. **Feinabstimmung:** Simulation gegen echte Drop-Raten, Preise gegen die Wirtschaft.
 
-Später (nicht jetzt): Werkzeuge und Rüstung (`refinable` setzen), Schutzzunder, eine Abschreck-Geste als Geschicklichkeitsbonus (+ bis 5 Punkte Chance, Timing wie beim Kochen und Angeln).
+Später (nicht jetzt): Werkzeuge und Rüstung (`refinable` setzen), Schutzzunder, eine Abschreck-Geste als Geschicklichkeitsbonus (+ bis 5 Punkte Chance, Timing wie beim Angeln).
 
 ## 11. Entscheidungen
 

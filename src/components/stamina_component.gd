@@ -22,6 +22,9 @@ var _delay_left: float = 0.0
 var _pulse_left: float = 1.0
 var _effects_checked: bool = false
 var _effects: StatusEffects
+var _base_max_stamina: float = 100.0
+var _spore_max_bonus: float = 0.0
+var _spore_regen_bonus: float = 0.0
 
 
 func _get_effects() -> StatusEffects:
@@ -32,7 +35,20 @@ func _get_effects() -> StatusEffects:
 
 
 func _ready() -> void:
+	_base_max_stamina = max_stamina
 	current = max_stamina
+	changed.emit(current, max_stamina)
+
+
+func set_spore_bonus(max_bonus: float, regen_bonus: float) -> void:
+	var old_max: float = max_stamina
+	_spore_max_bonus = maxf(max_bonus, 0.0)
+	_spore_regen_bonus = maxf(regen_bonus, 0.0)
+	max_stamina = _base_max_stamina + _spore_max_bonus
+	if max_stamina > old_max:
+		current = minf(current + (max_stamina - old_max), max_stamina)
+	else:
+		current = minf(current, max_stamina)
 	changed.emit(current, max_stamina)
 
 
@@ -62,7 +78,7 @@ func regen_scale() -> float:
 			sleep_mod += SleepRules.well_rested_regen_bonus()
 		if effects.has("tired"):
 			sleep_mod -= SleepRules.tired_regen_penalty(int(effects.scale_of("tired")))
-	return clampf(1.0 - DesertHeat.STAMINA_REGEN_PENALTY * heat + cool_bonus + sleep_mod, 0.35, 1.5)
+	return clampf(1.0 - DesertHeat.STAMINA_REGEN_PENALTY * heat + cool_bonus + sleep_mod + _spore_regen_bonus, 0.35, 1.65)
 
 
 ## 0..1 continuous desert sun-heat intensity on the owning player.
@@ -120,8 +136,10 @@ func sprint_scale() -> float:
 
 ## A new maximum (from the collected level); `grow` gives what was added right away.
 func set_max(value: float, grow: bool = false) -> void:
-	var added: float = value - max_stamina
-	max_stamina = value
+	_base_max_stamina = value
+	var target: float = _base_max_stamina + _spore_max_bonus
+	var added: float = target - max_stamina
+	max_stamina = target
 	if infinite:
 		refill()
 		return

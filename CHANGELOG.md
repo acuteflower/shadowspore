@@ -4,6 +4,66 @@ Alle Änderungen, neuen Features, Rebalancing-Werte und technischen Anpassungen 
 
 ---
 
+## [V0.10.2 Beta] – 2026-11-25
+### 🗺️ Zonenwelt ALTMARK, Windkap & Südkap, Feldcodex-Menü & Wind-Strand
+
+![Erlenbach-Mündung in die Silberbucht am Windkap](docs/img/windkap_v0102_estuary.png)
+
+> *Mit V0.10.2 Beta öffnet sich der Kontinent ALTMARK: Windkap und das weite Südkap verschmelzen nahtlos im Hintergrund, das neue Feldcodex-Menü vereint Atlas, Fortschrittspfad, Schattenfrüchte und Chronik unter einem Dach, und am Strand zieht echter Treibsand mit dem Küstenwind.*
+
+> [!IMPORTANT]
+> **Großer Meilenstein für Shadowspore 2.0!**
+> V0.10.2 Beta führt die komplette **Zonenwelt-Architektur (`ALTMARK`)** mit 4-Ebenen-Atlas, dem **Feldcodex-Ingame-Menü** samt eigenem **Schattenfrüchte-Reiter** und neuem rautenförmigem **Fortschrittspfad**, die **Steinsetzer-Prüfungstafel & Dungeons**, den **Sternensaal (Zero-G)** sowie den großen **Windkap- & Südkap-Welt-Feinschliff** (realistische Gewässerübergänge, windbewegter Sand, belebte Felsplateaus und ultraschnelles Südkap-Streaming) ein.
+
+<details>
+<summary><b>📋 Alle Neuerungen von V0.10.2 Beta auf einen Blick</b></summary>
+
+1. **🗺️ Zonenwelt ALTMARK & Nahtloses Südkap-Streaming:** Mehrstufige Zonenwelt (`ZoneWorld`, `ZoneDirector`, `PocketSpace`, `SaveGame v2`), 4-Ebenen-Atlas (`Zone → Region → Kontinent → Welt`), überarbeitetes Windkap samt nahtlosem Übergang ins XL-Gebiet **Südkap** (inkl. ~7× beschleunigter Gras-/Zonenerstellung & Worker-Thread-sicherer `WaterBridge`).
+2. **📖 Feldcodex — Vereintes Ingame-Menü:** Modernes, harmonisch texturiertes & animiertes Steinsetzer-Menü mit den Reitern **Atlas**, **Aufgaben**, **Fortschritt** (rautenförmiger Fähigkeiten-Fortschrittspfad + Stufen), **Schattenfrüchte**, **Welt** (*Chronik* mit Sidebar, *Stadt*, *Vögel*, *Flussbuch*) und **System** (Settings, Steuerung, Koop) — das Inventar bleibt direkt und schlank auf `I`.
+3. **🏖️ Windkap-Welt-Feinschliff (Gewässer, Wind-Strand & Felsplateaus):** Stetige Mündung von Erlenbach in die Silberbucht & Erlenweiher, sauberer goldener Strandsand ohne Flecken mit echter `WorldWind`-Treibsand- & Dünenbewegung, auswaschbaren 3D-Fußspuren und dicht strukturierten Felsbereichen aus bestehenden `LivingRock`- & Steingrund-Assets.
+4. **🏛️ HUD v2, Koop-Chat, Dungeons & Sternensaal:** Dynamische HUD-Regie (`HudDirector`), integrierter Koop-Chat, instanziierte Steinsetzer-Dungeons (`Sturmhafen`), Göttin Caelias Sternensaal mit Zero-G-Bewegung und überarbeitete 3D-Schwertführung mit persistenten Schnittspuren.
+
+</details>
+
+---
+
+### 🗺️ Zonenwelt ALTMARK, Windkap & Nahtloser Südkap-Übergang
+
+![Nahtloser Übergang vom Windkap ins Südkap](docs/img/windkap_v0102_suedkap.png)
+
+* **🟣 NEU – Kontinent ALTMARK & 4-Ebenen-Atlas:** Komplett neue Zonenwelt mit 11 geplanten Zonen in 5 Regionen, nahtlosem Multi-Zone-Koop-Streaming (`ZoneDirector`), interaktivem 4-Ebenen-Atlas (`Zone → Region → Kontinent → Welt`), Wegsteinen, Aussichtspunkten und Zonen-Ankunftstiteln.
+* **🟣 NEU – Startzone Windkap & Nachbarzone Südkap:** Handgeformte Küsten-Startzone mit Lager, Windkap-Ruine, Erlenbach-Brücke, Erlenweiher, Schattenfrüchten und offenem Ostweg ins XL-Küstengebiet **Südkap**.
+* **🟢 FIX & PERFORMANCE – Südkap-Eintritt & ~7× schnelleres Zonen-Streaming:** Thread-Guard-Blockade an `WaterBridge.has_water_deck_at()` beim Hintergrund-Streaming behoben; Zero-Allocation-Habitat-Queries, vorgenerierte Noise-Tabellen, flache MultiMesh-Bandpuffer und frühes XL-Preloading sorgen dafür, dass sich der Übergang nach Südkap rechtzeitig und ohne Nebelwand-Artefakte öffnet.
+
+---
+
+### 🏖️ Strand-Windbewegung, Gewässer & Felsplateaus
+
+![Goldener Sandstrand mit Wind-Treibsand, Dünenhafer und Fußspuren](docs/img/windkap_v0102_beach.png)
+
+* **🔵 REWORK – Realistische Gewässer-Übergänge:** Fließender Übergang von Erlenbach in die Silberbucht (Brackwasser-Mündung mit Strömung und glattem SDF-Verlauf) sowie sauber eingebetteter Waldsee *Erlenweiher*.
+* **🟣 NEU – Echte `WorldWind`-Strand- & Sandbewegung:** Trockener Strandsand reagiert direkt auf Windrichtung, Böen und Sturm mit wandernden Dünenrippeln, 4-Tap-Treibsand-Schleiern, fliegenden `2×1`-Saltationskörnern, Luft-Treibsand-Partikeln (`WorldWind`), feiner Brandungsgischt und windbewegtem Strandhafer.
+* **🔵 REWORK – Sauberer Sand & Belebte Felsplateaus:** Alle störenden Wasser-/Treibgut-Flecken und Dauerpfützen vom trockenen Strandsand entfernt; Felsbereiche im Nordwesten und rund um das Windkap mit bestehenden `LivingRock`-Formationen, Moos- und Steindetails natürlich verdichtet.
+
+---
+
+### 📖 Feldcodex — Das neue Ingame-Menü & Schattenfrüchte
+
+* **🟣 NEU – Feldcodex-Menü:** Einheitliches, animiertes Steinsetzer-Ingame-Menü mit klaren Oberreitern (*Atlas*, *Aufgaben*, *Fortschritt*, *Schattenfrüchte*, *Welt*, *System*), während das Inventar wie gewohnt schnell auf `I` öffnet.
+* **🔵 REWORK – Rauten-Fortschrittspfad & Schattenfrüchte:** Neuer zentraler Fortschrittspfad mit 3 Startpunkten in einer Mittelraute, der sich in die Himmelsrichtungen mit gestalteten Fähigkeits-Medaillons verzweigt; eigener **Schattenfrüchte**-Tab mit lebendig animierten Früchten sowie überarbeitete **Chronik** (mit Sidebar), **Flussbuch**, **Quests** und korrigierten **System-Settings**.
+
+---
+
+### 🏛️ HUD v2, Koop-Chat, Dungeons & Sternensaal
+
+* **🟣 NEU – HUD v2 & Ingame-Chat:** Profilbasierte HUD-Regie (`HudDirector`), kollabierbare Hotbar, Weg- & Begleiter-Ranken, gestaffelte Benachrichtigungen und voll integrierter Multiplayer-Chat.
+* **🟣 NEU – Dungeons, Sternensaal & Schwertführung:** Instanziierte Steinsetzer-Prüfungen (`PocketSpace.Lane.DUNGEON`), Göttin Caelias schwereloser Sternensaal (Zero-G) sowie verfeinerte 3D-Schwertführung samt persistenten Welt-Schnittspuren (`SlashWorldFx`).
+
+> ✦ ──────────────── ❖ ──────────────── ✦
+> *Betretet ALTMARK, spürt den Küstenwind an der Silberbucht und erkundet das neue Südkap – viel Spaß mit V0.10.2 Beta!*
+
+---
+
 ## [V0.10-1 Beta] – 2026-11-23
 ### 🌿 Shadowspore 2.0: Movement 2.0, Lebendige Natur, Wasser 2.0 & Abgrund-Finisher
 

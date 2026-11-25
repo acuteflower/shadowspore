@@ -24,6 +24,7 @@ var _shadows: SunShadows
 var _mood: MoodGrade
 var _interiors: Interiors
 var _mines: MineManager
+var _dungeons: DungeonManager
 var _weather: WeatherManager
 var _sky: WeatherSky
 var _weather_audio: WeatherAudio
@@ -96,14 +97,18 @@ func _update() -> void:
 		_interiors = get_parent().get_node_or_null("Interiors") as Interiors
 	if _mines == null: ## the level adds the mine after this node is ready
 		_mines = get_parent().get_node_or_null("Mines") as MineManager
+	if _dungeons == null:
+		_dungeons = get_parent().get_node_or_null("Dungeons") as DungeonManager
 	var room: Color = _interiors.ambient_color() if _interiors != null else Color(0, 0, 0, 0)
 	if room.a <= 0.0 and _mines != null:
 		room = _mines.ambient_color() ## the mine has the colour of its zone
+	if room.a <= 0.0 and _dungeons != null:
+		room = _dungeons.ambient_color() ## standalone dungeon scene lighting
 	color = room if room.a > 0.0 else TimeManager.ambient_color() ## inside a room it has its own light
 	var cam: Camera2D = get_viewport().get_camera_2d()
 	var cam_pos: Vector2 = cam.get_screen_center_position() if cam != null else Vector2.ZERO
 	var has_cam: bool = cam != null
-	var indoors: bool = room.a > 0.0 or (has_cam and (Interiors.slot_at(cam_pos) >= 0 or MineManager.in_mine(cam_pos))) ## rooms and the mine have their own light, no sun, no weather (also while the room's own tint is not known yet)
+	var indoors: bool = room.a > 0.0 or (has_cam and (Interiors.slot_at(cam_pos) >= 0 or MineManager.in_mine(cam_pos) or DungeonManager.in_dungeon(cam_pos))) ## rooms, mine and dungeons have their own light, no sun, no weather
 	_weather.follow(indoors, get_process_delta_time())
 	var sky_sun: float = 1.0 if indoors else _weather.sunlight() ## clouds and rain take the direct sun (and its golden hour, glints, dew)
 	if not indoors:
@@ -113,11 +118,14 @@ func _update() -> void:
 		var day_part: float = 1.0 - TimeManager.night_amount()
 		color = color * Color(lerpf(1.0, dim, day_part), lerpf(1.0, dim, day_part), lerpf(1.0, dim * 1.02, day_part), 1.0)
 	var cam_matches_weather: bool = has_cam and cam_pos.distance_squared_to(_weather.focus) < 4.0
+	if not indoors and not ZoneMood.now.is_empty(): ## the zone's own light (2.0 zone world): blended across seams, neutral elsewhere
+		color = color * ZoneMood.tint("tint_day").lerp(ZoneMood.tint("tint_night"), TimeManager.night_amount())
 	var gloom: float = 0.0 if (indoors or not has_cam) else (_weather.last_hex_at_focus if cam_matches_weather else BiomeBlend.amount_at(cam_pos)) ## the Hexenwald: permanent dusk by day, a deeper night (docs/hexenwald_konzept.md, stage 3)
 	if gloom > 0.0:
 		color = color.lerp(TimeManager.NIGHT_COLOR, gloom) ## always night in the mood, whatever the clock says
-	var sun: float = 0.0 if indoors else TimeManager.sun_amount() * (1.0 - gloom) * sky_sun
-	var golden: float = TimeManager.golden_amount() * (1.0 - gloom) * lerpf(1.0, sky_sun, 0.7)
+	var zone_sun: float = 1.0 if indoors else ZoneMood.value("sun")
+	var sun: float = 0.0 if indoors else TimeManager.sun_amount() * (1.0 - gloom) * sky_sun * zone_sun
+	var golden: float = TimeManager.golden_amount() * (1.0 - gloom) * lerpf(1.0, sky_sun, 0.7) * zone_sun
 	var ground_golden: float = 0.0 if indoors else golden
 	_daylight.follow(indoors, sun, golden)
 	if absf(sun - _sent_mat_sun) > GLOBAL_EPSILON:
@@ -177,7 +185,7 @@ func _camera_in_room() -> bool:
 	if camera == null:
 		return false
 	var at: Vector2 = camera.get_screen_center_position()
-	return Interiors.slot_at(at) >= 0 or MineManager.in_mine(at)
+	return Interiors.slot_at(at) >= 0 or MineManager.in_mine(at) or DungeonManager.in_dungeon(at)
 
 
 func _camera_in_starhall() -> bool:

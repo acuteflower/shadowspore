@@ -1,0 +1,16 @@
+{
+	"_doc": "Generiert von tools/art_sternenauge.py. Pixel relativ zur linken oberen Frame-Ecke.",
+	"frame": [212, 379],
+	"frames": {
+		"wild": 0,
+		"awake": 1
+	},
+	"foot": [106, 377],
+	"base_width": 210,
+	"base_row": 316,
+	"lens": [107, 37],
+	"beam_origin": [107, 37],
+	"ground_center": [106, 330],
+	"ground_radii": [102, 42],
+	"door": [106, 349]
+}

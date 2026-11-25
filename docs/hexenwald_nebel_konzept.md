@@ -1,6 +1,6 @@
 # Hexenwald: Nebel, Halluzination und der Talisman der Hexe (Konzept)
 
-Stand 2026-11-10. **Nichts davon ist gebaut.** Ergänzt `docs/hexenwald_konzept.md` (Stufe 3 "Stimmung" und Stufe 7 "Geschichte"). Der Hexenturm und die Hexe selbst kommen danach und sind hier nur so weit beschrieben, wie der Nebel sie braucht.
+Stand 2026-11-10. **Gebaut (`StatusEffects`, `Hallucinations`, `clarity_earrings`); für v2-Zone `hexenwald_kern` vorgesehen.** Ergänzt `docs/hexenwald_konzept.md` (Stufe 3 "Stimmung" und Stufe 7 "Geschichte"). Der Hexenturm und die Hexe selbst kommen danach und sind hier nur so weit beschrieben, wie der Nebel sie braucht.
 
 ## 1. Die Idee in drei Sätzen
 

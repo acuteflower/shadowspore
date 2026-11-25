@@ -85,6 +85,12 @@ func follow(indoors: bool, gloom: float, arid: float = 0.0, arcane_storm: float 
 				mood = blend(mood, _desert_storm, clampf(arcane_storm * 0.90, 0.0, 0.92))
 	var shadow: Color = mood["shadow"] as Color
 	var light: Color = mood["light"] as Color
+	if not indoors and not ZoneMood.now.is_empty(): ## the zone's lean (2.0 zone world, ZoneMood): multiplied tints, added amounts
+		shadow = shadow * ZoneMood.tint("shadow")
+		light = light * ZoneMood.tint("light")
+		mood = mood.duplicate()
+		for field: String in ["vibrance", "contrast", "bloom", "vignette"]:
+			mood[field] = maxf(0.0, float(mood[field]) + ZoneMood.value(field, 0.0))
 	var shadow_v: Vector3 = Vector3(shadow.r, shadow.g, shadow.b)
 	var light_v: Vector3 = Vector3(light.r, light.g, light.b)
 	if shadow_v.distance_squared_to(_sent_shadow) > 0.000001:

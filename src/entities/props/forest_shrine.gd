@@ -12,7 +12,7 @@ const FRAME_W: int = 64
 const FRAME_H: int = 72
 const FEET_Y: float = 64.0
 
-var landmarks: MeadowLandmarks
+var landmarks: Node
 var shrine_id: String = ""
 var variant: int = 0 ## 0..2
 var tier_name: String = "common"
@@ -24,7 +24,7 @@ var _light: NightLight
 var _shaft: SunbeamShaft
 
 
-func setup(owner_landmarks: MeadowLandmarks, id_val: String, pos_px: Vector2, var_idx: int, chest_tier: String = "common") -> void:
+func setup(owner_landmarks: Node, id_val: String, pos_px: Vector2, var_idx: int, chest_tier: String = "common") -> void:
 	landmarks = owner_landmarks
 	shrine_id = id_val
 	position = pos_px.round()

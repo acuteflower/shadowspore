@@ -22,9 +22,11 @@ func _ready() -> void:
 	add_to_group("vistas")
 	var table: Dictionary = DataRegistry.table("vistas")
 	_settings = table.get("settings", {}) as Dictionary
-	for entry: Variant in table.get("vistas", []) as Array:
-		var spec: Dictionary = entry as Dictionary
-		_specs[String(spec.id)] = spec
+	var is_v2_world: bool = get_tree().get_first_node_in_group("zone_director") != null or (get_parent() != null and get_parent().has_method("director"))
+	if not is_v2_world:
+		for entry: Variant in table.get("vistas", []) as Array:
+			var spec: Dictionary = entry as Dictionary
+			_specs[String(spec.id)] = spec
 	if multiplayer.is_server():
 		multiplayer.peer_connected.connect(func(peer: int) -> void:
 			_rpc_snapshot.rpc_id(peer, PackedStringArray(_seen.keys())))
@@ -64,6 +66,13 @@ func register(point: VistaPoint) -> void:
 	point.set_discovered_visual(_seen.has(point.vista_id))
 
 
+## Dynamically register a zone vista spec (v2 Atlas zones such as WINDKAP).
+func register_spec(id: String, spec: Dictionary) -> void:
+	if id.is_empty():
+		return
+	_specs[id] = spec.duplicate(true)
+
+
 ## Host only: called from `VistaPoint.rest_tick` once a player has sat quietly past `reveal_delay`.
 func host_discover(id: String, player: Player) -> void:
 	if not multiplayer.is_server() or not _specs.has(id) or _seen.has(id):
@@ -76,13 +85,23 @@ func host_discover(id: String, player: Player) -> void:
 	var tile_arr: Array = spec.tile as Array
 	var base_tile: Vector2 = Vector2(float(tile_arr[0]), float(tile_arr[1]))
 	var shift: float = float(_settings.get("reveal_shift_tiles", 16.0))
-	var focus_tile: Vector2 = (base_tile + point.sit_direction() * shift).clamp(
-		Vector2.ZERO, Vector2.ONE * float(RegionMap.WORLD_TILES - 1)
-	)
-	var cells: float = float(spec.get("reveal_cells", _settings.get("reveal_cells", 22.0)))
 	var discovery: MapDiscovery = get_tree().get_first_node_in_group("map_discovery") as MapDiscovery
+	var max_bounds: Vector2 = Vector2(1023.0, 1023.0)
+	if discovery != null and discovery.is_v2():
+		var csize: Vector2i = discovery.continent_size()
+		max_bounds = Vector2(float(maxi(csize.x - 1, 1)), float(maxi(csize.y - 1, 1)))
+	var focus_tile: Vector2 = (base_tile + point.sit_direction() * shift).clamp(Vector2.ZERO, max_bounds)
+	var cells: float = float(spec.get("reveal_cells", _settings.get("reveal_cells", 22.0)))
 	if discovery != null:
 		discovery.reveal_disc(focus_tile, cells)
+		if discovery.is_v2() and spec.has("zone"):
+			var atlas: Atlas = Atlas.shared()
+			var zid: StringName = StringName(String(spec["zone"]))
+			if atlas != null and zid != &"":
+				for t: Atlas.Threshold in atlas.thresholds_of(zid):
+					var other: StringName = t.other(zid)
+					if other != &"" and discovery.has_method("mark_zone_sighted"):
+						discovery.call("mark_zone_sighted", other)
 	var xp_reward: int = int(spec.get("xp_reward", _settings.get("xp_reward", 12)))
 	if xp_reward > 0 and player.progress != null:
 		player.progress.award(0, xp_reward)
@@ -132,16 +151,18 @@ func import_state(saved: Variant) -> void:
 
 
 func _show_banner(title: String, sub: String) -> void:
-	if _banner == null:
-		_banner = TownBanner.new()
-		add_child(_banner)
-	_banner.show_banner({
-		"header": "AUSSICHT ENTDECKT",
-		"title": title,
-		"sub": sub,
-		"color": Color("243b4a"),
-		"emblem": -1,
-	})
+	## the HUD's leaf (docs/hud_v2_konzept.md 3.F); the old banner only where there is no HUD
+	if not HudNotices.post(get_tree(), "medium", "vista:" + title, {"header": "AUSSICHT ENTDECKT", "text": title.to_upper(), "color": Color("9fd8ff")}):
+		if _banner == null:
+			_banner = TownBanner.new()
+			add_child(_banner)
+		_banner.show_banner({
+			"header": "AUSSICHT ENTDECKT",
+			"title": title,
+			"sub": sub,
+			"color": Color("243b4a"),
+			"emblem": -1,
+		})
 	if ResourceLoader.exists("res://assets/audio/vistas/chime.wav"):
 		var audio: AudioStreamPlayer = AudioStreamPlayer.new()
 		audio.stream = load("res://assets/audio/vistas/chime.wav") as AudioStream

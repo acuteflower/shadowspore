@@ -58,5 +58,5 @@ Beet-Zustand (Dictionary je Zelle): `t` gehackt, `w` gewässert (Tag+1), `c` Pfl
 - Feld-exklusive Samen, Düngen, Vogelscheuche (hält Krähen fern, passt zum Krähen-System), Bewässerungsrinne aus dem Fluss, Zaunbonus.
 - Nachtfrüchte: Glutkarotte und Nachtrübe leuchten im reifen Zustand (Glow-Sheet), im Feld zieht das Licht Glühwürmchen an (noch nicht angebunden).
 - Gustav-Dialogzeile zur Hacke, Quest/Hinweiskarte (`HintCard`) für den ersten Acker.
-- Kochen: Ernte-Items sind die vorhandenen Wildpflanzen-Items.
+- Alchemie: Ernte-Items sind die vorhandenen Wildpflanzen-Items (ersetzen das frühere Kochen).
 - Kunst entstand per Python-Generator (`art_crops.py`), nicht über den Terra-Subagenten (nicht verfügbar).

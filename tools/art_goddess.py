@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""Procedural 3D-ellipsoid pixel-art generator for the Goddess of the Star Hall.
+"""Complete ground-up 3D-ellipsoid pixel-art redesign of Caelia, the floating interstellar goddess
+(docs/caelia_interstellar_konzept.md).
 
-Follows `tools/art_hero3d.py`, `tools/art_hero_outfit.py`, `tools/art_hero_hair.py`,
-and `tools/hero_face.py` down to the exact subpixel shading & silhouette rules:
-  - 4x4 orthographic local-space ellipsoid supersampling (`SS = 4`).
-  - Outer 1px dark-violet silhouette outline ONLY against open air (`~all_solid`),
-    NEVER cutting black lines across her cheeks, collarbones, bustier, or legs!
-  - Material-tinted Band-0 soft internal depth creases (`art_hero3d._rows_from_best`).
-  - Structured, noise-free pixel-art drapery & strand shading (4-tone silver-gold
-    wavy hair & temple braids, golden starlight diadem, sweetheart pearl-silk bustier,
-    gold-laced midnight-indigo corset, astrolabe-trimmed pearl stole, pleated royal
-    night-blue split overskirt, gossamer starry shoulder veil, and delicate golden
-    halo arc with 7 faceted crystal rays).
+Sculpted visual pillars:
+  - Weightless barefoot floating posture in open deep space (NO throne, NO corset, NO stiff spiky halo).
+  - 128x144 frames, center anchor (64, 78), ~1.75x Ellie scale (~76 px tall), 8 REAL facings (E..NE).
+  - Unified Silky Living Nebula Hair: sculpted flowing moon-silver hair curtain sweeping cleanly behind
+    her shoulders and waist, transitioning softly through twilight lavender-indigo into starry cosmos-indigo
+    tips dotted with crisp 1px unlit stars; thin delicate side locks frame her serene face cleanly.
+  - Classical Flowing Moon-Ivory Veil Gown: asymmetrical left-shoulder silk drape, bare moonlit right
+    shoulder with subtle antique-gold Kintsugi light seam, slender golden under-bust cord, continuous
+    sculpted flowing skirt with an elegant asymmetric leg slit revealing her weightless bare feet &
+    floating golden ankle rings, trailing 3 graceful sheer starlight hem tails below.
+  - Wide Iconic Celestial Stole (Hagoromo Astral Ribbon): sweeping midnight-sapphire ribbon arching behind
+    her upper back, curling around her forearms, and billowing wide to both sides with bright antique-gold
+    borders and glowing turquoise constellation dots.
+  - True 3D Z-buffered Floating Astrolabe: two thin tilted golden light rings orbiting serenely around her
+    head & shoulders (never flipping edge-on!) with glowing starlight nodes.
+  - Clips: float_idle (8f), float_talk (8f), float_bless (12f) -> 28 cols x 8 rows.
 
-Outputs:
-  - assets/characters/goddess.png       (26 cols x 3 rows, 96x112 frames, anchor (48, 94))
-  - assets/characters/goddess_glow.png  (matching emissive-only sheet for Unlit overlay)
-  - data/goddess_rig.json               (clip definitions, anchor, facings)
+Usage:
+  py -3 tools/art_goddess.py                          builds full sheets + rig JSON
+  py -3 tools/art_goddess.py preview out.png          renders fast 2x preview (8-dir turnaround + clips)
 """
 from __future__ import annotations
 
@@ -28,25 +33,25 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from gen_art import ROOT, write_png  # noqa: E402
+from gen_art import ROOT  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# Frame & Camera Geometry (exact `art_hero3d.py` 26° 3/4 pitch + 4x SS)
-# ---------------------------------------------------------------------------
-FW, FH = 96, 112
-SS = 4
-PITCH = math.radians(26.0)
+FW, FH = 128, 144
+SS = 3
+PITCH = math.radians(20.0)
 COSP, SINP = math.cos(PITCH), math.sin(PITCH)
-SCALE = 1.38
-GROUND_ROW = 94.0
+SCALE = 1.40
+ANCHOR_X, ANCHOR_Y = 64.0, 78.0
+PELVIS_Y = 26.0
 
-XHAT = np.array([1.0, 0.0, 0.0], dtype=np.float64)
 UHAT = np.array([0.0, COSP, -SINP], dtype=np.float64)
 WHAT = np.array([0.0, SINP, COSP], dtype=np.float64)
-LIGHT = np.array([-0.48, 0.72, 0.50], dtype=np.float64)
+LIGHT = np.array([-0.50, 0.72, 0.48], dtype=np.float64)
 LIGHT /= np.linalg.norm(LIGHT)
+
+TAU = 2.0 * math.pi
 
 
 def hexc(s: str) -> tuple[int, int, int]:
@@ -55,55 +60,51 @@ def hexc(s: str) -> tuple[int, int, int]:
 
 
 # ---------------------------------------------------------------------------
-# Material Ramps (4 flat tones each, cool-violet shadows, zero pure black)
-# Emissive ramps (8..10) have unique RGBs so `goddess_glow.png` is 100% pure.
+# Shadowspore Material Ramps (4 flat tones dark -> light, cool-violet shadows)
 # ---------------------------------------------------------------------------
-SKIN = 0         # Ellie's exact luminous porcelain-rose skin ramp
-HAIR_SILV = 1    # Rich 4-tone lavender-shadow to moon-silver hair
-HAIR_GOLD = 2    # Warm champagne-starlight hair strands & temple braids
-PEARL_SILK = 3   # Luminous moon-ivory jacquard silk (bustier & stole)
-NIGHT_SILK = 4   # Deep cosmos midnight-indigo velvet-silk (corset & overskirt)
-NIGHT_PLEAT = 5  # Rich royal-amethyst satin pleat highlights
-ASTRAL_VEIL = 6  # Gossamer starry sapphire-violet shoulder veil
-GOLD = 7         # Antique-to-champagne gold filigree, clasps & sandals
-TEAL_EMIT = 8    # Emissive turquoise-starlight gems, veins & iris
-HALO_EMIT = 9    # Emissive radiant star-gold halo & blessing core
-STAR_EMIT = 10   # Emissive diamond-white / ice-cyan crystal facets
+SKIN = 0          # Luminous pale moonlit porcelain
+HAIR_SILV = 1     # Cool moon-silver hair
+HAIR_TWIL = 2     # Smooth twilight lavender-indigo bridge between silver & nebula tips
+HAIR_NEBULA = 3   # Deep starry cosmos-indigo lower hair tips
+PEARL_SILK = 4    # Sculpted moon-ivory flowing veil gown
+SILK_SHEER = 5    # Ethereal pale celestial-cyan sheer hem tails
+COSMOS_STOLE = 6  # Deep sapphire-indigo floating Hagoromo stole
+GOLD = 7          # Antique-to-champagne star-gold trim & cords
+TEAL_EMIT = 8     # Unlit luminous turquoise eyes, constellation dots & veil wisps
+HALO_EMIT = 9     # Unlit radiant star-gold astrolabe rings, kintsugi seam & ankle rings
+STAR_EMIT = 10    # Unlit diamond-white / ice-cyan starlight nodes & nebula hair stars
 
 RAMPS: list[list[tuple[int, int, int]]] = [
-    [hexc("dc9496"), hexc("f2b8b2"), hexc("fde0d2"), hexc("fff3e8")],  # 0 SKIN
-    [hexc("5e5294"), hexc("9286ca"), hexc("d2cae8"), hexc("f8f2ec")],  # 1 HAIR_SILV (richer midtone depth against bright hall ambient!)
-    [hexc("8c7250"), hexc("bfa476"), hexc("e6d4ae"), hexc("fbf4de")],  # 2 HAIR_GOLD
-    [hexc("7c729e"), hexc("aea4d0"), hexc("dcd6ee"), hexc("f7f3ee")],  # 3 PEARL_SILK (sculpted silver-ivory folds!)
-    [hexc("120d28"), hexc("221c4a"), hexc("3e347a"), hexc("685cae")],  # 4 NIGHT_SILK
-    [hexc("281a4a"), hexc("48307c"), hexc("7252b4"), hexc("a488e2")],  # 5 NIGHT_PLEAT
-    [hexc("1b244e"), hexc("2f447c"), hexc("547cb8"), hexc("96cef2")],  # 6 ASTRAL_VEIL
+    [hexc("c88a96"), hexc("e8b2b4"), hexc("fadcd2"), hexc("fff3ea")],  # 0 SKIN
+    [hexc("6c62a6"), hexc("a49ad8"), hexc("dcd6f4"), hexc("faf6fe")],  # 1 HAIR_SILV
+    [hexc("322a66"), hexc("524894"), hexc("7c72c2"), hexc("b2aae4")],  # 2 HAIR_TWIL
+    [hexc("0e0a26"), hexc("1e184c"), hexc("382e7e"), hexc("5e52b2")],  # 3 HAIR_NEBULA
+    [hexc("726c9a"), hexc("aba6d0"), hexc("e0dcf2"), hexc("fbf8f4")],  # 4 PEARL_SILK
+    [hexc("3a4d7c"), hexc("6484b4"), hexc("9ec4e8"), hexc("dcf2ff")],  # 5 SILK_SHEER
+    [hexc("0e102c"), hexc("1d2254"), hexc("343f86"), hexc("5c6eb8")],  # 6 COSMOS_STOLE
     [hexc("6f5020"), hexc("b48a38"), hexc("e6c468"), hexc("fff0b0")],  # 7 GOLD
     [hexc("268890"), hexc("3cc0c6"), hexc("78f4e6"), hexc("d0fff8")],  # 8 TEAL_EMIT
-    [hexc("9c7226"), hexc("dca842"), hexc("f8d876"), hexc("fff6c4")],  # 9 HALO_EMIT
-    [hexc("4aa4bc"), hexc("7ad6ec"), hexc("b8f4ff"), hexc("f4ffff")],  # 10 STAR_EMIT
+    [hexc("9c7226"), hexc("dca842"), hexc("f6d674"), hexc("fff5be")],  # 9 HALO_EMIT
+    [hexc("54b4cc"), hexc("8ce4f6"), hexc("c8f8ff"), hexc("f6ffff")],  # 10 STAR_EMIT
 ]
 EMIT_MATS = {TEAL_EMIT, HALO_EMIT, STAR_EMIT}
 
-DECAL_WEIGHT: dict[int, float] = {
-    GOLD: 1.36,
-    TEAL_EMIT: 1.58,
-    HALO_EMIT: 1.50,
-    STAR_EMIT: 1.58,
-}
-
-SIL_INK = (18, 9, 28, 255)       # Crisp dark obsidian-violet outer silhouette (#12091c)
-HALO_INK = (44, 30, 46, 255)     # Tinted warm plum-bronze outline for floating halo
-EYE_LASH = (32, 18, 54, 255)     # Crisp dark-violet upper eyelash (#201236)
+OUTLINE_DARK = (16, 10, 30, 255)
+OUTLINE_HAIR = (28, 22, 56, 255)
+OUTLINE_GOLD = (46, 32, 42, 255)
+OUTLINE_TEAL = (20, 48, 60, 255)
+LASH_COL = (28, 16, 52, 255)
+LIP_COL = (182, 104, 126, 255)
 
 
-def mat_ink(mat: int) -> tuple[int, int, int, int]:
-    """Soft material-tinted outer outline (`art_hero3d.ink_color`), keeping hair & halo airy while body stays crisp."""
-    if mat in (HALO_EMIT, STAR_EMIT, TEAL_EMIT):
-        return HALO_INK
-    if mat in (HAIR_SILV, HAIR_GOLD):
-        return (36, 26, 58, 255)
-    return SIL_INK
+def mat_outline(mat: int) -> tuple[int, int, int, int]:
+    if mat == HALO_EMIT:
+        return OUTLINE_GOLD
+    if mat in (TEAL_EMIT, STAR_EMIT):
+        return OUTLINE_TEAL
+    if mat in (HAIR_SILV, HAIR_TWIL, HAIR_NEBULA, SILK_SHEER):
+        return OUTLINE_HAIR
+    return OUTLINE_DARK
 
 
 # ---------------------------------------------------------------------------
@@ -124,1058 +125,551 @@ def rot_z(a: float) -> np.ndarray:
     return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]], dtype=np.float64)
 
 
-def frame_from(axis_y: np.ndarray | tuple[float, float, float], hint: np.ndarray | tuple[float, float, float] = (0.0, 0.0, 1.0)) -> np.ndarray:
+def frame_from(axis_y: np.ndarray, hint: tuple[float, float, float] = (0.0, 0.0, 1.0)) -> np.ndarray:
     ty = np.asarray(axis_y, dtype=np.float64)
     ny = float(np.linalg.norm(ty))
     ty = ty / ny if ny > 1e-6 else np.array([0.0, 1.0, 0.0])
     tx = np.cross(ty, np.asarray(hint, dtype=np.float64))
     if float(np.linalg.norm(tx)) < 1e-6:
-        tx = np.cross(ty, [1.0, 0.0, 0.0])
+        tx = np.cross(ty, np.array([1.0, 0.0, 0.0]))
     tx /= float(np.linalg.norm(tx))
     tz = np.cross(tx, ty)
     return np.stack([tx, ty, tz], axis=1)
 
 
-def panel_basis(right_vec: np.ndarray, up_vec: np.ndarray) -> np.ndarray:
-    ux = np.asarray(right_vec, dtype=np.float64)
-    nx = float(np.linalg.norm(ux))
-    ux = ux / nx if nx > 1e-6 else np.array([1.0, 0.0, 0.0])
-    uy = np.asarray(up_vec, dtype=np.float64)
-    uy = uy - np.dot(uy, ux) * ux
-    ny = float(np.linalg.norm(uy))
-    uy = uy / ny if ny > 1e-6 else np.array([0.0, 1.0, 0.0])
-    uz = np.cross(ux, uy)
-    nz = float(np.linalg.norm(uz))
-    uz = uz / nz if nz > 1e-6 else np.array([0.0, 0.0, 1.0])
-    return np.stack([ux, uy, uz], axis=1)
-
-
-def ik2(
-    root: np.ndarray,
-    target: np.ndarray,
-    l1: float,
-    l2: float,
-    pole: tuple[float, float, float] | np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    root_a = np.asarray(root, dtype=np.float64)
-    targ_a = np.asarray(target, dtype=np.float64)
-    d = targ_a - root_a
-    dist = float(np.linalg.norm(d))
-    reach = l1 + l2 - 0.04
-    if dist > reach:
-        d = d * (reach / max(dist, 1e-6))
-        dist = reach
-    if dist < abs(l1 - l2) + 0.04:
-        dist = abs(l1 - l2) + 0.04
-    u = d / max(float(np.linalg.norm(d)), 1e-6)
-    p = np.asarray(pole, dtype=np.float64)
-    p = p - np.dot(p, u) * u
-    np_len = float(np.linalg.norm(p))
-    p = p / np_len if np_len > 1e-6 else np.array([0.0, 0.0, 1.0])
-    cos_a = max(-1.0, min(1.0, (l1 * l1 + dist * dist - l2 * l2) / (2.0 * l1 * dist)))
+def ik2(root: np.ndarray, target: np.ndarray, l1: float, l2: float, pole: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    v = target - root
+    d = float(np.linalg.norm(v))
+    max_d = l1 + l2 - 0.05
+    min_d = abs(l1 - l2) + 0.05
+    if d < 1e-5:
+        v = np.array([0.0, -1.0, 0.0])
+        d = min_d
+    dc = max(min_d, min(max_d, d))
+    dir_v = v / d
+    eff_t = root + dir_v * dc
+    cos_a = max(-1.0, min(1.0, (l1 * l1 + dc * dc - l2 * l2) / (2.0 * l1 * dc)))
     sin_a = math.sqrt(max(0.0, 1.0 - cos_a * cos_a))
-    mid = root_a + l1 * (cos_a * u + sin_a * p)
-    return mid, root_a + d
+    p = pole - np.dot(pole, dir_v) * dir_v
+    pn = float(np.linalg.norm(p))
+    if pn < 1e-5:
+        p = np.cross(dir_v, np.array([0.0, 1.0, 0.0]))
+        pn = float(np.linalg.norm(p))
+    p = p / max(pn, 1e-5)
+    mid = root + dir_v * (l1 * cos_a) + p * (l1 * sin_a)
+    return mid, eff_t
 
 
 class Prim:
-    __slots__ = ("c", "r", "R", "mat", "kind", "tag", "clip", "layer")
+    __slots__ = ("c", "r", "R", "mat", "bias", "emit_band")
 
-    def __init__(
-        self,
-        c: np.ndarray,
-        r: np.ndarray,
-        R: np.ndarray,
-        mat: int,
-        kind: str = "",
-        tag: float = 0.0,
-        clip=None,
-        layer: str = "body",
-    ) -> None:
-        self.c = c
-        self.r = r
-        self.R = R
+    def __init__(self, c, r, R, mat: int, bias: float = 0.0, emit_band: int = -1) -> None:
+        self.c = np.asarray(c, dtype=np.float64)
+        self.r = np.asarray(r, dtype=np.float64)
+        self.R = np.asarray(R, dtype=np.float64)
         self.mat = mat
-        self.kind = kind
-        self.tag = tag
-        self.clip = clip
-        self.layer = layer
+        self.bias = bias
+        self.emit_band = emit_band
 
 
-class Model:
+class Builder:
     def __init__(self) -> None:
         self.prims: list[Prim] = []
-        self.layer: str = "body"
-        self.eyes: list[tuple[np.ndarray, np.ndarray, bool]] = []
+        self.head_c = np.array([0.0, 51.0, 0.4], dtype=np.float64)
+        self.head_R = np.eye(3, dtype=np.float64)
+        self.hand_l = np.zeros(3)
+        self.hand_r = np.zeros(3)
 
-    def ell(
-        self,
-        c,
-        r,
-        mat: int,
-        R: np.ndarray | None = None,
-        kind: str = "",
-        tag: float = 0.0,
-        clip=None,
-        layer: str | None = None,
-    ) -> None:
-        ca = np.asarray(c, dtype=np.float64)
-        ra = np.asarray(r, dtype=np.float64)
-        if ra.ndim == 0:
-            ra = np.array([float(ra)] * 3, dtype=np.float64)
-        rot_m = np.eye(3, dtype=np.float64) if R is None else R
-        self.prims.append(Prim(ca, ra, rot_m, mat, kind, tag, clip, self.layer if layer is None else layer))
+    def ell(self, c, r, mat: int, R=None, bias: float = 0.0, emit_band: int = -1) -> None:
+        self.prims.append(Prim(c, r, np.eye(3) if R is None else R, mat, bias, emit_band))
 
-    def limb(
-        self,
-        p0,
-        p1,
-        r0: float,
-        r1: float,
-        mat: int,
-        kind: str = "",
-        step: float = 0.45,
-        layer: str | None = None,
-    ) -> None:
-        a = np.asarray(p0, dtype=np.float64)
-        b = np.asarray(p1, dtype=np.float64)
-        n = max(2, int(float(np.linalg.norm(b - a)) / step))
-        for i in range(n + 1):
-            t = i / n
-            r = r0 + (r1 - r0) * t
-            self.ell(a + (b - a) * t, (r, r, r), mat, kind=kind, layer=layer)
+    def limb(self, a: np.ndarray, b: np.ndarray, r0: float, r1: float, mat: int, steps: int = 8) -> None:
+        v = b - a
+        R = frame_from(v)
+        seg_len = float(np.linalg.norm(v)) / max(steps, 1)
+        for i in range(steps + 1):
+            t = i / max(steps, 1)
+            rad = r0 * (1.0 - t) + r1 * t
+            p = a * (1.0 - t) + b * t
+            self.ell(p, (rad, max(rad * 1.12, seg_len * 0.72), rad), mat, R)
 
-    def ribbon(
+    def ribbon_chain(
         self,
-        pts: list,
+        pts: list[np.ndarray],
         widths: list[float],
-        thick: float,
-        mat: int,
-        hint: tuple[float, float, float] = (0.0, 0.0, -1.0),
-        tag: float = 0.0,
-        kind: str = "hair",
-        layer: str | None = None,
+        thickness: float,
+        mats: list[int],
+        subdiv: int = 3,
+        hint: tuple[float, float, float] = (0.0, 0.0, 1.0),
+        emit_band: int = -1,
     ) -> None:
-        arr = [np.asarray(p, dtype=np.float64) for p in pts]
-        for i in range(len(arr) - 1):
-            seg = arr[i + 1] - arr[i]
-            ln = float(np.linalg.norm(seg))
-            if ln < 1e-5:
+        n = len(pts) - 1
+        if n <= 0:
+            return
+        for i in range(n):
+            p0, p1 = pts[i], pts[i + 1]
+            w0, w1 = widths[i], widths[i + 1]
+            m0 = mats[min(i, len(mats) - 1)]
+            seg = p1 - p0
+            seg_len = float(np.linalg.norm(seg))
+            if seg_len < 1e-4:
                 continue
             R = frame_from(seg, hint)
-            n = max(2, int(ln / 0.50))
-            for k in range(n + 1):
-                t = k / n
-                u = (i + t) / (len(arr) - 1)
-                wi = u * (len(widths) - 1)
-                w0 = int(wi)
-                w1 = min(len(widths) - 1, w0 + 1)
-                w = widths[w0] * (1.0 - (wi - w0)) + widths[w1] * (wi - w0)
-                self.ell(arr[i] + seg * t, (w, max(0.55, ln / n * 1.18), thick), mat, R=R, kind=kind, tag=tag, layer=layer)
+            for k in range(subdiv):
+                t = (k + 0.5) / subdiv
+                p = p0 * (1.0 - t) + p1 * t
+                w = w0 * (1.0 - t) + w1 * t
+                ry = max(seg_len / subdiv * 1.48, thickness * 1.05)
+                self.ell(p, (w, ry, thickness), m0, R, emit_band=emit_band)
 
-    def transform(self, yaw: float) -> list[Prim]:
-        Ry = rot_y(yaw)
-        return [
-            Prim((Ry @ p.c) * SCALE, p.r * SCALE, Ry @ p.R, p.mat, p.kind, p.tag, p.clip, p.layer)
-            for p in self.prims
+
+def _catmull(pts: list[np.ndarray], samples_per_seg: int = 4) -> list[np.ndarray]:
+    if len(pts) < 2:
+        return pts
+    ext = [pts[0]] + pts + [pts[-1]]
+    out: list[np.ndarray] = []
+    for i in range(1, len(ext) - 2):
+        p0, p1, p2, p3 = ext[i - 1], ext[i], ext[i + 1], ext[i + 2]
+        for s in range(samples_per_seg):
+            t = s / samples_per_seg
+            t2, t3 = t * t, t * t * t
+            q = 0.5 * (
+                (2.0 * p1)
+                + (-p0 + p2) * t
+                + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+                + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3
+            )
+            out.append(q)
+    out.append(pts[-1])
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Caelia v2 Floating Goddess Model
+# ---------------------------------------------------------------------------
+def build_caelia(clip: str, f_i: int, n_f: int) -> tuple[Builder, float]:
+    u = f_i / max(n_f, 1)
+    ph = TAU * u
+    sn = math.sin(ph)
+    cs = math.cos(ph)
+
+    talk_k = 1.0 if clip == "float_talk" else 0.0
+    bless_k = 0.0
+    if clip == "float_bless":
+        bless_k = math.sin(math.pi * (f_i + 0.5) / n_f) ** 1.15
+
+    float_y = 1.25 * sn + 4.2 * bless_k
+    torso_pitch = 0.04 + 0.025 * cs + 0.09 * talk_k - 0.12 * bless_k
+    torso_yaw = 0.04 * sn + 0.07 * talk_k * math.sin(ph)
+    head_nod = -0.03 * cs + 0.05 * talk_k - 0.18 * bless_k
+    head_yaw = 0.05 * sn
+
+    R_torso = rot_y(torso_yaw) @ rot_x(torso_pitch)
+    pelvis = np.array([0.0, PELVIS_Y + float_y, 0.0], dtype=np.float64)
+
+    def T(local_p: tuple[float, float, float]) -> np.ndarray:
+        return pelvis + R_torso @ np.asarray(local_p, dtype=np.float64)
+
+    b = Builder()
+
+    # ---- 1. Sculpted Slender Torso, Graceful Neck & Unobstructed Luminous Face ----
+    b.ell(T((0.0, 0.2, 0.0)), (4.5, 3.2, 3.3), PEARL_SILK, R_torso)
+    b.ell(T((0.0, 4.9, 0.05)), (3.25, 3.5, 2.45), PEARL_SILK, R_torso)
+    b.ell(T((0.0, 10.2, 0.25)), (4.45, 4.2, 3.15), PEARL_SILK, R_torso)
+
+    # Slender antique-gold waist / under-bust sash cord (flowing Grecian line, NO corset!)
+    for k in range(14):
+        ang = TAU * k / 14.0
+        cp = T((math.cos(ang) * 3.70, 6.8 + 0.35 * math.sin(ang + 0.4), math.sin(ang) * 2.75 + 0.12))
+        b.ell(cp, (0.68, 0.48, 0.62), GOLD, R_torso)
+
+    # Asymmetrical left-shoulder silk drape + bare moonlit right shoulder with Kintsugi seam
+    sh_l = T((5.1, 14.6, -0.10))
+    sh_r = T((-5.1, 14.6, -0.10))
+    b.ell(T((0.0, 14.0, 0.15)), (4.65, 2.05, 2.35), SKIN, R_torso)
+    b.ell(sh_l, (2.10, 1.75, 1.88), PEARL_SILK, R_torso)
+    b.ell(T((2.8, 12.8, 1.55)), (2.45, 1.75, 1.25), PEARL_SILK, R_torso)
+    b.ell(T((4.6, 15.0, 0.38)), (0.85, 0.62, 0.82), GOLD, R_torso)
+    b.ell(sh_r, (1.85, 1.55, 1.65), SKIN, R_torso)
+
+    # Subtle glowing antique-gold Kintsugi light seam across her bare right shoulder/collarbone
+    for idx, kp in enumerate([(-4.5, 15.1, 0.72), (-3.5, 14.5, 1.25), (-2.5, 13.9, 1.52)]):
+        b.ell(T(kp), (0.48, 0.36, 0.44), HALO_EMIT, R_torso, emit_band=3 if idx == 1 else 2)
+
+    # Slender graceful neck lifting her head clearly above the shoulders
+    neck_base = T((0.0, 15.4, 0.05))
+    neck_top = T((0.0, 20.4, 0.25))
+    b.limb(neck_base, neck_top, 1.42, 1.30, SKIN, steps=5)
+
+    R_head = R_torso @ rot_y(head_yaw) @ rot_x(head_nod)
+    head_c = T((0.0, 24.8, 0.40))
+    b.head_c = head_c
+    b.head_R = R_head
+    b.ell(head_c, (4.45, 5.10, 4.40), SKIN, R_head)
+    b.ell(head_c + R_head @ np.array([0.0, -2.75, 0.92]), (2.55, 2.20, 2.85), SKIN, R_head)
+    for sgn in (-1.0, 1.0):
+        b.ell(head_c + R_head @ np.array([sgn * 4.20, -0.55, -0.15]), (0.72, 1.20, 0.82), SKIN, R_head)
+
+    # Minimalist glowing golden star mark on forehead
+    b.ell(head_c + R_head @ np.array([0.0, 2.05, 4.30]), (0.52, 0.72, 0.32), HALO_EMIT, R_head, emit_band=3)
+
+    # ---- 2. Weightless Barefoot Legs & Floating Golden Ankle Rings ----
+    hip_l = pelvis + np.array([2.15, -1.6, 0.0])
+    hip_r = pelvis + np.array([-2.15, -1.6, 0.0])
+
+    th_l = 0.42 + 0.07 * sn - 0.12 * bless_k
+    kn_l = 0.80 + 0.09 * cs - 0.16 * bless_k
+    th_r = -0.12 + 0.06 * math.sin(ph + 1.3) - 0.06 * bless_k
+    kn_r = 0.26 + 0.08 * math.cos(ph + 1.3) - 0.10 * bless_k
+
+    def leg_chain(hip: np.ndarray, thigh_a: float, knee_bend: float, sgn: float) -> None:
+        l_th, l_sh = 11.8, 11.4
+        knee = hip + np.array([sgn * 0.65, -math.cos(thigh_a) * l_th, math.sin(thigh_a) * l_th])
+        sh_a = thigh_a - knee_bend
+        ankle = knee + np.array([sgn * 0.20, -math.cos(sh_a) * l_sh, math.sin(sh_a) * l_sh])
+        toe = ankle + np.array([0.0, -3.1, 1.85])
+        b.limb(hip, knee, 2.05, 1.48, SKIN, steps=7)
+        b.limb(knee, ankle, 1.42, 0.94, SKIN, steps=7)
+        b.limb(ankle, toe, 0.88, 0.62, SKIN, steps=3)
+        for ri in range(8):
+            ra = TAU * ri / 8.0 + ph * 0.5
+            rp = ankle + np.array([math.cos(ra) * 1.90, 0.22 * math.sin(ra), math.sin(ra) * 1.90])
+            b.ell(rp, (0.38, 0.32, 0.38), HALO_EMIT, emit_band=2)
+
+    leg_chain(hip_l, th_l, kn_l, 1.0)
+    leg_chain(hip_r, th_r, kn_r, -1.0)
+
+    # ---- 3. Continuous Sculpted Moon-Ivory Silk Veil Gown (NO squid tentacles!) ----
+    # Built as a cohesive flared classical silk bell around hips/thighs/calves with ONE refined front-left slit
+    # revealing her floating bare bent knee & ankle ring, plus 3 long graceful sheer trailing hem tails behind!
+    n_panels = 18
+    for i in range(n_panels):
+        ang = TAU * i / n_panels
+        # Front-left slit centered around ang = +1.18 rad (+x, +z) so her bent floating bare leg peeks through gracefully
+        d_slit = math.atan2(math.sin(ang - 1.20), math.cos(ang - 1.20))
+        in_slit = abs(d_slit) < 0.42
+        base_r = 4.45
+        p0 = pelvis + np.array([math.cos(ang) * base_r * 0.88, 2.2, math.sin(ang) * base_r * 0.78])
+        panel_len = 8.5 if in_slit else (23.5 + 3.2 * max(0.0, -math.sin(ang)))
+        bloom = 1.0 + 0.32 * bless_k
+        pts_p = [p0]
+        segs = 5
+        for s_i in range(1, segs + 1):
+            frac = s_i / segs
+            sway = math.sin(ph - frac * 2.4 + ang * 2.0) * (0.9 + 1.4 * frac)
+            out_r = base_r + (2.0 + 4.4 * (frac ** 1.15)) * bloom
+            px = math.cos(ang) * out_r + sway * (-math.sin(ang)) * 0.45
+            pz = math.sin(ang) * (out_r * 0.82) + sway * math.cos(ang) * 0.45 - 1.6 * frac
+            py = pelvis[1] + 2.2 - panel_len * frac
+            pts_p.append(np.array([px, py, pz]))
+        # Generous overlapping panel width forms ONE smooth continuous pleated silk skirt!
+        w_base = 2.55 if not in_slit else 1.55
+        widths_p = [w_base * (1.0 + 0.25 * (k / segs)) for k in range(segs + 1)]
+        mats_p = [PEARL_SILK, PEARL_SILK, PEARL_SILK, PEARL_SILK, SILK_SHEER]
+        b.ribbon_chain(pts_p, widths_p, 1.05, mats_p, subdiv=5)
+        # Delicate gold trim dots along bottom hem of the main gown
+        if not in_slit and i % 2 == 0:
+            b.ell(pts_p[-1] + np.array([0.0, 0.6, 0.0]), (0.65, 0.45, 0.65), GOLD)
+
+    # 3 long ethereal trailing sheer silk tails sweeping gently below her bare feet in back/sides
+    for t_idx, t_ang in enumerate([-math.pi * 0.50, -math.pi * 0.78, -math.pi * 0.22]):
+        p0 = pelvis + np.array([math.cos(t_ang) * 5.8, -16.0, math.sin(t_ang) * 5.0 - 1.2])
+        tail_pts = [p0]
+        for k in range(1, 5):
+            f = k / 4.0
+            wave = math.sin(ph - f * 2.8 + t_idx * 1.4) * (2.2 * f)
+            tx = p0[0] + math.cos(t_ang) * (4.5 * f * (1.0 + 0.4 * bless_k)) + wave
+            ty = p0[1] - (13.5 + 2.0 * (t_idx == 0)) * f
+            tz = p0[2] - 3.5 * f + math.cos(ph + t_idx) * f
+            tail_pts.append(np.array([tx, ty, tz]))
+        b.ribbon_chain(tail_pts, [2.2, 1.7, 1.15, 0.72, 0.35], 0.58, [SILK_SHEER, SILK_SHEER, SILK_SHEER, TEAL_EMIT], subdiv=3)
+        b.ell(tail_pts[-1], (0.58, 0.72, 0.52), TEAL_EMIT, emit_band=2)
+
+    # ---- 4. Graceful Floating Arms & Glowing Veil Threads Between Her Hands ----
+    if clip == "float_bless":
+        t_hl = T((13.2 + 3.4 * bless_k, 13.8 + 5.6 * bless_k + 0.7 * sn, 4.4 + 2.0 * bless_k))
+        t_hr = T((-13.2 - 3.4 * bless_k, 13.8 + 5.6 * bless_k - 0.7 * sn, 4.4 + 2.0 * bless_k))
+    elif clip == "float_talk":
+        t_hl = T((5.2 + 0.6 * sn, 8.8 + 0.7 * cs, 5.4 + 0.6 * sn))
+        t_hr = T((-9.2 - 1.2 * cs, 8.6 + 1.1 * sn, 7.8 + 0.9 * cs))
+    else:
+        t_hl = T((6.4 + 0.8 * sn, 5.8 + 1.0 * cs, 6.2 + 0.7 * sn))
+        t_hr = T((-6.4 - 0.8 * cs, 6.0 + 1.0 * sn, 6.4 + 0.7 * cs))
+
+    el_l, h_l = ik2(sh_l, t_hl, 9.6, 9.2, np.array([0.45, -0.82, -0.35]))
+    el_r, h_r = ik2(sh_r, t_hr, 9.6, 9.2, np.array([-0.45, -0.82, -0.35]))
+    b.hand_l, b.hand_r = h_l, h_r
+
+    b.limb(sh_l, el_l, 1.45, 1.14, SKIN, steps=6)
+    b.limb(el_l, h_l, 1.08, 0.82, SKIN, steps=6)
+    b.limb(sh_r, el_r, 1.45, 1.14, SKIN, steps=6)
+    b.limb(el_r, h_r, 1.08, 0.82, SKIN, steps=6)
+
+    b.ell(h_l, (1.02, 0.85, 1.10), SKIN)
+    b.ell(h_r, (1.02, 0.85, 1.10), SKIN)
+    b.ell(el_l * 0.20 + h_l * 0.80, (1.12, 0.60, 1.12), GOLD)
+    b.ell(el_r * 0.20 + h_r * 0.80, (1.12, 0.60, 1.12), GOLD)
+
+    # Shimmering Veil threads suspended between her floating fingertips
+    n_th = 14
+    for ti in range(1, n_th):
+        ft = ti / n_th
+        sag = -2.0 * math.sin(math.pi * ft) + 0.9 * math.sin(ph + ft * TAU)
+        tp = h_l * (1.0 - ft) + h_r * ft + np.array([0.0, sag + 2.0 * bless_k * math.sin(math.pi * ft), 1.1 * math.sin(math.pi * ft)])
+        mat_t = HALO_EMIT if (ti % 3 == 0) else TEAL_EMIT
+        b.ell(tp, (0.42 + 0.15 * bless_k, 0.42 + 0.15 * bless_k, 0.42), mat_t, emit_band=3 if bless_k > 0.35 else 2)
+    if bless_k > 0.15:
+        mid_h = (h_l + h_r) * 0.5 + np.array([0.0, 2.2 * bless_k, 1.6])
+        core_r = 1.6 + 2.3 * bless_k
+        b.ell(mid_h, (core_r, core_r, core_r), STAR_EMIT, emit_band=3)
+        for ray_i in range(6):
+            ra = TAU * ray_i / 6.0 + ph * 0.5
+            rp = mid_h + np.array([math.cos(ra) * (core_r + 2.8 * bless_k), math.sin(ra) * (core_r + 2.8 * bless_k), 0.2])
+            b.ell(rp, (0.65, 0.65, 0.55), HALO_EMIT, emit_band=3)
+
+    # ---- 5. Wide Iconic Celestial Stole (Hagoromo Midnight-Sapphire Astral Ribbon!) ----
+    # Sweeps HIGH behind her shoulders and WIDE out around her forearms so it creates an unmistakable goddess halo silhouette!
+    stole_ctrl = [
+        np.array([-23.5 - 3.2 * bless_k, pelvis[1] + 2.0 + 3.4 * math.sin(ph + 0.4), -1.5 + 2.2 * cs]),
+        np.array([-16.8 - 1.8 * bless_k, pelvis[1] + 9.5 + 1.8 * cs, 3.2]),
+        el_r + np.array([-2.6, -1.6 + 1.0 * sn, 1.6]),
+        T((-9.2, 18.2 + 1.2 * cs, -4.8 - 1.2 * bless_k)),
+        T((0.0, 22.8 + 1.4 * sn + 1.8 * bless_k, -8.8 - 1.4 * bless_k)),
+        T((9.2, 18.2 - 1.2 * cs, -4.8 - 1.2 * bless_k)),
+        el_l + np.array([2.6, -1.6 - 1.0 * sn, 1.6]),
+        np.array([16.8 + 1.8 * bless_k, pelvis[1] + 9.5 - 1.8 * cs, 3.2]),
+        np.array([23.5 + 3.2 * bless_k, pelvis[1] + 2.0 - 3.4 * math.sin(ph + 0.4), -1.5 - 2.2 * cs]),
+    ]
+    stole_pts = _catmull(stole_ctrl, samples_per_seg=4)
+    stole_w = [1.1 + 1.8 * math.sin(math.pi * (k / max(len(stole_pts) - 1, 1))) for k in range(len(stole_pts))]
+    b.ribbon_chain(stole_pts, stole_w, 0.62, [COSMOS_STOLE], subdiv=2)
+    # Bright antique-gold upper rim & luminous turquoise constellation dots along the dark cosmic stole
+    for idx in range(2, len(stole_pts) - 2):
+        sp = stole_pts[idx]
+        if idx % 2 == 0:
+            b.ell(sp + np.array([0.0, 0.95, 0.35]), (0.46, 0.40, 0.44), GOLD)
+        if idx % 5 == 0:
+            b.ell(sp + np.array([0.0, -0.1, 0.65]), (0.55, 0.55, 0.55), STAR_EMIT, emit_band=3)
+        elif idx % 5 == 2:
+            b.ell(sp + np.array([0.0, 0.0, 0.58]), (0.45, 0.45, 0.45), TEAL_EMIT, emit_band=2)
+
+    # ---- 6. Unified Silky Living Nebula Hair Curtain (Smooth Flowing Cape, NOT spiky tubes!) ----
+    # Smooth moon-silver crown cap + high parted forehead fringe leaving her ENTIRE face & eyes crisp and clear
+    b.ell(head_c + R_head @ np.array([0.0, 1.15, -0.65]), (4.78, 4.95, 4.78), HAIR_SILV, R_head)
+    for sgn in (-1.0, 1.0):
+        # Swept parted brow curve (stays high above eyes!) + one slender cheek-framing wisp
+        b.ell(head_c + R_head @ np.array([sgn * 2.25, 3.65, 2.75]), (2.15, 1.25, 1.55), HAIR_SILV, R_head)
+        wisp = [
+            head_c + R_head @ np.array([sgn * 3.85, 2.2, 1.85]),
+            head_c + R_head @ np.array([sgn * 4.55, -2.0, 1.25]),
+            head_c + R_head @ np.array([sgn * 5.05 + sgn * 0.8 * bless_k, -8.5, 0.25 + 0.6 * sn]),
         ]
+        b.ribbon_chain(wisp, [1.05, 0.88, 0.55], 0.72, [HAIR_SILV], subdiv=3)
+
+    # Cohesive silky back-hair curtain (13 closely-overlapping wide silk ribbons strictly behind her ears & shoulders!)
+    n_curt = 13
+    for i in range(n_curt):
+        f_lat = (i / (n_curt - 1)) * 2.0 - 1.0  # -1 (right) .. +1 (left)
+        # Span strictly the rear arc (-108 deg .. +108 deg from straight back -Z) so face & shoulders stay 100% clear!
+        ang = math.pi + f_lat * math.radians(102.0)
+        root = head_c + R_head @ np.array([math.sin(ang) * 4.2, 2.0 - 0.5 * abs(f_lat), math.cos(ang) * 4.0 - 0.3])
+        bloom = 1.0 + 0.42 * bless_k
+        # Longer in center, softly tapering at outer edges like a real luminous flowing mane
+        lock_len = (34.0 - 7.5 * (f_lat * f_lat)) + 1.5 * math.sin(i * 1.3)
+        pts_h = [root]
+        segs_h = 6
+        for k in range(1, segs_h + 1):
+            t = k / segs_h
+            # Smooth unified S-wave across the whole curtain (shared phase with gentle offset -> silky cloth, not frizz!)
+            wave_x = math.sin(ph - t * 2.5 + f_lat * 1.1) * (1.6 + 2.8 * t)
+            wave_z = math.cos(ph - t * 2.1 + f_lat * 0.9) * (1.0 + 1.6 * t)
+            spread_x = f_lat * (4.2 + 8.8 * (t ** 1.15)) * bloom
+            back_z = -3.8 - 7.8 * (t ** 1.10) * bloom + abs(f_lat) * 2.0 * (1.0 - t)
+            ly = root[1] - lock_len * (t ** 1.04) * 0.86 + 3.4 * bless_k * (t ** 1.2)
+            pts_h.append(np.array([spread_x + wave_x, ly, back_z + wave_z]))
+
+        # Wide overlapping ribbon widths weld adjacent strands into one lush, painterly weightless mane!
+        w_edge = 1.0 - 0.25 * abs(f_lat)
+        widths_h = [2.1 * w_edge, 2.25 * w_edge, 2.35 * w_edge, 2.20 * w_edge, 1.85 * w_edge, 1.30 * w_edge, 0.55 * w_edge]
+        # 3-stage smooth Nebula transition: Moon-Silver -> Twilight Lavender-Indigo -> Starry Deep Cosmos-Indigo!
+        mats_h = [HAIR_SILV, HAIR_SILV, HAIR_SILV, HAIR_TWIL, HAIR_NEBULA, HAIR_NEBULA]
+        b.ribbon_chain(pts_h, widths_h, 0.98, mats_h, subdiv=5)
+
+        # Tiny crisp unlit nebula stars glittering softly inside the twilight & midnight-indigo lower hair cape
+        if i % 2 == 0:
+            star_m = STAR_EMIT if (i % 4 == 0) else TEAL_EMIT
+            b.ell(pts_h[5] + np.array([0.0, 0.6, -0.55]), (0.50, 0.50, 0.50), star_m, emit_band=3)
+            b.ell(pts_h[4] + np.array([0.4 * f_lat, 0.2, 0.65]), (0.45, 0.45, 0.45), star_m, emit_band=3)
+
+    # ---- 7. True 3D Z-Buffered Floating Astrolabe (Gracefully Framed Behind Crown, Never Cutting Face!) ----
+    astro_c = head_c + np.array([0.0, 2.2 + 0.8 * bless_k, -3.2])
+    align_k = 1.0 - 0.58 * bless_k
+    R_ring1 = rot_z(math.radians(20.0 + 3.5 * sn) * align_k) @ rot_x(math.radians(18.0 + 2.5 * cs) * align_k)
+    R_ring2 = rot_z(math.radians(-24.0 - 3.5 * cs) * align_k) @ rot_x(math.radians(-16.0 + 2.5 * sn) * align_k)
+
+    def add_astrolabe_ring(radius: float, R_ring: np.ndarray, n_seg: int, spin: float, nodes: int) -> None:
+        for k in range(n_seg):
+            a0 = TAU * k / n_seg + spin
+            p_loc = np.array([math.cos(a0) * radius, math.sin(a0) * radius * 0.94, 0.0])
+            p_w = astro_c + R_ring @ p_loc
+            b.ell(p_w, (0.55, 0.55, 0.55), HALO_EMIT, emit_band=3 if bless_k > 0.35 else 2)
+        for ni in range(nodes):
+            na = TAU * ni / nodes + spin * 1.25
+            p_loc = np.array([math.cos(na) * radius, math.sin(na) * radius * 0.94, 0.0])
+            p_w = astro_c + R_ring @ p_loc
+            n_mat = STAR_EMIT if ni % 2 == 0 else TEAL_EMIT
+            b.ell(p_w, (1.08, 1.08, 1.08), n_mat, emit_band=3)
+
+    add_astrolabe_ring(16.6 + 1.6 * bless_k, R_ring1, 48, ph * 0.5, 4)
+    add_astrolabe_ring(12.6 + 1.2 * bless_k, R_ring2, 40, -ph * 0.5, 3)
+
+    return b, bless_k
 
 
 # ---------------------------------------------------------------------------
-# Clip Masks & Structured Pixel-Art Surface Shading
+# Fast Vectorized Z-Buffered Ellipsoid Pixel Renderer (SS=3, 1px tinted outline)
 # ---------------------------------------------------------------------------
-def clip_hair_cap(q: np.ndarray) -> np.ndarray:
-    return ~((q[..., 2] > 0.24) & (q[..., 1] < 0.24) & (np.abs(q[..., 0]) < 0.78))
+def _project_pt(p_world: np.ndarray) -> tuple[float, float, float]:
+    sx = ANCHOR_X + p_world[0] * SCALE
+    sy = ANCHOR_Y - (p_world[1] * COSP - p_world[2] * SINP) * SCALE
+    sz = p_world[1] * SINP + p_world[2] * COSP
+    return sx, sy, sz
 
 
-def clip_stole_panel(q: np.ndarray) -> np.ndarray:
-    return (q[..., 1] >= -0.68) & (np.abs(q[..., 0]) <= 0.85)
+def render_frame(clip: str, f_i: int, n_f: int, yaw_rad: float) -> tuple[np.ndarray, np.ndarray]:
+    builder, bless_k = build_caelia(clip, f_i, n_f)
+    Ry = rot_y(yaw_rad)
 
+    Ws, Hs = FW * SS, FH * SS
+    depth = np.full((Hs, Ws), -1e9, dtype=np.float32)
+    code = np.full((Hs, Ws), -1, dtype=np.int16)
 
-def shade_surface(
-    p: Prim,
-    q: np.ndarray,
-    lam: np.ndarray,
-    bless_k: float,
-) -> tuple[np.ndarray, np.ndarray]:
-    qx, qy, qz = q[..., 0], q[..., 1], q[..., 2]
-    mat = np.full(qx.shape, p.mat, dtype=np.int16)
-    kind = p.kind
+    cam_ray = WHAT
 
-    if kind == "head":
-        band = np.digitize(lam + 0.10, (-0.16, 0.10, 0.46)).astype(np.int16)
-        return mat, band
+    for prim in builder.prims:
+        c0 = prim.c - np.array([0.0, PELVIS_Y, 0.0])
+        c = Ry @ c0
+        R = Ry @ prim.R
+        r = prim.r
 
-    if kind == "hair":
-        # Rich, sculpted longitudinal strand shading: deep lavender valleys, silver silk body, warm gold-kissed crests!
-        wave = 0.14 * np.sin(qx * 3.6 + p.tag * 1.1)
-        band = np.digitize(lam + wave, (-0.12, 0.16, 0.48)).astype(np.int16)
-        groove = ((qx * 1.75 + p.tag * 0.61) % 1.0) < 0.25
-        band = np.where(groove, np.maximum(band - 1, 0), band)
-        gold_crest = (((qx * 1.25 + p.tag * 0.41) % 1.0) > 0.66) & (band >= 2)
-        mat = np.where(gold_crest, HAIR_GOLD, mat)
-        return mat, band
+        cx = ANCHOR_X + c[0] * SCALE
+        cy = ANCHOR_Y - (c[1] * COSP - c[2] * SINP) * SCALE
+        ex = float(np.sqrt(np.sum((R[0, :] * r) ** 2))) * SCALE
+        uy_vec = R[1, :] * COSP - R[2, :] * SINP
+        ey = float(np.sqrt(np.sum((uy_vec * r) ** 2))) * SCALE
 
-    if kind == "braid":
-        # Alternating woven braid plait shading (`HAIR_GOLD` + `HAIR_SILV`)
-        weave = 0.22 * np.sin(qy * 5.6 + qx * 2.8 + p.tag)
-        band = np.digitize(lam + weave + 0.06, (-0.14, 0.14, 0.46)).astype(np.int16)
-        mat = np.where(weave > 0.02, HAIR_GOLD, HAIR_SILV).astype(np.int16)
-        return mat, band
-
-    if kind == "emit":
-        band = np.digitize(lam + 0.28 + 0.20 * bless_k, (-0.04, 0.28, 0.60)).astype(np.int16)
-        band = np.maximum(band, 1)
-        return mat, band
-
-    if kind == "crystal_ray":
-        ridge = 1.0 - np.minimum(1.0, np.abs(qx) * 1.15)
-        tip_boost = np.clip((qy + 0.5) * 0.65, 0.0, 0.75)
-        val = ridge * 0.55 + tip_boost + 0.20 * bless_k
-        band = np.digitize(val, (0.38, 0.62, 0.88)).astype(np.int16)
-        mat = np.where(qy > 0.18, STAR_EMIT, TEAL_EMIT).astype(np.int16)
-        if int(round(p.tag)) % 2 == 0:
-            mat = np.where(qy <= -0.18, HALO_EMIT, mat)
-        return mat, band
-
-    if kind == "bustier":
-        # Rich royal night-blue outer bodice framing a central pearl-ivory cameo panel & golden sweetheart rim,
-        # giving crisp dark-vs-porcelain contrast at her bare collarbones (matching Ellie's dark bodice contrast!)
-        sheen = 0.09 * np.sin(qx * 3.4 + qy * 2.4)
-        band = np.digitize(lam + sheen + 0.04, (-0.18, 0.10, 0.46)).astype(np.int16)
-        outer_night = (np.abs(qx) > 0.46) | (qz <= 0.15)
-        gold_rim = (qz > 0.22) & ((qy > 0.54) | (np.abs(np.abs(qx) - 0.46) < 0.10))
-        mat = np.where(outer_night, NIGHT_SILK, PEARL_SILK).astype(np.int16)
-        mat = np.where( outer_night & (band >= 2), NIGHT_PLEAT, mat)
-        mat = np.where(gold_rim, GOLD, mat)
-        band = np.where(gold_rim, np.maximum(band, 2), band)
-        return mat, band
-
-    if kind == "corset":
-        fold = 0.10 * np.sin(qx * 4.8)
-        band = np.digitize(lam + fold, (-0.14, 0.14, 0.48)).astype(np.int16)
-        front = qz > 0.32
-        lace = front & (np.abs(qx) < 0.11) & ((np.floor((qy + 1.0) * 3.8) % 2) == 0)
-        boning = front & (np.abs(np.abs(qx) - 0.50) < 0.08)
-        trim = lace | boning
-        mat = np.where(trim, GOLD, mat)
-        band = np.where(trim, np.maximum(band, 2), band)
-        return mat, band
-
-    if kind == "stole_front":
-        # Structured pearl-ivory jacquard stole: lavender-silk shadow folds, gold slit piping,
-        # central golden astrolabe diamond, and clean turquoise starlight leyline!
-        drape = 0.11 * np.cos(qx * 3.8)
-        band = np.digitize(lam + drape + 0.02, (-0.18, 0.10, 0.46)).astype(np.int16)
-        border_gold = (qy <= -0.55) | (np.abs(qx) >= 0.69)
-        astro_d = np.abs(qx) * 1.35 + np.abs(qy + 0.02) * 1.9
-        astro_gold = (astro_d > 0.24) & (astro_d < 0.44)
-        vein_teal = ((np.abs(qx) < 0.12) & (qy > -0.44) & (qy < 0.52) & (~astro_gold)) | (astro_d <= 0.22)
-
-        mat = np.where(border_gold | astro_gold, GOLD, mat)
-        band = np.where(border_gold | astro_gold, np.maximum(band, 2), band)
-        mat = np.where(vein_teal, TEAL_EMIT, mat)
-        band = np.where(vein_teal, 2 if bless_k < 0.35 else 3, band)
-        return mat, band
-
-    if kind == "overskirt":
-        # Structured cathedral pleats (deep indigo valleys, royal-violet flutes, crisp gold hem & slit trim,
-        # and clean symmetrical turquoise leyline diamond near the lower hem — zero random pixel noise!)
-        pleat_wave = np.sin(qx * 5.8 + p.tag * 1.2)
-        band = np.digitize(lam + 0.16 * pleat_wave, (-0.14, 0.12, 0.46)).astype(np.int16)
-        flute_hi = (pleat_wave > 0.36) & (band >= 2)
-        mat = np.where(flute_hi, NIGHT_PLEAT, mat)
-
-        hem_gold = qy <= -0.60
-        slit_gold = (qx * p.tag < -0.58) & (qy < 0.62)
-        # Clean diamond star-rune above the hem + subtle upper star pip
-        rune_d = np.abs(qx) * 1.5 + np.abs(qy + 0.34) * 2.2
-        rune_teal = (rune_d < 0.32) | ((np.abs(qx) < 0.12) & (np.abs(qy - 0.12) < 0.10))
-
-        mat = np.where(hem_gold | slit_gold, GOLD, mat)
-        band = np.where(hem_gold | slit_gold, np.maximum(band, 2), band)
-        mat = np.where(rune_teal, TEAL_EMIT, mat)
-        band = np.where(rune_teal, 2 if bless_k < 0.35 else 3, band)
-        return mat, band
-
-    if kind == "veil":
-        ripple = 0.14 * np.sin(qx * 4.6 + qy * 3.2 + p.tag)
-        band = np.digitize(lam + ripple + 0.06, (-0.18, 0.10, 0.46)).astype(np.int16)
-        vein_edge = (np.abs(qx) > 0.56) & (qy < 0.25)
-        tip_glow = qy < -0.36
-        mat = np.where(vein_edge | tip_glow, TEAL_EMIT, mat)
-        band = np.where(vein_edge | tip_glow, 2 if bless_k < 0.35 else 3, band)
-        return mat, band
-
-    band = np.digitize(lam, (-0.16, 0.14, 0.50)).astype(np.int16)
-    return mat, band
-
-
-# ---------------------------------------------------------------------------
-# Subpixel Rasterizer & `art_hero3d.render_layers`-Style Clean Compositor
-# ---------------------------------------------------------------------------
-def raster_subset(
-    prims: list[Prim],
-    bless_k: float,
-    init_depth: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    hs, ws = FH * SS, FW * SS
-    depth = np.full((hs, ws), -1e9, dtype=np.float64) if init_depth is None else init_depth.copy()
-    code = np.full((hs, ws), -1, dtype=np.int16)
-    only_depth = np.full((hs, ws), -1e9, dtype=np.float64)
-
-    for p in prims:
-        cx = FW * 0.5 + p.c[0]
-        cy = GROUND_ROW - (p.c[1] * COSP - p.c[2] * SINP)
-        rr = float(p.r.max()) + 0.5
-        x0 = max(0, int((cx - rr) * SS))
-        x1 = min(ws, int((cx + rr) * SS) + 1)
-        y0 = max(0, int((cy - rr) * SS))
-        y1 = min(hs, int((cy + rr) * SS) + 1)
+        x0 = max(0, int(math.floor((cx - ex) * SS)) - 1)
+        x1 = min(Ws, int(math.ceil((cx + ex) * SS)) + 1)
+        y0 = max(0, int(math.floor((cy - ey) * SS)) - 1)
+        y1 = min(Hs, int(math.ceil((cy + ey) * SS)) + 1)
         if x1 <= x0 or y1 <= y0:
             continue
 
-        a = (np.arange(x0, x1, dtype=np.float64) + 0.5) / SS - FW * 0.5
-        b = GROUND_ROW - (np.arange(y0, y1, dtype=np.float64) + 0.5) / SS
-        A, B = np.meshgrid(a, b)
-        o = A[..., None] * XHAT + B[..., None] * UHAT
-
-        M = np.diag(1.0 / p.r) @ p.R.T
-        q0 = (o - p.c) @ M.T
-        qd = M @ WHAT
-        aa = float(qd @ qd)
-        if aa <= 1e-12:
-            continue
-        bb = q0 @ qd
-        cc = (q0 * q0).sum(-1) - 1.0
-        disc = bb * bb - aa * cc
-        ok = disc >= 0.0
-        if not ok.any():
+        inv_r = 1.0 / np.maximum(r, 1e-4)
+        M = R.T * inv_r[:, None]
+        d_loc = M @ cam_ray
+        A = float(np.dot(d_loc, d_loc))
+        if A < 1e-9:
             continue
 
-        t = (-bb + np.sqrt(np.where(ok, disc, 0.0))) / aa
-        q = q0 + t[..., None] * qd
-        if p.clip is not None:
-            ok &= p.clip(q)
-        sub = depth[y0:y1, x0:x1]
-        ok &= t > sub
-        if not ok.any():
+        xs = ((np.arange(x0, x1, dtype=np.float64) + 0.5) / SS - ANCHOR_X) / SCALE
+        ys = (ANCHOR_Y - (np.arange(y0, y1, dtype=np.float64) + 0.5) / SS) / SCALE
+        ox = xs[None, :] - c[0]
+        oy = ys[:, None] * COSP - c[1]
+        oz = -ys[:, None] * SINP - c[2]
+
+        lx = M[0, 0] * ox + M[0, 1] * oy + M[0, 2] * oz
+        ly = M[1, 0] * ox + M[1, 1] * oy + M[1, 2] * oz
+        lz = M[2, 0] * ox + M[2, 1] * oy + M[2, 2] * oz
+
+        B = lx * d_loc[0] + ly * d_loc[1] + lz * d_loc[2]
+        C = lx * lx + ly * ly + lz * lz - 1.0
+        disc = B * B - A * C
+        hit = disc >= 0.0
+        if not np.any(hit):
             continue
 
-        n = (q / p.r) @ p.R.T
-        n = n / np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-9)
-        lam = 0.78 * (n @ LIGHT) + 0.22 * (0.5 + 0.5 * n[..., 1]) - 0.06
+        sqrt_d = np.sqrt(np.maximum(disc, 0.0))
+        w_hit = (-B + sqrt_d) / A
 
-        mat_arr, band_arr = shade_surface(p, q, lam, bless_k)
-        codes = (mat_arr * 4 + np.clip(band_arr, 0, 3)).astype(np.int16)
+        d_sub = depth[y0:y1, x0:x1]
+        vis = hit & (w_hit > d_sub)
+        if not np.any(vis):
+            continue
 
-        sub[ok] = t[ok]
-        code[y0:y1, x0:x1][ok] = codes[ok]
-        only_depth[y0:y1, x0:x1][ok] = t[ok]
+        d_sub[vis] = w_hit[vis].astype(np.float32)
 
-    return depth, code, only_depth
+        if prim.emit_band >= 0:
+            code[y0:y1, x0:x1][vis] = prim.mat * 4 + prim.emit_band
+        else:
+            qx = lx[vis] + w_hit[vis] * d_loc[0]
+            qy = ly[vis] + w_hit[vis] * d_loc[1]
+            qz = lz[vis] + w_hit[vis] * d_loc[2]
+            gx, gy, gz = qx * inv_r[0], qy * inv_r[1], qz * inv_r[2]
+            nx = R[0, 0] * gx + R[0, 1] * gy + R[0, 2] * gz
+            ny = R[1, 0] * gx + R[1, 1] * gy + R[1, 2] * gz
+            nz = R[2, 0] * gx + R[2, 1] * gy + R[2, 2] * gz
+            nlen = np.sqrt(nx * nx + ny * ny + nz * nz) + 1e-8
+            ndl = (nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]) / nlen + prim.bias
+            band = np.where(ndl < -0.10, 0, np.where(ndl < 0.28, 1, np.where(ndl < 0.68, 2, 3)))
+            code[y0:y1, x0:x1][vis] = (prim.mat * 4 + band).astype(np.int16)
 
-
-def best_codes(csub: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
-    best = np.full((FH, FW), -1, dtype=np.int16)
-    best_w = np.zeros((FH, FW), dtype=np.float64)
-    for v in range(k):
-        w = (csub == v).sum(-1) * DECAL_WEIGHT.get(v // 4, 1.0)
-        better = w > best_w
-        best = np.where(better, v, best)
-        best_w = np.where(better, w, best_w)
-    return best, best_w
-
-
-def resolve_layer_raw(
-    depth: np.ndarray,
-    code: np.ndarray,
-    min_cov: int = 6,
-    crease_thresh: float = 2.6,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Returns `(best_code, solid_mask, band0_crease_mask)` WITHOUT painting premature interior black outlines!"""
-    k = len(RAMPS) * 4
     csub = code.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
     dsub = depth.reshape(FH, SS, FW, SS).transpose(0, 2, 1, 3).reshape(FH, FW, SS * SS)
+    opaque = (csub >= 0).sum(axis=-1)
+    is_emit_sub = (csub >= TEAL_EMIT * 4)
+    emit_cnt = is_emit_sub.sum(axis=-1)
+    solid = (opaque >= 4) | (emit_cnt >= 2)
+
+    eff_d = np.where(csub >= 0, dsub + np.where(is_emit_sub, 0.35, 0.0), -1e9)
+    best_i = np.argmax(eff_d, axis=-1)
+    best_code = np.take_along_axis(csub, best_i[..., None], axis=-1)[..., 0]
+    best_code = np.where(solid, best_code, -1)
 
-    cnt = (csub >= 0).sum(-1)
-    solid = cnt >= min_cov
-    dmean = np.where(csub >= 0, dsub, 0.0).sum(-1) / np.maximum(cnt, 1)
-
-    best, _ = best_codes(csub, k)
-    best = np.where(solid, best, -1)
-
-    crease = np.zeros((FH, FW), dtype=bool)
-    if crease_thresh > 0.0:
-        for dy, dx in ((0, 1), (1, 0), (0, -1), (-1, 0)):
-            nb = np.roll(np.roll(dmean, dy, 0), dx, 1)
-            nbs = np.roll(np.roll(solid, dy, 0), dx, 1)
-            crease |= solid & nbs & (nb > dmean + crease_thresh)
-        crease[0, :] = crease[-1, :] = crease[:, 0] = crease[:, -1] = False
-
-    return best, solid, crease
-
-
-def stamp_goddess_eyes(
-    color: np.ndarray,
-    emit: np.ndarray,
-    eye_pts_2d: list[tuple[float, float, float, bool]],
-    pulse: float,
-) -> None:
-    """Ellie-cohesive (`hero_face.py`) precision face stamp: smooth luminous porcelain cheeks/chin
-    (zero noisy mouth/nose dots!) + expressive 2x2 glowing turquoise-starlight anime eyes under dark-violet lashes."""
-    vis = [e for e in eye_pts_2d if e[2] > 0.15]
-    if not vis:
-        return
-
-    h, w, _ = color.shape
-    vis.sort(key=lambda item: item[0])
-    ey = int(round(sum(item[1] for item in vis) / len(vis)))
-    closed = any(item[3] for item in vis)
-
-    if len(vis) == 2:
-        cx_mid = 0.5 * (vis[0][0] + vis[1][0])
-        sep = vis[1][0] - vis[0][0]
-        if sep >= 2.6:
-            # 2px left eye + 2px porcelain nose-bridge + 2px right eye = 6px across a 9px porcelain face!
-            c_int = int(round(cx_mid))
-            xs = [c_int - 3, c_int + 1]
-            eye_w = 2
-        else:
-            xs = [int(round(vis[0][0])), int(round(vis[1][0]))]
-            eye_w = 1
-    else:
-        xs = [int(round(vis[0][0]))]
-        eye_w = 2
-
-    iris_spark = RAMPS[TEAL_EMIT][3] if pulse > 0.45 else RAMPS[TEAL_EMIT][2]
-    iris_deep = RAMPS[TEAL_EMIT][1]
-
-    for idx_e, ex in enumerate(xs):
-        if ey < 2 or ey + 2 >= h or ex < 2 or ex + eye_w >= w:
-            continue
-        if closed:
-            for dx in range(eye_w):
-                px = ex + dx
-                color[ey + 1, px] = EYE_LASH
-                emit[ey + 1, px] = False
-            continue
-
-        for dx in range(eye_w):
-            px = ex + dx
-            color[ey, px] = EYE_LASH
-            emit[ey, px] = False
-            is_hi = (dx == 0) if idx_e == 0 else (dx == eye_w - 1)
-            col_i = iris_spark if (is_hi or eye_w == 1) else iris_deep
-            color[ey + 1, px] = (*col_i, 255)
-            emit[ey + 1, px] = True
-
-
-# ---------------------------------------------------------------------------
-# Rig & Pose Builder (Graceful, Relaxed Arms + Voluminous Hair + Detailed Gown)
-# ---------------------------------------------------------------------------
-def build_goddess(clip: str, frame_idx: int, n_frames: int) -> tuple[Model, float, float]:
-    m = Model()
-    phase = 2.0 * math.pi * (frame_idx / n_frames)
-    breath = math.sin(phase)
-    bless_k = 0.0
-    eye_pulse = 0.5 + 0.5 * math.sin(phase)
-    eyes_closed = False
-
-    seated = clip.startswith("sit_")
-    lean = 0.0
-    twist = 0.0
-    head_yaw = 0.0
-    head_tilt = 0.0
-    head_nod = 0.0
-    wind_lift = 0.0
-    u = frame_idx / max(1, n_frames - 1)
-
-    if clip == "sit_idle":
-        # Natural, feminine relaxed elbows (elbows drop softly down & back, NEVER chicken-wing akimbo!)
-        seat_dy = -9.6
-        lean = 0.04 + 0.015 * breath
-        head_tilt = 0.025 * math.sin(phase - 0.6)
-        hand_l = np.array([4.35, 19.6 + 0.16 * breath, 5.8])
-        hand_r = np.array([-3.55, 23.6 + 0.35 * breath, 7.2])
-        pole_l = (1.3, -3.2, -2.2)
-        pole_r = (-1.4, -3.0, -2.2)
-        spark_pos = hand_r + np.array([-0.15, 2.35 + 0.42 * math.sin(phase + 0.8), 0.9])
-        spark_r = 0.66 + 0.12 * math.sin(phase)
-    elif clip == "sit_talk":
-        seat_dy = -9.6
-        lean = 0.075 + 0.025 * math.sin(phase)
-        twist = 0.04 * math.sin(phase)
-        head_tilt = 0.05 * math.sin(phase + 0.4)
-        head_yaw = 0.05 * math.sin(phase - 0.3)
-        eye_pulse = 0.65 + 0.35 * math.sin(phase)
-        open_k = 0.5 + 0.5 * math.sin(phase - 0.3)
-        hand_l = np.array([4.35 + 0.45 * open_k, 20.2 + 0.6 * open_k, 6.0 + 0.4 * open_k])
-        hand_r = np.array([-3.95 - 1.35 * open_k, 24.4 + 1.4 * open_k, 7.5 + 0.7 * open_k])
-        pole_l = (1.4, -3.0, -2.0)
-        pole_r = (-1.6, -2.8, -2.0)
-        spark_pos = hand_r + np.array([0.1, 2.25 + 0.32 * open_k, 0.85])
-        spark_r = 0.70 + 0.15 * open_k
-    elif clip == "sit_bless":
-        seat_dy = -9.6
-        bless_k = math.sin(math.pi * u) ** 1.15
-        eyes_closed = 2 <= frame_idx <= 5
-        lean = 0.03 - 0.04 * bless_k
-        head_nod = 0.06 * bless_k if frame_idx <= 4 else -0.02 * bless_k
-        wind_lift = bless_k
-        eye_pulse = 0.45 + 0.55 * bless_k
-        hand_l = np.array([4.35 - 1.65 * bless_k, 20.0 + 7.8 * bless_k, 5.8 + 2.6 * bless_k])
-        hand_r = np.array([-3.65 + 0.95 * bless_k, 23.4 + 4.8 * bless_k, 6.8 + 1.6 * bless_k])
-        pole_l = (1.5 + 0.6 * bless_k, -2.8, -1.8)
-        pole_r = (-1.5 - 0.6 * bless_k, -2.8, -1.8)
-        spark_pos = np.array([0.0, 29.2 + 1.6 * bless_k, 9.2])
-        spark_r = 0.72 + 1.25 * bless_k
-    else:
-        # stand_idle: majestic ~66 px contrapposto pose with graceful relaxed arms (clear waist gap, no akimbo!)
-        seat_dy = 0.0
-        lean = 0.015 * breath
-        twist = -0.04 + 0.02 * math.sin(phase)
-        head_tilt = 0.025 * math.sin(phase - 0.5)
-        hand_l = np.array([4.85, 25.2 + 0.20 * breath, 1.4])
-        hand_r = np.array([-4.15, 29.2 + 0.35 * breath, 5.4])
-        pole_l = (1.2, -3.0, -2.2)
-        pole_r = (-1.4, -2.8, -2.0)
-        spark_pos = hand_r + np.array([-0.15, 2.45 + 0.38 * math.sin(phase + 0.7), 0.9])
-        spark_r = 0.70 + 0.12 * math.sin(phase)
-
-    # ------------------------------------------------------------------
-    # 1. Pelvis, Slender Shapely Legs & Criss-Cross Golden Sandals
-    # ------------------------------------------------------------------
-    pelvis_y = 28.0 + seat_dy + (0.12 * breath if not seated else 0.05 * breath)
-    pelvis_z = -1.6 if seated else 0.0
-
-    if seated:
-        hip_l = np.array([2.10, pelvis_y - 0.6, pelvis_z + 0.6])
-        knee_l = np.array([2.25, 13.8, 7.6])
-        ankle_l = np.array([2.10, 2.6, 8.2])
-
-        hip_r = np.array([-2.10, pelvis_y - 0.6, pelvis_z + 0.4])
-        knee_r = np.array([-2.30, 14.8, 6.8])
-        ankle_r = np.array([-2.15, 5.2, 6.8])
-    else:
-        hip_l = np.array([2.05, pelvis_y - 0.8, 0.0])
-        knee_l = np.array([2.05, 14.8, 0.35])
-        ankle_l = np.array([2.00, 2.3, -0.15])
-
-        hip_r = np.array([-2.15, pelvis_y - 0.9, 0.15])
-        knee_r = np.array([-2.35, 14.6, 1.05])
-        ankle_r = np.array([-2.25, 2.5, 0.45])
-
-    for _side, hip_a, knee_a, ankle_a in ((1, hip_l, knee_l, ankle_l), (-1, hip_r, knee_r, ankle_r)):
-        th_v = knee_a - hip_a
-        R_th = frame_from(-th_v, (0.0, 0.0, 1.0))
-        for i_t in range(11):
-            t_f = i_t / 10.0
-            rx_t = 1.66 - 0.44 * (t_f ** 0.85)
-            rz_t = 1.86 - 0.54 * (t_f ** 0.85)
-            m.ell(hip_a + th_v * t_f, (rx_t, 1.42, rz_t), SKIN, R=R_th, layer="body_under" if t_f < 0.36 else "body")
-
-        sh_v = ankle_a - knee_a
-        R_sh = frame_from(-sh_v, (0.0, 0.0, 1.0))
-        for i_s in range(11):
-            t_s = i_s / 10.0
-            swell = 0.18 * math.exp(-((t_s - 0.28) / 0.24) ** 2)
-            rx_s = 1.16 + swell * 0.46 - 0.30 * (t_s ** 1.08)
-            rz_s = 1.22 + swell - 0.32 * (t_s ** 1.08)
-            m.ell(knee_a + sh_v * t_s, (rx_s, 1.16, rz_s), SKIN, R=R_sh, layer="body")
-            if i_s in (4, 7):
-                m.ell(knee_a + sh_v * t_s, (rx_s + 0.08, 0.24, rz_s + 0.08), GOLD, R=R_sh @ rot_z(0.25 if i_s == 4 else -0.25), layer="outfit")
-
-        foot_c = ankle_a + np.array([0.0, -1.45, 1.18])
-        m.ell(foot_c, (0.94, 0.68, 1.82), SKIN, layer="body")
-        m.ell(foot_c + np.array([0.0, -0.34, 0.05]), (1.02, 0.36, 1.90), NIGHT_PLEAT, layer="outfit")
-        m.ell(ankle_a + np.array([0.0, 0.20, 0.32]), (1.04, 0.25, 1.02), GOLD, layer="outfit")
-        m.ell(foot_c + np.array([0.0, 0.22, 0.58]), (1.00, 0.22, 0.80), GOLD, layer="outfit")
-
-    # ------------------------------------------------------------------
-    # 2. Cinched Hourglass Torso, Collarbones & Slender Relaxed Arms
-    # ------------------------------------------------------------------
-    tor = rot_x(lean) @ rot_y(twist)
-    waist_base = np.array([0.0, pelvis_y + 1.2, pelvis_z])
-
-    def T(pt: tuple[float, float, float] | np.ndarray) -> np.ndarray:
-        return waist_base + tor @ np.asarray(pt, dtype=np.float64)
-
-    m.ell(T((0.0, 0.0, 0.10)), (2.64, 2.05, 2.08), SKIN, R=tor, layer="body_under")
-    m.ell(T((0.0, 2.95 + 0.05 * breath, 0.05)), (1.90, 2.35, 1.88), SKIN, R=tor, layer="body_under")
-    m.ell(T((0.0, 5.45 + 0.08 * breath, 0.08)), (2.26, 2.15, 2.08), SKIN, R=tor, layer="body_under")
-
-    m.ell(T((0.0, 9.25 + 0.12 * breath, 0.35)), (2.62, 1.80, 1.74), SKIN, R=tor, layer="body")
-    m.ell(T((0.0, 9.00 + 0.10 * breath, -0.35)), (2.82, 1.80, 1.82), SKIN, R=tor, layer="body")
-    for sx in (-1.0, 1.0):
-        m.limb(
-            T((sx * 0.90, 10.65 + 0.10 * breath, 0.12)),
-            T((sx * 3.45, 9.95 + 0.14 * breath, -0.05)),
-            1.12,
-            0.96,
-            SKIN,
-            layer="body",
-        )
-
-    m.limb(T((0.0, 9.8, 0.16)), T((0.0, 15.3, 0.36)), 1.08, 0.94, SKIN, layer="body")
-
-    shoulders: dict[int, np.ndarray] = {}
-    for side, hand_t, pole_v in ((1, hand_l, pole_l), (-1, hand_r, pole_r)):
-        sh = T((side * 3.62, 9.85 + 0.14 * breath, -0.08))
-        shoulders[side] = sh
-        elb, wri = ik2(sh, hand_t, 6.7, 6.2, pole_v)
-        d_fore = wri - elb
-        d_fore /= max(float(np.linalg.norm(d_fore)), 1e-6)
-
-        m.limb(sh, elb, 0.90, 0.76, SKIN, layer="body")
-        m.limb(elb, wri, 0.76, 0.62, SKIN, layer="body")
-        m.ell(wri + 0.68 * d_fore, (0.66, 0.76, 0.66), SKIN, layer="body")
-
-        # Golden winged shoulder clasp + turquoise gem + upper-arm ring + wrist cuff
-        m.ell(sh + np.array([side * 0.16, 0.50, 0.15]), (1.18, 0.48, 1.14), GOLD, layer="outfit")
-        m.ell(sh + np.array([side * 0.36, 0.68, 0.40]), (0.42, 0.42, 0.38), TEAL_EMIT, kind="emit", layer="outfit")
-        m.ell(sh + (elb - sh) * 0.42, (0.94, 0.25, 0.94), GOLD, layer="outfit")
-        m.ell(elb + (wri - elb) * 0.76, (0.80, 0.28, 0.80), GOLD, layer="outfit")
-
-    # ------------------------------------------------------------------
-    # 3. Richly Textured High-Waisted Divine Gown (`outfit` layer)
-    # ------------------------------------------------------------------
-    m.ell(T((0.0, 2.85 + 0.05 * breath, 0.08)), (2.30, 2.85, 2.06), NIGHT_SILK, R=tor, kind="corset", layer="outfit")
-    m.ell(T((0.0, 6.35 + 0.12 * breath, 0.10)), (2.82, 2.50, 2.28), PEARL_SILK, R=tor, kind="bustier", layer="outfit")
-    for sx in (-1.0, 1.0):
-        m.ell(T((sx * 1.32, 6.55 + 0.15 * breath, 1.52)), (1.45, 1.42, 1.42), PEARL_SILK, R=tor, kind="bustier", layer="outfit")
-
-    # Heart-star turquoise brooch + delicate golden collarbone necklace
-    m.ell(T((0.0, 7.60 + 0.14 * breath, 1.92)), (0.64, 0.72, 0.48), GOLD, R=tor, layer="outfit")
-    m.ell(T((0.0, 7.60 + 0.14 * breath, 2.10)), (0.44, 0.52, 0.38), TEAL_EMIT, R=tor, kind="emit", layer="outfit")
-    m.ell(T((0.0, 10.65, 1.22)), (1.20, 0.22, 1.10), GOLD, R=tor, layer="outfit")
-
-    # Sculpted golden V-girdle belt + hip chain loops
-    m.ell(T((0.0, 4.35 + 0.08 * breath, 0.12)), (2.50, 0.40, 2.18), GOLD, R=tor, layer="outfit")
-    m.ell(T((0.0, 3.80 + 0.08 * breath, 2.10)), (0.72, 0.78, 0.38), GOLD, R=tor, layer="outfit")
-    m.ell(T((0.0, 3.80 + 0.08 * breath, 2.26)), (0.40, 0.46, 0.32), TEAL_EMIT, R=tor, kind="emit", layer="outfit")
-    for sx in (-1.0, 1.0):
-        m.ell(T((sx * 1.82, 3.35 + 0.06 * breath, 1.82)), (0.56, 0.24, 0.34), GOLD, R=tor @ rot_z(sx * 0.45), layer="outfit")
-
-    hip_mid = np.array([0.0, pelvis_y - 0.2, pelvis_z + 0.1])
-    m.ell(hip_mid + np.array([0.0, 1.3, 0.0]), (3.12, 2.10, 2.45), NIGHT_SILK, layer="outfit")
-    if seated:
-        lap_c = 0.5 * (hip_l + hip_r) + np.array([0.0, 0.4, 2.15])
-        m.ell(lap_c, (3.20, 1.80, 2.72), NIGHT_SILK, layer="outfit")
-
-    # A) Astrolabe-Embroidered Pearl-Ivory Center Stole (`stole_front`)
-    breeze_x = 0.28 * math.sin(phase - 0.7)
-    if seated:
-        stole_top = np.array([0.0, pelvis_y + 1.4, pelvis_z + 2.35])
-        stole_knee = np.array([0.0, 15.2, 7.85])
-        stole_bot = np.array([0.15 * breeze_x, 5.0, 8.65 + 0.25 * wind_lift])
-
-        v_up1 = stole_top - stole_knee
-        l1 = float(np.linalg.norm(v_up1))
-        ry1 = l1 / 1.56
-        c1 = stole_knee + (v_up1 / l1) * (0.68 * ry1)
-        m.ell(c1, (1.82, ry1, 0.80), PEARL_SILK, R=panel_basis(np.array([1.0, 0.0, 0.0]), v_up1), kind="stole_front", clip=clip_stole_panel, layer="outfit")
-
-        v_up2 = stole_knee - stole_bot
-        l2 = float(np.linalg.norm(v_up2))
-        ry2 = l2 / 1.56
-        c2 = stole_bot + (v_up2 / l2) * (0.68 * ry2)
-        m.ell(c2, (1.65, ry2, 0.78), PEARL_SILK, R=panel_basis(np.array([1.0, 0.0, 0.0]), v_up2), kind="stole_front", clip=clip_stole_panel, layer="outfit")
-    else:
-        stole_top = np.array([0.0, pelvis_y + 1.2, 2.20])
-        stole_bot = np.array([0.22 * breeze_x, 5.2, 2.10 + 0.22 * math.sin(phase)])
-        v_up = stole_top - stole_bot
-        ln = float(np.linalg.norm(v_up))
-        ry_s = ln / 1.56
-        c_s = stole_bot + (v_up / ln) * (0.68 * ry_s)
-        m.ell(c_s, (1.85, ry_s, 0.82), PEARL_SILK, R=panel_basis(np.array([1.0, 0.0, 0.0]), v_up), kind="stole_front", clip=clip_stole_panel, layer="outfit")
-
-    # B) Pleated Royal Night-Blue Overskirt Wings (`overskirt`)
-    for side in (-1.0, 1.0):
-        sway_s = (0.32 + 0.52 * wind_lift) * side + 0.25 * math.sin(phase + side * 0.8)
-        if seated:
-            top_w = np.array([side * 2.90, pelvis_y + 0.8, pelvis_z + 0.8])
-            mid_w = np.array([side * (4.15 + 0.25 * wind_lift), 13.6, 5.8])
-            bot_w = np.array([side * (4.55 + 0.45 * wind_lift) + 0.2 * sway_s, 3.8 + 0.5 * wind_lift, 6.4])
-            m.ribbon(
-                [top_w, mid_w, bot_w],
-                [1.55, 1.95, 1.32],
-                0.78,
-                NIGHT_SILK,
-                hint=(side * 0.65, 0.0, 0.75),
-                kind="overskirt",
-                tag=side,
-                layer="outfit",
-            )
-        else:
-            top_w = np.array([side * 2.75, pelvis_y + 0.8, 0.2])
-            mid_w = np.array([side * 3.65 + 0.15 * sway_s, 15.2, -0.30])
-            bot_w = np.array([side * 4.08 + 0.28 * sway_s, 3.5, -0.85])
-            m.ribbon(
-                [top_w, mid_w, bot_w],
-                [1.55, 2.02, 1.46],
-                0.80,
-                NIGHT_SILK,
-                hint=(side * 0.72, 0.0, 0.68),
-                kind="overskirt",
-                tag=side,
-                layer="outfit",
-            )
-            m.ribbon(
-                [
-                    np.array([side * 1.75, pelvis_y + 0.4, -1.80]),
-                    np.array([side * 2.25 + 0.15 * sway_s, 14.5, -3.05]),
-                    np.array([side * 2.55 + 0.28 * sway_s, 2.8, -4.05]),
-                ],
-                [1.75, 2.15, 1.55],
-                0.75,
-                NIGHT_SILK,
-                hint=(0.0, 0.0, -1.0),
-                kind="overskirt",
-                tag=side * 2.0,
-                layer="hair_back",
-            )
-
-    # ------------------------------------------------------------------
-    # 4. Twin Gossamer Starry Astral Ribbon-Veils (`veil_back`)
-    # ------------------------------------------------------------------
-    for side in (-1.0, 1.0):
-        sh = shoulders[side]
-        v_pts = []
-        for lv in np.linspace(0.0, 1.0, 6):
-            wave_v = math.sin(phase - 1.8 * lv + side * 0.6)
-            vx = sh[0] + side * (1.15 + (3.45 + 1.80 * wind_lift) * (lv ** 0.92)) + 0.38 * lv * wave_v
-            vy = sh[1] + 0.80 * math.sin(math.pi * min(lv, 0.45)) - (12.6 - 3.5 * wind_lift) * (lv ** 1.08)
-            vz = sh[2] - 1.35 - 1.65 * lv + 0.40 * lv * math.cos(phase - 1.4 * lv)
-            v_pts.append(np.array([vx, vy, vz]))
-        m.ribbon(
-            v_pts,
-            [0.65, 1.08, 1.20, 1.02, 0.68, 0.24],
-            0.46,
-            ASTRAL_VEIL,
-            hint=(0.0, 0.0, 1.0),
-            kind="veil",
-            tag=side * 1.5,
-            layer="veil_back",
-        )
-
-    # ------------------------------------------------------------------
-    # 5. Sleek Sculpted Head, Voluminous Wavy Silver-Gold Hair, Braids & Diadem
-    # ------------------------------------------------------------------
-    head_R = tor @ rot_y(head_yaw) @ rot_z(head_tilt) @ rot_x(head_nod)
-    head_piv = np.array([0.0, 18.2 + 0.14 * breath, 0.45])
-    hc = T(head_piv)
-
-    def H(pt: tuple[float, float, float] | np.ndarray) -> np.ndarray:
-        return hc + head_R @ np.asarray(pt, dtype=np.float64)
-
-    m.ell(hc, (3.55, 4.15, 3.65), SKIN, R=head_R, kind="head", layer="body")
-    m.ell(H((0.0, -1.48, 0.68)), (2.22, 2.05, 2.45), SKIN, R=head_R, kind="head", layer="body")
-
-    ez = math.sqrt(1.0 - 0.36 * 0.36 - 0.05 * 0.05)
-    for sx in (-1.0, 1.0):
-        ep = H((sx * 0.37 * 3.55, -0.22, ez * 3.65))
-        en = head_R @ np.array([sx * 0.34, 0.0, ez])
-        m.eyes.append((ep, en, eyes_closed))
-
-    # Rounded, voluminous anime hair crown & side-waves (`hair_back` + `hair_front`)
-    m.ell(H((0.0, 0.55, -0.28)), (4.18, 4.58, 4.12), HAIR_SILV, R=head_R, kind="hair", tag=2.5, clip=clip_hair_cap, layer="hair_back")
-    for sx in (-1.0, 1.0):
-        m.ell(H((sx * 1.25, 3.35, 0.35)), (2.18, 1.55, 2.55), HAIR_SILV, R=head_R @ rot_z(-sx * 0.18), kind="hair", tag=10.2 + sx, layer="hair_front")
-
-    # Sweeping parted curtain bangs + sculpted temple braids + collarbone locks!
-    for side in (-1.0, 1.0):
-        sway_b = 0.24 * math.sin(phase + side * 0.7)
-        m.ribbon(
-            [
-                H((side * 0.32, 4.05, 1.95)),
-                H((side * 1.85, 2.65, 3.48)),
-                H((side * 3.15, 0.72, 2.95)),
-                H((side * 3.72 + 0.12 * sway_b, -1.25 + 0.25 * wind_lift, 1.88)),
-            ],
-            [0.92, 1.06, 0.84, 0.32],
-            0.54,
-            HAIR_SILV,
-            hint=(0.0, 0.0, 1.0),
-            kind="hair",
-            tag=10.5 + side,
-            layer="hair_front",
-        )
-
-        # Twisted half-up golden-silver temple braid
-        for k_b in range(5):
-            ub = k_b / 4.0
-            ang_b = 0.32 - ub * 1.15
-            bx = side * 4.15 * math.cos(ang_b)
-            by = 1.95 - 0.55 * math.sin(math.pi * ub * 0.8) + 0.18 * ((-1) ** k_b)
-            bz = 4.15 * math.sin(ang_b) - 0.20
-            b_R = head_R @ rot_y(side * ang_b) @ rot_x(0.38 * ((-1) ** k_b))
-            m.ell(H((bx, by, bz)), (0.66, 0.80, 0.70), HAIR_GOLD, R=b_R, kind="braid", tag=k_b * 0.9, layer="hair_front")
-
-        # Slender front collarbone braid/lock with gold ring & turquoise star-gem!
-        lock_pts = []
-        gem_pt = None
-        for idx_l, ll in enumerate(np.linspace(0.0, 1.0, 7)):
-            w_l = math.sin(phase - 1.6 * ll + side * 0.5)
-            lx = side * (3.78 - 0.32 * ll + 0.68 * wind_lift * ll) + 0.26 * (ll ** 1.1) * w_l
-            ly = 0.65 - (10.5 - 2.2 * wind_lift) * ll
-            lz = 1.12 + 1.48 * math.sin(math.pi * min(ll * 0.75, 0.88))
-            pt_w = H((lx, ly, lz)) if ll < 0.25 else (
-                (1.0 - min(1.0, (ll - 0.25) * 1.3)) * H((lx, ly, lz))
-                + min(1.0, (ll - 0.25) * 1.3) * (hc + np.array([lx, ly, lz]))
-            )
-            lock_pts.append(pt_w)
-            if idx_l == 4:
-                gem_pt = pt_w
-        m.ribbon(
-            lock_pts,
-            [0.72, 0.82, 0.76, 0.66, 0.52, 0.34, 0.15],
-            0.48,
-            HAIR_SILV,
-            hint=(0.0, 0.0, 1.0),
-            kind="braid",
-            tag=6.0 + side,
-            layer="hair_front",
-        )
-        if gem_pt is not None:
-            m.ell(gem_pt + np.array([0.0, 0.36, 0.26]), (0.42, 0.28, 0.38), GOLD, layer="hair_front")
-            m.ell(gem_pt + np.array([0.0, -0.08, 0.30]), (0.44, 0.52, 0.42), TEAL_EMIT, kind="emit", layer="hair_front")
-
-    # Filigree Golden Starlight Forehead Diadem + Central Turquoise Gem
-    m.ell(H((0.0, 2.72, 3.55)), (0.48, 0.56, 0.42), TEAL_EMIT, R=head_R, kind="emit", layer="hair_front")
-    m.ell(H((0.0, 3.38, 3.38)), (0.34, 0.42, 0.34), HALO_EMIT, R=head_R, kind="emit", layer="hair_front")
-    for side in (-1.0, 1.0):
-        m.ell(H((side * 0.92, 2.88, 3.38)), (0.56, 0.26, 0.38), GOLD, R=head_R @ rot_y(-side * 0.25), layer="hair_front")
-        m.ell(H((side * 1.98, 2.62, 2.86)), (0.52, 0.26, 0.38), GOLD, R=head_R @ rot_y(-side * 0.52), layer="hair_front")
-        m.ell(H((side * 2.88, 2.30, 2.02)), (0.42, 0.25, 0.36), GOLD, R=head_R @ rot_y(-side * 0.78), layer="hair_front")
-
-    # Voluminous Flowing Silver-Light-Gold Back Waves (fans gracefully past shoulders so silhouette reads lush from front & 3/4!)
-    back_plumes = [
-        (-3.85, 20.8, [1.05, 1.32, 1.38, 1.24, 0.98, 0.65, 0.28]),
-        (-2.15, 24.0, [1.22, 1.48, 1.52, 1.35, 1.08, 0.72, 0.32]),
-        (0.0,   25.8, [1.35, 1.62, 1.64, 1.45, 1.18, 0.80, 0.36]),
-        (2.15,  24.0, [1.22, 1.48, 1.52, 1.35, 1.08, 0.72, 0.32]),
-        (3.85,  20.8, [1.05, 1.32, 1.38, 1.24, 0.98, 0.65, 0.28]),
-    ]
-    for p_i, (bx, drop_len, widths) in enumerate(back_plumes):
-        pts_b = []
-        for lb in np.linspace(0.0, 1.0, len(widths)):
-            wb = math.sin(phase - 1.9 * lb + p_i * 0.65)
-            wave_s = 0.42 * math.sin(3.4 * lb + p_i * 0.8) * lb
-            px = bx * (0.88 + (0.48 + 0.36 * wind_lift) * lb) + wave_s + 0.48 * (lb ** 1.15) * wb
-            py = 1.4 - (drop_len - 3.8 * wind_lift) * lb
-            pz = -2.45 - 1.55 * math.sin(math.pi * min(lb * 0.85, 0.9)) - 0.80 * lb
-            pts_b.append(hc + np.array([px, py, pz]))
-        m.ribbon(
-            pts_b,
-            widths,
-            0.82,
-            HAIR_SILV,
-            hint=(0.0, 0.0, -1.0),
-            kind="hair",
-            tag=p_i * 1.9 + 1.2,
-            layer="hair_back",
-        )
-
-    # ------------------------------------------------------------------
-    # 6. Delicate Filigree Golden Halo Arc + 7 Slender Faceted Crystal Rays (`halo_back`)
-    # ------------------------------------------------------------------
-    halo_c = hc + np.array([0.0, 2.25 + 0.22 * math.sin(phase + 0.5) + 0.45 * wind_lift, -3.5])
-    halo_r = 6.45 + 0.25 * wind_lift
-
-    n_arc = 34
-    for i_a in range(n_arc):
-        ang = math.radians(-18.0 + 216.0 * (i_a / (n_arc - 1)))
-        ac = halo_c + np.array([halo_r * math.cos(ang), halo_r * math.sin(ang), 0.0])
-        m.ell(ac, (0.30, 0.48, 0.28), HALO_EMIT, R=rot_z(ang), kind="emit", layer="halo_back")
-
-    ray_angles = (-10.0, 23.0, 56.5, 90.0, 123.5, 157.0, 190.0)
-    for r_idx, deg in enumerate(ray_angles):
-        ang = math.radians(deg)
-        is_top = r_idx == 3
-        is_mid = r_idx in (1, 5)
-        gap_r = halo_r + (1.30 if is_top else 1.15) + 0.18 * math.sin(phase + r_idx)
-        shard_len = (2.60 if is_top else (2.00 if is_mid else 1.50)) + 0.45 * wind_lift
-        shard_w = 0.50 if is_top else (0.42 if is_mid else 0.35)
-        sc = halo_c + np.array([(gap_r + shard_len * 0.48) * math.cos(ang), (gap_r + shard_len * 0.48) * math.sin(ang), 0.0])
-        R_shd = rot_z(ang - math.pi * 0.5)
-        m.ell(sc, (shard_w, shard_len * 0.55, 0.32), STAR_EMIT, R=R_shd, kind="crystal_ray", tag=float(r_idx), layer="halo_back")
-
-    # ------------------------------------------------------------------
-    # 7. Floating Starlight Spark / Blooming Blessing Star (`fx_front`)
-    # ------------------------------------------------------------------
-    if clip == "sit_bless" and bless_k > 0.12:
-        star_spin = 0.32 * u
-        b_rad = spark_r * 1.35
-        m.ell(spark_pos, (b_rad * 0.58, b_rad * 0.58, b_rad * 0.58), HALO_EMIT, kind="emit", layer="fx_front")
-        for k_ray in range(4):
-            ra = star_spin + k_ray * (math.pi * 0.25)
-            r_len = b_rad * (2.05 if k_ray % 2 == 0 else 1.32)
-            r_wid = 0.46 if k_ray % 2 == 0 else 0.34
-            r_mat = HALO_EMIT if k_ray % 2 == 0 else STAR_EMIT
-            m.ell(spark_pos, (r_wid, r_len, 0.34), r_mat, R=rot_z(ra), kind="crystal_ray", tag=float(k_ray), layer="fx_front")
-        for m_i in range(4):
-            ma = phase + m_i * (2.0 * math.pi / 4.0)
-            mp_c = spark_pos + np.array([math.cos(ma) * (3.2 + 1.6 * bless_k), math.sin(ma) * (2.4 + 1.1 * bless_k), 0.6])
-            m.ell(mp_c, (0.42, 0.42, 0.42), TEAL_EMIT, kind="emit", layer="fx_front")
-    else:
-        m.ell(spark_pos, (0.38, spark_r * 1.20, 0.38), STAR_EMIT, kind="crystal_ray", tag=1.0, layer="fx_front")
-        m.ell(spark_pos, (spark_r * 0.94, 0.34, 0.34), TEAL_EMIT, kind="emit", layer="fx_front")
-
-    return m, bless_k, eye_pulse
-
-
-# ---------------------------------------------------------------------------
-# Frame Renderer (`art_hero3d.render_layers` outer-air-only silhouette ink!)
-# ---------------------------------------------------------------------------
-def render_frame(clip: str, frame_idx: int, n_frames: int, yaw_deg: float) -> tuple[np.ndarray, np.ndarray]:
-    yaw = math.radians(yaw_deg)
-    model, bless_k, eye_pulse = build_goddess(clip, frame_idx, n_frames)
-    tprims = model.transform(yaw)
-    Ry = rot_y(yaw)
-
-    def by_layer(*names: str) -> list[Prim]:
-        s = set(names)
-        return [p for p in tprims if p.layer in s]
-
-    d_halo, c_halo, _ = raster_subset(by_layer("halo_back"), bless_k)
-    b_halo, s_halo, _ = resolve_layer_raw(d_halo, c_halo, min_cov=4, crease_thresh=-1.0)
-
-    d_veil, c_veil, _ = raster_subset(by_layer("veil_back"), bless_k)
-    b_veil, s_veil, cr_veil = resolve_layer_raw(d_veil, c_veil, min_cov=5, crease_thresh=2.8)
-
-    d_hb, c_hb, _ = raster_subset(by_layer("hair_back"), bless_k)
-    b_hb, s_hb, cr_hb = resolve_layer_raw(d_hb, c_hb, min_cov=6, crease_thresh=2.6)
-
-    d_body, c_body, _ = raster_subset(by_layer("body", "body_under"), bless_k)
-    d_occ, _, _ = raster_subset(by_layer("body"), bless_k)
-    b_body, s_body, cr_body = resolve_layer_raw(d_body, c_body, min_cov=6, crease_thresh=2.6)
-
-    d_out, c_out, _ = raster_subset(by_layer("outfit"), bless_k, init_depth=d_occ)
-    b_out, s_out, cr_out = resolve_layer_raw(d_out, c_out, min_cov=5, crease_thresh=2.6)
-
-    d_mid = np.maximum(d_body, d_out)
-    d_hf, c_hf, _ = raster_subset(by_layer("hair_front"), bless_k, init_depth=d_mid - 0.16)
-    b_hf, s_hf, cr_hf = resolve_layer_raw(d_hf, c_hf, min_cov=5, crease_thresh=2.8)
-
-    d_fx, c_fx, _ = raster_subset(by_layer("fx_front"), bless_k)
-    b_fx, s_fx, _ = resolve_layer_raw(d_fx, c_fx, min_cov=4, crease_thresh=-1.0)
-
-    # Merge solid pixel codes back-to-front WITHOUT interior black lines!
-    # Instead, transitions between hair_front -> face, bustier -> chest, stole -> legs use
-    # natural 1px Band-0 material shadow creases (`art_hero3d.py` exact technique!).
-    final_code = np.full((FH, FW), -1, dtype=np.int16)
-    final_crease = np.zeros((FH, FW), dtype=bool)
-    char_solid = s_veil | s_hb | s_body | s_out | s_hf
-
-    # Halo sits behind everything and gets its warm outline in open air around the character
     canvas = np.zeros((FH, FW, 4), dtype=np.uint8)
     emit_mask = np.zeros((FH, FW), dtype=bool)
+    mat_map = np.where(solid, best_code // 4, -1)
+    band_map = np.where(solid, best_code % 4, 0)
 
-    if clip == "stand_idle":
-        yy, xx = np.ogrid[:FH, :FW]
-        sh_m = ((xx - FW * 0.5) / 8.5) ** 2 + ((yy - (GROUND_ROW + 1.0)) / 2.6) ** 2 <= 1.0
-        canvas[sh_m] = (14, 10, 26, 110)
+    ys_s, xs_s = np.nonzero(solid)
+    for y, x in zip(ys_s.tolist(), xs_s.tolist()):
+        m_i = int(mat_map[y, x])
+        b_i = int(band_map[y, x])
+        r, g, b_c = RAMPS[m_i][b_i]
+        canvas[y, x] = (r, g, b_c, 255)
+        if m_i in EMIT_MATS:
+            emit_mask[y, x] = True
 
-    # Paint floating halo first (with 1px warm outline in open air)
-    for y in range(FH):
-        for x in range(FW):
-            vh = int(b_halo[y, x])
-            if vh >= 0:
-                mh, bh = divmod(vh, 4)
-                r, g, b = RAMPS[mh][bh]
-                canvas[y, x] = (r, g, b, 255)
-                if mh in EMIT_MATS:
-                    emit_mask[y, x] = True
-            elif not char_solid[y, x]:
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    nx, ny = x + dx, y + dy
-                    if 0 <= nx < FW and 0 <= ny < FH and b_halo[ny, nx] >= 0:
-                        canvas[y, x] = HALO_INK
-                        break
+    _stamp_face(canvas, emit_mask, builder, Ry, bless_k)
 
-    # Stack character layers cleanly (`veil_back` -> `hair_back` -> `body` -> `outfit` -> `hair_front`)
-    for b_lyr, s_lyr, cr_lyr, add_shadow_under in (
-        (b_veil, s_veil, cr_veil, False),
-        (b_hb, s_hb, cr_hb, False),
-        (b_body, s_body, cr_body, True),
-        (b_out, s_out, cr_out, False),
-        (b_hf, s_hf, cr_hf, False),
-    ):
-        # Soft 1px Band-0 shadow on back hair right around neck/body silhouette for crisp depth separation!
-        if add_shadow_under:
-            dil_b = np.zeros_like(s_lyr)
-            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                dil_b |= np.roll(np.roll(s_lyr, dy, 0), dx, 1)
-            final_crease |= dil_b & (~s_lyr) & (final_code >= 0)
-        final_code = np.where(s_lyr, b_lyr, final_code)
-        final_crease = np.where(s_lyr, cr_lyr, final_crease)
+    solid_now = canvas[..., 3] > 0
+    air = ~solid_now
+    for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        nb_solid = np.zeros((FH, FW), dtype=bool)
+        nb_mat = np.full((FH, FW), -1, dtype=np.int16)
+        sy0, sy1 = max(0, -dy), FH - max(0, dy)
+        dy0, dy1 = max(0, dy), FH - max(0, -dy)
+        sx0, sx1 = max(0, -dx), FW - max(0, dx)
+        dx0, dx1 = max(0, dx), FW - max(0, -dx)
+        nb_solid[dy0:dy1, dx0:dx1] = solid_now[sy0:sy1, sx0:sx1]
+        nb_mat[dy0:dy1, dx0:dx1] = mat_map[sy0:sy1, sx0:sx1]
+        edge = air & nb_solid & (canvas[..., 3] == 0)
+        ey, ex = np.nonzero(edge)
+        for y, x in zip(ey.tolist(), ex.tolist()):
+            canvas[y, x] = mat_outline(int(nb_mat[y, x]))
 
-    # Resolve character pixels + 1px outer silhouette outline ONLY into open air (`~char_solid`)!
-    for y in range(FH):
-        for x in range(FW):
-            v = int(final_code[y, x])
-            if v >= 0:
-                m_i, b_i = divmod(v, 4)
-                if final_crease[y, x] and m_i not in EMIT_MATS and m_i != SKIN:
-                    b_i = 0
-                r, g, b = RAMPS[m_i][b_i]
-                canvas[y, x] = (r, g, b, 255)
-                emit_mask[y, x] = m_i in EMIT_MATS
-            else:
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    nx, ny = x + dx, y + dy
-                    if 0 <= nx < FW and 0 <= ny < FH and final_code[ny, nx] >= 0:
-                        nb_mat = int(final_code[ny, nx]) // 4
-                        canvas[y, x] = mat_ink(nb_mat)
-                        emit_mask[y, x] = False
-                        break
-
-    # Precision pixel-art glowing turquoise eyes (`stamp_goddess_eyes`)
-    eye_pts_2d: list[tuple[float, float, float, bool]] = []
-    for ep, en, closed in model.eyes:
-        pr = Ry @ ep * SCALE
-        sx = FW * 0.5 + float(pr[0])
-        sy = GROUND_ROW - float(pr[1] * COSP - pr[2] * SINP)
-        facing = float((Ry @ en) @ WHAT)
-        eye_pts_2d.append((sx, sy, facing, closed))
-    stamp_goddess_eyes(canvas, emit_mask, eye_pts_2d, eye_pulse)
-
-    # Re-apply solid front bangs over outer eye corners so bangs drape naturally over upper lashes
-    for y in range(FH):
-        for x in range(FW):
-            vhf = int(b_hf[y, x])
-            if vhf >= 0:
-                m_i, b_i = divmod(vhf, 4)
-                if cr_hf[y, x] and m_i not in EMIT_MATS:
-                    b_i = 0
-                r, g, b = RAMPS[m_i][b_i]
-                canvas[y, x] = (r, g, b, 255)
-                emit_mask[y, x] = m_i in EMIT_MATS
-
-    # Paint floating palm spark / blooming blessing star (`fx_front`)
-    for y in range(FH):
-        for x in range(FW):
-            vfx = int(b_fx[y, x])
-            if vfx >= 0:
-                m_i, b_i = divmod(vfx, 4)
-                r, g, b = RAMPS[m_i][b_i]
-                canvas[y, x] = (r, g, b, 255)
-                emit_mask[y, x] = m_i in EMIT_MATS
-
-    # Build crisp `goddess_glow.png`
     glow = np.zeros((FH, FW, 4), dtype=np.uint8)
     glow[emit_mask] = canvas[emit_mask]
 
-    air = canvas[..., 3] == 0
+    open_air = canvas[..., 3] == 0
     if emit_mask.any():
         aura = np.zeros((FH, FW), dtype=bool)
         aura_col = np.zeros((FH, FW, 3), dtype=np.uint8)
-        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-2, 0), (2, 0), (0, -2), (0, 2), (-1, -1), (-1, 1), (1, -1), (1, 1)):
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1), (-2, 0), (2, 0), (0, -2), (0, 2)):
             dist = abs(dy) + abs(dx)
             if dist > (3 if bless_k > 0.35 else 2):
                 continue
-            nb_em = np.zeros_like(emit_mask)
+            nb_em = np.zeros((FH, FW), dtype=bool)
             nb_c = np.zeros((FH, FW, 3), dtype=np.uint8)
             sy0, sy1 = max(0, -dy), FH - max(0, dy)
             dy0, dy1 = max(0, dy), FH - max(0, -dy)
@@ -1183,61 +677,105 @@ def render_frame(clip: str, frame_idx: int, n_frames: int, yaw_deg: float) -> tu
             dx0, dx1 = max(0, dx), FW - max(0, -dx)
             nb_em[dy0:dy1, dx0:dx1] = emit_mask[sy0:sy1, sx0:sx1]
             nb_c[dy0:dy1, dx0:dx1] = canvas[sy0:sy1, sx0:sx1, :3]
-            bayer_ok = ((np.arange(FH)[:, None] + np.arange(FW)[None, :]) % 2 == 0) if dist == 1 else (
-                (np.arange(FH)[:, None] % 2 == 0) & (np.arange(FW)[None, :] % 2 == 0)
-            )
-            hit_a = air & nb_em & (~aura) & bayer_ok
+            if dist == 1:
+                bayer_ok = ((np.arange(FH)[:, None] + np.arange(FW)[None, :]) % 2 == 0)
+            else:
+                bayer_ok = ((np.arange(FH)[:, None] % 2 == 0) & (np.arange(FW)[None, :] % 2 == 0))
+            hit_a = open_air & nb_em & (~aura) & bayer_ok
             aura |= hit_a
             aura_col[hit_a] = nb_c[hit_a]
         glow[aura, :3] = aura_col[aura]
-        glow[aura, 3] = 150 if bless_k > 0.35 else 105
+        glow[aura, 3] = 148 if bless_k > 0.35 else 102
 
     return canvas, glow
 
 
+def _stamp_face(
+    canvas: np.ndarray,
+    emit_mask: np.ndarray,
+    builder: Builder,
+    Ry: np.ndarray,
+    bless_k: float,
+) -> None:
+    fwd = Ry @ (builder.head_R @ np.array([0.0, 0.0, 1.0]))
+    if fwd[2] < 0.05:
+        return
+
+    def proj_head(loc: tuple[float, float, float]) -> tuple[int, int]:
+        pw = Ry @ (builder.head_c + builder.head_R @ np.asarray(loc, dtype=np.float64) - np.array([0.0, PELVIS_Y, 0.0]))
+        sx, sy, _ = _project_pt(pw)
+        return int(round(sx)), int(round(sy))
+
+    iris_bright = (*RAMPS[TEAL_EMIT][2], 255)
+    iris_core = (*RAMPS[TEAL_EMIT][3], 255)
+    iris_deep = (*RAMPS[TEAL_EMIT][0], 255)
+
+    for sgn in (-1.0, 1.0):
+        eye_norm = Ry @ (builder.head_R @ np.array([sgn * 0.38, 0.0, 0.92]))
+        if eye_norm[2] < 0.16:
+            continue
+        ex, ey = proj_head((sgn * 1.68, -0.20, 3.92))
+        if not (2 <= ex < FW - 2 and 2 <= ey < FH - 2):
+            continue
+        canvas[ey - 1, ex] = LASH_COL
+        if eye_norm[2] > 0.45:
+            canvas[ey - 1, ex + (1 if sgn > 0 else -1)] = LASH_COL
+        canvas[ey, ex] = iris_core if bless_k > 0.3 else iris_bright
+        emit_mask[ey, ex] = True
+        canvas[ey + 1, ex] = iris_bright if bless_k > 0.3 else iris_deep
+        emit_mask[ey + 1, ex] = True
+        if eye_norm[2] > 0.55:
+            nx = ex - (1 if sgn > 0 else -1)
+            canvas[ey, nx] = iris_core
+            emit_mask[ey, nx] = True
+
+    if fwd[2] > 0.35:
+        mx, my = proj_head((0.0, -2.45, 3.85))
+        if 1 <= mx < FW - 1 and 1 <= my < FH - 1:
+            canvas[my, mx] = LIP_COL
+
+
 # ---------------------------------------------------------------------------
-# Sheet Assembly & Multiprocessing Entrypoint
+# Sheet Assembly & Multiprocessing Entrypoint (8 True Facings E..NE)
 # ---------------------------------------------------------------------------
 CLIPS: list[tuple[str, int, int, bool]] = [
-    ("sit_idle", 6, 6, True),
-    ("sit_talk", 6, 7, True),
-    ("sit_bless", 8, 8, False),
-    ("stand_idle", 6, 6, True),
+    ("float_idle", 8, 6, True),
+    ("float_talk", 8, 7, True),
+    ("float_bless", 12, 8, False),
 ]
 FACINGS: list[tuple[str, float]] = [
+    ("E", math.pi / 2.0),
+    ("SE", math.pi / 4.0),
     ("S", 0.0),
-    ("SE", -32.0),
-    ("SW", 32.0),
+    ("SW", -math.pi / 4.0),
+    ("W", -math.pi / 2.0),
+    ("NW", -3.0 * math.pi / 4.0),
+    ("N", math.pi),
+    ("NE", 3.0 * math.pi / 4.0),
 ]
 
 
 def _worker(job: tuple[int, int, str, int, int, float]) -> tuple[int, int, bytes, bytes]:
-    row_i, col_i, clip_name, f_i, n_f, yaw_deg = job
-    col_arr, glow_arr = render_frame(clip_name, f_i, n_f, yaw_deg)
+    row_i, col_i, clip_name, f_i, n_f, yaw_rad = job
+    col_arr, glow_arr = render_frame(clip_name, f_i, n_f, yaw_rad)
     return row_i, col_i, col_arr.tobytes(), glow_arr.tobytes()
 
 
-def write_rgba_sheet(path: Path, arr: np.ndarray) -> None:
-    h, w, _ = arr.shape
-    rows = [[tuple(int(v) for v in arr[y, x]) for x in range(w)] for y in range(h)]
-    write_png(path, w, h, rows)
-
-
-def main() -> None:
+def write_sheets() -> None:
     total_cols = sum(cnt for _, cnt, _, _ in CLIPS)
     total_rows = len(FACINGS)
     sheet_c = np.zeros((total_rows * FH, total_cols * FW, 4), dtype=np.uint8)
     sheet_g = np.zeros((total_rows * FH, total_cols * FW, 4), dtype=np.uint8)
 
     jobs: list[tuple[int, int, str, int, int, float]] = []
-    for r_i, (_f_name, yaw_deg) in enumerate(FACINGS):
+    for r_i, (_f_name, yaw_rad) in enumerate(FACINGS):
         col_cursor = 0
         for c_name, cnt, _fps, _loop in CLIPS:
             for f_i in range(cnt):
-                jobs.append((r_i, col_cursor + f_i, c_name, f_i, cnt, yaw_deg))
+                jobs.append((r_i, col_cursor + f_i, c_name, f_i, cnt, yaw_rad))
             col_cursor += cnt
 
-    workers = min(6, os.cpu_count() or 1)
+    workers = min(8, os.cpu_count() or 1)
     with mp.Pool(workers) as pool:
         for r_i, col_i, cb, gb in pool.imap_unordered(_worker, jobs, chunksize=2):
             y0, y1 = r_i * FH, (r_i + 1) * FH
@@ -1247,8 +785,8 @@ def main() -> None:
 
     out_c = ROOT / "characters" / "goddess.png"
     out_g = ROOT / "characters" / "goddess_glow.png"
-    write_rgba_sheet(out_c, sheet_c)
-    write_rgba_sheet(out_g, sheet_g)
+    Image.fromarray(sheet_c, "RGBA").save(out_c)
+    Image.fromarray(sheet_g, "RGBA").save(out_g)
 
     clips_meta: dict[str, dict[str, int | bool]] = {}
     col_cursor = 0
@@ -1260,11 +798,11 @@ def main() -> None:
         "texture": "res://assets/characters/goddess.png",
         "glow_texture": "res://assets/characters/goddess_glow.png",
         "frame_size": [FW, FH],
-        "feet": [FW // 2, int(GROUND_ROW)],
-        "standing_height_px": 66,
+        "feet": [int(ANCHOR_X), int(ANCHOR_Y)],
+        "floating_height_px": 76,
         "columns": total_cols,
         "rows": total_rows,
-        "default_row": 0,
+        "default_row": 2,
         "facings": [name for name, _ in FACINGS],
         "row_by_facing": {name: idx for idx, (name, _) in enumerate(FACINGS)},
         "clips": clips_meta,
@@ -1274,5 +812,44 @@ def main() -> None:
     print(f"Wrote {out_c} ({total_cols * FW}x{total_rows * FH}), {out_g}, and {rig_path}")
 
 
+def write_preview(out_path: str) -> None:
+    jobs: list[tuple[int, int, str, int, int, float]] = []
+    for s_i, (_name, yaw_rad) in enumerate(FACINGS):
+        jobs.append((0, s_i, "float_idle", 0, 8, yaw_rad))
+    for k in range(4):
+        jobs.append((1, k, "float_talk", k * 2, 8, 0.0 if k < 2 else math.pi / 4.0))
+    for k in range(4):
+        jobs.append((1, 4 + k, "float_bless", k * 3, 12, 0.0))
+
+    workers = min(8, os.cpu_count() or 1)
+    board = np.zeros((2 * FH, 8 * FW, 4), dtype=np.uint8)
+    board[..., 0] = 6
+    board[..., 1] = 4
+    board[..., 2] = 16
+    board[..., 3] = 255
+
+    with mp.Pool(workers) as pool:
+        for r_i, col_i, cb, gb in pool.imap_unordered(_worker, jobs, chunksize=1):
+            c_arr = np.frombuffer(cb, dtype=np.uint8).reshape(FH, FW, 4)
+            g_arr = np.frombuffer(gb, dtype=np.uint8).reshape(FH, FW, 4)
+            y0, y1 = r_i * FH, (r_i + 1) * FH
+            x0, x1 = col_i * FW, (col_i + 1) * FW
+            cell = board[y0:y1, x0:x1].astype(np.float32)
+            ca = c_arr[..., 3:4].astype(np.float32) / 255.0
+            cell[..., :3] = cell[..., :3] * (1.0 - ca) + c_arr[..., :3].astype(np.float32) * ca
+            ga = g_arr[..., 3:4].astype(np.float32) / 255.0
+            cell[..., :3] = np.clip(cell[..., :3] + g_arr[..., :3].astype(np.float32) * ga * 0.55, 0.0, 255.0)
+            board[y0:y1, x0:x1] = cell.astype(np.uint8)
+
+    img = Image.fromarray(board, "RGBA").resize((8 * FW * 2, 2 * FH * 2), Image.Resampling.NEAREST)
+    p = Path(out_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    img.save(p)
+    print("Preview written:", p)
+
+
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) >= 3 and sys.argv[1] == "preview":
+        write_preview(sys.argv[2])
+    else:
+        write_sheets()

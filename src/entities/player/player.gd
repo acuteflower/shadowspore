@@ -11,6 +11,7 @@ static var all: Array[Player] = []
 
 const RESPAWN_FALLBACK_SECONDS: float = 90.0 ## a fallen player who never chooses comes back after this long
 const SPAWN_POINT: Vector2 = Vector2.ZERO
+const DEFAULT_CAMERA_ZOOM: Vector2 = Vector2(0.82, 0.82) ## default in-game zoom (slightly zoomed out for broader overview)
 const HUD_SCENE: PackedScene = preload("res://src/ui/hud.tscn")
 const RUN_DUST_MIN_SPEED: float = 40.0 ## px/s
 const BODY_CENTER: Vector2 = Vector2(0, -24) ## aim origin, relative to the feet
@@ -120,6 +121,10 @@ const AGILE_BLOOD: Texture2D = preload("res://assets/characters/player_agile_blo
 const FINISHER_SHEET_ID: int = 20 ## Combat V2 Finisher sheet (`tools/art_hero_finisher.py`: 8 sectors x 16 keys)
 const FINISHER_SHEET: Texture2D = preload("res://assets/characters/player_finisher.png")
 const FINISHER_BLOOD: Texture2D = preload("res://assets/characters/player_finisher_blood.png")
+const FLOAT_SHEET_ID: int = 21 ## Interstellar zero-G floating sheet (`tools/art_hero_float.py`: 8 sectors x 56 cols, 64x64 center-anchored)
+const FLOAT_SHEET: Texture2D = preload("res://assets/characters/player_float.png")
+const FLOAT_BLOOD: Texture2D = preload("res://assets/characters/player_float_blood.png")
+const FLOAT_OFFSET: Vector2 = Vector2(0.0, -20.0)
 const CAST_SHEET_PATH: String = "res://assets/characters/player_cast.png" ## tools/art_hero_cast.py: 8 sectors x 12 frames per clip (CAST_CLIPS)
 const CAST_BLOOD_PATH: String = "res://assets/characters/player_cast_blood.png"
 const CAST_CLIPS: Array[String] = ["light", "root", "ember", "veil", "maw"]
@@ -143,6 +148,7 @@ const WOUND_PALE_FROM: float = 0.8 ## the blood loss starts to show below this s
 const SHEET_COLS: int = 22
 
 @export var max_speed: float = 62.0 ## px/s
+var admin_speed_scale: float = 1.0 ## host-applied admin movement speed multiplier (0.25..4.0)
 @export var acceleration: float = 700.0 ## px/s²
 @export var friction: float = 900.0 ## px/s²
 @export var walk_fps: float = 13.0 ## walk frames per second at max_speed (6 frames = 1 cycle = 2 steps)
@@ -243,6 +249,7 @@ var _rig_agile_shoulder: PackedVector2Array
 var _rig_agile_hand: PackedVector2Array
 var _agile_cols: int = 43
 var finisher: FinisherComponent
+var dungeons: DungeonProfileComponent ## portable dungeon resonance, clears, records & echo shards (docs/dungeon_konzept.md)
 var _rig_finisher_shoulder: PackedVector2Array
 var _rig_finisher_hand: PackedVector2Array
 var _finisher_cols: int = 16
@@ -265,6 +272,9 @@ var _carry_dir: int = 1 ## 1 lifting, -1 setting down
 var _carry_walk: float = 0.0
 var swim: int = 0 ## synced: SwimRules.NONE / TREAD / BREAST / CRAWL (docs/schwimmen_konzept.md)
 var swimmer: SwimComponent
+var zero_g_state: int = 0 ## synced: ZeroGRules.State (docs/caelia_interstellar_konzept.md)
+var zero_g: ZeroGComponent
+var _float_rig: Dictionary = {} ## hero_rig.json "float": clips & center anchor
 const SWIM_SUBMERGE: float = 17.0 ## px of water over her body while swimming (stand-in until the swim sheet exists)
 
 var _surface: Dictionary = {} ## terrain.json entry under the feet
@@ -297,6 +307,7 @@ var _scan_clock: float = 0.0
 var _candidate: Interactable = null ## the nearest usable thing of the last scan, re-checked every frame
 var fainting: bool = false ## the faint sheet is shown (AmbushScene drives the frames)
 var _respawn_asked: bool = false
+var respawn_target: StringName = &"" ## where the death screen asked to come back (host-checked, told to every peer): "" / home, camp or a waystone id
 var story_lock: bool = false ## a cutscene holds her still (she still animates, the HUD stays)
 var auto_walk: Vector2 = Vector2.INF ## while `story_lock`: a cutscene walks her slowly to this point (her limp and all)
 var auto_walk_factor: float = -1.0 ## share of her top speed for that walk (< 0: the slow wounded walk)
@@ -354,6 +365,9 @@ func _ready() -> void:
 	swimmer.name = "SwimComponent"
 	add_child(swimmer)
 	swimmer.setup(self)
+	zero_g = ZeroGComponent.new()
+	add_child(zero_g)
+	zero_g.setup(self)
 	fishing = FishingComponent.new()
 	fishing.name = "FishingComponent"
 	fishing.set_multiplayer_authority(get_multiplayer_authority()) ## a child made in _ready does not inherit the owner (its own _ready needs it)
@@ -372,6 +386,10 @@ func _ready() -> void:
 	effects.name = "Effects"
 	effects.set_multiplayer_authority(get_multiplayer_authority())
 	add_child(effects)
+	dungeons = DungeonProfileComponent.new()
+	dungeons.name = "DungeonProfileComponent"
+	dungeons.set_multiplayer_authority(get_multiplayer_authority())
+	add_child(dungeons)
 	_eat_fx = EatEffect.new()
 	add_child(_eat_fx)
 	_drink_fx = DrinkEffect.new()
@@ -397,6 +415,7 @@ func _ready() -> void:
 	health.healed.connect(_on_healed)
 	if multiplayer.is_server():
 		health.died.connect(_respawn_after_delay)
+	_camera.zoom = DEFAULT_CAMERA_ZOOM
 	_camera.enabled = is_multiplayer_authority()
 	_camera.reset_smoothing()
 	if is_multiplayer_authority():
@@ -459,6 +478,32 @@ func _ready() -> void:
 		plate.name = "CoopNameplate"
 		plate.owner_id = name.to_int()
 		add_child(plate)
+	var vt_sys: VeilThreads = VeilThreads.of(get_tree())
+	if vt_sys != null:
+		vt_sys.apply_bonuses_to_player(self)
+
+
+var _spore_lantern: NightLight
+
+
+func set_spore_lantern(strength: float) -> void:
+	var on: bool = strength > 0.001
+	if not on:
+		if _spore_lantern != null and is_instance_valid(_spore_lantern):
+			_spore_lantern.visible = false
+		return
+	if _spore_lantern == null or not is_instance_valid(_spore_lantern):
+		_spore_lantern = NightLight.new()
+		_spore_lantern.name = "SporeLantern"
+		_spore_lantern.position = Vector2(0.0, -14.0)
+		_spore_lantern.radius = 48
+		_spore_lantern.squash = 0.68
+		_spore_lantern.base_energy = 0.72
+		_spore_lantern.glow_color = Color("7ce8dc")
+		_spore_lantern.pulse = 0.12
+		add_child(_spore_lantern)
+	_spore_lantern.visible = true
+	_spore_lantern.base_energy = 0.72 * clampf(strength / 0.22, 0.6, 1.6)
 
 
 ## The camera, for windows that frame a scene (zoom and `view_shift`).
@@ -469,13 +514,19 @@ func view_camera() -> Camera2D:
 func _process(delta: float) -> void:
 	## LivingCamera 2.0 (T10): comfort deadzone near rest, adaptive forward sightline in sprint/Reisetritt, and subtle combat aim framing
 	var active_cam: bool = is_multiplayer_authority() and intro == null and not story_lock and health.current > 0.0
-	if locomotion != null:
+	if in_zero_g():
+		_lead = zero_g.compute_camera_offset(delta, active_cam)
+	elif locomotion != null:
 		_lead = locomotion.compute_camera_offset(delta, active_cam)
 	else:
 		var lead_goal: Vector2 = velocity * CAMERA_LEAD if active_cam else Vector2.ZERO
 		_lead = _lead.lerp(lead_goal, 1.0 - exp(-CAMERA_LEAD_EASE * delta))
 	_camera.offset = view_shift + _lead + ((Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake * GameSettings.shake_factor()).round() if _shake > 0.0 else Vector2.ZERO)
 	_shake = move_toward(_shake, 0.0, 14.0 * delta)
+
+
+func in_zero_g() -> bool:
+	return zero_g != null and zero_g.active
 
 
 const CAMERA_LEAD: float = 0.22 ## seconds of her velocity the camera looks ahead (the smoothing lags about 0.14 s, so she stays near the middle with a little view ahead)
@@ -594,6 +645,11 @@ func _physics_process(delta: float) -> void:
 		_last_surface_result = _surface
 	else:
 		_surface = _last_surface_result
+	if zero_g != null:
+		var on_zero_g: bool = bool(_surface.get("zero_g", false))
+		zero_g.sync_presence(on_zero_g, delta)
+		if not on_zero_g and is_multiplayer_authority() and zero_g_state != ZeroGRules.State.NONE:
+			zero_g_state = ZeroGRules.State.NONE
 	var down: bool = health.current <= 0.0
 	_sprite.self_modulate = Color(0.35, 0.25, 0.5, 0.55) if down else Color.WHITE.lerp(Color(1.5, 1.9, 1.55), _eat_glow())
 	_net_vis_offset = Vector2.ZERO
@@ -704,6 +760,9 @@ func _try_blink() -> void:
 ## Alt: a short straight step through the void, the way she is walking, or towards the cursor (or where she looks) when she stands.
 ## Stops short at walls; too short a way is no step at all. True when it started.
 func effective_step_range() -> float:
+	if in_zero_g():
+		var base_zg: float = float(ZeroGRules.section("motion").get("step_range", 86.0))
+		return base_zg + (18.0 if light_step else 0.0)
 	return step_range + (18.0 if light_step else 0.0)
 
 
@@ -773,6 +832,7 @@ func play_shadow_step(from: Vector2, to: Vector2, way: Vector2) -> void:
 	_step_heard = false
 	if multiplayer.is_server():
 		health.grant_grace(step_grace + (0.06 if light_step else 0.0)) ## the host decides hits: while she is in the step nothing reaches her
+		set_meta(&"_counter_boost_until_msec", Time.get_ticks_msec() + 4000) ## Gezeitenreif: +16% next hit within 4s after ShadowStep or Counter
 		if light_step:
 			get_tree().create_timer(STEP_BACK).timeout.connect(func() -> void:
 				if is_instance_valid(self) and health.current > 0.0:
@@ -865,7 +925,11 @@ func _finish_step() -> void:
 	_set_step_extras(true)
 	if move_fx != null:
 		move_fx.trigger_choker_glint(0.22)
-	if locomotion != null:
+	if in_zero_g() and is_multiplayer_authority():
+		var m_cfg: Dictionary = ZeroGRules.section("motion")
+		var exit_spd: float = maxf(_step_carry * float(m_cfg.get("step_carry_ratio", 0.65)), float(m_cfg.get("step_exit_speed", 122.0)))
+		velocity = _step_dir.normalized() * exit_spd
+	elif locomotion != null:
 		locomotion.trigger_step_exit_glide(_step_carry)
 
 
@@ -885,6 +949,10 @@ func request_teleport(to: Vector2) -> void:
 	if swimmer != null:
 		swimmer.reset() ## she lands on foot; the next step decides again
 		swim = SwimRules.NONE
+	if zero_g != null:
+		zero_g.reset()
+		zero_g_state = ZeroGRules.State.NONE
+	_last_surface_tile = Vector2i(1 << 30, 1 << 30)
 	global_position = to
 	velocity = Vector2.ZERO
 	_lead = Vector2.ZERO
@@ -943,7 +1011,29 @@ func request_heal() -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func _rpc_heal() -> void:
 	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
-		health.heal_full()
+		if AdminCommands.is_sender_authorized(multiplayer.get_remote_sender_id()):
+			health.heal_full()
+
+
+## Host-only admin operation forwarded to the owning peer (teleport, infinite stamina, refill, speed multiplier).
+@rpc("authority", "call_local", "reliable")
+func apply_admin_local_op(op: String, arg: Variant) -> void:
+	if multiplayer.get_remote_sender_id() > 1:
+		return
+	if not is_multiplayer_authority():
+		return
+	match op:
+		"teleport":
+			if arg is Vector2:
+				request_teleport(arg as Vector2)
+		"stamina_infinite":
+			if stamina != null:
+				stamina.infinite = bool(arg)
+		"stamina_refill":
+			if stamina != null:
+				stamina.refill()
+		"speed":
+			admin_speed_scale = clampf(float(arg), 0.25, 4.0)
 
 
 func _on_inventory_changed() -> void:
@@ -989,7 +1079,7 @@ func _on_health_changed(current: float, _maximum: float) -> void:
 	if _was_dead and current > 0.0: ## respawned
 		var level: TestLevel = get_parent().get_parent() as TestLevel ## players hang under the level's `Players` node
 		if level != null and level.has_method("respawn_point_for"):
-			global_position = level.call("respawn_point_for", name.to_int()) as Vector2
+			global_position = level.call("respawn_point_for", name.to_int(), respawn_target) as Vector2
 		elif level != null and level.has_method("spawn_point_for"):
 			global_position = level.call("spawn_point_for", name.to_int()) as Vector2
 		else:
@@ -999,12 +1089,17 @@ func _on_health_changed(current: float, _maximum: float) -> void:
 			level.call("on_player_respawned", self)
 		_camera.reset_smoothing()
 		sync_wound_visuals()
+		respawn_target = &""
 	_was_dead = current <= 0.0
 
 
 ## Host: after a fall the player waits for the choice on her death screen (`request_respawn`); a player who never answers
 ## (gone, stuck) is brought back after `RESPAWN_FALLBACK_SECONDS` anyway.
 func _respawn_after_delay() -> void:
+	if DungeonManager.in_dungeon(global_position):
+		var dm: DungeonManager = DungeonManager.of(get_tree())
+		if dm != null and dm.host_handle_player_death(self):
+			return
 	_respawn_asked = false
 	var left: float = RESPAWN_FALLBACK_SECONDS
 	while not _respawn_asked and left > 0.0 and health.current <= 0.0:
@@ -1022,18 +1117,36 @@ func _respawn_after_delay() -> void:
 		health.heal_full()
 
 
-## The death screen's ZURÜCKKEHREN: the host brings her back (a client asks).
-func request_respawn() -> void:
+## The death screen's choice (docs/hud_v2_konzept.md 3.G): the host brings her back (a client asks). `target` "" / home =
+## home or the coast camp, camp, or a waystone id; the host refuses a waystone that is not awake (or lies in another
+## zone) through the world's `respawn_allowed` and then she comes home instead.
+func request_respawn(target: StringName = &"") -> void:
 	if multiplayer.is_server():
-		_respawn_asked = true
+		_accept_respawn(target)
 	else:
-		_rpc_respawn.rpc_id(1)
+		_rpc_respawn.rpc_id(1, String(target))
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _rpc_respawn() -> void:
+func _rpc_respawn(target: String) -> void:
 	if multiplayer.is_server() and multiplayer.get_remote_sender_id() == get_multiplayer_authority():
-		_respawn_asked = true
+		_accept_respawn(StringName(target))
+
+
+func _accept_respawn(target: StringName) -> void:
+	var world: Node = get_tree().get_first_node_in_group("world")
+	if target != &"" and world != null and world.has_method("respawn_allowed") and not bool(world.call("respawn_allowed", name.to_int(), target)):
+		target = &""
+	if multiplayer.has_multiplayer_peer() and not multiplayer.get_peers().is_empty():
+		_rpc_respawn_target.rpc(String(target))
+	else:
+		respawn_target = target
+	_respawn_asked = true
+
+
+@rpc("authority", "call_local", "reliable")
+func _rpc_respawn_target(target: String) -> void:
+	respawn_target = StringName(target)
 
 
 func _is_submerged() -> bool:
@@ -1045,6 +1158,10 @@ func _update_swim(delta: float, dir: Vector2) -> int:
 	var allowed: bool = health.current > 0.0 and not story_lock and intro == null and not _busy and not fainting and not stumbling and not attack.is_swinging()
 	var can_swim_water: bool = bool(_surface.get("water", false)) and _surface_id != "puddle"
 	swim = swimmer.step(delta, float(_surface.get("depth_amount", 0.0)), can_swim_water, allowed, dir != Vector2.ZERO, InputManager.sprint_held(), stamina, wounded)
+	if swim > 0:
+		var offshore_stamina: float = float(_surface.get("offshore_stamina", 0.0))
+		if offshore_stamina > 0.0:
+			stamina.drain(offshore_stamina, delta)
 	return swim
 
 
@@ -1115,14 +1232,17 @@ func _current_flow() -> Vector2:
 
 
 ## The river carries her a little (docs/schwimmen_konzept.md 4.4): at most 18 % of the walking speed, none while crawling.
+## Far offshore (>14 tiles), ocean swell gently pushes back toward the coast even while crawling.
 func _swim_drift(state: int) -> Vector2:
+	var offshore_v: Variant = _surface.get("offshore_drift", Vector2.ZERO)
+	var offshore: Vector2 = offshore_v as Vector2 if offshore_v is Vector2 else Vector2.ZERO
 	if state == SwimRules.CRAWL:
-		return Vector2.ZERO
+		return offshore
 	var flow: Vector2 = _current_flow()
 	if flow == Vector2.ZERO:
-		return Vector2.ZERO
+		return offshore
 	var cfg: Dictionary = SwimRules.cfg().get("current", {}) as Dictionary
-	return flow * max_speed * float(cfg.get("max_drift", 0.18))
+	return flow * max_speed * float(cfg.get("max_drift", 0.18)) + offshore
 
 
 ## Swimming against the stream is slower (breaststroke up to 15 %).
@@ -1198,7 +1318,7 @@ func _on_step() -> void:
 
 
 func _update_run_dust() -> void:
-	var running: bool = sprinting and velocity.length() > RUN_DUST_MIN_SPEED and not _is_submerged()
+	var running: bool = sprinting and velocity.length() > RUN_DUST_MIN_SPEED and not _is_submerged() and not in_zero_g()
 	_run_dust.emitting = running
 	if running:
 		_run_dust.direction = -velocity.normalized()
@@ -1237,6 +1357,29 @@ func _move(delta: float) -> void:
 	var charging: bool = _update_charge()
 	_update_alt()
 	var dir: Vector2 = InputManager.move_vector()
+	if in_zero_g():
+		var want_glide: bool = InputManager.sprint_held() and not _busy
+		var want_brake: bool = InputManager.sneak_held() and not _busy
+		var zg: Dictionary = zero_g.step_owner_motion(delta, dir, want_glide, want_brake)
+		velocity = zg["velocity"] as Vector2
+		zero_g_state = int(zg["state"])
+		sprinting = zero_g_state == ZeroGRules.State.GLIDE
+		stealth.sneaking = false
+		_winded = false
+		move_and_slide()
+		if dir != Vector2.ZERO:
+			var heading: Vector2 = dir.normalized()
+			var was_diag: bool = absf(_face_dir.x) > 0.3 and absf(_face_dir.y) > 0.3
+			var now_str: bool = absf(heading.x) < 0.05 or absf(heading.y) < 0.05
+			if was_diag and now_str and heading.dot(_face_dir) > 0.6 and _face_hold < DIAGONAL_GRACE:
+				_face_hold += delta
+			else:
+				_face_hold = 0.0
+				_face_dir = heading
+			facing = _face_dir
+		elif velocity.length() > 28.0:
+			facing = velocity.normalized()
+		return
 	if attack.is_heavy_swing():
 		dir = Vector2.ZERO ## the heavy blow is struck planted
 	var swimming: int = _update_swim(delta, dir)
@@ -1345,7 +1488,7 @@ func _move(delta: float) -> void:
 func _update_charge() -> bool:
 	if not is_multiplayer_authority():
 		return false
-	var blocked: bool = _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0 or swim > 0
+	var blocked: bool = _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0 or swim > 0 or in_zero_g()
 	if attack.is_charging():
 		if blocked or InputManager.shadow_step_pressed():
 			attack.cancel_charge()
@@ -1366,7 +1509,7 @@ func _update_charge() -> bool:
 func _update_alt() -> void:
 	if not is_multiplayer_authority() or not InputManager.secondary_pressed():
 		return
-	if _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0 or swim > 0 or attack.is_charging():
+	if _busy or stumbling or fainting or intro != null or story_lock or health.current <= 0.0 or swim > 0 or in_zero_g() or attack.is_charging():
 		return
 	if not attack.can_alt() and not attack.is_swinging():
 		return
@@ -1651,6 +1794,8 @@ func _slow_factor() -> float:
 		factor *= 0.7 ## hallucinating: 30 % slower
 	if effects != null and effects.has("webbed"):
 		factor *= 0.78 ## Sporenseide: -22 % locomotion speed until snapped by ShadowStep or blade swing
+	if effects != null and effects.has("shadow_rush"):
+		factor *= float(StatusEffects.definition("shadow_rush").get("speed_mult", 1.1)) ## Schattenrausch after a finisher (docs/finisher_v2_konzept.md)
 	return factor
 
 
@@ -1744,6 +1889,7 @@ func _set_focus(item: Interactable) -> void:
 func _load_rig() -> void:
 	var rig: Dictionary = DataRegistry.table("hero_rig")
 	_swim_rig = rig.get("swim", {}) as Dictionary
+	_float_rig = rig.get("float", {}) as Dictionary
 	_rig_shoulder = _points(rig.get("shoulder", []))
 	_rig_hand = _points(rig.get("hand", []))
 	_rig_attack_shoulder = _points(rig.get("attack_shoulder", []))
@@ -1952,6 +2098,47 @@ func _animate_swim(delta: float) -> bool:
 	return true
 
 
+## Zero-gravity interstellar floating sheet (docs/caelia_interstellar_konzept.md, tools/art_hero_float.py).
+## Uses synced `zero_g_state` and local `zero_g` clocks so all 1-4 peers animate smoothly in 8 real directions.
+func _animate_zero_g(_delta: float) -> bool:
+	if not in_zero_g():
+		return false
+	var clips: Dictionary = _float_rig.get("clips", {}) as Dictionary
+	var total: int = int(_float_rig.get("total", 0))
+	if clips.is_empty() or total <= 0:
+		return false
+	_cancel_standby()
+	var clip_name: String = "float_idle"
+	var use_arrive: bool = zero_g.arrive_left > 0.0 and velocity.length() < 14.0
+	if use_arrive and clips.has("arrive"):
+		clip_name = "arrive"
+	elif zero_g_state == ZeroGRules.State.BRAKE and clips.has("brake"):
+		clip_name = "brake"
+	elif zero_g_state == ZeroGRules.State.GLIDE and clips.has("glide"):
+		clip_name = "glide"
+	elif zero_g_state == ZeroGRules.State.DRIFT and clips.has("drift"):
+		clip_name = "drift"
+	elif zero_g.standby_active and clips.has("standby"):
+		clip_name = "standby"
+	var c: Dictionary = clips.get(clip_name, clips.get("float_idle", {})) as Dictionary
+	var start: int = int(c.get("start", 0))
+	var count: int = maxi(1, int(c.get("count", 8)))
+	var fps: float = float(c.get("fps", 6.0))
+	var idx: int = 0
+	if clip_name == "arrive":
+		var elapsed: float = ZeroGComponent.ARRIVE_DURATION - zero_g.arrive_left
+		idx = clampi(int(elapsed * fps), 0, count - 1)
+	elif clip_name == "standby":
+		idx = clampi(int(zero_g.standby_time * fps), 0, count - 1)
+	else:
+		idx = posmod(int(zero_g.float_time * fps), count)
+	_use_sheet(FLOAT_SHEET_ID)
+	_sprite.frame = _sector * total + start + idx
+	_sprite.position = (_net_vis_offset + zero_g.bob_offset()).round()
+	_sprite.skew = 0.0
+	return true
+
+
 ## Water effects of the swim frames: arms and kicks throw drops at the events of the rig, the crawl blows bubbles at the mouth, the wake leaves rings.
 func _swim_effects(delta: float, clips: Dictionary, idx: int, total: int) -> void:
 	var level: float = float(swimmer.blend) if swim > 0 else maxf(0.0, 1.0 - _swim_exit_t * 3.0)
@@ -2119,7 +2306,7 @@ func _animate(delta: float) -> void:
 		_walk_time = fposmod(_walk_time + direction * _cadence * limp_k * delta, float(WALK_FRAMES))
 		var step: int = int(_walk_time)
 		col = [0, JOG_COL, RUN_COL][_gait] + step
-		if step != _last_step and step % (WALK_FRAMES / 2) == 0: ## the two contact frames of the cycle
+		if not in_zero_g() and step != _last_step and step % (WALK_FRAMES / 2) == 0: ## the two contact frames of the cycle
 			_on_step()
 		_last_step = step
 		_idle_time = 0.0
@@ -2188,12 +2375,15 @@ func _animate(delta: float) -> void:
 	if not fish_frame_ok:
 		attack.rod_pose = Vector3.INF
 	var swim_drawn: bool = _animate_swim(delta)
+	var zero_g_drawn: bool = false
+	if not swim_drawn and not attack.is_swinging():
+		zero_g_drawn = _animate_zero_g(delta)
 	# The ring of water behind her lives only in the water or on the way out; the climb-out clip can end before its fade did, or the shake takes over.
 	if _swim_water != null and _swim_water.intensity > 0.0 and swim == 0 and _swim_exit_t < 0.0:
 		_swim_water.intensity = 0.0
 		_swim_water.queue_redraw()
 		_swim_water._back.queue_redraw()
-	if swim_drawn:
+	if swim_drawn or zero_g_drawn:
 		shoulder = Vector2(0.0, -30.0) ## the sheet already shows both arms; the sword arm is hidden below
 		hand = Vector2(0.0, -22.0)
 		arm_tex0 = ""
@@ -2419,11 +2609,12 @@ func _animate(delta: float) -> void:
 	attack.mirror_material(_sprite.material)
 	var tool_in_hotbar: bool = inventory != null and inventory.selected >= 0 and inventory.selected < inventory.slots.size() and not (inventory.slots[inventory.selected] as Dictionary).is_empty()
 	var peaceful_travel: bool = locomotion != null and locomotion.reisetritt and not attack.is_in_combat(3.0) and not attack.holds_staff() and not attack.always_drawn and not tool_in_hotbar
-	attack.sheathed = stealth.sneaking or peaceful_travel or (_busy and not _busy_kind.begins_with("cast_")) or swim_drawn ## sneaking, peaceful Reisetritt, picking and swimming put the weapon away
+	attack.sheathed = stealth.sneaking or peaceful_travel or (_busy and not _busy_kind.begins_with("cast_")) or swim_drawn or zero_g_drawn ## sneaking, peaceful Reisetritt, picking, swimming and zero-G put the weapon away
 	if attack.holds_staff() and not fish_frame_ok:
 		attack.rod_pose = _staff_pose(moving)
-	if attack.arm_shown() == swim_drawn:
-		attack.set_arm_shown(not swim_drawn) ## swim frames carry both arms
+	var hide_baked_arm: bool = swim_drawn or zero_g_drawn
+	if attack.arm_shown() == hide_baked_arm:
+		attack.set_arm_shown(not hide_baked_arm) ## swim & zero-G frames carry both arms
 
 
 ## The intro starts: normal HUD parts hide, the wound border and blood stay active.
@@ -2759,18 +2950,24 @@ func _rpc_set_health(value: float) -> void:
 func _use_sheet(sheet: int) -> void:
 	if sheet == _sheet:
 		return
-	var restore_offset: bool = _sheet == 13 or _sheet == CLIMB_SHEET
+	var restore_offset: bool = _sheet == 13 or _sheet == CLIMB_SHEET or _sheet == FLOAT_SHEET_ID
 	_sheet = sheet
 	if sheet == 13:
 		_sprite.offset = SWIM_OFFSET
 	elif sheet == CLIMB_SHEET:
 		_sprite.offset = CLIMB_OFFSET
+	elif sheet == FLOAT_SHEET_ID:
+		_sprite.offset = FLOAT_OFFSET
 	elif restore_offset:
 		_sprite.offset = Vector2(0.0, -23.0)
 	if _swim_under != null:
 		_swim_under.visible = sheet == 13
-	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", FINISHER_BLOOD if sheet == FINISHER_SHEET_ID else AGILE_BLOOD if sheet == AGILE_SHEET_ID else _cast_blood if sheet == CAST_SHEET_ID else STEP_BLOOD if sheet == STEP_SHEET_ID else WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
+	(_sprite.material as ShaderMaterial).set_shader_parameter("blood_map", FLOAT_BLOOD if sheet == FLOAT_SHEET_ID else FINISHER_BLOOD if sheet == FINISHER_SHEET_ID else AGILE_BLOOD if sheet == AGILE_SHEET_ID else _cast_blood if sheet == CAST_SHEET_ID else STEP_BLOOD if sheet == STEP_SHEET_ID else WallClimb.BLOOD if sheet == CLIMB_SHEET else DRINK_BLOOD if sheet == DRINK_SHEET_ID else FEED_BLOOD if sheet == 14 else COMBO_BLOOD if sheet == 12 else (HEAVY_BLOOD if sheet == 11 else (STANDBY_BLOOD if sheet == 9 else (FISH_BLOOD if sheet == 10 else (BLOOD_MAPS[sheet] if sheet < BLOOD_MAPS.size() else null)))))
 	match sheet:
+		FLOAT_SHEET_ID:
+			_sprite.texture = FLOAT_SHEET
+			_sprite.hframes = int(_float_rig.get("total", 56))
+			_sprite.vframes = 8
 		FINISHER_SHEET_ID:
 			_sprite.texture = FINISHER_SHEET
 			_sprite.hframes = _finisher_cols

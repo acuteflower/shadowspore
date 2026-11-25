@@ -18,6 +18,13 @@ uniform vec2 map_origin = vec2(-192.0, -144.0);
 uniform vec2 map_size = vec2(1152.0, 288.0);
 uniform sampler2D surface_map : filter_linear, repeat_disable; // R: way wear, G: cobble/gravel, B: forest_humus, A: hollow/wetness
 uniform sampler2D detail_map : filter_linear, repeat_disable;  // R: moss, G: stone_ao, B: canopy_shade, A: wheel rut
+// Forest from a coverage mask (`GroundSurfaces.set_forest_mask`, 2.0 zones): one texel per tile, wobbled and dressed
+// by a tileable noise (R edge, G moss, B shade). `_forest_cell` in ground_surfaces.gd mirrors this exactly.
+uniform bool forest_on = false;
+uniform sampler2D forest_mask : filter_linear, repeat_disable;
+uniform sampler2D forest_noise : filter_nearest, repeat_enable;
+uniform vec4 forest_rect = vec4(0.0, 0.0, 1.0, 1.0); // world px: origin, size
+uniform float forest_noise_px = 512.0; // world px of one noise tile
 
 // Harmonized Muted Country Earth & Olive-Taupe Loam (cool shadows -> calm parchment-loam highlights; zero cartoon orange!)
 const vec3 PATH_RAMP[6] = vec3[6](
@@ -87,14 +94,37 @@ float clod_warp(vec2 px) {
 	return (med * 0.68 + fine * 0.32) - 0.5;
 }
 
+// x = humus, y = moss, z = canopy shade of the mask forest at a world pixel.
+vec3 forest_cell(vec2 px) {
+	if (!forest_on) {
+		return vec3(0.0);
+	}
+	float m = texture(forest_mask, (px + 0.5 - forest_rect.xy) / forest_rect.zw).r;
+	if (m < 0.04) {
+		return vec3(0.0);
+	}
+	vec3 n = texture(forest_noise, (floor(px / 2.0) + 0.5) * 2.0 / forest_noise_px).rgb;
+	float fw = smoothstep(0.3, 0.72, m + (n.r * 2.0 - 1.0) * 0.24);
+	if (fw <= 0.01) {
+		return vec3(0.0);
+	}
+	return vec3(fw, smoothstep(0.50, 0.72, n.g) * fw * 0.92, clamp(n.b * 0.85 + 0.15, 0.0, 1.0) * fw * 0.78);
+}
+
 vec4 sample_surf(vec2 px) {
 	vec2 uv = clamp((px - map_origin) / map_size, vec2(0.001), vec2(0.999));
-	return texture(surface_map, uv);
+	vec4 s = texture(surface_map, uv);
+	s.b = max(s.b, forest_cell(px).x);
+	return s;
 }
 
 vec4 sample_det(vec2 px) {
 	vec2 uv = clamp((px - map_origin) / map_size, vec2(0.001), vec2(0.999));
-	return texture(detail_map, uv);
+	vec4 d = texture(detail_map, uv);
+	vec3 f = forest_cell(px);
+	d.r = max(d.r, f.y);
+	d.b = max(d.b, f.z);
+	return d;
 }
 
 // Binary crisp cushion-moss membership at pixel `px` (feathered organic micro-tuft border, no puzzle-piece outline!)
@@ -341,6 +371,10 @@ void fragment() {
 
 	vec4 surf = texture(surface_map, uv);
 	vec4 det = texture(detail_map, uv);
+	vec3 fcell = forest_cell(px);
+	surf.b = max(surf.b, fcell.x);
+	det.r = max(det.r, fcell.y);
+	det.b = max(det.b, fcell.z);
 	float canopy_sh = det.b;
 	float stone_ao = det.g;
 

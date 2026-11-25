@@ -2,51 +2,55 @@
   "texture": "res://assets/characters/goddess.png",
   "glow_texture": "res://assets/characters/goddess_glow.png",
   "frame_size": [
-    96,
-    112
+    128,
+    144
   ],
   "feet": [
-    48,
-    94
+    64,
+    78
   ],
-  "standing_height_px": 66,
-  "columns": 26,
-  "rows": 3,
-  "default_row": 0,
+  "floating_height_px": 76,
+  "columns": 28,
+  "rows": 8,
+  "default_row": 2,
   "facings": [
-    "S",
+    "E",
     "SE",
-    "SW"
+    "S",
+    "SW",
+    "W",
+    "NW",
+    "N",
+    "NE"
   ],
   "row_by_facing": {
-    "S": 0,
+    "E": 0,
     "SE": 1,
-    "SW": 2
+    "S": 2,
+    "SW": 3,
+    "W": 4,
+    "NW": 5,
+    "N": 6,
+    "NE": 7
   },
   "clips": {
-    "sit_idle": {
+    "float_idle": {
       "start": 0,
-      "count": 6,
+      "count": 8,
       "fps": 6,
       "loop": true
     },
-    "sit_talk": {
-      "start": 6,
-      "count": 6,
+    "float_talk": {
+      "start": 8,
+      "count": 8,
       "fps": 7,
       "loop": true
     },
-    "sit_bless": {
-      "start": 12,
-      "count": 8,
+    "float_bless": {
+      "start": 16,
+      "count": 12,
       "fps": 8,
       "loop": false
-    },
-    "stand_idle": {
-      "start": 20,
-      "count": 6,
-      "fps": 6,
-      "loop": true
     }
   }
 }

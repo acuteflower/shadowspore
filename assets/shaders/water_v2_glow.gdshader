@@ -53,22 +53,35 @@ void fragment() {
 	bool in_wet_sand = false;
 	float wetness = 0.0;
 	float eff_sdf = sdf_px;
+	float surf_mix = (regime == 3) ? 1.0 : 0.0;
+	float lake_mix = (regime == 2) ? 1.0 : 0.0;
+	float outflow_k = 0.0;
 
-	if (regime == 1 || regime == 2) {
-		float shore_warp = (w2_fbm(px / 9.5 + vec2(3.7, 8.1)) - 0.5) * 3.2 + (w2_vnoise(px / 4.0 + vec2(1.9, 6.3)) - 0.5) * 0.75;
-		eff_sdf = sdf_px + shore_warp;
-		in_water = (eff_sdf <= 0.0);
-	} else if (regime == 4) {
-		in_water = (sdf_px <= 0.0);
-	} else if (regime == 3) {
+	if (regime == 1 || regime == 2 || regime == 3) {
+		vec4 rw = w2_smooth_regime_weights(sample_pos, map_origin, map_size, water_geo_map);
+		float w_fresh = rw.x + rw.y;
+		float w_marine = rw.z + rw.w;
+		surf_mix = (w_fresh + w_marine > 0.001)
+			? smoothstep(0.02, 0.98, w_marine / (w_fresh + w_marine))
+			: (regime == 3 ? 1.0 : 0.0);
+		lake_mix = (w_fresh > 0.001)
+			? smoothstep(0.02, 0.98, rw.y / w_fresh)
+			: (regime == 2 ? 1.0 : 0.0);
+		outflow_k = smoothstep(0.40, 0.84, length(flow.xy)) * (1.0 - smoothstep(4.0, 62.0, -sdf_px));
+
+		float shore_warp = (w2_fbm(px / 9.5 + vec2(3.7, 8.1)) - 0.5) * 3.2
+			+ (w2_vnoise(px / 4.0 + vec2(1.9, 6.3)) - 0.5) * 0.75;
 		float swash_off = w2_swash_offset_px(sample_pos.y, g_water_time, g_wind_dir, g_wind_gust, g_storm);
 		float front_warp = (w2_fbm(vec2(px.x * 0.055, px.y * 0.085) + vec2(g_water_time * 0.10, 0.0)) - 0.5) * 3.0;
-		eff_sdf = sdf_px - swash_off + front_warp;
+		float swash_damp = 1.0 - outflow_k * 0.42;
+		eff_sdf = sdf_px + mix(shore_warp, -swash_off * swash_damp + front_warp, surf_mix);
 		in_water = (eff_sdf <= 0.0);
-		if (!in_water) {
-			wetness = w2_sand_wetness(sdf_px, sample_pos.y, g_water_time, g_wind_dir, g_wind_gust, g_storm);
+		if (!in_water && surf_mix > 0.05) {
+			wetness = w2_sand_wetness(sdf_px, sample_pos.y, g_water_time, g_wind_dir, g_wind_gust, g_storm) * surf_mix;
 			in_wet_sand = (wetness > W2_WET_THRESHOLD);
 		}
+	} else if (regime == 4) {
+		in_water = (sdf_px <= 0.0);
 	} else if (regime == 5) {
 		float edge_warp = (w2_fbm(px / 6.8 + vec2(9.1, 4.3)) - 0.5) * 2.5 + (w2_vnoise(px / 3.2) - 0.5) * 0.55;
 		eff_sdf = sdf_px - w2_puddle_reach_px(g_puddle) + edge_warp;
@@ -81,15 +94,16 @@ void fragment() {
 	if (in_water || in_wet_sand) {
 		float wobble = 0.16;
 		float rough = 0.15;
-		if (regime == 1) {
-			wobble = 0.85;
-			rough = 0.72;
-		} else if (regime == 2) {
-			wobble = 0.30;
-			rough = 0.25;
-		} else if (regime == 3) {
-			wobble = in_wet_sand ? 0.08 : 0.75;
-			rough = in_wet_sand ? 0.06 : (0.65 + g_storm * 0.6);
+		if (regime == 1 || regime == 2 || regime == 3) {
+			if (in_wet_sand) {
+				wobble = 0.08;
+				rough = 0.06;
+			} else {
+				float w_fresh_v = mix(0.85, 0.30, lake_mix);
+				float r_fresh_v = mix(0.72, 0.25, lake_mix);
+				wobble = mix(w_fresh_v, 0.75, surf_mix);
+				rough = mix(r_fresh_v, 0.65 + g_storm * 0.6, surf_mix);
+			}
 		} else if (regime == 4) {
 			wobble = 1.05 + g_storm * 0.5;
 			rough = 0.92 + g_storm * 0.45;
@@ -104,7 +118,7 @@ void fragment() {
 			float blocked = w2_reflect_at(px, wave.xy, wobble, g_water_time).a;
 			float vis = (1.0 - blocked) * (1.0 - flow.w * 0.85);
 			if (in_wet_sand) {
-				vis *= wetness * 0.45;
+				vis *= wetness * 0.38;
 			} else if (regime != 5) {
 				vis *= mix(0.55, 1.0, smoothstep(0.06, 0.45, depth));
 			}
@@ -112,37 +126,40 @@ void fragment() {
 		}
 
 		if (in_water) {
-			// Bioluminescent surf & obstacle wave-lap glow (V11: turquoise #3cc0c6/#78f4e6 + violet rim #9468ee)
-			if (regime == 3 && (eff_sdf > -18.0 || flow.z > 0.06)) {
-				float shore_band = 1.0 - smoothstep(0.0, 18.0, -eff_sdf);
+			// Delicate lacy bioluminescent surf & estuary glow (hugs sandy spits, fades gracefully into river outflow!)
+			if (surf_mix > 0.02 && (eff_sdf > -18.0 || flow.z > 0.10)) {
+				float shore_band = 1.0 - smoothstep(0.0, 16.0, -eff_sdf);
 				float cell_web = 1.0 - abs(w2_fbm(vec2(px.x * 0.10 - g_water_time * 0.36, px.y * 0.085)) - 0.48) * 3.6;
-				float bio = clamp(shore_band * smoothstep(0.28, 0.85, cell_web), 0.0, 1.0);
-				if (eff_sdf > -1.8) {
-					bio = max(bio, 0.62);
+				float lace_n = w2_fbm(vec2(px.x * 0.07 - g_water_time * 0.28, px.y * 0.075 + 5.0));
+				float bio = clamp(shore_band * smoothstep(0.36, 0.88, cell_web * 0.65 + lace_n * 0.45), 0.0, 1.0);
+				if (eff_sdf > -1.4) {
+					bio = max(bio, 0.24 + 0.28 * smoothstep(0.25, 0.85, cell_web));
 				}
-				if (flow.z > 0.18 && eff_sdf > -12.0) {
-					float lace_n = w2_fbm(vec2(px.x * 0.07 - g_water_time * 0.28, px.y * 0.075 + 5.0));
-					bio = max(bio, smoothstep(0.20, 0.78, flow.z) * (1.0 - smoothstep(0.0, 12.0, -eff_sdf)) * (0.45 + 0.55 * lace_n) * 0.80);
+				if (flow.z > 0.20 && eff_sdf > -12.0) {
+					bio = max(bio, smoothstep(0.22, 0.78, flow.z) * (1.0 - smoothstep(0.0, 12.0, -eff_sdf)) * (0.38 + 0.52 * lace_n) * 0.52);
 				}
-				if (bio > 0.12) {
-					vec3 bio_c = bio > 0.68 ? vec3(0.47, 0.96, 0.90) : (bio > 0.35 ? vec3(0.24, 0.75, 0.78) : vec3(0.58, 0.41, 0.93));
-					glow += bio_c * bio * 0.72;
+				// Freshwater river outflow dilutes marine surf glow cleanly across the estuary mouth!
+				bio *= surf_mix * (1.0 - outflow_k * 0.78);
+				if (bio > 0.10) {
+					vec3 bio_c = bio > 0.62 ? vec3(0.38, 0.84, 0.84) : (bio > 0.30 ? vec3(0.18, 0.60, 0.70) : vec3(0.50, 0.36, 0.84));
+					glow += bio_c * bio * 0.38;
 				}
 			}
 
-			// Toroidal ringbuffer wake & puddle footstep bioluminescence (V11 + R5)
+			// Toroidal ringbuffer wake & puddle footstep bioluminescence
 			float wake_sig = clamp(wave.w * 1.15 + abs(wave.z) * 1.4, 0.0, 1.0);
 			if (wake_sig > 0.06) {
 				vec3 wake_c = mix(vec3(0.24, 0.75, 0.78), vec3(0.58, 0.41, 0.93), clamp(abs(wave.z) * 1.8, 0.0, 1.0));
-				glow += wake_c * wake_sig * 0.85;
+				glow += wake_c * wake_sig * 0.78;
 			}
 
-			// Drifting brook / lake plankton & shoreline glow (damped under bridge shadow)
-			if (regime == 1 || regime == 2) {
+			// Drifting brook / lake plankton sparks & delicate intermittent shoreline moon-dew glints!
+			float fresh_vis = (regime == 1 || regime == 2 || regime == 3) ? clamp(1.0 - surf_mix + outflow_k * 0.45, 0.0, 1.0) : 0.0;
+			if (fresh_vis > 0.04) {
 				vec2 flow_v = length(flow.xy) > 0.02 ? normalize(flow.xy) : vec2(0.0, 1.0);
 				vec2 across = vec2(-flow_v.y, flow_v.x);
 				vec2 q = vec2(dot(px, flow_v), dot(px, across));
-				q.x -= floor(g_water_time * (regime == 2 ? 0.25 : 1.5));
+				q.x -= floor(g_water_time * mix(1.5, 0.25, lake_mix));
 				vec2 cell = floor(q / vec2(9.0, 7.0));
 				vec2 loc = floor(mod(q, vec2(9.0, 7.0)));
 				float h = w2_hash(cell);
@@ -150,17 +167,19 @@ void fragment() {
 				if (h > 0.80 && loc.x == at.x && loc.y == at.y) {
 					float tw = 0.5 + 0.5 * sin(mod(g_water_time * (1.0 + h * 2.0) + h * 40.0, W2_TAU));
 					vec3 pc = h > 0.88 ? vec3(0.58, 0.41, 0.93) : vec3(0.24, 0.75, 0.78);
-					glow += pc * (0.35 + 0.65 * tw) * (0.4 + depth) * (1.0 - flow.w * 0.8);
+					glow += pc * (0.35 + 0.65 * tw) * (0.4 + depth) * (1.0 - flow.w * 0.8) * fresh_vis;
 				}
-				if (eff_sdf > -2.5) {
-					float stretch = w2_vnoise(px / 13.0 + vec2(5.0, 5.0));
-					if (stretch > 0.45) {
-						glow += vec3(0.10, 0.48, 0.46) * (1.0 - (-eff_sdf) / 2.5) * (1.0 - flow.w * 0.8);
+				// Gentle intermittent dew shimmer along inland banks (never a harsh solid wireframe outline!)
+				if (eff_sdf > -2.0 && surf_mix < 0.35) {
+					float stretch = w2_vnoise(px / 11.0 + vec2(5.0, 5.0));
+					if (stretch > 0.62) {
+						float shore_k = smoothstep(0.62, 0.86, stretch) * (1.0 - (-eff_sdf) / 2.0) * (1.0 - surf_mix * 2.8);
+						glow += vec3(0.10, 0.42, 0.44) * shore_k * 0.58 * (1.0 - flow.w * 0.8);
 					}
 				}
 			}
 
-			// Smoothly twinkling ocean bioluminescent crest glints (no floor(time) jumps)
+			// Smoothly twinkling ocean bioluminescent crest glints
 			if (regime == 4) {
 				float sh = w2_swell_height(sample_pos, g_water_time, g_wind_dir, g_wind_gust, g_storm);
 				float gh = w2_hash(floor(px / 3.0) + vec2(19.0, 13.0));
@@ -170,8 +189,8 @@ void fragment() {
 				}
 			}
 		}
-	} else if (regime == 1 && sdf_px <= 10.0) {
-		// Faint bank fire-specks near brook shore
+	} else if (regime == 1 && sdf_px <= 10.0 && surf_mix < 0.20) {
+		// Faint bank fire-specks near inland brook shore
 		float h = w2_hash(px + vec2(13.0, 7.0));
 		if (h > 0.995) {
 			float tw = 0.5 + 0.5 * sin(mod(g_water_time * 1.3 + h * 300.0, W2_TAU));
@@ -182,7 +201,7 @@ void fragment() {
 		discard;
 	}
 
-	vec3 total = glow * night_k * 1.15 + sky;
+	vec3 total = glow * night_k * 1.05 + sky;
 	if (max(total.r, max(total.g, total.b)) < 0.004) {
 		discard;
 	}

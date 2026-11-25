@@ -7,8 +7,7 @@ extends RefCounted
 ## - `g_arid`  / `arid_at`:   Sonnenquarz-Öde (`arid`, 96-tile 3-phase desert transition)
 ## Pure function of the frozen map: every peer builds the same picture; nothing is saved.
 
-const WORLD_PX: float = float(RegionMap.WORLD_TILES) * 16.0
-const LAKE_SDF_PATH: String = "res://assets/world/lakes_sdf.png"
+const WORLD_PX: float = 1024.0 * 16.0
 
 static var _cells: PackedFloat32Array = PackedFloat32Array()
 static var _arid_cells: PackedFloat32Array = PackedFloat32Array()
@@ -18,10 +17,6 @@ static var _lake_side: int = 0
 static var _installed_key: String = ""
 static var _gloom_tex: ImageTexture
 static var _arid_tex: ImageTexture
-
-
-static func cache_key_for(map: RegionMap) -> String:
-	return "%d:%s" % [map.world_seed, map.world_biome]
 
 
 static func has_cache(expected_key: String) -> bool:
@@ -42,134 +37,7 @@ static func clear_cache() -> void:
 	RenderingServer.global_shader_parameter_set("g_lake_sdf", null)
 
 
-## The gloom field as numbers 0..1, one per map cell (row-major, `map.grid_size` wide).
-static func compute(map: RegionMap, biomes_table: Dictionary = {}) -> PackedFloat32Array:
-	return _compute_field(map, "gloom", 48.0, biomes_table)
-
-
-## The arid desert field as numbers 0..1, one per map cell (row-major, `map.grid_size` wide).
-static func compute_arid(map: RegionMap, biomes_table: Dictionary = {}) -> PackedFloat32Array:
-	return _compute_field(map, "arid", 96.0, biomes_table)
-
-
-static func _compute_field(map: RegionMap, key: String, default_fade: float, biomes_table: Dictionary = {}) -> PackedFloat32Array:
-	var side: int = map.grid_size
-	var biomes: Dictionary = biomes_table if not biomes_table.is_empty() else DataRegistry.table("biomes")
-	var strength: PackedFloat32Array = PackedFloat32Array()
-	var fade: PackedFloat32Array = PackedFloat32Array()
-	strength.resize(side * side)
-	fade.resize(side * side)
-	var land: PackedByteArray = PackedByteArray()
-	land.resize(side * side)
-	var any: bool = false
-	var max_fade: float = default_fade
-	for i: int in side * side:
-		var id: String = map.biome_at(Vector2i(i % side, i / side) * RegionMap.CELL)
-		if id.is_empty():
-			continue
-		land[i] = 1
-		var entry: Dictionary = biomes.get(id, {}) as Dictionary
-		strength[i] = float(entry.get(key, 0.0))
-		fade[i] = float(entry.get("fade", default_fade))
-		if strength[i] > 0.0:
-			any = true
-			max_fade = maxf(max_fade, fade[i])
-	var out: PackedFloat32Array = PackedFloat32Array()
-	out.resize(side * side)
-	if not any:
-		return out
-	var pad: int = ceili(max_fade / float(RegionMap.CELL)) + 6
-	var lo: Vector2i = Vector2i(side, side)
-	var hi: Vector2i = Vector2i.ZERO
-	for i: int in side * side:
-		if strength[i] > 0.0:
-			lo = Vector2i(mini(lo.x, i % side), mini(lo.y, i / side))
-			hi = Vector2i(maxi(hi.x, i % side), maxi(hi.y, i / side))
-	lo = (lo - Vector2i.ONE * pad).clamp(Vector2i.ZERO, Vector2i.ONE * (side - 1))
-	hi = (hi + Vector2i.ONE * pad).clamp(Vector2i.ZERO, Vector2i.ONE * (side - 1))
-	# distance (3-4 chamfer, a third of a cell per step) through land from the nearest land cell without this field
-	var far: int = 1 << 20
-	var dist: PackedInt32Array = PackedInt32Array()
-	dist.resize(side * side)
-	for i: int in side * side:
-		dist[i] = 0 if (land[i] == 1 and strength[i] <= 0.0) else far
-	for y: int in range(lo.y, hi.y + 1):
-		for x: int in range(lo.x, hi.x + 1):
-			var i: int = y * side + x
-			if land[i] == 0 or dist[i] == 0:
-				continue
-			var best: int = dist[i]
-			if x > 0 and land[i - 1] == 1:
-				best = mini(best, dist[i - 1] + 3)
-			if y > 0:
-				if land[i - side] == 1:
-					best = mini(best, dist[i - side] + 3)
-				if x > 0 and land[i - side - 1] == 1:
-					best = mini(best, dist[i - side - 1] + 4)
-				if x < side - 1 and land[i - side + 1] == 1:
-					best = mini(best, dist[i - side + 1] + 4)
-			dist[i] = best
-	for y: int in range(hi.y, lo.y - 1, -1):
-		for x: int in range(hi.x, lo.x - 1, -1):
-			var i: int = y * side + x
-			if land[i] == 0 or dist[i] == 0:
-				continue
-			var best: int = dist[i]
-			if x < side - 1 and land[i + 1] == 1:
-				best = mini(best, dist[i + 1] + 3)
-			if y < side - 1:
-				if land[i + side] == 1:
-					best = mini(best, dist[i + side] + 3)
-				if x < side - 1 and land[i + side + 1] == 1:
-					best = mini(best, dist[i + side + 1] + 4)
-				if x > 0 and land[i + side - 1] == 1:
-					best = mini(best, dist[i + side - 1] + 4)
-			dist[i] = best
-	for i: int in side * side:
-		if land[i] == 1 and strength[i] > 0.0:
-			var tiles: float = float(dist[i]) / 3.0 * float(RegionMap.CELL)
-			out[i] = strength[i] * smoothstep(0.0, maxf(fade[i], 1.0), minf(tiles, 9999.0))
-	var filled: PackedFloat32Array = out.duplicate()
-	for _pass: int in 3: ## void cells take what their land neighbours hold
-		var next: PackedFloat32Array = filled.duplicate()
-		for y: int in range(lo.y, hi.y + 1):
-			for x: int in range(lo.x, hi.x + 1):
-				var i: int = y * side + x
-				if land[i] == 1:
-					continue
-				var v: float = filled[i]
-				for dy: int in range(-1, 2):
-					for dx: int in range(-1, 2):
-						var nx: int = x + dx
-						var ny: int = y + dy
-						if nx >= 0 and ny >= 0 and nx < side and ny < side:
-							v = maxf(v, filled[ny * side + nx])
-				next[i] = v
-		filled = next
-	return filled
-
-
-## Pure worker-safe computation of the BiomeBlend grids and decoded lake bytes.
-static func compute_bundle(map: RegionMap, biomes_table: Dictionary, lake_img: Image) -> Dictionary:
-	var lake_bytes: PackedByteArray = PackedByteArray()
-	var lake_side: int = 0
-	if lake_img != null:
-		var copy: Image = lake_img.duplicate() as Image
-		if copy.get_format() != Image.FORMAT_L8 and copy.get_format() != Image.FORMAT_R8:
-			copy.convert(Image.FORMAT_R8)
-		lake_bytes = copy.get_data()
-		lake_side = copy.get_width()
-	return {
-		"key": cache_key_for(map),
-		"cells": compute(map, biomes_table),
-		"arid_cells": compute_arid(map, biomes_table),
-		"side": map.grid_size,
-		"lake_bytes": lake_bytes,
-		"lake_side": lake_side,
-	}
-
-
-## Publishes a precomputed bundle (from `compute_bundle`) on the main thread.
+## Publishes a precomputed bundle on the main thread.
 static func apply_bundle(bundle: Dictionary, lake_tex: Texture2D) -> void:
 	_cells = bundle.get("cells", PackedFloat32Array()) as PackedFloat32Array
 	_arid_cells = bundle.get("arid_cells", PackedFloat32Array()) as PackedFloat32Array
@@ -189,18 +57,6 @@ static func _publish_shaders(lake_tex: Texture2D) -> void:
 	RenderingServer.global_shader_parameter_set("g_gloom_rect", Vector4(0.0, 0.0, WORLD_PX, WORLD_PX))
 	if lake_tex != null:
 		RenderingServer.global_shader_parameter_set("g_lake_sdf", lake_tex)
-
-
-## Builds the fields for `map`, publishes them to the shaders and keeps the numbers for `amount_at` / `arid_at`.
-static func install(map: RegionMap) -> void:
-	var key: String = cache_key_for(map)
-	var lake_tex: Texture2D = ResourceLoader.load(LAKE_SDF_PATH) as Texture2D
-	if has_cache(key) and _gloom_tex != null and _arid_tex != null:
-		_publish_shaders(lake_tex)
-		return
-	var lake_img: Image = lake_tex.get_image() if lake_tex != null else null
-	var bundle: Dictionary = compute_bundle(map, DataRegistry.table("biomes"), lake_img)
-	apply_bundle(bundle, lake_tex)
 
 
 static func _make_r8_texture(values: PackedFloat32Array, side: int) -> ImageTexture:

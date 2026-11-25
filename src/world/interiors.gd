@@ -9,9 +9,17 @@ extends Node2D
 ##  - the floor is wood (`surface_at`, a `Terrain.patches` entry); the fireflies stay away.
 ## The transition is a ragged iris of dark (`door_wipe.gdshader`) with the door swinging open and a creak.
 
-const POCKET_X0: float = 60000.0
-const POCKET_Y0: float = 60000.0
-const SLOT: float = 1600.0
+const POCKET_X0: float = PocketSpace.ROOM_ORIGIN.x
+const POCKET_Y0: float = PocketSpace.ROOM_ORIGIN.y
+const SLOT: float = PocketSpace.ROOM_SLOT
+const PERSONALRAUM_SLOT: int = 34 ## col 2, row 2: 2x2 Lane.ROOM block [17, 18, 33, 34] holds personalraum + 8 adjacent halls
+const PERSONALRAUM_RESERVED: Array[int] = [17, 18, 33, 34]
+const COSMOS_LARGE_SLOT: int = 35 ## dedicated PocketSpace.Lane.LARGE slot for Caelia's interstellar sanctuary
+const COSMOS_SPAN: float = PocketSpace.LARGE_SLOT
+const COSMOS_PAD: float = 1700.0
+const COSMOS_X0: float = PocketSpace.LARGE_ORIGIN.x + float(COSMOS_LARGE_SLOT % PocketSpace.LARGE_COLUMNS) * PocketSpace.LARGE_SLOT + COSMOS_PAD
+const COSMOS_Y0: float = PocketSpace.LARGE_ORIGIN.y + float(int(COSMOS_LARGE_SLOT / PocketSpace.LARGE_COLUMNS)) * PocketSpace.LARGE_SLOT + COSMOS_PAD
+const COSMOS_SLOT: int = 64 + COSMOS_LARGE_SLOT
 const SOUNDS: Dictionary = {
 	"open": preload("res://assets/audio/hut/door_open.wav"),
 	"close": preload("res://assets/audio/hut/door_close.wav"),
@@ -23,6 +31,8 @@ const WIPE: Shader = preload("res://assets/shaders/door_wipe.gdshader")
 
 var _interiors: Dictionary = {} ## id -> Interior
 var _order: Array[String] = []
+var _slot_ids: Dictionary = {} ## int (Lane.ROOM slot) -> String (interior id)
+var _next_room_slot: int = 0
 var _entrances: Dictionary = {} ## interior id -> the building outside (a Hut, the WitchTower): a Node2D with `exit_position` and `doorway`
 var _wipe_material: ShaderMaterial = ShaderMaterial.new()
 var _wipe_layer: CanvasLayer
@@ -86,8 +96,21 @@ func setup_step(deadline_usec: int = 0) -> bool:
 			next_to = _interiors.get(String(adjacent.to)) as Interior
 			var offset: Array = adjacent.offset as Array
 			interior.position = next_to.position + Vector2(float(offset[0]), float(offset[1]))
+		elif bool(data.get("cosmos_pocket", false)):
+			interior.position = PocketSpace.slot_origin(PocketSpace.Lane.LARGE, COSMOS_LARGE_SLOT) + Vector2(COSMOS_PAD, COSMOS_PAD)
+			_slot_ids[COSMOS_SLOT] = id
+		elif id == "personalraum":
+			interior.position = PocketSpace.slot_origin(PocketSpace.Lane.ROOM, PERSONALRAUM_SLOT)
+			for reserved_slot: int in PERSONALRAUM_RESERVED:
+				_slot_ids[reserved_slot] = id
+			_order.append(id)
 		else:
-			interior.position = Vector2(POCKET_X0 + _order.size() * SLOT, POCKET_Y0)
+			while PERSONALRAUM_RESERVED.has(_next_room_slot) or _slot_ids.has(_next_room_slot):
+				_next_room_slot += 1
+			var slot_idx: int = _next_room_slot
+			_next_room_slot += 1
+			interior.position = PocketSpace.slot_origin(PocketSpace.Lane.ROOM, slot_idx)
+			_slot_ids[slot_idx] = id
 			_order.append(id)
 		add_child(interior)
 		interior.setup(id, data)
@@ -118,25 +141,42 @@ func setup_step(deadline_usec: int = 0) -> bool:
 			seen.append(member)
 			member.set_group_rect(group_rect)
 	_setup_finalized = true
+	for room_id: String in _interiors:
+		var room: Interior = _interiors[room_id] as Interior
+		var rect: Rect2 = PocketSpace.slot_rect(PocketSpace.Lane.LARGE, COSMOS_LARGE_SLOT) if bool(room.spec.get("cosmos_pocket", false)) else Rect2(room.global_position, room.size)
+		PocketSpace.register_pocket(StringName(room_id), rect, &"")
 	_sync_active_rooms()
 	return true
 
 
 func _exit_tree() -> void:
 	Terrain.patches.erase(self)
+	for room_id: String in _interiors:
+		PocketSpace.unregister_pocket(StringName(room_id))
 
 
 # ---------- where is what ----------
 
+## True when `pos` lies inside Caelia's wide interstellar pocket band.
+static func in_cosmos_band(pos: Vector2) -> bool:
+	return PocketSpace.locate(pos) == Vector2i(PocketSpace.Lane.LARGE, COSMOS_LARGE_SLOT)
+
+
 ## The slot (index of the interior) a position lies in, -1 for the open world.
 static func slot_at(pos: Vector2) -> int:
-	if pos.x < POCKET_X0 - 1400.0 or pos.y < POCKET_Y0 - 400.0 or pos.y > POCKET_Y0 + SLOT: ## the mine (MineManager) lies in a row below the rooms
-		return -1
-	return clampi(int((pos.x - POCKET_X0 + 1400.0) / SLOT), 0, 64)
+	var hit: Vector2i = PocketSpace.locate(pos)
+	if hit.x == PocketSpace.Lane.ROOM:
+		return hit.y
+	if hit.x == PocketSpace.Lane.LARGE and hit.y == COSMOS_LARGE_SLOT:
+		return COSMOS_SLOT
+	return -1
 
 
 ## Where something stands as far as the open world is concerned: its own position, or the door of the building it is in.
 static func outer(tree: SceneTree, pos: Vector2) -> Vector2:
+	if DungeonManager.in_dungeon(pos):
+		var dm: DungeonManager = DungeonManager.of(tree)
+		return dm.world_position(pos) if dm != null else pos
 	if MineManager.in_mine(pos):
 		var mines: MineManager = tree.get_first_node_in_group("mines") as MineManager
 		return mines.world_position(pos) if mines != null else pos
@@ -146,9 +186,9 @@ static func outer(tree: SceneTree, pos: Vector2) -> Vector2:
 	return manager.world_position(pos) if manager != null else pos
 
 
-## True for a point in a pocket room or the mine (far outside the world).
+## True for a point in a pocket room, the mine, or a dungeon (far outside the world).
 static func is_pocket(pos: Vector2) -> bool:
-	return slot_at(pos) >= 0 or MineManager.in_mine(pos)
+	return slot_at(pos) >= 0 or MineManager.in_mine(pos) or DungeonManager.in_dungeon(pos)
 
 
 ## `outer` without a tree at hand (static callers such as map helpers); Vector2.INF when a pocket point has no known door.
@@ -162,6 +202,8 @@ static func to_world(pos: Vector2) -> Vector2:
 
 ## Distance in px as the player would walk it: inside the same room straight, otherwise between the doors / world points.
 static func travel_distance(a: Vector2, b: Vector2) -> float:
+	if in_cosmos_band(a) and in_cosmos_band(b):
+		return a.distance_to(b)
 	if is_pocket(a) == is_pocket(b) and a.distance_to(b) < SLOT:
 		return a.distance_to(b)
 	var wa: Vector2 = to_world(a)
@@ -178,8 +220,11 @@ func interior_at(pos: Vector2) -> Interior:
 			found = room
 	if found != null:
 		return found
+	if in_cosmos_band(pos):
+		return _interiors.get(GoddessSystem.STARHALL_ID) as Interior
 	var slot: int = slot_at(pos)
-	return _interiors[_order[slot]] as Interior if slot >= 0 and slot < _order.size() else null
+	var sid: String = String(_slot_ids.get(slot, ""))
+	return _interiors.get(sid) as Interior if sid != "" else null
 
 
 func interior(id: String) -> Interior:
@@ -206,8 +251,22 @@ func starhall_position() -> Vector2:
 	return hall.entry_position() if hall != null else Vector2.ZERO
 
 
-func register_entrance(id: String, hut: Node2D) -> void:
+func register_entrance(id: String, hut: Node2D, parent_zone: StringName = &"") -> void:
 	_entrances[id] = hut
+	if parent_zone == &"" and hut != null and is_inside_tree():
+		var world: Node = get_tree().get_first_node_in_group("world")
+		if world != null and world.has_method("director"):
+			var dir: ZoneDirector = world.call("director") as ZoneDirector
+			if dir != null and dir.atlas != null:
+				var exit_v: Variant = hut.get("exit_position")
+				if exit_v is Vector2 and (exit_v as Vector2).is_finite():
+					parent_zone = dir.atlas.zone_at(dir.continent_id, exit_v as Vector2)
+	var room: Interior = interior(id)
+	if room != null:
+		var rect: Rect2 = PocketSpace.slot_rect(PocketSpace.Lane.LARGE, COSMOS_LARGE_SLOT) if bool(room.spec.get("cosmos_pocket", false)) else Rect2(room.global_position, room.size)
+		PocketSpace.register_pocket(StringName(id), rect, parent_zone)
+		for other: Interior in room.neighbors:
+			PocketSpace.register_pocket(StringName(other.id), Rect2(other.global_position, other.size), parent_zone)
 
 
 ## A named place for the quest marker: "<interior id>_exit" is the door inside.
@@ -319,8 +378,28 @@ func apply_view(player: Player) -> void:
 	if camera == null:
 		return
 	var inside: Interior = interior_at(player.global_position)
-	if inside != null:
-		var rect: Rect2 = inside.view_rect(get_viewport().get_visible_rect().size)
+	if DungeonManager.in_dungeon(player.global_position):
+		var dm: DungeonManager = DungeonManager.of(get_tree())
+		var drect: Rect2 = dm.camera_rect_at(player.global_position) if dm != null else Rect2()
+		if drect.has_area():
+			camera.limit_left = int(drect.position.x)
+			camera.limit_top = int(drect.position.y)
+			camera.limit_right = int(drect.end.x)
+			camera.limit_bottom = int(drect.end.y)
+		else:
+			camera.limit_left = -10000000
+			camera.limit_top = -10000000
+			camera.limit_right = 10000000
+			camera.limit_bottom = 10000000
+	elif inside != null and bool(inside.spec.get("cosmos_pocket", false)):
+		## Open interstellar space has an infinite shader backdrop & elastic soft horizon: never clamp the camera harshly.
+		camera.limit_left = -10000000
+		camera.limit_top = -10000000
+		camera.limit_right = 10000000
+		camera.limit_bottom = 10000000
+	elif inside != null:
+		var view_world: Vector2 = get_viewport().get_visible_rect().size / maxf(camera.zoom.x, 0.1)
+		var rect: Rect2 = inside.view_rect(view_world)
 		camera.limit_left = int(rect.position.x)
 		camera.limit_top = int(rect.position.y)
 		camera.limit_right = int(rect.end.x)
@@ -372,20 +451,20 @@ func _add_connected_rooms(seed_room: Interior, wanted: Dictionary) -> void:
 func _sync_active_rooms(extra_pos: Vector2 = Vector2.INF) -> void:
 	var any_pocket: bool = false
 	var wanted: Dictionary = {}
-	if extra_pos.is_finite() and extra_pos.x >= POCKET_X0 - 1400.0 and extra_pos.y >= POCKET_Y0 - 600.0:
+	if extra_pos.is_finite() and slot_at(extra_pos) >= 0:
 		any_pocket = true
 		_add_connected_rooms(_room_at_or_near(extra_pos), wanted)
 	for player: Player in Player.all:
 		if is_instance_valid(player):
 			var p: Vector2 = player.global_position
-			if p.x >= POCKET_X0 - 1400.0 and p.y >= POCKET_Y0 - 600.0:
+			if slot_at(p) >= 0:
 				any_pocket = true
 				_add_connected_rooms(_room_at_or_near(p), wanted)
 	var vp: Viewport = get_viewport()
 	var cam: Camera2D = vp.get_camera_2d() if vp != null else null
 	if cam != null:
 		var cp: Vector2 = cam.get_screen_center_position()
-		if cp.x >= POCKET_X0 - 1400.0 and cp.y >= POCKET_Y0 - 600.0:
+		if slot_at(cp) >= 0:
 			any_pocket = true
 			_add_connected_rooms(_room_at_or_near(cp), wanted)
 	if not any_pocket and bool(get_meta("_all_rooms_paused", false)):

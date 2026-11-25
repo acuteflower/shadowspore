@@ -1,0 +1,421 @@
+{
+	"sheet": "res://assets/ui/menu_chrome.png",
+	"size": [
+		256,
+		256
+	],
+	"regions": {
+		"slate_panel": {
+			"rect": [
+				4,
+				4,
+				24,
+				24
+			],
+			"nine_patch": [
+				6,
+				6,
+				6,
+				6
+			]
+		},
+		"slate_inset": {
+			"rect": [
+				32,
+				4,
+				24,
+				24
+			],
+			"nine_patch": [
+				5,
+				5,
+				5,
+				5
+			]
+		},
+		"parchment_panel": {
+			"rect": [
+				60,
+				4,
+				24,
+				24
+			],
+			"nine_patch": [
+				6,
+				6,
+				6,
+				6
+			]
+		},
+		"gold_frame": {
+			"rect": [
+				88,
+				4,
+				24,
+				24
+			],
+			"nine_patch": [
+				6,
+				6,
+				6,
+				6
+			]
+		},
+		"tab_pill_idle": {
+			"rect": [
+				116,
+				4,
+				32,
+				22
+			],
+			"nine_patch": [
+				6,
+				5,
+				6,
+				5
+			]
+		},
+		"tab_pill_active": {
+			"rect": [
+				152,
+				4,
+				32,
+				22
+			],
+			"nine_patch": [
+				6,
+				5,
+				6,
+				5
+			]
+		},
+		"moss_niche": {
+			"rect": [
+				188,
+				4,
+				28,
+				28
+			],
+			"nine_patch": [
+				6,
+				6,
+				6,
+				6
+			]
+		},
+		"bloom_slider": {
+			"rect": [
+				220,
+				4,
+				28,
+				8
+			]
+		},
+		"badge_bud": {
+			"rect": [
+				220,
+				16,
+				9,
+				9
+			]
+		},
+		"lock_crest": {
+			"rect": [
+				234,
+				16,
+				12,
+				12
+			]
+		},
+		"canopy_rail": {
+			"rect": [
+				4,
+				36,
+				48,
+				34
+			],
+			"nine_patch": [
+				12,
+				6,
+				12,
+				6
+			]
+		},
+		"footer_rail": {
+			"rect": [
+				56,
+				36,
+				48,
+				20
+			],
+			"nine_patch": [
+				10,
+				4,
+				10,
+				4
+			]
+		},
+		"divider_brass": {
+			"rect": [
+				56,
+				60,
+				48,
+				7
+			]
+		},
+		"corner_nw": {
+			"rect": [
+				110,
+				36,
+				14,
+				14
+			]
+		},
+		"corner_ne": {
+			"rect": [
+				128,
+				36,
+				14,
+				14
+			]
+		},
+		"corner_sw": {
+			"rect": [
+				146,
+				36,
+				14,
+				14
+			]
+		},
+		"corner_se": {
+			"rect": [
+				164,
+				36,
+				14,
+				14
+			]
+		},
+		"tile_slate": {
+			"rect": [
+				4,
+				116,
+				48,
+				48
+			],
+			"tile": true
+		},
+		"tile_inset": {
+			"rect": [
+				56,
+				116,
+				48,
+				48
+			],
+			"tile": true
+		},
+		"tile_cosmos": {
+			"rect": [
+				108,
+				116,
+				48,
+				48
+			],
+			"tile": true
+		},
+		"tile_vellum": {
+			"rect": [
+				160,
+				116,
+				48,
+				48
+			],
+			"tile": true
+		},
+		"tile_canopy": {
+			"rect": [
+				4,
+				170,
+				64,
+				34
+			],
+			"tile": true
+		},
+		"tile_footer": {
+			"rect": [
+				72,
+				170,
+				64,
+				20
+			],
+			"tile": true
+		},
+		"wax_seal": {
+			"rect": [
+				4,
+				212,
+				14,
+				14
+			]
+		},
+		"crown_gold": {
+			"rect": [
+				22,
+				214,
+				12,
+				10
+			]
+		},
+		"sun_glyph": {
+			"rect": [
+				38,
+				214,
+				10,
+				10
+			]
+		},
+		"moon_glyph": {
+			"rect": [
+				52,
+				214,
+				10,
+				10
+			]
+		},
+		"home_beacon": {
+			"rect": [
+				66,
+				213,
+				12,
+				12
+			]
+		},
+		"hearth_crest": {
+			"rect": [
+				84,
+				210,
+				18,
+				18
+			]
+		},
+		"raven_crest": {
+			"rect": [
+				106,
+				210,
+				18,
+				18
+			]
+		},
+		"icon_bag_dim": {
+			"rect": [
+				4,
+				80,
+				12,
+				12
+			]
+		},
+		"icon_bag_lit": {
+			"rect": [
+				4,
+				96,
+				12,
+				12
+			]
+		},
+		"icon_atlas_dim": {
+			"rect": [
+				20,
+				80,
+				12,
+				12
+			]
+		},
+		"icon_atlas_lit": {
+			"rect": [
+				20,
+				96,
+				12,
+				12
+			]
+		},
+		"icon_quests_dim": {
+			"rect": [
+				36,
+				80,
+				12,
+				12
+			]
+		},
+		"icon_quests_lit": {
+			"rect": [
+				36,
+				96,
+				12,
+				12
+			]
+		},
+		"icon_path_dim": {
+			"rect": [
+				52,
+				80,
+				12,
+				12
+			]
+		},
+		"icon_path_lit": {
+			"rect": [
+				52,
+				96,
+				12,
+				12
+			]
+		},
+		"icon_fruits_dim": {
+			"rect": [
+				68,
+				80,
+				12,
+				12
+			]
+		},
+		"icon_fruits_lit": {
+			"rect": [
+				68,
+				96,
+				12,
+				12
+			]
+		},
+		"icon_world_dim": {
+			"rect": [
+				84,
+				80,
+				12,
+				12
+			]
+		},
+		"icon_world_lit": {
+			"rect": [
+				84,
+				96,
+				12,
+				12
+			]
+		},
+		"icon_system_dim": {
+			"rect": [
+				100,
+				80,
+				12,
+				12
+			]
+		},
+		"icon_system_lit": {
+			"rect": [
+				100,
+				96,
+				12,
+				12
+			]
+		}
+	}
+}

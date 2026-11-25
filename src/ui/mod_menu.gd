@@ -20,6 +20,7 @@ var _god_mode: Button
 var _infinite_stamina: Button
 var _level_up: Button
 var _map_unlock: Button
+var _atlas_unlock: Button
 var _goddess_unlock: Button
 var _section: Section = Section.ITEMS
 var _weather_ids: Array[String] = [""]
@@ -48,6 +49,7 @@ func bind(player: Node) -> void:
 	_level_up = _add_cheat("+1 Level", _raise_level)
 	_level_up.tooltip_text = "Stufenbelohnungen holst du im Fortschrittsmenü (P) ab."
 	_map_unlock = _add_cheat("Ganze Karte aufdecken", _toggle_map)
+	_atlas_unlock = _add_cheat("ATLAS: KONTINENT & WELT FREISCHALTEN", _toggle_atlas_continent)
 	_goddess_unlock = _add_cheat("Wächterin über Statuen freischalten", _unlock_goddess)
 	_add_cheat("Stufenbelohnungen öffnen", _open_level_rewards)
 	_setup_world()
@@ -224,6 +226,10 @@ func _refresh_cheats() -> void:
 	_map_unlock.disabled = fog == null
 	_map_unlock.text = "Kartennebel wiederherstellen" if fog != null and fog.is_reveal_all() else "Ganze Karte aufdecken"
 	_map_unlock.tooltip_text = "In dieser Welt gibt es keine Weltkarte." if fog == null else ""
+	var atlas_open: bool = fog != null and fog.is_continent_unlocked()
+	_atlas_unlock.disabled = fog == null
+	_atlas_unlock.text = "ATLAS: KONTINENT & WELT VERRIEGELN" if atlas_open else "ATLAS: KONTINENT & WELT FREISCHALTEN"
+	_atlas_unlock.tooltip_text = "In dieser Welt gibt es keinen Atlas." if fog == null else "Schaltet die Steinsetzer-Ebene KONTINENT & WELT im Atlas frei."
 	var goddess: GoddessSystem = GoddessSystem.of(get_tree())
 	var introduced: bool = goddess != null and goddess.is_introduced_player(_player)
 	_goddess_unlock.disabled = goddess == null or introduced
@@ -281,6 +287,27 @@ func _toggle_map() -> void:
 	else:
 		fog.reveal_all()
 		_status.text = "Ganze Karte aufgedeckt"
+	_refresh_cheats()
+
+
+func _toggle_atlas_continent() -> void:
+	if not visible or not _can_use():
+		return
+	var fog: MapDiscovery = _map_discovery()
+	if fog == null:
+		return
+	var next_unlocked: bool = not fog.is_continent_unlocked()
+	fog.set_continent_unlocked(next_unlocked)
+	if is_instance_valid(_player) and _player.quests != null:
+		if next_unlocked:
+			_player.quests.set_flag("atlas_continent_unlocked")
+		else:
+			_player.quests.flags.erase("atlas_continent_unlocked")
+			_player.quests.changed.emit()
+	var mw: MapWindow = get_tree().get_first_node_in_group("map_window") as MapWindow
+	if mw != null and mw.has_method("set_continent_unlocked_instant"):
+		mw.call("set_continent_unlocked_instant", next_unlocked)
+	_status.text = "Atlas: KONTINENT & WELT freigeschaltet" if next_unlocked else "Atlas: KONTINENT & WELT wieder verriegelt"
 	_refresh_cheats()
 
 

@@ -1,0 +1,135 @@
+{
+	"behaviors": {
+		"ambient_hear_tiles": 11.0,
+		"ambient_close_tiles": 5.0,
+		"ambient_wind_tiles": 9.0,
+		"shy_spook_tiles": 5.5,
+		"shy_run_speed": 52.0,
+		"shy_recover_seconds": 1.4,
+		"nocturnal_night_min": 0.35,
+		"nocturnal_light_tiles": 4.5,
+		"stubborn_window_seconds": 6.5,
+		"stubborn_coop_assist_tiles": 3.5,
+		"xp_by_trait": {
+			"calm": 15,
+			"shy": 20,
+			"nocturnal": 25,
+			"stubborn": 25
+		}
+	},
+	"families": [
+		{"id": "teal", "name": "SCHLEIER-TÜRKIS", "color": "#78f4e6"},
+		{"id": "violet", "name": "DÄMMER-VIOLETT", "color": "#b98cff"},
+		{"id": "magenta", "name": "SPOREN-MAGENTA", "color": "#ff80e4"},
+		{"id": "mint", "name": "MOND-MINT", "color": "#82f0be"},
+		{"id": "indigo", "name": "STERN-INDIGO", "color": "#9ec0ff"}
+	],
+	"milestones": [
+		{
+			"id": "bag_1",
+			"count": 3,
+			"title": "TASCHEN-GEFLECHT I",
+			"desc": "+4 Rucksack-Plätze",
+			"effect": "bag_slots",
+			"value": 4
+		},
+		{
+			"id": "stamina_1",
+			"count": 6,
+			"title": "WURZELATEM I",
+			"desc": "+15 Max-Ausdauer & +8 % Regen",
+			"effect": "stamina",
+			"value": 15
+		},
+		{
+			"id": "lantern_1",
+			"count": 10,
+			"title": "SPORENLATERNE",
+			"desc": "+22 % Nacht-Lichtradius um Ellie",
+			"effect": "night_light",
+			"value": 0.22
+		},
+		{
+			"id": "bag_2",
+			"count": 15,
+			"title": "TASCHEN-GEFLECHT II",
+			"desc": "+4 weitere Rucksack-Plätze",
+			"effect": "bag_slots",
+			"value": 4
+		},
+		{
+			"id": "moss_step",
+			"count": 22,
+			"title": "MOOSGANG",
+			"desc": "Scheue Früchte & Tiere erschrecken 30 % später",
+			"effect": "stealth",
+			"value": 0.30
+		},
+		{
+			"id": "harvest_1",
+			"count": 30,
+			"title": "ERNTESEGEN I",
+			"desc": "+15 % Chance auf doppelte Wildflora & Ernte",
+			"effect": "harvest",
+			"value": 0.15
+		},
+		{
+			"id": "step_echo",
+			"count": 42,
+			"title": "SCHATTENSCHRITT-ECHO",
+			"desc": "-12 % Abklingzeit auf Schattenschritt",
+			"effect": "step_cd",
+			"value": 0.12
+		},
+		{
+			"id": "bag_3",
+			"count": 56,
+			"title": "TASCHEN-GEFLECHT III",
+			"desc": "+8 Rucksack-Plätze (neue Reihe!)",
+			"effect": "bag_slots",
+			"value": 8
+		},
+		{
+			"id": "stamina_2",
+			"count": 75,
+			"title": "WURZELATEM II",
+			"desc": "+20 Ausdauer & +15 % Karten-Aufdeckradius",
+			"effect": "stamina_reveal",
+			"value": 20
+		},
+		{
+			"id": "spore_keeper",
+			"count": 100,
+			"title": "HÜTERIN DER SPOREN",
+			"desc": "Doppelte Tagesgabe am Sporenbeet & Leuchtspur",
+			"effect": "keeper",
+			"value": 1
+		}
+	],
+	"endless_step": 25,
+	"zone_blessings": {
+		"windkap": {
+			"half_name": "ERWACHTER BODEN",
+			"half_desc": "+15 % Wildflora & Fangglück",
+			"full_name": "SEGEN DER SILBERBUCHT",
+			"full_desc": "+8 % Tempo & +15 % Ernteglück",
+			"speed_bonus": 0.08
+		},
+		"default": {
+			"half_name": "ERWACHTER BODEN",
+			"half_desc": "Die Zone beruhigt sich · reichere Wildflora",
+			"full_name": "GEHEILTER BODEN",
+			"full_desc": "+6 % Lauftempo & reiche Ausbeute in dieser Zone",
+			"speed_bonus": 0.06
+		}
+	},
+	"spore_bed": {
+		"max_visible": 24,
+		"daily_gift_min_fruits": 5,
+		"daily_gifts": [
+			{"item": "glimmer", "count": 2},
+			{"item": "moon_berry", "count": 3},
+			{"item": "glow_shroom", "count": 2}
+		]
+	}
+}

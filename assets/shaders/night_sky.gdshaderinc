@@ -1,20 +1,19 @@
 // The night sky as water mirrors it (docs/wasserspiegelung.md): stars, the Milky Way and the moon with its phase and glade.
-// The sky is infinitely far away, so its mirror image is nailed to the SCREEN, not to the ground: walking past a lake, the moon's
-// reflection walks along with her (as it does on a real lake). Needs river_noise.gdshaderinc, daylight.gdshaderinc (clouds) before it.
-// Additive light; call it from an unshaded pass (river_glow.gdshader), the CanvasModulate night tint would swallow it otherwise.
+// Stars, Milky Way, moon and moon glade stay anchored in world space (drifting only slowly over the night and with water ripples,
+// completely independent of Ellie / the camera). Needs river_noise.gdshaderinc, daylight.gdshaderinc (clouds) before it.
+// Additive light; call it from an unshaded pass (river_glow.gdshader / water_v2_glow.gdshader), the CanvasModulate night tint would swallow it otherwise.
 global uniform vec4 g_sky_view; // world px: top left of the camera view, view size (NightAtmosphere)
 global uniform vec4 g_sky; // x night progress 0..1 (dusk .. dawn), y moon phase 0 new .. 0.5 full .. 1, z sky strength 0..1 (0 = day/indoors), w moon brightness
 
 // The reflected sky at world pixel `px` on water whose surface slides rows sideways by `wobble` px. `rough` 0 calm .. 1+ choppy.
 vec3 night_sky_at(vec2 px, float wobble, float rough, float t) {
 	if (g_sky.z < 0.01) { return vec3(0.0); }
-	vec2 s = px - floor(g_sky_view.xy + 0.5); // screen art pixel
 	float row = floor(px.y);
 	float slide = floor(sin(row * 0.61 + t * 2.1) * wobble + sin(row * 0.17 - t * 0.83 + px.x * 0.013) * wobble * 0.7 + 0.5);
-	vec2 sp = vec2(s.x + slide, s.y);
-	// the sky turns slowly over the night
+	vec2 wp = vec2(px.x + slide, px.y); // world art pixel (sky reflection stays put when Ellie moves)
+	// the sky turns slowly over the night, independently of the camera
 	vec2 turn = vec2(g_sky.x * 46.0, -g_sky.x * 14.0);
-	vec2 st = sp + floor(turn);
+	vec2 st = wp + floor(turn);
 	// clouds hide it (their shadow on the ground is where the sky above this water is covered)
 	float cover = smoothstep(0.2, 0.75, cloud_thick(px)); // thin veils let the stars through
 	cover = max(cover, 0.85 * g_storm);
@@ -24,9 +23,11 @@ vec3 night_sky_at(vec2 px, float wobble, float rough, float t) {
 	sky += vec3(0.010, 0.016, 0.034) * (0.6 + 0.6 * g_sky.w) * mix(1.0, 0.5, cover);
 	// clouds reflect as a dim grey sheen when the moon lights them
 	sky += vec3(0.020, 0.022, 0.030) * cover * g_sky.w * (1.0 - g_storm);
-	// the Milky Way: a faint dusty band across the screen
-	vec2 vb = st / vec2(g_sky_view.zw);
-	float band = 1.0 - smoothstep(0.0, 0.17, abs(vb.y - 0.62 + vb.x * 0.55 + sin(vb.x * 5.0) * 0.04));
+	// the Milky Way: faint dusty bands across the world sky, anchored in world space
+	vec2 vb = st / vec2(640.0, 360.0);
+	float band_phase = vb.y - 0.62 + vb.x * 0.55 + sin(vb.x * 5.0) * 0.04;
+	float band_dist = abs(fract(band_phase / 1.6 + 0.5) - 0.5) * 1.6;
+	float band = 1.0 - smoothstep(0.0, 0.17, band_dist);
 	float dust = vnoise(st / 7.0) * 0.6 + vnoise(st / 2.5) * 0.4;
 	float lane = smoothstep(0.42, 0.7, vnoise(st / 15.0 + 3.0)); // dark lanes in it
 	sky += vec3(0.030, 0.030, 0.046) * band * smoothstep(0.45, 0.8, dust) * (1.0 - 0.7 * lane) * open * (1.15 - 0.4 * g_sky.w);
@@ -49,17 +50,20 @@ vec3 night_sky_at(vec2 px, float wobble, float rough, float t) {
 		else if (mag > 0.55 && rough < 0.6 && abs(d.x) + abs(d.y) == 1.0) { sky += tint * b * 0.28 * wink * open; } // a bright star's cross on calm water
 		else if (mag > 0.4 && rough >= 0.6 && d.y == 0.0 && abs(d.x) == 1.0) { sky += tint * b * 0.3 * wink * open; } // choppy: smeared sideways
 	}
-	// the moon
+	// the moon (anchored in world space on a periodic sky tile so it stays put when Ellie moves)
 	float phase = g_sky.y;
 	float lit_part = 0.5 - 0.5 * cos(6.2831853 * phase); // 0 new .. 1 full
 	if (lit_part > 0.02) {
 		float p = g_sky.x;
-		vec2 moon = floor(g_sky_view.zw * vec2(mix(0.86, 0.14, p), 0.34 - 0.16 * sin(3.14159 * p))); // rises right, sets left
+		vec2 moon_tile = vec2(840.0, 640.0);
+		vec2 moon_origin = floor(moon_tile * vec2(mix(0.86, 0.14, p), 0.34 - 0.16 * sin(3.14159 * p))); // rises east, sets west
+		vec2 m_diff = wp - moon_origin;
+		vec2 m_rel = m_diff - moon_tile * floor(m_diff / moon_tile + 0.5);
 		float radius = 7.5;
 		float choppy = clamp(rough, 0.0, 1.4);
 		// the disc breaks a little more than the rest: each row slides on its own, choppy water stretches it sideways
 		float row_cut = floor(sin(row * 1.37 + t * 1.7) * choppy * 2.2 + 0.5);
-		vec2 dm = vec2(sp.x + row_cut - moon.x, sp.y - moon.y);
+		vec2 dm = vec2(m_rel.x + row_cut, m_rel.y);
 		dm.x /= 1.0 + 0.6 * choppy;
 		float r = length(dm + 0.5);
 		float glow_amt = lit_part * g_sky.w * open;
@@ -86,23 +90,23 @@ vec3 night_sky_at(vec2 px, float wobble, float rough, float t) {
 			float halo = exp(-(r - radius) / 3.0) * 0.55 + exp(-(r - radius) / 9.0) * 0.25;
 			if (halo * glow_amt > bayer4(px) * 1.1) { sky += vec3(0.12, 0.14, 0.18) * glow_amt; }
 		}
-		// the glade: on any ripple the moon breaks into short bright dashes stacked in rows, stretching towards the viewer (down the screen)
+		// the glade: on any ripple the moon breaks into short bright dashes stacked in rows, stretching towards the viewer (+y)
 		// and a little above; calm water keeps it short and narrow, a river or rain throws it long and wide and makes it dance
-		float dx = sp.x - moon.x;
-		float dy = sp.y - moon.y;
+		float dx = m_rel.x;
+		float dy = m_rel.y;
 		float reach = 80.0 + 150.0 * choppy;
 		if (dy > -reach * 0.3 && dy < reach && r > radius - 1.0) {
 			float along = dy > 0.0 ? dy / reach : -dy / (reach * 0.3);
 			float width = radius * 1.2 + abs(dy) * (0.10 + 0.12 * choppy) + 8.0 * choppy;
 			float across = abs(dx) / width;
 			float inside = (1.0 - smoothstep(0.25, 1.0, across)) * (1.0 - smoothstep(0.05, 1.0, along));
-			float gband = floor(sp.y / 2.0);
-			if (mod(sp.y, 2.0) < 1.0 && inside > 0.01) {
+			float gband = floor(wp.y / 2.0);
+			if (mod(wp.y, 2.0) < 1.0 && inside > 0.01) {
 				float dir = hash21(vec2(gband, 3.0)) > 0.5 ? 1.0 : -1.0;
 				float seg_len = 3.0 + floor(hash21(vec2(gband, 9.0)) * 4.0);
 				float drift = floor(dir * t * (2.0 + 6.0 * choppy) * (0.6 + hash21(vec2(gband, 5.0))));
-				float seg = floor((sp.x + drift) / seg_len);
-				float gap = mod(sp.x + drift, seg_len) < seg_len - 1.0 ? 1.0 : 0.0; // a dark pixel between dashes
+				float seg = floor((wp.x + drift) / seg_len);
+				float gap = mod(wp.x + drift, seg_len) < seg_len - 1.0 ? 1.0 : 0.0; // a dark pixel between dashes
 				float pulse = 0.5 + 0.5 * sin(t * (1.2 + choppy * 2.0) + gband * 1.9 + seg * 0.7);
 				if (gap > 0.5 && hash21(vec2(seg, gband) + 61.0) < inside * (0.55 + 0.35 * pulse)) {
 					float bright = 0.55 + 0.75 * inside;

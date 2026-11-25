@@ -181,7 +181,7 @@ func _frame_view(into: bool) -> void:
 		_view_tween.tween_property(camera, "zoom", Vector2(ZOOM, ZOOM), 0.7)
 		_view_tween.tween_property(player, "view_shift", (centre - camera.global_position).round(), 0.7)
 	else:
-		_view_tween.tween_property(camera, "zoom", Vector2.ONE, 0.5)
+		_view_tween.tween_property(camera, "zoom", Player.DEFAULT_CAMERA_ZOOM, 0.5)
 		_view_tween.tween_property(player, "view_shift", Vector2.ZERO, 0.5)
 
 
@@ -207,7 +207,7 @@ func _exit_tree() -> void:
 		if is_instance_valid(player):
 			player.story_lock = false
 			player.view_shift = Vector2.ZERO
-			player.view_camera().zoom = Vector2.ONE
+			player.view_camera().zoom = Player.DEFAULT_CAMERA_ZOOM
 		InputManager.ui_blocking = false
 
 

@@ -137,7 +137,8 @@ func _setup_gloom() -> void:
 
 
 func _setup_blight() -> void:
-	if level == null or _sprite == null or PropGenerator.TREE_KINDS.has(kind) or kind in ["rock", "iron_rock", "curse_rock", "sun_quartz_rock", "prism_vein", "ruin_sandstone", "mine_rock", "mine_collapse"]:
+	const TREE_KINDS: Array[String] = ["tree", "ancient_fir", "orchard_apple", "orchard_pear", "willow", "blossom", "birch", "hag_tree", "bone_tree", "crown_cactus", "sun_palm"]
+	if level == null or _sprite == null or TREE_KINDS.has(kind) or kind in ["rock", "iron_rock", "curse_rock", "sun_quartz_rock", "prism_vein", "ruin_sandstone", "mine_rock", "mine_collapse"]:
 		return
 	blight = 1.0 - smoothstep(2.0, BLIGHT_REACH, level.coast_tiles(global_position))
 	if blight <= 0.02:

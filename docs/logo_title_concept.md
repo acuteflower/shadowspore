@@ -1,6 +1,6 @@
 # Shadowspore – Logo und Titel-Inszenierung (Konzept)
 
-Status: **Konzept, nichts gebaut.** Dieses Dokument hält fest, was wir uns bisher überlegt haben, damit wir
+Status: **Gebaut (`TitleLogo`, `tools/art_title_logo.py`, `data/title.json`).** Dieses Dokument hält fest, was wir uns bisher überlegt haben, damit wir
 Schritt für Schritt entscheiden können. Offene Punkte stehen unten unter „Entscheidungen".
 
 ---

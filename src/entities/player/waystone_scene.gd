@@ -33,7 +33,7 @@ func start(player: Player, statue: WaystoneStatue, spec: Dictionary) -> void:
 	var map: MapWindow = get_tree().get_first_node_in_group("map_window") as MapWindow
 	if map != null and is_instance_valid(player):
 		var tile: Array = spec.tile as Array
-		map.present(Vector2(float(tile[0]), float(tile[1])), MAP_HOLD, float(spec.get("reveal", 15.0)) * float(RegionMap.CELL))
+		map.present(Vector2(float(tile[0]), float(tile[1])), MAP_HOLD, float(spec.get("reveal", 15.0)) * 4.0)
 		await get_tree().create_timer(0.3).timeout
 		var waited: float = 0.0
 		while map.visible and waited < MAP_HOLD + 3.0:

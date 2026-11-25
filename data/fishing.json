@@ -6,7 +6,7 @@
   },
   "cast": {
    "min": 28.0,
-   "max": 130.0,
+   "max": 160.0,
    "flight": 0.45,
    "target_x_max": -4.0,
    "cooldown": 0.6,
@@ -18,7 +18,7 @@
    "stop_x": -3.0,
    "sync": 0.1,
    "give_hold": 0.3,
-   "max_line": 190.0
+   "max_line": 225.0
   },
   "twitch": {
    "shift": 3.0,
@@ -177,9 +177,9 @@
  "rods": {
   "rod_basic": {
    "flex": 1.0,
-   "line": 190.0,
+   "line": 225.0,
    "reel": 52.0,
-   "cast": 130.0
+   "cast": 160.0
   }
  },
  "baits": {

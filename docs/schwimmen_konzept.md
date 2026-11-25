@@ -1,6 +1,6 @@
 # Schwimmen an der Oberfläche – Konzept
 
-Stand: 2026-11-09. **Nur Konzept, nichts gebaut.** Umfang: Ellie schwimmt auf der Wasseroberfläche von Flüssen und Seen (`WorldRivers`), mit Sprint für schnelleres Schwimmen. Tauchen, Unterwasserwelt, Ertrinken, Strömungsmitreißen, Boote und Schwimmen für Tiere sind ausdrücklich **nicht** Teil davon.
+Stand: 2026-11-09. **Gebaut (`SwimComponent`, `SwimRules`, `SwimWater`, aktiv in v2 WINDKAP Küste & Erlenbach).** Umfang: Ellie schwimmt auf der Wasseroberfläche von Flüssen und Seen (`WorldRivers`), mit Sprint für schnelleres Schwimmen. Tauchen, Unterwasserwelt, Ertrinken, Strömungsmitreißen, Boote und Schwimmen für Tiere sind ausdrücklich **nicht** Teil davon.
 
 ## 1. Ausgangslage (was es schon gibt)
 

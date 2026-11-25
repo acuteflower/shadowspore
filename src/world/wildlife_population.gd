@@ -48,6 +48,15 @@ func chunk_loaded(cell: Vector2i) -> void:
 		_pending.append(cell)
 
 
+## Loads a 512px wildlife cell in v2 ZoneWorld, enabling meadow insects and small residents alongside rabbits, corvids & woodland fauna.
+func load_zone_chunk(cell: Vector2i) -> void:
+	if not multiplayer.is_server():
+		return
+	chunk_loaded(cell)
+	$MeadowInsects.chunk_loaded(cell)
+	$SmallResidents.chunk_loaded(cell)
+
+
 func chunk_unloaded(cell: Vector2i) -> void:
 	if multiplayer.is_server():
 		$Corvids.chunk_unloaded(cell)

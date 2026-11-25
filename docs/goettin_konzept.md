@@ -1,6 +1,6 @@
 # Die Göttin der Wegsteine & Der Sternensaal (Konzept)
 
-> **Status: Konzept (noch nichts davon ist gebaut).** Dieses Dokument hält das abgestimmte Design für die Göttin (Gegenspiel zur Leere), ihren schwebenden Sternensaal, die erste Rettungs-Introduction, den Statuen-Zugang, die Läuterung von `SCHATTENSCHRITT` → `LICHTSCHRITT` und das Gerüst für spätere Gaben fest.
+> **Status: Gebaut & auf v2-Interstellar-Raum erweitert (siehe `docs/caelia_interstellar_konzept.md`, `GoddessSystem`, `StarHallRoom`).** Dieses Dokument hält das abgestimmte Design für die Göttin (Gegenspiel zur Leere), ihren schwebenden Sternensaal, die erste Rettungs-Introduction, den Statuen-Zugang, die Läuterung von `SCHATTENSCHRITT` → `LICHTSCHRITT` und das Gerüst für spätere Gaben fest.
 
 ---
 

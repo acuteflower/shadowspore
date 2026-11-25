@@ -99,7 +99,16 @@ func active() -> bool:
 	if is_holding() or not multiplayer.is_server() or not bool(_world.opening_over):
 		return false
 	var town: TownManager = _world.town()
-	return town != null and town.founded
+	if town != null and town.founded:
+		return true
+	return _world.has_method("night_enabled") and bool(_world.call("night_enabled"))
+
+
+func _spawn_blocked(pos: Vector2) -> bool:
+	var town: TownManager = _world.town()
+	if town != null:
+		return town.spawn_blocked(pos)
+	return _world.has_method("spawn_blocked") and bool(_world.call("spawn_blocked", pos))
 
 
 func live_count(include_remnants: bool = true) -> int:
@@ -134,6 +143,8 @@ func group_budget(members: Array[Player], died: bool = false) -> float:
 		levels.append(member.progress.level)
 	var value: float = NightRules.budget(NightRules.group_level(levels), TimeManager.day, members.size()) * float(NightRules.special_spec(special).budget)
 	value *= NightRules.moon_budget(TimeManager.moon_phase()) * float(stage().budget)
+	if _world.has_method("zone_danger_scale"):
+		value *= maxf(0.25, float(_world.call("zone_danger_scale", members)))
 	return value * (float((NightRules.config().budget as Dictionary).after_death) if died else 1.0)
 
 
@@ -240,6 +251,7 @@ func _begin_night() -> void:
 ## The morning: the night's reward for a group that held (a banner and a little XP), and every creature turns for the dark.
 func _end_night() -> void:
 	_report = _make_report()
+	var town: TownManager = _world.town() as TownManager
 	if active() and not _ledger.is_empty():
 		var rewarded: bool = false
 		for key: String in _ledger:
@@ -251,11 +263,10 @@ func _end_night() -> void:
 					var survive: Dictionary = NightRules.config().survive as Dictionary
 					player.progress.award(0, roundi(float(survive.xp_base) + float(survive.xp_per_level) * float(player.progress.level)))
 					rewarded = true
-		if rewarded:
-			(_world.town() as TownManager).banner("NACHT ÜBERSTANDEN", "TAG %d" % (TimeManager.day + 1))
-			(_world.town() as TownManager).emit_event("night_survived", {})
+		if rewarded and town != null:
+			town.banner("NACHT ÜBERSTANDEN", "TAG %d" % (TimeManager.day + 1))
+			town.emit_event("night_survived", {})
 	_end_raid(false)
-	var town: TownManager = _world.town() as TownManager
 	if town != null and multiplayer.is_server() and town.fear_on:
 		town.set_fear(false)
 
@@ -287,6 +298,16 @@ func skip_night() -> void:
 		town.set_fear(false)
 
 
+## This night's special kind as every peer can work it out (the HUD's omen at the moon bud): the running night's on
+## the host, else the kind the calendar gives tonight. "none" without a world map.
+func tonight_special() -> String:
+	if special != "none":
+		return special
+	if _world == null or not is_instance_valid(_world) or _world.get("_map") == null:
+		return "none"
+	return NightRules.special_for(int(_world._map.world_seed), TimeManager.day)
+
+
 ## The omens at dusk (the first sign that the dark will not be an ordinary one): a special night, then a new rung of the ladder, then a new moon. One banner a dusk.
 func _dusk_notice() -> void:
 	var cfg: Dictionary = NightRules.config().omens as Dictionary
@@ -295,6 +316,8 @@ func _dusk_notice() -> void:
 		return
 	_announced = TimeManager.day
 	var town: TownManager = _world.town() as TownManager
+	if town == null:
+		return
 	var kind: String = NightRules.special_for(int(_world._map.world_seed), TimeManager.day)
 	var current: String = String(stage().id)
 	var changed: bool = _stage_seen != "" and _stage_seen != current
@@ -404,7 +427,8 @@ func _try_spawn(key: String, members: Array[Player], entry: Dictionary, progress
 	var strength: float = group_strength(members)
 	var damage: float = NightRules.damage_scale(strength) * float(spec.damage)
 	var packs: Dictionary = NightRules.config().packs as Dictionary
-	if bool(current.scouts) and not _scouted and not _has_scout() and _scout_wait <= 0.0: ## the first thing of a night: one looks at the base
+	var town: TownManager = _world.town() as TownManager
+	if town != null and town.founded and bool(current.scouts) and not _scouted and not _has_scout() and _scout_wait <= 0.0: ## the first thing of a night: one looks at the base
 		var scout: Node2D = _spawn("shadow_spider", spot.pos as Vector2, strength * float(spec.health), damage, key, 1.0, false)
 		if scout == null:
 			return false
@@ -457,8 +481,13 @@ func _try_water(key: String, members: Array[Player], entry: Dictionary, progress
 	var spec: Dictionary = NightRules.config().get("water", {}) as Dictionary
 	if spec.is_empty() or not _world.has_method("water_depth"):
 		return false
+	var zone_water: bool = _world.has_method("zone_allows_water_night") and bool(_world.call("zone_allows_water_night", members))
+	var min_day: int = 0 if zone_water else int(spec.min_day)
+	var min_level: int = 1 if zone_water else int(spec.min_level)
+	var min_budget: float = minf(float(spec.min_budget), 2.0) if zone_water else float(spec.min_budget)
+	var water_cost: float = minf(float(spec.cost), 1.5) if zone_water else float(spec.cost)
 	_water_wait = maxf(0.0, _water_wait - float((NightRules.config().spawn as Dictionary).interval))
-	if _water_wait > 0.0 or TimeManager.day < int(spec.min_day):
+	if _water_wait > 0.0 or TimeManager.day < min_day:
 		return false
 	var alive: int = 0
 	for item: Dictionary in _water:
@@ -471,7 +500,7 @@ func _try_water(key: String, members: Array[Player], entry: Dictionary, progress
 	var levels: Array[int] = []
 	for member: Player in members:
 		levels.append(member.progress.level)
-	if budget < float(spec.min_budget) or left < float(spec.cost) or NightRules.group_level(levels) < int(spec.min_level):
+	if budget < min_budget or left < water_cost or NightRules.group_level(levels) < min_level:
 		return false
 	_water_wait = float(spec.retry_seconds)
 	if _rng.randf() > float(spec.chance):
@@ -484,9 +513,9 @@ func _try_water(key: String, members: Array[Player], entry: Dictionary, progress
 	var enemy: Node2D = _world.spawn_species(String(spec.id), at, _rng.randf() * TAU, strength * float(specials.health), NightRules.damage_scale(strength) * float(specials.damage), true) as Node2D
 	if enemy == null:
 		return false
-	var item: Dictionary = {"node": enemy, "key": key, "cost": float(spec.cost)}
+	var item: Dictionary = {"node": enemy, "key": key, "cost": water_cost}
 	_water.append(item)
-	entry.spent = float(entry.spent) + float(spec.cost)
+	entry.spent = float(entry.spent) + water_cost
 	(enemy.get_node("HealthComponent") as HealthComponent).died.connect(_on_water_killed.bind(item))
 	return true
 
@@ -494,11 +523,10 @@ func _try_water(key: String, members: Array[Player], entry: Dictionary, progress
 ## Deep enough water in the ring round a random member, loaded, outside the town's light and not right next to anybody. INF when there is none.
 func _water_spot(members: Array[Player], spec: Dictionary) -> Vector2:
 	var ring: Array = spec.ring_tiles as Array
-	var town: TownManager = _world.town()
 	for attempt: int in 24:
 		var member: Player = members[_rng.randi() % members.size()]
 		var pos: Vector2 = member.global_position + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(float(ring[0]), float(ring[1])) * TownRules.TILE
-		if float(_world.water_depth(pos)) < float(spec.min_depth) or (town != null and town.spawn_blocked(pos)):
+		if float(_world.water_depth(pos)) < float(spec.min_depth) or _spawn_blocked(pos):
 			continue
 		var near: bool = false
 		for other: Player in Player.all:
@@ -741,7 +769,9 @@ func _spawn_elite(key: String, members: Array[Player], entry: Dictionary) -> voi
 	live["name"] = name
 	live["nights"] = nights
 	live["flee"] = 0.0
-	(_world.town() as TownManager).banner(("%s IST ZURÜCK" % name) if name != "" else String(cfg.notice), "")
+	var town: TownManager = _world.town() as TownManager
+	if town != null:
+		town.banner(("%s IST ZURÜCK" % name) if name != "" else String(cfg.notice), "")
 
 
 ## Is the marked one out in the night right now (a live entry carries its name)?
@@ -799,8 +829,7 @@ func spawn_spot(members: Array[Player]) -> Dictionary:
 
 func _clear_to_spawn(pos: Vector2, members: Array[Player]) -> bool:
 	var spawn: Dictionary = NightRules.config().spawn as Dictionary
-	var town: TownManager = _world.town()
-	if town.spawn_blocked(pos) or not bool(_world.navigation_floor(pos)):
+	if _spawn_blocked(pos) or not bool(_world.navigation_floor(pos)):
 		return false
 	var nearest: float = INF
 	for member: Player in members:
@@ -859,10 +888,16 @@ func _day(players: Array[Player]) -> void:
 		_spawn("shadow_spider", spot, strength * float(remnants.health), NightRules.damage_scale(strength) * float(remnants.damage), key, 0.0, false, true)
 
 
+func _shade_trees() -> Array[Node]:
+	var trees: Array[Node] = get_tree().get_nodes_in_group("bird_perches")
+	trees.append_array(get_tree().get_nodes_in_group("living_trees"))
+	return trees
+
+
 func _shade_spot(members: Array[Player]) -> Vector2:
 	var remnants: Dictionary = NightRules.config().remnants as Dictionary
 	var ring: Array = remnants.ring_tiles as Array
-	var trees: Array[Node] = get_tree().get_nodes_in_group("bird_perches")
+	var trees: Array[Node] = _shade_trees()
 	trees.shuffle()
 	for tree: Node in trees:
 		var base: Vector2 = (tree as Node2D).global_position + Vector2(_rng.randf_range(-26.0, 26.0), 18.0)
@@ -875,15 +910,14 @@ func _shade_spot(members: Array[Player]) -> Vector2:
 
 
 func _clear_to_spawn_anywhere(pos: Vector2) -> bool:
-	var town: TownManager = _world.town()
-	return not town.spawn_blocked(pos) and bool(_world.navigation_floor(pos)) and String(_world.town_probe(Rect2(pos - Vector2(10, 10), Vector2(20, 20)))) == ""
+	return not _spawn_blocked(pos) and bool(_world.navigation_floor(pos)) and String(_world.town_probe(Rect2(pos - Vector2(10, 10), Vector2(20, 20)))) == ""
 
 
 ## The nearest tree whose crown shades a creature of the day (a point at its foot), or infinity.
 func _nearest_tree(pos: Vector2) -> Vector2:
 	var best: Vector2 = Vector2.INF
 	var best_distance: float = float((NightRules.config().remnants as Dictionary).tree_search_px)
-	for tree: Node in get_tree().get_nodes_in_group("bird_perches"):
+	for tree: Node in _shade_trees():
 		var distance: float = (tree as Node2D).global_position.distance_to(pos)
 		if distance < best_distance:
 			best_distance = distance
@@ -893,7 +927,7 @@ func _nearest_tree(pos: Vector2) -> Vector2:
 
 func _in_shade(pos: Vector2) -> bool:
 	var radius: float = float((NightRules.config().remnants as Dictionary).shade_px)
-	for tree: Node in get_tree().get_nodes_in_group("bird_perches"):
+	for tree: Node in _shade_trees():
 		if (tree as Node2D).global_position.distance_to(pos) <= radius:
 			return true
 	return false
@@ -1149,7 +1183,7 @@ func _evidence_goal(pos: Vector2, behavior: NightBehavior) -> Vector2:
 	if best.is_empty():
 		return Vector2.INF
 	var spot: Vector2 = best.pos as Vector2
-	if town.light_depth(spot) > -margin:
+	if town != null and town.founded and town.light_depth(spot) > -margin:
 		if behavior.brave():
 			var probe: Vector2 = _dim_point(pos, spot)
 			if probe.is_finite():
@@ -1164,6 +1198,8 @@ func _evidence_goal(pos: Vector2, behavior: NightBehavior) -> Vector2:
 ## A scout that has watched the base from the edge of the light for a few seconds opens the raids of the night.
 func _scout_tick() -> void:
 	var town: TownManager = _world.town() as TownManager
+	if town == null or not town.founded:
+		return
 	var cfg: Dictionary = NightRules.config().packs as Dictionary
 	for entry: Dictionary in _live:
 		var behavior: NightBehavior = entry.nb as NightBehavior
@@ -1179,6 +1215,8 @@ func _scout_tick() -> void:
 
 func _scout_post(pos: Vector2) -> Vector2:
 	var town: TownManager = _world.town() as TownManager
+	if town == null or not town.founded:
+		return pos
 	var post: Vector2 = town.dark_edge(pos, town.center, -float((NightRules.config().packs as Dictionary).scout_report_depth) - 40.0)
 	return post + Vector2(_rng.randf_range(-30.0, 30.0), _rng.randf_range(-30.0, 30.0))
 
@@ -1250,7 +1288,7 @@ func _pick_goal(pos: Vector2, behavior: NightBehavior, players: Array[Player]) -
 	if behavior.remnant:
 		return _nearest_tree(pos)
 	var cfg: Dictionary = NightRules.config().behavior as Dictionary
-	var town: TownManager = _world.town()
+	var town: TownManager = _world.town() as TownManager
 	if behavior.retreat:
 		var from: Player = _nearest_player(pos, players) ## the morning: away from the people, into the dark
 		var away: Vector2 = (pos - from.global_position).normalized() if from != null else Vector2.from_angle(_rng.randf() * TAU)
@@ -1258,7 +1296,7 @@ func _pick_goal(pos: Vector2, behavior: NightBehavior, players: Array[Player]) -
 	var heard: Vector2 = _evidence_goal(pos, behavior) ## something was heard: go and look
 	if heard.is_finite():
 		return heard
-	if town.founded and _rng.randf() < float((NightRules.config().ring_walk as Dictionary).chance):
+	if town != null and town.founded and _rng.randf() < float((NightRules.config().ring_walk as Dictionary).chance):
 		var round_goal: Vector2 = _ring_goal(_pick_sector()) ## pace round the base, longest on its thin side
 		if round_goal.is_finite():
 			return round_goal
@@ -1267,7 +1305,7 @@ func _pick_goal(pos: Vector2, behavior: NightBehavior, players: Array[Player]) -
 		var target: Player = _nearest_player(pos, players)
 		if target != null and target.global_position.distance_to(pos) < 1400.0:
 			var spot: Vector2 = target.global_position
-			if town.light_depth(spot) > -40.0: ## the player stands in the light: they wait at its edge and watch
+			if town != null and town.founded and town.light_depth(spot) > -40.0: ## the player stands in the light: they wait at its edge and watch
 				spot = town.dark_edge(pos, spot, float(cfg.dark_margin))
 			return spot + Vector2(_rng.randf_range(-70.0, 70.0), _rng.randf_range(-70.0, 70.0))
 	elif roll < float(cfg.trace_chance) + float(cfg.home_chance) and behavior.home.is_finite():
@@ -1275,7 +1313,8 @@ func _pick_goal(pos: Vector2, behavior: NightBehavior, players: Array[Player]) -
 	var span: Array = cfg.goal_tiles as Array
 	for attempt: int in 8:
 		var point: Vector2 = pos + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(float(span[0]), float(span[1])) * TownRules.TILE
-		if bool(_world.navigation_floor(point)) and town.light_depth(point) < -float(cfg.dark_margin):
+		var dark_ok: bool = (town.light_depth(point) < -float(cfg.dark_margin)) if (town != null and town.founded) else (not _spawn_blocked(point))
+		if bool(_world.navigation_floor(point)) and dark_ok:
 			return point
 	return Vector2.INF
 
@@ -1284,6 +1323,9 @@ func _pick_goal(pos: Vector2, behavior: NightBehavior, players: Array[Player]) -
 
 ## Is the night open for a raid? The ladder must allow them, a scout must have looked at the base and the beat must not be a lull.
 func _raids_open(progress: float) -> bool:
+	var town: TownManager = _world.town() as TownManager
+	if town == null or not town.founded:
+		return false
 	if _world.has_method("raids_allowed") and not bool(_world.call("raids_allowed")):
 		return false
 	if _force_raid:
@@ -1298,10 +1340,10 @@ func _raids_open(progress: float) -> bool:
 ## Besides the lure the night has two raids of its own: the call of a listener in the middle of the night and the last rush before dawn.
 func _lure_tick(players: Array[Player], progress: float) -> void:
 	var cfg: Dictionary = NightRules.config().lure as Dictionary
-	if _world.has_method("raids_allowed") and not bool(_world.call("raids_allowed")):
+	var town: TownManager = _world.town() as TownManager
+	if town == null or not town.founded or (_world.has_method("raids_allowed") and not bool(_world.call("raids_allowed"))):
 		lure = maxf(0.0, lure - float(cfg.decay) * TICK)
 		return
-	var town: TownManager = _world.town()
 	_raid_cooldown = maxf(0.0, _raid_cooldown - TICK)
 	_caller_wait = maxf(0.0, _caller_wait - TICK)
 	match String(_raid.state):
@@ -1429,7 +1471,9 @@ func _set_calling(on: bool) -> void:
 func _cancel_call() -> void:
 	_end_raid(false)
 	_raid_cooldown = 20.0
-	(_world.town() as TownManager).emit_event("call_broken", {})
+	var town: TownManager = _world.town() as TownManager
+	if town != null:
+		town.emit_event("call_broken", {})
 
 
 ## The call, seen and heard on every peer: a ring running out over the ground and the listener's own voice, lowered.

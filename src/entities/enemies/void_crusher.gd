@@ -67,6 +67,7 @@ static var _ray_query: PhysicsRayQueryParameters2D = PhysicsRayQueryParameters2D
 @onready var _navigation: EnemyNavigation = $Navigation
 @onready var _zone: Node2D = $Zone
 @onready var _fx: Node2D = $Fx
+var _counter: CounterComponent = null
 @onready var _trail: ShadowTrailComponent = $ShadowTrail
 @onready var _voice: AudioStreamPlayer2D = $Voice
 @onready var _impact: AudioStreamPlayer2D = $Impact
@@ -109,6 +110,14 @@ func _ready() -> void:
 		_slam_cd = 1.6
 		_rush_cd = 3.0
 		_sense_left = 1.4
+	_body.set_deferred("disabled", false)
+	_counter = CounterComponent.new()
+	_counter.cooldown_seconds = 16.0
+	_counter.stun_seconds = 2.8
+	_counter.visual_offset = Vector2(0.0, -22.0)
+	add_child(_counter)
+	if multiplayer.is_server():
+		_counter.countered.connect(_on_countered)
 	if not multiplayer.is_server():
 		_request_state.rpc_id(1)
 
@@ -210,9 +219,17 @@ func _duration_of(s: State) -> float:
 	return 1.0
 
 
+func _on_countered(_source_peer: int) -> void:
+	if multiplayer.is_server() and state != State.DEAD:
+		velocity = -attack_dir * 70.0
+		_set_state(State.STUN)
+
+
 func damage_factor(from: Vector2) -> float:
 	if state == State.DEAD:
 		return 1.0
+	if _counter != null and _counter.is_stunned():
+		return 1.0 ## frontal counter shatters the horn collar guard
 	return float(_def["rear_damage"]) if is_rear_hit(from) else float(_def["front_damage"])
 
 
@@ -483,9 +500,13 @@ func _set_state(next: State) -> void:
 			State.RUSH_WINDUP:
 				_rush_cd = float(_def["rush"]["cooldown"])
 				warning_length = _lane_length()
+				if _counter != null and _counter.can_open_window():
+					_counter.open_window(attack_dir, minf(float(_def["rush"]["windup"]) * 0.72, 0.50))
 			_:
 				_sweep_cd = float(_def["sweep"]["cooldown"])
 				warning_length = float(_def["sweep"]["reach"])
+	if next != State.RUSH_WINDUP and _counter != null and _counter.window_open:
+		_counter.close_window()
 	if next == State.RUSH:
 		_travelled = 0.0
 		_last_position = global_position

@@ -17,6 +17,7 @@ var _claims: Dictionary = {}
 var _sounds: Dictionary = {}
 var _watch_turns: Dictionary = {}
 var _visitors: Array[WildCorvid] = []
+var _zone_crow_sites: Dictionary = {} ## zone_id -> true (prevents duplicate curated crow site spawns)
 var _serial: int = 0
 var _maintenance: float = 0.0
 var _clear_circle: CircleShape2D
@@ -183,7 +184,7 @@ func _populate_owl(cell: Vector2i, gloom: float, flock: Array[WildCorvid]) -> bo
 	owl_rng.seed = hash(Vector3i(cell.x, cell.y, _seed + 9187))
 	var spec: Dictionary = local_spec("owl", gloom)
 	var mid_px: Vector2 = Vector2(cell) * CHUNK_PIXELS + Vector2.ONE * CHUNK_PIXELS * 0.5
-	var w_deep_owl: float = MeadowHabitats.deep_forest_at(mid_px)
+	var w_deep_owl: float = 0.0
 	var owl_chance: float = float(spec["chunk_chance"]) * (1.0 + 1.85 * w_deep_owl)
 	var owl_cap: int = int(spec.get("max_species_loaded", 2)) + (2 if w_deep_owl >= 0.40 else 0)
 	if owl_rng.randf() > owl_chance or _wild_count() >= Quality.scaled(int(spec["max_loaded"]), "wildlife", 1) or _species_count("owl") >= owl_cap:
@@ -330,7 +331,74 @@ func _near_tree(point: Vector2, radius: float) -> bool:
 		var tree: FirTree = node as FirTree
 		if tree != null and tree.global_position.distance_squared_to(point) <= r2 and not tree.is_depleted() and not tree.kind in ["bone_tree", "crown_cactus", "sun_palm"] and BiomeBlend.arid_at(tree.global_position) < 0.22:
 			return true
+	for node: Node in get_tree().get_nodes_in_group("living_trees"):
+		var lt: LivingTree = node as LivingTree
+		if lt != null and lt.stage >= 2 and not lt.is_depleted() and not lt.is_falling() and lt.global_position.distance_squared_to(point) <= r2:
+			return true
 	return false
+
+
+## Host: spawns tameable crow flocks at curated zone crow sites (e.g. WINDKAP's Silberbucht / Apfeltrift / Kronensaum),
+## preserving deterministic `pet_key` identities for `PetRegistry` so tamed crows stay bound to their player.
+func spawn_zone_crow_sites(sites_px: Array[Vector2], zone_id: String) -> void:
+	if not multiplayer.is_server() or sites_px.is_empty():
+		return
+	if _zone_crow_sites.has(zone_id):
+		return
+	_zone_crow_sites[zone_id] = true
+	var registry: PetRegistry = PetRegistry.of(get_tree())
+	var spec: Dictionary = DataRegistry.get_entry("wildlife", "crow")
+	if spec.is_empty():
+		return
+	var scene: PackedScene = _scene(String(spec["scene"]))
+	if scene == null:
+		return
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	for si: int in sites_px.size():
+		var site: Vector2 = sites_px[si]
+		var cell: Vector2i = _chunk(site)
+		_active[cell] = true
+		var flock: Array[WildCorvid] = []
+		if _flocks.has(cell):
+			flock = _flocks[cell] as Array[WildCorvid]
+		else:
+			_flocks[cell] = flock
+		rng.seed = hash([zone_id, si, _seed + 7717])
+		var count: int = rng.randi_range(2, 3)
+		var fid: String = "zone_%s_crow_%d" % [zone_id, si]
+		for bi: int in count:
+			var key: String = "%s#%d" % [fid, bi]
+			if registry != null and registry.has_record(key):
+				rng.randi_range(0, 2)
+				rng.randf()
+				continue
+			var point: Vector2 = site
+			var ok: bool = false
+			for attempt: int in 8:
+				var rad: float = 0.0 if (bi == 0 and attempt == 0) else rng.randf_range(16.0, 44.0)
+				var cand: Vector2 = site + Vector2.from_angle(float(bi) * TAU / float(count) + float(attempt) * 0.85) * rad
+				if _floor(cand, "crow") and _clear(cand, 6.0):
+					point = cand
+					ok = true
+					break
+			if not ok:
+				continue
+			var bird: WildCorvid = scene.instantiate() as WildCorvid
+			_serial += 1
+			bird.name = "Corvid%d" % _serial
+			bird.species = "crow"
+			bird.appearance = rng.randi_range(0, 2)
+			bird.flock_id = fid
+			bird.pet_key = key
+			bird.home = site
+			bird.position = point
+			bird.facing = rng.randf() * TAU
+			_birds.add_child(bird)
+			flock.append(bird)
+
+
+func clear_zone_crow_sites(zone_id: String) -> void:
+	_zone_crow_sites.erase(zone_id)
 
 
 ## The species' numbers for a chunk with `gloom` (BiomeBlend): a `witch_forest` block in data/wildlife.json raises the chunk chance
@@ -544,6 +612,28 @@ func choose_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 			if value < score:
 				score = value
 				best = {"position": seat.position, "height": seat.height, "path": tree_path, "claim": key}
+	for node: Node in get_tree().get_nodes_in_group("living_trees"):
+		var lt: LivingTree = node as LivingTree
+		if lt == null or lt.is_depleted() or lt.stage < 2:
+			continue
+		var d2: float = lt.global_position.distance_squared_to(bpos)
+		if d2 > 115600.0:
+			continue
+		if danger.is_finite() and lt.global_position.distance_squared_to(danger) < safe_r2:
+			continue
+		var distance: float = sqrt(d2)
+		var lt_path: String = String(lt.get_path())
+		var lt_slots: int = 1 if lt.stage <= 2 else 3
+		for slot: int in lt_slots:
+			var key: String = "%s:%d" % [lt_path, slot]
+			var owner: Variant = _claims.get(key)
+			if is_instance_valid(owner) and owner != bird:
+				continue
+			var seat: Dictionary = _living_tree_slot(lt, slot, lt_slots)
+			var value: float = distance + (seat.position as Vector2).distance_to(bird.home) * 0.15
+			if value < score:
+				score = value
+				best = {"position": seat.position, "height": seat.height, "path": lt_path, "claim": key}
 	if not best.is_empty():
 		_claims[String(best["claim"])] = bird
 	return best
@@ -591,6 +681,29 @@ func choose_trunk_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 		if val < score:
 			score = val
 			best = {"position": seat_pos, "height": base_h, "path": tree_path, "claim": trunk_key}
+	for node: Node in get_tree().get_nodes_in_group("living_trees"):
+		var lt: LivingTree = node as LivingTree
+		if lt == null or lt.is_depleted() or lt.stage < 2:
+			continue
+		var d2: float = lt.global_position.distance_squared_to(bpos)
+		if d2 > 96100.0:
+			continue
+		if danger.is_finite() and lt.global_position.distance_squared_to(danger) < safe_r2:
+			continue
+		var lt_path: String = String(lt.get_path())
+		if not bird._perch_path.is_empty() and lt_path == bird._perch_path:
+			continue
+		var trunk_key: String = "%s:trunk" % lt_path
+		var owner: Variant = _claims.get(trunk_key)
+		if is_instance_valid(owner) and owner != bird:
+			continue
+		var side: float = -4.5 if bpos.x <= lt.global_position.x else 4.5
+		var base_h: float = 22.0 if bird._rest_time() else 14.0
+		var seat_pos: Vector2 = lt.global_position + Vector2(side, 2.0)
+		var val: float = sqrt(d2) + seat_pos.distance_to(bird.home) * 0.18
+		if val < score:
+			score = val
+			best = {"position": seat_pos, "height": base_h, "path": lt_path, "claim": trunk_key}
 	if not best.is_empty():
 		_claims[String(best["claim"])] = bird
 	return best
@@ -641,7 +754,11 @@ func choose_desert_perch(bird: WildCorvid, danger: Vector2) -> Dictionary:
 					var chunk_obj: Variant = chunks_dict.get(center_cell + Vector2i(dx, dy))
 					if chunk_obj == null:
 						continue
-					for prop: WorldProp in (chunk_obj as WorldLevel.Chunk).things:
+					var chunk_things: Variant = chunk_obj.get("things")
+					if not (chunk_things is Array):
+						continue
+					for prop_v: Variant in chunk_things as Array:
+						var prop: WorldProp = prop_v as WorldProp
 						if prop == null or not is_instance_valid(prop) or prop.kind != "sun_quartz_rock" or prop.is_depleted() or prop.variant < 1:
 							continue
 						var dr2: float = prop.global_position.distance_squared_to(bpos)
@@ -726,6 +843,18 @@ func _slot(tree: FirTree, slot: int) -> Dictionary:
 	return {"position": tree.global_position + Vector2(side * half * (0.45 if slots <= 3 else 0.6), 2.0 + slot * 0.5), "height": height * rise}
 
 
+## Branch perch slot on a v2 `LivingTree` (height & crown width estimated cleanly from life stage).
+func _living_tree_slot(lt: LivingTree, slot: int, slots: int) -> Dictionary:
+	const HEIGHTS: Array[float] = [18.0, 28.0, 40.0, 56.0, 74.0, 94.0, 42.0]
+	const HALVES: Array[float] = [10.0, 16.0, 24.0, 34.0, 46.0, 62.0, 26.0]
+	var st: int = clampi(lt.stage, 0, HEIGHTS.size() - 1)
+	var height: float = HEIGHTS[st]
+	var half: float = HALVES[st]
+	var side: float = (float(slot) / float(slots - 1) * 2.0 - 1.0) if slots > 1 else 0.0
+	var rise: float = 0.62 + 0.09 * float(slot)
+	return {"position": lt.global_position + Vector2(side * half * 0.45, 2.0 + float(slot) * 0.5), "height": height * rise}
+
+
 ## Host: a free branch on a tree within `radius` of `point` (an observing crow of the Hexenwald, see WildCorvid._observe), claimed; {} if none.
 func perch_near(bird: WildCorvid, point: Vector2, radius: float) -> Dictionary:
 	var best: Dictionary = {}
@@ -744,6 +873,21 @@ func perch_near(bird: WildCorvid, point: Vector2, radius: float) -> Dictionary:
 			if value < score:
 				score = value
 				best = {"position": seat.position, "height": seat.height, "path": String(tree.get_path()), "claim": key}
+	for node: Node in get_tree().get_nodes_in_group("living_trees"):
+		var lt: LivingTree = node as LivingTree
+		if lt == null or lt.is_depleted() or lt.is_falling() or lt.stage < 2 or lt.global_position.distance_to(point) > radius:
+			continue
+		var lt_slots: int = 1 if lt.stage <= 2 else 3
+		for slot: int in lt_slots:
+			var key: String = "%s:%d" % [lt.get_path(), slot]
+			var owner: Variant = _claims.get(key)
+			if is_instance_valid(owner) and owner != bird:
+				continue
+			var seat: Dictionary = _living_tree_slot(lt, slot, lt_slots)
+			var value: float = (seat.position as Vector2).distance_to(point)
+			if value < score:
+				score = value
+				best = {"position": seat.position, "height": seat.height, "path": String(lt.get_path()), "claim": key}
 	if not best.is_empty():
 		release_perch(bird)
 		_claims[String(best["claim"])] = bird
@@ -766,6 +910,8 @@ func _route_distance(point: Vector2, start: Vector2, end: Vector2, bend: Vector2
 
 
 func route_bend(start: Vector2, end: Vector2, preferred: Vector2) -> Vector2:
+	const LT_HEIGHTS: Array[float] = [18.0, 28.0, 40.0, 56.0, 74.0, 94.0, 42.0]
+	const LT_HALVES: Array[float] = [10.0, 16.0, 24.0, 34.0, 46.0, 62.0, 26.0]
 	var side: Vector2 = (end - start).orthogonal().normalized()
 	var best: Vector2 = preferred
 	var cost: float = INF
@@ -780,6 +926,16 @@ func route_bend(start: Vector2, end: Vector2, preferred: Vector2) -> Vector2:
 				continue ## departing/approaching a branch, not crossing the entire tree
 			if _route_distance(tree.global_position, start, end, bend) < radius:
 				score += float(tree.spec()["height"][tree.variant]) * 4.0
+		for node: Node in get_tree().get_nodes_in_group("living_trees"):
+			var lt: LivingTree = node as LivingTree
+			if lt == null or lt.is_depleted() or lt.stage < 2:
+				continue
+			var st: int = clampi(lt.stage, 0, LT_HALVES.size() - 1)
+			var radius: float = LT_HALVES[st] + 12.0
+			if lt.global_position.distance_to(start) < radius or lt.global_position.distance_to(end) < radius:
+				continue
+			if _route_distance(lt.global_position, start, end, bend) < radius:
+				score += LT_HEIGHTS[st] * 4.0
 		if score < cost:
 			cost = score
 			best = bend
@@ -787,6 +943,8 @@ func route_bend(start: Vector2, end: Vector2, preferred: Vector2) -> Vector2:
 
 
 func flight_clearance(start: Vector2, end: Vector2, bend: Vector2 = Vector2.ZERO) -> float:
+	const LT_HEIGHTS: Array[float] = [18.0, 28.0, 40.0, 56.0, 74.0, 94.0, 42.0]
+	const LT_HALVES: Array[float] = [10.0, 16.0, 24.0, 34.0, 46.0, 62.0, 26.0]
 	var height: float = 0.0
 	for node: Node in get_tree().get_nodes_in_group("bird_perches"):
 		var tree: FirTree = node as FirTree
@@ -796,6 +954,15 @@ func flight_clearance(start: Vector2, end: Vector2, bend: Vector2 = Vector2.ZERO
 				continue
 			if _route_distance(tree.global_position, start, end, bend) < radius:
 				height = maxf(height, float(tree.spec()["height"][tree.variant]) + 28.0)
+	for node: Node in get_tree().get_nodes_in_group("living_trees"):
+		var lt: LivingTree = node as LivingTree
+		if lt != null and not lt.is_depleted() and lt.stage >= 2:
+			var st: int = clampi(lt.stage, 0, LT_HALVES.size() - 1)
+			var radius: float = LT_HALVES[st] + 12.0
+			if lt.global_position.distance_to(start) < radius or lt.global_position.distance_to(end) < radius:
+				continue
+			if _route_distance(lt.global_position, start, end, bend) < radius:
+				height = maxf(height, LT_HEIGHTS[st] + 28.0)
 	return height
 
 

@@ -5,11 +5,11 @@ extends Node2D
 ## the mine's entrance (`Interiors.outer`), the camera stays on the level, the zone's tint replaces the day's, enemies path on the level's floor.
 ## The classification is static so any code can ask "is this point in the mine" without a node.
 
-const X0: float = 60000.0 ## slot of level 1 (top left of its tile (0, 0)); the interiors sit at y 60000, the mine in a row of its own below them
-const Y0: float = 120000.0
-const SLOT: float = 6400.0 ## 400 tiles: wider than the biggest level (304)
-const MARGIN: float = 400.0 ## the void around a level, still inside its slot
-const MAX_LEVELS: int = 32
+const SLOT: float = PocketSpace.LARGE_SLOT ## 5600.0 (350 tiles): wider than the biggest level (304)
+const MARGIN: float = 368.0 ## centers max 304-tile level (4864 px) inside its 5600x5600 PocketSpace slot
+const MAX_LEVELS: int = 32 ## uses PocketSpace.Lane.LARGE slots 0..31 (all x, y < -16000)
+const X0: float = PocketSpace.LARGE_ORIGIN.x + MARGIN
+const Y0: float = PocketSpace.LARGE_ORIGIN.y + MARGIN
 const TILE: float = 16.0
 const PREFETCH_RANGE: float = 640.0 ## px: how close she must come to the gate or the stairs down for the next layout to be made
 
@@ -34,10 +34,18 @@ func _ready() -> void:
 		multiplayer.peer_connected.connect(func(id: int) -> void:
 			if NetworkManager.rpc_ready(self):
 				_rpc_snapshot.rpc_id(id, state))
+	_register_pockets(&"")
 
 
 func _exit_tree() -> void:
 	Terrain.patches.erase(self)
+	for lvl: int in range(1, MAX_LEVELS + 1):
+		PocketSpace.unregister_pocket(StringName("mine_%d" % lvl))
+
+
+func _register_pockets(parent_zone: StringName) -> void:
+	for lvl: int in range(1, MAX_LEVELS + 1):
+		PocketSpace.register_pocket(StringName("mine_%d" % lvl), PocketSpace.slot_rect(PocketSpace.Lane.LARGE, lvl - 1), parent_zone)
 
 
 ## `Terrain.patches`: the floor of the mine (slate rock, plus shallow cave puddles in wet rooms).
@@ -72,10 +80,10 @@ func setup(seed_value: int) -> void:
 
 ## The level (1 = the first) a position lies in, -1 for everything else (the open world, the interiors).
 static func level_at(pos: Vector2) -> int:
-	if pos.x < X0 - MARGIN or pos.y < Y0 - MARGIN or pos.y > Y0 + SLOT - MARGIN:
+	var hit: Vector2i = PocketSpace.locate(pos)
+	if hit.x != PocketSpace.Lane.LARGE:
 		return -1
-	var index: int = int((pos.x - X0 + MARGIN) / SLOT)
-	return index + 1 if index < MAX_LEVELS else -1
+	return hit.y + 1 if hit.y >= 0 and hit.y < MAX_LEVELS else -1
 
 
 static func in_mine(pos: Vector2) -> bool:
@@ -84,7 +92,11 @@ static func in_mine(pos: Vector2) -> bool:
 
 ## Top left of a level's tile (0, 0) in world px.
 static func origin(level: int) -> Vector2:
-	return Vector2(X0 + (level - 1) * SLOT, Y0)
+	if level < 1 or level > MAX_LEVELS:
+		push_error("MineManager: level %d out of range [1..%d]" % [level, MAX_LEVELS])
+		return Vector2.INF
+	var slot_pos: Vector2 = PocketSpace.slot_origin(PocketSpace.Lane.LARGE, level - 1)
+	return slot_pos + Vector2(MARGIN, MARGIN) if slot_pos.is_finite() else Vector2.INF
 
 
 static func config() -> Dictionary:
@@ -103,7 +115,11 @@ static func zone(level: int) -> Dictionary:
 ## Side length of a level in tiles: 88 on level 1 growing geometrically to 304 on level 20, a multiple of the cell size.
 ## The mine is always night: the light that depends on the time of day (night lights, glow sheets) asks here how dark it is where it stands.
 static func night_at(node: Node2D, amount: float) -> float:
-	return 1.0 if node.is_inside_tree() and in_mine(node.global_position) else amount
+	if node.is_inside_tree():
+		var p: Vector2 = node.global_position
+		if in_mine(p) or PocketSpace.locate(p).x == PocketSpace.Lane.DUNGEON:
+			return 1.0
+	return amount
 
 
 ## How much tougher an enemy of this level is than the one in data/enemies.json.
@@ -181,11 +197,22 @@ func ensure_level(level: int) -> MineLevel:
 	return _levels[level] as MineLevel
 
 
+func set_entrance(pos: Vector2, parent_zone: StringName = &"") -> void:
+	entrance = pos
+	if parent_zone == &"" and is_inside_tree():
+		var world: Node = get_tree().get_first_node_in_group("world")
+		if world != null and world.has_method("director"):
+			var dir: ZoneDirector = world.call("director") as ZoneDirector
+			if dir != null and dir.atlas != null and pos.is_finite():
+				parent_zone = dir.atlas.zone_at(dir.continent_id, pos)
+	_register_pockets(parent_zone)
+
+
 ## Dev entry (and later the stairs): puts a player in the entry room of a level. The world outside stays where she came from (`entrance`).
 func enter(player: Player, level: int) -> void:
 	var l: MineLayout = layout(level)
 	if not in_mine(player.global_position):
-		entrance = player.global_position
+		set_entrance(player.global_position)
 	ensure_level(level).build_at(l.entry)
 	player.request_teleport(origin(level) + l.tile_center(l.entry))
 	apply_view(player)

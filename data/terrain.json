@@ -191,7 +191,8 @@
 		},
 		"footprint": {
 			"color": "#744943",
-			"seconds": 9
+			"seconds": 12,
+			"style": "dry_sand"
 		},
 		"sound": "sand"
 	},
@@ -232,12 +233,14 @@
 		"dust": true,
 		"step": {
 			"kind": "puff",
-			"color": "#e8d2a0",
-			"amount": 4
+			"color": "#ebd7a8",
+			"amount": 5
 		},
 		"footprint": {
-			"color": "#8b7352",
-			"seconds": 9
+			"color": "#7d6347",
+			"seconds": 14,
+			"style": "dry_sand",
+			"washable": true
 		},
 		"sound": "sand",
 		"sound_gain": 0.3
@@ -252,8 +255,10 @@
 			"amount": 2
 		},
 		"footprint": {
-			"color": "#4f4232",
-			"seconds": 5
+			"color": "#3d332d",
+			"seconds": 7,
+			"style": "wet_sand",
+			"washable": true
 		},
 		"sound": "mud",
 		"sound_gain": 0.35
@@ -271,5 +276,13 @@
 		},
 		"sound": "shallow_water",
 		"sound_gain": 0.45
+	},
+	"cosmos": {
+		"speed": 1.0,
+		"zero_g": true,
+		"allow_sprint": true,
+		"allow_blink": true,
+		"no_shadow": true,
+		"no_steps": true
 	}
 }

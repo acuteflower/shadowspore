@@ -18,7 +18,7 @@ const STONE_GLOW: String = "res://assets/props/order_boundary_stone_glow.png"
 const SWAY_SHADER: Shader = preload("res://assets/shaders/sway_rows.gdshader")
 const ORDER_AUDIO: String = "res://assets/audio/meadow_wonders/order_stone.wav"
 
-var pois: MeadowPois
+var pois: Node
 var poi_id: String = ""
 var monument_kind: String = "boundary_stone"
 var variant: int = 0
@@ -38,7 +38,7 @@ var _far_wait: float = 0.0
 var _pulse: float = 99.0
 
 
-func setup(owner_pois: MeadowPois, kind_name: String, spec: Dictionary, pos_px: Vector2) -> void:
+func setup(owner_pois: Node, kind_name: String, spec: Dictionary, pos_px: Vector2) -> void:
 	pois = owner_pois
 	monument_kind = kind_name
 	poi_id = String(spec.get("id", ""))

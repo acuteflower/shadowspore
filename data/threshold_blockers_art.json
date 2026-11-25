@@ -1,0 +1,206 @@
+{
+	"sheet": "res://assets/props/threshold_blockers.png",
+	"glow_sheet": "res://assets/props/threshold_blockers_glow.png",
+	"sheet_size": [
+		288,
+		128
+	],
+	"mossy_rockfall": {
+		"rect": [
+			0,
+			0,
+			96,
+			64
+		],
+		"open_rect": [
+			0,
+			64,
+			96,
+			64
+		],
+		"frame": [
+			96,
+			64
+		],
+		"ground": 54,
+		"anchor": [
+			48,
+			54
+		],
+		"offset": [
+			-48,
+			-54
+		],
+		"cols": 3,
+		"rows": 2,
+		"col": 0,
+		"row": 0,
+		"foot": [
+			80,
+			18
+		],
+		"colliders": [
+			[
+				-40,
+				-16,
+				80,
+				18
+			]
+		],
+		"open_colliders": [
+			[
+				-44,
+				-14,
+				24,
+				16
+			],
+			[
+				20,
+				-14,
+				24,
+				16
+			]
+		],
+		"prompt_anchor": [
+			0,
+			-44
+		],
+		"light_pos": [
+			0,
+			-12
+		],
+		"light_color": "78f4e6"
+	},
+	"collapsed_arch": {
+		"rect": [
+			96,
+			0,
+			96,
+			64
+		],
+		"open_rect": [
+			96,
+			64,
+			96,
+			64
+		],
+		"frame": [
+			96,
+			64
+		],
+		"ground": 54,
+		"anchor": [
+			48,
+			54
+		],
+		"offset": [
+			-48,
+			-54
+		],
+		"cols": 3,
+		"rows": 2,
+		"col": 1,
+		"row": 0,
+		"foot": [
+			82,
+			18
+		],
+		"colliders": [
+			[
+				-41,
+				-16,
+				82,
+				18
+			]
+		],
+		"open_colliders": [
+			[
+				-41,
+				-16,
+				20,
+				18
+			],
+			[
+				21,
+				-16,
+				20,
+				18
+			]
+		],
+		"prompt_anchor": [
+			0,
+			-50
+		],
+		"light_pos": [
+			0,
+			-14
+		],
+		"light_color": "78f4e6"
+	},
+	"bramble_wall": {
+		"rect": [
+			192,
+			0,
+			96,
+			64
+		],
+		"open_rect": [
+			192,
+			64,
+			96,
+			64
+		],
+		"frame": [
+			96,
+			64
+		],
+		"ground": 54,
+		"anchor": [
+			48,
+			54
+		],
+		"offset": [
+			-48,
+			-54
+		],
+		"cols": 3,
+		"rows": 2,
+		"col": 2,
+		"row": 0,
+		"foot": [
+			84,
+			16
+		],
+		"colliders": [
+			[
+				-42,
+				-14,
+				84,
+				16
+			]
+		],
+		"open_colliders": [
+			[
+				-44,
+				-13,
+				24,
+				14
+			],
+			[
+				20,
+				-13,
+				24,
+				14
+			]
+		],
+		"prompt_anchor": [
+			0,
+			-46
+		],
+		"light_pos": [
+			0,
+			-12
+		],
+		"light_color": "cbaaff"
+	}
+}

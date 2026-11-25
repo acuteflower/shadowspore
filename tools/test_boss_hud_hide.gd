@@ -4,6 +4,8 @@ extends Node
 ## and cleanly restore once the boss dies or releases.
 ## Optional: `-- --capture=/abs/folder` saves before_boss.png, during_boss.png, after_boss.png.
 
+const HudTestWorld := preload("res://tools/hud_test_world.gd")
+
 var _fails: int = 0
 var _capture_dir: String = ""
 
@@ -39,35 +41,12 @@ func _run() -> void:
 	GameSettings.set_value("player_name", "ELLIE")
 	NetworkManager.host_multiplayer(17968, "B0SS99", 4, "boss_hud_test", "TEST-WELT", "")
 
-	var world: WorldLevel = load("res://src/world/world_level.tscn").instantiate() as WorldLevel
-	world.loading_in_steps = true
-	add_child(world)
-	while not world.loading_init_step():
-		await get_tree().process_frame
-
-	var deadline: int = Time.get_ticks_msec() + 15000
-	var player: Player = null
-	while Time.get_ticks_msec() < deadline:
-		player = world.get_node_or_null("Players/1") as Player
-		if player != null:
-			break
-		await get_tree().process_frame
+	var player: Player = await HudTestWorld.open(self) ## the v2 main world (ZoneWorld), loaded in steps
 	_check(player != null, "player spawned")
 	if player == null:
 		NetworkManager.leave()
 		get_tree().quit(1)
 		return
-
-	var guide: Node = player.get_node_or_null("OpeningGuide")
-	if guide != null:
-		guide.set_process(false)
-	var stumbles: Node = player.get_node_or_null("StumbleGuide")
-	if stumbles != null:
-		stumbles.set_process(false)
-	if world.has_method("finish_opening"):
-		world.call("finish_opening")
-	if player.quests != null:
-		player.quests.set_flag("hud_unlocked", true)
 	if player.progress != null:
 		player.progress.copper = 1245
 		player.progress.changed.emit()

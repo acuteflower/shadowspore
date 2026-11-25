@@ -23,6 +23,15 @@ const WITCH_COLORS: Array[Color] = [
 const QUARTZ_COLORS: Array[Color] = [
 	Color("e5e3f8"), Color("fff0b0"), Color("e6c468"),
 ]
+const SAND_GRAINS: Array[Color] = [
+	Color("f3e1b4"), Color("d8b982"), Color("a8895c"),
+]
+const WET_FLECKS: Array[Color] = [
+	Color("726150"), Color("9cdbd6"), Color("5a4d42"),
+]
+const GRIT_COLORS: Array[Color] = [
+	Color("b8c4bc"), Color("829096"), Color("d6ddd4"),
+]
 
 class PixelFlecks:
 	var world_pos: Vector2 = Vector2.ZERO
@@ -112,7 +121,25 @@ func on_biome_footstep(world_pos: Vector2, surface_id: String, velocity: Vector2
 			_add_fleck(world_pos, back * 0.5, WITCH_COLORS[_rng.randi() % WITCH_COLORS.size()], 10.0, 12.0, 18.0, 0.55, true)
 		return
 
-	# 3. Morning dew droplets (05:30 = 0.23 .. 09:15 = 0.385) & floral petals on lush grass
+	# 3. Coastal sand grain kick-up (drifting with live WorldWind!), damp wet-sand flecks & rocky gravel grit!
+	if surface_id == "beach_sand" or surface_id == "sand":
+		var n_sand: int = 3 if gait >= 2 else (2 if gait == 1 else 1)
+		var wind_push: Vector2 = WorldWind.sample_soft(world_pos) * 18.0
+		for _i: int in n_sand:
+			_add_fleck(world_pos, back, SAND_GRAINS[_rng.randi() % SAND_GRAINS.size()], 24.0 if gait >= 2 else 15.0, 17.0, 52.0, 0.44, false, wind_push)
+		return
+	if surface_id == "wet_sand":
+		if gait >= 1 or _rng.randf() < 0.55:
+			var n_wet: int = 2 if gait >= 2 else 1
+			for _i: int in n_wet:
+				_add_fleck(world_pos, back, WET_FLECKS[_rng.randi() % WET_FLECKS.size()], 20.0, 22.0, 78.0, 0.28, false)
+		return
+	if (surface_id == "gravel" or surface_id == "stone") and gait >= 2:
+		if _rng.randf() < 0.65:
+			_add_fleck(world_pos, back, GRIT_COLORS[_rng.randi() % GRIT_COLORS.size()], 24.0, 20.0, 74.0, 0.26, false)
+		return
+
+	# 4. Morning dew droplets (05:30 = 0.23 .. 09:15 = 0.385) & floral petals on lush grass
 	if surface_id == "grass":
 		var tod: float = TimeManager.time_of_day
 		var morning_dew: bool = tod >= 0.22 and tod <= 0.39
@@ -122,10 +149,10 @@ func on_biome_footstep(world_pos: Vector2, surface_id: String, velocity: Vector2
 			_add_fleck(world_pos, back, PETAL_COLORS[_rng.randi() % PETAL_COLORS.size()], 18.0, 16.0, 24.0, 0.52, false)
 
 
-func _add_fleck(pos: Vector2, back: Vector2, col: Color, h_spd: float, z_v: float, grav: float, life: float, unlit: bool) -> void:
+func _add_fleck(pos: Vector2, back: Vector2, col: Color, h_spd: float, z_v: float, grav: float, life: float, unlit: bool, wind_bias: Vector2 = Vector2.ZERO) -> void:
 	var f: PixelFlecks = PixelFlecks.new()
 	f.world_pos = pos + Vector2(_rng.randf_range(-2.5, 2.5), _rng.randf_range(-1.0, 1.0))
-	f.vel = back.rotated(_rng.randf_range(-0.55, 0.55)) * _rng.randf_range(h_spd * 0.6, h_spd * 1.2)
+	f.vel = back.rotated(_rng.randf_range(-0.55, 0.55)) * _rng.randf_range(h_spd * 0.6, h_spd * 1.2) + wind_bias
 	f.z_h = _rng.randf_range(1.0, 3.0)
 	f.z_vel = z_v * _rng.randf_range(0.8, 1.2)
 	f.grav = grav

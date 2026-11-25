@@ -19,7 +19,7 @@ const RIVER_WATER_SHADER: Shader = preload("res://assets/shaders/river_water.gds
 const RIVER_GLOW_SHADER: Shader = preload("res://assets/shaders/river_glow.gdshader")
 const WATER_DETAIL_TEX: Texture2D = preload("res://assets/water/water_detail.png")
 const BANK_MATERIAL_TEX: Texture2D = preload("res://assets/water/bank_material.png")
-const LAKE_SDF: Texture2D = preload("res://assets/world/lakes_sdf.png")
+const LAKE_SDF_PATH: String = "res://assets/world/lakes_sdf.png"
 static var _shared_data: Dictionary = {}
 static var _shared_queries: Dictionary = {}
 static var _shared_lake_bytes: PackedByteArray = PackedByteArray()
@@ -50,15 +50,19 @@ func _ready() -> void:
 	Jobs.register_cleanup(WorldRivers.clear_cache)
 	if _shared_data.is_empty():
 		var merged: Dictionary = DataRegistry.table("rivers_baked").duplicate(true)
+		if not merged.has("chunks"):
+			merged["chunks"] = {}
 		var lakes: Dictionary = DataRegistry.table("lakes_baked")
 		(merged["chunks"] as Dictionary).merge(lakes.get("chunks", {}) as Dictionary, true)
 		merged["lakes"] = lakes.get("lakes", [])
 		_shared_data = merged
 	_data = _shared_data
-	if _shared_lake_bytes.is_empty():
-		var lake_image: Image = LAKE_SDF.get_image()
-		lake_image.convert(Image.FORMAT_L8)
-		_shared_lake_bytes = lake_image.get_data()
+	if _shared_lake_bytes.is_empty() and ResourceLoader.exists(LAKE_SDF_PATH):
+		var lake_tex: Texture2D = load(LAKE_SDF_PATH) as Texture2D
+		if lake_tex != null:
+			var lake_image: Image = lake_tex.get_image()
+			lake_image.convert(Image.FORMAT_L8)
+			_shared_lake_bytes = lake_image.get_data()
 	_lake_bytes = _shared_lake_bytes
 	_spec = DataRegistry.table("rivers")
 	_query_lock.lock()
@@ -90,8 +94,10 @@ func _key(cell: Vector2i) -> String:
 
 ## These enclosed basins belong to water, never to the exterior abyss.
 func lake_at(point: Vector2) -> bool:
+	if _lake_bytes.is_empty():
+		return false
 	var tile: Vector2i = Vector2i((point / 16.0).floor())
-	return tile.x >= 0 and tile.y >= 0 and tile.x < RegionMap.WORLD_TILES and tile.y < RegionMap.WORLD_TILES and _lake_bytes[tile.y * RegionMap.WORLD_TILES + tile.x] < 128
+	return tile.x >= 0 and tile.y >= 0 and tile.x < 1024 and tile.y < 1024 and _lake_bytes[tile.y * 1024 + tile.x] < 128
 
 ## Loads the query fields on the main thread: a first `load()` inside a chunk worker would deadlock against the waiting main thread (Jobs.warm).
 func _warm_queries() -> void:
@@ -210,7 +216,7 @@ func wade_data(point: Vector2, base: Dictionary) -> Dictionary:
 	result["depth_amount"] = amount ## 0..1 up to the deep threshold; SwimRules starts at 0.92
 	return result
 
-func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -> RiverDetails:
+func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -> Node2D:
 	var key: String = _key(cell)
 	if not (_data["chunks"] as Dictionary).has(key): return null
 	var record: Dictionary = _data["chunks"][key]
@@ -242,15 +248,10 @@ func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -
 		_water_materials.erase(shader_material))
 	parent.add_child(sprite)
 	parent.y_sort_enabled = true
-	var details: RiverDetails = RiverDetails.new()
-	details.name = "RiverDetails"
-	details.y_sort_enabled = true
-	parent.add_child(details)
-	if not defer_details:
+	if not defer_details and field_tex != null:
 		var flow_img: Image = field_tex.get_image()
 		fauna.set_field_image(cell, flow_img)
-		details.setup(self, cell, flow_img)
-	# Night glow pass: unlit, additive, same field; strength follows the day cycle (RiverDetails.set_night).
+	# Night glow pass: unlit, additive, same field.
 	var night_glow: Sprite2D = Sprite2D.new()
 	night_glow.name = "RiverGlow"
 	night_glow.centered = false
@@ -268,10 +269,7 @@ func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -
 	_materials.append(glow_material)
 	night_glow.tree_exiting.connect(func() -> void: _materials.erase(glow_material))
 	parent.add_child(night_glow)
-	details.glow_materials.append(glow_material)
 	var anchors: PackedVector4Array = []
-	for value: Array in details.disturbances:
-		anchors.append(Vector4(float(value[0]), float(value[1]), float(value[2]), float(value[3])))
 
 	# Waterfalls in this chunk
 	var falls_data: Array = record.get("waterfalls", [])
@@ -343,8 +341,6 @@ func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -
 		if anchors.size() < 8:
 			anchors.append(Vector4(sx, sy + 10.0, 18.0, 0.75))
 
-	if defer_details:
-		details.set_deferred_water(field_tex, shader_material, anchors.duplicate())
 	var count: int = anchors.size()
 	while anchors.size() < 8: anchors.append(Vector4.ZERO)
 	shader_material.set_shader_parameter("disturbances", anchors)
@@ -361,7 +357,7 @@ func attach_chunk(parent: Node2D, cell: Vector2i, defer_details: bool = false) -
 		shape.shape = box
 		shape.position = Vector2(cell) * 512.0 + Vector2(float(rect[0]), float(rect[1])) + box.size * 0.5
 		body.add_child(shape)
-	return details
+	return sprite
 
 ## Swimmers (up to 4 at once: x, y, radius, energy) make rings in the surface of every loaded water chunk. Each swimmer owns a key;
 ## energy <= 0 removes it.

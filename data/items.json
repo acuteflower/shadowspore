@@ -14,7 +14,7 @@
   "stats": {
    "damage": 5,
    "speed": 0.9,
-   "reach": 28,
+   "reach": 35,
    "knockback": 40
   },
   "description": "Ein schlichtes Eisenschwert. Hat schon bessere Tage gesehen."
@@ -34,7 +34,7 @@
   "stats": {
    "damage": 8,
    "speed": 1.0,
-   "reach": 30,
+   "reach": 38,
    "knockback": 50
   },
   "description": "Testgegenstand: besser als das Standardschwert."
@@ -54,7 +54,7 @@
   "stats": {
    "damage": 30,
    "speed": 1.15,
-   "reach": 34,
+   "reach": 42,
    "knockback": 60
   },
   "description": "Testgegenstand: eine Klinge aus verdichteter Leere, stark genug für einen Bosskampf."
@@ -162,7 +162,7 @@
   "stats": {
    "damage": 2,
    "speed": 1.1,
-   "reach": 22,
+   "reach": 30,
    "knockback": 8
   },
   "description": "Zum Zerrupfen von Büschen. Als Waffe nur ein Notbehelf. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
@@ -181,7 +181,7 @@
   "stats": {
    "damage": 3,
    "speed": 0.9,
-   "reach": 24,
+   "reach": 32,
    "knockback": 14
   },
   "description": "Bricht Felsen auf. Schwer, aber ehrlich. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
@@ -290,7 +290,7 @@
   "stats": {
    "damage": 4,
    "speed": 0.9,
-   "reach": 24,
+   "reach": 32,
    "knockback": 16
   },
   "description": "Fällt Bäume. Der Stiel ist violett umwickelt, damit er nicht aus der Hand rutscht. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
@@ -660,7 +660,7 @@
   "icon": "res://assets/items/rod_basic.png",
   "held": "res://assets/items/rod_basic_held.png",
   "stats": {
-   "reach": 130
+   "reach": 160
   },
   "description": "Geschälte Esche und Flachsfaser, biegsam wie Weide. In der Schnellleiste gewählt: Maus zielt aufs Wasser, Linksklick wirft. Z wechselt den Köder, H die Pose."
  },
@@ -824,7 +824,7 @@
   "stats": {
    "damage": 40,
    "speed": 1.15,
-   "reach": 36,
+   "reach": 45,
    "knockback": 60
   },
   "fx": {
@@ -1330,10 +1330,10 @@
   "stats": {
    "damage": 3,
    "speed": 0.95,
-   "reach": 22,
+   "reach": 30,
    "knockback": 6
   },
-  "description": "Bricht Erde auf. Auf einem Feld hackt man damit die Beete, bevor gesät wird. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
+  "description": "Bricht Erde auf und entfernt hohes Gras. Auf einem Feld hackt man damit die Beete, bevor gesät wird. In der Schnellleiste gewählt, ersetzt sie die Waffe in der Hand."
  },
  "watering_can": {
   "name": "Gießkanne",
@@ -1350,7 +1350,7 @@
   "stats": {
    "damage": 0,
    "speed": 0.9,
-   "reach": 24,
+   "reach": 32,
    "knockback": 0
   },
   "description": "Ein Schwall über die Beete und die Saat trinkt. Fasst 12 Güsse; am Brunnenplatz, am Fluss, an der Regentonne oder im Regen wieder füllbar."
@@ -2684,7 +2684,7 @@
   "stats": {
    "damage": 28,
    "speed": 1.18,
-   "reach": 34,
+   "reach": 42,
    "knockback": 58
   },
   "fx": {
@@ -3108,5 +3108,61 @@
   "hotbar": false,
   "icon": "res://assets/items/nettle_linen.png",
   "description": "Dicht und geschmeidig gewebtes Tuch aus hellgrüner Nesselfaser mit violetter Webkante."
+ },
+ "harbor_guard_sword": {
+  "name": "Klinge der Hafenwache",
+  "kind": "weapon",
+  "slot": "main_hand",
+  "weapon_class": "sword_1h",
+  "rarity": "rare",
+  "enchant_slots": 1,
+  "refinable": true,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/harbor_guard_sword.png",
+  "held": "res://assets/items/harbor_guard_sword_held.png",
+  "stats": {
+   "damage": 13,
+   "speed": 1.06,
+   "reach": 40,
+   "knockback": 54
+  },
+  "description": "Salzgehärteter Gezeitenstahl der alten Sturmhafen-Wache. Schneidet sauber durch Nebel und Sporenranken."
+ },
+ "anchor_pendant": {
+  "name": "Anker-Talisman der Alten Mole",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "necklace",
+  "rarity": "rare",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/anchor_pendant.png",
+  "bonus": {
+   "health": 16,
+   "armor": 2,
+   "knock_resist": 0.25
+  },
+  "description": "Schwerer Steinsetzer-Anker aus den Gezeitenkammern von Sturmhafen. Verleiht Standfestigkeit selbst gegen die Springflut."
+ },
+ "tide_bracelet": {
+  "name": "Gezeitenreif von Sturmhafen",
+  "kind": "talisman",
+  "slot": "talisman",
+  "jewelry": "bracelet",
+  "rarity": "epic",
+  "enchant_slots": 1,
+  "max_stack": 1,
+  "hotbar": false,
+  "icon": "res://assets/items/tide_bracelet.png",
+  "bonus": {
+   "damage": 0.08,
+   "charge_speed": 0.14
+  },
+  "perks": [
+   "tide_surge"
+  ],
+  "description": "Geflochtener Reif aus Gezeitenbronze und Meeresquarz. Belohnt entschlossene Klangkonter und schnelle Schattenschritte."
  }
 }

@@ -13,6 +13,7 @@ var _canvas: Control
 var _age: float = 99.0
 var _title: String = ""
 var _zone: String = ""
+var _waiting: bool = false ## the stage is held by another big notice
 
 
 func _ready() -> void:
@@ -27,7 +28,12 @@ func _ready() -> void:
 func show_level(level: int) -> void:
 	_title = "EBENE %d" % level
 	_zone = String(MineManager.zone(level).get("name", "")).to_upper()
-	_age = 0.0
+	_waiting = true
+	_age = 99.0
+
+
+func _exit_tree() -> void:
+	HudNotices.release_big(self)
 
 
 func is_showing() -> bool:
@@ -35,7 +41,12 @@ func is_showing() -> bool:
 
 
 func _process(delta: float) -> void:
+	if _waiting and HudNotices.claim_big(self):
+		_waiting = false
+		_age = 0.0
 	if not is_showing():
+		if not _waiting:
+			HudNotices.release_big(self)
 		return
 	_age += delta
 	_canvas.queue_redraw()

@@ -1,8 +1,8 @@
 {
-    "version":  "0.9.4",
-    "download_url":  "https://shadowspore.com/updates/Shadowspore-0.9.4-win64.zip",
-    "sha256":  "fe3c47f79e20a5ae3bfd8bf81836840da2f901631f7387141ce49db3113f908f",
-    "exe_sha256":  "c08aa14cf0f926f765a02fe8e11e603a842a00429c5534439bbb07fcc3d3f9fd",
-    "size_bytes":  100924296,
+    "version":  "0.10.2",
+    "download_url":  "https://shadowspore.com/updates/Shadowspore-0.10.2-win64.zip",
+    "sha256":  "d646e06551c8615a9e22f1945e5985f3a98e7aef3765f5ae548350de6a561de0",
+    "exe_sha256":  "d191fe4cbbea109d054552a99f9cc7e310210b8e9289a91c845f23d1851ecddb",
+    "size_bytes":  110107365,
     "changelog":  "https://shadowspore.com/"
 }

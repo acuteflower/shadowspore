@@ -1,0 +1,285 @@
+{
+	"_doc": "Schwellen von ALTMARK. Jede Schwelle liegt auf ihrer gemeinsamen Naht (`seam` + `span`). Die drei Binnen-Schwellen von WINDKAP sind anfangs physisch blockiert (`open.flag` + `closed_reason` + `blocker`).",
+	"thresholds": [
+		{
+			"id": "windkap_erlenfurt",
+			"kind": "path",
+			"mask": "canopy",
+			"open": {
+				"flag": "windkap_erlenfurt_open"
+			},
+			"closed_reason": "Das alte Steinsetzertor nach Erlenfurt ist eingestürzt.",
+			"blocker": "collapsed_gate",
+			"span": [
+				0.35,
+				0.65
+			],
+			"a": "windkap",
+			"b": "erlenfurt",
+			"seam": "naht_windkap_erlenfurt"
+		},
+		{
+			"id": "windkap_suedkap",
+			"kind": "path",
+			"mask": "canopy",
+			"closed_reason": "",
+			"span": [
+				0.35,
+				0.65
+			],
+			"a": "windkap",
+			"b": "suedkap",
+			"seam": "naht_windkap_suedkap"
+		},
+		{
+			"id": "windkap_klippenstieg",
+			"kind": "pass",
+			"mask": "cliff",
+			"open": {
+				"flag": "windkap_pass_open"
+			},
+			"closed_reason": "Ein gewaltiger Felssturz versperrt den Klippenstieg.",
+			"blocker": "rockfall",
+			"span": [
+				0.35,
+				0.65
+			],
+			"a": "windkap",
+			"b": "klippenstieg",
+			"seam": "naht_windkap_klippenstieg"
+		},
+		{
+			"id": "klippenstieg_erlenfurt",
+			"kind": "path",
+			"a": "klippenstieg",
+			"b": "erlenfurt",
+			"seam": "naht_klippenstieg_erlenfurt",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "klippenstieg_hallgrat",
+			"kind": "pass",
+			"a": "klippenstieg",
+			"b": "hallgrat",
+			"seam": "naht_klippenstieg_hallgrat",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "cliff",
+			"closed_reason": ""
+		},
+		{
+			"id": "suedkap_glimmrast",
+			"kind": "path",
+			"a": "suedkap",
+			"b": "glimmrast",
+			"seam": "naht_suedkap_glimmrast",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": "Uraltes Dornengeflecht versperrt den Pfad nach Glimmrast.",
+			"open": {
+				"flag": "suedkap_glimmrast_open"
+			},
+			"blocker": "bramble_wall"
+		},
+		{
+			"id": "suedkap_hexenwald_kern",
+			"kind": "path",
+			"a": "suedkap",
+			"b": "hexenwald_kern",
+			"seam": "naht_suedkap_hexenwald_kern",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": "Dichter Hexenwald-Nebel und Wurzelwerk blockieren den Ostpfad.",
+			"open": {
+				"flag": "suedkap_hexenwald_open"
+			},
+			"blocker": "bramble_wall"
+		},
+		{
+			"id": "suedkap_erlenfurt",
+			"kind": "path",
+			"a": "suedkap",
+			"b": "erlenfurt",
+			"seam": "naht_suedkap_erlenfurt",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": "Das nördliche Hafentor nach Erlenfurt liegt unter Trümmern.",
+			"open": {
+				"flag": "suedkap_erlenfurt_open"
+			},
+			"blocker": "collapsed_gate"
+		},
+		{
+			"id": "erlenfurt_glimmrast",
+			"kind": "bridge",
+			"a": "erlenfurt",
+			"b": "glimmrast",
+			"seam": "naht_erlenfurt_glimmrast",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "erlenfurt_hallgrat",
+			"kind": "path",
+			"a": "erlenfurt",
+			"b": "hallgrat",
+			"seam": "naht_erlenfurt_hallgrat",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "hallgrat_kristallgrat",
+			"kind": "pass",
+			"a": "hallgrat",
+			"b": "kristallgrat",
+			"seam": "naht_hallgrat_kristallgrat",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "cliff",
+			"closed_reason": ""
+		},
+		{
+			"id": "hallgrat_glimmrast",
+			"kind": "path",
+			"a": "hallgrat",
+			"b": "glimmrast",
+			"seam": "naht_hallgrat_glimmrast",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "kristallgrat_muehlenaue",
+			"kind": "path",
+			"a": "kristallgrat",
+			"b": "muehlenaue",
+			"seam": "naht_kristallgrat_muehlenaue",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "muehlenaue_varnholm",
+			"kind": "pass",
+			"a": "muehlenaue",
+			"b": "varnholm",
+			"seam": "naht_muehlenaue_varnholm",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "cliff",
+			"closed_reason": ""
+		},
+		{
+			"id": "muehlenaue_hexenwald_saum",
+			"kind": "path",
+			"a": "muehlenaue",
+			"b": "hexenwald_saum",
+			"seam": "naht_muehlenaue_hexenwald_saum",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "muehlenaue_glimmrast",
+			"kind": "path",
+			"a": "muehlenaue",
+			"b": "glimmrast",
+			"seam": "naht_muehlenaue_glimmrast",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "glimmrast_hexenwald_saum",
+			"kind": "path",
+			"a": "glimmrast",
+			"b": "hexenwald_saum",
+			"seam": "naht_glimmrast_hexenwald_saum",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "glimmrast_hexenwald_kern",
+			"kind": "path",
+			"a": "glimmrast",
+			"b": "hexenwald_kern",
+			"seam": "naht_glimmrast_hexenwald_kern",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		},
+		{
+			"id": "hexenwald_saum_varnholm",
+			"kind": "pass",
+			"a": "hexenwald_saum",
+			"b": "varnholm",
+			"seam": "naht_hexenwald_saum_varnholm",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "cliff",
+			"closed_reason": ""
+		},
+		{
+			"id": "hexenwald_saum_hexenwald_kern",
+			"kind": "path",
+			"a": "hexenwald_saum",
+			"b": "hexenwald_kern",
+			"seam": "naht_hexenwald_saum_hexenwald_kern",
+			"span": [
+				0.38,
+				0.62
+			],
+			"mask": "canopy",
+			"closed_reason": ""
+		}
+	]
+}

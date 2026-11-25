@@ -26,6 +26,7 @@ var _payload: Dictionary = {} ## host: id -> what a boss chest holds {enemy, cop
 var _dev_count: int = 0
 var _serial: int = 0
 var _drop_count: int = 0
+var load_default_placed: bool = true ## set false in v2 ZoneWorld so legacy v1 meadow chests are not placed
 var rng: RandomNumberGenerator = RandomNumberGenerator.new() ## host: the loot dice (tests may seed it)
 
 
@@ -41,9 +42,10 @@ func _ready() -> void:
 	_settings = table.get("settings", {}) as Dictionary
 	_tiers = table.get("tiers", {}) as Dictionary
 	_pools = table.get("pools", {}) as Dictionary
-	for spec: Dictionary in table.get("placed", []) as Array: ## {id, tier, tile [x, y], flip}
-		var tile: Array = spec.tile as Array
-		place(String(spec.id), String(spec.tier), Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8), bool(spec.get("flip", false)))
+	if load_default_placed:
+		for spec: Dictionary in table.get("placed", []) as Array: ## {id, tier, tile [x, y], flip}
+			var tile: Array = spec.tile as Array
+			place(String(spec.id), String(spec.tier), Vector2(float(tile[0]), float(tile[1])) * 16.0 + Vector2(8, 8), bool(spec.get("flip", false)))
 	if multiplayer.is_server():
 		multiplayer.peer_connected.connect(func(peer: int) -> void: _rpc_snapshot.rpc_id(peer, _spawned_list(), PackedStringArray(_opened.keys())))
 

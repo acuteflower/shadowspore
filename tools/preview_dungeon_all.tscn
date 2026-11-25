@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/preview_dungeon_all.gd" id="1"]
+
+[node name="PreviewDungeonAll" type="Node"]
+script = ExtResource("1")

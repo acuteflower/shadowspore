@@ -24,6 +24,8 @@ var _flare: float = 0.0
 var _sparks: float = 0.0
 var _target: Vector2 = Vector2.INF
 var _target_actor: Node2D
+var _route: Dictionary = {} ## QuestRoute.plan for a goal in another zone ({} or same = plain distance)
+var _route_tick: float = 0.0
 var _search: float = 0.0 ## radius in tiles of a search area (the map shows it): the goal is no exact place
 var _has_quest: bool = false
 var _tasks: Array = [] ## the jobs of a "tasks" step: {text, done, have, need, counter}
@@ -124,8 +126,32 @@ func _refresh(instant: bool) -> void:
 var _redraw_wait: float = 0.0
 
 
+## Where the goal lies against the zones (QuestRoute): an empty / same plan keeps the plain distance.
+func _update_route() -> void:
+	_route = {}
+	if _player == null or not is_instance_valid(_player):
+		return
+	var target: Vector2 = _target_actor.global_position if is_instance_valid(_target_actor) and _target_actor.is_inside_tree() else _target
+	if target == Vector2.INF:
+		return
+	var world: Node = get_tree().get_first_node_in_group("world")
+	var director: ZoneDirector = world.call("director") as ZoneDirector if world != null and world.has_method("director") else null
+	if director == null or director.atlas == null:
+		return
+	_route = QuestRoute.plan(director.atlas, director.continent_id, Interiors.outer(get_tree(), _player.global_position), target, director.flags())
+
+
+## The current route (tests, the way vine).
+func route() -> Dictionary:
+	return _route
+
+
 func _process(delta: float) -> void:
 	_time += delta
+	_route_tick -= delta
+	if _route_tick <= 0.0:
+		_route_tick = 0.5
+		_update_route()
 	var animating: bool = false
 	if _journal_focus_bloom and not InputManager.journal_open and not InputManager.map_open:
 		_journal_focus_bloom = false
@@ -216,28 +242,39 @@ func _draw() -> void:
 	var target_notice_top: float = 15.0
 	if _has_quest:
 		var text_alpha: float = branch_alpha * _wither_alpha()
+		var text_top: int = 38
 		var title_color: Color = Color(VineStyle.WARM_GLOW, text_alpha)
-		PixelText.draw(self, _title, Vector2i(right - PixelText.width(_title), 16), title_color, Color(VineStyle.OUTLINE, text_alpha))
+		HudText.draw(self, _title, Vector2(right - HudText.width(_title), 16), title_color, text_alpha)
 		var target: Vector2 = _target_actor.global_position if is_instance_valid(_target_actor) and _target_actor.is_inside_tree() else _target
-		if target != Vector2.INF and _player != null:
+		var head: String = QuestRoute.headline(_route)
+		if head != "" and target != Vector2.INF: ## the goal lies in another zone: first to the threshold (docs/hud_v2_konzept.md 3.C)
+			var shut: bool = not bool((_route.next as Dictionary).get("open", true))
+			var head_color: Color = Color(Color("8f8aa0") if shut else UiStyle.ACCENT, text_alpha * 0.95)
+			HudText.draw(self, head, Vector2(right - HudText.width(head), 26), head_color, text_alpha)
+			var sub: String = QuestRoute.subline(_route)
+			if sub != "":
+				sub = sub.left(LINE_CHARS)
+				HudText.draw(self, sub, Vector2(right - HudText.width(sub), 33), Color(UiStyle.TEXT_DIM, text_alpha * 0.85), text_alpha)
+				text_top = 46
+		elif target != Vector2.INF and _player != null:
 			var meters: String = "%d M" % roundi(Interiors.travel_distance(_player.global_position, target) / 16.0)
 			if _search > 0.0:
 				meters = "SUCHKREIS %d M" % roundi(_search)
-			PixelText.draw(self, meters, Vector2i(right - PixelText.width(meters), 26), Color(UiStyle.ACCENT, text_alpha * 0.9), Color(VineStyle.OUTLINE, text_alpha))
+			HudText.draw(self, meters, Vector2(right - HudText.width(meters), 26), Color(UiStyle.ACCENT, text_alpha * 0.9), text_alpha)
 		elif _has_area:
-			PixelText.draw(self, "SUCHGEBIET", Vector2i(right - PixelText.width("SUCHGEBIET"), 26), Color(UiStyle.ACCENT, text_alpha), Color(VineStyle.OUTLINE, text_alpha))
+			HudText.ink(self, "SUCHGEBIET", Vector2i(right - PixelText.width("SUCHGEBIET"), 26), Color(UiStyle.ACCENT, text_alpha), Color(VineStyle.OUTLINE, text_alpha))
 		var lines: PackedStringArray = _wrap(_text.left(int(_typed)))
 		for i: int in lines.size():
-			PixelText.draw(self, lines[i], Vector2i(right - PixelText.width(lines[i]), 38 + i * 9), Color(UiStyle.TEXT, text_alpha), Color(VineStyle.OUTLINE, text_alpha))
-		var task_y: int = 38 + lines.size() * 9 + 5
+			HudText.draw(self, lines[i], Vector2(right - HudText.width(lines[i]), text_top + i * 9), Color(UiStyle.TEXT, text_alpha), text_alpha)
+		var task_y: int = text_top + lines.size() * 9 + 5
 		for task: Dictionary in _tasks: ## the jobs of the step: a bud (lit when done), the words, a counter
 			var done: bool = bool(task.done)
 			var label: String = String(task.text)
 			if bool(task.counter):
 				label += "  %d/%d" % [int(task.have), int(task.need)]
 			var tint: Color = Color(UiStyle.ACCENT if done else UiStyle.TEXT_DIM, text_alpha * (1.0 if done else 0.9))
-			var width: int = PixelText.width(label)
-			PixelText.draw(self, label, Vector2i(right - width, task_y), tint, Color(VineStyle.OUTLINE, text_alpha))
+			var width: int = int(HudText.width(label))
+			HudText.draw(self, label, Vector2(right - width, task_y), tint, text_alpha)
 			var bud_at: Vector2 = Vector2(right - width - 7, task_y + 2)
 			draw_rect(Rect2(bud_at, Vector2(3, 3)), Color(UiStyle.ACCENT if done else VineStyle.BARK_LIGHT, text_alpha))
 			if done:
@@ -245,10 +282,10 @@ func _draw() -> void:
 			task_y += 10
 		if int(_typed) < _text.length() and int(_time * 6.0) % 2 == 0 and not lines.is_empty(): ## a blinking bud where the writing goes on
 			var last: int = lines.size() - 1
-			draw_rect(Rect2(right - PixelText.width(lines[last]) - 4, 40 + last * 9, 2, 2), Color(UiStyle.ACCENT, text_alpha))
+			draw_rect(Rect2(right - PixelText.width(lines[last]) - 4, text_top + 2 + last * 9, 2, 2), Color(UiStyle.ACCENT, text_alpha))
 		if _deadline != "":
 			var deadline: String = _deadline.to_upper()
-			PixelText.draw(self, deadline, Vector2i(right - PixelText.width(deadline), task_y + 2), Color(UiStyle.TEXT_DIM, text_alpha), Color(VineStyle.OUTLINE, text_alpha))
+			HudText.ink(self, deadline, Vector2i(right - PixelText.width(deadline), task_y + 2), Color(UiStyle.TEXT_DIM, text_alpha), Color(VineStyle.OUTLINE, text_alpha))
 		var full_lines: int = maxi(_wrap(_text).size(), lines.size())
 		var stable_task_y: int = 38 + full_lines * 9 + 5 + _tasks.size() * 10
 		var quest_bottom: int = stable_task_y + (11 if _deadline != "" else 0)
@@ -341,11 +378,11 @@ func _draw_board_notice(top_y: float, right: int, branch_alpha: float, void_leve
 		var row: Dictionary = row_texts[i]
 		var words: String = String(row.text)
 		var col: Color = Color(row.color as Color, card_alpha)
-		PixelText.draw(self, words, Vector2i(text_x, line_y + i * 9), col, Color(VineStyle.OUTLINE, card_alpha))
+		HudText.ink(self, words, Vector2i(text_x, line_y + i * 9), col, Color(VineStyle.OUTLINE, card_alpha))
 		var dt: String = String(row.get("dist", ""))
 		if dt != "":
 			var dx: int = text_x + PixelText.width(words + "  ")
-			PixelText.draw(self, dt, Vector2i(dx, line_y + i * 9), Color(UiStyle.ACCENT, card_alpha), Color(VineStyle.OUTLINE, card_alpha))
+			HudText.ink(self, dt, Vector2i(dx, line_y + i * 9), Color(UiStyle.ACCENT, card_alpha), Color(VineStyle.OUTLINE, card_alpha))
 
 
 func _wither_alpha() -> float:

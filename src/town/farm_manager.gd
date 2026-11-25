@@ -8,9 +8,9 @@ extends Node
 signal cell_changed(field_id: int, index: int, fx: String) ## a cell has a new state on this peer (fx: till, water, scrape, plant, harvest, grow, "")
 signal reset ## the whole table was replaced (load, snapshot)
 
-const REACH: float = 52.0 ## how far from a cell's middle the one who works it may stand (the swing's fan reaches about 22 px from her chest)
-const PLANT_REACH: float = 44.0
-const WATER_REFILL_REACH: float = 40.0 ## px: fountain stand, rain barrel or water bank
+const REACH: float = 64.0 ## how far from a cell's middle the one who works it may stand (matches expanded hoe/can reach)
+const PLANT_REACH: float = 56.0
+const WATER_REFILL_REACH: float = 52.0 ## px: fountain stand, rain barrel or water bank
 const RAIN_REFILL_MIN: float = 0.25 ## outdoors rain strength that lets an upward/air swing catch rainwater
 
 var town: TownManager
@@ -203,9 +203,9 @@ func _rpc_refill_fx(at: Vector2) -> void:
 	puff.z_index = 6
 	parent.add_child(puff)
 	get_tree().create_timer(1.0).timeout.connect(puff.queue_free)
-	if ResourceLoader.exists("res://assets/audio/farming/water.wav"):
+	if ResourceLoader.exists("res://assets/audio/farming/can_pour.wav"):
 		var audio: AudioStreamPlayer2D = AudioStreamPlayer2D.new()
-		audio.stream = load("res://assets/audio/farming/water.wav") as AudioStream
+		audio.stream = load("res://assets/audio/farming/can_pour.wav") as AudioStream
 		audio.global_position = at
 		audio.volume_db = -8.0
 		parent.add_child(audio)

@@ -1,5 +1,8 @@
 # Die Steinstadt im Westen – Konzept „HALLGRAT"
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 > Arbeitsname **Hallgrat** (Hall = Nachklang, Grat = Bergrücken). Alle Namen, Texte und Zahlen sind **Platzhalter und Vorschläge**, nichts davon ist gebaut. Dieses Dokument ist eine Ideensammlung zum gemeinsamen Aussortieren, kein Beschluss. Es folgt der Regel aus CLAUDE.md: Systeme, die nicht besprochen sind, werden nicht gebaut.
 
 ## 0. In einem Absatz
@@ -188,7 +191,7 @@ Schwarze Mauer und **Verlorenes Viertel** liegen an der Nordwestflanke (Ebene 1�
 | **Tamsa** | Glasschleiferin | frech, schnell, liebt Kristall; stellt Talisman-Steine her | will ein „echtes Leitstein-Herz" (Questkette) |
 | **Pim** | Lichtknecht, 14, entzündet die Laternen jeden Abend | Ellie begleitet ihn auf der Runde (Ritual-Szene) | Hallgrats Herzschlag; ohne ihn bleibt die Stadt dunkel |
 | **Sebald** | Archivar | pedantisch, sammelt Inschriften; gibt Karten | tauscht Fragmente gegen Funde |
-| **Hedda** | Wirtin | Hausmannskost, Gerüchte, Rezepte | **Küchenbuch**-Anbindung (Rezepte, die Ellie später kochen kann) |
+| **Hedda** | Wirtin | Hausmannskost, Gerüchte, Alchemie-Zutaten | **Alchemie-/Trank-Anbindung** (Kochen wurde durch Alchemie abgelöst) |
 | **Jorun und Familie** | Karawanenführer (wechselnd da) | bringen Fernes (Holz, Samen, Nachrichten aus dem Osten) | kommen alle paar Tage, wenn der Weg offen ist |
 | **Perrin** | blinder **Stimmer**, hört Resonanz | Questgeber der Stimmsteine (8.1) | kann Leitstein-Töne hören, die Ellie nur sieht |
 | **Hauptmann Corvin** | letzter Rotmantel der Garnison | kennt Valdric (oder tut so) | Story-Schlüssel (siehe 12, **Entscheidung**) |
@@ -266,7 +269,7 @@ Im Steinmetzhof steht ein halbfertiges Werk, ein Gesicht in Stein. Es wird **üb
 Nach der Erweckung kann Ellie am Mutterstein **etwas fragen** (kurze Auswahl, drei Themen: Stadt, Leere, Ellie). Die Antworten sind Stein-Stimme (kurze Sätze, Echo), aber jedes Mal etwas klarer. Hängt an der bestehenden Wegstein-Berührung (`begin_touch`).
 
 ### 8.9 **Das Stadt-Gedächtnis (Inschriften-Sammelbuch)**
-Überall in der Stadt, am Weg und im Untergrund liegen **Inschriften** (30–40 Stück): Gedenkplatten, Meisterzeichen, Kinderkritzeleien, Stadtgesetze, Spottverse. Jede lesen (E) = eine Zeile + Eintrag in ein Buch (`InscriptionBook`, persistiert wie `FishBook`/`CookingBook`). Sebald bewertet Vollständigkeit (Belohnungen: Rezept, Talisman, Kartenfragment). Das **ist** das Welt-Lore-System, ohne Textmauern.
+Überall in der Stadt, am Weg und im Untergrund liegen **Inschriften** (30–40 Stück): Gedenkplatten, Meisterzeichen, Kinderkritzeleien, Stadtgesetze, Spottverse. Jede lesen (E) = eine Zeile + Eintrag in ein Buch (`InscriptionBook`, persistiert wie `FishBook`). Sebald bewertet Vollständigkeit (Belohnungen: Rezept, Talisman, Kartenfragment). Das **ist** das Welt-Lore-System, ohne Textmauern.
 
 ### 8.10 **Die Stadt, die nach Steinen riecht** (Sinne)
 - Geräusch: pro Bezirk eine eigene Klangtapete (Fuß: Wind in Leere; Staffeln: Hämmern; Stille: Glocken, Stille; Westmauer: Leerenatem).

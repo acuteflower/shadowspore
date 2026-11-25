@@ -193,12 +193,21 @@ func step_ground_locomotion(
 	var slope_mult: float = _sample_slope_factor(raw_dir) if moving_input else 1.0
 	var combat_mult: float = MovementRules.combat_speed_scale(quadrant) if (in_combat and not now_sprinting) else 1.0
 	var step_glide_mult: float = float(MovementRules.section("spore_step").get("exit_glide_mult", 1.14)) if step_exit_left > 0.0 else 1.0
+	var zone_blessing_mult: float = 1.0
+	var vt_sys: VeilThreads = VeilThreads.of(_player.get_tree())
+	if vt_sys != null and vt_sys.collected_count() > 0:
+		var z_id: StringName = Atlas.shared().zone_at(&"main", _player.global_position)
+		if z_id != &"":
+			var zb: Dictionary = vt_sys.zone_blessing_status(z_id)
+			zone_blessing_mult += float(zb.get("speed_bonus", 0.0))
 	var target_speed: float = (
 		base_speed
 		* surf_mult
 		* slope_mult
 		* combat_mult
 		* step_glide_mult
+		* zone_blessing_mult
+		* clampf(_player.admin_speed_scale, 0.25, 4.0)
 		* _player._slow_factor()
 		* (Player.WOUND_SPEED if _player.wounded else 1.0)
 		* _player.attack.charge_move_factor()
@@ -368,7 +377,11 @@ func _compute_shadow_cover() -> float:
 	for grass_node: Node in get_tree().get_nodes_in_group("living_grass"):
 		var lg: LivingGrass = grass_node as LivingGrass
 		if lg != null and lg._bounds.has_point(_player.global_position):
-			cover = maxf(cover, 0.45)
+			var tall_k: float = lg.tallness_at(_player.global_position)
+			if tall_k >= 0.35:
+				cover = maxf(cover, lerpf(0.56, 0.84, clampf((tall_k - 0.35) / 0.65, 0.0, 1.0)))
+			elif lg.has_grass_near(_player.global_position):
+				cover = maxf(cover, 0.45)
 			break
 	for tree_node: Node in get_tree().get_nodes_in_group("bird_perches"):
 		var tree: Node2D = tree_node as Node2D

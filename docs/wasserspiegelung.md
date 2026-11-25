@@ -36,16 +36,17 @@ buildings show an upside-down mirror image in rivers, lakes and rain puddles.
 Built 2026-11-15. At night rivers and lakes mirror the sky: `assets/shaders/night_sky.gdshaderinc` (`night_sky_at`), added by
 the unlit, additive night pass `river_glow.gdshader` (the world-lit water would be swallowed by the night tint).
 
-- **Nailed to the screen, not the ground:** the sky is infinitely far, so its mirror image moves with the camera (walk along a
-  lake and the moon's reflection walks with her). Globals `g_sky_view` (view rect) and `g_sky` (x night run dusk 0 .. dawn 1,
+- **Anchored to the world, independent of Ellie:** stars, the Milky Way, the moon and its glade stay anchored in world
+  space (on a periodic world sky tile for the moon) so none of them slide along with Ellie as she moves; they drift only
+  slowly over the night and shimmer with ripples. Globals `g_sky_view` (view rect) and `g_sky` (x night run dusk 0 .. dawn 1,
   y moon phase, z sky strength, w moon brightness) are pushed by `NightAtmosphere` (`_push_sky`, `_push_transform`).
-- **Moon:** rises at the right of the screen, crosses high and sets left over the night; its real phase (`TimeManager.moon_phase`,
+- **Moon:** drifts east to west over the night across each world sky tile; its real phase (`TimeManager.moon_phase`,
   eight days; the reflection is upside down), dark seas, limb darkening, earthshine on the dark part, a dithered halo. Its rows slide
   with the ripples.
 - **Glade:** below (and a little above) the moon the water breaks the light into short bright dashes in rows that drift sideways;
   calm lakes keep it short and narrow, rivers, rain and storm throw it long and wide.
-- **Stars:** one candidate per 5x5 screen px, most faint, a few bright with a cross on calm water or smeared on choppy water, white,
-  blue or warm; a faint Milky Way band with dark lanes; the sky turns slowly over the night; crests make stars wink.
+- **Stars:** one candidate per 5x5 world px, most faint, a few bright with a cross on calm water or smeared on choppy water, white,
+  blue or warm; a faint Milky Way band with dark lanes; the sky turns slowly over the night independently of the camera; crests make stars wink.
 - Clouds (`cloud_thick`, thin veils let stars through), storm and fog hide the sky; mirror images of trees/people/houses cover it.
   Deep water mirrors more than shallow water. By day (`g_sky.z` 0) the pass returns at once.
 - Look: `tools/preview_world_rivers.tscn -- --lake=1 --sky --night --day=4 --weather=clear --capture=/abs.png`

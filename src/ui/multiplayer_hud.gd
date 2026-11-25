@@ -11,7 +11,7 @@ const COLLAPSED_H: float = 42.0
 const PLAYER_ROW_H: float = 11.0
 const ICONS_PATH: String = "res://assets/ui/menu_icons.png"
 
-var _expanded: bool = true
+var _expanded: bool = false ## the player list lives in the CompanionVine now; this stays the room badge (click to unfold)
 var _ip_index: int = 0
 var _toast_text: String = ""
 var _toast_timer: float = 0.0
@@ -48,7 +48,6 @@ func _on_session_changed() -> void:
 
 
 func _on_peer_joined(id: int) -> void:
-	_expanded = true
 	var pname: String = NetworkManager.player_name_for(id)
 	_show_toast("%s BEIGETRETEN" % pname, Color("a6e68f"))
 	queue_redraw()

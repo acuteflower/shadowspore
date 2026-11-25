@@ -5,6 +5,9 @@ extends Control
 ## effect is refreshed and stutters in the last second). Reads `StatusEffects` only; nothing is sent.
 
 const TAG_H: int = 17
+const MAX_TAGS: int = 4 ## more effects than this fold into one "+N" tag (docs/hud_v2_konzept.md 3.H)
+const GOOD: Color = Color("7fe0c8") ## a teal leaf on the tag of a good effect (status_effects.json `good`)
+const BAD: Color = Color("ff4fa8") ## a magenta thorn on a bad one
 const GAP: int = 3
 const PAPER: Color = Color("120d22")
 const PAPER_VOID: Color = Color("07030f")
@@ -65,6 +68,8 @@ const DROWSE: Array[String] = [
 
 var _effects: StatusEffects
 var _time: float = 0.0
+var _redraw_wait: float = 0.0
+const CALM_REDRAW_INTERVAL: float = 0.05 ## settled tags only tick their crack and pulse: 20 FPS (docs/hud_v2_konzept.md 8.4)
 var _shown: Dictionary = {} ## id -> 0..1 (how far its tag has dropped in)
 var _flare: Dictionary = {} ## id -> 0..1 (a refresh)
 var _last_left: Dictionary = {}
@@ -86,6 +91,7 @@ func _process(delta: float) -> void:
 	if _effects == null:
 		return
 	var any: bool = false
+	var moving: bool = false ## a tag drops in, fades out or flares
 	var ids: Array[String] = _effects.active()
 	for id: String in ids:
 		if bool(StatusEffects.definition(id).get("hidden", false)):
@@ -96,6 +102,8 @@ func _process(delta: float) -> void:
 		_last_left[id] = left
 		_shown[id] = minf(float(_shown.get(id, 0.0)) + delta * 4.0, 1.0)
 		_flare[id] = maxf(float(_flare.get(id, 0.0)) - delta * 3.0, 0.0)
+		if float(_shown[id]) < 1.0 or float(_flare[id]) > 0.0:
+			moving = true
 		any = true
 	for id: String in _shown.keys():
 		if not ids.has(id) or bool(StatusEffects.definition(id).get("hidden", false)):
@@ -105,9 +113,17 @@ func _process(delta: float) -> void:
 				_flare.erase(id)
 				_last_left.erase(id)
 			any = true
+			moving = true
 	visible = any
-	if any:
+	_redraw_wait -= delta
+	if any and (moving or _redraw_wait <= 0.0):
+		_redraw_wait = CALM_REDRAW_INTERVAL
 		queue_redraw()
+
+
+## Room it takes above the health vine (HUD director stacking): one row of tags while any shows.
+func hud_height() -> float:
+	return float(TAG_H + 3) if visible and not _shown.is_empty() else 0.0
 
 
 func _draw() -> void:
@@ -115,10 +131,16 @@ func _draw() -> void:
 		return
 	var void_level: float = VineStyle.void_amount()
 	var x: int = 0
+	var drawn: int = 0
+	var hidden: int = 0
 	for id: String in _shown.keys():
 		var p: float = float(_shown[id])
 		if p <= 0.0:
 			continue
+		if drawn >= MAX_TAGS:
+			hidden += 1
+			continue
+		drawn += 1
 		var def: Dictionary = StatusEffects.definition(id)
 		var tone: Color = Color(String(def.get("color", "ffffff")))
 		var hot: Color = Color(String(def.get("hot", "ffffff")))
@@ -140,12 +162,22 @@ func _draw() -> void:
 		var numeral: String = String(_tier_of.get(id, "")) if bool(def.get("tiered", false)) else ""
 		_draw_paper(Rect2i(x, y, width, TAG_H + (8 if numeral != "" else 0)), a, void_level, tone)
 		if numeral != "":
-			PixelText.draw(self, "STUFE " + numeral, Vector2i(x + 4, y + TAG_H), Color(hot, a * stutter), Color(VineStyle.OUTLINE, a))
+			HudText.ink(self, "STUFE " + numeral, Vector2i(x + 4, y + TAG_H), Color(hot, a * stutter), Color(VineStyle.OUTLINE, a))
 		_draw_glyph(Vector2i(x + 4, y + 4), tone.lerp(hot, 0.4 + 0.5 * flare), a * stutter, _glyph_of(String(def.get("glyph", ""))))
-		PixelText.draw(self, label, Vector2i(x + 13, y + 3), Color(tone.lerp(UiStyle.TEXT, 0.35 + 0.4 * flare), a * stutter), Color(VineStyle.OUTLINE, a))
+		HudText.ink(self, label, Vector2i(x + 13, y + 3), Color(tone.lerp(UiStyle.TEXT, 0.35 + 0.4 * flare), a * stutter), Color(VineStyle.OUTLINE, a))
 		_draw_crack(x + 4, y + 12, width - 8, frac, tone, hot, a * stutter, flare)
-		VineStyle.leaf(self, Vector2(x + width - 2, y + 2), 1, -1, 3, Color(VineStyle.LEAF.lerp(VineStyle.LEAF_VOID, void_level), a), Color(VineStyle.LEAF_LIGHT.lerp(VineStyle.LEAF_VOID_LIGHT, void_level), a))
+		if bool(def.get("good", false)): ## good: a teal leaf on the corner; bad: a magenta thorn
+			VineStyle.leaf(self, Vector2(x + width - 2, y + 2), 1, -1, 3, Color(GOOD.darkened(0.35), a), Color(GOOD, a))
+		else:
+			for k: int in 3:
+				draw_rect(Rect2(x + width - 3 + k, y + 2 - k, 1, 1), Color(BAD.lerp(Color.WHITE, 0.3 * float(k) / 2.0), a))
+			draw_rect(Rect2(x + width - 2, y + 3, 1, 1), Color(BAD.darkened(0.4), a))
 		x += width + GAP
+	if hidden > 0: ## the rest folded into one small tag
+		var more: String = "+%d" % hidden
+		var more_w: int = PixelText.width(more) + 8
+		_draw_paper(Rect2i(x, 0, more_w, TAG_H), 1.0, void_level, UiStyle.TEXT_DIM)
+		HudText.ink(self, more, Vector2i(x + 4, 6), UiStyle.TEXT, Color(VineStyle.OUTLINE, 1.0))
 
 
 func _glyph_of(glyph: String) -> Array[String]:

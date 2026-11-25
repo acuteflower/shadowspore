@@ -126,6 +126,12 @@ var _flow_y_buf: PackedFloat32Array = PackedFloat32Array()
 var _turb_buf: PackedFloat32Array = PackedFloat32Array()
 var _shadow_buf: PackedFloat32Array = PackedFloat32Array()
 var _petal_spawns: Array[Vector2] = []
+var _coast_shore_pts: PackedVector2Array = PackedVector2Array()
+var _coast_land_poly: PackedVector2Array = PackedVector2Array()
+var _brook_polylines: Array[PackedVector2Array] = []
+var _drift_offshore_tiles: float = SwimRules.OFFSHORE_START_TILES
+var _ocean_safety_tiles: float = SwimRules.OFFSHORE_MAX_TILES
+var _dry_sand_width_px: float = 130.0
 var _maps_built: bool = false
 var _committed: bool = false
 
@@ -184,6 +190,8 @@ var _snap_puddle: float = 0.0
 var _snap_rain: float = 0.0
 var _snap_golden: float = 0.0
 var _snap_night: float = 0.0
+var _sand_drift: Vector2 = Vector2.ZERO
+var _dune_creep: float = 0.0
 var _petal_timer: float = 0.4
 var _spray_timer: float = 0.15
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -252,6 +260,22 @@ func _process(delta: float) -> void:
 		RenderingServer.global_shader_parameter_set(&"g_water_time", _clock)
 
 	_sync_frame_snapshots()
+
+	# Advance live WorldWind-driven coastal sand drift & ripple migration (paused when rain-soaked)
+	var dry_k: float = 1.0 - smoothstep(0.18, 0.55, _snap_rain)
+	if dry_k > 0.01:
+		var wdir: Vector2 = _snap_wind_dir.normalized() if _snap_wind_dir.length_squared() > 0.0001 else Vector2(0.96, 0.26)
+		var g_soft: float = _snap_wind_gust if _snap_wind_gust <= 1.1 else (1.1 + 0.75 * tanh((_snap_wind_gust - 1.1) * 0.35))
+		var drift_spd: float = (13.0 + g_soft * 26.0 + _snap_storm * 34.0) * dry_k
+		_sand_drift += wdir * drift_spd * dt
+		_dune_creep += (0.26 + g_soft * 0.66 + _snap_storm * 0.72) * dry_k * dt
+		if _sand_drift.length_squared() > 1.0e11:
+			_sand_drift = Vector2(fmod(_sand_drift.x, 65536.0), fmod(_sand_drift.y, 65536.0))
+		if _dune_creep > 65536.0:
+			_dune_creep = fmod(_dune_creep, 4096.0)
+	if _surface_mat != null:
+		_surface_mat.set_shader_parameter("sand_drift", _sand_drift)
+		_surface_mat.set_shader_parameter("dune_creep", _dune_creep)
 
 	if _glow_rect != null:
 		var show_glow: bool = visible and _snap_night > 0.02
@@ -328,6 +352,12 @@ func setup_rect(world_rect: Rect2, cell_size_px: float = 2.0, params: Dictionary
 	_shadow_buf.resize(total)
 	_shadow_buf.fill(0.0)
 	_petal_spawns.clear()
+	_coast_shore_pts = PackedVector2Array()
+	_coast_land_poly = PackedVector2Array()
+	_brook_polylines.clear()
+	_drift_offshore_tiles = SwimRules.OFFSHORE_START_TILES
+	_ocean_safety_tiles = SwimRules.OFFSHORE_MAX_TILES
+	_dry_sand_width_px = 130.0
 	_maps_built = false
 
 
@@ -364,6 +394,13 @@ func _smooth_path(points: PackedVector3Array) -> PackedVector3Array:
 	return curve
 
 
+static func _smin(a: float, b: float, k: float) -> float:
+	if k <= 0.001:
+		return minf(a, b)
+	var h: float = maxf(k - absf(a - b), 0.0) / k
+	return minf(a, b) - h * h * k * 0.25
+
+
 func add_brook(points: PackedVector3Array, params: Dictionary = {}) -> void:
 	_ensure_setup()
 	if points.size() < 2:
@@ -377,68 +414,240 @@ func add_brook(points: PackedVector3Array, params: Dictionary = {}) -> void:
 	var pools: Array = params.get("pools", []) as Array
 	var noise_seed: float = float(params.get("shore_noise_seed", 17.0))
 
-	# Track upstream spawn points for V12 surface petals
+	# Track polyline & upstream spawn points for V12 surface petals and ambience
+	var poly2: PackedVector2Array = PackedVector2Array()
+	poly2.resize(curve.size())
+	var max_r: float = 24.0
+	var bb: Rect2 = Rect2(Vector2(curve[0].x, curve[0].y), Vector2.ZERO)
+	for ci: int in curve.size():
+		var pt2: Vector2 = Vector2(curve[ci].x, curve[ci].y)
+		poly2[ci] = pt2
+		max_r = maxf(max_r, curve[ci].z)
+		bb = bb.expand(pt2)
+	_brook_polylines.append(poly2)
 	if curve.size() >= 3:
 		for k: int in range(1, mini(4, curve.size())):
 			_petal_spawns.append(Vector2(curve[k].x, curve[k].y))
 
-	for iy: int in _map_h:
-		for ix: int in _map_w:
-			var p: Vector2 = _texel_world_center(ix, iy)
-			var shore_wobble: float = sin(p.y * 0.085 + noise_seed) * 2.1 + sin(p.y * 0.21 - p.x * 0.05) * 1.1
-			var best_sdf: float = INF
-			var best_radius: float = 24.0
-			var best_flow: Vector2 = Vector2.DOWN
-			for i: int in curve.size() - 1:
-				var a: Vector3 = curve[i]
-				var b: Vector3 = curve[i + 1]
-				var a2: Vector2 = Vector2(a.x, a.y)
-				var b2: Vector2 = Vector2(b.x, b.y)
-				var delta: Vector2 = b2 - a2
-				var l2: float = delta.length_squared()
-				if l2 <= 0.0001:
-					continue
+	# Extra margin covers natural trumpet-mouth estuary flaring & smooth-min shoreline fillets!
+	var flare_margin: float = 42.0
+	var reach: float = bank_w + 18.0 + flare_margin
+	bb = bb.grow(max_r + reach)
+	var bx0: int = clampi(floori((bb.position.x - bounds.position.x) / texel_px), 0, _map_w - 1)
+	var bx1: int = clampi(ceili((bb.end.x - bounds.position.x) / texel_px), 0, _map_w - 1)
+	var by0: int = clampi(floori((bb.position.y - bounds.position.y) / texel_px), 0, _map_h - 1)
+	var by1: int = clampi(ceili((bb.end.y - bounds.position.y) / texel_px), 0, _map_h - 1)
+	if bx1 < bx0 or by1 < by0:
+		return
+
+	var bw: int = bx1 - bx0 + 1
+	var bh: int = by1 - by0 + 1
+	var bsize: int = bw * bh
+	var local_sdf: PackedFloat32Array = PackedFloat32Array()
+	var local_rad: PackedFloat32Array = PackedFloat32Array()
+	var local_fx: PackedFloat32Array = PackedFloat32Array()
+	var local_fy: PackedFloat32Array = PackedFloat32Array()
+	local_sdf.resize(bsize)
+	local_sdf.fill(INF)
+	local_rad.resize(bsize)
+	local_rad.fill(24.0)
+	local_fx.resize(bsize)
+	local_fx.fill(0.0)
+	local_fy.resize(bsize)
+	local_fy.fill(1.0)
+
+	# Stamp per segment in each segment's tight local rectangle (O(segments * local_area), ~100x faster on large zones!)
+	for i: int in curve.size() - 1:
+		var a: Vector3 = curve[i]
+		var b: Vector3 = curve[i + 1]
+		var a2: Vector2 = Vector2(a.x, a.y)
+		var b2: Vector2 = Vector2(b.x, b.y)
+		var delta: Vector2 = b2 - a2
+		var l2: float = delta.length_squared()
+		if l2 <= 0.0001:
+			continue
+		var fdir: Vector2 = delta / sqrt(l2)
+		var seg_pad: float = maxf(a.z, b.z) + reach
+		var sx0: int = clampi(floori((minf(a2.x, b2.x) - seg_pad - bounds.position.x) / texel_px), bx0, bx1)
+		var sx1: int = clampi(ceili((maxf(a2.x, b2.x) + seg_pad - bounds.position.x) / texel_px), bx0, bx1)
+		var sy0: int = clampi(floori((minf(a2.y, b2.y) - seg_pad - bounds.position.y) / texel_px), by0, by1)
+		var sy1: int = clampi(ceili((maxf(a2.y, b2.y) + seg_pad - bounds.position.y) / texel_px), by0, by1)
+		for iy: int in range(sy0, sy1 + 1):
+			var row_off: int = (iy - by0) * bw
+			for ix: int in range(sx0, sx1 + 1):
+				var p: Vector2 = _texel_world_center(ix, iy)
 				var t: float = clampf((p - a2).dot(delta) / l2, 0.0, 1.0)
 				var radius: float = lerpf(a.z, b.z, t)
 				var dist: float = p.distance_to(a2 + delta * t)
-				var sdf: float = dist - radius - shore_wobble
-				if sdf < best_sdf:
-					best_sdf = sdf
-					best_radius = radius
-					best_flow = delta.normalized()
+				var raw_sdf: float = dist - radius
+				var li: int = row_off + (ix - bx0)
+				if raw_sdf < local_sdf[li]:
+					local_sdf[li] = raw_sdf
+					local_rad[li] = radius
+					local_fx[li] = fdir.x
+					local_fy[li] = fdir.y
 
+	for ly: int in bh:
+		var iy: int = by0 + ly
+		var row_off: int = ly * bw
+		for lx: int in bw:
+			var li: int = row_off + lx
+			var raw_s: float = local_sdf[li]
+			if raw_s > bank_w + 16.0 + flare_margin:
+				continue
+			var ix: int = bx0 + lx
+			var p: Vector2 = _texel_world_center(ix, iy)
+			var shore_wobble: float = sin(p.y * 0.085 + noise_seed) * 2.1 + sin(p.y * 0.21 - p.x * 0.05) * 1.1
+			var best_sdf: float = raw_s - shore_wobble
+			var idx: int = iy * _map_w + ix
+			var prev_reg: int = int(_regime_buf[idx])
+			var prev_bed: int = int(_bed_buf[idx])
+			var prev_sdf: float = _sdf_buf[idx]
+			var prev_is_coast: bool = (
+				prev_reg == WR.REGIME_SURF
+				or prev_reg == WR.REGIME_OCEAN
+				or (prev_reg == WR.REGIME_LAND and (prev_bed == WR.BED_SAND or prev_bed == WR.BED_ROCK))
+			)
+
+			# --- 1. Coastal Estuary / River-Meets-Sea Union (smooth-min shoreline + flared sandy mouth + brackish plume!) ---
+			if prev_is_coast:
+				var estuary_k: float = clampf(1.0 - smoothstep(-14.0, 96.0, prev_sdf), 0.0, 1.0)
+				var mouth_flare: float = estuary_k * estuary_k * 26.0
+				var eff_rad: float = maxf(local_rad[li] + mouth_flare, 1.0)
+				var eff_brook_sdf: float = best_sdf - mouth_flare
+				if eff_brook_sdf > bank_w + 34.0:
+					continue
+
+				if prev_reg == WR.REGIME_OCEAN:
+					if eff_brook_sdf <= 24.0 and prev_sdf > -80.0:
+						var plume_oc: float = (1.0 - smoothstep(-8.0, 24.0, eff_brook_sdf)) * (1.0 - smoothstep(16.0, 80.0, -prev_sdf))
+						var cf_o: Vector2 = Vector2(_flow_x_buf[idx], _flow_y_buf[idx]).lerp(Vector2(local_fx[li], local_fy[li]), plume_oc * 0.45)
+						_flow_x_buf[idx] = clampf(cf_o.x, -1.0, 1.0)
+						_flow_y_buf[idx] = clampf(cf_o.y, -1.0, 1.0)
+					continue
+
+				var fillet_k: float = lerpf(18.0, 36.0, estuary_k)
+				var union_sdf: float = _smin(prev_sdf, eff_brook_sdf, fillet_k)
+				var norm_in_e: float = clampf(-eff_brook_sdf / eff_rad, 0.0, 1.0)
+				# Natural sandy mouth-bar shoaling: river smoothly shallows over sunlit estuary sand (0.26..0.34)
+				# instead of cutting a dark deep-ocean trench across bright shallow bay shoals!
+				var bar_shoal: float = lerpf(1.0, 0.44, estuary_k * estuary_k)
+				var chan_d: float = pow(norm_in_e, 0.74) * base_depth * bar_shoal
+
+				if prev_reg == WR.REGIME_SURF:
+					_sdf_buf[idx] = clampf(union_sdf, -128.0, 127.0)
+					if prev_sdf <= 16.0:
+						# Seaward mouth & bay: keep REGIME_SURF so waves curve smoothly around sandy estuary spits!
+						if eff_brook_sdf <= 14.0:
+							var sea_fade: float = 1.0 - smoothstep(4.0, 68.0, -prev_sdf)
+							var mouth_d: float = clampf(chan_d * sea_fade, 0.04, 0.34)
+							if union_sdf <= 0.0:
+								_depth_buf[idx] = clampf(maxf(_depth_buf[idx], mouth_d), 0.04, 1.0)
+						var plume_w: float = (1.0 - smoothstep(-10.0, 32.0, eff_brook_sdf)) * (1.0 - smoothstep(0.0, 74.0, -prev_sdf))
+						if plume_w > 0.01:
+							var cur_f: Vector2 = Vector2(_flow_x_buf[idx], _flow_y_buf[idx])
+							var out_f: Vector2 = Vector2(local_fx[li], local_fy[li])
+							var mix_f: Vector2 = cur_f.lerp(out_f, plume_w * 0.86)
+							_flow_x_buf[idx] = clampf(mix_f.x, -1.0, 1.0)
+							_flow_y_buf[idx] = clampf(mix_f.y, -1.0, 1.0)
+							# Gentle organic brackish turbulence inside outflow plume (never a hard straight bar line!)
+							var eddy_t: float = (0.5 + 0.5 * sin(p.x * 0.09 + p.y * 0.07)) * plume_w * (1.0 - smoothstep(0.0, 44.0, -prev_sdf))
+							_turb_buf[idx] = clampf(maxf(_turb_buf[idx], eddy_t * 0.22), 0.0, 1.0)
+					else:
+						# Upper swash margin (16..40 px inland): river channel transitions seamlessly into beach sand!
+						if eff_brook_sdf <= 4.0:
+							_regime_buf[idx] = WR.REGIME_BROOK
+							_flow_x_buf[idx] = local_fx[li]
+							_flow_y_buf[idx] = local_fy[li]
+							_bed_buf[idx] = WR.BED_SAND if prev_bed == WR.BED_SAND else prev_bed
+							_depth_buf[idx] = clampf(maxf(_depth_buf[idx], chan_d), 0.03, 1.0) if union_sdf <= 0.0 else 0.0
+					continue
+
+				# Dry coastal beach sand / headland rock (`prev_reg == REGIME_LAND` with `BED_SAND` / `BED_ROCK`):
+				if eff_brook_sdf <= bank_w + 12.0:
+					_sdf_buf[idx] = clampf(union_sdf, -128.0, 127.0)
+					if eff_brook_sdf <= 6.0:
+						_regime_buf[idx] = WR.REGIME_BROOK
+						_flow_x_buf[idx] = local_fx[li]
+						_flow_y_buf[idx] = local_fy[li]
+						if union_sdf <= 0.0:
+							_depth_buf[idx] = clampf(chan_d, 0.03, 1.0)
+							_bed_buf[idx] = WR.BED_SAND if estuary_k > 0.25 else bed_id
+						else:
+							_depth_buf[idx] = 0.0
+							# Keep beach sand bed on dry estuary banks so shader renders damp sand, NOT forest moss!
+							_bed_buf[idx] = prev_bed
+				continue
+
+			# --- 2. Inland Brook, Confluence, & Lake Inlet/Outlet ---
 			if best_sdf > bank_w + 12.0:
 				continue
-			var idx: int = iy * _map_w + ix
-			var prev_reg: int = _regime_buf[idx]
-			if prev_reg == WR.REGIME_LAND or best_sdf < _sdf_buf[idx]:
+
+			var norm_in: float = clampf(-best_sdf / maxf(local_rad[li], 1.0), 0.0, 1.0)
+			var d_val: float = pow(norm_in, 0.72) * base_depth
+			var local_bed: int = bed_id
+			if best_sdf <= 0.0:
+				for pool_v: Variant in pools:
+					var pool: Dictionary = pool_v as Dictionary
+					var pc: Vector2 = pool.get("pos", Vector2.ZERO) as Vector2
+					var pr: float = maxf(float(pool.get("radius", 28.0)), 1.0)
+					var pd: float = p.distance_to(pc)
+					if pd < pr:
+						var pw: float = 1.0 - smoothstep(pr * 0.25, pr, pd)
+						d_val = lerpf(d_val, float(pool.get("depth", 0.86)), pw)
+						if pw > 0.45:
+							local_bed = int(pool.get("bed", WR.BED_SILT))
+				for ford_v: Variant in fords:
+					var ford: Dictionary = ford_v as Dictionary
+					var fc: Vector2 = ford.get("pos", Vector2.ZERO) as Vector2
+					var fr: float = maxf(float(ford.get("radius", 32.0)), 1.0)
+					var fd: float = p.distance_to(fc)
+					if fd < fr:
+						var fw: float = 1.0 - smoothstep(fr * 0.30, fr, fd)
+						d_val = lerpf(d_val, minf(d_val, float(ford.get("depth", 0.26))), fw)
+						local_bed = int(ford.get("bed", WR.BED_PEBBLE))
+
+			if prev_reg == WR.REGIME_LAKE:
+				var lake_union: float = _smin(prev_sdf, best_sdf, 20.0)
+				_sdf_buf[idx] = clampf(lake_union, -128.0, 127.0)
+				if prev_sdf <= 0.0:
+					# Inside lake basin: smoothly blend depth & inject tapered inflow/outflow current ripples!
+					if best_sdf <= 12.0:
+						var in_fade: float = (1.0 - smoothstep(-6.0, 12.0, best_sdf)) * (1.0 - smoothstep(0.0, 44.0, -prev_sdf))
+						_depth_buf[idx] = clampf(maxf(_depth_buf[idx], d_val * 0.88), 0.04, 1.0)
+						var lf: Vector2 = Vector2(_flow_x_buf[idx], _flow_y_buf[idx]).lerp(Vector2(local_fx[li], local_fy[li]) * 0.65, in_fade * 0.80)
+						_flow_x_buf[idx] = clampf(lf.x, -1.0, 1.0)
+						_flow_y_buf[idx] = clampf(lf.y, -1.0, 1.0)
+						_turb_buf[idx] = clampf(maxf(_turb_buf[idx], in_fade * 0.24), 0.0, 1.0)
+				elif best_sdf <= 2.0:
+					_regime_buf[idx] = WR.REGIME_BROOK
+					_flow_x_buf[idx] = local_fx[li]
+					_flow_y_buf[idx] = local_fy[li]
+					_depth_buf[idx] = clampf(d_val, 0.03, 1.0) if lake_union <= 0.0 else 0.0
+					_bed_buf[idx] = local_bed if lake_union <= 0.0 else (bed_id if lake_union < 6.0 else bank_bed)
+				continue
+
+			if prev_reg == WR.REGIME_BROOK:
+				# Smooth river-meets-river confluence!
+				var conf_sdf: float = _smin(prev_sdf, best_sdf, 16.0)
+				_sdf_buf[idx] = clampf(conf_sdf, -128.0, 127.0)
+				var mf: Vector2 = Vector2(_flow_x_buf[idx] + local_fx[li], _flow_y_buf[idx] + local_fy[li])
+				if mf.length_squared() > 0.001:
+					mf = mf.normalized()
+					_flow_x_buf[idx] = mf.x
+					_flow_y_buf[idx] = mf.y
+				if conf_sdf <= 0.0:
+					_depth_buf[idx] = clampf(maxf(_depth_buf[idx], d_val), 0.03, 1.0)
+					if best_sdf < prev_sdf:
+						_bed_buf[idx] = local_bed
+				continue
+
+			if prev_reg == WR.REGIME_LAND or best_sdf < prev_sdf:
 				_sdf_buf[idx] = clampf(best_sdf, -128.0, 127.0)
 				_regime_buf[idx] = WR.REGIME_BROOK
-				_flow_x_buf[idx] = best_flow.x
-				_flow_y_buf[idx] = best_flow.y
+				_flow_x_buf[idx] = local_fx[li]
+				_flow_y_buf[idx] = local_fy[li]
 				if best_sdf <= 0.0:
-					var norm_in: float = clampf(-best_sdf / maxf(best_radius, 1.0), 0.0, 1.0)
-					var d_val: float = pow(norm_in, 0.72) * base_depth
-					var local_bed: int = bed_id
-					for pool_v: Variant in pools:
-						var pool: Dictionary = pool_v as Dictionary
-						var pc: Vector2 = pool.get("pos", Vector2.ZERO) as Vector2
-						var pr: float = maxf(float(pool.get("radius", 28.0)), 1.0)
-						var pd: float = p.distance_to(pc)
-						if pd < pr:
-							var pw: float = 1.0 - smoothstep(pr * 0.25, pr, pd)
-							d_val = lerpf(d_val, float(pool.get("depth", 0.86)), pw)
-							if pw > 0.45:
-								local_bed = int(pool.get("bed", WR.BED_SILT))
-					for ford_v: Variant in fords:
-						var ford: Dictionary = ford_v as Dictionary
-						var fc: Vector2 = ford.get("pos", Vector2.ZERO) as Vector2
-						var fr: float = maxf(float(ford.get("radius", 32.0)), 1.0)
-						var fd: float = p.distance_to(fc)
-						if fd < fr:
-							var fw: float = 1.0 - smoothstep(fr * 0.30, fr, fd)
-							d_val = lerpf(d_val, minf(d_val, float(ford.get("depth", 0.26))), fw)
-							local_bed = int(ford.get("bed", WR.BED_PEBBLE))
 					_depth_buf[idx] = clampf(d_val, 0.03, 1.0)
 					_bed_buf[idx] = local_bed
 				else:
@@ -456,24 +665,59 @@ func add_lake(center: Vector2, radii: Vector2, params: Dictionary = {}) -> void:
 	var bank_bed: int = int(params.get("bank_bed", WR.BED_MUD))
 	var noise_seed: float = float(params.get("seed", 31.0))
 
-	for iy: int in _map_h:
-		for ix: int in _map_w:
+	var pad_x: float = rx * 1.15 + bank_w + 26.0
+	var pad_y: float = ry * 1.15 + bank_w + 26.0
+	var x0: int = clampi(floori((center.x - pad_x - bounds.position.x) / texel_px), 0, _map_w - 1)
+	var x1: int = clampi(ceili((center.x + pad_x - bounds.position.x) / texel_px), 0, _map_w - 1)
+	var y0: int = clampi(floori((center.y - pad_y - bounds.position.y) / texel_px), 0, _map_h - 1)
+	var y1: int = clampi(ceili((center.y + pad_y - bounds.position.y) / texel_px), 0, _map_h - 1)
+
+	for iy: int in range(y0, y1 + 1):
+		for ix: int in range(x0, x1 + 1):
 			var p: Vector2 = _texel_world_center(ix, iy)
 			var rel: Vector2 = Vector2((p.x - center.x) / rx, (p.y - center.y) / ry)
 			var ang: float = atan2(rel.y, rel.x)
 			var warp: float = 0.06 * sin(ang * 3.0 + noise_seed) + 0.035 * cos(ang * 5.0 - noise_seed * 0.7)
 			var d_norm: float = rel.length() - warp
 			var sdf: float = (d_norm - 1.0) * minf(rx, ry)
-			if sdf > bank_w + 12.0:
+			if sdf > bank_w + 24.0:
 				continue
 			var idx: int = iy * _map_w + ix
-			if _regime_buf[idx] == WR.REGIME_LAND or sdf < _sdf_buf[idx]:
+			var prev_reg: int = int(_regime_buf[idx])
+			var prev_sdf: float = _sdf_buf[idx]
+			var lake_d: float = clampf(pow(clampf(1.0 - d_norm, 0.0, 1.0), 0.70) * max_depth, 0.04, 1.0) if sdf <= 0.0 else 0.0
+
+			if prev_reg == WR.REGIME_BROOK:
+				# Smooth river-to-lake inlet/outlet union with tapered inflow current instead of hard velocity cutoff!
+				var union_sdf: float = _smin(prev_sdf, sdf, 20.0)
+				_sdf_buf[idx] = clampf(union_sdf, -128.0, 127.0)
+				if sdf <= 2.0:
+					_regime_buf[idx] = WR.REGIME_LAKE
+					var flow_taper: float = clampf(1.0 - maxf(-sdf, 0.0) / 40.0, 0.0, 1.0) * 0.65
+					_flow_x_buf[idx] *= flow_taper
+					_flow_y_buf[idx] *= flow_taper
+					if union_sdf <= 0.0:
+						_depth_buf[idx] = clampf(maxf(_depth_buf[idx], lake_d), 0.04, 1.0)
+						if sdf < -8.0:
+							_bed_buf[idx] = bed_id
+				continue
+
+			if prev_reg == WR.REGIME_LAKE:
+				var union_l: float = _smin(prev_sdf, sdf, 18.0)
+				_sdf_buf[idx] = clampf(union_l, -128.0, 127.0)
+				if union_l <= 0.0:
+					_depth_buf[idx] = clampf(maxf(_depth_buf[idx], lake_d), 0.04, 1.0)
+				continue
+
+			if prev_reg == WR.REGIME_LAND or sdf < prev_sdf:
+				if sdf > bank_w + 12.0:
+					continue
 				_sdf_buf[idx] = clampf(sdf, -128.0, 127.0)
 				_regime_buf[idx] = WR.REGIME_LAKE
 				_flow_x_buf[idx] = 0.0
 				_flow_y_buf[idx] = 0.0
 				if sdf <= 0.0:
-					_depth_buf[idx] = clampf(pow(clampf(1.0 - d_norm, 0.0, 1.0), 0.7) * max_depth, 0.04, 1.0)
+					_depth_buf[idx] = lake_d
 					_bed_buf[idx] = bed_id
 				else:
 					_depth_buf[idx] = 0.0
@@ -582,6 +826,373 @@ func add_ocean(ocean_rect: Rect2, shelf_start_x: float, params: Dictionary = {})
 			_flow_y_buf[idx] = 0.0
 
 
+## General curved coastline + surf bay + open ocean builder for v2 coastal zones (e.g. WINDKAP).
+## Worker-safe (operates purely on authoring float/byte buffers before `build_images_only()`).
+## - `shore_pts_px`: shoreline polyline in world px (separates dry beach/land from sea).
+## - `dry_land_poly_px`: closed polygon of dry land inside the zone (replacing the water arc with `shore_pts_px`).
+## - `footprint_poly_px`: closed full zone footprint polygon in world px (includes the bay between `shore_pts_px` and water border).
+## - `water_edges_px`: pairs of Vector2 (a, b) for water-border segments on `footprint_poly_px`.
+## - `non_water_edges_px`: pairs of Vector2 (a, b) for non-water-border segments on `footprint_poly_px`.
+func add_curved_coast_and_ocean(
+	shore_pts_px: PackedVector2Array,
+	dry_land_poly_px: PackedVector2Array,
+	footprint_poly_px: PackedVector2Array,
+	water_edges_px: PackedVector2Array,
+	non_water_edges_px: PackedVector2Array,
+	params: Dictionary = {}
+) -> void:
+	_ensure_setup()
+	if shore_pts_px.size() < 2 or dry_land_poly_px.size() < 3 or footprint_poly_px.size() < 3:
+		return
+	var dry_sand_width: float = float(params.get("dry_sand_width", 96.0))
+	var swash_margin: float = float(params.get("swash_margin", 40.0))
+	var max_surf_depth: float = float(params.get("max_surf_depth", 0.465))
+	var surf_span: float = maxf(float(params.get("surf_span", 112.0)), 32.0)
+	var shelf_width: float = maxf(float(params.get("shelf_width", 224.0)), 32.0)
+	var max_ocean_depth: float = float(params.get("max_ocean_depth", 1.0))
+	var headlands: Array = params.get("headlands", []) as Array
+	var reefs: Array = params.get("reefs", []) as Array
+	var seed_v: float = float(params.get("seed", 42.0))
+
+	_coast_shore_pts = shore_pts_px.duplicate()
+	_coast_land_poly = dry_land_poly_px.duplicate()
+	_drift_offshore_tiles = float(params.get("drift_offshore_tiles", SwimRules.OFFSHORE_START_TILES))
+	_ocean_safety_tiles = float(params.get("ocean_safety_tiles", SwimRules.OFFSHORE_MAX_TILES))
+	_dry_sand_width_px = dry_sand_width
+
+	var total: int = _map_w * _map_h
+	# 1. Exact per-texel scanline rasterization of dry_land_poly and footprint_poly (~8 ms total)
+	var in_dry: PackedByteArray = _rasterize_polygon_mask(dry_land_poly_px)
+	var in_foot: PackedByteArray = _rasterize_polygon_mask(footprint_poly_px)
+
+	# 2. Coarse 16px Chamfer Voronoi to classify outside-footprint sea vs non-water borders AND far-offshore distance
+	var coarse_px: float = 16.0
+	var cw: int = maxi(4, ceili(bounds.size.x / coarse_px))
+	var ch: int = maxi(4, ceili(bounds.size.y / coarse_px))
+	var ctotal: int = cw * ch
+	var c_dist: PackedFloat32Array = PackedFloat32Array()
+	var c_label: PackedByteArray = PackedByteArray() ## 0 unset, 1 water border, 2 non-water border
+	var c_shore_dist: PackedFloat32Array = PackedFloat32Array()
+	c_dist.resize(ctotal)
+	c_dist.fill(INF)
+	c_label.resize(ctotal)
+	c_label.fill(0)
+	c_shore_dist.resize(ctotal)
+	c_shore_dist.fill(INF)
+
+	_stamp_coarse_edges(water_edges_px, 1, c_dist, c_label, cw, ch, coarse_px)
+	_stamp_coarse_edges(non_water_edges_px, 2, c_dist, c_label, cw, ch, coarse_px)
+	_chamfer_coarse_voronoi(c_dist, c_label, cw, ch, coarse_px)
+
+	var shore_pairs: PackedVector2Array = PackedVector2Array()
+	for si: int in shore_pts_px.size() - 1:
+		shore_pairs.append(shore_pts_px[si])
+		shore_pairs.append(shore_pts_px[si + 1])
+	var dummy_lbl: PackedByteArray = PackedByteArray()
+	dummy_lbl.resize(ctotal)
+	dummy_lbl.fill(0)
+	_stamp_coarse_edges(shore_pairs, 1, c_shore_dist, dummy_lbl, cw, ch, coarse_px)
+	_chamfer_coarse_voronoi(c_shore_dist, dummy_lbl, cw, ch, coarse_px)
+
+	# 3. Exact floating-point Euclidean distance to shore_pts_px within the coastal & surf band
+	var exact_band: float = maxf(dry_sand_width + 36.0, surf_span + 64.0)
+	var band_sq: float = exact_band * exact_band
+	var dist_sq: PackedFloat32Array = PackedFloat32Array()
+	dist_sq.resize(total)
+	dist_sq.fill(band_sq)
+	for si: int in shore_pts_px.size() - 1:
+		var a: Vector2 = shore_pts_px[si]
+		var b: Vector2 = shore_pts_px[si + 1]
+		var ab: Vector2 = b - a
+		var l2: float = ab.length_squared()
+		if l2 <= 0.0001:
+			continue
+		var sx0: int = clampi(floori((minf(a.x, b.x) - exact_band - bounds.position.x) / texel_px), 0, _map_w - 1)
+		var sx1: int = clampi(ceili((maxf(a.x, b.x) + exact_band - bounds.position.x) / texel_px), 0, _map_w - 1)
+		var sy0: int = clampi(floori((minf(a.y, b.y) - exact_band - bounds.position.y) / texel_px), 0, _map_h - 1)
+		var sy1: int = clampi(ceili((maxf(a.y, b.y) + exact_band - bounds.position.y) / texel_px), 0, _map_h - 1)
+		for iy: int in range(sy0, sy1 + 1):
+			var row_off: int = iy * _map_w
+			var py: float = bounds.position.y + (float(iy) + 0.5) * texel_px
+			for ix: int in range(sx0, sx1 + 1):
+				var px: float = bounds.position.x + (float(ix) + 0.5) * texel_px
+				var t: float = clampf(((px - a.x) * ab.x + (py - a.y) * ab.y) / l2, 0.0, 1.0)
+				var dx: float = px - (a.x + ab.x * t)
+				var dy: float = py - (a.y + ab.y * t)
+				var d2: float = dx * dx + dy * dy
+				var idx: int = row_off + ix
+				if d2 < dist_sq[idx]:
+					dist_sq[idx] = d2
+
+	# 4. Populate authoring buffers across beach sand, surf swash, bay & deep ocean shelf
+	for iy: int in _map_h:
+		var py: float = bounds.position.y + (float(iy) + 0.5) * texel_px
+		var cy: int = clampi(floori((py - bounds.position.y) / coarse_px), 0, ch - 1)
+		var row_off: int = iy * _map_w
+		var crow_off: int = cy * cw
+		for ix: int in _map_w:
+			var idx: int = row_off + ix
+			var px: float = bounds.position.x + (float(ix) + 0.5) * texel_px
+			var dry: bool = in_dry[idx] == 1
+			var is_sea: bool = false
+			if not dry:
+				if in_foot[idx] == 1:
+					is_sea = true
+				else:
+					var cx: int = clampi(floori((px - bounds.position.x) / coarse_px), 0, cw - 1)
+					is_sea = c_label[crow_off + cx] == 1
+			if not dry and not is_sea:
+				continue
+
+			var d2: float = dist_sq[idx]
+			if dry and d2 >= band_sq:
+				continue
+
+			var d_shore: float = sqrt(d2) if d2 < band_sq else maxf(exact_band, c_shore_dist[crow_off + clampi(floori((px - bounds.position.x) / coarse_px), 0, cw - 1)])
+			var shore_noise: float = sin((px + py) * 0.036 + seed_v) * 4.2 + sin((px - py) * 0.11 - seed_v * 0.4) * 1.8
+
+			var in_headland: bool = false
+			for hl_v: Variant in headlands:
+				var hl: Dictionary = hl_v as Dictionary
+				var hc: Vector2 = hl.get("center", Vector2.ZERO) as Vector2
+				var hr: Vector2 = hl.get("radii", Vector2(40.0, 28.0)) as Vector2
+				var rel: Vector2 = Vector2((px - hc.x) / maxf(hr.x, 1.0), (py - hc.y) / maxf(hr.y, 1.0))
+				if rel.length() <= 1.0 + 0.12 * sin(atan2(rel.y, rel.x) * 4.0 + seed_v):
+					in_headland = true
+					break
+
+			if dry:
+				var sdf: float = d_shore + shore_noise
+				var dune_wobble: float = sin((px - py) * 0.048 + 1.3) * 10.0 + cos((px + py) * 0.12) * 5.0
+				if sdf <= swash_margin:
+					_sdf_buf[idx] = clampf(sdf, -128.0, 127.0)
+					_regime_buf[idx] = WR.REGIME_SURF
+					_bed_buf[idx] = WR.BED_ROCK if in_headland else WR.BED_SAND
+					_depth_buf[idx] = 0.0
+					_flow_x_buf[idx] = 0.22
+					_flow_y_buf[idx] = -0.25
+				elif sdf <= dry_sand_width + dune_wobble or in_headland:
+					_sdf_buf[idx] = clampf(sdf, -128.0, 127.0)
+					_regime_buf[idx] = WR.REGIME_LAND
+					_bed_buf[idx] = WR.BED_ROCK if in_headland else WR.BED_SAND
+					_depth_buf[idx] = 0.0
+			else:
+				var sdf_sea: float = -d_shore + shore_noise
+				var surf_edge_wob: float = sin((px + py) * 0.042) * 8.0 + cos((px - py) * 0.11) * 3.0
+				var local_surf_span: float = surf_span + surf_edge_wob
+				if sdf_sea > -local_surf_span:
+					_sdf_buf[idx] = clampf(sdf_sea, -128.0, 127.0)
+					_regime_buf[idx] = WR.REGIME_SURF
+					_bed_buf[idx] = WR.BED_ROCK if in_headland else WR.BED_SAND
+					_flow_x_buf[idx] = 0.22
+					_flow_y_buf[idx] = -0.25
+					if sdf_sea <= 0.0:
+						var t_sea: float = clampf(-sdf_sea / maxf(local_surf_span, 24.0), 0.0, 1.0)
+						_depth_buf[idx] = clampf(0.06 + pow(t_sea, 0.78) * (max_surf_depth - 0.06), 0.04, max_surf_depth)
+					else:
+						_depth_buf[idx] = 0.0
+				else:
+					var dist_ocean: float = maxf(-sdf_sea - local_surf_span, 0.0)
+					var t_shelf: float = smoothstep(0.0, shelf_width, dist_ocean)
+					var d_val: float = lerpf(max_surf_depth, max_ocean_depth, t_shelf)
+					var bed_id: int = WR.BED_SAND
+					for rf_v: Variant in reefs:
+						var rf: Dictionary = rf_v as Dictionary
+						var rc: Vector2 = rf.get("center", Vector2.ZERO) as Vector2
+						var rr: Vector2 = rf.get("radii", Vector2(44.0, 26.0)) as Vector2
+						var rel_r: Vector2 = Vector2((px - rc.x) / maxf(rr.x, 1.0), (py - rc.y) / maxf(rr.y, 1.0))
+						if rel_r.length() <= 1.0 + 0.14 * sin(atan2(rel_r.y, rel_r.x) * 3.0):
+							bed_id = WR.BED_REEF
+							d_val = maxf(max_surf_depth, d_val - 0.10)
+							break
+					_sdf_buf[idx] = clampf(-dist_ocean - 32.0, -128.0, -16.0)
+					_depth_buf[idx] = clampf(d_val, 0.10, 1.0)
+					_regime_buf[idx] = WR.REGIME_OCEAN
+					_bed_buf[idx] = bed_id
+					_flow_x_buf[idx] = 0.18
+					_flow_y_buf[idx] = -0.18
+
+
+func _rasterize_polygon_mask(poly_px: PackedVector2Array) -> PackedByteArray:
+	var mask: PackedByteArray = PackedByteArray()
+	mask.resize(_map_w * _map_h)
+	mask.fill(0)
+	var n: int = poly_px.size()
+	if n < 3:
+		return mask
+	var min_y_px: float = INF
+	var max_y_px: float = -INF
+	for p: Vector2 in poly_px:
+		min_y_px = minf(min_y_px, p.y)
+		max_y_px = maxf(max_y_px, p.y)
+	var y0: int = clampi(floori((min_y_px - bounds.position.y) / texel_px), 0, _map_h - 1)
+	var y1: int = clampi(ceili((max_y_px - bounds.position.y) / texel_px), 0, _map_h - 1)
+	var xs: Array[float] = []
+	for iy: int in range(y0, y1 + 1):
+		var py: float = bounds.position.y + (float(iy) + 0.5) * texel_px
+		xs.clear()
+		for i: int in n:
+			var a: Vector2 = poly_px[i]
+			var b: Vector2 = poly_px[(i + 1) % n]
+			if (a.y <= py and b.y > py) or (b.y <= py and a.y > py):
+				var t: float = (py - a.y) / (b.y - a.y)
+				xs.append(a.x + (b.x - a.x) * t)
+		if xs.size() < 2:
+			continue
+		xs.sort()
+		var row_off: int = iy * _map_w
+		var k: int = 0
+		while k + 1 < xs.size():
+			var ix0: int = clampi(ceili((xs[k] - bounds.position.x) / texel_px - 0.5), 0, _map_w - 1)
+			var ix1: int = clampi(floori((xs[k + 1] - bounds.position.x) / texel_px - 0.5), 0, _map_w - 1)
+			for ix: int in range(ix0, ix1 + 1):
+				mask[row_off + ix] = 1
+			k += 2
+	return mask
+
+
+func _stamp_coarse_edges(edges: PackedVector2Array, lbl: int, dist: PackedFloat32Array, label: PackedByteArray, cw: int, ch: int, step_px: float) -> void:
+	var i: int = 0
+	while i + 1 < edges.size():
+		var a: Vector2 = edges[i]
+		var b: Vector2 = edges[i + 1]
+		var slen: float = a.distance_to(b)
+		var steps: int = maxi(1, ceili(slen / (step_px * 0.5)))
+		for s: int in steps + 1:
+			var pt: Vector2 = a.lerp(b, float(s) / float(steps))
+			var cx: int = clampi(floori((pt.x - bounds.position.x) / step_px), 0, cw - 1)
+			var cy: int = clampi(floori((pt.y - bounds.position.y) / step_px), 0, ch - 1)
+			var ci: int = cy * cw + cx
+			dist[ci] = 0.0
+			label[ci] = lbl
+		i += 2
+
+
+static func _chamfer_coarse_voronoi(dist: PackedFloat32Array, label: PackedByteArray, cw: int, ch: int, step_px: float) -> void:
+	var diag: float = step_px * 1.41421356
+	for y: int in ch:
+		var row: int = y * cw
+		for x: int in cw:
+			var idx: int = row + x
+			var cur: float = dist[idx]
+			if x > 0:
+				var v: float = dist[idx - 1] + step_px
+				if v < cur:
+					cur = v
+					dist[idx] = v
+					label[idx] = label[idx - 1]
+			if y > 0:
+				var up: int = idx - cw
+				var v2: float = dist[up] + step_px
+				if v2 < cur:
+					cur = v2
+					dist[idx] = v2
+					label[idx] = label[up]
+				if x > 0:
+					var v3: float = dist[up - 1] + diag
+					if v3 < cur:
+						cur = v3
+						dist[idx] = v3
+						label[idx] = label[up - 1]
+				if x < cw - 1:
+					var v4: float = dist[up + 1] + diag
+					if v4 < cur:
+						cur = v4
+						dist[idx] = v4
+						label[idx] = label[up + 1]
+	for y: int in range(ch - 1, -1, -1):
+		var row: int = y * cw
+		for x: int in range(cw - 1, -1, -1):
+			var idx: int = row + x
+			var cur: float = dist[idx]
+			if x < cw - 1:
+				var v: float = dist[idx + 1] + step_px
+				if v < cur:
+					cur = v
+					dist[idx] = v
+					label[idx] = label[idx + 1]
+			if y < ch - 1:
+				var dn: int = idx + cw
+				var v2: float = dist[dn] + step_px
+				if v2 < cur:
+					cur = v2
+					dist[idx] = v2
+					label[idx] = label[dn]
+				if x < cw - 1:
+					var v3: float = dist[dn + 1] + diag
+					if v3 < cur:
+						cur = v3
+						dist[idx] = v3
+						label[idx] = label[dn + 1]
+				if x > 0:
+					var v4: float = dist[dn - 1] + diag
+					if v4 < cur:
+						cur = v4
+						dist[idx] = v4
+						label[idx] = label[dn - 1]
+
+
+## Nearest point on the curved coastline polyline (or Vector2.INF when none configured).
+func nearest_coast_px(world_pos: Vector2) -> Vector2:
+	if _coast_shore_pts.size() < 2:
+		return Vector2.INF
+	var best_pt: Vector2 = _coast_shore_pts[0]
+	var best_d2: float = INF
+	for i: int in _coast_shore_pts.size() - 1:
+		var a: Vector2 = _coast_shore_pts[i]
+		var b: Vector2 = _coast_shore_pts[i + 1]
+		var ab: Vector2 = b - a
+		var l2: float = ab.length_squared()
+		var t: float = clampf((world_pos - a).dot(ab) / l2, 0.0, 1.0) if l2 > 0.0001 else 0.0
+		var pt: Vector2 = a + ab * t
+		var d2: float = world_pos.distance_squared_to(pt)
+		if d2 < best_d2:
+			best_d2 = d2
+			best_pt = pt
+	return best_pt
+
+
+## Nearest point on any brook centerline (or Vector2.INF when none configured).
+func nearest_brook_px(world_pos: Vector2) -> Vector2:
+	if _brook_polylines.is_empty():
+		return Vector2.INF
+	var best_pt: Vector2 = Vector2.INF
+	var best_d2: float = INF
+	for poly: PackedVector2Array in _brook_polylines:
+		for i: int in poly.size() - 1:
+			var a: Vector2 = poly[i]
+			var b: Vector2 = poly[i + 1]
+			var ab: Vector2 = b - a
+			var l2: float = ab.length_squared()
+			var t: float = clampf((world_pos - a).dot(ab) / l2, 0.0, 1.0) if l2 > 0.0001 else 0.0
+			var pt: Vector2 = a + ab * t
+			var d2: float = world_pos.distance_squared_to(pt)
+			if d2 < best_d2:
+				best_d2 = d2
+				best_pt = pt
+	return best_pt
+
+
+## Progressive offshore return current & stamina pull beyond `_drift_offshore_tiles` (14 tiles) in REGIME_OCEAN.
+func offshore_pull_at(world_pos: Vector2) -> Dictionary:
+	if _coast_shore_pts.size() < 2:
+		return {}
+	var nearest: Vector2 = nearest_coast_px(world_pos)
+	if nearest == Vector2.INF:
+		return {}
+	var dist_px: float = world_pos.distance_to(nearest)
+	var offshore_tiles: float = dist_px / 16.0
+	var return_dir: Vector2 = (nearest - world_pos).normalized() if dist_px > 0.5 else Vector2.ZERO
+	var drift: Vector2 = SwimRules.offshore_drift(offshore_tiles, return_dir, _drift_offshore_tiles, _ocean_safety_tiles)
+	var stamina_extra: float = SwimRules.offshore_stamina_extra(offshore_tiles, _drift_offshore_tiles, _ocean_safety_tiles)
+	return {
+		"tiles": offshore_tiles,
+		"dir": return_dir,
+		"drift": drift,
+		"stamina_extra": stamina_extra,
+	}
+
+
 func add_puddle(center: Vector2, radii: Vector2, params: Dictionary = {}) -> void:
 	_ensure_setup()
 	var rx: float = maxf(radii.x, 3.0)
@@ -592,8 +1203,15 @@ func add_puddle(center: Vector2, radii: Vector2, params: Dictionary = {}) -> voi
 	var seed_v: float = float(params.get("seed", 77.0))
 	var outer_margin: float = 14.0
 
-	for iy: int in _map_h:
-		for ix: int in _map_w:
+	var pad_x: float = rx * 1.25 + outer_margin + 6.0
+	var pad_y: float = ry * 1.25 + outer_margin + 6.0
+	var x0: int = clampi(floori((center.x - pad_x - bounds.position.x) / texel_px), 0, _map_w - 1)
+	var x1: int = clampi(ceili((center.x + pad_x - bounds.position.x) / texel_px), 0, _map_w - 1)
+	var y0: int = clampi(floori((center.y - pad_y - bounds.position.y) / texel_px), 0, _map_h - 1)
+	var y1: int = clampi(ceili((center.y + pad_y - bounds.position.y) / texel_px), 0, _map_h - 1)
+
+	for iy: int in range(y0, y1 + 1):
+		for ix: int in range(x0, x1 + 1):
 			var p: Vector2 = _texel_world_center(ix, iy)
 			var rel: Vector2 = Vector2((p.x - center.x) / rx, (p.y - center.y) / ry)
 			var ang: float = atan2(rel.y, rel.x)
@@ -623,7 +1241,9 @@ func add_puddle(center: Vector2, radii: Vector2, params: Dictionary = {}) -> voi
 			_flow_y_buf[idx] = 0.0
 
 
-func build_maps() -> void:
+## Worker-safe CPU map bake: packs geo & flow RGBA8 images and updates thread-safe COW byte snapshots
+## without touching GPU textures or the SceneTree. Call `commit()` later on the main thread.
+func build_images_only() -> void:
 	_ensure_setup()
 	_geo_img = Image.create(_map_w, _map_h, false, Image.FORMAT_RGBA8)
 	_flow_img = Image.create(_map_w, _map_h, false, Image.FORMAT_RGBA8)
@@ -647,7 +1267,15 @@ func build_maps() -> void:
 
 	_geo_img.set_data(_map_w, _map_h, false, Image.FORMAT_RGBA8, geo_raw)
 	_flow_img.set_data(_map_w, _map_h, false, Image.FORMAT_RGBA8, flow_raw)
+	_bytes_lock.lock()
+	_geo_bytes = geo_raw
+	_flow_bytes = flow_raw
+	_bytes_lock.unlock()
 	_maps_built = true
+
+
+func build_maps() -> void:
+	build_images_only()
 	commit()
 
 
@@ -1266,6 +1894,12 @@ func wade_data(world_pos: Vector2, base: Dictionary) -> Dictionary:
 	result["submerge"] = lerpf(_depth_min, _depth_max, amount)
 	result["speed"] = lerpf(_wade_speed_max, _wade_speed_min, amount)
 	result["flow_velocity"] = water_flow_at(world_pos)
+	if regime == WR.REGIME_OCEAN and _coast_shore_pts.size() >= 2:
+		var pull: Dictionary = offshore_pull_at(world_pos)
+		if not pull.is_empty():
+			result["offshore_tiles"] = float(pull.get("tiles", 0.0))
+			result["offshore_drift"] = pull.get("drift", Vector2.ZERO)
+			result["offshore_stamina"] = float(pull.get("stamina_extra", 0.0))
 	return result
 
 
@@ -1334,51 +1968,201 @@ func flow_texture() -> Texture2D:
 	return _flow_tex
 
 
+func _sample_bed_weight_from_bytes(world_pos: Vector2, geo: PackedByteArray, target_bed: int) -> float:
+	var fx: float = (world_pos.x - bounds.position.x) / texel_px - 0.5
+	var fy: float = (world_pos.y - bounds.position.y) / texel_px - 0.5
+	var c0x: int = floori(fx)
+	var c0y: int = floori(fy)
+	var frx: float = fx - float(c0x)
+	var fry: float = fy - float(c0y)
+	var x0: int = clampi(c0x, 0, _map_w - 1)
+	var x1: int = clampi(c0x + 1, 0, _map_w - 1)
+	var y0: int = clampi(c0y, 0, _map_h - 1)
+	var y1: int = clampi(c0y + 1, 0, _map_h - 1)
+	var m00: float = 1.0 if int(geo[(y0 * _map_w + x0) * 4 + 3]) == target_bed else 0.0
+	var m10: float = 1.0 if int(geo[(y0 * _map_w + x1) * 4 + 3]) == target_bed else 0.0
+	var m01: float = 1.0 if int(geo[(y1 * _map_w + x0) * 4 + 3]) == target_bed else 0.0
+	var m11: float = 1.0 if int(geo[(y1 * _map_w + x1) * 4 + 3]) == target_bed else 0.0
+	return lerpf(lerpf(m00, m10, frx), lerpf(m01, m11, frx), fry)
+
+
 func grass_habitat_at(world_pos: Vector2) -> Dictionary:
 	if not bounds.has_point(world_pos):
 		return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
-	var snap: Array = _snapshot_bytes()
-	var geo: PackedByteArray = snap[0] as PackedByteArray
+	var geo: PackedByteArray = _geo_bytes
 	if geo.is_empty():
 		return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
+	var inv_t: float = 1.0 / texel_px
+	var fx: float = (world_pos.x - bounds.position.x) * inv_t - 0.5
+	var fy: float = (world_pos.y - bounds.position.y) * inv_t - 0.5
+	var nx: int = clampi(floori(fx + 0.5), 0, _map_w - 1)
+	var ny: int = clampi(floori(fy + 0.5), 0, _map_h - 1)
+	var ni: int = (ny * _map_w + nx) * 4
+	var reg: int = int(geo[ni + 2])
+	var bed_id: int = int(geo[ni + 3])
+	if reg == WR.REGIME_SURF:
+		return {"density": 0.0, "height_scale": 0.6, "style": "none"}
+	if reg == WR.REGIME_LAND:
+		if bed_id == WR.BED_ROCK:
+			return {"density": 0.0, "height_scale": 0.6, "style": "none"}
+		var c0x: int = floori(fx)
+		var c0y: int = floori(fy)
+		var x0: int = clampi(c0x, 0, _map_w - 1)
+		var x1: int = clampi(c0x + 1, 0, _map_w - 1)
+		var y0: int = clampi(c0y, 0, _map_h - 1)
+		var y1: int = clampi(c0y + 1, 0, _map_h - 1)
+		var b00: int = int(geo[(y0 * _map_w + x0) * 4 + 3])
+		var b10: int = int(geo[(y0 * _map_w + x1) * 4 + 3])
+		var b01: int = int(geo[(y1 * _map_w + x0) * 4 + 3])
+		var b11: int = int(geo[(y1 * _map_w + x1) * 4 + 3])
+		# Ultra-fast O(1) inland meadow early-out (skips float bilinear & trig for ~80% of XL zones!)
+		if b00 != WR.BED_SAND and b10 != WR.BED_SAND and b01 != WR.BED_SAND and b11 != WR.BED_SAND:
+			if _coast_shore_pts.is_empty() and world_pos.x < -540.0:
+				return {"density": 0.82, "height_scale": 1.0, "style": "coastal_edge"}
+			return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
 	var g: Vector4 = _sample_geo_from_bytes(world_pos, geo)
 	var sdf_px: float = g.x
-	var reg: int = int(g.z)
-	var bed_id: int = int(g.w)
+	var w_sand: float = _sample_bed_weight_from_bytes(world_pos, geo, WR.BED_SAND)
 
 	if reg == WR.REGIME_OCEAN or reg == WR.REGIME_LAKE:
 		if sdf_px <= 2.5:
 			return {"density": 0.0, "height_scale": 0.6, "style": "none"}
+		if sdf_px <= 14.0:
+			var l_t: float = clampf((sdf_px - 2.5) / 11.5, 0.0, 1.0)
+			return {"density": lerpf(0.30, 0.82, l_t), "height_scale": 1.08, "style": "bank_reed"}
 	if reg == WR.REGIME_PUDDLE:
 		if sdf_px <= 3.0 or bed_id == WR.BED_ROCK or bed_id == WR.BED_SAND:
 			return {"density": 0.0, "height_scale": 0.6, "style": "none"}
 		return {"density": 0.35, "height_scale": 0.9, "style": "moss_edge"}
 	if reg == WR.REGIME_BROOK:
-		if sdf_px <= 2.0:
+		if sdf_px <= 2.5:
 			return {"density": 0.0, "height_scale": 0.6, "style": "none"}
+		if w_sand > 0.35:
+			# Sandy coastal estuary banks stay open near water, then feather into brackish sedge/dune oats!
+			if sdf_px <= 10.0:
+				return {"density": 0.0, "height_scale": 0.6, "style": "none"}
+			return {"density": 0.34, "height_scale": 0.96, "style": "dune_oat"}
 		if sdf_px <= 14.0:
-			var bank_t: float = clampf((sdf_px - 2.0) / 12.0, 0.0, 1.0)
-			return {"density": lerpf(0.32, 0.84, bank_t), "height_scale": 1.12, "style": "bank_reed"}
+			var bank_t: float = clampf((sdf_px - 2.5) / 11.5, 0.0, 1.0)
+			return {"density": lerpf(0.34, 0.86, bank_t), "height_scale": 1.12, "style": "bank_reed"}
 		return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
 	if reg == WR.REGIME_SURF:
-		# Keep open surf & beach completely free of grass!
+		# Keep open surf & wet swash completely free of grass!
 		return {"density": 0.0, "height_scale": 0.6, "style": "none"}
 	if reg == WR.REGIME_LAND:
 		if bed_id == WR.BED_ROCK:
 			return {"density": 0.0, "height_scale": 0.6, "style": "none"}
-		if bed_id == WR.BED_SAND:
-			# Keep open beach sand clean; only cluster authentic Strandhafer on upper eastern dune hummocks!
-			if sdf_px < 96.0:
+		if w_sand > 0.02:
+			# Smooth organic coastal dune -> meadow transition (ZERO harsh blocky grass-to-sand cliff!):
+			# - Open mid/lower beach stays clean windswept sand
+			# - Upper dune ridge grows swaying Strandhafer hummocks + feathering golden-sage coastal grass!
+			var sand_clear: float = minf(84.0, _dry_sand_width_px * 0.56)
+			if w_sand > 0.85 and sdf_px < sand_clear:
 				return {"density": 0.0, "height_scale": 0.6, "style": "none"}
-			var hummock: float = 0.5 * sin(world_pos.y * 0.06 + 0.8) + 0.5 * cos(world_pos.y * 0.14 - world_pos.x * 0.05)
-			if hummock < -0.10:
-				return {"density": 0.0, "height_scale": 0.6, "style": "none"}
-			var dune_t: float = clampf((sdf_px - 96.0) / 52.0, 0.0, 1.0)
-			return {"density": lerpf(0.20, 0.50, dune_t), "height_scale": 1.06, "style": "dune_oat"}
-		# Gentle coastal-sage grass transition just east of the dune ridge into Square -1!
-		if world_pos.x < -540.0:
+			var dune_t: float = clampf((sdf_px - sand_clear) / maxf(_dry_sand_width_px - sand_clear, 24.0), 0.0, 1.0)
+			var hummock: float = 0.5 * sin(world_pos.x * 0.055 + world_pos.y * 0.048 + 0.8) + 0.5 * cos(world_pos.y * 0.12 - world_pos.x * 0.065)
+			if w_sand > 0.62:
+				# Upper dune sand: organic Strandhafer (marram grass) drifts that grow denser toward the meadow!
+				var thresh: float = lerpf(0.28, -0.45, dune_t)
+				if hummock < thresh:
+					return {"density": 0.0, "height_scale": 0.6, "style": "none"}
+				var tuft_k: float = clampf((hummock - thresh) / 0.70, 0.0, 1.0)
+				return {
+					"density": lerpf(0.26, 0.72, dune_t * 0.65 + tuft_k * 0.35),
+					"height_scale": lerpf(0.92, 1.12, dune_t),
+					"style": "dune_oat",
+				}
+			# Feathered sand-to-meadow border (w_sand in 0.02..0.62): seamless sage-golden coastal grass!
+			var edge_k: float = 1.0 - clampf((w_sand - 0.02) / 0.60, 0.0, 1.0)
+			return {
+				"density": lerpf(0.46, 0.94, edge_k),
+				"height_scale": lerpf(0.86, 1.02, edge_k),
+				"style": "coastal_edge" if edge_k > 0.35 else "dune_oat",
+			}
+		# Gentle coastal-sage grass transition just east of the dune ridge into Square -1 (grass_lab only)!
+		if _coast_shore_pts.is_empty() and world_pos.x < -540.0:
 			return {"density": 0.82, "height_scale": 1.0, "style": "coastal_edge"}
 	return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
+
+
+## Zero-allocation habitat query for `LivingGrass._build_tufts()` (`Vector3(density, height_scale, style_code)`).
+## Style codes: 0=none, 1=meadow, 2=stone_seam, 3=path_edge, 4=forest, 5=moss_edge, 6=bank_reed, 7=dune_oat, 8=coastal_edge.
+func grass_habitat_vec(world_pos: Vector2) -> Vector3:
+	if not bounds.has_point(world_pos):
+		return Vector3(1.0, 1.0, 1.0)
+	var geo: PackedByteArray = _geo_bytes
+	if geo.is_empty():
+		return Vector3(1.0, 1.0, 1.0)
+	var inv_t: float = 1.0 / texel_px
+	var fx: float = (world_pos.x - bounds.position.x) * inv_t - 0.5
+	var fy: float = (world_pos.y - bounds.position.y) * inv_t - 0.5
+	var nx: int = clampi(floori(fx + 0.5), 0, _map_w - 1)
+	var ny: int = clampi(floori(fy + 0.5), 0, _map_h - 1)
+	var ni: int = (ny * _map_w + nx) * 4
+	var reg: int = int(geo[ni + 2])
+	var bed_id: int = int(geo[ni + 3])
+	if reg == WR.REGIME_SURF:
+		return Vector3(0.0, 0.6, 0.0)
+	if reg == WR.REGIME_LAND:
+		if bed_id == WR.BED_ROCK:
+			return Vector3(0.0, 0.6, 0.0)
+		var c0x: int = floori(fx)
+		var c0y: int = floori(fy)
+		var x0: int = clampi(c0x, 0, _map_w - 1)
+		var x1: int = clampi(c0x + 1, 0, _map_w - 1)
+		var y0: int = clampi(c0y, 0, _map_h - 1)
+		var y1: int = clampi(c0y + 1, 0, _map_h - 1)
+		var b00: int = int(geo[(y0 * _map_w + x0) * 4 + 3])
+		var b10: int = int(geo[(y0 * _map_w + x1) * 4 + 3])
+		var b01: int = int(geo[(y1 * _map_w + x0) * 4 + 3])
+		var b11: int = int(geo[(y1 * _map_w + x1) * 4 + 3])
+		if b00 != WR.BED_SAND and b10 != WR.BED_SAND and b01 != WR.BED_SAND and b11 != WR.BED_SAND:
+			if _coast_shore_pts.is_empty() and world_pos.x < -540.0:
+				return Vector3(0.82, 1.0, 8.0)
+			return Vector3(1.0, 1.0, 1.0)
+	var g: Vector4 = _sample_geo_from_bytes(world_pos, geo)
+	var sdf_px: float = g.x
+	var w_sand: float = _sample_bed_weight_from_bytes(world_pos, geo, WR.BED_SAND)
+
+	if reg == WR.REGIME_OCEAN or reg == WR.REGIME_LAKE:
+		if sdf_px <= 2.5:
+			return Vector3(0.0, 0.6, 0.0)
+		if sdf_px <= 14.0:
+			var l_t: float = clampf((sdf_px - 2.5) / 11.5, 0.0, 1.0)
+			return Vector3(lerpf(0.30, 0.82, l_t), 1.08, 6.0)
+	if reg == WR.REGIME_PUDDLE:
+		if sdf_px <= 3.0 or bed_id == WR.BED_ROCK or bed_id == WR.BED_SAND:
+			return Vector3(0.0, 0.6, 0.0)
+		return Vector3(0.35, 0.9, 5.0)
+	if reg == WR.REGIME_BROOK:
+		if sdf_px <= 2.5:
+			return Vector3(0.0, 0.6, 0.0)
+		if w_sand > 0.35:
+			if sdf_px <= 10.0:
+				return Vector3(0.0, 0.6, 0.0)
+			return Vector3(0.34, 0.96, 7.0)
+		if sdf_px <= 14.0:
+			var bank_t: float = clampf((sdf_px - 2.5) / 11.5, 0.0, 1.0)
+			return Vector3(lerpf(0.34, 0.86, bank_t), 1.12, 6.0)
+		return Vector3(1.0, 1.0, 1.0)
+	if reg == WR.REGIME_LAND:
+		if w_sand > 0.02:
+			var sand_clear: float = minf(84.0, _dry_sand_width_px * 0.56)
+			if w_sand > 0.85 and sdf_px < sand_clear:
+				return Vector3(0.0, 0.6, 0.0)
+			var dune_t: float = clampf((sdf_px - sand_clear) / maxf(_dry_sand_width_px - sand_clear, 24.0), 0.0, 1.0)
+			var hummock: float = 0.5 * sin(world_pos.x * 0.055 + world_pos.y * 0.048 + 0.8) + 0.5 * cos(world_pos.y * 0.12 - world_pos.x * 0.065)
+			if w_sand > 0.62:
+				var thresh: float = lerpf(0.28, -0.45, dune_t)
+				if hummock < thresh:
+					return Vector3(0.0, 0.6, 0.0)
+				var tuft_k: float = clampf((hummock - thresh) / 0.70, 0.0, 1.0)
+				return Vector3(lerpf(0.26, 0.72, dune_t * 0.65 + tuft_k * 0.35), lerpf(0.92, 1.12, dune_t), 7.0)
+			var edge_k: float = 1.0 - clampf((w_sand - 0.02) / 0.60, 0.0, 1.0)
+			return Vector3(lerpf(0.46, 0.94, edge_k), lerpf(0.86, 1.02, edge_k), 8.0 if edge_k > 0.35 else 7.0)
+		if _coast_shore_pts.is_empty() and world_pos.x < -540.0:
+			return Vector3(0.82, 1.0, 8.0)
+	return Vector3(1.0, 1.0, 1.0)
 
 
 # ==============================================================================
@@ -1858,7 +2642,8 @@ func _step_motes(delta: float) -> void:
 			_spray_timer -= delta
 			if _spray_timer <= 0.0 and _air_mote_layer.motes.size() < MAX_AIR_MOTES:
 				_spray_timer = _rng.randf_range(0.08, 0.22)
-				var sx: float = _rng.randf_range(bounds.position.x + 12.0, minf(bounds.end.x - 12.0, -720.0))
+				var max_sx: float = bounds.end.x - 12.0 if not _coast_shore_pts.is_empty() else minf(bounds.end.x - 12.0, -720.0)
+				var sx: float = _rng.randf_range(bounds.position.x + 12.0, max_sx)
 				var sy: float = _rng.randf_range(bounds.position.y + 8.0, bounds.end.y - 8.0)
 				var swf: Dictionary = water_field_at(Vector2(sx, sy))
 				if bool(swf["water"]) and (int(swf["regime"]) == WR.REGIME_SURF or int(swf["regime"]) == WR.REGIME_OCEAN):

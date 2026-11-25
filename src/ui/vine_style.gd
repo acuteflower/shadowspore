@@ -5,10 +5,17 @@ extends RefCounted
 ## composition (health tip, stamina tip) towards the middle of the hotbar.
 
 const OUTLINE: Color = Color("120c1c")
-const BARK: Color = Color("3b2c40")
-const BARK_LIGHT: Color = Color("65506b")
-const BARK_VOID: Color = Color("0b0614")
-const BARK_VOID_LIGHT: Color = Color("3a1f66")
+const BASE_BARK: Color = Color("3b2c40")
+const BASE_BARK_LIGHT: Color = Color("65506b")
+const BASE_BARK_VOID: Color = Color("0b0614")
+const BASE_BARK_VOID_LIGHT: Color = Color("3a1f66")
+## The bark the HUD draws with. Static so the zone tint (step 9 of docs/hud_v2_konzept.md, `follow_mood`) can lean it a
+## little towards the zone's colour; text, numbers, leaves and danger colours never change.
+static var BARK: Color = BASE_BARK
+static var BARK_LIGHT: Color = BASE_BARK_LIGHT
+static var BARK_VOID: Color = BASE_BARK_VOID
+static var BARK_VOID_LIGHT: Color = BASE_BARK_VOID_LIGHT
+const TINT_MAX: float = 0.12 ## the most the zone may move the bark
 const LEAF: Color = Color("4f9a62")
 const LEAF_LIGHT: Color = Color("a6e68f")
 const LEAF_VOID: Color = Color("6a35c8")
@@ -22,6 +29,29 @@ const TIP_SPAN: float = 116.0 + 112.0 ## the longer sap vine from its tip to the
 
 
 static var _glow_spans: Dictionary = {} ## radius -> exact unrounded scanline widths
+
+
+## Lean the bark towards the zone's mood (`ZoneMood.now` keys `hud_bark` colour, `hud_tint` 0..1 how much,
+## `hud_void` 0..1 how much of the night's void shows by day). At most `TINT_MAX` each; `on` false or no zone world
+## puts the plain bark back. Returns the mix used (tests).
+static func follow_mood(on: bool) -> float:
+	var mood: Dictionary = ZoneMood.now
+	if not on or mood.is_empty():
+		BARK = BASE_BARK
+		BARK_LIGHT = BASE_BARK_LIGHT
+		BARK_VOID = BASE_BARK_VOID
+		BARK_VOID_LIGHT = BASE_BARK_VOID_LIGHT
+		return 0.0
+	var tone: Color = mood.get("hud_bark", Color.WHITE) as Color
+	var mix: float = clampf(float(mood.get("hud_tint", 0.0)), 0.0, 1.0) * TINT_MAX
+	var void_mix: float = clampf(float(mood.get("hud_void", 0.0)), 0.0, 1.0) * TINT_MAX
+	var dark: Color = Color(tone.r * 0.32, tone.g * 0.32, tone.b * 0.32) ## the tone at the bark's own depth
+	var light: Color = Color(tone.r * 0.5, tone.g * 0.5, tone.b * 0.5)
+	BARK = BASE_BARK.lerp(dark, mix).lerp(BASE_BARK_VOID, void_mix)
+	BARK_LIGHT = BASE_BARK_LIGHT.lerp(light, mix).lerp(BASE_BARK_VOID_LIGHT, void_mix)
+	BARK_VOID = BASE_BARK_VOID.lerp(dark.darkened(0.6), mix * 0.5)
+	BARK_VOID_LIGHT = BASE_BARK_VOID_LIGHT.lerp(light.darkened(0.3), mix * 0.5)
+	return mix + void_mix
 
 
 static func void_amount() -> float:
@@ -285,10 +315,37 @@ const KEY_NAMES: Dictionary = {"Ctrl": "STRG", "Shift": "UMSCH", "Alt": "ALT", "
 const CAP_HEIGHT: int = 12
 const MOUSE_LEFT: String = "LMT"
 const MOUSE_RIGHT: String = "RMT"
+## Gamepad buttons come back from `key_name` as "@" tokens (docs/hud_v2_konzept.md 3.H): "@A" "@B" "@X" "@Y" are drawn as
+## round caps in their colours, "@LB" "@RB" "@LT" "@RT" as flat shoulder caps, "@LS" "@RS" as sticks.
+const PAD_BUTTONS: Dictionary = {
+	JOY_BUTTON_A: "@A", JOY_BUTTON_B: "@B", JOY_BUTTON_X: "@X", JOY_BUTTON_Y: "@Y",
+	JOY_BUTTON_LEFT_SHOULDER: "@LB", JOY_BUTTON_RIGHT_SHOULDER: "@RB", JOY_BUTTON_LEFT_STICK: "@LS", JOY_BUTTON_RIGHT_STICK: "@RS",
+	JOY_BUTTON_START: "@START", JOY_BUTTON_BACK: "@SEL", JOY_BUTTON_DPAD_UP: "@HOCH", JOY_BUTTON_DPAD_DOWN: "@RUNTER",
+	JOY_BUTTON_DPAD_LEFT: "@LINKS", JOY_BUTTON_DPAD_RIGHT: "@RECHTS",
+}
+const PAD_FACE: Dictionary = {"@A": Color("6fd36f"), "@B": Color("e0485a"), "@X": Color("5fa8ff"), "@Y": Color("f2c84b")}
 
 
 ## The label of the first key (or mouse button) bound to `action`, in the game's words ("STRG", "LEER", "LMT").
-static func key_name(action: String, fallback: String = "?") -> String:
+## While a gamepad is in use (and `pad`), its button comes first as an "@" token for `key_cap` (see PAD_BUTTONS);
+## callers that write the key into words pass `pad` false or use `key_text`.
+static func key_name(action: String, fallback: String = "?", pad: bool = true) -> String:
+	if pad and not InputManager.using_mouse:
+		for event: InputEvent in InputMap.action_get_events(action):
+			var joy: InputEventJoypadButton = event as InputEventJoypadButton
+			if joy != null and PAD_BUTTONS.has(joy.button_index):
+				return String(PAD_BUTTONS[joy.button_index])
+			var motion: InputEventJoypadMotion = event as InputEventJoypadMotion
+			if motion != null:
+				match motion.axis:
+					JOY_AXIS_TRIGGER_LEFT:
+						return "@LT"
+					JOY_AXIS_TRIGGER_RIGHT:
+						return "@RT"
+					JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y:
+						return "@LS"
+					JOY_AXIS_RIGHT_X, JOY_AXIS_RIGHT_Y:
+						return "@RS"
 	for event: InputEvent in InputMap.action_get_events(action):
 		var button: InputEventMouseButton = event as InputEventMouseButton
 		if button != null:
@@ -301,10 +358,17 @@ static func key_name(action: String, fallback: String = "?") -> String:
 	return fallback
 
 
+## A key token as words ("@A" -> "A").
+static func key_text(key: String) -> String:
+	return key.trim_prefix("@")
+
+
 ## How wide `key_cap` draws `key`.
 static func cap_width(key: String) -> int:
-	if key == MOUSE_LEFT or key == MOUSE_RIGHT:
+	if key == MOUSE_LEFT or key == MOUSE_RIGHT or PAD_FACE.has(key) or key == "@LS" or key == "@RS":
 		return CAP_HEIGHT - 1
+	if key.begins_with("@"):
+		return maxi(CAP_HEIGHT - 1, PixelText.width(key_text(key)) + 7)
 	return maxi(CAP_HEIGHT - 1, PixelText.width(key) + 7)
 
 
@@ -333,6 +397,9 @@ static func key_cap(canvas: CanvasItem, at: Vector2, key: String, fade: float = 
 	if key == MOUSE_LEFT or key == MOUSE_RIGHT:
 		_mouse_face(canvas, Vector2(o.x, top), w, face_h, key == MOUSE_LEFT, fade, lit, face_dark, face, shine)
 		return w
+	if key.begins_with("@"):
+		_pad_face(canvas, o, w, h, press, key, fade, lit, face_dark, face, shine)
+		return w
 	canvas.draw_rect(Rect2(o.x + 1, top, w - 2, face_h), Color(face_dark, fade))
 	canvas.draw_rect(Rect2(o.x + 2, top, w - 4, face_h - 1), Color(face, fade)) ## the dished face
 	canvas.draw_rect(Rect2(o.x + 2, top, w - 4, 1), Color(shine, fade)) ## light from the top left
@@ -343,6 +410,44 @@ static func key_cap(canvas: CanvasItem, at: Vector2, key: String, fade: float = 
 	var text_color: Color = PETAL.lerp(OUTLINE, smoothstep(0.4, 0.9, lit))
 	PixelText.draw(canvas, key, Vector2i(int(o.x) + (w - PixelText.width(key) + 1) / 2, int(top) - 1), Color(text_color, fade))
 	return w
+
+
+## Gamepad caps: round face buttons with their letter in its colour, flat shoulders and triggers, sticks as a ring.
+static func _pad_face(canvas: CanvasItem, o: Vector2, w: int, h: int, press: int, key: String, fade: float, lit: float, dark: Color, face: Color, shine: Color) -> void:
+	var label: String = key_text(key)
+	var ink: Color = Color(OUTLINE, fade)
+	if PAD_FACE.has(key) or key == "@LS" or key == "@RS":
+		var c: Vector2 = o + Vector2(w / 2.0 - 0.5, h / 2.0 - 1.0 + press)
+		for dy: int in range(-5, 6): ## a round stone: ink rim, face, light on the upper left
+			for dx: int in range(-5, 6):
+				var d2: int = dx * dx + dy * dy
+				if d2 > 26:
+					continue
+				var p: Rect2 = Rect2(c + Vector2(dx, dy), Vector2.ONE)
+				if d2 > 17:
+					canvas.draw_rect(p, ink)
+				elif dx + dy < -3 and d2 > 8:
+					canvas.draw_rect(p, Color(shine, fade))
+				else:
+					canvas.draw_rect(p, Color(face if d2 < 12 else dark, fade))
+		if PAD_FACE.has(key):
+			var tone: Color = (PAD_FACE[key] as Color).lerp(Color.WHITE, 0.35 * lit)
+			PixelText.draw(canvas, label, Vector2i(int(c.x) - 1, int(c.y) - 3), Color(tone, fade))
+		else: ## a stick: a ring with its knob, the letter of the side under it
+			for k: int in 8:
+				var a: float = float(k) / 8.0 * TAU
+				canvas.draw_rect(Rect2((c + Vector2(cos(a), sin(a)) * 3.0).round(), Vector2.ONE), Color(PETAL, 0.7 * fade))
+			canvas.draw_rect(Rect2(c - Vector2(1, 1), Vector2(2, 2)), Color(UiStyle.ACCENT.lerp(PETAL, 0.5), fade))
+		return
+	var shoulder: bool = key in ["@LB", "@RB", "@LT", "@RT"]
+	var top: float = o.y + (3.0 if shoulder else 1.0) + press
+	var face_h: int = h - (6 if shoulder else 4) - press
+	canvas.draw_rect(Rect2(o.x + 1, top, w - 2, face_h), Color(dark, fade))
+	canvas.draw_rect(Rect2(o.x + 2, top, w - 4, face_h - 1), Color(face, fade))
+	canvas.draw_rect(Rect2(o.x + 2, top, w - 4, 1), Color(shine, fade))
+	if key == "@LT" or key == "@RT": ## a trigger: the face rounds up at its far end
+		canvas.draw_rect(Rect2(o.x + (1 if key == "@LT" else w - 4), top - 2, 3, 2), ink)
+	PixelText.draw(canvas, label, Vector2i(int(o.x) + (w - PixelText.width(label) + 1) / 2, int(top) + (0 if shoulder else -1)), Color(PETAL.lerp(OUTLINE, smoothstep(0.4, 0.9, lit)), fade))
 
 
 static func _mouse_face(canvas: CanvasItem, at: Vector2, w: int, h: int, left: bool, fade: float, lit: float, dark: Color, face: Color, shine: Color) -> void:

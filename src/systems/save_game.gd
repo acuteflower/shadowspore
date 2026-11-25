@@ -6,9 +6,7 @@ extends RefCounted
 
 const PATH: String = "user://save.json"
 const COOP_PATH: String = "user://coop_save.json"
-const ZONES_PATH: String = "user://save_zones.json"
-const COOP_ZONES_PATH: String = "user://coop_save_zones.json"
-const VERSION: int = 1
+const VERSION: int = 2
 const MAX_CLOUD_WORLD_BYTES: int = 16777216
 
 static var _io_mutex: Mutex = Mutex.new()
@@ -24,17 +22,12 @@ static func as_array(raw: Variant) -> Array:
 	return raw as Array if raw is Array else []
 
 
-static func is_zones_world(tree: SceneTree) -> bool:
-	return tree.get_first_node_in_group("zone_world") != null
-
-
-static func path_for(tree: SceneTree) -> String:
-	var zones: bool = is_zones_world(tree)
+static func path_for(_tree: SceneTree = null) -> String:
 	if NetworkManager.is_coop_session():
 		if not NetworkManager.active_save_path.is_empty():
 			return NetworkManager.active_save_path
-		return COOP_ZONES_PATH if zones else COOP_PATH
-	return ZONES_PATH if zones else PATH
+		return COOP_PATH
+	return PATH
 
 
 static func _local_saves_blocked() -> bool:
@@ -44,7 +37,7 @@ static func _local_saves_blocked() -> bool:
 static func exists(path: String = PATH) -> bool:
 	if _local_saves_blocked():
 		return false
-	return FileAccess.file_exists(path)
+	return not _read(path).is_empty()
 
 
 static func delete(path: String = PATH) -> bool:
@@ -82,6 +75,8 @@ static func export_player_data(player: Player, stow_live: bool = false) -> Dicti
 		"appearance": player.appearance.export_data() if player.appearance != null else {},
 		"quests": player.quests.export_data() if player.quests != null else {},
 		"board_local": player.tracked.export_data() if player.tracked != null else {}, ## journal focus, page and read notices
+		"atlas_ui": _export_player_atlas_ui(player),
+		"dungeons": player.dungeons.export_data() if player.dungeons != null else {},
 	}
 
 
@@ -144,21 +139,22 @@ static func export_world_data(tree: SceneTree) -> Dictionary:
 		data["pets"] = pets.export_state() ## the bonds with wild birds (docs/pet_konzept.md)
 	var vistas: Vistas = Vistas.of(tree)
 	if vistas != null and vistas.discovered_count() > 0:
-		data["vistas"] = vistas.export_state() ## discovered meadow cliff vistas (docs/wiesenbiom_ausbau_konzept.md)
-	var m_landmarks: MeadowLandmarks = MeadowLandmarks.of(tree)
-	if m_landmarks != null and m_landmarks.blessed_count() > 0:
-		data["meadow_landmarks"] = m_landmarks.export_state() ## blessed Urforst shrines (docs/wiesenbiom_ausbau_konzept.md)
-	var m_pois: MeadowPois = MeadowPois.of(tree)
-	if m_pois != null and m_pois.has_progress():
-		data["meadow_pois"] = m_pois.export_state() ## Red Order inscriptions, unjammed watermills & rowboats (docs/wiesenbiom_ausbau_konzept.md)
-	var m_wonders: MeadowWonders = MeadowWonders.of(tree)
-	if m_wonders != null and m_wonders.has_progress():
-		data["meadow_wonders"] = m_wonders.export_state() ## awakened BellPond, SleepingGuardians & FlowerAmphitheater (docs/wiesenbiom_ausbau_konzept.md)
+		data["vistas"] = vistas.export_state()
+	var veil: VeilThreads = VeilThreads.of(tree)
+	if veil != null and veil.collected_count() > 0:
+		data["veil_threads"] = veil.export_state()
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
 	if discovery != null:
 		data["map"] = Marshalls.raw_to_base64(discovery.export_data())
 		if discovery.is_reveal_all():
 			data["map_before"] = Marshalls.raw_to_base64(discovery.export_before()) ## the fog from before the developer's whole-map reveal
+		if discovery.is_v2():
+			data["atlas_discovery"] = discovery.export_atlas_state()
+	var map_win: Node = tree.get_first_node_in_group("map_window")
+	if map_win != null and map_win.has_method("export_atlas_ui_state"):
+		var ui_st: Variant = map_win.call("export_atlas_ui_state")
+		if ui_st is Dictionary and not (ui_st as Dictionary).is_empty():
+			data["atlas_chronicle"] = ui_st
 	return data
 
 
@@ -321,6 +317,10 @@ static func import_player_data(player: Player, saved: Dictionary, apply_pos: boo
 			player.quests.import_data(as_dict(saved.get("quests")))
 		if player.tracked != null and saved.has("board_local"):
 			player.tracked.import_data(as_dict(saved.get("board_local")))
+	if saved.has("atlas_ui"):
+		_import_player_atlas_ui(player, as_dict(saved.get("atlas_ui")))
+	if player.dungeons != null:
+		player.dungeons.import_data(as_dict(saved.get("dungeons")))
 
 
 static func sync_player_to_network(player: Player) -> void:
@@ -342,10 +342,14 @@ static func sync_player_to_network(player: Player) -> void:
 		player.appearance._rpc_apply_all.rpc(player.appearance.export_data())
 	if player.health != null and owner_id != mp.get_unique_id() and can_rpc:
 		player.health._set_value.rpc(player.health.current)
+	if player.dungeons != null:
+		player.dungeons._push_state()
 
 
 static func import_world_data(tree: SceneTree, data: Dictionary, player: Player, resume: bool = true) -> bool:
 	if tree.get_first_node_in_group("sandbox") != null or data.is_empty() or player == null:
+		return false
+	if int(data.get("version", 0)) < VERSION:
 		return false
 	var world_node: Node = tree.get_first_node_in_group("world")
 	var quest_flags: Dictionary = {}
@@ -406,21 +410,24 @@ static func import_world_data(tree: SceneTree, data: Dictionary, player: Player,
 	var vistas: Vistas = Vistas.of(tree)
 	if vistas != null and data.has("vistas"):
 		vistas.import_state(data.get("vistas"))
-	var m_landmarks: MeadowLandmarks = MeadowLandmarks.of(tree)
-	if m_landmarks != null and data.has("meadow_landmarks"):
-		m_landmarks.import_state(data.get("meadow_landmarks"))
-	var m_pois: MeadowPois = MeadowPois.of(tree)
-	if m_pois != null and data.has("meadow_pois"):
-		m_pois.import_state(data.get("meadow_pois"))
-	var m_wonders: MeadowWonders = MeadowWonders.of(tree)
-	if m_wonders != null and data.has("meadow_wonders"):
-		m_wonders.import_state(data.get("meadow_wonders"))
+	var veil: VeilThreads = VeilThreads.of(tree)
+	if veil != null and data.has("veil_threads"):
+		veil.import_state(as_dict(data.get("veil_threads")))
 	var discovery: MapDiscovery = tree.get_first_node_in_group("map_discovery") as MapDiscovery
-	if discovery != null and data.has("map"):
-		var map_b64: Variant = data.get("map")
-		var map_before_b64: Variant = data.get("map_before")
-		discovery.import_saved(Marshalls.base64_to_raw(map_b64 as String if map_b64 is String else ""))
-		discovery.import_before(Marshalls.base64_to_raw(map_before_b64 as String if map_before_b64 is String else "")) ## empty = no whole-map reveal active
+	if discovery != null:
+		if data.has("map"):
+			var map_b64: Variant = data.get("map")
+			var map_before_b64: Variant = data.get("map_before")
+			discovery.import_saved(Marshalls.base64_to_raw(map_b64 as String if map_b64 is String else ""))
+			discovery.import_before(Marshalls.base64_to_raw(map_before_b64 as String if map_before_b64 is String else "")) ## empty = no whole-map reveal active
+		if data.has("atlas_discovery"):
+			discovery.import_atlas_state(as_dict(data.get("atlas_discovery")))
+		if bool(quest_flags.get("atlas_continent_unlocked", false)):
+			discovery.set_continent_unlocked(true)
+	if data.has("atlas_chronicle"):
+		var map_win_in: Node = tree.get_first_node_in_group("map_window")
+		if map_win_in != null and map_win_in.has_method("import_atlas_ui_state"):
+			map_win_in.call("import_atlas_ui_state", as_dict(data.get("atlas_chronicle")))
 	if resume and world != null and world.has_method("resume_story"):
 		world.call_deferred("resume_story", player) ## a save that stopped in the middle of the wake-up plays it again
 	if TimeManager.nights_awake >= 1 and world != null and world.has_method("apply_tiredness_to_players"):
@@ -444,6 +451,11 @@ static func load_into(tree: SceneTree, path: String = "", resume: bool = true) -
 
 static func _restore_stacks(inventory: InventoryComponent, saved: Dictionary) -> void:
 	var slots: Array = as_array(saved.get("slots"))
+	var max_slots: int = InventoryComponent.SIZE + InventoryComponent.MAX_BONUS_SLOTS
+	var target_len: int = clampi(slots.size(), InventoryComponent.SIZE, max_slots)
+	while inventory.slots.size() < target_len:
+		inventory.slots.append({})
+	inventory.bonus_slots = clampi(inventory.slots.size() - InventoryComponent.SIZE, 0, InventoryComponent.MAX_BONUS_SLOTS)
 	for i: int in mini(slots.size(), inventory.slots.size()):
 		inventory.slots[i] = _stack(slots[i])
 	var equipment: Dictionary = as_dict(saved.get("equipment"))
@@ -461,6 +473,7 @@ static func guest_economy(player: Player) -> Dictionary:
 		"held": player.inventory.held.duplicate(true), "raw_rolls": player.inventory.hidden.duplicate(true), "xp": player.progress.xp, "copper": player.progress.copper,
 		"claimed": player.progress.claimed, "skill_tree": skills.export_data(),
 		"appearance": player.appearance.export_data() if player.appearance != null else {},
+		"dungeons": player.dungeons.export_data() if player.dungeons != null else {},
 	}
 
 
@@ -474,6 +487,8 @@ static func restore_guest_economy(player: Player, saved: Dictionary) -> void:
 	skills.import_data(as_dict(saved.get("skill_tree")))
 	if player.appearance != null:
 		player.appearance.import_data(as_dict(saved.get("appearance")))
+	if player.dungeons != null:
+		player.dungeons.import_data(as_dict(saved.get("dungeons")))
 	player.inventory.held = _stack(saved.get("held"))
 	_restore_stacks(player.inventory, saved)
 	player.inventory.import_hidden(as_dict(saved.get("raw_rolls")))
@@ -501,10 +516,37 @@ static func _local_player(tree: SceneTree) -> Player:
 	return null
 
 
+static func _export_player_atlas_ui(player: Player) -> Dictionary:
+	if player == null:
+		return {}
+	var hud: CanvasLayer = player.get("_hud") as CanvasLayer
+	if hud != null:
+		var mw: Node = hud.get_node_or_null("MapWindow")
+		if mw != null and mw.has_method("export_atlas_ui_state"):
+			var raw: Variant = mw.call("export_atlas_ui_state")
+			if raw is Dictionary:
+				return raw as Dictionary
+	var meta_st: Variant = player.get_meta(&"_pending_atlas_ui", {})
+	return meta_st as Dictionary if meta_st is Dictionary else {}
+
+
+static func _import_player_atlas_ui(player: Player, ui_data: Dictionary) -> void:
+	if player == null or ui_data.is_empty():
+		return
+	player.set_meta(&"_pending_atlas_ui", ui_data.duplicate(true))
+	var hud: CanvasLayer = player.get("_hud") as CanvasLayer
+	if hud != null:
+		var mw: Node = hud.get_node_or_null("MapWindow")
+		if mw != null and mw.has_method("import_atlas_ui_state"):
+			mw.call("import_atlas_ui_state", ui_data)
+
+
 static func _read(path: String = PATH) -> Dictionary:
 	for candidate: String in [path, path + ".bak"]:
 		if FileAccess.file_exists(candidate):
 			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(candidate))
-			if parsed is Dictionary and not (parsed as Dictionary).is_empty():
-				return parsed as Dictionary
+			if parsed is Dictionary:
+				var d: Dictionary = parsed as Dictionary
+				if not d.is_empty() and int(d.get("version", 0)) >= VERSION:
+					return d
 	return {}

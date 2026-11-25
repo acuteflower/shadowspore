@@ -1,0 +1,85 @@
+{
+	"id": "erlenfurt",
+	"name": "ERLENFURT",
+	"old_name": "FURT AM ERLENBACH",
+	"subtitle": "Weites Flusstal zwischen Glaskamm und Südküste",
+	"continent": "main",
+	"region": "gruenland",
+	"kind": "field",
+	"size_class": "XL",
+	"origin": [
+		661,
+		880
+	],
+	"size": [
+		492,
+		433
+	],
+	"biomes": [
+		"meadow"
+	],
+	"mood": "meadow_open",
+	"night": "meadow_default",
+	"danger": "ruhig",
+	"placeholder": true,
+	"curve": false,
+	"footprint": [
+		[
+			166.0,
+			2.0
+		],
+		{
+			"seam": "naht_erlenfurt_glimmrast"
+		},
+		[
+			490.0,
+			307.0
+		],
+		{
+			"seam": "naht_suedkap_erlenfurt"
+		},
+		[
+			62.0,
+			431.0
+		],
+		{
+			"seam": "naht_windkap_erlenfurt"
+		},
+		[
+			5.0,
+			320.0
+		],
+		{
+			"seam": "naht_klippenstieg_erlenfurt"
+		},
+		[
+			68.0,
+			88.0
+		],
+		{
+			"seam": "naht_erlenfurt_hallgrat"
+		}
+	],
+	"borders": [
+		{
+			"kind": "meadow",
+			"from": 0.0,
+			"to": 1.0
+		}
+	],
+	"places": [],
+	"landmarks": [],
+	"nature": {
+		"seed": 303,
+		"meadow": true,
+		"turf": {
+			"accents": 0.07,
+			"kinds": [
+				"tuft",
+				"clump",
+				"clover",
+				"flower"
+			]
+		}
+	}
+}

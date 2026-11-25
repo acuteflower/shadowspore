@@ -1,0 +1,14 @@
+{
+	"_doc": "Schwellen des Zonenlabors (isolierte Testfixture labor_wiese <-> labor_wald).",
+	"thresholds": [
+		{
+			"id": "labor_kronengang",
+			"kind": "path",
+			"a": "labor_wiese",
+			"b": "labor_wald",
+			"seam": "labor_naht",
+			"span": [0.4, 0.6],
+			"mask": "canopy"
+		}
+	]
+}

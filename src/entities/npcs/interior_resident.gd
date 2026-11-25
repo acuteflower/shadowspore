@@ -192,9 +192,9 @@ func interact(player: Player) -> void:
 	_sector = Adventurer.sector_of(player.global_position - global_position)
 	var talk: String = _quest_talk(player)
 	if talk != "": ## a quest step wants this talk (the lake witch's meeting): the dialogue instead of the shop
-		var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
-		if world != null:
-			await world.play_story_dialogue(player, talk, self)
+		var world: Node = get_tree().get_first_node_in_group("world")
+		if world != null and world.has_method("play_story_dialogue"):
+			await world.call("play_story_dialogue", player, talk, self)
 		_talking = false
 		return
 	if _town.board != null and not _town.board.finishable(sid, player).is_empty(): ## the end of a board notice: report to the one who gave it

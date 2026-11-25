@@ -1,6 +1,6 @@
 [package]
 name = "shadowspore-launcher"
-version = "0.1.0"
+version = "0.10.2"
 description = "Shadowspore Desktop Launcher"
 authors = ["Shadowspore"]
 edition = "2021"

@@ -170,7 +170,7 @@ func _ready() -> void:
 		yard.name = "Yard"
 		yard.setup(yard_props, dir)
 		add_child(yard)
-		for seat: Array in ([] if art != "hut" else [["east", KnightFireScene.STUMP + Vector2(0, 8)], ["south", KnightFireScene.LOG + Vector2(4, 8)]]): ## the two places at the fire (story: "sit by the fire")
+		for seat: Array in ([] if art != "hut" else [["east", Vector2(84.0, 64.0) + Vector2(0, 8)], ["south", Vector2(34.0, 92.0) + Vector2(4, 8)]]): ## the two places at the fire (story: "sit by the fire")
 			var spot: CampfireSeat = CampfireSeat.new()
 			spot.name = "Seat_" + String(seat[0])
 			spot.hut = self

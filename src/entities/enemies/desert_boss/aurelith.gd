@@ -379,7 +379,7 @@ func _update_bar() -> void:
 				break
 	if near and not _bar_shown:
 		_bar_shown = true
-		get_tree().call_group("boss_bar", "track", TITLE, _health)
+		get_tree().call_group("boss_bar", "track", TITLE, _health, 15)
 	elif not near and _bar_shown:
 		_bar_shown = false
 		if _health.current > 0.0:

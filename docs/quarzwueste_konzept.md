@@ -1,5 +1,8 @@
 # Die Magische Quarzwüste – Konzept („Sonnenquarz-Öde“)
 
+> **Shadowspore 2.0 Hinweis:** Referenzkonzept aus v1 für künftige ALTMARK-Zonen (noch nicht in `ZoneWorld` platziert; alte v1-Tile-Koordinaten gelten nicht mehr).
+
+
 > Arbeitsnamen **Sonnenquarz-Öde** / **Die Singenden Dünen** (`biome: "quartz_desert"`). Alle Eigennamen und Zahlenwerte sind Startwerte zum gemeinsamen Abstimmen. Status: **Stufen 1–5 komplett gebaut & verifiziert (2026-11-13)** – Weltkarte (`165.784` Tiles in Überregion 6 / Regionen `5, 6, 32, 33, 34`), 96-Tile-Übergang (`g_arid`), dynamisch mit `WorldWind` ziehende Sanddünen (`g_wind_sand`), weiße Quarz-Ausbisse (~3,6 % Fläche), Sandstein-Wandtexturen (`Style 6`), **4 variable Quarzoasen (`oasis_west`, `oasis_lagoon`, `oasis_twins`, `oasis_spring`)**, 15 Wüsten-Pflanzen & Erze (`sun_quartz_rock`, `prism_vein`, `ruin_sandstone`), **6 Wüstentierarten mit 5 Ökosystem-Events**, **Mittagshitze (`sun_heat` / `ERHITZT` + `refreshed` / `ERFRISCHT`, Ellies `'sweat'`-Standgeste, Ausdauerranken-Schimmer)**, **Magisches Wüstenwetter (`Singender Resonanzwind` & `Arkanes Quarzgewitter` ohne nassen Regen)**, **verwehte Karawanenstraße (`desert_caravan_*`)** sowie **aktive Quarzruinen (`QuartzArch`, `LightConduit`, `ResonanceObelisk`, `QuartzSeal` & 2 `PrismSeal`-Wächterinnen-Prüfungen)** sind live; als Nächstes folgen **Stufe 6 (Quarz- und Steinkolosse)** und **Stufe 7 (Hauptort, Zauberstab-Ausbau & Quests)**.
 
 ---

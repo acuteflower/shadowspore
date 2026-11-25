@@ -268,7 +268,7 @@ if (-not $SkipLauncher) {
         if ($LASTEXITCODE -ne 0) { throw "npm run tauri build fehlgeschlagen." }
 
         $nsisDir = Join-Path $launcherDir "src-tauri\target\release\bundle\nsis"
-        $setupExe = Get-ChildItem -Path $nsisDir -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        $setupExe = Get-ChildItem -Path $nsisDir -Filter "*-setup.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if ($setupExe) {
             Invoke-CodeSign $setupExe.FullName
             $dlDir = Join-Path $Root "firebase\public\downloads"

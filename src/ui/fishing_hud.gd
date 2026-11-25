@@ -18,6 +18,7 @@ const POSE_ROW: Dictionary = {"cork": 0, "glimmer": 1, "obsidian": 2}
 var _p: Player
 var _c: FishingComponent
 var _show: float = 0.0
+var hud_lift: float = 0.0 ## set by the HUD director: the parts below it in `above_bar` take this much room
 var _time: float = 0.0
 var _width: float = 0.0
 var _key: String = ""
@@ -124,6 +125,11 @@ func _group_width(g: Dictionary) -> int:
 	return w
 
 
+## Room it takes above the hotbar (HUD director stacking): the leaf while it shows.
+func hud_height() -> float:
+	return float(HEIGHT) if _show > 0.01 and visible else 0.0
+
+
 func _measure(groups: Array) -> int:
 	var w: int = 18
 	for i: int in groups.size():
@@ -140,7 +146,7 @@ func _draw() -> void:
 	var groups: Array = _groups()
 	var warn: bool = groups.any(func(g: Dictionary) -> bool: return bool(g.get("warn", false)))
 	var w: float = roundf(_width * (0.35 + 0.65 * a)) ## it unfurls from the middle
-	var rect: Rect2 = Rect2(cx - roundf(w * 0.5), roundf(top - RAISE + (1.0 - a) * 4.0), w, HEIGHT)
+	var rect: Rect2 = Rect2(cx - roundf(w * 0.5), roundf(top - RAISE - hud_lift + (1.0 - a) * 4.0), w, HEIGHT)
 	if warn:
 		VineStyle.glow(self, rect.get_center(), rect.size.x * 0.45, GOLD, (0.35 + 0.2 * sin(_time * 9.0)) * a)
 	_stems(rect, a, void_level)

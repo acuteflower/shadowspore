@@ -24,7 +24,7 @@ const CHORD_WAV: String = "res://assets/audio/meadow_wonders/guardian_chord.wav"
 const GUARDIAN_COUNT: int = 7
 const BROKEN_INDEX: int = 6 ## 7th guardian (southern/south-east arch) is the broken headless sentinel
 
-var wonders: MeadowWonders
+var wonders: Node
 var wonder_id: String = "wonder_sleeping_guardians"
 var chest_tier: String = "legendary"
 var ring_rx: float = 76.0
@@ -51,7 +51,7 @@ var _regen_accum: float = 0.0
 var _mist_wisps: Array[Dictionary] = []
 
 
-func setup(owner_wonders: MeadowWonders, spec: Dictionary) -> void:
+func setup(owner_wonders: Node, spec: Dictionary) -> void:
 	wonders = owner_wonders
 	wonder_id = String(spec.get("id", "wonder_sleeping_guardians"))
 	chest_tier = String(spec.get("chest_tier", "legendary"))
@@ -433,7 +433,7 @@ class GuardianBrazier extends Interactable:
 			return
 		var dir: Vector2 = global_position - player.global_position
 		var idx_capture: int = index
-		var w_ref: MeadowWonders = circle.wonders
+		var w_ref: Node = circle.wonders
 		player.begin_pick(dir, func() -> void:
 			if w_ref != null:
 				w_ref.request_light_guardian_brazier(idx_capture)

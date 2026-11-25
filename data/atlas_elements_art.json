@@ -1,0 +1,493 @@
+{
+	"sheet": "res://assets/ui/atlas_elements.png",
+	"size": [
+		256,
+		160
+	],
+	"regions": {
+		"coast_stamp_wax": {
+			"rect": [
+				4,
+				4,
+				32,
+				32
+			],
+			"anchor": [
+				16,
+				16
+			],
+			"category": "reward_stamp",
+			"reward_tier": 30
+		},
+		"coast_stamp_ink": {
+			"rect": [
+				40,
+				4,
+				32,
+				32
+			],
+			"anchor": [
+				16,
+				16
+			],
+			"category": "reward_stamp",
+			"reward_tier": 30
+		},
+		"coast_stamp_mini": {
+			"rect": [
+				76,
+				4,
+				16,
+				16
+			],
+			"anchor": [
+				8,
+				8
+			],
+			"category": "reward_stamp",
+			"reward_tier": 30
+		},
+		"compass_rose": {
+			"rect": [
+				96,
+				4,
+				32,
+				32
+			],
+			"anchor": [
+				16,
+				16
+			],
+			"category": "compass"
+		},
+		"compass_ring_outer": {
+			"rect": [
+				132,
+				4,
+				32,
+				32
+			],
+			"anchor": [
+				16,
+				16
+			],
+			"category": "compass"
+		},
+		"flower_0": {
+			"rect": [
+				168,
+				4,
+				16,
+				16
+			],
+			"anchor": [
+				8,
+				8
+			],
+			"category": "completion_flower",
+			"stage": 0
+		},
+		"flower_1": {
+			"rect": [
+				188,
+				4,
+				16,
+				16
+			],
+			"anchor": [
+				8,
+				8
+			],
+			"category": "completion_flower",
+			"stage": 1
+		},
+		"flower_2": {
+			"rect": [
+				208,
+				4,
+				16,
+				16
+			],
+			"anchor": [
+				8,
+				8
+			],
+			"category": "completion_flower",
+			"stage": 2
+		},
+		"flower_3": {
+			"rect": [
+				228,
+				4,
+				16,
+				16
+			],
+			"anchor": [
+				8,
+				8
+			],
+			"category": "completion_flower",
+			"stage": 3
+		},
+		"vine_corner_nw": {
+			"rect": [
+				4,
+				44,
+				24,
+				24
+			],
+			"anchor": [
+				4,
+				4
+			],
+			"category": "reward_frame",
+			"reward_tier": 60
+		},
+		"vine_corner_ne": {
+			"rect": [
+				32,
+				44,
+				24,
+				24
+			],
+			"anchor": [
+				20,
+				4
+			],
+			"category": "reward_frame",
+			"reward_tier": 60
+		},
+		"vine_corner_sw": {
+			"rect": [
+				60,
+				44,
+				24,
+				24
+			],
+			"anchor": [
+				4,
+				20
+			],
+			"category": "reward_frame",
+			"reward_tier": 60
+		},
+		"vine_corner_se": {
+			"rect": [
+				88,
+				44,
+				24,
+				24
+			],
+			"anchor": [
+				20,
+				20
+			],
+			"category": "reward_frame",
+			"reward_tier": 60
+		},
+		"vine_border_h": {
+			"rect": [
+				116,
+				44,
+				32,
+				12
+			],
+			"anchor": [
+				16,
+				6
+			],
+			"category": "reward_frame",
+			"reward_tier": 60,
+			"tileable": "horizontal"
+		},
+		"vine_border_v": {
+			"rect": [
+				152,
+				44,
+				12,
+				32
+			],
+			"anchor": [
+				6,
+				16
+			],
+			"category": "reward_frame",
+			"reward_tier": 60,
+			"tileable": "vertical"
+		},
+		"vine_divider": {
+			"rect": [
+				168,
+				44,
+				32,
+				12
+			],
+			"anchor": [
+				16,
+				6
+			],
+			"category": "reward_frame",
+			"reward_tier": 60
+		},
+		"engrave_corner_nw": {
+			"rect": [
+				4,
+				80,
+				16,
+				16
+			],
+			"anchor": [
+				2,
+				2
+			],
+			"category": "engraving_border"
+		},
+		"engrave_corner_ne": {
+			"rect": [
+				24,
+				80,
+				16,
+				16
+			],
+			"anchor": [
+				14,
+				2
+			],
+			"category": "engraving_border"
+		},
+		"engrave_corner_sw": {
+			"rect": [
+				44,
+				80,
+				16,
+				16
+			],
+			"anchor": [
+				2,
+				14
+			],
+			"category": "engraving_border"
+		},
+		"engrave_corner_se": {
+			"rect": [
+				64,
+				80,
+				16,
+				16
+			],
+			"anchor": [
+				14,
+				14
+			],
+			"category": "engraving_border"
+		},
+		"engrave_border_h": {
+			"rect": [
+				84,
+				80,
+				32,
+				8
+			],
+			"anchor": [
+				16,
+				4
+			],
+			"category": "engraving_border",
+			"tileable": "horizontal"
+		},
+		"engrave_border_v": {
+			"rect": [
+				120,
+				80,
+				8,
+				32
+			],
+			"anchor": [
+				4,
+				16
+			],
+			"category": "engraving_border",
+			"tileable": "vertical"
+		},
+		"engrave_divider": {
+			"rect": [
+				132,
+				80,
+				48,
+				12
+			],
+			"anchor": [
+				24,
+				6
+			],
+			"category": "engraving_border"
+		},
+		"seal_locked": {
+			"rect": [
+				184,
+				80,
+				16,
+				16
+			],
+			"anchor": [
+				8,
+				8
+			],
+			"category": "seal"
+		},
+		"seal_unlocked": {
+			"rect": [
+				204,
+				80,
+				16,
+				16
+			],
+			"anchor": [
+				8,
+				8
+			],
+			"category": "seal"
+		},
+		"veil_thread_icon": {
+			"rect": [
+				224,
+				80,
+				12,
+				12
+			],
+			"anchor": [
+				6,
+				6
+			],
+			"category": "chronicle_badge"
+		},
+		"badge_waystone": {
+			"rect": [
+				4,
+				116,
+				12,
+				12
+			],
+			"anchor": [
+				6,
+				6
+			],
+			"category": "chronicle_badge"
+		},
+		"badge_vista": {
+			"rect": [
+				20,
+				116,
+				12,
+				12
+			],
+			"anchor": [
+				6,
+				6
+			],
+			"category": "chronicle_badge"
+		},
+		"badge_chest": {
+			"rect": [
+				36,
+				116,
+				12,
+				12
+			],
+			"anchor": [
+				6,
+				6
+			],
+			"category": "chronicle_badge"
+		},
+		"badge_puzzle": {
+			"rect": [
+				52,
+				116,
+				12,
+				12
+			],
+			"anchor": [
+				6,
+				6
+			],
+			"category": "chronicle_badge"
+		},
+		"badge_flora": {
+			"rect": [
+				68,
+				116,
+				12,
+				12
+			],
+			"anchor": [
+				6,
+				6
+			],
+			"category": "chronicle_badge"
+		},
+		"badge_secret": {
+			"rect": [
+				84,
+				116,
+				12,
+				12
+			],
+			"anchor": [
+				6,
+				6
+			],
+			"category": "chronicle_badge"
+		},
+		"title_ribbon": {
+			"rect": [
+				100,
+				116,
+				64,
+				16
+			],
+			"anchor": [
+				32,
+				8
+			],
+			"category": "reward_title",
+			"reward_tier": 100,
+			"nine_patch": [
+				12,
+				4,
+				12,
+				4
+			]
+		}
+	},
+	"sets": {
+		"completion_flower": [
+			"flower_0",
+			"flower_1",
+			"flower_2",
+			"flower_3"
+		],
+		"silvercoast_frame": {
+			"corners": [
+				"vine_corner_nw",
+				"vine_corner_ne",
+				"vine_corner_sw",
+				"vine_corner_se"
+			],
+			"h": "vine_border_h",
+			"v": "vine_border_v",
+			"divider": "vine_divider"
+		},
+		"stonesetter_frame": {
+			"corners": [
+				"engrave_corner_nw",
+				"engrave_corner_ne",
+				"engrave_corner_sw",
+				"engrave_corner_se"
+			],
+			"h": "engrave_border_h",
+			"v": "engrave_border_v",
+			"divider": "engrave_divider"
+		}
+	}
+}

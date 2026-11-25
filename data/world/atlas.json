@@ -1,0 +1,15 @@
+{
+	"_doc": "Shadowspore 2.0 Weltatlas (docs/v2_zonenwelt_atlas_konzept.md). Jeder Kontinent hat sein eigenes Koordinatensystem in Tiles (Nullpunkt oben links). `chart` = Lage und Größe auf der Weltkarte in Weltkarten-Einheiten (0..1).",
+	"continents": [
+		{
+			"id": "main",
+			"file": "world/continents/main.json",
+			"chart": [0.32, 0.30, 0.36, 0.30]
+		},
+		{
+			"id": "lab",
+			"file": "world/continents/lab.json",
+			"chart": [0.02, 0.02, 0.16, 0.12]
+		}
+	]
+}

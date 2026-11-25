@@ -28,6 +28,9 @@ var _glow_sprites: Array[Sprite2D] = []
 var _lantern_light: NightLight = null
 var _last_night: float = -1.0
 var _bound_field: Node = null
+var _world_origin: Vector2 = Vector2.ZERO
+var _world_deck_rect: Rect2 = Rect2()
+var _world_cached: bool = false
 
 
 func _ready() -> void:
@@ -35,6 +38,8 @@ func _ready() -> void:
 	z_index = 0
 	y_sort_enabled = true
 	add_to_group("flora_glow")
+	set_notify_transform(true)
+	_update_world_cache()
 
 	_register_patch()
 	if not tree_exiting.is_connected(_on_tree_exiting):
@@ -46,6 +51,23 @@ func _ready() -> void:
 
 	if _bound_field != null and is_instance_valid(_bound_field):
 		bind_water_field(_bound_field)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSFORM_CHANGED:
+		_update_world_cache()
+
+
+func _update_world_cache() -> void:
+	_world_origin = global_position if is_inside_tree() else position
+	_world_deck_rect = Rect2(_world_origin + WALKABLE_DECK_RECT.position, WALKABLE_DECK_RECT.size)
+	_world_cached = true
+
+
+func deck_world_bounds() -> Rect2:
+	if _world_cached:
+		return _world_deck_rect
+	return Rect2(position + WALKABLE_DECK_RECT.position, WALKABLE_DECK_RECT.size)
 
 
 func _on_tree_exiting() -> void:
@@ -82,10 +104,11 @@ func ensure_after_water_field(water_field: Node = null) -> void:
 
 func bind_water_field(water_field: Node) -> void:
 	_bound_field = water_field
+	_update_world_cache()
 	re_register_after(water_field)
 	if water_field == null or not is_instance_valid(water_field):
 		return
-	var origin: Vector2 = global_position if is_inside_tree() else position
+	var origin: Vector2 = _world_origin
 	if water_field.has_method(&"inject_obstacle"):
 		water_field.call(&"inject_obstacle", origin + PIER_LEFT_OFFSET, PIER_RADIUS_PX, 1.0)
 		water_field.call(&"inject_obstacle", origin + PIER_RIGHT_OFFSET, PIER_RADIUS_PX, 1.0)
@@ -97,8 +120,9 @@ func bind_water_field(water_field: Node) -> void:
 func has_water_deck_at(world_pos: Vector2) -> bool:
 	if not is_finite(world_pos.x) or not is_finite(world_pos.y):
 		return false
-	var local_pos: Vector2 = to_local(world_pos) if is_inside_tree() else (world_pos - position)
-	return WALKABLE_DECK_RECT.has_point(local_pos)
+	if _world_cached:
+		return _world_deck_rect.has_point(world_pos)
+	return WALKABLE_DECK_RECT.has_point(world_pos - position)
 
 
 func surface_at(world_pos: Vector2) -> String:

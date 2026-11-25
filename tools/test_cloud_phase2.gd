@@ -18,7 +18,7 @@ func _run() -> void:
 	CloudSession.strict_override = false
 
 	# 1. Local compression round-trip
-	var sample_world: Dictionary = {"version": 1, "day": 7, "time": 0.42, "things": {"a": 1, "b": "hello"}}
+	var sample_world: Dictionary = {"version": SaveGame.VERSION, "day": 7, "time": 0.42, "things": {"a": 1, "b": "hello"}}
 	var gz: String = SaveGame.compress_json(sample_world)
 	if gz.is_empty():
 		_fail("compress_json returned empty")

@@ -188,8 +188,39 @@ func _notification(what: int) -> void:
 		_velocity = Vector2.ZERO
 
 
+var embedded_in_menu: bool = false
+
+
+func set_embedded_active(on: bool) -> void:
+	if on:
+		_owns_input = true
+		_opening = true
+		_open_t = 1.0
+		InputManager.skills_open = true
+		visible = true
+		modulate.a = 1.0
+		mouse_filter = Control.MOUSE_FILTER_STOP
+		_center = HOME
+		_flying = false
+		_anchor = size * 0.5
+		_velocity = Vector2.ZERO
+		_zoom_target = _fit_zoom()
+		_zoom = _zoom_target
+	else:
+		_opening = false
+		_open_t = 0.0
+		_owns_input = false
+		visible = false
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		InputManager.skills_open = false
+		_cancel_hold()
+		_dragging = false
+		_slider_drag = false
+		_velocity = Vector2.ZERO
+
+
 func _process(delta: float) -> void:
-	if InputManager.skills_pressed():
+	if not embedded_in_menu and InputManager.skills_pressed():
 		_set_open(not _opening)
 	if not _owns_input:
 		return
@@ -489,12 +520,17 @@ func _input(event: InputEvent) -> void:
 	if not _owns_input:
 		return
 	if event.is_action_pressed("ui_cancel"):
+		if embedded_in_menu:
+			return
 		_set_open(false)
 		get_viewport().set_input_as_handled()
 		return
 	if not _opening:
 		return
 	var mouse: InputEventMouseButton = event as InputEventMouseButton
+	if embedded_in_menu and mouse != null and mouse.pressed:
+		if Rect2(size.x * 0.5 - 82.0, GameMenu.RAIL_H + 2.0, 164.0, 24.0).has_point(mouse.position):
+			return
 	var motion: InputEventMouseMotion = event as InputEventMouseMotion
 	if mouse != null:
 		if mouse.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN] and mouse.pressed:
@@ -595,16 +631,18 @@ func _draw_chrome() -> void:
 		return
 	var void_level: float = VineStyle.void_amount()
 	var plate: float = clampf((_open_t - 0.35) / 0.5, 0.0, 1.0)
-	VineStyle.tag(_chrome, "FÄHIGKEITEN", Vector2(size.x * 0.5, 0), plate, void_level, _time)
-	_text_centered("DAS SCHLEIERGEFLECHT", Vector2(size.x * 0.5, 29), DIM)
+	if not embedded_in_menu:
+		VineStyle.tag(_chrome, "FÄHIGKEITEN", Vector2(size.x * 0.5, 0), plate, void_level, _time)
+		_text_centered("DAS SCHLEIERGEFLECHT", Vector2(size.x * 0.5, 29), DIM)
 	_draw_points_vine(void_level)
 	_draw_details()
 	_draw_action_vine(void_level)
 	_draw_zoom_vine(void_level)
-	var controls: String = "ZIEHEN / WASD: SCHIEBEN   RAD / Q E: ZOOM   R: MITTE   F / ESC: ZURÜCK" if InputManager.using_mouse else "STICK: SCHIEBEN   STEUERKREUZ: AUSWAHL   A: HALTEN   START: ZURÜCK"
-	var hint_width: float = PixelText.width(controls) + 16.0
-	_text_backing(Rect2(size.x * 0.5 - hint_width * 0.5, size.y - 19, hint_width, 15), VineStyle.BARK_LIGHT, 0.68)
-	_text_centered(controls, Vector2(size.x * 0.5, size.y - 15), Color(DIM, 0.75))
+	if not embedded_in_menu:
+		var controls: String = "ZIEHEN / WASD: SCHIEBEN   RAD / Q E: ZOOM   R: MITTE   F / ESC: ZURÜCK" if InputManager.using_mouse else "STICK: SCHIEBEN   STEUERKREUZ: AUSWAHL   A: HALTEN   START: ZURÜCK"
+		var hint_width: float = PixelText.width(controls) + 16.0
+		_text_backing(Rect2(size.x * 0.5 - hint_width * 0.5, size.y - 19, hint_width, 15), VineStyle.BARK_LIGHT, 0.68)
+		_text_centered(controls, Vector2(size.x * 0.5, size.y - 15), Color(DIM, 0.75))
 
 
 func _text_centered(value: String, at: Vector2, color: Color) -> void:
@@ -744,13 +782,13 @@ func _detail_line(id: String) -> String:
 		var player: Player = _player as Player
 		if player != null and player.stepper != null:
 			var cd: float = player.stepper.cooldown * (0.78 if _has_light_step() else 1.0)
-			return "%s / REICHWEITE %d / %.2f S / %d AUSDAUER" % [VineStyle.key_name("shadow_step", "ALT"), roundi(player.effective_step_range()), cd, roundi(player.step_cost())]
+			return "%s / REICHWEITE %d / %.2f S / %d AUSDAUER" % [VineStyle.key_name("shadow_step", "ALT", false), roundi(player.effective_step_range()), cd, roundi(player.step_cost())]
 	if id == "sneak":
 		var stealth: StealthComponent = _player.get_node_or_null("StealthComponent") as StealthComponent
 		if stealth != null:
-			return "%s HALTEN / SICHTWEITE %d %%" % [VineStyle.key_name("sneak", "STRG"), roundi(stealth.sneak_detection_multiplier * 100.0)]
+			return "%s HALTEN / SICHTWEITE %d %%" % [VineStyle.key_name("sneak", "STRG", false), roundi(stealth.sneak_detection_multiplier * 100.0)]
 	if id == "wall_climb":
-		return String(node.detail) % (VineStyle.key_name("interact", "E") if InputManager.using_mouse else InteractPrompt.GAMEPAD_KEY)
+		return String(node.detail) % (VineStyle.key_name("interact", "E", false) if InputManager.using_mouse else InteractPrompt.GAMEPAD_KEY)
 	return String(node.get("detail", ""))
 
 

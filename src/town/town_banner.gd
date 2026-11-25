@@ -22,8 +22,13 @@ var _queue: Array[Dictionary] = []
 var _time: float = 0.0
 
 
+func _exit_tree() -> void:
+	HudNotices.release_big(self)
+
+
 func _ready() -> void:
 	layer = 21
+	add_to_group("world_banners")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_canvas = Control.new()
 	_canvas.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -39,7 +44,7 @@ func show_text(title: String, sub: String = "") -> void:
 
 ## `info`: title, sub, header (small line over the emblem), color, emblem (-1 none), big (the level), sound ("" = the cloth only).
 func show_banner(info: Dictionary) -> void:
-	if is_showing() or not _queue.is_empty():
+	if is_showing() or not _queue.is_empty() or not HudNotices.claim_big(self): ## one big notice on the stage at a time
 		_queue.append(info)
 		return
 	_now = info
@@ -72,14 +77,19 @@ func _play(file: String, db: float) -> void:
 
 func _blocked() -> bool:
 	var box: DialogueBox = get_tree().get_first_node_in_group("dialogue") as DialogueBox
-	return get_tree().paused or (box != null and box.is_active())
+	return get_tree().paused or InputManager.menu_open or (box != null and box.is_active())
 
 
 func _process(delta: float) -> void:
 	_time += delta
 	if not is_showing():
-		if not _queue.is_empty() and not _blocked():
-			show_banner(_queue.pop_front())
+		HudNotices.release_big(self)
+		if not _queue.is_empty() and not _blocked() and HudNotices.claim_big(self):
+			_now = _queue.pop_front()
+			_age = 0.0
+			_play("banner_unroll", -6.0)
+			if String(_now.get("sound", "")) != "":
+				_play(String(_now.sound), -4.0)
 		return
 	if _age > UNROLL and _age < UNROLL + _hold() - 0.1 and _blocked():
 		_canvas.queue_redraw()

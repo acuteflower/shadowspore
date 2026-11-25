@@ -3111,7 +3111,8 @@ func _update_wear() -> void:
 		_wear_tex.update(img)
 	RenderingServer.global_shader_parameter_set("g_town_wear_rect", Vector4(origin.x, origin.y, TownWear.SIZE * TownWear.CELL, TownWear.SIZE * TownWear.CELL))
 	for node: Node in get_tree().get_nodes_in_group("meadow_details"):
-		(node as MeadowDetails).apply_wear(self)
+		if node.has_method("apply_wear"):
+			node.call("apply_wear", self)
 
 
 ## The local player enters the town's ground (not a room): its name comes once a day, quietly (docs/town_ausbau.md C19).

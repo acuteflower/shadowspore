@@ -318,6 +318,8 @@ func _run_rescue_sequence(player: Player) -> void:
 	await _flash_cover_to(1.0, 0.72)
 	player.request_teleport(interiors.starhall_position())
 	player.facing = Vector2.UP
+	if player.zero_g != null:
+		player.zero_g.trigger_arrive()
 	player.sync_wound_visuals()
 	interiors.apply_view(player)
 	await get_tree().create_timer(0.28, true, false, true).timeout
@@ -360,6 +362,8 @@ func travel_to_starhall(player: Player, from_statue_id: String) -> void:
 	await interiors.transit(player, func() -> void:
 		player.request_teleport(interiors.starhall_position())
 		player.facing = Vector2.UP
+		if player.zero_g != null:
+			player.zero_g.trigger_arrive()
 		interiors.apply_view(player), true)
 
 

@@ -28,11 +28,12 @@ var _frames: int = 0
 func _exit_tree() -> void:
 	if is_instance_valid(decor):
 		decor.queue_free()
-	var world: Variant = get_tree().get_first_node_in_group("world") if is_inside_tree() else null
+	var world: Node = get_tree().get_first_node_in_group("world") if is_inside_tree() else null
+	var things: Variant = world.get("_things") if (world != null and "_things" in world) else null
 	for rock: WorldProp in rocks:
 		if is_instance_valid(rock):
-			if world != null and world._things.get(rock.cell) == rock:
-				world._things.erase(rock.cell)
+			if things is Dictionary and (things as Dictionary).get(rock.cell) == rock:
+				(things as Dictionary).erase(rock.cell)
 			rock.queue_free()
 	rocks.clear()
 

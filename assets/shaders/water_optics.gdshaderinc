@@ -8,6 +8,7 @@ global uniform float g_water_time;
 global uniform vec2 g_wind_dir;
 global uniform float g_wind_gust;
 global uniform float g_wind_clock;
+global uniform vec4 g_wind_sand;
 global uniform float g_night;
 global uniform float g_sun;
 
@@ -182,6 +183,60 @@ float w2_bilinear_bed_weight(vec2 world_pos, vec2 map_origin, vec2 map_size, sam
 	return mix(mix(m00, m10, fr.x), mix(m01, m11, fr.x), fr.y);
 }
 
+// Smooth 4x4 tent-filtered bed weight [0..1] (~16px organic transition even on 4px zone texels!).
+float w2_soft_bed_weight(vec2 world_pos, vec2 map_origin, vec2 map_size, sampler2D geo_map, int target_bed) {
+	ivec2 sz = textureSize(geo_map, 0);
+	vec2 inv_cell = vec2(sz) / max(map_size, vec2(1.0));
+	vec2 fc = (world_pos - map_origin) * inv_cell - vec2(0.5);
+	ivec2 c = ivec2(floor(fc));
+	vec2 fr = fract(fc);
+	float acc = 0.0;
+	float wsum = 0.0;
+	for (int dy = -1; dy <= 2; dy++) {
+		float wy = max(0.0, 1.5 - abs(float(dy) - fr.y));
+		int sy = clamp(c.y + dy, 0, sz.y - 1);
+		for (int dx = -1; dx <= 2; dx++) {
+			float wx = max(0.0, 1.5 - abs(float(dx) - fr.x));
+			float w = wx * wy;
+			if (w <= 0.001) { continue; }
+			int sx = clamp(c.x + dx, 0, sz.x - 1);
+			int b = int(floor(texelFetch(geo_map, ivec2(sx, sy), 0).a * 255.0 + 0.5));
+			if (b == target_bed) { acc += w; }
+			wsum += w;
+		}
+	}
+	return acc / max(wsum, 0.001);
+}
+
+// Smooth wide-kernel tent-filtered regime weights: vec4(w_brook, w_lake, w_surf, w_ocean)
+// Eliminates hard texel staircase cuts where rivers meet the sea or lakes (~26px optical blend)!
+vec4 w2_smooth_regime_weights(vec2 world_pos, vec2 map_origin, vec2 map_size, sampler2D geo_map) {
+	ivec2 sz = textureSize(geo_map, 0);
+	vec2 inv_cell = vec2(sz) / max(map_size, vec2(1.0));
+	vec2 fc = (world_pos - map_origin) * inv_cell - vec2(0.5);
+	ivec2 c = ivec2(floor(fc));
+	vec2 fr = fract(fc);
+	vec4 acc = vec4(0.0);
+	float wsum = 0.0;
+	for (int dy = -2; dy <= 3; dy++) {
+		float wy = max(0.0, 2.5 - abs(float(dy) - fr.y));
+		int sy = clamp(c.y + dy, 0, sz.y - 1);
+		for (int dx = -2; dx <= 3; dx++) {
+			float wx = max(0.0, 2.5 - abs(float(dx) - fr.x));
+			float w = wx * wy;
+			if (w <= 0.001) { continue; }
+			int sx = clamp(c.x + dx, 0, sz.x - 1);
+			int r = int(floor(texelFetch(geo_map, ivec2(sx, sy), 0).b * 255.0 + 0.5));
+			if (r == 1) { acc.x += w; }
+			else if (r == 2) { acc.y += w; }
+			else if (r == 3) { acc.z += w; }
+			else if (r == 4) { acc.w += w; }
+			wsum += w;
+		}
+	}
+	return acc / max(wsum, 0.001);
+}
+
 // Samples water_flow_map (filter_linear): returns vec4(flow_x, flow_y, turbulence, overhead_shadow).
 vec4 w2_sample_flow(vec2 world_pos, vec2 map_origin, vec2 map_size, sampler2D flow_map) {
 	vec2 uv = clamp((world_pos - map_origin) / map_size, vec2(0.0), vec2(1.0));
@@ -287,42 +342,158 @@ float w2_dual_caustics(vec2 px, vec2 flow_v, float t) {
 	return clamp(mix(c1, c0, w0), 0.0, 1.0);
 }
 
-// Silky, clean wind-swept dry coastal sand (connected contour waves, ZERO single-pixel checkerboard or stray dots!).
-vec3 w2_shade_dry_sand(vec2 px, float wrack_band) {
-	vec3 r0 = vec3(0.71, 0.58, 0.41); // subtle warm sand trough
-	vec3 r1 = vec3(0.78, 0.65, 0.46); // warm coastal sand shadow
-	vec3 r2 = vec3(0.84, 0.71, 0.50); // mid golden beach sand
-	vec3 r3 = vec3(0.88, 0.77, 0.56); // sunlit sand crest
-	vec3 r4 = vec3(0.92, 0.82, 0.61); // pale warm dune highlight
-	float macro = w2_fbm(px / 30.0 + vec2(11.0, 23.0));
-	float fine = w2_vnoise(px / 12.0 + vec2(37.0, 5.0));
-	float ripple = sin(px.x * 0.21 + px.y * 0.12 + w2_fbm(px / 18.0) * 2.9);
-	float t = clamp(0.49 + (macro - 0.5) * 0.34 + (fine - 0.5) * 0.11 + ripple * 0.10, 0.0, 1.0);
-	vec3 col = w2_clean_ramp5(r0, r1, r2, r3, r4, t);
+// Crisp Shadowspore pixel-art wind-swept coastal sand with REAL WorldWind movement:
+// - 6-step quantized palette (cool lavender-taupe ripple troughs -> sunlit golden-cream NW crests)
+// - Wind-carved dune ripples that slowly migrate downwind with `dune_creep` (paused on wet sand & rain)
+// - Live directional Treibsand / saltation sand veils & skimming sand grains streaming along live `g_wind_dir`
+// - Rolling sunlit wind-gust waves synchronized with WorldWind & LivingGrass (ZERO static kelp/water blotches!)
+vec3 w2_shade_dry_sand(vec2 px, vec2 sand_drift, float dune_creep, float wetness) {
+	const vec3 SAND_RAMP[6] = vec3[6](
+		vec3(0.57, 0.48, 0.39), // 0 cool lavender-taupe lee trough
+		vec3(0.68, 0.57, 0.44), // 1 shaded ripple flank
+		vec3(0.77, 0.65, 0.49), // 2 warm mid coastal sand
+		vec3(0.84, 0.73, 0.55), // 3 sunlit beach sand
+		vec3(0.90, 0.81, 0.62), // 4 crisp NW wind-ripple crest
+		vec3(0.95, 0.88, 0.72)  // 5 pale sunlit dune highlight
+	);
 
-	// Clean organic Spülsaum wrack-line contour (connected damp sand & soft sea-kelp strokes)
-	if (wrack_band > 0.01) {
-		float w_tex = w2_fbm(px / 9.5 + vec2(51.0, 17.0));
-		float w_mask = smoothstep(0.44, 0.76, w_tex);
-		col = mix(col, vec3(0.58, 0.48, 0.37), wrack_band * w_mask * 0.42);
+	// Dry sand mobility factor: wet swash sand & rain-soaked sand stay packed and heavy!
+	float dry_k = (1.0 - smoothstep(0.05, 0.38, wetness)) * (1.0 - smoothstep(0.18, 0.55, g_rain));
+	vec2 wdir = length(g_wind_dir) > 0.01 ? normalize(g_wind_dir) : vec2(0.96, 0.26);
+	float g_soft = g_wind_gust <= 1.1 ? g_wind_gust : 1.1 + 0.75 * tanh((g_wind_gust - 1.1) * 0.35);
+	float gust_eff = clamp(g_soft + g_storm * 0.75, 0.0, 2.0);
+
+	// Sweeping macro dune topography (separates sunlit upper crests from warmer troughs)
+	float macro = w2_fbm(px / 28.0 + vec2(11.0, 23.0));
+	float patch_w = smoothstep(0.26, 0.74, w2_fbm(px / 22.0 + vec2(43.0, 17.0)));
+
+	// Subtle rolling wind-gust front advected along live wind direction (ZERO world-origin rotation lever-arm!)
+	float gust_front = smoothstep(0.28, 0.86, w2_fbm((px - sand_drift * 1.40) / 52.0 + vec2(17.0, 41.0)));
+
+	// Asymmetric wind-carved dune ripples slowly creeping downwind with WorldWind
+	float warp = w2_fbm(px / 16.0 + vec2(5.0, 19.0)) * 2.5 + w2_vnoise(px / 7.5 + vec2(31.0, 7.0)) * 0.42;
+	float rip_coord = px.y * 0.19 + px.x * 0.11 + warp - dune_creep * 0.20;
+	float rip_f = fract(rip_coord);
+	float rip_crest = smoothstep(0.10, 0.24, rip_f) * (1.0 - smoothstep(0.24, 0.44, rip_f));
+	float rip_trough = 1.0 - smoothstep(0.0, 0.17, rip_f);
+
+	float fine_clump = w2_vnoise(floor(px / 2.0) * 0.45 + vec2(37.0, 5.0)) - 0.5;
+	float gust_sheen = dry_k * gust_front * clamp(gust_eff * 0.38, 0.0, 0.55) * (0.45 + 0.55 * macro);
+	float f = 2.48
+		+ (macro - 0.5) * 1.85
+		+ (rip_crest * 1.12 - rip_trough * 1.02) * (0.45 + 0.55 * patch_w)
+		+ fine_clump * 0.48
+		+ gust_sheen;
+	int idx = clamp(int(floor(f)), 0, 5);
+	vec3 col = SAND_RAMP[idx];
+
+	// Embedded 2x1 sunlit shell fragments & smooth tiny coastal grit pebbles (clean sparse accents)
+	vec2 sc = floor(px / vec2(14.0, 12.0));
+	float sh = w2_hash(sc + vec2(173.0, 59.0));
+	if (sh > 0.78) {
+		vec2 at = sc * vec2(14.0, 12.0) + vec2(2.0 + floor(w2_hash(sc + vec2(3.0, 7.0)) * 8.0), 2.0 + floor(w2_hash(sc + vec2(11.0, 13.0)) * 6.0));
+		vec2 d = px - at;
+		if (sh > 0.92) {
+			if (d.y == 0.0 && d.x >= 0.0 && d.x <= 1.0) {
+				col = vec3(0.95, 0.91, 0.83);
+			} else if (d.y == 1.0 && d.x == 0.0) {
+				col = SAND_RAMP[0];
+			}
+		} else {
+			if (d.y == 0.0 && d.x >= 0.0 && d.x <= 1.0) {
+				col = (d.x == 0.0) ? vec3(0.68, 0.62, 0.54) : vec3(0.53, 0.48, 0.43);
+			}
+		}
+	}
+
+	// Real-time wind-driven Treibsand (saltation sand veils & skimming sand grains) following live `g_wind_dir`!
+	if (dry_k > 0.04 && gust_eff > 0.10) {
+		// 4-tap directional streak filter along live `-wdir` on purely translated coordinates (zero rotation jitter!)
+		vec2 sp1 = px - sand_drift;
+		float st1 = 0.31 * w2_vnoise(sp1 / 12.0 + vec2(13.0, 47.0))
+			+ 0.27 * w2_vnoise((sp1 - wdir * 5.0) / 12.0 + vec2(13.0, 47.0))
+			+ 0.23 * w2_vnoise((sp1 - wdir * 11.0) / 12.0 + vec2(13.0, 47.0))
+			+ 0.19 * w2_vnoise((sp1 - wdir * 17.0) / 12.0 + vec2(13.0, 47.0));
+		// Faster upper saltation wisp layer
+		vec2 sp2 = px - sand_drift * 1.65;
+		float st2 = 0.54 * w2_vnoise(sp2 / 7.5 + vec2(73.0, 19.0))
+			+ 0.46 * w2_vnoise((sp2 - wdir * 4.5) / 7.5 + vec2(73.0, 19.0));
+
+		float veil = st1 * 0.64 + st2 * 0.36;
+		float crest_expose = 0.56 + 0.44 * clamp(macro * 1.15 + rip_crest * 0.25, 0.0, 1.0);
+		float veil_str = clamp((0.34 + gust_eff * 0.78) * (0.42 + 0.58 * gust_front) * crest_expose, 0.0, 1.60);
+		float veil_thr = 0.65 - 0.14 * min(veil_str, 1.35);
+		if (veil > veil_thr) {
+			float v_amt = clamp((veil - veil_thr) * 4.2, 0.0, 1.0) * dry_k;
+			int blown_i = clamp(idx + (v_amt > 0.38 ? 2 : 1), 4, 5);
+			col = mix(col, SAND_RAMP[blown_i], clamp(v_amt * (0.34 + 0.34 * min(gust_eff, 1.3)), 0.14, 0.64));
+		}
+
+		// Fast crisp 2x1 wind-skimming saltation sand grains during coastal breezes & gusts
+		if (gust_eff > 0.14 && gust_front > 0.24) {
+			vec2 gp = floor(px - sand_drift * 2.25);
+			vec2 gcell = floor(gp / vec2(9.0, 7.0));
+			float gh = w2_hash(gcell + vec2(317.0, 89.0));
+			float g_chance = clamp(0.82 - gust_eff * 0.10, 0.62, 0.84);
+			if (gh > g_chance) {
+				vec2 gat = gcell * vec2(9.0, 7.0) + vec2(
+					1.0 + floor(w2_hash(gcell + vec2(5.0, 2.0)) * 6.0),
+					1.0 + floor(w2_hash(gcell + vec2(9.0, 7.0)) * 4.0)
+				);
+				vec2 gd = gp - gat;
+				vec2 step_d = vec2(wdir.x >= 0.0 ? 1.0 : -1.0, abs(wdir.y) > 0.55 ? sign(wdir.y) : 0.0);
+				if ((gd.x == 0.0 && gd.y == 0.0) || (gd.x == -step_d.x && gd.y == -step_d.y)) {
+					float head_w = (gd.x == 0.0 && gd.y == 0.0) ? 0.72 : 0.38;
+					col = mix(col, SAND_RAMP[5], head_w * dry_k * smoothstep(0.24, 0.72, gust_front));
+				}
+			}
+		}
+
+		// Subtle sunlit quartz sand-grain glints twinkling as breezes sweep dry sand
+		float day_vis = g_day_strength * (1.0 - g_night) * dry_k;
+		if (day_vis > 0.15 && rip_crest > 0.35) {
+			vec2 qc = floor(px / 3.0);
+			float qh = w2_hash(qc + vec2(509.0, 127.0));
+			if (qh > 0.94 && gust_front > 0.55) {
+				float tw = step(0.62, fract(g_wind_clock * 0.55 + qh * 19.0));
+				col = mix(col, vec3(0.99, 0.96, 0.84), tw * day_vis * 0.42);
+			}
+		}
 	}
 	return col;
 }
 
-// Sculpted 3/4 coastal slate headland bedrock (stratified rock shelves with sunlit top rims, zero spaghetti loops!).
+// Sculpted 3/4 coastal limestone-slate headland bedrock harmonized with RockyGround geology!
 vec3 w2_shade_coast_rock(vec2 px) {
-	vec3 r0 = vec3(0.15, 0.15, 0.23); // deep slate ledge shadow
-	vec3 r1 = vec3(0.21, 0.22, 0.31); // dark coastal slate
-	vec3 r2 = vec3(0.28, 0.29, 0.39); // mid slate shelf
-	vec3 r3 = vec3(0.36, 0.37, 0.47); // sunlit top plane
-	vec3 r4 = vec3(0.45, 0.46, 0.56); // top-left slate bevel highlight
-	float shelf_field = (px.y * 0.055 + px.x * 0.018) + w2_fbm(px / 16.0 + vec2(4.0, 12.0)) * 1.15;
-	float step_f = fract(shelf_field);
-	float ledge_shadow = 1.0 - smoothstep(0.0, 0.16, step_f);
-	float top_rim = smoothstep(0.76, 0.96, step_f) * (1.0 - smoothstep(0.96, 1.0, step_f));
-	float grain = w2_vnoise(vec2(px.x * 0.11, px.y * 0.19) + vec2(19.0, 7.0));
-	float t = clamp(0.44 + (grain - 0.5) * 0.26 + top_rim * 0.34 - ledge_shadow * 0.38, 0.0, 1.0);
-	return w2_clean_ramp5(r0, r1, r2, r3, r4, t);
+	const vec3 COAST_ROCK_RAMP[6] = vec3[6](
+		vec3(0.11, 0.15, 0.21), // 0 deep coastal fissure shadow
+		vec3(0.17, 0.23, 0.29), // 1 shaded wave-worn ledge
+		vec3(0.25, 0.32, 0.38), // 2 cool coastal slate
+		vec3(0.36, 0.43, 0.48), // 3 weathered mid headland stone
+		vec3(0.49, 0.55, 0.57), // 4 sunlit limestone-slate plane
+		vec3(0.64, 0.69, 0.68)  // 5 crisp NW chiseled rock bevel
+	);
+	float shelf_field = (px.y * 0.062 + px.x * 0.024) + w2_fbm(px / 14.0 + vec2(4.0, 12.0)) * 1.15;
+	float step_f = fract(shelf_field * 1.25);
+	if (step_f < 0.11) {
+		return COAST_ROCK_RAMP[0];
+	}
+	if (step_f < 0.21) {
+		return COAST_ROCK_RAMP[5];
+	}
+	// Interlocking weathered rock plates & tectonic fracture cracks
+	vec2 p_cell = floor((px + vec2(w2_vnoise(px / 8.0) * 2.8)) / vec2(7.5, 5.5));
+	vec2 p_frac = fract((px + vec2(w2_vnoise(px / 8.0) * 2.8)) / vec2(7.5, 5.5));
+	float ph = w2_hash(p_cell + vec2(37.0, 19.0));
+	if ((p_frac.y < 0.16 && ph < 0.44) || (p_frac.x < 0.15 && ph > 0.66)) {
+		return COAST_ROCK_RAMP[1];
+	}
+	if (p_frac.y >= 0.16 && p_frac.y < 0.32 && ph < 0.44) {
+		return COAST_ROCK_RAMP[4];
+	}
+	float grain = w2_vnoise(floor(px / 2.0) * 0.55 + vec2(19.0, 7.0)) - 0.5;
+	int idx = clamp(int(floor(2.7 + (ph - 0.5) * 1.45 + grain * 0.9)), 1, 4);
+	return COAST_ROCK_RAMP[idx];
 }
 
 #endif

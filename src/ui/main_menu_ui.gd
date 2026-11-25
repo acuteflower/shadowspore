@@ -224,6 +224,7 @@ func _rebuild_rows() -> void:
 				2:
 					_rows.append_array([
 						{"id": "player_name", "label": "SPIELERNAME", "kind": "field"},
+						{"id": "chat_opacity", "label": "CHAT-SICHTBARKEIT", "kind": "slider"},
 						{"id": "weather_fx", "label": "WETTER-EFFEKTE", "kind": "weather"},
 						{"id": "cursor", "label": "EIGENER CURSOR", "kind": "toggle"},
 						{"id": "numbers", "label": "SCHADENSZAHLEN", "kind": "toggle"},
@@ -420,8 +421,15 @@ func _type(key: InputEventKey) -> bool:
 	return true
 
 
+func _slider_bounds(id: String) -> Vector2i:
+	if id == "chat_opacity":
+		return Vector2i(GameSettings.CHAT_OPACITY_MIN, GameSettings.CHAT_OPACITY_MAX)
+	return Vector2i(0, 100)
+
+
 func _step_slider(id: String, step: int) -> void:
-	GameSettings.set_value(id, clampi(int(GameSettings.get_value(id)) + step, 0, 100))
+	var b: Vector2i = _slider_bounds(id)
+	GameSettings.set_value(id, clampi(int(GameSettings.get_value(id)) + step, b.x, b.y))
 	GameSettings.save()
 
 
@@ -431,12 +439,14 @@ func _flip(id: String) -> void:
 
 
 func _apply_slider_drag(id: String, mouse: Vector2) -> void:
+	var b: Vector2i = _slider_bounds(id)
 	for i: int in _rows.size():
 		if String(_rows[i].id) == id and i < _rects.size():
 			var r: Rect2 = _rects[i]
 			var bar_x: float = r.end.x - SLIDER_W - 28.0
 			var ratio: float = clampf((mouse.x - bar_x) / SLIDER_W, 0.0, 1.0)
-			GameSettings.set_value(id, clampi(roundi(ratio * 20.0) * 5, 0, 100))
+			var raw_val: float = float(b.x) + ratio * float(maxi(b.y - b.x, 1))
+			GameSettings.set_value(id, clampi(roundi(raw_val / 5.0) * 5, b.x, b.y))
 			GameSettings.save()
 			return
 
@@ -776,7 +786,9 @@ func _draw_row_widget(idx: int, row: Dictionary, rect: Rect2, fade: float, void_
 
 
 func _draw_vine_slider(id: String, at: Vector2, fade: float, tone: Color, focused: bool) -> void:
-	var value: float = float(clampi(int(GameSettings.get_value(id)), 0, 100)) / 100.0
+	var b: Vector2i = _slider_bounds(id)
+	var raw_int: int = clampi(int(GameSettings.get_value(id)), b.x, b.y)
+	var value: float = float(raw_int - b.x) / float(maxi(b.y - b.x, 1))
 	for x: int in int(SLIDER_W) + 1:
 		draw_rect(Rect2(at.x + float(x), at.y, 1.0, 1.0), Color(VineStyle.BARK, fade))
 		if x % 4 == 0:
@@ -791,7 +803,7 @@ func _draw_vine_slider(id: String, at: Vector2, fade: float, tone: Color, focuse
 	for o: Vector2 in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1)]:
 		draw_rect(Rect2(bud + o, Vector2.ONE), Color(VineStyle.PETAL, fade))
 	draw_rect(Rect2(bud, Vector2.ONE), Color(tone, fade))
-	var num: String = str(roundi(value * 100.0))
+	var num: String = ("%d%%" % raw_int) if id == "chat_opacity" else str(raw_int)
 	PixelText.draw(self, num, Vector2i(int(at.x + SLIDER_W + 8.0), int(at.y - 3.0)), Color(UiStyle.TEXT if focused else UiStyle.TEXT_DIM, fade), Color(VineStyle.OUTLINE, fade))
 
 
@@ -822,7 +834,7 @@ func _draw_controls_grid(rect: Rect2, fade: float, void_level: float) -> void:
 		var y: float = rect.position.y + 31.0 + float(row_idx) * 18.0
 		var action_name: String = String(row.get("action", ""))
 		var use_fallback: bool = action_name.is_empty() or DisplayServer.get_name() == "headless"
-		var key_label: String = String(row.get("fallback", "?")) if use_fallback else VineStyle.key_name(action_name, String(row.get("fallback", "?")))
+		var key_label: String = String(row.get("fallback", "?")) if use_fallback else VineStyle.key_name(action_name, String(row.get("fallback", "?")), false)
 		PixelText.draw(self, String(row.label), Vector2i(int(x), int(y + 3.0)), Color(UiStyle.TEXT, 0.9 * fade), outline)
 		var kw: int = VineStyle.cap_width(key_label)
 		VineStyle.key_cap(self, Vector2(x + col_w - float(kw) - 4.0, y), key_label, fade, 0.0, void_level * 0.4)

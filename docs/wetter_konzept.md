@@ -1,6 +1,6 @@
 # Konzept: Wettersystem (Sonne, Wolken, Regen, Sturm)
 
-Status: Konzept, noch nichts gebaut. Umsetzung in vier Schritten (Abschnitt 11).
+Status: **Gebaut (`WeatherManager`, `WeatherRules`, `WeatherField`, `WeatherSky`, aktiv in v2).** Umsetzung in vier Schritten (Abschnitt 11).
 Stand der Bestandsaufnahme: 2026-11-10.
 
 ## 1. Ziel und Spielgefühl

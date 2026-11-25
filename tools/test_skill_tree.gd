@@ -310,7 +310,14 @@ func _run() -> void:
 	key(KEY_I, true)
 	await get_tree().process_frame
 	key(KEY_I, false)
-	check(not inventory.visible, "inventory cannot overlap the skill menu")
+	if InputManager.unified_menu:
+		check(not (inventory.visible and window.visible), "inventory cannot overlap the skill menu")
+		key(KEY_F, true)
+		await get_tree().process_frame
+		key(KEY_F, false)
+		await get_tree().process_frame
+	else:
+		check(not inventory.visible, "inventory cannot overlap the skill menu")
 	window._select("movement_echo_a")
 	await capture("placeholder")
 	key(KEY_ENTER, true)

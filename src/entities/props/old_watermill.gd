@@ -16,7 +16,7 @@ const CREAK_WAV: String = "res://assets/audio/meadow_wonders/mill_creak_loop.wav
 const WHEEL_LOCAL: Vector2 = Vector2(44.0, -30.0) ## axle bearing at (124, 98) relative to foundation anchor (80, 128)
 const DOOR_CHEST_LOCAL: Vector2 = Vector2(-24.0, 14.0)
 
-var pois: MeadowPois
+var pois: Node
 var mill_id: String = ""
 var mill_name: String = "ALTE WASSERMÜHLE"
 var mill_sub: String = "DAS MÜHLRAD DREHT SICH WIEDER"
@@ -34,7 +34,7 @@ var _creak: AudioStreamPlayer2D
 var _wheel_phase: float = 0.0
 
 
-func setup(owner_pois: MeadowPois, spec: Dictionary, pos_px: Vector2) -> void:
+func setup(owner_pois: Node, spec: Dictionary, pos_px: Vector2) -> void:
 	pois = owner_pois
 	mill_id = String(spec.get("id", ""))
 	mill_name = String(spec.get("name", "ALTE WASSERMÜHLE"))

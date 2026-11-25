@@ -161,8 +161,27 @@ func set_time(time: float) -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func _request_time(time: float) -> void:
-	if multiplayer.is_server():
+	if multiplayer.is_server() and NetworkManager.is_peer_admin(multiplayer.get_remote_sender_id()):
 		set_time(time)
+
+
+## Host-only admin helpers to change day or lock/unlock the clock with immediate peer sync.
+func set_day_number(target_day: int) -> void:
+	if not multiplayer.is_server():
+		return
+	day = maxi(target_day, 0)
+	if NetworkManager.rpc_ready(self):
+		_rpc_time_jump.rpc(time_of_day, day, locked, true)
+	else:
+		day_started.emit(day)
+
+
+func set_clock_locked(flag: bool) -> void:
+	if not multiplayer.is_server():
+		return
+	locked = flag
+	if NetworkManager.rpc_ready(self):
+		_sync_time.rpc(time_of_day, day, locked)
 
 
 func _process(delta: float) -> void:

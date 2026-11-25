@@ -525,8 +525,8 @@ func _draw_xp_label() -> void:
 	var dim: Color = Color(UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, taken), 0.8)
 	var total: int = PixelText.width("LV") + 3 + PixelText.width(number)
 	var x: int = roundi(center) - total / 2
-	PixelText.draw(_overlay, "LV", Vector2i(x, base_y), dim, VineStyle.OUTLINE)
-	PixelText.draw(_overlay, number, Vector2i(x + PixelText.width("LV") + 3, base_y), tone, VineStyle.OUTLINE)
+	HudText.ink(_overlay, "LV", Vector2i(x, base_y), dim, VineStyle.OUTLINE)
+	HudText.ink(_overlay, number, Vector2i(x + PixelText.width("LV") + 3, base_y), tone, VineStyle.OUTLINE)
 	if _badge_hover:
 		VineStyle.glow(_overlay, Vector2(center, base_y + 3), 22.0, tone, 0.35)
 	var waiting: int = _progress.claimable()
@@ -537,12 +537,12 @@ func _draw_xp_label() -> void:
 		_overlay.draw_rect(Rect2(bud - Vector2(1, 1), Vector2(3, 3)), VineStyle.OUTLINE)
 		_overlay.draw_rect(Rect2(bud, Vector2.ONE), VineStyle.PETAL)
 		var note: String = "BELOHNUNG" if waiting == 1 else "%d BELOHNUNGEN" % waiting
-		PixelText.draw(_overlay, note, Vector2i(roundi(center) - PixelText.width(note) / 2, base_y - 9), Color(VineStyle.WARM_GLOW, 0.55 + beat * 0.4), VineStyle.OUTLINE)
+		HudText.ink(_overlay, note, Vector2i(roundi(center) - PixelText.width(note) / 2, base_y - 9), Color(VineStyle.WARM_GLOW, 0.55 + beat * 0.4), VineStyle.OUTLINE)
 	if _gain_age < 1.4: ## "+12" floats up from the bud
 		var head: float = _fx(XP_START + _shown * (XP_END - XP_START))
 		var text: String = "+%d" % _gain
 		var fade: float = 1.0 - _gain_age / 1.4
-		PixelText.draw(_overlay, text, Vector2i(roundi(head) - PixelText.width(text) / 2, roundi(_vy(head)) - 12 - int(_gain_age * 10.0)), Color(VineStyle.WARM_GLOW, fade), Color(VineStyle.OUTLINE, fade))
+		HudText.ink(_overlay, text, Vector2i(roundi(head) - PixelText.width(text) / 2, roundi(_vy(head)) - 12 - int(_gain_age * 10.0)), Color(VineStyle.WARM_GLOW, fade), Color(VineStyle.OUTLINE, fade))
 
 
 func _draw_overlay() -> void:
@@ -560,9 +560,9 @@ func _draw_pendants() -> void:
 		var taken: float = _taken(_center_x(i))
 		var color: Color = VineStyle.PETAL if is_pick else UiStyle.TEXT_DIM.lerp(VineStyle.LEAF_VOID_LIGHT, taken)
 		if has_item:
-			PixelText.draw(_pend, str(i + 1), Vector2i(roundi(c.x) - 10, roundi(c.y) - 11), color, VineStyle.OUTLINE)
+			HudText.ink(_pend, str(i + 1), Vector2i(roundi(c.x) - 10, roundi(c.y) - 11), color, VineStyle.OUTLINE)
 		else:
-			PixelText.draw(_pend, str(i + 1), Vector2i(roundi(c.x) - 1, roundi(c.y) + 3), Color(color, 0.7), VineStyle.OUTLINE)
+			HudText.ink(_pend, str(i + 1), Vector2i(roundi(c.x) - 1, roundi(c.y) + 3), Color(color, 0.7), VineStyle.OUTLINE)
 	for i: int in _slots.size(): ## a pause blocks this item: a dim ring runs out around it (the part still to wait)
 		var left: float = _pause_left(i)
 		if left <= 0.0:

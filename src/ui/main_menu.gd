@@ -18,7 +18,7 @@ const BUILD_AFTER: float = 0.9 ## the logo starts to build
 const LETTERS_AFTER: float = 2.2 ## the entries start to rise from the fire
 const DRIFT: float = 4.0 ## the camera sways this many pixels left and right
 
-var _world: Node ## a WorldLevel (see menu_world.gd): duck-typed on purpose
+var _world: Node ## lightweight v2 MenuWorld backdrop (see menu_world.gd)
 var _camera: Camera2D
 var _camera_home: Vector2 = Vector2.ZERO
 var _dark: ColorRect
@@ -104,14 +104,11 @@ func clock() -> float:
 	return float(Time.get_ticks_usec() - _t0_usec) / 1000000.0
 
 
-## The real world with nobody in it, framed on the fire at the hut.
+## Lightweight v2 clearing backdrop with nobody in it, framed on the fire at the hut.
 func _build_world() -> void:
-	_world = (load(GameLauncher.WORLD_PATH) as PackedScene).instantiate()
-	_world.set_script(load("res://src/ui/menu_world.gd") as Script)
+	_world = (load("res://src/ui/menu_world.gd") as GDScript).new() as Node2D
 	add_child(_world)
-	_world.set_process(false)
-	var hut: Node2D = _world.call("hut_node") as Node2D
-	_fire_world = hut.global_position + FIRE_OFFSET
+	_fire_world = _world.call("fire_world") as Vector2
 	var view: Vector2 = Vector2(640.0, 360.0)
 	_camera = Camera2D.new()
 	_camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
@@ -119,13 +116,6 @@ func _build_world() -> void:
 	_camera.position = _camera_home
 	_camera.zoom = Vector2.ONE
 	_world.add_child(_camera)
-	var middle: Vector2i = Vector2i((_camera.position / 512.0).floor())
-	for dy: int in range(-1, 2):
-		for dx: int in range(-1, 2):
-			var cell: Vector2i = middle + Vector2i(dx, dy)
-			if not (_world.get("_chunks") as Dictionary).has(cell):
-				_world.call("_load_chunk", cell)
-	hut.call("set_renewed", true) ## the mended hut, lit window
 	TimeManager.unlock()
 	TimeManager.locked = true
 	TimeManager.day = 0

@@ -26,6 +26,8 @@ func start_cooldown() -> void:
 	var talismans: TalismanComponent = get_node_or_null("../TalismanComponent") as TalismanComponent
 	var parent_node: Node = get_parent()
 	var light_factor: float = 0.78 if (parent_node != null and bool(parent_node.get("light_step"))) else 1.0
-	total = cooldown * light_factor * (talismans.blink_scale() if talismans != null else 1.0)
+	var vt: VeilThreads = VeilThreads.of(get_tree()) if is_inside_tree() else null
+	var spore_factor: float = vt.step_cooldown_scale() if vt != null else 1.0
+	total = cooldown * light_factor * spore_factor * (talismans.blink_scale() if talismans != null else 1.0)
 	cooldown_left = total
 	cooldown_changed.emit(cooldown_left, total)

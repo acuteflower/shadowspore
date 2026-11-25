@@ -32,7 +32,7 @@ var _shown: float = 1.0
 var _trail: float = 1.0
 var _flash: float = 0.0
 var _time: float = 0.0
-var _label_alpha: float = 0.4
+var _label_alpha: float = 0.72 ## resting opacity of the value (readable, docs/hud_v2_konzept.md 3.H)
 var _last_label: String = ""
 var _drop_pos: PackedVector2Array = PackedVector2Array()
 var _drop_vel: PackedVector2Array = PackedVector2Array()
@@ -40,6 +40,7 @@ var _drop_life: PackedFloat32Array = PackedFloat32Array()
 var _dirty: bool = true
 var _redraw_timer: float = 0.0
 const IDLE_REDRAW_INTERVAL: float = 0.066 ## ~15 FPS idle sway/breathing
+const PULSE_REDRAW_INTERVAL: float = 0.04 ## alert pulse, heat/cold shimmer, label fade: 25 FPS is smooth enough (docs/hud_v2_konzept.md 8.4)
 
 
 func _ready() -> void:
@@ -95,8 +96,8 @@ func _process(delta: float) -> void:
 		_last_label = label
 		_label_alpha = 1.0
 		_dirty = true
-	var label_alpha_changing: bool = _label_alpha > 0.405
-	_label_alpha = maxf(_label_alpha - 0.5 * delta, 0.4)
+	var label_alpha_changing: bool = _label_alpha > 0.725
+	_label_alpha = maxf(_label_alpha - 0.5 * delta, 0.72)
 	var has_drops: bool = not _drop_pos.is_empty()
 	for i: int in range(_drop_pos.size() - 1, -1, -1):
 		_drop_life[i] -= delta
@@ -115,14 +116,14 @@ func _process(delta: float) -> void:
 		or shown_changing
 		or trail_changing
 		or was_flashing
-		or has_drops
-		or label_alpha_changing
+		or has_drops)
+	var is_pulsing: bool = (label_alpha_changing
 		or alert.a > 0.0
 		or heat_shimmer > 0.05
 		or cool_shimmer > 0.05)
 
 	_redraw_timer += delta
-	if is_animating or _dirty or _redraw_timer >= IDLE_REDRAW_INTERVAL:
+	if is_animating or _dirty or _redraw_timer >= IDLE_REDRAW_INTERVAL or (is_pulsing and _redraw_timer >= PULSE_REDRAW_INTERVAL):
 		_redraw_timer = 0.0
 		_dirty = false
 		queue_redraw()
@@ -227,5 +228,5 @@ func _draw() -> void:
 
 	if label != "":
 		var at: Vector2i = Vector2i(roundi(_root_x() + dir * 20.0) - PixelText.width(label) / 2, int(label_y))
-		PixelText.draw(self, label, at, Color(UiStyle.TEXT, _label_alpha), Color(VineStyle.OUTLINE, _label_alpha))
+		HudText.ink(self, label, at, Color(UiStyle.TEXT, _label_alpha), Color(VineStyle.OUTLINE, _label_alpha))
 	draw_set_transform(Vector2.ZERO)

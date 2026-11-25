@@ -87,11 +87,8 @@ func _can_enter() -> bool:
 		return false
 	if _player.get("intro") != null or bool(_player.get("story_lock")) or bool(_player.get("stumbling")) or bool(_player.get("fainting")):
 		return false
-	var world: WorldLevel = get_tree().get_first_node_in_group("world") as WorldLevel
-	if world != null: ## rooms, shafts and the mine lie far outside the map: the camera would only show the void
-		var limit: float = float(RegionMap.WORLD_TILES) * 16.0
-		if _player.global_position.x < 0.0 or _player.global_position.y < 0.0 or _player.global_position.x > limit or _player.global_position.y > limit:
-			return false
+	if PocketSpace.is_pocket(_player.global_position) or Interiors.is_pocket(_player.global_position):
+		return false
 	return true
 
 
@@ -107,8 +104,6 @@ func _enter() -> void:
 	_cam.zoom = Vector2(_zoom, _zoom)
 	(_world if _world != null else _player.get_parent()).add_child(_cam)
 	_cam.make_current()
-	if _world is WorldLevel:
-		(_world as WorldLevel).editor_camera = _cam ## the same hook the map editor uses: the world streams round the camera
 	_layer = CanvasLayer.new()
 	_layer.layer = 30
 	_hint = FreeCamHint.new()
@@ -136,8 +131,6 @@ func _leave() -> void:
 func _cancel() -> void:
 	_active = false
 	InputManager.freecam_open = false
-	if _world is WorldLevel and (_world as WorldLevel).editor_camera == _cam:
-		(_world as WorldLevel).editor_camera = null
 	if is_instance_valid(_player_cam):
 		_player_cam.make_current()
 		_player_cam.reset_smoothing()
@@ -168,19 +161,20 @@ func _free_spot(feet: Vector2) -> Vector2:
 
 
 func _on_land(spot: Vector2) -> bool:
-	var world: WorldLevel = _world as WorldLevel
-	if world == null:
+	if _world == null:
 		return true
-	return world.call("_land_at", int(floorf(spot.x / 16.0)), int(floorf(spot.y / 16.0)))
+	if _world.has_method("navigation_floor"):
+		return bool(_world.call("navigation_floor", spot))
+	return true
 
 
-## The chunk is there (its collision exists), so she does not drop into an unloaded gap.
+## The zone is loaded at `spot`, so she does not drop into an unloaded gap.
 func _loaded_at(spot: Vector2) -> bool:
-	var world: WorldLevel = _world as WorldLevel
-	if world == null:
+	if _world == null:
 		return true
-	var chunks: Variant = world.get("_chunks")
-	if chunks is Dictionary:
-		var cell: Vector2i = Vector2i(int(floorf(spot.x / 16.0)), int(floorf(spot.y / 16.0))) / WorldLevel.CHUNK
-		return (chunks as Dictionary).has(cell)
+	if _world.has_method("director"):
+		var dir: ZoneDirector = _world.call("director") as ZoneDirector
+		if dir != null and dir.atlas != null:
+			var zid: StringName = dir.atlas.zone_at(dir.continent_id, spot)
+			return zid != &"" and dir.is_loaded(zid)
 	return true

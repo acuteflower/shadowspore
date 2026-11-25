@@ -68,7 +68,9 @@ static func build(relief: Relief, data: Dictionary, art: Dictionary, baked: Dict
 		if not TRUNKS.has(String(spec.kind)):
 			continue
 		var tile: Array = spec.tile as Array
-		var foot: Vector2 = PropGenerator.position_of(Vector2i(int(tile[0]), int(tile[1])))
+		var cell: Vector2i = Vector2i(int(tile[0]), int(tile[1]))
+		var h: int = absi(hash(Vector2i(cell.x, cell.y * 7 + 3)))
+		var foot: Vector2 = Vector2(cell) * 16.0 + Vector2(8 + h % 9 - 4, 13 + (h / 9) % 5 - 2)
 		var r: float = 5.0 + MARGIN
 		var c0: Vector2i = w.cell_of(foot - Vector2(r, r))
 		var c1: Vector2i = w.cell_of(foot + Vector2(r, r))

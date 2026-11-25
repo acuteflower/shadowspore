@@ -113,7 +113,7 @@ Der Netzwerktest deckt ab: ein Beobachter-Client sieht Wurf, Drift, Biss, Drill,
 ## Nicht gebaut (bewusst)
 
 - Kein „Gemeinsamer Fang“-Buff (es gibt kein Buff-System). Der gefangene Fisch hängt nicht sichtbar in ihrer Hand (die Karte zeigt ihn).
-- Kein Steg, keine Maren (Siedler `enabled: false`, Kunst ist integriert), keine Reuse/Räucherkammer/Hälterung (Schritt 8). Keine Rezepte im Kessel, keine Mine-Anbindung, keine Skill-Perks (Schritt 9; Kochen kennt noch kein Inventar).
+- Kein Steg, keine Maren (Siedler `enabled: false`, Kunst ist integriert), keine Reuse/Räucherkammer/Hälterung (Schritt 8). Keine Alchemie-Rezepte, keine Mine-Anbindung, keine Skill-Perks (Schritt 9).
 - Keine Hindernisse im Drill (Federkraut, Felsen), keine versunkene Schatulle, kein Schatten-Polyp.
 - Keine Libelle/Larve/Gespinst als Köder (keine Quelle), keine Hinweise durch Reiher/Eisvogel/Enten.
 - Keine Gamepad-Belegung (Zielen, Köder, Pose, Buch), keine Rutenstufen (`rod_hardened`, `rod_maren` fehlen).

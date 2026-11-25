@@ -1,6 +1,6 @@
 # Alchemie – Konzept (Entwurf, 2026-11-10)
 
-Status: **Konzept, nichts gebaut.** Ersetzt das Kochen vollständig. Entscheidungen vom 2026-11-10 sind eingearbeitet (Abschnitt 10).
+Status: **Gebaut (Trankbrauen + Spezialtränke Aschenhaut/Klarblick/Irrlichtsud; siehe `AlchemyRules`).** Ersetzt das Kochen vollständig. Entscheidungen vom 2026-11-10 sind eingearbeitet (Abschnitt 10).
 
 ## 1. Idee in einem Satz
 

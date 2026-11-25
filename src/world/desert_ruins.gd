@@ -20,7 +20,7 @@ const DESERT_CHUNK_X1: int = 34 ## tile 1088
 const DESERT_CHUNK_Y0: int = 1 ## tile 32
 const DESERT_CHUNK_Y1: int = 11 ## tile 352
 
-var world: WorldLevel
+var world: Node
 var _sites_by_chunk: Dictionary = {} ## Vector2i(chunk) -> Dictionary site spec
 var _live_chunks: Dictionary = {} ## Vector2i(chunk) -> Array[Node]
 var _awakened_seals: Dictionary = {} ## String(seal_id) -> true
@@ -35,7 +35,7 @@ func extra_masonry() -> Array[Dictionary]:
 	return _masonry_props
 
 
-func setup(level: WorldLevel, prior_blocked: Dictionary) -> Dictionary:
+func setup(level: Node, prior_blocked: Dictionary) -> Dictionary:
 	world = level
 	z_index = -8
 	_sites_by_chunk.clear()
@@ -92,10 +92,10 @@ func import_state(saved: Variant) -> void:
 
 
 func _plan_chunk_site(chunk_cell: Vector2i, rng: RandomNumberGenerator, prior_blocked: Dictionary) -> Dictionary:
-	var base_tile: Vector2i = chunk_cell * WorldLevel.CHUNK
+	var base_tile: Vector2i = chunk_cell * 32
 	for _attempt: int in 8:
-		var tx: int = base_tile.x + rng.randi_range(7, WorldLevel.CHUNK - 8)
-		var ty: int = base_tile.y + rng.randi_range(7, WorldLevel.CHUNK - 8)
+		var tx: int = base_tile.x + rng.randi_range(7, 32 - 8)
+		var ty: int = base_tile.y + rng.randi_range(7, 32 - 8)
 		var center_tile: Vector2i = Vector2i(tx, ty)
 		if not world._generator.is_desert_bare(center_tile):
 			continue

@@ -244,7 +244,7 @@ static func nearest_bank(tree: SceneTree, from: Vector2) -> Vector2:
 		return Vector2.INF
 	var best: Vector2 = Vector2.INF
 	var best_d: float = INF
-	for ford: Array in DataRegistry.table("rivers_baked")["fords"]:
+	for ford: Array in DataRegistry.table("rivers_baked").get("fords", []) as Array:
 		var centre: Vector2 = Vector2(float(ford[0]), float(ford[1]))
 		if centre.distance_to(from) > best_d + 200.0:
 			continue

@@ -11,21 +11,54 @@ signal unlocked(kind: String, id: String)
 const TABLE_NAME: String = "hero_cosmetics"
 const OUTFITS_ROOT: String = "res://assets/characters/outfits/"
 const HAIR_ROOT: String = "res://assets/characters/hair/"
+const TITLES: Dictionary = {
+	"": {"name": "", "label": "KEINER", "starter": true},
+	"kind_der_bucht": {"name": "KIND DER BUCHT", "label": "KIND DER BUCHT", "starter": false, "source": "WINDKAP 100%"},
+	"sturm_laeufer": {"name": "STURMLÄUFER", "label": "STURMLÄUFER", "starter": false, "source": "SÜDKAP 100%"},
+	"molen_brecher": {"name": "MOLENBRECHER", "label": "MOLENBRECHER", "starter": false, "source": "STURMHAFEN-GEWÖLBE"},
+}
 
 @export var outfit_id: String = "default":
 	set = set_outfit
 @export var hair_id: String = "default":
 	set = set_hair
+@export var title_id: String = "":
+	set = set_title
 
 var unlocked_hair_styles: Array[String] = []
 var unlocked_hair_colors: Array[String] = []
 var unlocked_outfits: Array[String] = []
 var unlocked_outfit_colors: Array[String] = []
+var unlocked_titles: Array[String] = []
 
 var _preview_outfit: String = ""
 var _preview_hair: String = ""
 var _sprite: Sprite2D = null
+var _title_badge: Node2D = null
 var _tex_cache: Dictionary = {} ## String resource path -> Texture2D or false sentinel
+
+
+class _TitleBadge extends Node2D:
+	var appearance: AppearanceComponent = null
+
+	func _ready() -> void:
+		z_index = 40
+		material = Unlit.material()
+		NetworkManager.session_changed.connect(func() -> void: queue_redraw())
+
+	func _draw() -> void:
+		if appearance == null:
+			return
+		var t_str: String = appearance.title_text()
+		if t_str.is_empty():
+			return
+		if not NetworkManager.is_multiplayer_session():
+			return
+		var label: String = "- %s -" % t_str
+		var tw: int = PixelText.width(label)
+		var x: int = -tw / 2
+		var y: int = -68
+		PixelText.draw(self, label, Vector2i(x, y), Color("ffd98a", 0.90), Color(VineStyle.OUTLINE, 0.92))
 
 
 func _ready() -> void:
@@ -33,6 +66,13 @@ func _ready() -> void:
 		var sibling: Sprite2D = get_node_or_null("../Sprite2D") as Sprite2D
 		if sibling != null:
 			bind_sprite(sibling)
+	var parent_2d: Node2D = get_parent() as Node2D
+	if parent_2d != null and _title_badge == null:
+		var badge: _TitleBadge = _TitleBadge.new()
+		badge.name = "TitleBadge"
+		badge.appearance = self
+		_title_badge = badge
+		parent_2d.add_child.call_deferred(badge)
 
 
 ## Binds this component to the player's main `Sprite2D` and stays synced across all sheet switches (`texture_changed`).
@@ -93,6 +133,172 @@ func set_hair(id: String) -> void:
 	hair_id = target
 	_sync_material()
 	changed.emit()
+
+
+func set_title(id: String) -> void:
+	var target: String = id if is_valid_title(id) else ""
+	if title_id == target:
+		if _title_badge != null:
+			_title_badge.queue_redraw()
+		return
+	title_id = target
+	if _title_badge != null:
+		_title_badge.queue_redraw()
+	changed.emit()
+
+
+func is_valid_title(id: String) -> bool:
+	return id == "" or TITLES.has(id) or _titles_table().has(id)
+
+
+func is_title_unlocked(id: String) -> bool:
+	if id == "":
+		return true
+	if unlocked_titles.has(id):
+		return true
+	var cfg: Dictionary = _title_entry_raw(id)
+	return bool(cfg.get("starter", false))
+
+
+func unlocked_title_ids() -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray([""])
+	var all_keys: Array[String] = []
+	for k: Variant in TITLES.keys():
+		var ks: String = String(k)
+		if ks != "" and not all_keys.has(ks):
+			all_keys.append(ks)
+	for k2: Variant in _titles_table().keys():
+		var ks2: String = String(k2)
+		if ks2 != "" and not all_keys.has(ks2):
+			all_keys.append(ks2)
+	for tid: String in all_keys:
+		if is_title_unlocked(tid):
+			out.append(tid)
+	return out
+
+
+func title_text(id: String = "__current__") -> String:
+	var key: String = title_id if id == "__current__" else id
+	if key.is_empty():
+		return ""
+	var cfg: Dictionary = _title_entry_raw(key)
+	return String(cfg.get("name", key.replace("_", " ").to_upper()))
+
+
+func title_label(id: String = "__current__") -> String:
+	var key: String = title_id if id == "__current__" else id
+	if key.is_empty():
+		return "KEINER"
+	var cfg: Dictionary = _title_entry_raw(key)
+	return String(cfg.get("label", cfg.get("name", key.replace("_", " ").to_upper())))
+
+
+func display_name_with_title(base_name: String) -> String:
+	var t: String = title_text()
+	if t.is_empty():
+		return base_name
+	return "%s - %s" % [base_name, t]
+
+
+func _title_entry_raw(id: String) -> Dictionary:
+	var tbl: Dictionary = _titles_table()
+	if tbl.has(id):
+		return tbl[id] as Dictionary
+	if TITLES.has(id):
+		return TITLES[id] as Dictionary
+	return {}
+
+
+func _titles_table() -> Dictionary:
+	return DataRegistry.table(TABLE_NAME).get("titles", {}) as Dictionary
+
+
+func request_title(id: String) -> void:
+	if not is_valid_title(id) or not is_title_unlocked(id):
+		return
+	var parent_node: Node = get_parent()
+	if multiplayer.multiplayer_peer == null or (parent_node != null and parent_node.is_multiplayer_authority()):
+		set_title(id)
+		if multiplayer.multiplayer_peer != null and not multiplayer.is_server() and NetworkManager.rpc_ready(self):
+			_rpc_set_title.rpc_id(1, id)
+		elif multiplayer.multiplayer_peer != null and multiplayer.is_server() and NetworkManager.rpc_ready(self):
+			_rpc_apply_title.rpc(id)
+	elif multiplayer.is_server():
+		if NetworkManager.rpc_ready(self):
+			_rpc_apply_title.rpc(id)
+		else:
+			set_title(id)
+	elif NetworkManager.rpc_ready(self):
+		_rpc_set_title.rpc_id(1, id)
+
+
+func cycle_title(direction: int = 1) -> void:
+	var avail: PackedStringArray = unlocked_title_ids()
+	if avail.size() <= 1:
+		return
+	var cur_idx: int = avail.find(title_id)
+	if cur_idx < 0:
+		cur_idx = 0
+	var next_idx: int = posmod(cur_idx + direction, avail.size())
+	request_title(avail[next_idx])
+
+
+func unlock_title(id: String) -> bool:
+	if not is_valid_title(id) or id == "":
+		return false
+	if _has_unlock("title", id):
+		return false
+	if multiplayer.multiplayer_peer == null or multiplayer.is_server():
+		if NetworkManager.rpc_ready(self):
+			_rpc_apply_unlock.rpc("title", id)
+			return true
+		return _apply_unlock("title", id)
+	if NetworkManager.rpc_ready(self):
+		_rpc_request_unlock_title.rpc_id(1, id)
+		return _apply_unlock("title", id)
+	return _apply_unlock("title", id)
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_request_unlock_title(id: String) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	var parent_node: Node = get_parent()
+	if sender != 0 and parent_node != null and sender != parent_node.get_multiplayer_authority():
+		return
+	if is_valid_title(id) and id != "" and not _has_unlock("title", id):
+		if NetworkManager.rpc_ready(self):
+			_rpc_apply_unlock.rpc("title", id)
+		else:
+			_apply_unlock("title", id)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _rpc_set_title(id: String) -> void:
+	if not multiplayer.is_server():
+		return
+	var sender: int = multiplayer.get_remote_sender_id()
+	var parent_node: Node = get_parent()
+	if sender != 0 and parent_node != null and sender != parent_node.get_multiplayer_authority():
+		return
+	if is_valid_title(id):
+		if id != "" and not unlocked_titles.has(id):
+			unlocked_titles.append(id)
+		if NetworkManager.rpc_ready(self):
+			_rpc_apply_title.rpc(id)
+		else:
+			set_title(id)
+
+
+@rpc("any_peer", "call_local", "reliable")
+func _rpc_apply_title(id: String) -> void:
+	var sender: int = multiplayer.get_remote_sender_id()
+	if sender != 0 and sender != 1:
+		return
+	if id != "" and is_valid_title(id) and not unlocked_titles.has(id):
+		unlocked_titles.append(id)
+	set_title(id)
 
 
 ## Multiplayer-safe request from the local player or UI to equip an outfit.
@@ -423,10 +629,12 @@ func export_data() -> Dictionary:
 	return {
 		"outfit": outfit_id,
 		"hair": hair_id,
+		"title": title_id,
 		"unlocked_hair_styles": unlocked_hair_styles.duplicate(),
 		"unlocked_hair_colors": unlocked_hair_colors.duplicate(),
 		"unlocked_outfits": unlocked_outfits.duplicate(),
 		"unlocked_outfit_colors": unlocked_outfit_colors.duplicate(),
+		"unlocked_titles": unlocked_titles.duplicate(),
 	}
 
 
@@ -451,8 +659,17 @@ func import_data(data: Dictionary) -> void:
 		var oc: String = String(item)
 		if _outfit_colors_table().has(oc) and not unlocked_outfit_colors.has(oc):
 			unlocked_outfit_colors.append(oc)
+	unlocked_titles.clear()
+	for item: Variant in SaveGame.as_array(data.get("unlocked_titles")):
+		var tid: String = String(item)
+		if is_valid_title(tid) and tid != "" and not unlocked_titles.has(tid):
+			unlocked_titles.append(tid)
 	set_outfit(String(data.get("outfit", default_outfit_id())))
 	set_hair(String(data.get("hair", default_hair_id())))
+	var imported_title: String = String(data.get("title", ""))
+	if imported_title != "" and is_valid_title(imported_title) and not unlocked_titles.has(imported_title):
+		unlocked_titles.append(imported_title)
+	set_title(imported_title)
 
 
 func _is_unlockable(kind: String, id: String) -> bool:
@@ -465,6 +682,8 @@ func _is_unlockable(kind: String, id: String) -> bool:
 			return _outfits_table().has(id) or _outfit_styles_table().has(id)
 		"outfit_color":
 			return _outfit_colors_table().has(id)
+		"title":
+			return id != "" and is_valid_title(id)
 	return false
 
 
@@ -478,6 +697,8 @@ func _has_unlock(kind: String, id: String) -> bool:
 			return is_outfit_unlocked(id)
 		"outfit_color":
 			return is_outfit_color_unlocked(id)
+		"title":
+			return is_title_unlocked(id)
 	return true
 
 
@@ -499,6 +720,10 @@ func _apply_unlock(kind: String, id: String) -> bool:
 			if not _outfit_colors_table().has(id) or unlocked_outfit_colors.has(id):
 				return false
 			unlocked_outfit_colors.append(id)
+		"title":
+			if not is_valid_title(id) or id == "" or unlocked_titles.has(id):
+				return false
+			unlocked_titles.append(id)
 		_:
 			return false
 	unlocked.emit(kind, id)

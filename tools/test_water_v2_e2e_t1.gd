@@ -504,7 +504,6 @@ static func _test_f7_art_audio(tree: SceneTree, ctx: RefCounted, lab: Node2D, wf
 	for p: String in [
 		"res://assets/props/water_bridge.png",
 		"res://assets/props/water_bridge_glow.png",
-		"res://docs/img/water_bridge_atlas_4x.png",
 	]:
 		if not ResourceLoader.exists(p):
 			bridge_art_ok = false
@@ -512,13 +511,12 @@ static func _test_f7_art_audio(tree: SceneTree, ctx: RefCounted, lab: Node2D, wf
 			var t: Texture2D = load(p) as Texture2D
 			if t == null or t.get_width() <= 0 or t.get_height() <= 0:
 				bridge_art_ok = false
-	_chk(ctx, bridge_art_ok, "F7", "Bridge art & 4x atlas PNGs exist and load with positive dimensions")
+	_chk(ctx, bridge_art_ok, "F7", "Bridge art PNGs exist and load with positive dimensions")
 
 	var coastal_art_ok: bool = true
 	for p: String in [
 		"res://assets/tiles/coastal_props.png",
 		"res://assets/tiles/coastal_props_glow.png",
-		"res://docs/img/coastal_biome_atlas_4x.png",
 	]:
 		if not ResourceLoader.exists(p):
 			coastal_art_ok = false
@@ -526,7 +524,7 @@ static func _test_f7_art_audio(tree: SceneTree, ctx: RefCounted, lab: Node2D, wf
 			var t: Texture2D = load(p) as Texture2D
 			if t == null or t.get_width() <= 0 or t.get_height() <= 0:
 				coastal_art_ok = false
-	_chk(ctx, coastal_art_ok, "F7", "Coastal biome props & 4x atlas PNGs exist and load with positive dimensions")
+	_chk(ctx, coastal_art_ok, "F7", "Coastal biome props PNGs exist and load with positive dimensions")
 
 	var shaders_ok: bool = FileAccess.file_exists("res://assets/shaders/water_optics.gdshaderinc")
 	for sp: String in [

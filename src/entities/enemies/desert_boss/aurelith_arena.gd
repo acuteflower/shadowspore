@@ -41,7 +41,7 @@ static var _CACHED_SEAL_GLOW: ImageTexture = null
 static var _CACHED_VEIN_GLOWS: Array[ImageTexture] = []
 static var _TOOTH_TEX_CACHE: Array[Dictionary] = []
 
-var world: WorldLevel
+var world: Node
 var boss: Aurelith
 var stage: Stage = Stage.DORMANT
 var released: bool = false
@@ -94,7 +94,7 @@ var _storm_ribbons: Array[Dictionary] = [] ## {ang, speed, rad_k, z, span, kind}
 var _storm_streaks: Array[Dictionary] = [] ## {ang, speed, rad_k, z, len, kind}
 
 
-func setup(p_world: WorldLevel) -> Dictionary:
+func setup(p_world: Node) -> Dictionary:
 	world = p_world
 	name = "AurelithArena"
 	add_to_group("aurelith_arena")

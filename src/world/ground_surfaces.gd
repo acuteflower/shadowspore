@@ -10,6 +10,9 @@ extends Node2D
 ## - Exposes `grass_habitat_at(world_pos)` so `LivingGrass` organically frays along paths, tucks moss
 ##   & clover into antique stone seams, avoids standing puddles, and shifts to shaded ferns in forests.
 
+const TREE_BUCKET_PX: float = 128.0 ## bigger than any crown's drip line
+const FOREST_NOISE_PX: float = 2.0 ## world px per texel of the forest noise (= one surface cell)
+const FOREST_NOISE_SIZE: int = 256 ## the forest noise repeats every 512 px
 const SURFACE_SHADER: Shader = preload("res://assets/shaders/ground_surfaces.gdshader")
 const PROP_LIT_SHADER: Shader = preload("res://assets/shaders/ground_prop_lit.gdshader")
 const SLAB_TEX: Texture2D = preload("res://assets/tiles/ancient_stones.png")
@@ -51,6 +54,25 @@ var _props_root: Node2D
 var _glow_root: Node2D
 var _stones: Array[StoneFootprint] = []
 var _trees: Array[TreeMicroZone] = []
+var _forest_mask: Image ## `set_forest_mask`: drawn by the shader, asked by `_forest_cell`
+var _forest_origin: Vector2 = Vector2.ZERO
+var _forest_texel: float = 16.0
+var _forest_noise: Image
+var _forest_mask_tex: ImageTexture
+var _forest_noise_tex: ImageTexture
+var _tree_buckets: Dictionary = {} ## Vector2i -> PackedInt32Array of `_trees` indices (grass queries look at 3x3)
+var _surf_bytes: PackedByteArray = PackedByteArray()
+var _det_bytes: PackedByteArray = PackedByteArray()
+var _fmask_bytes: PackedByteArray = PackedByteArray()
+var _fmask_w: int = 0
+var _fmask_h: int = 0
+var _fmask_stride: int = 1
+var _fnoise_bytes: PackedByteArray = PackedByteArray()
+var _tree_near: PackedByteArray = PackedByteArray()
+var _tb_ox: int = 0
+var _tb_oy: int = 0
+var _tb_w: int = 0
+var _tb_h: int = 0
 
 
 func _ready() -> void:
@@ -71,6 +93,7 @@ func setup(world_rect: Rect2, texel_px: float = 2.0) -> void:
 	_detail_img.fill(Color(0.0, 0.0, 0.0, 0.0))
 	_stones.clear()
 	_trees.clear()
+	_tree_buckets.clear()
 	slab_count = 0
 	detail_count = 0
 
@@ -364,6 +387,89 @@ func paint_forest_zone(rect: Rect2, blend_margin: float = 34.0, seed_val: int = 
 			_detail_img.set_pixel(ix, iy, dc)
 
 
+## Forest floor from a coverage mask (2.0 zones: the planned stands and belts, any outline). `mask` is an L8 image
+## whose texel (i, j) covers `texel_px` world px from `origin_px`, its value meant at the texel's centre (blur it first
+## for a soft edge). Nothing is painted per cell: the surface shader reads the mask and a tileable noise texture
+## (edge wobble, moss, canopy shade) and lays the humus itself, and `surface_at` / `grass_habitat_at` ask the very same
+## data (`_forest_cell`), so a zone of any size costs only its mask. Same channels as `paint_forest_zone` (b = humus,
+## detail r = moss, detail b = shade); combined with painted forest by max.
+func set_forest_mask(mask: Image, origin_px: Vector2, texel_px: float, seed_val: int = 101) -> void:
+	_forest_mask = mask
+	_forest_origin = origin_px
+	_forest_texel = maxf(1.0, texel_px)
+	_forest_noise = _make_forest_noise(seed_val)
+
+
+## Three tileable noises in one RGB8 image (edge wobble, moss, canopy shade), one texel per `FOREST_NOISE_PX`.
+static func _make_forest_noise(seed_val: int) -> Image:
+	var size: int = FOREST_NOISE_SIZE
+	var freqs: Array[float] = [0.03, 0.022, 0.014]
+	var layers: Array[Image] = []
+	for k: int in 3:
+		var n: FastNoiseLite = FastNoiseLite.new()
+		n.seed = seed_val + [0, 53, 127][k]
+		n.frequency = freqs[k] * FOREST_NOISE_PX
+		n.fractal_octaves = 2
+		var img: Image = n.get_seamless_image(size, size, false, false, 0.1, true)
+		img.convert(Image.FORMAT_L8)
+		layers.append(img)
+	var bytes: PackedByteArray = PackedByteArray()
+	bytes.resize(size * size * 3)
+	var a: PackedByteArray = layers[0].get_data()
+	var b: PackedByteArray = layers[1].get_data()
+	var c: PackedByteArray = layers[2].get_data()
+	for i: int in size * size:
+		bytes[i * 3] = a[i]
+		bytes[i * 3 + 1] = b[i]
+		bytes[i * 3 + 2] = c[i]
+	return Image.create_from_data(size, size, false, Image.FORMAT_RGB8, bytes)
+
+
+## Forest at a world point: x = humus (0..1), y = moss, z = canopy shade; what the shader draws there.
+func _forest_cell(world_pos: Vector2) -> Vector3:
+	if _forest_mask == null:
+		return Vector3.ZERO
+	var f: Vector2 = (world_pos - _forest_origin) / _forest_texel - Vector2(0.5, 0.5)
+	var x0: int = floori(f.x)
+	var y0: int = floori(f.y)
+	var fx: float = f.x - float(x0)
+	var fy: float = f.y - float(y0)
+	var mw: int = _forest_mask.get_width() - 1
+	var mh: int = _forest_mask.get_height() - 1
+	var v00: float = _forest_mask.get_pixel(clampi(x0, 0, mw), clampi(y0, 0, mh)).r
+	var v10: float = _forest_mask.get_pixel(clampi(x0 + 1, 0, mw), clampi(y0, 0, mh)).r
+	var v01: float = _forest_mask.get_pixel(clampi(x0, 0, mw), clampi(y0 + 1, 0, mh)).r
+	var v11: float = _forest_mask.get_pixel(clampi(x0 + 1, 0, mw), clampi(y0 + 1, 0, mh)).r
+	var m: float = lerpf(lerpf(v00, v10, fx), lerpf(v01, v11, fx), fy)
+	if m < 0.04:
+		return Vector3.ZERO
+	var q: Vector2i = Vector2i(floori(world_pos.x / FOREST_NOISE_PX), floori(world_pos.y / FOREST_NOISE_PX))
+	var n: Color = _forest_noise.get_pixel(posmod(q.x, FOREST_NOISE_SIZE), posmod(q.y, FOREST_NOISE_SIZE))
+	var fw: float = smoothstep(0.3, 0.72, m + (n.r * 2.0 - 1.0) * 0.24)
+	if fw <= 0.01:
+		return Vector3.ZERO
+	var moss: float = smoothstep(0.50, 0.72, n.g) * fw * 0.92
+	var shade: float = clampf(n.b * 0.85 + 0.15, 0.0, 1.0) * fw * 0.78
+	return Vector3(fw, moss, shade)
+
+
+## A tree's micro-zone for the grass (root collar, drip line) without painting its ground (many trees in a wood).
+func add_tree_zone(center: Vector2, trunk_r: float, crown_r: float) -> void:
+	var tz: TreeMicroZone = TreeMicroZone.new()
+	tz.center = center
+	tz.trunk_r = maxf(trunk_r, 4.0)
+	tz.crown_r = maxf(crown_r, 12.0)
+	_add_tree_zone(tz)
+
+
+func _add_tree_zone(tz: TreeMicroZone) -> void:
+	_trees.append(tz)
+	var cell: Vector2i = Vector2i(floori(tz.center.x / TREE_BUCKET_PX), floori(tz.center.y / TREE_BUCKET_PX))
+	var list: PackedInt32Array = _tree_buckets.get(cell, PackedInt32Array()) as PackedInt32Array
+	list.append(_trees.size() - 1)
+	_tree_buckets[cell] = list
+
+
 ## Smoothly widens a road fork or courtyard junction so paths flare naturally where travellers turn.
 func paint_junction_fillet(center: Vector2, radii: Vector2, channel: String = "path", strength: float = 0.90) -> void:
 	if _surface_img == null:
@@ -507,6 +613,15 @@ func add_ancient_courtyard(world_pos: Vector2) -> void:
 	_stamp_stone_ao(fp.center, Vector2(53.5, 38.0))
 
 
+## Invisible stone footprint (no decal): stone footsteps and no grass through a built base, e.g. the Sternenauge plinth.
+func add_stone_footprint(world_pos: Vector2, radii: Vector2) -> void:
+	var fp: StoneFootprint = StoneFootprint.new()
+	fp.center = world_pos.round()
+	fp.radii = radii
+	fp.is_courtyard = true
+	_stones.append(fp)
+
+
 func add_hero_rondell(world_pos: Vector2) -> void:
 	add_ancient_courtyard(world_pos)
 
@@ -571,6 +686,14 @@ func commit() -> void:
 	_surface_mat.set_shader_parameter("map_size", bounds.size)
 	_surface_mat.set_shader_parameter("surface_map", _surface_tex)
 	_surface_mat.set_shader_parameter("detail_map", _detail_tex)
+	if _forest_mask != null:
+		_forest_mask_tex = ImageTexture.create_from_image(_forest_mask)
+		_forest_noise_tex = ImageTexture.create_from_image(_forest_noise)
+		_surface_mat.set_shader_parameter("forest_on", true)
+		_surface_mat.set_shader_parameter("forest_mask", _forest_mask_tex)
+		_surface_mat.set_shader_parameter("forest_noise", _forest_noise_tex)
+		_surface_mat.set_shader_parameter("forest_rect", Vector4(_forest_origin.x, _forest_origin.y, float(_forest_mask.get_width()) * _forest_texel, float(_forest_mask.get_height()) * _forest_texel))
+		_surface_mat.set_shader_parameter("forest_noise_px", FOREST_NOISE_PX * float(FOREST_NOISE_SIZE))
 
 	if _surface_rect != null:
 		_surface_rect.queue_free()
@@ -606,6 +729,10 @@ func surface_at(world_pos: Vector2) -> String:
 	var iy: int = clampi(p.y, 0, _map_h - 1)
 	var sc: Color = _surface_img.get_pixel(ix, iy)
 	var dc: Color = _detail_img.get_pixel(ix, iy)
+	var fc: Vector3 = _forest_cell(world_pos)
+	sc.b = maxf(sc.b, fc.x)
+	dc.r = maxf(dc.r, fc.y)
+	dc.b = maxf(dc.b, fc.z)
 
 	# Standing woodland puddle wins over submerged earth; antique stone slabs sit above earth/paths!
 	if sc.a >= 0.77:
@@ -637,6 +764,10 @@ func grass_habitat_at(world_pos: Vector2) -> Dictionary:
 	var iy: int = clampi(p.y, 0, _map_h - 1)
 	var sc: Color = _surface_img.get_pixel(ix, iy)
 	var dc: Color = _detail_img.get_pixel(ix, iy)
+	var fc: Vector3 = _forest_cell(world_pos)
+	sc.b = maxf(sc.b, fc.x)
+	dc.r = maxf(dc.r, fc.y)
+	dc.b = maxf(dc.b, fc.z)
 
 	# 1. Standing puddle or deep mud -> zero upright grass inside water/mud
 	if sc.a >= 0.58:
@@ -669,19 +800,10 @@ func grass_habitat_at(world_pos: Vector2) -> Dictionary:
 	# - Tight buttress collar (`r < trunk_r * 1.12`): clear tall blades so buttress roots & moss cushions stay crisp
 	# - Inner shaded root humus (`r < crown_r * 0.56`): softer woodland clover, moss & low sedges
 	# - Outer Canopy Drip Line (`r = crown_r * 0.78 .. 1.16`): rainwater runoff nourishes lush tall ferns, clover & sedges!
-	for tz: TreeMicroZone in _trees:
-		var rel_t: Vector2 = (world_pos - tz.center) * Vector2(1.0, 1.38)
-		var dist_t: float = rel_t.length()
-		if dist_t <= tz.trunk_r * 0.68:
-			return {"density": 0.0, "height_scale": 0.55, "style": "none"}
-		if dist_t <= tz.trunk_r * 1.65:
-			return {"density": 0.84, "height_scale": 0.66, "style": "stone_seam"}
-		if tz.crown_r >= 24.0:
-			var cr_ratio: float = dist_t / tz.crown_r
-			if cr_ratio >= 0.78 and cr_ratio <= 1.16:
-				return {"density": 1.0, "height_scale": 1.12, "style": "meadow" if sc.b < 0.25 else "moss_edge"}
-			if cr_ratio < 0.56 and sc.b < 0.38:
-				return {"density": 0.72, "height_scale": 0.88, "style": "moss_edge"}
+	if not _trees.is_empty():
+		var tree_hab: Dictionary = _tree_habitat(world_pos, sc.b)
+		if not tree_hab.is_empty():
+			return tree_hab
 
 	# 5. Woodland floor (Square 3) -> lush ferns, moss cushions & dark sedges clustered naturally on moss banks!
 	if sc.b >= 0.38:
@@ -697,6 +819,231 @@ func grass_habitat_at(world_pos: Vector2) -> Dictionary:
 	return {"density": 1.0, "height_scale": 1.0, "style": "meadow"}
 
 
+## Snapshots immutable byte arrays & builds a 1-byte/bucket tree-presence grid so `LivingGrass` queries
+## run without `Image.get_pixel()`, `Dictionary` allocations, or 3x3 bucket hash lookups on open meadow!
+func prepare_fast_queries() -> void:
+	if _surface_img != null:
+		_surf_bytes = _surface_img.get_data()
+	if _detail_img != null:
+		_det_bytes = _detail_img.get_data()
+	if _forest_mask != null:
+		_fmask_bytes = _forest_mask.get_data()
+		_fmask_w = _forest_mask.get_width()
+		_fmask_h = _forest_mask.get_height()
+		_fmask_stride = maxi(1, _fmask_bytes.size() / maxi(1, _fmask_w * _fmask_h))
+	else:
+		_fmask_bytes = PackedByteArray()
+		_fmask_w = 0
+		_fmask_h = 0
+	if _forest_noise != null:
+		_fnoise_bytes = _forest_noise.get_data()
+	else:
+		_fnoise_bytes = PackedByteArray()
+
+	if _tree_buckets.is_empty():
+		_tree_near = PackedByteArray()
+		_tb_w = 0
+		_tb_h = 0
+		return
+	var inv_tb: float = 1.0 / TREE_BUCKET_PX
+	_tb_ox = floori(bounds.position.x * inv_tb) - 2
+	_tb_oy = floori(bounds.position.y * inv_tb) - 2
+	_tb_w = maxi(1, ceili(bounds.end.x * inv_tb) - _tb_ox + 3)
+	_tb_h = maxi(1, ceili(bounds.end.y * inv_tb) - _tb_oy + 3)
+	_tree_near.resize(_tb_w * _tb_h)
+	_tree_near.fill(0)
+	for cell_v: Variant in _tree_buckets:
+		var c: Vector2i = cell_v as Vector2i
+		var cx: int = c.x - _tb_ox
+		var cy: int = c.y - _tb_oy
+		for dy: int in range(-1, 2):
+			var ny: int = cy + dy
+			if ny < 0 or ny >= _tb_h:
+				continue
+			var nrow: int = ny * _tb_w
+			for dx: int in range(-1, 2):
+				var nx: int = cx + dx
+				if nx >= 0 and nx < _tb_w:
+					_tree_near[nrow + nx] = 1
+
+
+func _forest_cell_fast(world_pos: Vector2) -> Vector3:
+	if _fmask_bytes.is_empty():
+		return _forest_cell(world_pos)
+	var inv_ft: float = 1.0 / _forest_texel
+	var fx_f: float = (world_pos.x - _forest_origin.x) * inv_ft - 0.5
+	var fy_f: float = (world_pos.y - _forest_origin.y) * inv_ft - 0.5
+	var x0: int = floori(fx_f)
+	var y0: int = floori(fy_f)
+	var mw: int = _fmask_w - 1
+	var mh: int = _fmask_h - 1
+	var cx0: int = clampi(x0, 0, mw)
+	var cx1: int = clampi(x0 + 1, 0, mw)
+	var cy0: int = clampi(y0, 0, mh)
+	var cy1: int = clampi(y0 + 1, 0, mh)
+	var s: int = _fmask_stride
+	var b00: int = _fmask_bytes[(cy0 * _fmask_w + cx0) * s]
+	var b10: int = _fmask_bytes[(cy0 * _fmask_w + cx1) * s]
+	var b01: int = _fmask_bytes[(cy1 * _fmask_w + cx0) * s]
+	var b11: int = _fmask_bytes[(cy1 * _fmask_w + cx1) * s]
+	if b00 == 0 and b10 == 0 and b01 == 0 and b11 == 0:
+		return Vector3.ZERO
+	var fx: float = fx_f - float(x0)
+	var fy: float = fy_f - float(y0)
+	var inv255: float = 1.0 / 255.0
+	var m: float = lerpf(lerpf(float(b00), float(b10), fx), lerpf(float(b01), float(b11), fx), fy) * inv255
+	if m < 0.04:
+		return Vector3.ZERO
+	var qx: int = posmod(floori(world_pos.x * (1.0 / FOREST_NOISE_PX)), FOREST_NOISE_SIZE)
+	var qy: int = posmod(floori(world_pos.y * (1.0 / FOREST_NOISE_PX)), FOREST_NOISE_SIZE)
+	var ni: int = (qy * FOREST_NOISE_SIZE + qx) * 3
+	var nr: float = float(_fnoise_bytes[ni]) * inv255
+	var fw: float = smoothstep(0.3, 0.72, m + (nr * 2.0 - 1.0) * 0.24)
+	if fw <= 0.01:
+		return Vector3.ZERO
+	var ng: float = float(_fnoise_bytes[ni + 1]) * inv255
+	var nb: float = float(_fnoise_bytes[ni + 2]) * inv255
+	return Vector3(fw, smoothstep(0.50, 0.72, ng) * fw * 0.92, clampf(nb * 0.85 + 0.15, 0.0, 1.0) * fw * 0.78)
+
+
+## Returns `Vector3(density, height_scale, style_code)` or `Vector3(-1.0, 0.0, 0.0)` when no tree is near.
+func _tree_habitat_vec(world_pos: Vector2, humus: float) -> Vector3:
+	var inv_tb: float = 1.0 / TREE_BUCKET_PX
+	var tx: int = floori(world_pos.x * inv_tb)
+	var ty: int = floori(world_pos.y * inv_tb)
+	if not _tree_near.is_empty():
+		var gx: int = tx - _tb_ox
+		var gy: int = ty - _tb_oy
+		if gx < 0 or gx >= _tb_w or gy < 0 or gy >= _tb_h or _tree_near[gy * _tb_w + gx] == 0:
+			return Vector3(-1.0, 0.0, 0.0)
+	var cell: Vector2i = Vector2i(tx, ty)
+	for oy: int in range(-1, 2):
+		for ox: int in range(-1, 2):
+			var bucket: Variant = _tree_buckets.get(cell + Vector2i(ox, oy))
+			if bucket == null:
+				continue
+			for index: int in (bucket as PackedInt32Array):
+				var tz: TreeMicroZone = _trees[index]
+				var dx: float = world_pos.x - tz.center.x
+				var dy: float = (world_pos.y - tz.center.y) * 1.38
+				var max_r: float = maxf(tz.crown_r * 1.16, tz.trunk_r * 1.65)
+				if absf(dx) > max_r or absf(dy) > max_r:
+					continue
+				var dist_t: float = sqrt(dx * dx + dy * dy)
+				if dist_t > max_r:
+					continue
+				if dist_t <= tz.trunk_r * 0.68:
+					return Vector3(0.0, 0.55, 0.0)
+				if dist_t <= tz.trunk_r * 1.65:
+					return Vector3(0.84, 0.66, 2.0)
+				if tz.crown_r >= 24.0:
+					var cr_ratio: float = dist_t / tz.crown_r
+					if cr_ratio >= 0.78 and cr_ratio <= 1.16:
+						return Vector3(1.0, 1.12, 1.0 if humus < 0.25 else 5.0)
+					if cr_ratio < 0.56 and humus < 0.38:
+						return Vector3(0.72, 0.88, 5.0)
+	return Vector3(-1.0, 0.0, 0.0)
+
+
+## Zero-allocation habitat query for `LivingGrass._build_tufts()` (`Vector3(density, height_scale, style_code)`).
+## Style codes: 0=none, 1=meadow, 2=stone_seam, 3=path_edge, 4=forest, 5=moss_edge.
+func grass_habitat_vec(world_pos: Vector2) -> Vector3:
+	if _surface_img == null or not bounds.has_point(world_pos):
+		return Vector3(1.0, 1.0, 1.0)
+	var inv_c: float = 1.0 / cell_px
+	var ix: int = clampi(floori((world_pos.x - bounds.position.x) * inv_c), 0, _map_w - 1)
+	var iy: int = clampi(floori((world_pos.y - bounds.position.y) * inv_c), 0, _map_h - 1)
+	var sc_r: float
+	var sc_g: float
+	var sc_b: float
+	var sc_a: float
+	var dc_r: float
+	var dc_a: float
+	if not _surf_bytes.is_empty() and not _det_bytes.is_empty():
+		var bi: int = (iy * _map_w + ix) * 4
+		var inv255: float = 1.0 / 255.0
+		sc_r = float(_surf_bytes[bi]) * inv255
+		sc_g = float(_surf_bytes[bi + 1]) * inv255
+		sc_b = float(_surf_bytes[bi + 2]) * inv255
+		sc_a = float(_surf_bytes[bi + 3]) * inv255
+		dc_r = float(_det_bytes[bi]) * inv255
+		dc_a = float(_det_bytes[bi + 3]) * inv255
+	else:
+		var sc: Color = _surface_img.get_pixel(ix, iy)
+		var dc: Color = _detail_img.get_pixel(ix, iy)
+		sc_r = sc.r
+		sc_g = sc.g
+		sc_b = sc.b
+		sc_a = sc.a
+		dc_r = dc.r
+		dc_a = dc.a
+	if _forest_mask != null:
+		var fc: Vector3 = _forest_cell_fast(world_pos)
+		if fc.x > sc_b:
+			sc_b = fc.x
+		if fc.y > dc_r:
+			dc_r = fc.y
+
+	if sc_a >= 0.58:
+		return Vector3(0.0, 0.6, 0.0)
+	if not _stones.is_empty():
+		var stone_clear: int = _stone_grass_zone(world_pos)
+		if stone_clear == 2:
+			return Vector3(0.0, 0.55, 0.0)
+		if stone_clear == 1:
+			return Vector3(0.72, 0.58, 2.0)
+	if sc_g >= 0.46:
+		return Vector3(0.0, 0.62, 0.0)
+	if sc_g >= 0.16:
+		var edge_t: float = 1.0 - smoothstep(0.16, 0.46, sc_g)
+		return Vector3(clampf(edge_t * 0.90, 0.0, 1.0), lerpf(0.60, 0.88, edge_t), 3.0)
+	if dc_a >= 0.5 or sc_r >= 0.62:
+		return Vector3(0.0, 0.55, 0.0)
+	if sc_r >= 0.12:
+		var wear_t: float = smoothstep(0.12, 0.62, sc_r)
+		return Vector3(1.0 - wear_t * 0.85, lerpf(0.95, 0.5, wear_t), 3.0)
+	if not _trees.is_empty():
+		var tv: Vector3 = _tree_habitat_vec(world_pos, sc_b)
+		if tv.x >= 0.0:
+			return tv
+	if sc_b >= 0.38:
+		var wet_cut: float = 1.0 - smoothstep(0.28, 0.56, sc_a)
+		if dc_r >= 0.36:
+			return Vector3(clampf((0.46 + dc_r * 0.36) * wet_cut, 0.0, 0.80), 0.90, 5.0)
+		return Vector3(clampf(0.18 * wet_cut, 0.0, 0.30), 0.82, 4.0)
+	if sc_a >= 0.24:
+		return Vector3(0.35, 0.80, 5.0)
+	return Vector3(1.0, 1.0, 1.0)
+
+
+## Grass at a tree's root collar or drip line (`grass_habitat_at` step 4), {} when no tree is near. Walks the 3x3
+## buckets round the point in a fixed order (the same on every peer), no list is built per query.
+func _tree_habitat(world_pos: Vector2, humus: float) -> Dictionary:
+	var cell: Vector2i = Vector2i(floori(world_pos.x / TREE_BUCKET_PX), floori(world_pos.y / TREE_BUCKET_PX))
+	for oy: int in range(-1, 2):
+		for ox: int in range(-1, 2):
+			var bucket: Variant = _tree_buckets.get(cell + Vector2i(ox, oy))
+			if bucket == null:
+				continue
+			for index: int in (bucket as PackedInt32Array):
+				var tz: TreeMicroZone = _trees[index]
+				var rel_t: Vector2 = (world_pos - tz.center) * Vector2(1.0, 1.38)
+				var dist_t: float = rel_t.length()
+				if dist_t > tz.crown_r * 1.16 and dist_t > tz.trunk_r * 1.65:
+					continue
+				if dist_t <= tz.trunk_r * 0.68:
+					return {"density": 0.0, "height_scale": 0.55, "style": "none"}
+				if dist_t <= tz.trunk_r * 1.65:
+					return {"density": 0.84, "height_scale": 0.66, "style": "stone_seam"}
+				if tz.crown_r >= 24.0:
+					var cr_ratio: float = dist_t / tz.crown_r
+					if cr_ratio >= 0.78 and cr_ratio <= 1.16:
+						return {"density": 1.0, "height_scale": 1.12, "style": "meadow" if humus < 0.25 else "moss_edge"}
+					if cr_ratio < 0.56 and humus < 0.38:
+						return {"density": 0.72, "height_scale": 0.88, "style": "moss_edge"}
+	return {}
+
+
 ## Paints a botanical root-humus collar, north-bias cushion moss & moist canopy drip-line ring for `LivingTree 2.0`.
 func paint_tree_root_zone(center: Vector2, trunk_r: float, crown_r: float, seed_val: int = 401) -> void:
 	if _surface_img == null or _detail_img == null:
@@ -705,7 +1052,7 @@ func paint_tree_root_zone(center: Vector2, trunk_r: float, crown_r: float, seed_
 	tz.center = center
 	tz.trunk_r = maxf(trunk_r, 4.0)
 	tz.crown_r = maxf(crown_r, 12.0)
-	_trees.append(tz)
+	_add_tree_zone(tz)
 
 	var noise: FastNoiseLite = FastNoiseLite.new()
 	noise.seed = seed_val

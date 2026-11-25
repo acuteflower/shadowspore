@@ -1,0 +1,55 @@
+{
+	"_doc": "HUD director (docs/hud_v2_konzept.md 4.2). Screen px of the 640 x 360 picture. box = [x, y, w, h] where the part draws at most (layout test), slot = where it lives, order = place inside a stacking slot, hide = contexts that take it away, dim = context -> alpha factor, attach = group whose members may touch each other, fold = how it follows the folded hotbar (self, in, out, crystal, drop), stack = lifted by the parts below it in its slot, unlock = quest flag that must be set in a story world (group story_world) before it shows.",
+	"layers": {
+		"hud": 1,
+		"mine_banner": 20,
+		"town_banner": 21,
+		"notices": 22,
+		"death": 60,
+		"chat": 80
+	},
+	"idle": {"seconds": 10.0},
+	"contexts": {
+		"idle": {"fade_out": 1.4, "fade_in": 0.25},
+		"vista": {"fade_out": 0.85, "fade_in": 0.35},
+		"boss": {"fade_out": 0.35, "fade_in": 0.55},
+		"menu": {"fade_out": 0.125, "fade_in": 0.125},
+		"dialogue": {"fade_out": 0.3, "fade_in": 0.4},
+		"cutscene": {"fade_out": 0.3, "fade_in": 0.4},
+		"combat": {"fade_out": 0.5, "fade_in": 0.8},
+		"build": {"fade_out": 0.3, "fade_in": 0.3},
+		"fish": {"fade_out": 0.4, "fade_in": 0.4},
+		"swim": {"fade_out": 0.4, "fade_in": 0.4},
+		"notice": {"fade_out": 0.25, "fade_in": 0.5},
+		"town": {"fade_out": 0.8, "fade_in": 0.8}
+	},
+	"slots": {
+		"top_left": {"stack": false},
+		"top_center": {"stack": false},
+		"top_right": {"stack": false},
+		"right_rail": {"stack": false},
+		"left_rail": {"stack": false},
+		"bottom_center": {"stack": false, "folds": true},
+		"above_bar": {"stack": true, "floor": 310.0, "gap": 2.0},
+		"bottom_left": {"stack": false}
+	},
+	"parts": {
+		"ClockVine": {"slot": "top_left", "box": [0, 8, 200, 74], "hide": ["idle", "vista", "boss"], "unlock": "hud_unlocked"},
+		"PurseVine": {"slot": "top_right", "box": [488, 8, 152, 68], "hide": ["idle", "vista", "boss"], "unlock": "hud_unlocked"},
+		"WayVine": {"slot": "top_center", "box": [232, 2, 176, 24], "hide": ["idle", "vista", "boss", "menu", "dialogue", "cutscene", "combat", "build", "notice"], "dim": {"town": 0.45}},
+		"QuestVine": {"slot": "right_rail", "order": 0, "box": [466, 80, 174, 172], "hide": ["idle", "vista", "boss", "menu"]},
+		"NoticeLeaf": {"slot": "right_rail", "order": 1, "box": [484, 256, 152, 42], "hide": ["menu", "vista"]},
+		"HintCard": {"slot": "left_rail", "order": 0, "box": [0, 96, 176, 92], "hide": ["idle", "vista", "boss", "menu"]},
+		"CompanionVine": {"slot": "left_rail", "order": 1, "box": [0, 194, 134, 66], "hide": ["idle", "vista", "menu"]},
+		"Hotbar": {"slot": "bottom_center", "box": [208, 312, 224, 44], "hide": ["idle", "vista"], "fold": "self", "attach": "bar", "unlock": "hud_unlocked"},
+		"HealthBar": {"slot": "bottom_center", "box": [122, 312, 86, 44], "hide": ["idle", "vista"], "fold": "in", "attach": "bar", "unlock": "hud_unlocked"},
+		"StaminaBar": {"slot": "bottom_center", "box": [432, 312, 76, 44], "hide": ["idle", "vista"], "fold": "out", "attach": "bar", "unlock": "hud_unlocked"},
+		"BlinkIcon": {"slot": "bottom_center", "box": [406, 312, 28, 44], "hide": ["idle", "vista"], "fold": "crystal", "attach": "bar", "unlock": "hud_unlocked"},
+		"StatusTags": {"slot": "above_bar", "order": 0, "box": [122, 288, 320, 20], "hide": ["idle", "vista"], "fold": "drop", "stack": true},
+		"FishingHud": {"slot": "above_bar", "order": 1, "box": [190, 282, 260, 18], "hide": ["idle", "vista", "boss"], "stack": true},
+		"NoticeLine": {"slot": "above_bar", "order": 2, "box": [200, 290, 240, 10], "hide": ["vista", "menu"], "stack": true},
+		"SpeechBox": {"slot": "above_bar", "order": 3, "box": [186, 236, 268, 60], "stack": true},
+		"MultiplayerHud": {"slot": "bottom_left", "box": [6, 300, 112, 54], "hide": ["idle", "vista", "boss", "menu"]},
+		"BossBar": {"slot": "top_center", "box": [130, 0, 380, 52]}
+	}
+}

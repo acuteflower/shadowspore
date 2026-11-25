@@ -10,7 +10,7 @@ const BODY: Vector2 = Vector2(2, -2) ## where he sits in the picture (feet at th
 const CLINK: AudioStream = preload("res://assets/audio/intro/lid_scrape.wav")
 const DISSOLVE_SECONDS: float = 4.2
 
-var story: ArenaStory
+var story: Node
 var inspectable: bool = false
 var shown: bool = false
 

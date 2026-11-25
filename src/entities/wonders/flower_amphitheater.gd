@@ -23,7 +23,7 @@ const WISP_PALETTE: Array[Color] = [
 	Color("9ff8ee"),
 ]
 
-var wonders: MeadowWonders
+var wonders: Node
 var wonder_id: String = "wonder_flower_amphitheater"
 var chest_tier: String = "rare"
 var awakened: bool = false
@@ -41,7 +41,7 @@ var _far_wait: float = 0.0
 var _glow_t: float = 0.0
 
 
-func setup(owner_wonders: MeadowWonders, spec: Dictionary) -> void:
+func setup(owner_wonders: Node, spec: Dictionary) -> void:
 	wonders = owner_wonders
 	wonder_id = String(spec.get("id", "wonder_flower_amphitheater"))
 	chest_tier = String(spec.get("chest_tier", "rare"))

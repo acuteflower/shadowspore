@@ -3,12 +3,25 @@ extends Node
 ## PC for now; touch (virtual twin-stick) plugs in here later.
 
 ## Set by open full-screen UI (inventory) so clicks and keys don't reach the game world.
-var ui_blocking: bool = false
+var chat_open: bool = false
+var chat_closed_frame: int = -10
+var ui_blocking: bool = false:
+	get:
+		return ui_blocking or chat_open
+
+
+func mark_chat_closed() -> void:
+	chat_closed_frame = Engine.get_process_frames()
+
+
+func chat_closed_recently() -> bool:
+	return Engine.get_process_frames() - chat_closed_frame <= 1
 var inventory_open: bool = false ## the inventory window is open: its slots take clicks and number keys
 var item_keys_claimed: bool = false ## the inventory uses the number keys this frame (an item under the mouse or on the cursor): the hotbar must not select
 
 ## True while the Escape menu is open (the inventory stays shut then).
 var menu_open: bool = false
+var unified_menu: bool = false ## true when GameMenu ('Der Feldcodex') owns global menu hotkeys & pause
 var mod_menu_open: bool = false ## the item drop menu holds the hero's movement and aim
 
 ## True while the free camera (L) flies: she stands still and nothing in the world reacts to the keys.
@@ -27,6 +40,9 @@ var skills_open: bool = false
 ## Full-screen progress window (levels and their rewards, P); kept true through its closing animation.
 var progress_open: bool = false
 
+## Full-screen Steinsetzer-Prüfungstafel / dungeon result window (G or at gate).
+var dungeons_open: bool = false
+
 ## True while the mouse was the last aiming device used; false once a gamepad takes over.
 var using_mouse: bool = true
 
@@ -41,19 +57,23 @@ func _input(event: InputEvent) -> void:
 
 
 func move_vector() -> Vector2:
-	return Vector2.ZERO if map_open or journal_open or skills_open or progress_open or freecam_open or mod_menu_open else map_pan_vector()
+	return Vector2.ZERO if chat_open or map_open or journal_open or skills_open or progress_open or dungeons_open or freecam_open or mod_menu_open else map_pan_vector()
 
 
 func skills_pressed() -> bool:
-	return Input.is_action_just_pressed("skills")
+	return not chat_open and Input.is_action_just_pressed("skills")
 
 
 func progress_pressed() -> bool:
-	return Input.is_action_just_pressed("progress")
+	return not chat_open and Input.is_action_just_pressed("progress")
+
+
+func dungeons_pressed() -> bool:
+	return not chat_open and Input.is_action_just_pressed("dungeons")
 
 
 func skills_center_pressed() -> bool:
-	return Input.is_action_just_pressed("skills_center")
+	return not chat_open and Input.is_action_just_pressed("skills_center")
 
 
 ## The move keys / left stick as they are, for menus that pan (the map).
@@ -67,7 +87,7 @@ func freecam_pressed() -> bool:
 
 
 func map_pressed() -> bool:
-	return Input.is_action_just_pressed("map")
+	return not chat_open and Input.is_action_just_pressed("map")
 
 
 ## Zoom keys: +1 in, -1 out, 0 none.
@@ -76,15 +96,15 @@ func map_zoom_step() -> int:
 
 
 func map_center_pressed() -> bool:
-	return Input.is_action_just_pressed("map_center")
+	return not chat_open and Input.is_action_just_pressed("map_center")
 
 
 func sprint_pressed() -> bool:
-	return not (skills_open or progress_open) and Input.is_action_just_pressed("sprint")
+	return not chat_open and not (skills_open or progress_open or dungeons_open) and Input.is_action_just_pressed("sprint")
 
 
 func sprint_held() -> bool:
-	return not (skills_open or progress_open) and Input.is_action_pressed("sprint")
+	return not chat_open and not (skills_open or progress_open or dungeons_open) and Input.is_action_pressed("sprint")
 
 
 func attack_pressed() -> bool:
@@ -106,7 +126,7 @@ func secondary_held() -> bool:
 
 ## The raw button, also while a menu owns the input (the charge of a heavy blow is dropped then, not released).
 func secondary_down() -> bool:
-	return Input.is_action_pressed("action_secondary")
+	return not chat_open and Input.is_action_pressed("action_secondary")
 
 
 ## Dev key: spawn an enemy at the cursor.
@@ -130,12 +150,12 @@ func debug_fisher_pressed() -> bool:
 
 ## Dev key F4 (host): the clock jumps one hour.
 func debug_time_pressed() -> bool:
-	return CloudSession.is_admin() and Input.is_action_just_pressed("debug_time")
+	return not chat_open and CloudSession.is_admin() and Input.is_action_just_pressed("debug_time")
 
 
 ## The map's travel mode: E held (the hold on a waystone's marker) and A / D or the arrow keys to step through the destinations.
 func interact_held() -> bool:
-	return Input.is_action_pressed("interact")
+	return not chat_open and Input.is_action_pressed("interact")
 
 
 func map_select_step() -> int:
@@ -148,7 +168,7 @@ func interact_pressed() -> bool:
 
 
 func inventory_pressed() -> bool:
-	return Input.is_action_just_pressed("inventory")
+	return not chat_open and Input.is_action_just_pressed("inventory")
 
 
 const HOTBAR_ACTIONS: Array[StringName] = [
@@ -159,7 +179,7 @@ const HOTBAR_ACTIONS: Array[StringName] = [
 
 ## Number key 1-8 pressed this frame -> 0-7, else -1.
 func hotbar_pick() -> int:
-	if (skills_open or progress_open) or build_open or freecam_open or item_keys_claimed or mod_menu_open:
+	if chat_open or (skills_open or progress_open or dungeons_open) or build_open or freecam_open or item_keys_claimed or mod_menu_open:
 		return -1
 	for i: int in 8:
 		if Input.is_action_just_pressed(HOTBAR_ACTIONS[i]):
@@ -179,16 +199,16 @@ func hotbar_step() -> int:
 
 
 func sneak_held() -> bool:
-	return not (skills_open or progress_open) and not freecam_open and Input.is_action_pressed("sneak")
+	return not chat_open and not (skills_open or progress_open or dungeons_open) and not freecam_open and Input.is_action_pressed("sneak")
 
 
 func blink_pressed() -> bool:
-	return not (skills_open or progress_open) and not freecam_open and not mod_menu_open and Input.is_action_just_pressed("blink")
+	return not chat_open and not (skills_open or progress_open or dungeons_open) and not freecam_open and not mod_menu_open and Input.is_action_just_pressed("blink")
 
 
 ## Alt (gamepad B): the shadow step, a short evasive step through the void.
 func shadow_step_pressed() -> bool:
-	return not (skills_open or progress_open) and not freecam_open and not ui_blocking and not build_open and Input.is_action_just_pressed("shadow_step")
+	return not chat_open and not (skills_open or progress_open or dungeons_open) and not freecam_open and not ui_blocking and not build_open and Input.is_action_just_pressed("shadow_step")
 
 
 func aim_world_position() -> Vector2:
@@ -242,4 +262,4 @@ func fish_pose_pressed() -> bool:
 
 
 func fish_book_pressed() -> bool:
-	return Input.is_action_just_pressed("fish_book")
+	return not chat_open and Input.is_action_just_pressed("fish_book")

@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/entities/enemies/dungeon_boss/vorgath_boss.gd" id="1"]
+
+[node name="VorgathBoss" type="CharacterBody2D"]
+script = ExtResource("1")
